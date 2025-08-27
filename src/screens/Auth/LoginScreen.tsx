@@ -1,12 +1,16 @@
+/* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { RootState } from '../../store';
 import { setRole } from '../../store/slices/userSlice';
 import { signInThunk } from '../../store/thunks/authThunks';
-
+import ThemedTextInput from '../../components/ThemedTextInput';
+import BrandButton from '../../components/BrandButton';
 
 export default function LoginScreen({ navigation }: any) {
+  const { theme } = useAppTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setLocalRole] = useState<'driver' | 'passenger'>('passenger');
@@ -19,48 +23,68 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.c}>
-      <Text style={styles.h}>Welcome back</Text>
-      <TextInput
-        style={styles.i}
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        padding: 16,
+        gap: 12,
+        justifyContent: 'center',
+      }}
+    >
+      <Text
+        style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}
+      >
+        Welcome back
+      </Text>
+
+      <ThemedTextInput
         placeholder="Email"
         autoCapitalize="none"
+        keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
-        style={styles.i}
+      <ThemedTextInput
         placeholder="Password"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
-      <View style={{ flexDirection: 'row', gap: 12, marginVertical: 8 }}>
-        <Button
+
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <BrandButton
           title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'}
+          variant="secondary"
           onPress={() => setLocalRole('passenger')}
+          style={{ flex: 1 }}
         />
-        <Button
+        <BrandButton
           title={role === 'driver' ? 'Driver ✓' : 'Driver'}
+          variant="success"
           onPress={() => setLocalRole('driver')}
+          style={{ flex: 1 }}
         />
       </View>
-      <Button
+
+      <BrandButton
         title={status === 'loading' ? 'Signing in…' : 'Sign in'}
         onPress={onLogin}
+        variant="primary"
       />
-      {!!error && <Text style={{ color: 'red', marginTop: 8 }}>{error}</Text>}
-      <View style={{ height: 12 }} />
-      <Button
+
+      {!!error && (
+        <Text style={{ color: theme.colors.warning, marginTop: 6 }}>
+          {error}
+        </Text>
+      )}
+
+      <BrandButton
         title="Create account"
         onPress={() => navigation.navigate('Signup')}
+        variant="secondary"
+        style={{ marginTop: 8 }}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  c: { flex: 1, padding: 16, gap: 12, justifyContent: 'center' },
-  h: { fontSize: 22, fontWeight: '600', marginBottom: 8 },
-  i: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 },
-});

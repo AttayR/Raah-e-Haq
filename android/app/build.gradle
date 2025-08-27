@@ -1,3 +1,7 @@
+project.ext.react = [
+        nodeExecutableAndArgs: ["/usr/local/bin/node"]
+]
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -117,3 +121,4 @@ dependencies {
         implementation jscFlavor
     }
 }
+
