@@ -1,36 +1,88 @@
+/* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { useDispatch } from 'react-redux';
+
+import { useAppTheme } from '../../app/providers/ThemeProvider';
+
+import ThemedTextInput from '../../components/ThemedTextInput';
+import BrandButton from '../../components/BrandButton';
 import { signUpThunk } from '../../store/thunks/authThunks';
 
-
 export default function SignupScreen() {
-const [email, setEmail] = useState('');
-const [password, setPassword] = useState('');
-const [role, setRole] = useState<'driver'|'passenger'>('passenger');
-const dispatch = useDispatch<any>();
+  const { theme } = useAppTheme();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<'driver' | 'passenger'>('passenger');
+  const dispatch = useDispatch<any>();
 
+  const onSignup = () =>
+    dispatch(signUpThunk(email.trim(), password.trim(), role));
 
-const onSignup = () => dispatch(signUpThunk(email.trim(), password.trim(), role));
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        padding: 16,
+        gap: 12,
+        justifyContent: 'center',
+      }}
+    >
+      <Text
+        style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}
+      >
+        Create your account
+      </Text>
+      <ThemedTextInput
+        placeholder="Name"
+        autoCapitalize="none"
+        value={name}
+        onChangeText={setName}
+      />
+      <ThemedTextInput
+        placeholder="Email"
+        autoCapitalize="none"
+        keyboardType="email-address"
+        value={email}
+        onChangeText={setEmail}
+      />
+      <ThemedTextInput
+        placeholder="Password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+      <ThemedTextInput
+        placeholder="Confirm Password"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+      />
 
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <BrandButton
+          title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'}
+          variant="secondary"
+          onPress={() => setRole('passenger')}
+          style={{ flex: 1 }}
+        />
+        <BrandButton
+          title={role === 'driver' ? 'Driver ✓' : 'Driver'}
+          variant="success"
+          onPress={() => setRole('driver')}
+          style={{ flex: 1 }}
+        />
+      </View>
 
-return (
-<View style={styles.c}>
-<Text style={styles.h}>Create your account</Text>
-<TextInput style={styles.i} placeholder="Email" autoCapitalize='none' value={email} onChangeText={setEmail} />
-<TextInput style={styles.i} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
-<View style={{ flexDirection: 'row', gap: 12, marginVertical: 8 }}>
-<Button title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'} onPress={() => setRole('passenger')} />
-<Button title={role === 'driver' ? 'Driver ✓' : 'Driver'} onPress={() => setRole('driver')} />
-</View>
-<Button title="Sign up" onPress={onSignup} />
-</View>
-);
+      <BrandButton title="Sign up" onPress={onSignup} variant="primary" />
+      <BrandButton
+        title="Continue with Google"
+        onPress={onSignup}
+        variant="secondary"
+      />
+    </View>
+  );
 }
-
-
-const styles = StyleSheet.create({
-c: { flex: 1, padding: 16, gap: 12, justifyContent: 'center' },
-h: { fontSize: 22, fontWeight: '600', marginBottom: 8 },
-i: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 },
-});
