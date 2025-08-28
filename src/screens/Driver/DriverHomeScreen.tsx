@@ -6,8 +6,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import BrandButton from '../../components/BrandButton';
 import { signOutThunk } from '../../store/thunks/authThunks';
 
-
-export default function DriverHomeScreen() {
+const DriverHomeScreen = () => {
   const { theme } = useAppTheme();
   const dispatch = useDispatch<any>();
   return (
@@ -19,4 +18,6 @@ export default function DriverHomeScreen() {
       <BrandButton title="Sign out" variant="warning" onPress={() => dispatch(signOutThunk())} />
     </View>
   );
-}
+};
+
+export default DriverHomeScreen;
