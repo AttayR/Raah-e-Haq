@@ -1,20 +1,19 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import PassengerHomeScreen from '../../../screens/Passenger/PassengerHomeScreen';
+import PassengerBottomTabs from 'src/app/navigation/tabs/PassengerBottomTabs';
 
 export type PassengerStackParamList = {
-  PassengerHome: undefined;
+  PassengerTabs: undefined;
 };
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
-export default function PassengerStack() {
+
+const PassengerStack = () => {
   return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="PassengerHome"
-        component={PassengerHomeScreen}
-        options={{ title: 'Passenger' }}
-      />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
     </Stack.Navigator>
   );
-}
+};
+
+export default PassengerStack;
