@@ -20,9 +20,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function RootNavigator() {
 const { status } = useSelector((s: RootState) => s.auth);
 const { role } = useSelector((s: RootState) => s.user);
-
-
-// Unauthenticated → Auth flow
+// Original auth check (commented out for development)
+// const role = 'driver'
 if (status !== 'authenticated') {
 return (
 <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -31,8 +30,6 @@ return (
 );
 }
 
-
-// Authenticated → route by role
 return (
 <Stack.Navigator screenOptions={{ headerShown: false }}>
 {role === 'driver' && <Stack.Screen name="Driver" component={DriverStack} />}
