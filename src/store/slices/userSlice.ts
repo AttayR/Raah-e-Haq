@@ -3,7 +3,7 @@ export type Role = 'driver' | 'passenger' | 'admin' | null;
 
 
 type UserState = { role: Role; displayName?: string | null };
-const initialState: UserState = { role: null, displayName: null };
+const initialState: UserState = { role: 'driver', displayName: null };
 
 
 const userSlice = createSlice({

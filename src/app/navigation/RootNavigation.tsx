@@ -21,24 +21,25 @@ export default function RootNavigator() {
 const { status } = useSelector((s: RootState) => s.auth);
 const { role } = useSelector((s: RootState) => s.user);
 
+// TEMPORARY FOR DEVELOPMENT: Set default role to driver and skip auth
+// TODO: Re-enable authentication when ready
+const developmentRole = role || 'driver';
 
-// Unauthenticated → Auth flow
-if (status !== 'authenticated') {
+// Original auth check (commented out for development)
+// if (status !== 'authenticated') {
+// return (
+// <Stack.Navigator screenOptions={{ headerShown: false }}>
+// <Stack.Screen name="Auth" component={AuthStack} />
+// </Stack.Navigator>
+// );
+// }
+
 return (
 <Stack.Navigator screenOptions={{ headerShown: false }}>
-<Stack.Screen name="Auth" component={AuthStack} />
-</Stack.Navigator>
-);
-}
-
-
-// Authenticated → route by role
-return (
-<Stack.Navigator screenOptions={{ headerShown: false }}>
-{role === 'driver' && <Stack.Screen name="Driver" component={DriverStack} />}
-{role === 'passenger' && <Stack.Screen name="Passenger" component={PassengerStack} />}
+{developmentRole === 'driver' && <Stack.Screen name="Driver" component={DriverStack} />}
+{developmentRole === 'passenger' && <Stack.Screen name="Passenger" component={PassengerStack} />}
 {/* Fallback: if role missing, show Auth to choose role or a RolePicker screen */}
-{!role && <Stack.Screen name="Auth" component={AuthStack} />}
+{!developmentRole && <Stack.Screen name="Auth" component={AuthStack} />}
 </Stack.Navigator>
 );
 }

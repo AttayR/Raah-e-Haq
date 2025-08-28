@@ -1,18 +1,22 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import DriverHomeScreen from '../../../screens/Driver/DriverHomeScreen';
-
+import DriverBottomTabs from '../tabs/DriverBottomTabs';
 
 export type DriverStackParamList = {
-DriverHome: undefined;
+  DriverTabs: undefined;
 };
 
-
 const Stack = createNativeStackNavigator<DriverStackParamList>();
-export default function DriverStack() {
-return (
-<Stack.Navigator>
-<Stack.Screen name="DriverHome" component={DriverHomeScreen} options={{ title: 'Driver' }} />
-</Stack.Navigator>
-);
-}
+
+const DriverStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
+    </Stack.Navigator>
+  );
+
+
+  
+};
+
+export default DriverStack;
