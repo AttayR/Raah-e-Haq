@@ -2,7 +2,6 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppTheme } from '../../providers/ThemeProvider';
-
 import DriverHomeScreen from '../../../screens/Driver/DriverHomeScreen';
 import DriverMapScreen from '../../../screens/Driver/DriverMapScreen';
 import DriverNotificationsScreen from '../../../screens/Driver/DriverNotificationsScreen';
