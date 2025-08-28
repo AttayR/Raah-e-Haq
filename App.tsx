@@ -1,45 +1,60 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import React from 'react';
 import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+  NavigationContainer,
+  DefaultTheme as NavLight,
+  DarkTheme as NavDark,
+} from '@react-navigation/native';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+import { StatusBar } from 'react-native';
+import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
+import RootNavigator from './src/app/navigation/RootNavigation';
+import ReduxProvider from './src/app/providers/ReduxProvider';
 
+function ThemedNav() {
+  const { theme } = useAppTheme();
+  const navTheme =
+    theme.mode === 'dark'
+      ? {
+          ...NavDark,
+          colors: {
+            ...NavDark.colors,
+            primary: theme.colors.primary,
+            background: theme.colors.background,
+            card: theme.colors.surface,
+            text: theme.colors.text,
+            border: theme.colors.border,
+          },
+        }
+      : {
+          ...NavLight,
+          colors: {
+            ...NavLight.colors,
+            primary: theme.colors.primary,
+            background: theme.colors.background,
+            card: theme.colors.surface,
+            text: theme.colors.text,
+            border: theme.colors.border,
+          },
+        };
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
+    <>
+      <StatusBar
+        barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.colors.background}
       />
-    </View>
+      <NavigationContainer theme={navTheme}>
+        <RootNavigator />
+      </NavigationContainer>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
+export default function App() {
+  return (
+    <ReduxProvider>
+      <ThemeProvider>
+        <ThemedNav />
+      </ThemeProvider>
+    </ReduxProvider>
+  );
+}
