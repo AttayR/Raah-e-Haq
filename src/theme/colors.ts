@@ -1,10 +1,10 @@
 export const BrandColors = {
-  primary: '#0A1D5C',    // Royal blue
-  secondary: '#E88C30',  // Premium golden-orange
+  primary: '#011c72ff',    // Royal blue
+  secondary: '#FA1B05',  // Premium golden-orange
   gold: '#D4AF37',       // Metallic gold accent
   platinum: '#C0C0C0',   // Soft silver/platinum
-  success: '#2E7D32',    // Emerald green
-  warning: '#B71C1C',    // Deep crimson red
+  success: '#058a0bee',    // Emerald green
+  warning: '#ce0a0aff',    // Deep crimson red
   light: {
     background: '#FAFAFA',
     surface: '#FFFFFF',
