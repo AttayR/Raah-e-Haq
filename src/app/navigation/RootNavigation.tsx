@@ -21,6 +21,7 @@ export default function RootNavigator() {
 const { status } = useSelector((s: RootState) => s.auth);
 const { role } = useSelector((s: RootState) => s.user);
 // Original auth check (commented out for development)
+// const role = 'driver'
 if (status !== 'authenticated') {
 return (
 <Stack.Navigator screenOptions={{ headerShown: false }}>
