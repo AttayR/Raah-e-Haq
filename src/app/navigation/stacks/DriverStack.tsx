@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import DriverBottomTabs from '../tabs/DriverBottomTabs';
+import DriverBottomTabs from 'src/app/navigation/tabs/DriverBottomTabs';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;

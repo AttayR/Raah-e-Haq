@@ -2,11 +2,11 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppTheme } from '../../providers/ThemeProvider';
-import DriverHomeScreen from '../../../screens/Driver/DriverHomeScreen';
-import DriverMapScreen from '../../../screens/Driver/DriverMapScreen';
-import DriverNotificationsScreen from '../../../screens/Driver/DriverNotificationsScreen';
-import DriverChatScreen from '../../../screens/Driver/DriverChatScreen';
-import DriverSettingsScreen from '../../../screens/Driver/DriverSettingsScreen';
+import DriverHomeScreen from 'src/screens/Driver/DriverHomeScreen';
+import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
+import DriverNotificationsScreen from 'src/screens/Driver/DriverNotificationsScreen';
+import DriverChatScreen from 'src/screens/Driver/DriverChatScreen'
+import DriverSettingsScreen from 'src/screens/Driver/DriverSettingsScreen';
 
 export type DriverTabParamList = {
   Home: undefined;
