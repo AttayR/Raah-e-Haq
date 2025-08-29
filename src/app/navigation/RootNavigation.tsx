@@ -25,7 +25,8 @@ const { role } = useSelector((s: RootState) => s.user);
 if (status !== 'authenticated') {
 return (
 <Stack.Navigator screenOptions={{ headerShown: false }}>
-<Stack.Screen name="Auth" component={AuthStack} />
+<Stack.Screen name="Driver" component={DriverStack} />
+{/* <Stack.Screen name="Auth" component={AuthStack} /> */}
 </Stack.Navigator>
 );
 }
@@ -36,6 +37,7 @@ return (
 {role === 'passenger' && <Stack.Screen name="Passenger" component={PassengerStack} />}
 {/* Fallback: if role missing, show Auth to choose role or a RolePicker screen */}
 {!role && <Stack.Screen name="Auth" component={AuthStack} />}
+
 </Stack.Navigator>
 );
 }
