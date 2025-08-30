@@ -7,8 +7,11 @@ export interface UserProfile {
   uid: string;
   phoneNumber: string;
   role: 'driver' | 'passenger' | 'admin';
+  fullName?: string;
   displayName?: string;
   email?: string;
+  cnic?: string;
+  address?: string;
   createdAt: any;
   updatedAt: any;
   isVerified: boolean;
@@ -66,17 +69,27 @@ export const createUserProfile = async (
   email?: string
 ): Promise<UserProfile> => {
   try {
+    console.log('createUserProfile - Input values:', { uid, phoneNumber, role, displayName, email });
+    
     const userProfile: UserProfile = {
       uid,
       phoneNumber,
       role,
-      displayName,
-      email,
       createdAt: firestore.FieldValue.serverTimestamp(),
       updatedAt: firestore.FieldValue.serverTimestamp(),
       isVerified: true,
       isActive: true
     };
+
+    // Only add optional fields if they have values
+    if (displayName) {
+      userProfile.displayName = displayName;
+    }
+    if (email) {
+      userProfile.email = email;
+    }
+
+    console.log('createUserProfile - Final userProfile:', userProfile);
 
     await firestore().collection('users').doc(uid).set(userProfile);
     return userProfile;
@@ -133,13 +146,13 @@ export const updateUserProfile = async (
 };
 
 // Session Management
-export const createAuthSession = async (user: FirebaseAuthTypes.User, profile: UserProfile): Promise<AuthSession> => {
+export const createAuthSession = async (user: FirebaseAuthTypes.User, profile: UserProfile | { uid: string; phoneNumber: string; role?: 'driver' | 'passenger'; isVerified: boolean; isActive: boolean }): Promise<AuthSession> => {
   try {
     const token = await user.getIdToken();
     const session: AuthSession = {
       uid: user.uid,
       phoneNumber: profile.phoneNumber,
-      role: profile.role,
+      role: profile.role || undefined,
       token,
       expiresAt: Date.now() + SESSION_DURATION
     };

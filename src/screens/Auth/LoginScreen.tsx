@@ -1,37 +1,20 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { RootState } from '../../store';
-import { setUserRole } from '../../store/slices/authSlice';
-import { sendVerificationCodeThunk } from '../../store/thunks/authThunks';
-import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
 import { useNavigation } from '@react-navigation/native';
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen() {
   const { theme } = useAppTheme();
-  const nav = useNavigation();
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [role, setLocalRole] = useState<'driver' | 'passenger'>('passenger');
-  const dispatch = useDispatch<any>();
-  const { status, error } = useSelector((s: RootState) => s.auth);
+  const navigation = useNavigation<any>();
 
-  const onSendCode = async () => {
-    if (!phoneNumber.trim()) {
-      Alert.alert('Error', 'Please enter a phone number');
-      return;
-    }
+  const handlePhoneSignIn = () => {
+    navigation.navigate('PhoneAuth');
+  };
 
-    try {
-      dispatch(setUserRole(role));
-      await dispatch(sendVerificationCodeThunk(phoneNumber.trim()));
-      // Navigate to verification screen
-      nav.navigate('PhoneAuth' as never);
-    } catch (error: any) {
-      // Error is handled in the thunk
-    }
+  const handleCreateAccount = () => {
+    navigation.navigate('Signup');
   };
 
   return (
@@ -41,69 +24,26 @@ export default function LoginScreen({ navigation }: any) {
         { backgroundColor: theme.colors.background }
       ]}
     >
-      <Text
-        style={[styles.title, { color: theme.colors.text }]}
-      >
-        Welcome back
+      <Text style={[styles.title, { color: theme.colors.text }]}>
+        Welcome to RaaHeHaq
       </Text>
 
       <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>
-        Sign in with your phone number
+        Sign in to your account or create a new one
       </Text>
 
-      <ThemedTextInput
-        placeholder="Phone number (e.g., +1234567890)"
-        keyboardType="phone-pad"
-        value={phoneNumber}
-        onChangeText={setPhoneNumber}
-        autoFocus
-      />
-
-      <View style={styles.roleContainer}>
-        <Text style={[styles.roleLabel, { color: theme.colors.text }]}>
-          I am a:
-        </Text>
-        <View style={styles.roleButtons}>
-          <BrandButton
-            title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'}
-            variant="secondary"
-            onPress={() => setLocalRole('passenger')}
-            style={styles.roleButton}
-          />
-          <BrandButton
-            title={role === 'driver' ? 'Driver ✓' : 'Driver'}
-            variant="success"
-            onPress={() => setLocalRole('driver')}
-            style={styles.roleButton}
-          />
-        </View>
-      </View>
-
       <BrandButton
-        title={status === 'loading' ? 'Sending...' : 'Send Code'}
-        onPress={onSendCode}
+        title="Sign in with Phone Number"
+        onPress={handlePhoneSignIn}
         variant="primary"
-        disabled={status === 'loading'}
-      />
-
-      {!!error && (
-        <Text style={[styles.errorText, { color: theme.colors.warning }]}>
-          {error}
-        </Text>
-      )}
-
-      <BrandButton
-        title="Create account"
-        onPress={() => navigation.navigate('Signup')}
-        variant="secondary"
-        style={styles.createAccountButton}
+        style={styles.primaryButton}
       />
 
       <BrandButton
-        title="Use Phone Authentication"
-        onPress={() => nav.navigate('PhoneAuth' as never)}
+        title="Create Account"
+        onPress={handleCreateAccount}
         variant="secondary"
-        style={styles.phoneAuthButton}
+        style={styles.secondaryButton}
       />
     </View>
   );
@@ -113,44 +53,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    gap: 12,
+    gap: 24,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
-  roleContainer: {
-    gap: 12,
+  primaryButton: {
+    marginBottom: 16,
   },
-  roleLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  roleButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  roleButton: {
-    flex: 1,
-  },
-  errorText: {
-    textAlign: 'center',
-    marginTop: 6,
-    fontSize: 14,
-  },
-  createAccountButton: {
-    marginTop: 8,
-  },
-  phoneAuthButton: {
-    marginTop: 8,
+  secondaryButton: {
+    marginBottom: 16,
   },
 });

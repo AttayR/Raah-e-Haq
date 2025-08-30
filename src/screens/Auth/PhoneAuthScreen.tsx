@@ -8,41 +8,44 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { RootState } from '../../store';
+import { clearError } from '../../store/slices/authSlice';
 import {
   sendVerificationCodeThunk,
   verifyCodeThunk,
-  setUserRole,
-  clearError,
 } from '../../store/thunks/authThunks';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
+import Toast from '../../components/Toast';
 import { useNavigation } from '@react-navigation/native';
 
-type AuthStep = 'phone' | 'verification' | 'profile';
+type AuthStep = 'phone' | 'verification';
 
 export default function PhoneAuthScreen() {
   const { theme } = useAppTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const dispatch = useDispatch<any>();
-  
-  const { status, error, phoneNumber, verificationId, role } = useSelector(
+
+  const { status, error, phoneNumber } = useSelector(
     (state: RootState) => state.auth
   );
+
+  // Debug logging for state changes
+  useEffect(() => {
+    console.log('PhoneAuthScreen - Auth state changed:', { status, error, phoneNumber });
+  }, [status, error, phoneNumber]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
   const [phoneInput, setPhoneInput] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'driver' | 'passenger'>('passenger');
   const [countdown, setCountdown] = useState(0);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // Countdown timer for resend code
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (countdown > 0) {
       interval = setInterval(() => {
         setCountdown((prev) => prev - 1);
@@ -73,9 +76,17 @@ export default function PhoneAuthScreen() {
     }
 
     try {
-      await dispatch(verifyCodeThunk(verificationCode.trim(), selectedRole, displayName, email));
-      // If successful, the auth listener will handle the state change
-      // and redirect to the main app
+      // Verify the code without setting a role
+      await dispatch(verifyCodeThunk(verificationCode.trim()));
+      
+      // Show success toast
+      setShowSuccessToast(true);
+      
+      // Navigate to role selection after a short delay
+      setTimeout(() => {
+        navigation.navigate('RoleSelection');
+      }, 2000);
+      
     } catch (error: any) {
       // Error is handled in the thunk
     }
@@ -97,47 +108,22 @@ export default function PhoneAuthScreen() {
     dispatch(clearError());
   };
 
-  const handleBackToVerification = () => {
-    setCurrentStep('verification');
-    dispatch(clearError());
-  };
-
   const renderPhoneStep = () => (
     <View style={styles.stepContainer}>
       <Text style={[styles.title, { color: theme.colors.text }]}>
         Enter your phone number
       </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+      <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>
         We'll send you a verification code
       </Text>
 
       <ThemedTextInput
-        placeholder="Phone number (e.g., +1234567890)"
+        placeholder="Phone number (e.g., +923486716994)"
         value={phoneInput}
         onChangeText={setPhoneInput}
         keyboardType="phone-pad"
         autoFocus
       />
-
-      <View style={styles.roleContainer}>
-        <Text style={[styles.roleLabel, { color: theme.colors.text }]}>
-          I am a:
-        </Text>
-        <View style={styles.roleButtons}>
-          <BrandButton
-            title={selectedRole === 'passenger' ? 'Passenger ✓' : 'Passenger'}
-            variant={selectedRole === 'passenger' ? 'primary' : 'secondary'}
-            onPress={() => setSelectedRole('passenger')}
-            style={styles.roleButton}
-          />
-          <BrandButton
-            title={selectedRole === 'driver' ? 'Driver ✓' : 'Driver'}
-            variant={selectedRole === 'driver' ? 'success' : 'secondary'}
-            onPress={() => setSelectedRole('driver')}
-            style={styles.roleButton}
-          />
-        </View>
-      </View>
 
       <BrandButton
         title={status === 'loading' ? 'Sending...' : 'Send Code'}
@@ -159,8 +145,11 @@ export default function PhoneAuthScreen() {
       <Text style={[styles.title, { color: theme.colors.text }]}>
         Enter verification code
       </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+      <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>
         We sent a code to {phoneNumber}
+      </Text>
+      <Text style={[styles.testInfo, { color: theme.colors.primary }]}>
+        Test Code: 123456
       </Text>
 
       <ThemedTextInput
@@ -181,7 +170,7 @@ export default function PhoneAuthScreen() {
 
       <View style={styles.resendContainer}>
         {countdown > 0 ? (
-          <Text style={[styles.resendText, { color: theme.colors.textSecondary }]}>
+          <Text style={[styles.resendText, { color: theme.colors.mutedText }]}>
             Resend code in {countdown}s
           </Text>
         ) : (
@@ -209,65 +198,6 @@ export default function PhoneAuthScreen() {
     </View>
   );
 
-  const renderProfileStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        Complete your profile
-      </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-        Add some details to personalize your experience
-      </Text>
-
-      <ThemedTextInput
-        placeholder="Display Name (optional)"
-        value={displayName}
-        onChangeText={setDisplayName}
-        autoCapitalize="words"
-      />
-
-      <ThemedTextInput
-        placeholder="Email (optional)"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <View style={styles.roleContainer}>
-        <Text style={[styles.roleLabel, { color: theme.colors.text }]}>
-          I am a:
-        </Text>
-        <View style={styles.roleButtons}>
-          <BrandButton
-            title={selectedRole === 'passenger' ? 'Passenger ✓' : 'Passenger'}
-            variant={selectedRole === 'passenger' ? 'primary' : 'secondary'}
-            onPress={() => setSelectedRole('passenger')}
-            style={styles.roleButton}
-          />
-          <BrandButton
-            title={selectedRole === 'driver' ? 'Driver ✓' : 'Driver'}
-            variant={selectedRole === 'driver' ? 'success' : 'secondary'}
-            onPress={() => setSelectedRole('driver')}
-            style={styles.roleButton}
-          />
-        </View>
-      </View>
-
-      <BrandButton
-        title="Continue"
-        onPress={() => setCurrentStep('verification')}
-        variant="primary"
-      />
-
-      <BrandButton
-        title="Back to Verification"
-        onPress={handleBackToVerification}
-        variant="secondary"
-        style={styles.backButton}
-      />
-    </View>
-  );
-
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -279,8 +209,15 @@ export default function PhoneAuthScreen() {
       >
         {currentStep === 'phone' && renderPhoneStep()}
         {currentStep === 'verification' && renderVerificationStep()}
-        {currentStep === 'profile' && renderProfileStep()}
       </ScrollView>
+
+      <Toast
+        message="Phone number verified successfully! Redirecting to role selection..."
+        type="success"
+        visible={showSuccessToast}
+        onHide={() => setShowSuccessToast(false)}
+        duration={3000}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -308,20 +245,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  roleContainer: {
-    gap: 12,
-  },
-  roleLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+  testInfo: {
+    fontSize: 14,
     textAlign: 'center',
-  },
-  roleButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  roleButton: {
-    flex: 1,
+    marginBottom: 16,
+    fontWeight: '600',
   },
   resendContainer: {
     alignItems: 'center',

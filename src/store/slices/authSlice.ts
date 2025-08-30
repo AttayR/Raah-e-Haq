@@ -11,6 +11,7 @@ export type AuthState = {
   session: AuthSession | null;
   isPhoneVerified: boolean;
   verificationId: string | null;
+  profileCompleted: boolean;
 };
 
 const initialState: AuthState = {
@@ -22,7 +23,8 @@ const initialState: AuthState = {
   userProfile: null,
   session: null,
   isPhoneVerified: false,
-  verificationId: null
+  verificationId: null,
+  profileCompleted: false,
 };
 
 const authSlice = createSlice({
@@ -42,14 +44,14 @@ const authSlice = createSlice({
     setAuthenticated: (state, action: PayloadAction<{ 
       uid: string; 
       phoneNumber: string; 
-      role: 'driver' | 'passenger' | 'admin';
-      userProfile: UserProfile;
+      role: 'driver' | 'passenger' | 'admin' | undefined;
+      userProfile: UserProfile | null;
       session: AuthSession;
     }>) => {
       console.log('authSlice - setAuthenticated called with:', action.payload);
       state.uid = action.payload.uid;
       state.phoneNumber = action.payload.phoneNumber;
-      state.role = action.payload.role;
+      state.role = action.payload.role || null;
       state.status = 'authenticated';
       state.userProfile = action.payload.userProfile;
       state.session = action.payload.session;
@@ -85,6 +87,21 @@ const authSlice = createSlice({
       console.log('authSlice - setUserRole called with:', action.payload);
       state.role = action.payload;
     },
+    setProfileCompleted: (state) => {
+      console.log('authSlice - setProfileCompleted called');
+      console.log('authSlice - Before: profileCompleted =', state.profileCompleted);
+      state.profileCompleted = true;
+      console.log('authSlice - After: profileCompleted =', state.profileCompleted);
+      console.log('authSlice - Full state after setProfileCompleted:', state);
+    },
+    setUserProfile: (state, action: PayloadAction<UserProfile>) => {
+      console.log('authSlice - setUserProfile called with:', action.payload);
+      state.userProfile = action.payload;
+    },
+    clearProfileCompleted: (state) => {
+      console.log('authSlice - clearProfileCompleted called');
+      state.profileCompleted = false;
+    },
     updateUserProfile: (state, action: PayloadAction<Partial<UserProfile>>) => {
       console.log('authSlice - updateUserProfile called with:', action.payload);
       if (state.userProfile) {
@@ -113,7 +130,10 @@ export const {
   setUserRole,
   updateUserProfile,
   clearError,
-  setSession
+  setSession,
+  setProfileCompleted,
+  clearProfileCompleted,
+  setUserProfile
 } = authSlice.actions;
 
 export default authSlice.reducer;

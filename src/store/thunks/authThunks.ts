@@ -53,11 +53,11 @@ export const sendVerificationCodeThunk = (phoneNumber: string) => async (dispatc
     const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
     dispatch(setPhoneNumber(formattedPhone));
     
-    // For now, simulate sending verification code
-    const mockVerificationId = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    dispatch(setVerificationId(mockVerificationId));
+    // Use actual Firebase phone authentication
+    const verificationId = await sendPhoneVerification(formattedPhone);
+    dispatch(setVerificationId(verificationId));
     
-    return mockVerificationId;
+    return verificationId;
   } catch (error: any) {
     const errorMessage = error.message || 'Failed to send verification code';
     dispatch(setAuthError(errorMessage));
@@ -68,61 +68,103 @@ export const sendVerificationCodeThunk = (phoneNumber: string) => async (dispatc
 // Verify phone code and sign in/sign up
 export const verifyCodeThunk = (
   verificationCode: string,
-  role: 'driver' | 'passenger',
+  role?: 'driver' | 'passenger',
   displayName?: string,
   email?: string
 ) => async (dispatch: AppDispatch, getState: () => any) => {
   try {
+    console.log('verifyCodeThunk - Starting verification...');
     dispatch(setVerifying());
     dispatch(clearError());
     
     const { auth } = getState();
     const { verificationId, phoneNumber } = auth;
     
+    console.log('verifyCodeThunk - Current auth state:', auth);
+    
     if (!verificationId || !phoneNumber) {
       throw new Error('Verification ID or phone number not found');
     }
     
-    // For now, simulate verification with mock code '123456'
-    if (verificationCode !== '123456') {
-      throw new Error('Invalid verification code. Use 123456 for testing.');
+    // Verify the code using Firebase
+    console.log('verifyCodeThunk - Verifying code with Firebase...');
+    const userCredential = await verifyPhoneCode(verificationId, verificationCode);
+    const user = userCredential.user;
+    console.log('verifyCodeThunk - Firebase verification successful, user:', user.uid);
+    
+    // If no role provided, just authenticate the user without setting a role
+    if (!role) {
+      console.log('verifyCodeThunk - No role provided, authenticating user without role...');
+      
+      // Create a minimal session without role
+      const session = await createAuthSession(user, {
+        uid: user.uid,
+        phoneNumber,
+        role: undefined,
+        isVerified: true,
+        isActive: true,
+      });
+      
+      // Set authenticated state without role
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber,
+        role: undefined,
+        userProfile: null,
+        session
+      }));
+      
+      dispatch(setSession(session));
+      console.log('verifyCodeThunk - User authenticated without role, ready for role selection');
+      return { user, userProfile: null, session };
     }
     
-    // Create mock user data for testing
-    const mockUser = {
-      uid: `user_${Date.now()}`,
-      phoneNumber,
-      role,
-      displayName,
-      email,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isVerified: true,
-      isActive: true
-    };
+    // Check if user already exists
+    let userProfile = await getUserByPhone(phoneNumber);
     
-    // Create mock session
-    const mockSession = {
-      uid: mockUser.uid,
-      phoneNumber: mockUser.phoneNumber,
-      role: mockUser.role,
-      token: 'mock_token_' + Date.now(),
-      expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
-    };
+    if (userProfile) {
+      console.log('verifyCodeThunk - Existing user found, updating role if needed...');
+      // Existing user - sign in
+      if (userProfile.uid !== user.uid) {
+        // Phone number exists but with different UID (shouldn't happen with phone auth)
+        throw new Error('Phone number already registered with different account');
+      }
+      
+      // Update role if different
+      if (userProfile.role !== role) {
+        await updateUserProfile(user.uid, { role });
+        userProfile = { ...userProfile, role };
+      }
+    } else {
+      console.log('verifyCodeThunk - Creating new user profile...');
+      // New user - create profile
+      userProfile = await createUserProfile(user.uid, phoneNumber, role, displayName, email);
+    }
+    
+    console.log('verifyCodeThunk - User profile ready:', userProfile);
+    
+    // Create session
+    console.log('verifyCodeThunk - Creating auth session...');
+    const session = await createAuthSession(user, userProfile);
+    console.log('verifyCodeThunk - Session created:', session);
     
     // Set authenticated state
+    console.log('verifyCodeThunk - Dispatching setAuthenticated...');
     dispatch(setAuthenticated({
-      uid: mockUser.uid,
-      phoneNumber: mockUser.phoneNumber,
-      role: mockUser.role,
-      userProfile: mockUser,
-      session: mockSession
+      uid: user.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session
     }));
     
-    dispatch(setSession(mockSession));
+    console.log('verifyCodeThunk - Dispatching setSession...');
+    dispatch(setSession(session));
     
-    return { user: mockUser, userProfile: mockUser, session: mockSession };
+    console.log('verifyCodeThunk - Verification completed successfully');
+    return { user, userProfile, session };
   } catch (error: any) {
+    console.error('verifyCodeThunk - Error:', error);
     const errorMessage = error.message || 'Failed to verify code';
     dispatch(setAuthError(errorMessage));
     throw error;
@@ -187,7 +229,6 @@ export const updateProfileThunk = (updates: any) => async (dispatch: AppDispatch
   } catch (error: any) {
     console.error('Profile update error:', error);
     dispatch(setAuthError('Failed to update profile'));
-    throw error;
   }
 };
 
