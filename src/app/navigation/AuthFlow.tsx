@@ -1,34 +1,27 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import AuthStack from './stacks/AuthStack';
 import RootNavigation from './RootNavigation';
 
 export default function AuthFlow() {
-  // For now, always show auth screens to test
-  console.log('AuthFlow - Rendering auth screens');
+  const { status, uid, phoneNumber, role, profileCompleted } = useSelector((state: RootState) => state.auth);
   
-  return (
-    <View style={styles.container}>
-      <Text style={styles.debugText}>AuthFlow is working!</Text>
-      <AuthStack />
-    </View>
-  );
-}
+  console.log('AuthFlow - Current state:', { status, uid, phoneNumber, role, profileCompleted });
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  debugText: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    backgroundColor: 'yellow',
-    padding: 10,
-    zIndex: 1000,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});
+  // If authenticated, has a role, AND profile is completed, show main app
+  if (status === 'authenticated' && uid && role && profileCompleted) {
+    console.log('AuthFlow - User authenticated with role and completed profile, showing main app');
+    return <RootNavigation />;
+  }
+
+  // If authenticated but missing role OR profile not completed, show auth screens
+  if (status === 'authenticated' && uid && (!role || !profileCompleted)) {
+    console.log('AuthFlow - User authenticated but needs to complete setup, showing auth screens');
+    return <AuthStack />;
+  }
+
+  // If not authenticated or still loading, show auth screens
+  console.log('AuthFlow - User not authenticated, showing auth screens');
+  return <AuthStack />;
+}

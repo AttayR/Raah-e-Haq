@@ -13,16 +13,31 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { role } = useSelector((s: RootState) => s.user);
+  const { role } = useSelector((s: RootState) => s.auth);
 
-  // Only show role-based screens when authenticated
-  // AuthFlow will handle showing Auth screens when not authenticated
+  console.log('RootNavigation - Current role:', role);
+  console.log('RootNavigation - Role type:', typeof role);
+  console.log('RootNavigation - Role === "passenger":', role === 'passenger');
+  console.log('RootNavigation - Role === "driver":', role === 'driver');
+
+  // Use key prop to force re-rendering when role changes
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {role === 'driver' && <Stack.Screen name="Driver" component={DriverStack} />}
-      {role === 'passenger' && <Stack.Screen name="Passenger" component={PassengerStack} />}
-      {/* If no role is set, this means user is not authenticated */}
-      {/* AuthFlow will handle showing the appropriate auth screens */}
+    <Stack.Navigator 
+      key={role || 'no-role'} 
+      screenOptions={{ headerShown: false }}
+    >
+      {role === 'driver' && (
+        <Stack.Screen 
+          name="Driver" 
+          component={DriverStack} 
+        />
+      )}
+      {role === 'passenger' && (
+        <Stack.Screen 
+          name="Passenger" 
+          component={PassengerStack} 
+        />
+      )}
     </Stack.Navigator>
   );
 }
