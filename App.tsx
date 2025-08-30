@@ -7,7 +7,7 @@ import {
 
 import { StatusBar } from 'react-native';
 import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
-import RootNavigator from './src/app/navigation/RootNavigation';
+import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
 
 function ThemedNav() {
@@ -43,7 +43,7 @@ function ThemedNav() {
         backgroundColor={theme.colors.background}
       />
       <NavigationContainer theme={navTheme}>
-        <RootNavigator />
+        <AuthFlow />
       </NavigationContainer>
     </>
   );
