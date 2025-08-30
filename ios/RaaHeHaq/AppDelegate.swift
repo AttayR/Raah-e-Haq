@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import Firebase
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -14,6 +15,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    
+    // Configure Firebase
+    FirebaseApp.configure()
+    
+    // Configure Firebase Messaging
+    UNUserNotificationCenter.current().delegate = self
+    
+    let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+    UNUserNotificationCenter.current().requestAuthorization(
+      options: authOptions,
+      completionHandler: { _, _ in }
+    )
+    
+    application.registerForRemoteNotifications()
+    
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -30,6 +46,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     )
 
     return true
+  }
+  
+  // Handle Firebase messaging
+  func application(_ application: UIApplication,
+                   didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    // Firebase messaging will be handled by React Native
+  }
+}
+
+// MARK: - UNUserNotificationCenterDelegate
+extension AppDelegate: UNUserNotificationCenterDelegate {
+  func userNotificationCenter(_ center: UNUserNotificationCenter,
+                              willPresent notification: UNNotification,
+                              withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+    completionHandler([[.alert, .sound]])
   }
 }
 

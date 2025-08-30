@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "19712791802",
+    "project_id": "raah-e-haq",
+    "storage_bucket": "raah-e-haq.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:19712791802:android:08fc36d1e8dbb1e1b66543",
+        "android_client_info": {
+          "package_name": "com.raahehaq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDL3DQ9VgCY8nwHCZNFwLk1DjbDTyCwxaE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
