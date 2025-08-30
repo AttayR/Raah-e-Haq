@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import PassengerBottomTabs from 'src/app/navigation/tabs/PassengerBottomTabs';
+import PassengerBottomTabs from '../tabs/PassengerBottomTabs';
 
 export type PassengerStackParamList = {
   PassengerTabs: undefined;
