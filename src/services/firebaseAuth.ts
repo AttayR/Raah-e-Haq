@@ -1,32 +1,8 @@
-import { auth, db } from './firebase';
-import { 
-  PhoneAuthProvider, 
-  signInWithCredential, 
-  signOut, 
-  onAuthStateChanged, 
-  User,
-  signInWithPhoneNumber,
-  UserCredential
-} from 'firebase/auth';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection,
-  query,
-  where,
-  getDocs,
-  serverTimestamp 
-} from 'firebase/firestore';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types
-export interface PhoneAuthData {
-  phoneNumber: string;
-  verificationId: string;
-  verificationCode: string;
-}
-
 export interface UserProfile {
   uid: string;
   phoneNumber: string;
@@ -57,16 +33,9 @@ export const sendPhoneVerification = async (phoneNumber: string): Promise<string
     // Check if user already exists
     const existingUser = await getUserByPhone(phoneNumber);
     
-    // For React Native, we need to use a different approach
-    // The verification will be handled by the native Firebase SDK
-    // We'll simulate the verification process for now
-    console.log('Sending verification code to:', phoneNumber);
-    
-    // In a real implementation, this would trigger the native Firebase phone auth
-    // For now, we'll return a mock verification ID
-    const mockVerificationId = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    return mockVerificationId;
+    // Send verification code using React Native Firebase
+    const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
+    return confirmation.verificationId;
   } catch (error: any) {
     console.error('Error sending verification code:', error);
     throw new Error(error.message || 'Failed to send verification code');
@@ -76,44 +45,12 @@ export const sendPhoneVerification = async (phoneNumber: string): Promise<string
 export const verifyPhoneCode = async (
   verificationId: string, 
   verificationCode: string
-): Promise<UserCredential> => {
+): Promise<FirebaseAuthTypes.UserCredential> => {
   try {
-    // For React Native, we need to implement this differently
-    // This is a mock implementation - in production, you'd use the actual Firebase phone auth
-    
-    if (verificationCode === '123456') { // Mock verification code
-      // Create a mock user credential
-      const mockUser = {
-        uid: `user_${Date.now()}`,
-        phoneNumber: '+1234567890', // This should come from the actual auth state
-        emailVerified: false,
-        isAnonymous: false,
-        metadata: {},
-        providerData: [],
-        refreshToken: '',
-        tenantId: null,
-        delete: async () => {},
-        getIdToken: async () => 'mock_token',
-        getIdTokenResult: async () => ({ authTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null, expirationTime: '', token: 'mock_token', claims: {} }),
-        reload: async () => {},
-        toJSON: () => ({}),
-        displayName: null,
-        email: null,
-        photoURL: null,
-        providerId: 'phone',
-      } as User;
-      
-      const mockCredential = {
-        user: mockUser,
-        operationType: 'signIn',
-        providerId: 'phone',
-        additionalUserInfo: null,
-      } as UserCredential;
-      
-      return mockCredential;
-    } else {
-      throw new Error('Invalid verification code');
-    }
+    // Create credential and sign in
+    const credential = auth.PhoneAuthProvider.credential(verificationId, verificationCode);
+    const result = await auth().signInWithCredential(credential);
+    return result;
   } catch (error: any) {
     console.error('Error verifying code:', error);
     throw new Error(error.message || 'Invalid verification code');
@@ -135,13 +72,13 @@ export const createUserProfile = async (
       role,
       displayName,
       email,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
       isVerified: true,
       isActive: true
     };
 
-    await setDoc(doc(db, 'users', uid), userProfile);
+    await firestore().collection('users').doc(uid).set(userProfile);
     return userProfile;
   } catch (error: any) {
     console.error('Error creating user profile:', error);
@@ -151,8 +88,8 @@ export const createUserProfile = async (
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
-    const userDoc = await getDoc(doc(db, 'users', uid));
-    if (userDoc.exists()) {
+    const userDoc = await firestore().collection('users').doc(uid).get();
+    if (userDoc.exists) {
       return userDoc.data() as UserProfile;
     }
     return null;
@@ -164,9 +101,10 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 
 export const getUserByPhone = async (phoneNumber: string): Promise<UserProfile | null> => {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('phoneNumber', '==', phoneNumber));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await firestore()
+      .collection('users')
+      .where('phoneNumber', '==', phoneNumber)
+      .get();
     
     if (!querySnapshot.empty) {
       const userDoc = querySnapshot.docs[0];
@@ -184,11 +122,10 @@ export const updateUserProfile = async (
   updates: Partial<UserProfile>
 ): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', uid);
-    await setDoc(userRef, {
+    await firestore().collection('users').doc(uid).update({
       ...updates,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+      updatedAt: firestore.FieldValue.serverTimestamp()
+    });
   } catch (error: any) {
     console.error('Error updating user profile:', error);
     throw new Error(error.message || 'Failed to update user profile');
@@ -196,7 +133,7 @@ export const updateUserProfile = async (
 };
 
 // Session Management
-export const createAuthSession = async (user: User, profile: UserProfile): Promise<AuthSession> => {
+export const createAuthSession = async (user: FirebaseAuthTypes.User, profile: UserProfile): Promise<AuthSession> => {
   try {
     const token = await user.getIdToken();
     const session: AuthSession = {
@@ -244,7 +181,7 @@ export const clearAuthSession = async (): Promise<void> => {
   }
 };
 
-export const refreshAuthSession = async (user: User): Promise<AuthSession | null> => {
+export const refreshAuthSession = async (user: FirebaseAuthTypes.User): Promise<AuthSession | null> => {
   try {
     const profile = await getUserProfile(user.uid);
     if (profile) {
@@ -258,13 +195,15 @@ export const refreshAuthSession = async (user: User): Promise<AuthSession | null
 };
 
 // Authentication State
-export const listenAuth = (cb: (user: User | null) => void) => onAuthStateChanged(auth, cb);
+export const listenAuth = (cb: (user: FirebaseAuthTypes.User | null) => void) => {
+  return auth().onAuthStateChanged(cb);
+};
 
 // Sign Out
 export const signOutUser = async () => {
   try {
     await clearAuthSession();
-    await signOut(auth);
+    await auth().signOut();
   } catch (error: any) {
     console.error('Error signing out:', error);
     throw new Error(error.message || 'Failed to sign out');
@@ -281,13 +220,13 @@ export const isAuthenticated = async (): Promise<boolean> => {
   }
 };
 
-// Legacy email functions (keeping for backward compatibility)
-export const emailSignIn = async (email: string, password: string) => {
-  // This would need to be implemented with email/password if needed
-  throw new Error('Email authentication not implemented. Please use phone authentication.');
+// Get current user
+export const getCurrentUser = (): FirebaseAuthTypes.User | null => {
+  return auth().currentUser;
 };
 
-export const emailSignUp = async (email: string, password: string) => {
-  // This would need to be implemented with email/password if needed
-  throw new Error('Email authentication not implemented. Please use phone authentication.');
+// Check if phone number is verified
+export const isPhoneNumberVerified = (): boolean => {
+  const user = auth().currentUser;
+  return user ? user.phoneNumber !== null : false;
 };
