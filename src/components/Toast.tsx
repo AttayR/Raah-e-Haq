@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useAppTheme } from '../app/providers/ThemeProvider';
 
@@ -9,6 +9,40 @@ interface ToastProps {
   onHide: () => void;
   duration?: number;
 }
+
+// Global toast state
+let toastState: {
+  visible: boolean;
+  message: string;
+  type: 'success' | 'error' | 'info';
+  onHide?: () => void;
+} = {
+  visible: false,
+  message: '',
+  type: 'info',
+};
+
+let toastListeners: Array<() => void> = [];
+
+const notifyListeners = () => {
+  toastListeners.forEach(listener => listener());
+};
+
+// Static methods for showing toast
+export const showToast = (type: 'success' | 'error' | 'info', message: string, onHide?: () => void) => {
+  toastState = {
+    visible: true,
+    message,
+    type,
+    onHide,
+  };
+  notifyListeners();
+};
+
+export const hideToast = () => {
+  toastState.visible = false;
+  notifyListeners();
+};
 
 export default function Toast({ 
   message, 
@@ -45,7 +79,7 @@ export default function Toast({
     }
   }, [visible]);
 
-  const hideToast = () => {
+  const hideToastLocal = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
