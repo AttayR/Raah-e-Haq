@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -8,6 +8,7 @@ import { setProfileCompleted, setUserProfile } from '../../store/slices/authSlic
 import BrandButton from '../../components/BrandButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import { saveUserBasicInfo } from '../../services/userService';
+import { showToast } from '../../components/ToastProvider';
 
 interface BasicInfoParams {
   role: 'driver' | 'passenger';
@@ -95,12 +96,12 @@ export default function BasicInfoScreen() {
     }
 
     if (!phoneNumber) {
-      Alert.alert('Error', 'Phone number not found. Please try signing in again.');
+      showToast('error', 'Phone number not found. Please try signing in again.');
       return;
     }
 
     if (!uid) {
-      Alert.alert('Error', 'User ID not found. Please try signing in again.');
+      showToast('error', 'User ID not found. Please try signing in again.');
       console.error('BasicInfoScreen - UID is undefined in auth state');
       return;
     }
@@ -121,22 +122,19 @@ export default function BasicInfoScreen() {
       // Update auth state with the userProfile
       dispatch(setUserProfile(savedUserProfile));
 
-      Alert.alert(
-        'Success!',
-        'Your information has been saved successfully.',
-        [
-          {
-            text: 'Continue',
-            onPress: () => {
-              // Mark profile as completed
-              dispatch(setProfileCompleted());
-            },
-          },
-        ]
+      // Show success toast
+      showToast(
+        'success',
+        'Your information has been saved successfully.'
       );
+
+      // Dispatch setProfileCompleted immediately after showing toast
+      console.log('BasicInfoScreen - Dispatching setProfileCompleted immediately...');
+      dispatch(setProfileCompleted());
+      console.log('BasicInfoScreen - setProfileCompleted dispatched');
     } catch (error: any) {
       console.error('BasicInfoScreen - Error saving user info:', error);
-      Alert.alert('Error', error.message || 'Failed to save information');
+      showToast('error', error.message || 'Failed to save information');
     } finally {
       setIsSubmitting(false);
     }
