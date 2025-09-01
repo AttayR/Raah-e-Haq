@@ -40,7 +40,7 @@ export default function LoginScreen() {
       />
 
       <BrandButton
-        title="Create Account"
+        title="Sign in with Email"
         onPress={handleCreateAccount}
         variant="secondary"
         style={styles.secondaryButton}
