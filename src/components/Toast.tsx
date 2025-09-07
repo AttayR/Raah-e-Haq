@@ -72,7 +72,7 @@ export default function Toast({
 
       // Hide toast after duration
       const timer = setTimeout(() => {
-        hideToast();
+        hideToastLocal();
       }, duration);
 
       return () => clearTimeout(timer);
@@ -92,6 +92,7 @@ export default function Toast({
         useNativeDriver: true,
       }),
     ]).start(() => {
+      hideToast(); // Update global state
       onHide();
     });
   };
