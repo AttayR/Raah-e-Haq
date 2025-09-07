@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   Dimensions,
-  StatusBar
+  StatusBar,
+  ImageBackground
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
@@ -65,57 +66,66 @@ export default function PassengerHomeScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar 
-        barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} 
-        backgroundColor={theme.colors.primary}
-      />
+    <ImageBackground 
+      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      {/* Dull/Blur Overlay */}
+      <View style={styles.overlay} />
+      <View style={styles.overlay2} />
       
-      {/* Header with Cartoon-style Background */}
-      <View style={[styles.header, styles.headerBackground]}>
-        {/* Decorative Circles */}
-        <View style={styles.decorativeCircle1} />
-        <View style={styles.decorativeCircle2} />
-        <View style={styles.decorativeCircle3} />
-        <View style={styles.decorativeCircle4} />
-        <View style={styles.decorativeCircle5} />
+      <View style={[styles.container, styles.transparentBackground]}>
+        <StatusBar 
+          barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} 
+          backgroundColor={theme.colors.primary}
+        />
         
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}</Text>
-            <Text style={styles.userName}>{userProfile?.fullName || 'Passenger'}</Text>
+        {/* Header with Cartoon-style Background */}
+        <View style={[styles.header, styles.headerBackground]}>
+          {/* Decorative Circles */}
+          <View style={styles.decorativeCircle1} />
+          <View style={styles.decorativeCircle2} />
+          <View style={styles.decorativeCircle3} />
+          <View style={styles.decorativeCircle4} />
+          <View style={styles.decorativeCircle5} />
+          
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.greeting}>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}</Text>
+              <Text style={styles.userName}>{userProfile?.fullName || 'Passenger'}</Text>
+            </View>
+            <TouchableOpacity style={styles.profileButton}>
+              <Icon name="person" size={24} color="white" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
-            <Icon name="person" size={24} color="white" />
-          </TouchableOpacity>
+          
+          {/* Status Badge with Cartoon Style */}
+          <View style={[
+            styles.statusBadge, 
+            userProfile?.isVerified ? styles.statusVerified : styles.statusPending
+          ]}>
+            <Icon 
+              name={userProfile?.isVerified ? 'verified' : 'schedule'} 
+              size={16} 
+              color="white" 
+            />
+            <Text style={styles.statusText}>
+              {userProfile?.isVerified ? 'Verified' : 'Pending'}
+            </Text>
+          </View>
+          
+          {/* Welcome Message with Cartoon Style */}
+          <View style={styles.welcomeMessage}>
+            <Text style={styles.welcomeText}>🚗 Ready for your next adventure?</Text>
+          </View>
         </View>
-        
-        {/* Status Badge with Cartoon Style */}
-        <View style={[
-          styles.statusBadge, 
-          userProfile?.isVerified ? styles.statusVerified : styles.statusPending
-        ]}>
-          <Icon 
-            name={userProfile?.isVerified ? 'verified' : 'schedule'} 
-            size={16} 
-            color="white" 
-          />
-          <Text style={styles.statusText}>
-            {userProfile?.isVerified ? 'Verified' : 'Pending'}
-          </Text>
-        </View>
-        
-        {/* Welcome Message with Cartoon Style */}
-        <View style={styles.welcomeMessage}>
-          <Text style={styles.welcomeText}>🚗 Ready for your next adventure?</Text>
-        </View>
-      </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           {stats.map((stat, index) => (
@@ -211,14 +221,42 @@ export default function PassengerHomeScreen() {
 
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
-      </ScrollView>
-    </View>
+        </ScrollView>
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    zIndex: 1,
+  },
+  overlay2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 1,
+  },
   container: {
     flex: 1,
+    zIndex: 2,
+  },
+  transparentBackground: {
+    backgroundColor: 'transparent',
   },
   header: {
     paddingTop: 50,
@@ -230,7 +268,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerBackground: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#011c72ff',
   },
   headerContent: {
     flexDirection: 'row',
@@ -362,6 +400,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
     marginHorizontal: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -398,6 +437,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -425,6 +465,7 @@ const styles = StyleSheet.create({
   activityCard: {
     borderRadius: 16,
     padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -465,6 +506,7 @@ const styles = StyleSheet.create({
   },
   accountCard: {
     borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
