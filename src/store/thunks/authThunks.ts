@@ -3,15 +3,12 @@ import {
   sendPhoneVerification,
   verifyPhoneCode,
   createUserProfile,
-  getUserProfile,
   getUserByPhone,
   createAuthSession,
   signOutUser,
   listenAuth,
   getAuthSession,
   refreshAuthSession,
-  clearAuthSession,
-  isAuthenticated,
   updateUserProfile
 } from '../../services/firebaseAuth';
 import {
@@ -22,24 +19,47 @@ import {
   setSignedOut,
   setVerificationId,
   setPhoneNumber,
-  setUserRole,
   setSession,
-  clearError
+  clearError,
+  updateUserProfile as updateUserProfileAction
 } from '../slices/authSlice';
-import { resetUser } from '../slices/userSlice';
 
 // Start authentication listener
-export const startAuthListener = () => (dispatch: AppDispatch) => {
+export const startAuthListener = () => (dispatch: AppDispatch, _getState: () => any) => {
   console.log('startAuthListener - Starting...');
-  // For now, just set signed out to show auth screens
-  // Firebase phone auth will be implemented later
-  console.log('startAuthListener - Setting signed out state');
-  dispatch(setSignedOut());
-  console.log('startAuthListener - Completed');
   
-  // Return a dummy unsubscribe function
+  // Set up Firebase auth state listener
+  const unsubscribe = listenAuth(async (user) => {
+    console.log('startAuthListener - Firebase auth state changed:', user ? user.uid : 'signed out');
+    
+    if (user) {
+      // User is signed in, but we need to check if we have a valid session
+      // The checkAuthStatusThunk will handle session validation
+      console.log('startAuthListener - User signed in, session will be validated by checkAuthStatusThunk');
+    } else {
+      // User is signed out in Firebase, but check if we have a valid session in AsyncStorage
+      console.log('startAuthListener - Firebase user signed out, checking for valid session...');
+      
+      const session = await getAuthSession();
+      if (session) {
+        console.log('startAuthListener - Valid session found in AsyncStorage, keeping authenticated state');
+        // Don't sign out - we have a valid session
+        return;
+      } else {
+        console.log('startAuthListener - No valid session found, signing out');
+        dispatch(setSignedOut());
+      }
+    }
+  });
+  
+  console.log('startAuthListener - Auth listener set up successfully');
+  
+  // Return the unsubscribe function
   return () => {
-    console.log('startAuthListener - Unsubscribing');
+    console.log('startAuthListener - Unsubscribing from auth listener');
+    if (unsubscribe) {
+      unsubscribe();
+    }
   };
 };
 
@@ -184,13 +204,52 @@ export const signOutThunk = () => async (dispatch: AppDispatch) => {
 };
 
 // Check authentication status on app start
-export const checkAuthStatusThunk = () => async (dispatch: AppDispatch) => {
+export const checkAuthStatusThunk = () => async (dispatch: AppDispatch, getState: () => any) => {
   try {
     console.log('checkAuthStatusThunk - Starting...');
-    // For now, always set to signed out to show auth screens
-    // This will be updated by the auth listener when Firebase initializes
-    console.log('checkAuthStatusThunk - Setting signed out state');
-    dispatch(setSignedOut());
+    
+    // Check if we have a persisted auth state first
+    const { auth } = getState();
+    console.log('checkAuthStatusThunk - Current persisted state:', auth);
+    
+    // If we already have an authenticated user with valid session, don't override it
+    if (auth.status === 'authenticated' && auth.uid && auth.session) {
+      console.log('checkAuthStatusThunk - User already authenticated, checking session validity...');
+      
+      // Check if the session is still valid
+      const session = await getAuthSession();
+      if (session && session.uid === auth.uid) {
+        console.log('checkAuthStatusThunk - Valid session found, keeping authenticated state');
+        return;
+      } else {
+        console.log('checkAuthStatusThunk - Session expired or invalid, signing out');
+        dispatch(setSignedOut());
+        return;
+      }
+    }
+    
+    // Check for existing session in AsyncStorage
+    console.log('checkAuthStatusThunk - Checking AsyncStorage for existing session...');
+    const session = await getAuthSession();
+    
+    if (session) {
+      console.log('checkAuthStatusThunk - Found valid session:', session);
+      
+      // Restore authentication state from session
+      dispatch(setAuthenticated({
+        uid: session.uid,
+        phoneNumber: session.phoneNumber,
+        role: session.role || null,
+        userProfile: null, // Will be loaded separately if needed
+        session
+      }));
+      
+      console.log('checkAuthStatusThunk - Authentication state restored from session');
+    } else {
+      console.log('checkAuthStatusThunk - No valid session found, setting signed out state');
+      dispatch(setSignedOut());
+    }
+    
     console.log('checkAuthStatusThunk - Completed');
   } catch (error: any) {
     console.error('checkAuthStatusThunk - Error:', error);
@@ -223,7 +282,7 @@ export const updateProfileThunk = (updates: any) => async (dispatch: AppDispatch
     if (auth.uid) {
       await updateUserProfile(auth.uid, updates);
       if (auth.userProfile) {
-        dispatch(updateUserProfile({ ...auth.userProfile, ...updates }));
+        dispatch(updateUserProfileAction({ ...auth.userProfile, ...updates }));
       }
     }
   } catch (error: any) {
@@ -233,12 +292,12 @@ export const updateProfileThunk = (updates: any) => async (dispatch: AppDispatch
 };
 
 // Legacy functions (keeping for backward compatibility)
-export const signInThunk = (email: string, password: string, role?: 'driver' | 'passenger' | 'admin') => 
+export const signInThunk = (_email: string, _password: string, _role?: 'driver' | 'passenger' | 'admin') => 
   async (dispatch: AppDispatch) => {
     dispatch(setAuthError('Email authentication not supported. Please use phone authentication.'));
   };
 
-export const signUpThunk = (email: string, password: string, role: 'driver' | 'passenger') => 
+export const signUpThunk = (_email: string, _password: string, _role: 'driver' | 'passenger') => 
   async (dispatch: AppDispatch) => {
     dispatch(setAuthError('Email authentication not supported. Please use phone authentication.'));
   };

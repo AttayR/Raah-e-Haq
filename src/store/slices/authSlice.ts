@@ -68,6 +68,7 @@ const authSlice = createSlice({
       state.session = null;
       state.isPhoneVerified = false;
       state.verificationId = null;
+      state.profileCompleted = false;
       state.error = null;
     },
     setAuthError: (state, action: PayloadAction<string>) => {

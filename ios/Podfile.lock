@@ -3738,7 +3738,7 @@ PODS:
     - React-utils (= 0.80.1)
     - SocketRocket
   - RecaptchaInterop (101.0.0)
-  - RNCAsyncStorage (1.24.0):
+  - RNCAsyncStorage (2.2.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -3767,6 +3767,17 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNFBApp (23.2.0):
+    - Firebase/CoreOnly (= 12.1.0)
+    - React-Core
+  - RNFBAuth (23.2.0):
+    - Firebase/Auth (= 12.1.0)
+    - React-Core
+    - RNFBApp
+  - RNFBFirestore (23.2.0):
+    - Firebase/Firestore (= 12.1.0)
+    - React-Core
+    - RNFBApp
   - RNGestureHandler (2.28.0):
     - boost
     - DoubleConversion
@@ -4003,6 +4014,9 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
+  - "RNFBAuth (from `../node_modules/@react-native-firebase/auth`)"
+  - "RNFBFirestore (from `../node_modules/@react-native-firebase/firestore`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - "RNGoogleSignin (from `../node_modules/@react-native-google-signin/google-signin`)"
   - RNScreens (from `../node_modules/react-native-screens`)
@@ -4197,6 +4211,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNFBApp:
+    :path: "../node_modules/@react-native-firebase/app"
+  RNFBAuth:
+    :path: "../node_modules/@react-native-firebase/auth"
+  RNFBFirestore:
+    :path: "../node_modules/@react-native-firebase/firestore"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
   RNGoogleSignin:
@@ -4314,7 +4334,10 @@ SPEC CHECKSUMS:
   ReactCodegen: 3c43e79aa0aa13c1a6456a956b23419878213e8d
   ReactCommon: 0148a0eeec41961cfcf43621379bb6140a78caa6
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
-  RNCAsyncStorage: aa2db51e4dfe91670b5941c65bed077ecb52983b
+  RNCAsyncStorage: afe7c3711dc256e492aa3a50dcac43eecebd0ae5
+  RNFBApp: 67fdeb6977bc377f1392f5add808af7590a6be33
+  RNFBAuth: cc2acea2b528daae857e12af4460cccb6af769c5
+  RNFBFirestore: 73619e2f61f6096ad0c3fa1fbdd5175d645ae322
   RNGestureHandler: 8c4c3ff641284e689208dc01e51d5c1e6807cf3c
   RNGoogleSignin: 029839f8dab57db5e9d430e050fee45587c21c2f
   RNScreens: 68d326e021562426e82a4a04c90ddd309b9ad041
