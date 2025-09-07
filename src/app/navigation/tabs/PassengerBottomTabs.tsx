@@ -40,14 +40,16 @@ const PassengerBottomTabs = () => {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={PassengerHomeScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="home" color={color} size={size} />
-          ),
-        }}
-      />
+  name="Home"
+  component={PassengerHomeScreen}
+  options={{
+    headerShown: false, // 👈 This hides the header for Home screen
+    tabBarIcon: ({ color, size }) => (
+      <Icon name="home" color={color} size={size} />
+    ),
+  }}
+/>
+
       <Tab.Screen
         name="Map"
         component={PassengerMapScreen}
