@@ -31,7 +31,7 @@ export type IconType =
   | 'ioniconsIcon'
   | 'materialCommunityIcon'
   | 'entypoIcon'
-  | 'OcticonsIcon';
+  | 'octiconsIcon';
 
 const getIcon = (type: IconType) => {
   switch (type) {
@@ -63,7 +63,7 @@ const getIcon = (type: IconType) => {
       return MaterialCommunityIconsIcon;
     case 'entypoIcon':
       return EntypoIcon;
-    case 'OcticonsIcon':
+    case 'octiconsIcon':
       return OcticonsIcon;
     default:
       return FontAwesomeIcon;
