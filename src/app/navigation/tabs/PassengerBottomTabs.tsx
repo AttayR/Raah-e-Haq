@@ -37,6 +37,7 @@ const PassengerBottomTabs = () => {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerShown: false
       }}
     >
       <Tab.Screen
