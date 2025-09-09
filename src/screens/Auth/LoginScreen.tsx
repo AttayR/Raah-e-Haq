@@ -1,90 +1,76 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState } from 'react';
-import { View, Text } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { RootState } from '../../store';
-import { setRole } from '../../store/slices/userSlice';
-import { signInThunk } from '../../store/thunks/authThunks';
-import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
+import { useNavigation } from '@react-navigation/native';
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen() {
   const { theme } = useAppTheme();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setLocalRole] = useState<'driver' | 'passenger'>('passenger');
-  const dispatch = useDispatch<any>();
-  const { status, error } = useSelector((s: RootState) => s.auth);
+  const navigation = useNavigation<any>();
 
-  const onLogin = () => {
-    dispatch(setRole(role));
-    dispatch(signInThunk(email.trim(), password.trim(), role));
+  const handlePhoneSignIn = () => {
+    navigation.navigate('PhoneAuth');
+  };
+
+  const handleCreateAccount = () => {
+    navigation.navigate('Signup');
   };
 
   return (
     <View
-      style={{
-        flex: 1,
-        backgroundColor: theme.colors.background,
-        padding: 16,
-        gap: 12,
-        justifyContent: 'center',
-      }}
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background }
+      ]}
     >
-      <Text
-        style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}
-      >
-        Welcome back
+      <Text style={[styles.title, { color: theme.colors.text }]}>
+        Welcome to RaaHeHaq
       </Text>
 
-      <ThemedTextInput
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <ThemedTextInput
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <BrandButton
-          title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'}
-          variant="secondary"
-          onPress={() => setLocalRole('passenger')}
-          style={{ flex: 1 }}
-        />
-        <BrandButton
-          title={role === 'driver' ? 'Driver ✓' : 'Driver'}
-          variant="success"
-          onPress={() => setLocalRole('driver')}
-          style={{ flex: 1 }}
-        />
-      </View>
+      <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>
+        Sign in to your account or create a new one
+      </Text>
 
       <BrandButton
-        title={status === 'loading' ? 'Signing in…' : 'Sign in'}
-        onPress={onLogin}
+        title="Sign in with Phone Number"
+        onPress={handlePhoneSignIn}
         variant="primary"
+        style={styles.primaryButton}
       />
 
-      {!!error && (
-        <Text style={{ color: theme.colors.warning, marginTop: 6 }}>
-          {error}
-        </Text>
-      )}
-
       <BrandButton
-        title="Create account"
-        onPress={() => navigation.navigate('Signup')}
+        title="Sign in with Email"
+        onPress={handleCreateAccount}
         variant="secondary"
-        style={{ marginTop: 8 }}
+        style={styles.secondaryButton}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+    gap: 24,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  primaryButton: {
+    marginBottom: 16,
+  },
+  secondaryButton: {
+    marginBottom: 16,
+  },
+});
