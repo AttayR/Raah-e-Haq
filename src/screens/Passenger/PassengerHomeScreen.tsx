@@ -1,385 +1,691 @@
-/* eslint-disable react-native/no-inline-styles */
 import React from 'react';
 import {
   View,
   Text,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Dimensions,
   StatusBar,
-  SafeAreaView,
-  ScrollView,
+  ImageBackground,
 } from 'react-native';
-import Icon from 'src/assets/icons/index';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { signOutThunk } from '../../store/thunks/authThunks';
 import { RootState } from '../../store';
-import { BrandColors } from 'src/theme/colors';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
+
+const { width } = Dimensions.get('window');
 
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
   const dispatch = useDispatch<any>();
   const navigation = useNavigation();
   // Get user data from Redux store
-  const { userProfile, phoneNumber, role } = useSelector(
-    (state: RootState) => state.auth,
-  );
+  const { userProfile } = useSelector((state: RootState) => state.auth);
+
+  const quickActions = [
+    {
+      id: 'ride',
+      title: 'Book a Ride',
+      subtitle: 'Find nearby drivers',
+      icon: 'local-taxi',
+      color: theme.colors.primary,
+      onPress: () => console.log('Book ride'),
+    },
+    {
+      id: 'history',
+      title: 'Ride History',
+      subtitle: 'View past trips',
+      icon: 'history',
+      color: theme.colors.secondary,
+      onPress: () => console.log('View history'),
+    },
+    {
+      id: 'favorites',
+      title: 'Favorites',
+      subtitle: 'Saved locations',
+      icon: 'favorite',
+      color: '#FF6B6B',
+      onPress: () => console.log('Favorites'),
+    },
+    {
+      id: 'wallet',
+      title: 'Wallet',
+      subtitle: 'Payment methods',
+      icon: 'account-balance-wallet',
+      color: '#4ECDC4',
+      onPress: () => console.log('Wallet'),
+    },
+  ];
+
+  const stats = [
+    { label: 'Total Rides', value: '24', icon: 'local-taxi' },
+    { label: 'Rating', value: '4.8', icon: 'star' },
+    { label: 'Distance', value: '156 km', icon: 'straighten' },
+  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1e3a8a" />
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
+    <ImageBackground
+      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      {/* Dull/Blur Overlay */}
+      <View style={styles.overlay} />
+      <View style={styles.overlay2} />
+
+      <View style={[styles.container, styles.transparentBackground]}>
+        <StatusBar
+          barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
+          backgroundColor={theme.colors.primary}
+        />
+
+        {/* Header with Cartoon-style Background */}
+        <View style={[styles.header, styles.headerBackground]}>
+          {/* Decorative Circles */}
+          <View style={styles.decorativeCircle1} />
+          <View style={styles.decorativeCircle2} />
+          <View style={styles.decorativeCircle3} />
+          <View style={styles.decorativeCircle4} />
+          <View style={styles.decorativeCircle5} />
+
           <View style={styles.headerContent}>
             <View>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              >
-                <View>
-                  <Text style={styles.greeting}>Good Evening</Text>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 5,
-                    }}
-                  >
-                    <Text style={styles.userName}>{userProfile?.fullName}</Text>
-                  </View>
-                </View>
-                <View>
-                  <TouchableOpacity
-                    style={styles.userIcon}
-                    onPress={() => navigation.navigate('PassengerPofile')}
-                  >
-                    <Icon
-                      name="person"
-                      size={20}
-                      color="#ffffff"
-                      type={'fontistoIcon'}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.verifiedBadge}>
-                <Icon
-                  name="check"
-                  size={14}
-                  color="#ffffff"
-                  style={styles.checkIcon}
-                  type={'antDesignIcon'}
-                />
-                <Text style={styles.verifiedText}>
-                  {' '}
-                  {userProfile?.isVerified ? 'Verified User' : 'Not verified'}
-                </Text>
-              </View>
-              <View style={styles.adventurePrompt}>
-                <Text style={styles.adventureText}>
-                  🚗 Ready for your next adventure?
-                </Text>
-              </View>
+              <Text style={styles.greeting}>
+                Good{' '}
+                {new Date().getHours() < 12
+                  ? 'Morning'
+                  : new Date().getHours() < 18
+                  ? 'Afternoon'
+                  : 'Evening'}
+              </Text>
+              <Text style={styles.userName}>
+                {userProfile?.fullName || 'Passenger'}
+              </Text>
             </View>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => navigation.navigate('PassengerPofile')}
+            >
+              <Icon name="person" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Status Badge with Cartoon Style */}
+          <View
+            style={[
+              styles.statusBadge,
+              userProfile?.isVerified
+                ? styles.statusVerified
+                : styles.statusPending,
+            ]}
+          >
+            <Icon
+              name={userProfile?.isVerified ? 'verified' : 'schedule'}
+              size={16}
+              color="white"
+            />
+            <Text style={styles.statusText}>
+              {userProfile?.isVerified ? 'Verified' : 'Pending'}
+            </Text>
+          </View>
+
+          {/* Welcome Message with Cartoon Style */}
+          <View style={styles.welcomeMessage}>
+            <Text style={styles.welcomeText}>
+              🚗 Ready for your next adventure?
+            </Text>
           </View>
         </View>
 
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Stats Cards */}
+          <View style={styles.statsContainer}>
+            {stats.map((stat, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.statCard,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+              >
+                <Icon name={stat.icon} size={24} color={theme.colors.primary} />
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                  {stat.value}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.colors.mutedText }]}
+                >
+                  {stat.label}
+                </Text>
+              </View>
+            ))}
+          </View>
 
-          <View style={styles.activityCard}>
-            <View style={styles.activityItem}>
-              <View style={styles.activityInfo}>
-                <Icon
-                  name="car-side"
-                  size={20}
-                  color={BrandColors.primary}
-                  type={'fontAwesome6Icon'}
-                />
-                <View style={styles.activityDetails}>
-                  <Text style={styles.activityTitle}>Ride to Airport</Text>
-                  <Text style={styles.activitySubtitle}>
+          {/* Quick Actions Grid */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Quick Actions
+            </Text>
+            <View style={styles.actionsGrid}>
+              {quickActions.map(action => (
+                <TouchableOpacity
+                  key={action.id}
+                  style={[
+                    styles.actionCard,
+                    { backgroundColor: theme.colors.surface },
+                  ]}
+                  onPress={action.onPress}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.actionIcon,
+                      { backgroundColor: action.color + '20' },
+                    ]}
+                  >
+                    <Icon name={action.icon} size={28} color={action.color} />
+                  </View>
+                  <Text
+                    style={[styles.actionTitle, { color: theme.colors.text }]}
+                  >
+                    {action.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.actionSubtitle,
+                      { color: theme.colors.mutedText },
+                    ]}
+                  >
+                    {action.subtitle}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Recent Activity */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Recent Activity
+            </Text>
+            <View
+              style={[
+                styles.activityCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
+            >
+              <View style={styles.activityItem}>
+                <View
+                  style={[
+                    styles.activityIcon,
+                    { backgroundColor: theme.colors.primary + '20' },
+                  ]}
+                >
+                  <Icon
+                    name="local-taxi"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text
+                    style={[styles.activityTitle, { color: theme.colors.text }]}
+                  >
+                    Ride to Airport
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activitySubtitle,
+                      { color: theme.colors.mutedText },
+                    ]}
+                  >
                     Yesterday, 2:30 PM
                   </Text>
                 </View>
-              </View>
-              <Text style={styles.price}>$24.50</Text>
-            </View>
-
-            <View style={[styles.activityItem, styles.borderTop]}>
-              <View style={styles.activityInfo}>
-                <Icon
-                  name="star"
-                  size={20}
-                  color="#10b981"
-                  type={'antDesignIcon'}
-                />
-                <View style={styles.activityDetails}>
-                  <Text style={styles.activityTitle}>Rated Driver</Text>
-                  <Text style={styles.activitySubtitle}>2 days ago</Text>
-                </View>
-              </View>
-              <Text style={styles.rating}>5.0</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.accountCard}>
-            <TouchableOpacity style={styles.accountItem}>
-              <View style={styles.accountInfo}>
-                <Icon
-                  name="pen"
-                  size={20}
-                  color={BrandColors.primary}
-                  type={'fontAwesome6Icon'}
-                />
-                <Text style={styles.accountText}>Edit Profile</Text>
-              </View>
-              <Icon
-                name="chevron-small-right"
-                size={25}
-                color="#9ca3af"
-                type={'entypoIcon'}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.accountItem, styles.borderTop]}>
-              <View style={styles.accountInfo}>
-                <Icon
-                  name="settings"
-                  size={20}
-                  color={BrandColors.primary}
-                  type={'ioniconsIcon'}
-                />
-                <Text style={styles.accountText}>Settings</Text>
-              </View>
-              <Icon
-                name="chevron-small-right"
-                size={25}
-                color="#9ca3af"
-                type={'entypoIcon'}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.accountItem, styles.borderTop]}>
-              <View style={styles.accountInfo}>
-                <Icon
-                  name="logout"
-                  size={20}
-                  color="#ef4444"
-                  type={'antDesignIcon'}
-                />
-                <Text style={[styles.accountText, styles.signOutText]}>
-                  Sign Out
+                <Text
+                  style={[
+                    styles.activityPrice,
+                    { color: theme.colors.primary },
+                  ]}
+                >
+                  $24.50
                 </Text>
               </View>
-              <Icon
-                name="chevron-small-right"
-                size={25}
-                color="#9ca3af"
-                type={'entypoIcon'}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-    </SafeAreaView>
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: theme.colors.border },
+                ]}
+              />
+
+              <View style={styles.activityItem}>
+                <View
+                  style={[
+                    styles.activityIcon,
+                    { backgroundColor: theme.colors.success + '20' },
+                  ]}
+                >
+                  <Icon name="star" size={20} color={theme.colors.success} />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text
+                    style={[styles.activityTitle, { color: theme.colors.text }]}
+                  >
+                    Rated Driver
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activitySubtitle,
+                      { color: theme.colors.mutedText },
+                    ]}
+                  >
+                    2 days ago
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.activityPrice,
+                    { color: theme.colors.success },
+                  ]}
+                >
+                  5.0
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Account Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Account
+            </Text>
+            <View
+              style={[
+                styles.accountCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => console.log('Edit Profile')}
+              >
+                <Icon name="edit" size={24} color={theme.colors.primary} />
+                <Text
+                  style={[styles.accountText, { color: theme.colors.text }]}
+                >
+                  Edit Profile
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={24}
+                  color={theme.colors.mutedText}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: theme.colors.border },
+                ]}
+              />
+
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => console.log('Settings')}
+              >
+                <Icon name="settings" size={24} color={theme.colors.primary} />
+                <Text
+                  style={[styles.accountText, { color: theme.colors.text }]}
+                >
+                  Settings
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={24}
+                  color={theme.colors.mutedText}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: theme.colors.border },
+                ]}
+              />
+
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => dispatch(signOutThunk())}
+              >
+                <Icon name="logout" size={24} color={theme.colors.warning} />
+                <Text
+                  style={[styles.accountText, { color: theme.colors.warning }]}
+                >
+                  Sign Out
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={24}
+                  color={theme.colors.mutedText}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Bottom Spacing */}
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+      </View>
+    </ImageBackground>
   );
 }
+
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    zIndex: 1,
+  },
+  overlay2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    zIndex: 2,
+  },
+  transparentBackground: {
+    backgroundColor: 'transparent',
+  },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  headerBackground: {
+    backgroundColor: '#011c72ff',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  greeting: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  userName: {
+    fontSize: 24,
+    color: 'white',
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  profileButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: -30,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    top: 20,
+    left: -20,
+  },
+  decorativeCircle3: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    bottom: 10,
+    right: 50,
+  },
+  decorativeCircle4: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    top: 60,
+    right: 80,
+  },
+  decorativeCircle5: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    bottom: -20,
+    left: 30,
+  },
+  welcomeMessage: {
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusVerified: {
+    backgroundColor: '#00C851',
+  },
+  statusPending: {
+    backgroundColor: '#FF9500',
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    backgroundColor: BrandColors.primary,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 35,
-    borderBottomRightRadius: 35,
-    marginBottom: 20,
+  scrollContent: {
+    padding: 20,
   },
-  headerTop: {
+  statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 30,
   },
-  headerIcons: {
-    flexDirection: 'row',
+  statCard: {
+    flex: 1,
     alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
+    marginHorizontal: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 4,
   },
-  userIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerContent: {},
-  greeting: {
-    color: '#e5e7eb',
-    fontSize: 16,
-    marginBottom: -5
-  },
-  userName: {
-    color: '#ffffff',
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#10b981',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 15,
-    alignSelf: 'flex-start',
-  },
-  checkIcon: {
-    marginRight: 5,
-  },
-  verifiedText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  adventurePrompt: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 20,
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
     textAlign: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    alignItems: 'center',
-    width: '100%',
   },
-  adventureText: {
-    color: '#ffffff',
-    fontSize: 16,
-  },
-  sectionContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
+  section: {
+    marginBottom: 30,
   },
   sectionTitle: {
     fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    width: (width - 60) / 2,
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  actionTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 15,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  actionSubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
   },
   activityCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 8,
     elevation: 3,
   },
   activityItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: 12,
   },
-  borderTop: {
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  activityInfo: {
-    flexDirection: 'row',
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
+  },
+  activityContent: {
     flex: 1,
-    gap: 15,
-  },
-  activityDetails: {
-    gap: 5,
   },
   activityTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   activitySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
   },
-  price: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: BrandColors.primary,
+  activityPrice: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  rating: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#10b981',
+  divider: {
+    height: 1,
+    marginVertical: 8,
   },
   accountCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 16,
-    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 8,
     elevation: 3,
   },
   accountItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 18,
-  },
-  accountInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    padding: 20,
   },
   accountText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '500',
-    color: '#1f2937',
-    marginLeft: 15,
+    marginLeft: 16,
   },
-  signOutText: {
-    color: '#ef4444',
-  },
-  bottomPadding: {
+  bottomSpacing: {
     height: 20,
   },
 });
