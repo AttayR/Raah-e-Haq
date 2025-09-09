@@ -28,7 +28,6 @@ const ProfileSettingsScreen = () => {
       >
         <View style={styles.header}>
           <View style={styles.profileSection}>
-            <View style={styles.profileImageContainer}>
               <View style={styles.profileImage}>
                 <Icon
                   name="person"
@@ -36,11 +35,9 @@ const ProfileSettingsScreen = () => {
                   color="#6b7280"
                   type="fontistoIcon"
                 />
-              </View>
             </View>
 
             <Text style={styles.passengerName}>{userProfile?.fullName}</Text>
-
             <View style={styles.ratingContainer}>
               <Icon
                 name="star"
@@ -74,7 +71,6 @@ const ProfileSettingsScreen = () => {
           </View>
         </View>
 
-        {/* Settings Options */}
         <View style={styles.optionsContainer}>
           <TouchableOpacity style={styles.optionItem}>
             <View style={styles.optionInfo}>
@@ -206,7 +202,7 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.primary,
     paddingTop: 10,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 10,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     marginBottom: 20,
@@ -215,7 +211,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profileImageContainer: {
-    marginBottom: 20,
   },
   profileImage: {
     width: 80,
@@ -226,12 +221,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 4,
     borderColor: '#ffffff',
+     marginBottom: 10
   },
   passengerName: {
     color: '#ffffff',
     fontSize: 24,
     fontWeight: '600',
-    marginBottom: 15,
+    marginBottom: 10
   },
   ratingContainer: {
     flexDirection: 'row',

@@ -5,7 +5,7 @@ import { useAppTheme } from '../../providers/ThemeProvider';
 import PassengerHomeScreen from 'src/screens/Passenger/PassengerHomeScreen';
 import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
-import PassengerChatScreen from 'src/screens/Passenger/PassengerChatScreen';
+import PassengerChatScreen from 'src/screens/Passenger/chat/PassengerChatScreen';
 import PassengerSettingsScreen from 'src/screens/Passenger/PassengerSettingsScreen';
 
 export type PassengerTabParamList = {
