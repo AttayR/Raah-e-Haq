@@ -62,7 +62,7 @@ export default function SignupScreen() {
         onChangeText={setConfirmPassword}
       />
 
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      {/* <View style={{ flexDirection: 'row', gap: 12 }}>
         <BrandButton
           title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'}
           variant="secondary"
@@ -75,7 +75,7 @@ export default function SignupScreen() {
           onPress={() => setRole('driver')}
           style={{ flex: 1 }}
         />
-      </View>
+      </View> */}
 
       <BrandButton title="Sign up" onPress={onSignup} variant="primary" />
       <BrandButton
