@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Image,
+  ImageBackground,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { launchImageLibrary, launchCamera, MediaType, ImagePickerResponse } from 'react-native-image-picker';
@@ -67,31 +68,47 @@ const PassengerProfile = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={BrandColors.primary}
-      />
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Icon
-                name="left"
-                size={20}
-                color="#ffffff"
-                type="antDesignIcon"
-              />
-            </TouchableOpacity>
-          </View>
+    <ImageBackground
+      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      {/* Dull/Blur Overlay */}
+      <View style={styles.overlay} />
+      <View style={styles.overlay2} />
+      
+      <SafeAreaView style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={BrandColors.primary}
+        />
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            {/* Decorative Circles */}
+            <View style={styles.decorativeCircle1} />
+            <View style={styles.decorativeCircle2} />
+            <View style={styles.decorativeCircle3} />
+            <View style={styles.decorativeCircle4} />
+            <View style={styles.decorativeCircle5} />
+            
+            <View style={styles.headerTop}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+              >
+                <Icon
+                  name="left"
+                  size={20}
+                  color="#ffffff"
+                  type="antDesignIcon"
+                />
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.profileSection}>
+            <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
               <View style={styles.profileImage}>
                 {profileImage ? (
@@ -321,13 +338,38 @@ const PassengerProfile = () => {
         <View style={styles.bottomPadding} />
       </ScrollView>
     </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    zIndex: 1,
+  },
+  overlay2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'transparent',
+    zIndex: 2,
   },
   scrollView: {
     flex: 1,
@@ -340,6 +382,53 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     marginBottom: 20,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: -30,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    top: 20,
+    left: -20,
+  },
+  decorativeCircle3: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    bottom: 10,
+    right: 50,
+  },
+  decorativeCircle4: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    top: 60,
+    right: 80,
+  },
+  decorativeCircle5: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    bottom: -20,
+    left: 30,
   },
   headerTop: {
     flexDirection: 'row',

@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   FlatList,
   Image,
+  ImageBackground,
 } from 'react-native';
 import Icon from 'src/assets/icons/index';
 import { BrandColors } from 'src/theme/colors';
@@ -122,31 +123,72 @@ const PassengerChatScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={BrandColors.primary}
-      />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Messages</Text>
+    <ImageBackground
+      source={require('../../../assets/images/BackgroundRaaheHaq.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      {/* Dull/Blur Overlay */}
+      <View style={styles.overlay} />
+      <View style={styles.overlay2} />
+      
+      <SafeAreaView style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={BrandColors.primary}
+        />
+        <View style={styles.header}>
+          {/* Decorative Circles */}
+          <View style={styles.decorativeCircle1} />
+          <View style={styles.decorativeCircle2} />
+          <View style={styles.decorativeCircle3} />
+          <View style={styles.decorativeCircle4} />
+          <View style={styles.decorativeCircle5} />
+          
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Messages</Text>
+          </View>
         </View>
-      </View>
-      <FlatList
-        data={dummyChats}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => renderChatItem(item)}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.flatListContent}
-      />
-    </SafeAreaView>
+        <FlatList
+          data={dummyChats}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => renderChatItem(item)}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.flatListContent}
+        />
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    zIndex: 1,
+  },
+  overlay2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'transparent',
+    zIndex: 2,
   },
   flatListContent: {
     paddingHorizontal: 20,
@@ -159,6 +201,53 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
     marginBottom: 15,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: -30,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    top: 20,
+    left: -20,
+  },
+  decorativeCircle3: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    bottom: 10,
+    right: 50,
+  },
+  decorativeCircle4: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    top: 60,
+    right: 80,
+  },
+  decorativeCircle5: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    bottom: -20,
+    left: 30,
   },
   headerContent: {
     flexDirection: 'row',
