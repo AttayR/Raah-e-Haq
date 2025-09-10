@@ -1,9 +1,13 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import PassengerBottomTabs from '../tabs/PassengerBottomTabs';
+import PassengerProfile from 'src/screens/Passenger/Passengerprofile';
+import MessagesScreen from 'src/screens/Passenger/chat/MessagesScreen';
 
 export type PassengerStackParamList = {
   PassengerTabs: undefined;
+  PassengerPofile: undefined;
+  MessagesScreen: { chatData: any };
 };
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
@@ -12,6 +16,8 @@ const PassengerStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
+      <Stack.Screen name="PassengerPofile" component={PassengerProfile} />
+      <Stack.Screen name="MessagesScreen" component={MessagesScreen} />
     </Stack.Navigator>
   );
 };

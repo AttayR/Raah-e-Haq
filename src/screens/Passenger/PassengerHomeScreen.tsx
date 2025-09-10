@@ -1,26 +1,27 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  StyleSheet, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
   Dimensions,
   StatusBar,
-  ImageBackground
+  ImageBackground,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { signOutThunk } from '../../store/thunks/authThunks';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
   const dispatch = useDispatch<any>();
-  
+  const navigation = useNavigation();
   // Get user data from Redux store
   const { userProfile } = useSelector((state: RootState) => state.auth);
 
@@ -31,7 +32,7 @@ export default function PassengerHomeScreen() {
       subtitle: 'Find nearby drivers',
       icon: 'local-taxi',
       color: theme.colors.primary,
-      onPress: () => console.log('Book ride')
+      onPress: () => console.log('Book ride'),
     },
     {
       id: 'history',
@@ -39,7 +40,7 @@ export default function PassengerHomeScreen() {
       subtitle: 'View past trips',
       icon: 'history',
       color: theme.colors.secondary,
-      onPress: () => console.log('View history')
+      onPress: () => console.log('View history'),
     },
     {
       id: 'favorites',
@@ -47,7 +48,7 @@ export default function PassengerHomeScreen() {
       subtitle: 'Saved locations',
       icon: 'favorite',
       color: '#FF6B6B',
-      onPress: () => console.log('Favorites')
+      onPress: () => console.log('Favorites'),
     },
     {
       id: 'wallet',
@@ -55,18 +56,18 @@ export default function PassengerHomeScreen() {
       subtitle: 'Payment methods',
       icon: 'account-balance-wallet',
       color: '#4ECDC4',
-      onPress: () => console.log('Wallet')
-    }
+      onPress: () => console.log('Wallet'),
+    },
   ];
 
   const stats = [
     { label: 'Total Rides', value: '24', icon: 'local-taxi' },
     { label: 'Rating', value: '4.8', icon: 'star' },
-    { label: 'Distance', value: '156 km', icon: 'straighten' }
+    { label: 'Distance', value: '156 km', icon: 'straighten' },
   ];
 
   return (
-    <ImageBackground 
+    <ImageBackground
       source={require('../../assets/images/BackgroundRaaheHaq.png')}
       style={styles.backgroundImage}
       resizeMode="cover"
@@ -74,13 +75,13 @@ export default function PassengerHomeScreen() {
       {/* Dull/Blur Overlay */}
       <View style={styles.overlay} />
       <View style={styles.overlay2} />
-      
+
       <View style={[styles.container, styles.transparentBackground]}>
-        <StatusBar 
-          barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} 
+        <StatusBar
+          barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
           backgroundColor={theme.colors.primary}
         />
-        
+
         {/* Header with Cartoon-style Background */}
         <View style={[styles.header, styles.headerBackground]}>
           {/* Decorative Circles */}
@@ -89,138 +90,298 @@ export default function PassengerHomeScreen() {
           <View style={styles.decorativeCircle3} />
           <View style={styles.decorativeCircle4} />
           <View style={styles.decorativeCircle5} />
-          
+
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.greeting}>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}</Text>
-              <Text style={styles.userName}>{userProfile?.fullName || 'Passenger'}</Text>
+              <Text style={styles.greeting}>
+                Good{' '}
+                {new Date().getHours() < 12
+                  ? 'Morning'
+                  : new Date().getHours() < 18
+                  ? 'Afternoon'
+                  : 'Evening'}
+              </Text>
+              <Text style={styles.userName}>
+                {userProfile?.fullName || 'Passenger'}
+              </Text>
             </View>
-            <TouchableOpacity style={styles.profileButton}>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => navigation.navigate('PassengerPofile')}
+            >
               <Icon name="person" size={24} color="white" />
             </TouchableOpacity>
           </View>
-          
+
           {/* Status Badge with Cartoon Style */}
-          <View style={[
-            styles.statusBadge, 
-            userProfile?.isVerified ? styles.statusVerified : styles.statusPending
-          ]}>
-            <Icon 
-              name={userProfile?.isVerified ? 'verified' : 'schedule'} 
-              size={16} 
-              color="white" 
+          <View
+            style={[
+              styles.statusBadge,
+              userProfile?.isVerified
+                ? styles.statusVerified
+                : styles.statusPending,
+            ]}
+          >
+            <Icon
+              name={userProfile?.isVerified ? 'verified' : 'schedule'}
+              size={16}
+              color="white"
             />
             <Text style={styles.statusText}>
               {userProfile?.isVerified ? 'Verified' : 'Pending'}
             </Text>
           </View>
-          
+
           {/* Welcome Message with Cartoon Style */}
           <View style={styles.welcomeMessage}>
-            <Text style={styles.welcomeText}>🚗 Ready for your next adventure?</Text>
+            <Text style={styles.welcomeText}>
+              🚗 Ready for your next adventure?
+            </Text>
           </View>
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          {stats.map((stat, index) => (
-            <View key={index} style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
-              <Icon name={stat.icon} size={24} color={theme.colors.primary} />
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.mutedText }]}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Quick Actions Grid */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
-              <TouchableOpacity
-                key={action.id}
-                style={[styles.actionCard, { backgroundColor: theme.colors.surface }]}
-                onPress={action.onPress}
-                activeOpacity={0.7}
+          {/* Stats Cards */}
+          <View style={styles.statsContainer}>
+            {stats.map((stat, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.statCard,
+                  { backgroundColor: theme.colors.surface },
+                ]}
               >
-                <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
-                  <Icon name={action.icon} size={28} color={action.color} />
-                </View>
-                <Text style={[styles.actionTitle, { color: theme.colors.text }]}>{action.title}</Text>
-                <Text style={[styles.actionSubtitle, { color: theme.colors.mutedText }]}>{action.subtitle}</Text>
-              </TouchableOpacity>
+                <Icon name={stat.icon} size={24} color={theme.colors.primary} />
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                  {stat.value}
+                </Text>
+                <Text
+                  style={[styles.statLabel, { color: theme.colors.mutedText }]}
+                >
+                  {stat.label}
+                </Text>
+              </View>
             ))}
           </View>
-        </View>
 
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Activity</Text>
-          <View style={[styles.activityCard, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: theme.colors.primary + '20' }]}>
-                <Icon name="local-taxi" size={20} color={theme.colors.primary} />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={[styles.activityTitle, { color: theme.colors.text }]}>Ride to Airport</Text>
-                <Text style={[styles.activitySubtitle, { color: theme.colors.mutedText }]}>Yesterday, 2:30 PM</Text>
-              </View>
-              <Text style={[styles.activityPrice, { color: theme.colors.primary }]}>$24.50</Text>
-            </View>
-            
-            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-            
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: theme.colors.success + '20' }]}>
-                <Icon name="star" size={20} color={theme.colors.success} />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={[styles.activityTitle, { color: theme.colors.text }]}>Rated Driver</Text>
-                <Text style={[styles.activitySubtitle, { color: theme.colors.mutedText }]}>2 days ago</Text>
-              </View>
-              <Text style={[styles.activityPrice, { color: theme.colors.success }]}>5.0</Text>
+          {/* Quick Actions Grid */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Quick Actions
+            </Text>
+            <View style={styles.actionsGrid}>
+              {quickActions.map(action => (
+                <TouchableOpacity
+                  key={action.id}
+                  style={[
+                    styles.actionCard,
+                    { backgroundColor: theme.colors.surface },
+                  ]}
+                  onPress={action.onPress}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.actionIcon,
+                      { backgroundColor: action.color + '20' },
+                    ]}
+                  >
+                    <Icon name={action.icon} size={28} color={action.color} />
+                  </View>
+                  <Text
+                    style={[styles.actionTitle, { color: theme.colors.text }]}
+                  >
+                    {action.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.actionSubtitle,
+                      { color: theme.colors.mutedText },
+                    ]}
+                  >
+                    {action.subtitle}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-        </View>
 
-        {/* Account Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Account</Text>
-          <View style={[styles.accountCard, { backgroundColor: theme.colors.surface }]}>
-            <TouchableOpacity style={styles.accountItem} onPress={() => console.log('Edit Profile')}>
-              <Icon name="edit" size={24} color={theme.colors.primary} />
-              <Text style={[styles.accountText, { color: theme.colors.text }]}>Edit Profile</Text>
-              <Icon name="chevron-right" size={24} color={theme.colors.mutedText} />
-            </TouchableOpacity>
-            
-            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-            
-            <TouchableOpacity style={styles.accountItem} onPress={() => console.log('Settings')}>
-              <Icon name="settings" size={24} color={theme.colors.primary} />
-              <Text style={[styles.accountText, { color: theme.colors.text }]}>Settings</Text>
-              <Icon name="chevron-right" size={24} color={theme.colors.mutedText} />
-            </TouchableOpacity>
-            
-            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-            
-            <TouchableOpacity 
-              style={styles.accountItem} 
-              onPress={() => dispatch(signOutThunk())}
+          {/* Recent Activity */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Recent Activity
+            </Text>
+            <View
+              style={[
+                styles.activityCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
             >
-              <Icon name="logout" size={24} color={theme.colors.warning} />
-              <Text style={[styles.accountText, { color: theme.colors.warning }]}>Sign Out</Text>
-              <Icon name="chevron-right" size={24} color={theme.colors.mutedText} />
-            </TouchableOpacity>
-          </View>
-        </View>
+              <View style={styles.activityItem}>
+                <View
+                  style={[
+                    styles.activityIcon,
+                    { backgroundColor: theme.colors.primary + '20' },
+                  ]}
+                >
+                  <Icon
+                    name="local-taxi"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text
+                    style={[styles.activityTitle, { color: theme.colors.text }]}
+                  >
+                    Ride to Airport
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activitySubtitle,
+                      { color: theme.colors.mutedText },
+                    ]}
+                  >
+                    Yesterday, 2:30 PM
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.activityPrice,
+                    { color: theme.colors.primary },
+                  ]}
+                >
+                  $24.50
+                </Text>
+              </View>
 
-        {/* Bottom Spacing */}
-        <View style={styles.bottomSpacing} />
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: theme.colors.border },
+                ]}
+              />
+
+              <View style={styles.activityItem}>
+                <View
+                  style={[
+                    styles.activityIcon,
+                    { backgroundColor: theme.colors.success + '20' },
+                  ]}
+                >
+                  <Icon name="star" size={20} color={theme.colors.success} />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text
+                    style={[styles.activityTitle, { color: theme.colors.text }]}
+                  >
+                    Rated Driver
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activitySubtitle,
+                      { color: theme.colors.mutedText },
+                    ]}
+                  >
+                    2 days ago
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.activityPrice,
+                    { color: theme.colors.success },
+                  ]}
+                >
+                  5.0
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Account Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Account
+            </Text>
+            <View
+              style={[
+                styles.accountCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => console.log('Edit Profile')}
+              >
+                <Icon name="edit" size={24} color={theme.colors.primary} />
+                <Text
+                  style={[styles.accountText, { color: theme.colors.text }]}
+                >
+                  Edit Profile
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={24}
+                  color={theme.colors.mutedText}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: theme.colors.border },
+                ]}
+              />
+
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => console.log('Settings')}
+              >
+                <Icon name="settings" size={24} color={theme.colors.primary} />
+                <Text
+                  style={[styles.accountText, { color: theme.colors.text }]}
+                >
+                  Settings
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={24}
+                  color={theme.colors.mutedText}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.divider,
+                  { backgroundColor: theme.colors.border },
+                ]}
+              />
+
+              <TouchableOpacity
+                style={styles.accountItem}
+                onPress={() => dispatch(signOutThunk())}
+              >
+                <Icon name="logout" size={24} color={theme.colors.warning} />
+                <Text
+                  style={[styles.accountText, { color: theme.colors.warning }]}
+                >
+                  Sign Out
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={24}
+                  color={theme.colors.mutedText}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Bottom Spacing */}
+          <View style={styles.bottomSpacing} />
         </ScrollView>
       </View>
     </ImageBackground>
