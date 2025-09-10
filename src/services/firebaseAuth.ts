@@ -31,14 +31,19 @@ const SESSION_KEY = '@auth_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // Phone Authentication
-export const sendPhoneVerification = async (phoneNumber: string): Promise<string> => {
+export const sendPhoneVerification = async (phoneNumber: string): Promise<{ verificationId: string; isExistingUser: boolean; userProfile?: UserProfile }> => {
   try {
     // Check if user already exists
     const existingUser = await getUserByPhone(phoneNumber);
     
     // Send verification code using React Native Firebase
     const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
-    return confirmation.verificationId;
+    
+    return {
+      verificationId: confirmation.verificationId,
+      isExistingUser: !!existingUser,
+      userProfile: existingUser || undefined
+    };
   } catch (error: any) {
     console.error('Error sending verification code:', error);
     throw new Error(error.message || 'Failed to send verification code');
@@ -242,4 +247,30 @@ export const getCurrentUser = (): FirebaseAuthTypes.User | null => {
 export const isPhoneNumberVerified = (): boolean => {
   const user = auth().currentUser;
   return user ? user.phoneNumber !== null : false;
+};
+
+// Helper function to create a test user for demonstration
+export const createTestUser = async (phoneNumber: string, role: 'driver' | 'passenger' = 'passenger'): Promise<UserProfile> => {
+  try {
+    const testUid = `test_${Date.now()}`;
+    const userProfile: UserProfile = {
+      uid: testUid,
+      phoneNumber,
+      role,
+      displayName: 'Test User',
+      fullName: 'Test User',
+      email: 'test@example.com',
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+      isVerified: true,
+      isActive: true
+    };
+
+    await firestore().collection('users').doc(testUid).set(userProfile);
+    console.log('Test user created:', userProfile);
+    return userProfile;
+  } catch (error: any) {
+    console.error('Error creating test user:', error);
+    throw new Error(error.message || 'Failed to create test user');
+  }
 };
