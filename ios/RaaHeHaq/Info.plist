@@ -6,6 +6,11 @@
 	<array>
 		<string>MaterialIcons.ttf</string>
 		<string>FontAwesome.ttf</string>
+		<string>FontAwesome6_Solid.ttf</string>
+		<string>AntDesign.ttf</string>
+		<string>Entypo.ttf</string>
+		<string>Fontisto.ttf</string>
+		<string>Ionicons.ttf</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
