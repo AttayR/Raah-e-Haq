@@ -9,8 +9,13 @@ import {
   listenAuth,
   getAuthSession,
   refreshAuthSession,
-  updateUserProfile
+  updateUserProfile,
+  emailSignUp,
+  emailSignIn,
+  resetPassword,
+  createUserProfileWithDetails
 } from '../../services/firebaseAuth';
+import firestore from '@react-native-firebase/firestore';
 import {
   setAuthError,
   setAuthLoading,
@@ -21,7 +26,10 @@ import {
   setPhoneNumber,
   setSession,
   clearError,
-  updateUserProfile as updateUserProfileAction
+  updateUserProfile as updateUserProfileAction,
+  setUserStatus,
+  clearUserStatus,
+  setProfileCompleted
 } from '../slices/authSlice';
 
 // Start authentication listener
@@ -68,16 +76,24 @@ export const sendVerificationCodeThunk = (phoneNumber: string) => async (dispatc
   try {
     dispatch(setAuthLoading());
     dispatch(clearError());
+    dispatch(clearUserStatus());
     
     // Format phone number (add + if not present)
     const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
     dispatch(setPhoneNumber(formattedPhone));
     
     // Use actual Firebase phone authentication
-    const verificationId = await sendPhoneVerification(formattedPhone);
-    dispatch(setVerificationId(verificationId));
+    const result = await sendPhoneVerification(formattedPhone);
+    dispatch(setVerificationId(result.verificationId));
     
-    return verificationId;
+    // Set user status based on whether user exists
+    dispatch(setUserStatus({
+      isExistingUser: result.isExistingUser,
+      userStatus: result.isExistingUser ? 'existing' : 'new',
+      userProfile: result.userProfile
+    }));
+    
+    return result;
   } catch (error: any) {
     const errorMessage = error.message || 'Failed to send verification code';
     dispatch(setAuthError(errorMessage));
@@ -98,7 +114,7 @@ export const verifyCodeThunk = (
     dispatch(clearError());
     
     const { auth } = getState();
-    const { verificationId, phoneNumber } = auth;
+    const { verificationId, phoneNumber, isExistingUser, userProfile: existingUserProfile } = auth;
     
     console.log('verifyCodeThunk - Current auth state:', auth);
     
@@ -111,6 +127,36 @@ export const verifyCodeThunk = (
     const userCredential = await verifyPhoneCode(verificationId, verificationCode);
     const user = userCredential.user;
     console.log('verifyCodeThunk - Firebase verification successful, user:', user.uid);
+    
+    // Handle existing user flow
+    if (isExistingUser && existingUserProfile) {
+      console.log('verifyCodeThunk - Existing user detected, signing in...');
+      
+      // Update last login time
+      await updateUserProfile(user.uid, { 
+        updatedAt: firestore.FieldValue.serverTimestamp() 
+      });
+      
+      // Create session for existing user
+      const session = await createAuthSession(user, existingUserProfile);
+      
+      // Set authenticated state for existing user with profileCompleted = true
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber: existingUserProfile.phoneNumber,
+        role: existingUserProfile.role,
+        userProfile: existingUserProfile,
+        session,
+        profileCompleted: true
+      }));
+      
+      dispatch(setSession(session));
+      console.log('verifyCodeThunk - Existing user signed in successfully');
+      return { user, userProfile: existingUserProfile, session, isExistingUser: true };
+    }
+    
+    // Handle new user flow
+    console.log('verifyCodeThunk - New user detected...');
     
     // If no role provided, just authenticate the user without setting a role
     if (!role) {
@@ -131,35 +177,18 @@ export const verifyCodeThunk = (
         phoneNumber,
         role: undefined,
         userProfile: null,
-        session
+        session,
+        profileCompleted: false
       }));
       
       dispatch(setSession(session));
       console.log('verifyCodeThunk - User authenticated without role, ready for role selection');
-      return { user, userProfile: null, session };
+      return { user, userProfile: null, session, isExistingUser: false };
     }
     
-    // Check if user already exists
-    let userProfile = await getUserByPhone(phoneNumber);
-    
-    if (userProfile) {
-      console.log('verifyCodeThunk - Existing user found, updating role if needed...');
-      // Existing user - sign in
-      if (userProfile.uid !== user.uid) {
-        // Phone number exists but with different UID (shouldn't happen with phone auth)
-        throw new Error('Phone number already registered with different account');
-      }
-      
-      // Update role if different
-      if (userProfile.role !== role) {
-        await updateUserProfile(user.uid, { role });
-        userProfile = { ...userProfile, role };
-      }
-    } else {
-      console.log('verifyCodeThunk - Creating new user profile...');
-      // New user - create profile
-      userProfile = await createUserProfile(user.uid, phoneNumber, role, displayName, email);
-    }
+    // Create new user profile
+    console.log('verifyCodeThunk - Creating new user profile...');
+    const userProfile = await createUserProfile(user.uid, phoneNumber, role, displayName, email);
     
     console.log('verifyCodeThunk - User profile ready:', userProfile);
     
@@ -175,14 +204,15 @@ export const verifyCodeThunk = (
       phoneNumber: userProfile.phoneNumber,
       role: userProfile.role,
       userProfile,
-      session
+      session,
+      profileCompleted: true
     }));
     
     console.log('verifyCodeThunk - Dispatching setSession...');
     dispatch(setSession(session));
     
     console.log('verifyCodeThunk - Verification completed successfully');
-    return { user, userProfile, session };
+    return { user, userProfile, session, isExistingUser: false };
   } catch (error: any) {
     console.error('verifyCodeThunk - Error:', error);
     const errorMessage = error.message || 'Failed to verify code';
@@ -241,7 +271,8 @@ export const checkAuthStatusThunk = () => async (dispatch: AppDispatch, getState
         phoneNumber: session.phoneNumber,
         role: session.role || null,
         userProfile: null, // Will be loaded separately if needed
-        session
+        session,
+        profileCompleted: true // If there's a valid session, profile must be completed
       }));
       
       console.log('checkAuthStatusThunk - Authentication state restored from session');
@@ -291,13 +322,202 @@ export const updateProfileThunk = (updates: any) => async (dispatch: AppDispatch
   }
 };
 
+// Email/Password Authentication Thunks
+export const emailSignUpThunk = (
+  email: string, 
+  password: string, 
+  role: 'driver' | 'passenger',
+  displayName?: string
+) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('emailSignUpThunk - Starting email signup...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    // Validate password strength
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+    
+    // Sign up with email and password
+    const result = await emailSignUp(email.trim(), password, role, displayName?.trim());
+    const { user, userProfile, session } = result;
+    
+    // Set authenticated state
+    dispatch(setAuthenticated({
+      uid: user.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session,
+      profileCompleted: true
+    }));
+    
+    dispatch(setSession(session));
+    console.log('emailSignUpThunk - Email signup successful');
+    return { user, userProfile, session };
+  } catch (error: any) {
+    console.error('emailSignUpThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to create account';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
+export const emailSignInThunk = (email: string, password: string) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('emailSignInThunk - Starting email signin...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    // Sign in with email and password
+    const result = await emailSignIn(email.trim(), password);
+    const { user, userProfile, session, isExistingUser } = result;
+    
+    if (isExistingUser && userProfile) {
+      // Existing user with complete profile
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber: userProfile.phoneNumber,
+        role: userProfile.role,
+        userProfile,
+        session,
+        profileCompleted: true
+      }));
+    } else {
+      // User needs to complete profile
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber: email, // Use email as identifier
+        role: undefined,
+        userProfile: null,
+        session,
+        profileCompleted: false
+      }));
+    }
+    
+    dispatch(setSession(session));
+    console.log('emailSignInThunk - Email signin successful');
+    return { user, userProfile, session, isExistingUser };
+  } catch (error: any) {
+    console.error('emailSignInThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to sign in';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
+export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('resetPasswordThunk - Starting password reset...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    await resetPassword(email.trim());
+    console.log('resetPasswordThunk - Password reset email sent');
+    return true;
+  } catch (error: any) {
+    console.error('resetPasswordThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to send password reset email';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
+// Detailed Registration Thunk
+export const detailedRegistrationThunk = (
+  email: string,
+  password: string,
+  role: 'driver' | 'passenger',
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo?: {
+      number: string;
+      brand: string;
+      model: string;
+      year?: string;
+      color?: string;
+    };
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('detailedRegistrationThunk - Starting detailed registration...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    // Validate password strength
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+    
+    // Create user with email and password
+    const userCredential = await emailSignUp(email.trim(), password, role, profileData.fullName);
+    const user = userCredential.user;
+    
+    // Create detailed profile with images
+    const userProfile = await createUserProfileWithDetails(user.uid, email, role, profileData);
+    
+    // Create session
+    const session = await createAuthSession(user, userProfile);
+    
+    // Set authenticated state
+    dispatch(setAuthenticated({
+      uid: user.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session,
+      profileCompleted: true
+    }));
+    
+    dispatch(setSession(session));
+    console.log('detailedRegistrationThunk - Detailed registration successful');
+    return { user, userProfile, session };
+  } catch (error: any) {
+    console.error('detailedRegistrationThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to create account';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
 // Legacy functions (keeping for backward compatibility)
-export const signInThunk = (_email: string, _password: string, _role?: 'driver' | 'passenger' | 'admin') => 
+export const signInThunk = (email: string, password: string, role?: 'driver' | 'passenger' | 'admin') => 
   async (dispatch: AppDispatch) => {
-    dispatch(setAuthError('Email authentication not supported. Please use phone authentication.'));
+    return dispatch(emailSignInThunk(email, password));
   };
 
-export const signUpThunk = (_email: string, _password: string, _role: 'driver' | 'passenger') => 
+export const signUpThunk = (email: string, password: string, role: 'driver' | 'passenger') => 
   async (dispatch: AppDispatch) => {
-    dispatch(setAuthError('Email authentication not supported. Please use phone authentication.'));
+    return dispatch(emailSignUpThunk(email, password, role));
   };

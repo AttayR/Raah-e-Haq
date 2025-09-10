@@ -1,8 +1,17 @@
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types
+export interface VehicleInfo {
+  number: string;
+  brand: string;
+  model: string;
+  year?: string;
+  color?: string;
+}
+
 export interface UserProfile {
   uid: string;
   phoneNumber: string;
@@ -12,6 +21,13 @@ export interface UserProfile {
   email?: string;
   cnic?: string;
   address?: string;
+  // Driver-specific fields
+  vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+  vehicleInfo?: VehicleInfo;
+  driverPicture?: string; // Firebase Storage URL
+  cnicPicture?: string; // Firebase Storage URL
+  vehiclePictures?: string[]; // Array of Firebase Storage URLs
+  // Common fields
   createdAt: any;
   updatedAt: any;
   isVerified: boolean;
@@ -21,7 +37,7 @@ export interface UserProfile {
 export interface AuthSession {
   uid: string;
   phoneNumber: string;
-  role: 'driver' | 'passenger' | 'admin';
+  role: 'driver' | 'passenger' | 'admin' | undefined;
   token: string;
   expiresAt: number;
 }
@@ -31,14 +47,19 @@ const SESSION_KEY = '@auth_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // Phone Authentication
-export const sendPhoneVerification = async (phoneNumber: string): Promise<string> => {
+export const sendPhoneVerification = async (phoneNumber: string): Promise<{ verificationId: string; isExistingUser: boolean; userProfile?: UserProfile }> => {
   try {
     // Check if user already exists
     const existingUser = await getUserByPhone(phoneNumber);
     
     // Send verification code using React Native Firebase
     const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
-    return confirmation.verificationId;
+    
+    return {
+      verificationId: confirmation.verificationId || '',
+      isExistingUser: !!existingUser,
+      userProfile: existingUser || undefined
+    };
   } catch (error: any) {
     console.error('Error sending verification code:', error);
     throw new Error(error.message || 'Failed to send verification code');
@@ -102,7 +123,7 @@ export const createUserProfile = async (
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
     const userDoc = await firestore().collection('users').doc(uid).get();
-    if (userDoc.exists) {
+    if (userDoc.exists()) {
       return userDoc.data() as UserProfile;
     }
     return null;
@@ -242,4 +263,295 @@ export const getCurrentUser = (): FirebaseAuthTypes.User | null => {
 export const isPhoneNumberVerified = (): boolean => {
   const user = auth().currentUser;
   return user ? user.phoneNumber !== null : false;
+};
+
+// Helper function to create a test user for demonstration
+export const createTestUser = async (phoneNumber: string, role: 'driver' | 'passenger' = 'passenger'): Promise<UserProfile> => {
+  try {
+    const testUid = `test_${Date.now()}`;
+    const userProfile: UserProfile = {
+      uid: testUid,
+      phoneNumber,
+      role,
+      displayName: 'Test User',
+      fullName: 'Test User',
+      email: 'test@example.com',
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+      isVerified: true,
+      isActive: true
+    };
+
+    await firestore().collection('users').doc(testUid).set(userProfile);
+    console.log('Test user created:', userProfile);
+    return userProfile;
+  } catch (error: any) {
+    console.error('Error creating test user:', error);
+    throw new Error(error.message || 'Failed to create test user');
+  }
+};
+
+// Email/Password Authentication
+export const emailSignUp = async (
+  email: string, 
+  password: string, 
+  role: 'driver' | 'passenger',
+  displayName?: string
+): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile; session: AuthSession }> => {
+  try {
+    console.log('emailSignUp - Starting email signup...', { email, role, displayName });
+    
+    // Create user with email and password
+    const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+    const user = userCredential.user;
+    
+    // Update user profile with display name
+    if (displayName) {
+      await user.updateProfile({ displayName });
+    }
+    
+    // Send email verification
+    await user.sendEmailVerification();
+    
+    // Create user profile in Firestore
+    const userProfile = await createUserProfile(user.uid, email, role, displayName, email);
+    
+    // Create session
+    const session = await createAuthSession(user, userProfile);
+    
+    console.log('emailSignUp - Email signup successful:', { uid: user.uid, email });
+    
+    return { user, userProfile, session };
+  } catch (error: any) {
+    console.error('emailSignUp - Error:', error);
+    throw new Error(error.message || 'Failed to create account with email');
+  }
+};
+
+export const emailSignIn = async (
+  email: string, 
+  password: string
+): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile | null; session: AuthSession; isExistingUser: boolean }> => {
+  try {
+    console.log('emailSignIn - Starting email signin...', { email });
+    
+    // Sign in with email and password
+    const userCredential = await auth().signInWithEmailAndPassword(email, password);
+    const user = userCredential.user;
+    
+    // Get user profile from Firestore
+    const userProfile = await getUserProfile(user.uid);
+    
+    if (userProfile) {
+      // Update last login time
+      await updateUserProfile(user.uid, { 
+        updatedAt: firestore.FieldValue.serverTimestamp() 
+      });
+      
+      // Create session for existing user
+      const session = await createAuthSession(user, userProfile);
+      
+      console.log('emailSignIn - Email signin successful for existing user:', { uid: user.uid, email });
+      return { user, userProfile, session, isExistingUser: true };
+    } else {
+      // User exists in Firebase Auth but not in Firestore (incomplete profile)
+      console.log('emailSignIn - User exists in auth but not in Firestore, needs profile completion');
+      
+      // Create a minimal session without role
+      const session = await createAuthSession(user, {
+        uid: user.uid,
+        phoneNumber: email, // Use email as identifier
+        role: undefined,
+        isVerified: user.emailVerified,
+        isActive: true,
+      });
+      
+      return { user, userProfile: null, session, isExistingUser: false };
+    }
+  } catch (error: any) {
+    console.error('emailSignIn - Error:', error);
+    throw new Error(error.message || 'Failed to sign in with email');
+  }
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    console.log('resetPassword - Sending password reset email...', { email });
+    await auth().sendPasswordResetEmail(email);
+    console.log('resetPassword - Password reset email sent successfully');
+  } catch (error: any) {
+    console.error('resetPassword - Error:', error);
+    throw new Error(error.message || 'Failed to send password reset email');
+  }
+};
+
+export const updateEmail = async (newEmail: string): Promise<void> => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    console.log('updateEmail - Updating email...', { newEmail });
+    await user.updateEmail(newEmail);
+    await user.sendEmailVerification();
+    console.log('updateEmail - Email updated successfully');
+  } catch (error: any) {
+    console.error('updateEmail - Error:', error);
+    throw new Error(error.message || 'Failed to update email');
+  }
+};
+
+export const updatePassword = async (newPassword: string): Promise<void> => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    console.log('updatePassword - Updating password...');
+    await user.updatePassword(newPassword);
+    console.log('updatePassword - Password updated successfully');
+  } catch (error: any) {
+    console.error('updatePassword - Error:', error);
+    throw new Error(error.message || 'Failed to update password');
+  }
+};
+
+// Image Upload Functions
+export const uploadImage = async (
+  imageUri: string, 
+  path: string, 
+  uid: string
+): Promise<string> => {
+  try {
+    console.log('uploadImage - Starting upload...', { path, uid });
+    
+    const reference = storage().ref(`users/${uid}/${path}`);
+    const task = reference.putFile(imageUri);
+    
+    // Wait for upload to complete
+    await task;
+    
+    // Get download URL
+    const downloadURL = await reference.getDownloadURL();
+    
+    console.log('uploadImage - Upload successful:', downloadURL);
+    return downloadURL;
+  } catch (error: any) {
+    console.error('uploadImage - Error:', error);
+    throw new Error(error.message || 'Failed to upload image');
+  }
+};
+
+export const uploadMultipleImages = async (
+  imageUris: string[], 
+  path: string, 
+  uid: string
+): Promise<string[]> => {
+  try {
+    console.log('uploadMultipleImages - Starting batch upload...', { path, uid, count: imageUris.length });
+    
+    const uploadPromises = imageUris.map((uri, index) => 
+      uploadImage(uri, `${path}_${index}`, uid)
+    );
+    
+    const downloadURLs = await Promise.all(uploadPromises);
+    
+    console.log('uploadMultipleImages - Batch upload successful:', downloadURLs);
+    return downloadURLs;
+  } catch (error: any) {
+    console.error('uploadMultipleImages - Error:', error);
+    throw new Error(error.message || 'Failed to upload images');
+  }
+};
+
+// Enhanced User Profile Creation
+export const createUserProfileWithDetails = async (
+  uid: string,
+  email: string,
+  role: 'driver' | 'passenger',
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    // Driver-specific fields
+    vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo?: VehicleInfo;
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+): Promise<UserProfile> => {
+  try {
+    console.log('createUserProfileWithDetails - Starting...', { uid, role, profileData });
+    
+    const userProfile: UserProfile = {
+      uid,
+      phoneNumber: email, // Use email as identifier for email auth
+      role,
+      fullName: profileData.fullName,
+      displayName: profileData.fullName,
+      email,
+      cnic: profileData.cnic,
+      address: profileData.address,
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+      isVerified: true,
+      isActive: true
+    };
+
+    // Handle driver-specific fields
+    if (role === 'driver') {
+      userProfile.vehicleType = profileData.vehicleType;
+      userProfile.vehicleInfo = profileData.vehicleInfo;
+      
+      // Upload images for drivers
+      const uploadPromises: Promise<string>[] = [];
+      
+      if (profileData.driverPictureUri) {
+        uploadPromises.push(
+          uploadImage(profileData.driverPictureUri, 'driver_picture', uid)
+        );
+      }
+      
+      if (profileData.cnicPictureUri) {
+        uploadPromises.push(
+          uploadImage(profileData.cnicPictureUri, 'cnic_picture', uid)
+        );
+      }
+      
+      if (profileData.vehiclePictureUris && profileData.vehiclePictureUris.length > 0) {
+        uploadPromises.push(
+          uploadMultipleImages(profileData.vehiclePictureUris, 'vehicle_picture', uid)
+            .then(urls => urls.join(',')) // Store as comma-separated string
+        );
+      }
+      
+      // Wait for all uploads to complete
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      if (profileData.driverPictureUri) {
+        userProfile.driverPicture = uploadResults[0];
+      }
+      
+      if (profileData.cnicPictureUri) {
+        userProfile.cnicPicture = uploadResults[profileData.driverPictureUri ? 1 : 0];
+      }
+      
+      if (profileData.vehiclePictureUris && profileData.vehiclePictureUris.length > 0) {
+        const vehiclePicturesIndex = (profileData.driverPictureUri ? 1 : 0) + (profileData.cnicPictureUri ? 1 : 0);
+        userProfile.vehiclePictures = uploadResults[vehiclePicturesIndex].split(',');
+      }
+    }
+
+    // Save to Firestore
+    await firestore().collection('users').doc(uid).set(userProfile);
+    
+    console.log('createUserProfileWithDetails - Profile created successfully:', userProfile);
+    return userProfile;
+  } catch (error: any) {
+    console.error('createUserProfileWithDetails - Error:', error);
+    throw new Error(error.message || 'Failed to create user profile with details');
+  }
 };
