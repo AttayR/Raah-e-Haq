@@ -50,8 +50,41 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
   // Manual validation function
   const validateForm = React.useCallback(async (data: any) => {
     try {
+      // Add vehicle type to data if it's selected
+      if (selectedRole === 'driver' && selectedVehicleType) {
+        data.vehicleType = selectedVehicleType;
+      }
+      
       const schema = createValidationSchema(selectedRole);
       await schema.validate(data, { abortEarly: false });
+      
+      // Additional validation for driver images
+      const errors: any = {};
+      if (selectedRole === 'driver') {
+        console.log('Image validation debug:', {
+          driverPicture: driverPicture,
+          cnicPicture: cnicPicture,
+          vehiclePictures: vehiclePictures,
+          driverPictureLength: driverPicture?.length || 0,
+          cnicPictureLength: cnicPicture?.length || 0,
+          vehiclePicturesLength: vehiclePictures?.length || 0,
+          driverPictureType: typeof driverPicture,
+          cnicPictureType: typeof cnicPicture
+        });
+        
+        // Driver picture and CNIC picture are now optional
+        // Only vehicle pictures are required for drivers
+        if (!vehiclePictures || vehiclePictures.length === 0) {
+          errors.vehiclePictures = 'At least one vehicle picture is required';
+        }
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        console.log('Validation errors:', errors);
+        setManualValidation({ isValid: false, errors });
+        return false;
+      }
+      
       setManualValidation({ isValid: true, errors: {} });
       return true;
     } catch (validationError: any) {
@@ -63,10 +96,32 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
           }
         });
       }
+      
+      // Add image validation errors for driver
+      if (selectedRole === 'driver') {
+        console.log('Image validation debug (catch):', {
+          driverPicture: driverPicture,
+          cnicPicture: cnicPicture,
+          vehiclePictures: vehiclePictures,
+          driverPictureLength: driverPicture?.length || 0,
+          cnicPictureLength: cnicPicture?.length || 0,
+          vehiclePicturesLength: vehiclePictures?.length || 0,
+          driverPictureType: typeof driverPicture,
+          cnicPictureType: typeof cnicPicture
+        });
+        
+        // Driver picture and CNIC picture are now optional
+        // Only vehicle pictures are required for drivers
+        if (!vehiclePictures || vehiclePictures.length === 0) {
+          errors.vehiclePictures = 'At least one vehicle picture is required';
+        }
+      }
+      
+      console.log('Validation errors (catch):', errors);
       setManualValidation({ isValid: false, errors });
       return false;
     }
-  }, [selectedRole]);
+  }, [selectedRole, selectedVehicleType, driverPicture, cnicPicture, vehiclePictures]);
 
   // Custom validation resolver that handles role changes
   const customResolver = async (data: any) => {
@@ -134,10 +189,24 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
   React.useEffect(() => {
     const timeoutId = setTimeout(() => {
       const currentValues = getValues();
+      console.log('Triggering validation with current values:', currentValues);
+      console.log('Current image states:', { driverPicture, cnicPicture, vehiclePictures });
       validateForm(currentValues);
     }, 300);
     return () => clearTimeout(timeoutId);
-  }, [fullName, cnic, address, email, password, confirmPassword, vehicleType, vehicleNumber, vehicleBrand, vehicleModel, selectedRole, getValues, validateForm]);
+  }, [fullName, cnic, address, email, password, confirmPassword, vehicleType, vehicleNumber, vehicleBrand, vehicleModel, selectedRole, selectedVehicleType, driverPicture, cnicPicture, vehiclePictures, getValues, validateForm]);
+
+  // Additional validation trigger when images change
+  React.useEffect(() => {
+    if (selectedRole === 'driver') {
+      const timeoutId = setTimeout(() => {
+        const currentValues = getValues();
+        console.log('Image change validation trigger:', { driverPicture, cnicPicture, vehiclePictures });
+        validateForm(currentValues);
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [driverPicture, cnicPicture, vehiclePictures, selectedRole, getValues, validateForm]);
 
   // Reset form when role changes
   React.useEffect(() => {
@@ -190,17 +259,32 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
       switch (type) {
         case 'driver':
           setDriverPicture(imageUri);
-          // Driver picture is handled separately, not in form
+          console.log('Driver picture set to:', imageUri);
+          // Trigger validation after setting image with longer delay
+          setTimeout(() => {
+            const currentValues = getValues();
+            validateForm(currentValues);
+          }, 500);
           break;
         case 'cnic':
           setCnicPicture(imageUri);
-          // CNIC picture is handled separately, not in form
+          console.log('CNIC picture set to:', imageUri);
+          // Trigger validation after setting image with longer delay
+          setTimeout(() => {
+            const currentValues = getValues();
+            validateForm(currentValues);
+          }, 500);
           break;
         case 'vehicle':
           if (vehiclePictures.length < 6) {
             const newPictures = [...vehiclePictures, imageUri];
             setVehiclePictures(newPictures);
-            // Vehicle pictures are handled separately, not in form
+            console.log('Vehicle pictures set to:', newPictures);
+            // Trigger validation after setting image with longer delay
+            setTimeout(() => {
+              const currentValues = getValues();
+              validateForm(currentValues);
+            }, 500);
           } else {
             Alert.alert('Limit Reached', 'Maximum 6 vehicle pictures allowed');
           }
@@ -212,12 +296,29 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
   const removeVehiclePicture = (index: number) => {
     const newPictures = vehiclePictures.filter((_, i) => i !== index);
     setVehiclePictures(newPictures);
-    // Vehicle pictures are handled separately, not in form
+    // Trigger validation after removing image
+    setTimeout(() => {
+      const currentValues = getValues();
+      validateForm(currentValues);
+    }, 100);
   };
 
   const onSubmit = async (data: any) => {
     try {
       setIsSubmitting(true);
+      
+      // First validate the form
+      const isValid = await validateForm(data);
+      if (!isValid) {
+        // Show specific validation errors
+        const errorMessages = Object.values(manualValidation.errors).join('\n• ');
+        Alert.alert(
+          'Validation Error',
+          `Please fix the following issues:\n\n• ${errorMessages}`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
       
       // Prepare profile data
       const profileData = {
@@ -498,6 +599,12 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
                     onPress={() => {
                       setSelectedVehicleType(type.value);
                       setValue('vehicleType', type.value);
+                      // Trigger validation after setting the value
+                      setTimeout(() => {
+                        trigger();
+                        const currentValues = getValues();
+                        validateForm(currentValues);
+                      }, 100);
                     }}
                     variant={selectedVehicleType === type.value ? 'primary' : 'secondary'}
                     style={styles.vehicleTypeButton}
@@ -616,18 +723,18 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
 
             {/* Image Uploads */}
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Required Documents
+              Documents (Optional)
             </Text>
 
             {renderImagePicker(
-              'Driver Picture',
+              'Driver Picture (Optional)',
               driverPicture,
               () => openImagePicker('driver'),
               manualValidation.errors.driverPicture
             )}
 
             {renderImagePicker(
-              'CNIC Picture',
+              'CNIC Picture (Optional)',
               cnicPicture,
               () => openImagePicker('cnic'),
               manualValidation.errors.cnicPicture
@@ -645,6 +752,10 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
             <Text style={styles.debugText}>Role: {selectedRole}</Text>
             <Text style={styles.debugText}>Errors: {Object.keys(errors).length}</Text>
             <Text style={styles.debugText}>Manual Errors: {Object.keys(manualValidation.errors).length}</Text>
+            <Text style={styles.debugText}>Driver Pic: {driverPicture ? 'Yes' : 'No'}</Text>
+            <Text style={styles.debugText}>CNIC Pic: {cnicPicture ? 'Yes' : 'No'}</Text>
+            <Text style={styles.debugText}>Vehicle Pics: {vehiclePictures.length}</Text>
+            <Text style={styles.debugText}>Vehicle Type: {selectedVehicleType || 'None'}</Text>
           </View>
         )}
 
@@ -653,7 +764,7 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
           title={isSubmitting ? 'Creating Account...' : 'Create Account'}
           onPress={handleSubmit(onSubmit)}
           variant="primary"
-          disabled={!manualValidation.isValid || isSubmitting}
+          disabled={isSubmitting}
           style={styles.submitButton}
         />
 
