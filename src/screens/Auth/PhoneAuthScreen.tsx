@@ -28,14 +28,14 @@ export default function PhoneAuthScreen() {
   const navigation = useNavigation<any>();
   const dispatch = useDispatch<any>();
 
-  const { status, error, phoneNumber } = useSelector(
+  const { status, error, phoneNumber, isExistingUser, userStatus, userProfile } = useSelector(
     (state: RootState) => state.auth
   );
 
   // Debug logging for state changes
   useEffect(() => {
-    console.log('PhoneAuthScreen - Auth state changed:', { status, error, phoneNumber });
-  }, [status, error, phoneNumber]);
+    console.log('PhoneAuthScreen - Auth state changed:', { status, error, phoneNumber, isExistingUser, userStatus });
+  }, [status, error, phoneNumber, isExistingUser, userStatus]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
   const [phoneInput, setPhoneInput] = useState('');
@@ -77,15 +77,23 @@ export default function PhoneAuthScreen() {
 
     try {
       // Verify the code without setting a role
-      await dispatch(verifyCodeThunk(verificationCode.trim()));
+      const result = await dispatch(verifyCodeThunk(verificationCode.trim()));
       
       // Show success toast
       setShowSuccessToast(true);
       
-      // Navigate to role selection after a short delay
-      setTimeout(() => {
-        navigation.navigate('RoleSelection');
-      }, 2000);
+      // Handle navigation based on user status
+      if (result.isExistingUser) {
+        // Existing user - navigate directly to dashboard
+        console.log('PhoneAuthScreen - Existing user verified, navigating to dashboard');
+        // The navigation will be handled by AuthFlow component based on auth state
+      } else {
+        // New user - navigate to role selection
+        console.log('PhoneAuthScreen - New user verified, navigating to role selection');
+        setTimeout(() => {
+          navigation.navigate('RoleSelection');
+        }, 2000);
+      }
       
     } catch (error: any) {
       // Error is handled in the thunk
@@ -143,11 +151,19 @@ export default function PhoneAuthScreen() {
   const renderVerificationStep = () => (
     <View style={styles.stepContainer}>
       <Text style={[styles.title, { color: theme.colors.text }]}>
-        Enter verification code
+        {isExistingUser ? 'Welcome back!' : 'Enter verification code'}
       </Text>
       <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>
-        We sent a code to {phoneNumber}
+        {isExistingUser 
+          ? `We sent a code to ${phoneNumber}. Enter it to sign in.`
+          : `We sent a code to ${phoneNumber}`
+        }
       </Text>
+      {isExistingUser && userProfile && (
+        <Text style={[styles.welcomeText, { color: theme.colors.primary }]}>
+          Welcome back, {userProfile.displayName || userProfile.fullName || 'User'}!
+        </Text>
+      )}
       <Text style={[styles.testInfo, { color: theme.colors.primary }]}>
         Test Code: 123456
       </Text>
@@ -162,7 +178,7 @@ export default function PhoneAuthScreen() {
       />
 
       <BrandButton
-        title={status === 'verifying' ? 'Verifying...' : 'Verify Code'}
+        title={status === 'verifying' ? 'Verifying...' : (isExistingUser ? 'Sign In' : 'Verify Code')}
         onPress={handleVerifyCode}
         variant="primary"
         disabled={status === 'verifying'}
@@ -212,7 +228,10 @@ export default function PhoneAuthScreen() {
       </ScrollView>
 
       <Toast
-        message="Phone number verified successfully! Redirecting to role selection..."
+        message={isExistingUser 
+          ? "Welcome back! Redirecting to dashboard..." 
+          : "Phone number verified successfully! Redirecting to role selection..."
+        }
         type="success"
         visible={showSuccessToast}
         onHide={() => setShowSuccessToast(false)}
@@ -247,6 +266,12 @@ const styles = StyleSheet.create({
   },
   testInfo: {
     fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+  welcomeText: {
+    fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
     fontWeight: '600',

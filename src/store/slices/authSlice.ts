@@ -12,6 +12,8 @@ export type AuthState = {
   isPhoneVerified: boolean;
   verificationId: string | null;
   profileCompleted: boolean;
+  isExistingUser: boolean;
+  userStatus: 'new' | 'existing' | 'unknown';
 };
 
 const initialState: AuthState = {
@@ -25,6 +27,8 @@ const initialState: AuthState = {
   isPhoneVerified: false,
   verificationId: null,
   profileCompleted: false,
+  isExistingUser: false,
+  userStatus: 'unknown',
 };
 
 const authSlice = createSlice({
@@ -47,6 +51,7 @@ const authSlice = createSlice({
       role: 'driver' | 'passenger' | 'admin' | undefined;
       userProfile: UserProfile | null;
       session: AuthSession;
+      profileCompleted?: boolean;
     }>) => {
       console.log('authSlice - setAuthenticated called with:', action.payload);
       state.uid = action.payload.uid;
@@ -57,6 +62,11 @@ const authSlice = createSlice({
       state.session = action.payload.session;
       state.isPhoneVerified = true;
       state.error = null;
+      
+      // Set profileCompleted if provided, otherwise keep current value
+      if (action.payload.profileCompleted !== undefined) {
+        state.profileCompleted = action.payload.profileCompleted;
+      }
     },
     setSignedOut: (state) => {
       console.log('authSlice - setSignedOut called');
@@ -116,6 +126,19 @@ const authSlice = createSlice({
     setSession: (state, action: PayloadAction<AuthSession>) => {
       console.log('authSlice - setSession called with:', action.payload);
       state.session = action.payload;
+    },
+    setUserStatus: (state, action: PayloadAction<{ isExistingUser: boolean; userStatus: 'new' | 'existing' | 'unknown'; userProfile?: UserProfile }>) => {
+      console.log('authSlice - setUserStatus called with:', action.payload);
+      state.isExistingUser = action.payload.isExistingUser;
+      state.userStatus = action.payload.userStatus;
+      if (action.payload.userProfile) {
+        state.userProfile = action.payload.userProfile;
+      }
+    },
+    clearUserStatus: (state) => {
+      console.log('authSlice - clearUserStatus called');
+      state.isExistingUser = false;
+      state.userStatus = 'unknown';
     }
   },
 });
@@ -134,7 +157,9 @@ export const {
   setSession,
   setProfileCompleted,
   clearProfileCompleted,
-  setUserProfile
+  setUserProfile,
+  setUserStatus,
+  clearUserStatus
 } = authSlice.actions;
 
 export default authSlice.reducer;
