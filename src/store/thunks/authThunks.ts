@@ -11,6 +11,7 @@ import {
   refreshAuthSession,
   updateUserProfile
 } from '../../services/firebaseAuth';
+import firestore from '@react-native-firebase/firestore';
 import {
   setAuthError,
   setAuthLoading,
@@ -21,7 +22,10 @@ import {
   setPhoneNumber,
   setSession,
   clearError,
-  updateUserProfile as updateUserProfileAction
+  updateUserProfile as updateUserProfileAction,
+  setUserStatus,
+  clearUserStatus,
+  setProfileCompleted
 } from '../slices/authSlice';
 
 // Start authentication listener
@@ -68,16 +72,24 @@ export const sendVerificationCodeThunk = (phoneNumber: string) => async (dispatc
   try {
     dispatch(setAuthLoading());
     dispatch(clearError());
+    dispatch(clearUserStatus());
     
     // Format phone number (add + if not present)
     const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
     dispatch(setPhoneNumber(formattedPhone));
     
     // Use actual Firebase phone authentication
-    const verificationId = await sendPhoneVerification(formattedPhone);
-    dispatch(setVerificationId(verificationId));
+    const result = await sendPhoneVerification(formattedPhone);
+    dispatch(setVerificationId(result.verificationId));
     
-    return verificationId;
+    // Set user status based on whether user exists
+    dispatch(setUserStatus({
+      isExistingUser: result.isExistingUser,
+      userStatus: result.isExistingUser ? 'existing' : 'new',
+      userProfile: result.userProfile
+    }));
+    
+    return result;
   } catch (error: any) {
     const errorMessage = error.message || 'Failed to send verification code';
     dispatch(setAuthError(errorMessage));
@@ -98,7 +110,7 @@ export const verifyCodeThunk = (
     dispatch(clearError());
     
     const { auth } = getState();
-    const { verificationId, phoneNumber } = auth;
+    const { verificationId, phoneNumber, isExistingUser, userProfile: existingUserProfile } = auth;
     
     console.log('verifyCodeThunk - Current auth state:', auth);
     
@@ -111,6 +123,36 @@ export const verifyCodeThunk = (
     const userCredential = await verifyPhoneCode(verificationId, verificationCode);
     const user = userCredential.user;
     console.log('verifyCodeThunk - Firebase verification successful, user:', user.uid);
+    
+    // Handle existing user flow
+    if (isExistingUser && existingUserProfile) {
+      console.log('verifyCodeThunk - Existing user detected, signing in...');
+      
+      // Update last login time
+      await updateUserProfile(user.uid, { 
+        updatedAt: firestore.FieldValue.serverTimestamp() 
+      });
+      
+      // Create session for existing user
+      const session = await createAuthSession(user, existingUserProfile);
+      
+      // Set authenticated state for existing user with profileCompleted = true
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber: existingUserProfile.phoneNumber,
+        role: existingUserProfile.role,
+        userProfile: existingUserProfile,
+        session,
+        profileCompleted: true
+      }));
+      
+      dispatch(setSession(session));
+      console.log('verifyCodeThunk - Existing user signed in successfully');
+      return { user, userProfile: existingUserProfile, session, isExistingUser: true };
+    }
+    
+    // Handle new user flow
+    console.log('verifyCodeThunk - New user detected...');
     
     // If no role provided, just authenticate the user without setting a role
     if (!role) {
@@ -131,35 +173,18 @@ export const verifyCodeThunk = (
         phoneNumber,
         role: undefined,
         userProfile: null,
-        session
+        session,
+        profileCompleted: false
       }));
       
       dispatch(setSession(session));
       console.log('verifyCodeThunk - User authenticated without role, ready for role selection');
-      return { user, userProfile: null, session };
+      return { user, userProfile: null, session, isExistingUser: false };
     }
     
-    // Check if user already exists
-    let userProfile = await getUserByPhone(phoneNumber);
-    
-    if (userProfile) {
-      console.log('verifyCodeThunk - Existing user found, updating role if needed...');
-      // Existing user - sign in
-      if (userProfile.uid !== user.uid) {
-        // Phone number exists but with different UID (shouldn't happen with phone auth)
-        throw new Error('Phone number already registered with different account');
-      }
-      
-      // Update role if different
-      if (userProfile.role !== role) {
-        await updateUserProfile(user.uid, { role });
-        userProfile = { ...userProfile, role };
-      }
-    } else {
-      console.log('verifyCodeThunk - Creating new user profile...');
-      // New user - create profile
-      userProfile = await createUserProfile(user.uid, phoneNumber, role, displayName, email);
-    }
+    // Create new user profile
+    console.log('verifyCodeThunk - Creating new user profile...');
+    const userProfile = await createUserProfile(user.uid, phoneNumber, role, displayName, email);
     
     console.log('verifyCodeThunk - User profile ready:', userProfile);
     
@@ -175,14 +200,15 @@ export const verifyCodeThunk = (
       phoneNumber: userProfile.phoneNumber,
       role: userProfile.role,
       userProfile,
-      session
+      session,
+      profileCompleted: true
     }));
     
     console.log('verifyCodeThunk - Dispatching setSession...');
     dispatch(setSession(session));
     
     console.log('verifyCodeThunk - Verification completed successfully');
-    return { user, userProfile, session };
+    return { user, userProfile, session, isExistingUser: false };
   } catch (error: any) {
     console.error('verifyCodeThunk - Error:', error);
     const errorMessage = error.message || 'Failed to verify code';
@@ -241,7 +267,8 @@ export const checkAuthStatusThunk = () => async (dispatch: AppDispatch, getState
         phoneNumber: session.phoneNumber,
         role: session.role || null,
         userProfile: null, // Will be loaded separately if needed
-        session
+        session,
+        profileCompleted: true // If there's a valid session, profile must be completed
       }));
       
       console.log('checkAuthStatusThunk - Authentication state restored from session');
