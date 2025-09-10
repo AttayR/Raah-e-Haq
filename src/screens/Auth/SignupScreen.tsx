@@ -1,13 +1,13 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 
 import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
-import { signUpThunk } from '../../store/thunks/authThunks';
+import { emailSignUpThunk } from '../../store/thunks/authThunks';
 
 export default function SignupScreen() {
   const { theme } = useAppTheme();
@@ -18,8 +18,26 @@ export default function SignupScreen() {
   const [role, setRole] = useState<'driver' | 'passenger'>('passenger');
   const dispatch = useDispatch<any>();
 
-  const onSignup = () =>
-    dispatch(signUpThunk(email.trim(), password.trim(), role));
+  const onSignup = () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+    
+    dispatch(emailSignUpThunk(email.trim(), password.trim(), role, name.trim()));
+  };
 
   return (
     <View
@@ -62,7 +80,7 @@ export default function SignupScreen() {
         onChangeText={setConfirmPassword}
       />
 
-      {/* <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
         <BrandButton
           title={role === 'passenger' ? 'Passenger ✓' : 'Passenger'}
           variant="secondary"
@@ -75,7 +93,7 @@ export default function SignupScreen() {
           onPress={() => setRole('driver')}
           style={{ flex: 1 }}
         />
-      </View> */}
+      </View>
 
       <BrandButton title="Sign up" onPress={onSignup} variant="primary" />
       <BrandButton

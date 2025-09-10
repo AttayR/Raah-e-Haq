@@ -21,7 +21,7 @@ export interface UserProfile {
 export interface AuthSession {
   uid: string;
   phoneNumber: string;
-  role: 'driver' | 'passenger' | 'admin';
+  role: 'driver' | 'passenger' | 'admin' | undefined;
   token: string;
   expiresAt: number;
 }
@@ -40,7 +40,7 @@ export const sendPhoneVerification = async (phoneNumber: string): Promise<{ veri
     const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
     
     return {
-      verificationId: confirmation.verificationId,
+      verificationId: confirmation.verificationId || '',
       isExistingUser: !!existingUser,
       userProfile: existingUser || undefined
     };
@@ -107,7 +107,7 @@ export const createUserProfile = async (
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   try {
     const userDoc = await firestore().collection('users').doc(uid).get();
-    if (userDoc.exists) {
+    if (userDoc.exists()) {
       return userDoc.data() as UserProfile;
     }
     return null;
@@ -272,5 +272,132 @@ export const createTestUser = async (phoneNumber: string, role: 'driver' | 'pass
   } catch (error: any) {
     console.error('Error creating test user:', error);
     throw new Error(error.message || 'Failed to create test user');
+  }
+};
+
+// Email/Password Authentication
+export const emailSignUp = async (
+  email: string, 
+  password: string, 
+  role: 'driver' | 'passenger',
+  displayName?: string
+): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile; session: AuthSession }> => {
+  try {
+    console.log('emailSignUp - Starting email signup...', { email, role, displayName });
+    
+    // Create user with email and password
+    const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+    const user = userCredential.user;
+    
+    // Update user profile with display name
+    if (displayName) {
+      await user.updateProfile({ displayName });
+    }
+    
+    // Send email verification
+    await user.sendEmailVerification();
+    
+    // Create user profile in Firestore
+    const userProfile = await createUserProfile(user.uid, email, role, displayName, email);
+    
+    // Create session
+    const session = await createAuthSession(user, userProfile);
+    
+    console.log('emailSignUp - Email signup successful:', { uid: user.uid, email });
+    
+    return { user, userProfile, session };
+  } catch (error: any) {
+    console.error('emailSignUp - Error:', error);
+    throw new Error(error.message || 'Failed to create account with email');
+  }
+};
+
+export const emailSignIn = async (
+  email: string, 
+  password: string
+): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile | null; session: AuthSession; isExistingUser: boolean }> => {
+  try {
+    console.log('emailSignIn - Starting email signin...', { email });
+    
+    // Sign in with email and password
+    const userCredential = await auth().signInWithEmailAndPassword(email, password);
+    const user = userCredential.user;
+    
+    // Get user profile from Firestore
+    const userProfile = await getUserProfile(user.uid);
+    
+    if (userProfile) {
+      // Update last login time
+      await updateUserProfile(user.uid, { 
+        updatedAt: firestore.FieldValue.serverTimestamp() 
+      });
+      
+      // Create session for existing user
+      const session = await createAuthSession(user, userProfile);
+      
+      console.log('emailSignIn - Email signin successful for existing user:', { uid: user.uid, email });
+      return { user, userProfile, session, isExistingUser: true };
+    } else {
+      // User exists in Firebase Auth but not in Firestore (incomplete profile)
+      console.log('emailSignIn - User exists in auth but not in Firestore, needs profile completion');
+      
+      // Create a minimal session without role
+      const session = await createAuthSession(user, {
+        uid: user.uid,
+        phoneNumber: email, // Use email as identifier
+        role: undefined,
+        isVerified: user.emailVerified,
+        isActive: true,
+      });
+      
+      return { user, userProfile: null, session, isExistingUser: false };
+    }
+  } catch (error: any) {
+    console.error('emailSignIn - Error:', error);
+    throw new Error(error.message || 'Failed to sign in with email');
+  }
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    console.log('resetPassword - Sending password reset email...', { email });
+    await auth().sendPasswordResetEmail(email);
+    console.log('resetPassword - Password reset email sent successfully');
+  } catch (error: any) {
+    console.error('resetPassword - Error:', error);
+    throw new Error(error.message || 'Failed to send password reset email');
+  }
+};
+
+export const updateEmail = async (newEmail: string): Promise<void> => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    console.log('updateEmail - Updating email...', { newEmail });
+    await user.updateEmail(newEmail);
+    await user.sendEmailVerification();
+    console.log('updateEmail - Email updated successfully');
+  } catch (error: any) {
+    console.error('updateEmail - Error:', error);
+    throw new Error(error.message || 'Failed to update email');
+  }
+};
+
+export const updatePassword = async (newPassword: string): Promise<void> => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    console.log('updatePassword - Updating password...');
+    await user.updatePassword(newPassword);
+    console.log('updatePassword - Password updated successfully');
+  } catch (error: any) {
+    console.error('updatePassword - Error:', error);
+    throw new Error(error.message || 'Failed to update password');
   }
 };

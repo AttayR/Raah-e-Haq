@@ -9,7 +9,10 @@ import {
   listenAuth,
   getAuthSession,
   refreshAuthSession,
-  updateUserProfile
+  updateUserProfile,
+  emailSignUp,
+  emailSignIn,
+  resetPassword
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
 import {
@@ -318,13 +321,133 @@ export const updateProfileThunk = (updates: any) => async (dispatch: AppDispatch
   }
 };
 
+// Email/Password Authentication Thunks
+export const emailSignUpThunk = (
+  email: string, 
+  password: string, 
+  role: 'driver' | 'passenger',
+  displayName?: string
+) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('emailSignUpThunk - Starting email signup...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    // Validate password strength
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+    
+    // Sign up with email and password
+    const result = await emailSignUp(email.trim(), password, role, displayName?.trim());
+    const { user, userProfile, session } = result;
+    
+    // Set authenticated state
+    dispatch(setAuthenticated({
+      uid: user.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session,
+      profileCompleted: true
+    }));
+    
+    dispatch(setSession(session));
+    console.log('emailSignUpThunk - Email signup successful');
+    return { user, userProfile, session };
+  } catch (error: any) {
+    console.error('emailSignUpThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to create account';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
+export const emailSignInThunk = (email: string, password: string) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('emailSignInThunk - Starting email signin...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    // Sign in with email and password
+    const result = await emailSignIn(email.trim(), password);
+    const { user, userProfile, session, isExistingUser } = result;
+    
+    if (isExistingUser && userProfile) {
+      // Existing user with complete profile
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber: userProfile.phoneNumber,
+        role: userProfile.role,
+        userProfile,
+        session,
+        profileCompleted: true
+      }));
+    } else {
+      // User needs to complete profile
+      dispatch(setAuthenticated({
+        uid: user.uid,
+        phoneNumber: email, // Use email as identifier
+        role: undefined,
+        userProfile: null,
+        session,
+        profileCompleted: false
+      }));
+    }
+    
+    dispatch(setSession(session));
+    console.log('emailSignInThunk - Email signin successful');
+    return { user, userProfile, session, isExistingUser };
+  } catch (error: any) {
+    console.error('emailSignInThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to sign in';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
+export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('resetPasswordThunk - Starting password reset...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    await resetPassword(email.trim());
+    console.log('resetPasswordThunk - Password reset email sent');
+    return true;
+  } catch (error: any) {
+    console.error('resetPasswordThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to send password reset email';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
 // Legacy functions (keeping for backward compatibility)
-export const signInThunk = (_email: string, _password: string, _role?: 'driver' | 'passenger' | 'admin') => 
+export const signInThunk = (email: string, password: string, role?: 'driver' | 'passenger' | 'admin') => 
   async (dispatch: AppDispatch) => {
-    dispatch(setAuthError('Email authentication not supported. Please use phone authentication.'));
+    return dispatch(emailSignInThunk(email, password));
   };
 
-export const signUpThunk = (_email: string, _password: string, _role: 'driver' | 'passenger') => 
+export const signUpThunk = (email: string, password: string, role: 'driver' | 'passenger') => 
   async (dispatch: AppDispatch) => {
-    dispatch(setAuthError('Email authentication not supported. Please use phone authentication.'));
+    return dispatch(emailSignUpThunk(email, password, role));
   };
