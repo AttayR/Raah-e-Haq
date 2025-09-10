@@ -12,7 +12,8 @@ import {
   updateUserProfile,
   emailSignUp,
   emailSignIn,
-  resetPassword
+  resetPassword,
+  createUserProfileWithDetails
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
 import {
@@ -436,6 +437,75 @@ export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatc
   } catch (error: any) {
     console.error('resetPasswordThunk - Error:', error);
     const errorMessage = error.message || 'Failed to send password reset email';
+    dispatch(setAuthError(errorMessage));
+    throw error;
+  }
+};
+
+// Detailed Registration Thunk
+export const detailedRegistrationThunk = (
+  email: string,
+  password: string,
+  role: 'driver' | 'passenger',
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo?: {
+      number: string;
+      brand: string;
+      model: string;
+      year?: string;
+      color?: string;
+    };
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+) => async (dispatch: AppDispatch) => {
+  try {
+    console.log('detailedRegistrationThunk - Starting detailed registration...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Please enter a valid email address');
+    }
+    
+    // Validate password strength
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+    
+    // Create user with email and password
+    const userCredential = await emailSignUp(email.trim(), password, role, profileData.fullName);
+    const user = userCredential.user;
+    
+    // Create detailed profile with images
+    const userProfile = await createUserProfileWithDetails(user.uid, email, role, profileData);
+    
+    // Create session
+    const session = await createAuthSession(user, userProfile);
+    
+    // Set authenticated state
+    dispatch(setAuthenticated({
+      uid: user.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session,
+      profileCompleted: true
+    }));
+    
+    dispatch(setSession(session));
+    console.log('detailedRegistrationThunk - Detailed registration successful');
+    return { user, userProfile, session };
+  } catch (error: any) {
+    console.error('detailedRegistrationThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to create account';
     dispatch(setAuthError(errorMessage));
     throw error;
   }

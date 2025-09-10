@@ -1,8 +1,17 @@
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types
+export interface VehicleInfo {
+  number: string;
+  brand: string;
+  model: string;
+  year?: string;
+  color?: string;
+}
+
 export interface UserProfile {
   uid: string;
   phoneNumber: string;
@@ -12,6 +21,13 @@ export interface UserProfile {
   email?: string;
   cnic?: string;
   address?: string;
+  // Driver-specific fields
+  vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+  vehicleInfo?: VehicleInfo;
+  driverPicture?: string; // Firebase Storage URL
+  cnicPicture?: string; // Firebase Storage URL
+  vehiclePictures?: string[]; // Array of Firebase Storage URLs
+  // Common fields
   createdAt: any;
   updatedAt: any;
   isVerified: boolean;
@@ -399,5 +415,143 @@ export const updatePassword = async (newPassword: string): Promise<void> => {
   } catch (error: any) {
     console.error('updatePassword - Error:', error);
     throw new Error(error.message || 'Failed to update password');
+  }
+};
+
+// Image Upload Functions
+export const uploadImage = async (
+  imageUri: string, 
+  path: string, 
+  uid: string
+): Promise<string> => {
+  try {
+    console.log('uploadImage - Starting upload...', { path, uid });
+    
+    const reference = storage().ref(`users/${uid}/${path}`);
+    const task = reference.putFile(imageUri);
+    
+    // Wait for upload to complete
+    await task;
+    
+    // Get download URL
+    const downloadURL = await reference.getDownloadURL();
+    
+    console.log('uploadImage - Upload successful:', downloadURL);
+    return downloadURL;
+  } catch (error: any) {
+    console.error('uploadImage - Error:', error);
+    throw new Error(error.message || 'Failed to upload image');
+  }
+};
+
+export const uploadMultipleImages = async (
+  imageUris: string[], 
+  path: string, 
+  uid: string
+): Promise<string[]> => {
+  try {
+    console.log('uploadMultipleImages - Starting batch upload...', { path, uid, count: imageUris.length });
+    
+    const uploadPromises = imageUris.map((uri, index) => 
+      uploadImage(uri, `${path}_${index}`, uid)
+    );
+    
+    const downloadURLs = await Promise.all(uploadPromises);
+    
+    console.log('uploadMultipleImages - Batch upload successful:', downloadURLs);
+    return downloadURLs;
+  } catch (error: any) {
+    console.error('uploadMultipleImages - Error:', error);
+    throw new Error(error.message || 'Failed to upload images');
+  }
+};
+
+// Enhanced User Profile Creation
+export const createUserProfileWithDetails = async (
+  uid: string,
+  email: string,
+  role: 'driver' | 'passenger',
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    // Driver-specific fields
+    vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo?: VehicleInfo;
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+): Promise<UserProfile> => {
+  try {
+    console.log('createUserProfileWithDetails - Starting...', { uid, role, profileData });
+    
+    const userProfile: UserProfile = {
+      uid,
+      phoneNumber: email, // Use email as identifier for email auth
+      role,
+      fullName: profileData.fullName,
+      displayName: profileData.fullName,
+      email,
+      cnic: profileData.cnic,
+      address: profileData.address,
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+      isVerified: true,
+      isActive: true
+    };
+
+    // Handle driver-specific fields
+    if (role === 'driver') {
+      userProfile.vehicleType = profileData.vehicleType;
+      userProfile.vehicleInfo = profileData.vehicleInfo;
+      
+      // Upload images for drivers
+      const uploadPromises: Promise<string>[] = [];
+      
+      if (profileData.driverPictureUri) {
+        uploadPromises.push(
+          uploadImage(profileData.driverPictureUri, 'driver_picture', uid)
+        );
+      }
+      
+      if (profileData.cnicPictureUri) {
+        uploadPromises.push(
+          uploadImage(profileData.cnicPictureUri, 'cnic_picture', uid)
+        );
+      }
+      
+      if (profileData.vehiclePictureUris && profileData.vehiclePictureUris.length > 0) {
+        uploadPromises.push(
+          uploadMultipleImages(profileData.vehiclePictureUris, 'vehicle_picture', uid)
+            .then(urls => urls.join(',')) // Store as comma-separated string
+        );
+      }
+      
+      // Wait for all uploads to complete
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      if (profileData.driverPictureUri) {
+        userProfile.driverPicture = uploadResults[0];
+      }
+      
+      if (profileData.cnicPictureUri) {
+        userProfile.cnicPicture = uploadResults[profileData.driverPictureUri ? 1 : 0];
+      }
+      
+      if (profileData.vehiclePictureUris && profileData.vehiclePictureUris.length > 0) {
+        const vehiclePicturesIndex = (profileData.driverPictureUri ? 1 : 0) + (profileData.cnicPictureUri ? 1 : 0);
+        userProfile.vehiclePictures = uploadResults[vehiclePicturesIndex].split(',');
+      }
+    }
+
+    // Save to Firestore
+    await firestore().collection('users').doc(uid).set(userProfile);
+    
+    console.log('createUserProfileWithDetails - Profile created successfully:', userProfile);
+    return userProfile;
+  } catch (error: any) {
+    console.error('createUserProfileWithDetails - Error:', error);
+    throw new Error(error.message || 'Failed to create user profile with details');
   }
 };
