@@ -90,6 +90,7 @@ const driverSchema = baseSchema.shape({
   vehiclePictures: yup
     .array()
     .of(yup.string())
+    .required('Vehicle pictures are required')
     .min(4, 'Please upload at least 4 vehicle pictures (front, back, left, right)')
     .max(6, 'Maximum 6 vehicle pictures allowed'),
 });
