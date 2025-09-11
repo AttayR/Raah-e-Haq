@@ -55,35 +55,15 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
         data.vehicleType = selectedVehicleType;
       }
       
+      // Add image data to form data for driver validation
+      if (selectedRole === 'driver') {
+        data.driverPicture = driverPicture;
+        data.cnicPicture = cnicPicture;
+        data.vehiclePictures = vehiclePictures;
+      }
+      
       const schema = createValidationSchema(selectedRole);
       await schema.validate(data, { abortEarly: false });
-      
-      // Additional validation for driver images
-      const errors: any = {};
-      if (selectedRole === 'driver') {
-        console.log('Image validation debug:', {
-          driverPicture: driverPicture,
-          cnicPicture: cnicPicture,
-          vehiclePictures: vehiclePictures,
-          driverPictureLength: driverPicture?.length || 0,
-          cnicPictureLength: cnicPicture?.length || 0,
-          vehiclePicturesLength: vehiclePictures?.length || 0,
-          driverPictureType: typeof driverPicture,
-          cnicPictureType: typeof cnicPicture
-        });
-        
-        // Driver picture and CNIC picture are now optional
-        // Only vehicle pictures are required for drivers
-        if (!vehiclePictures || vehiclePictures.length === 0) {
-          errors.vehiclePictures = 'At least one vehicle picture is required';
-        }
-      }
-      
-      if (Object.keys(errors).length > 0) {
-        console.log('Validation errors:', errors);
-        setManualValidation({ isValid: false, errors });
-        return false;
-      }
       
       setManualValidation({ isValid: true, errors: {} });
       return true;
@@ -97,27 +77,7 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
         });
       }
       
-      // Add image validation errors for driver
-      if (selectedRole === 'driver') {
-        console.log('Image validation debug (catch):', {
-          driverPicture: driverPicture,
-          cnicPicture: cnicPicture,
-          vehiclePictures: vehiclePictures,
-          driverPictureLength: driverPicture?.length || 0,
-          cnicPictureLength: cnicPicture?.length || 0,
-          vehiclePicturesLength: vehiclePictures?.length || 0,
-          driverPictureType: typeof driverPicture,
-          cnicPictureType: typeof cnicPicture
-        });
-        
-        // Driver picture and CNIC picture are now optional
-        // Only vehicle pictures are required for drivers
-        if (!vehiclePictures || vehiclePictures.length === 0) {
-          errors.vehiclePictures = 'At least one vehicle picture is required';
-        }
-      }
-      
-      console.log('Validation errors (catch):', errors);
+      console.log('Validation errors:', errors);
       setManualValidation({ isValid: false, errors });
       return false;
     }
@@ -126,6 +86,18 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
   // Custom validation resolver that handles role changes
   const customResolver = async (data: any) => {
     try {
+      // Add vehicle type to data if it's selected
+      if (selectedRole === 'driver' && selectedVehicleType) {
+        data.vehicleType = selectedVehicleType;
+      }
+      
+      // Add image data to form data for driver validation
+      if (selectedRole === 'driver') {
+        data.driverPicture = driverPicture;
+        data.cnicPicture = cnicPicture;
+        data.vehiclePictures = vehiclePictures;
+      }
+      
       const schema = createValidationSchema(selectedRole);
       const result = await schema.validate(data, { abortEarly: false });
       return { values: result, errors: {} };
@@ -196,17 +168,6 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
     return () => clearTimeout(timeoutId);
   }, [fullName, cnic, address, email, password, confirmPassword, vehicleType, vehicleNumber, vehicleBrand, vehicleModel, selectedRole, selectedVehicleType, driverPicture, cnicPicture, vehiclePictures, getValues, validateForm]);
 
-  // Additional validation trigger when images change
-  React.useEffect(() => {
-    if (selectedRole === 'driver') {
-      const timeoutId = setTimeout(() => {
-        const currentValues = getValues();
-        console.log('Image change validation trigger:', { driverPicture, cnicPicture, vehiclePictures });
-        validateForm(currentValues);
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [driverPicture, cnicPicture, vehiclePictures, selectedRole, getValues, validateForm]);
 
   // Reset form when role changes
   React.useEffect(() => {
@@ -250,41 +211,38 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
 
     launchImageLibrary(options, (response: ImagePickerResponse) => {
       if (response.didCancel || response.errorMessage) {
+        console.log('Image picker cancelled or error:', response.errorMessage);
         return;
       }
 
       const imageUri = response.assets?.[0]?.uri;
-      if (!imageUri) return;
+      if (!imageUri) {
+        console.log('No image URI found in response:', response);
+        Alert.alert('Error', 'Failed to get image. Please try again.');
+        return;
+      }
+      
+      console.log('Image picker response:', {
+        imageUri,
+        fileName: response.assets?.[0]?.fileName,
+        fileSize: response.assets?.[0]?.fileSize,
+        type: response.assets?.[0]?.type
+      });
 
       switch (type) {
         case 'driver':
           setDriverPicture(imageUri);
           console.log('Driver picture set to:', imageUri);
-          // Trigger validation after setting image with longer delay
-          setTimeout(() => {
-            const currentValues = getValues();
-            validateForm(currentValues);
-          }, 500);
           break;
         case 'cnic':
           setCnicPicture(imageUri);
           console.log('CNIC picture set to:', imageUri);
-          // Trigger validation after setting image with longer delay
-          setTimeout(() => {
-            const currentValues = getValues();
-            validateForm(currentValues);
-          }, 500);
           break;
         case 'vehicle':
           if (vehiclePictures.length < 6) {
             const newPictures = [...vehiclePictures, imageUri];
             setVehiclePictures(newPictures);
             console.log('Vehicle pictures set to:', newPictures);
-            // Trigger validation after setting image with longer delay
-            setTimeout(() => {
-              const currentValues = getValues();
-              validateForm(currentValues);
-            }, 500);
           } else {
             Alert.alert('Limit Reached', 'Maximum 6 vehicle pictures allowed');
           }
@@ -296,17 +254,24 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
   const removeVehiclePicture = (index: number) => {
     const newPictures = vehiclePictures.filter((_, i) => i !== index);
     setVehiclePictures(newPictures);
-    // Trigger validation after removing image
-    setTimeout(() => {
-      const currentValues = getValues();
-      validateForm(currentValues);
-    }, 100);
   };
 
   const onSubmit = async (data: any) => {
+      // Add vehicle type and image data to form data
+      if (selectedRole === 'driver' && selectedVehicleType) {
+        data.vehicleType = selectedVehicleType;
+      }
+      
+      if (selectedRole === 'driver') {
+        data.driverPicture = driverPicture;
+        data.cnicPicture = cnicPicture;
+        data.vehiclePictures = vehiclePictures;
+      }
+      
+      console.log('Form data with images:', data);
+
     try {
       setIsSubmitting(true);
-      
       // First validate the form
       const isValid = await validateForm(data);
       if (!isValid) {
@@ -379,7 +344,7 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
           </Text>
         )}
       </TouchableOpacity>
-      {error && <Text style={[styles.errorText, { color: theme.colors.warning }]}>{error}</Text>}
+      {_errorMessage && <Text style={[styles.errorText, { color: theme.colors.warning }]}>{_errorMessage}</Text>}
     </View>
   );
 
@@ -723,18 +688,18 @@ export default function RegistrationForm({ initialRole = 'passenger', onSuccess 
 
             {/* Image Uploads */}
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Documents (Optional)
+              Documents * Required
             </Text>
 
             {renderImagePicker(
-              'Driver Picture (Optional)',
+              'Driver Picture *',
               driverPicture,
               () => openImagePicker('driver'),
               manualValidation.errors.driverPicture
             )}
 
             {renderImagePicker(
-              'CNIC Picture (Optional)',
+              'CNIC Picture *',
               cnicPicture,
               () => openImagePicker('cnic'),
               manualValidation.errors.cnicPicture
