@@ -28,10 +28,19 @@ export default function BrandButton({
     opacity: disabled ? 0.6 : 1,
   };
   return (
-    <Pressable onPress={onPress} style={[base, style]} disabled={disabled}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [base, style, { opacity: pressed ? 0.6 : 1 }]}
+      disabled={disabled}
+    >
       <Text
         style={[
-          { color: '#fff', fontWeight: '700', textAlign: 'center', fontSize: 16 },
+          {
+            color: '#fff',
+            fontWeight: '700',
+            textAlign: 'center',
+            fontSize: 16,
+          },
           textStyle,
         ]}
       >
