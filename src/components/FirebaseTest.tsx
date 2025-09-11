@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { auth, db } from '../services/firebase';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
+import { createTestUser } from '../services/firebaseAuth';
 
 const FirebaseTest: React.FC = () => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -53,6 +54,28 @@ const FirebaseTest: React.FC = () => {
     }
   };
 
+  const createTestUserForDemo = async () => {
+    try {
+      const testPhoneNumber = '+923486716994'; // Replace with your test number
+      const testUser = await createTestUser(testPhoneNumber, 'passenger');
+      
+      Alert.alert(
+        'Test User Created',
+        `Test user created with phone: ${testPhoneNumber}\nYou can now test the existing user flow by entering this phone number in the app.`,
+        [{ text: 'OK' }]
+      );
+      
+      console.log('Test user created for demo:', testUser);
+    } catch (error) {
+      console.error('Error creating test user:', error);
+      Alert.alert(
+        'Error',
+        `Failed to create test user: ${error.message}`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Firebase Connection Test</Text>
@@ -60,6 +83,13 @@ const FirebaseTest: React.FC = () => {
         Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
       </Text>
       <Text style={styles.result}>{testResult}</Text>
+      
+      <TouchableOpacity 
+        style={styles.button} 
+        onPress={createTestUserForDemo}
+      >
+        <Text style={styles.buttonText}>Create Test User for Demo</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -86,6 +116,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  buttonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
 

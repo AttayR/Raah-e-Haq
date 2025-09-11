@@ -5,12 +5,12 @@ import { getStorage } from 'firebase/storage';
 import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAvsyP9TM3Ak1zCjQkiuvAi_ojy09SMsfw',
+  apiKey: 'AIzaSyDL3DQ9VgCY8nwHCZNFwLk1DjbDTyCwxaE',
   authDomain: 'raah-e-haq.firebaseapp.com',
   projectId: 'raah-e-haq',
   storageBucket: 'raah-e-haq.firebasestorage.app',
   messagingSenderId: '19712791802',
-  appId: '1:19712791802:ios:69e6492b2c3fe191b66543',
+  appId: '1:19712791802:android:08fc36d1e8dbb1e1b66543',
 };
 
 const app = initializeApp(firebaseConfig);
