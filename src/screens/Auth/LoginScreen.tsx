@@ -1,201 +1,686 @@
-/* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Alert, 
+  SafeAreaView, 
+  StatusBar, 
+  ImageBackground, 
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Dimensions,
+} from 'react-native';
 import BrandButton from '../../components/BrandButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { emailSignInThunk, resetPasswordThunk } from '../../store/thunks/authThunks';
+import { BrandColors } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 type LoginMethod = 'phone' | 'email';
 
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+
 export default function LoginScreen() {
-  const { theme } = useAppTheme();
   const navigation = useNavigation<any>();
   const dispatch = useDispatch<any>();
   
-  const { status, error } = useSelector((state: RootState) => state.auth);
+  const { error } = useSelector((state: RootState) => state.auth);
   
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('phone');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+
+  // Validation functions
+  const validateEmail = (emailValue: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(emailValue);
+  };
+
+  const validatePassword = (passwordValue: string): boolean => {
+    return passwordValue.length >= 6;
+  };
+
+  const clearValidationErrors = () => {
+    setValidationErrors({});
+  };
 
   const handlePhoneSignIn = () => {
-    navigation.navigate('PhoneAuth');
+    try {
+      clearValidationErrors();
+      navigation.navigate('PhoneAuth');
+    } catch (err) {
+      console.error('Navigation error:', err);
+      Alert.alert('Error', 'Unable to navigate to phone authentication');
+    }
   };
 
   const handleCreateAccount = () => {
-    navigation.navigate('Signup');
+    try {
+      clearValidationErrors();
+      navigation.navigate('Signup');
+    } catch (err) {
+      console.error('Navigation error:', err);
+      Alert.alert('Error', 'Unable to navigate to signup');
+    }
   };
 
   const handleEmailSignIn = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
-      return;
-    }
-    if (!password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
-      return;
-    }
-
     try {
-      await dispatch(emailSignInThunk(email.trim(), password));
-    } catch (error: any) {
-      // Error is handled in the thunk
+      clearValidationErrors();
+      setIsLoading(true);
+
+      // Validation
+      const errors: {[key: string]: string} = {};
+      
+      if (!email.trim()) {
+        errors.email = 'Email is required';
+      } else if (!validateEmail(email.trim())) {
+        errors.email = 'Please enter a valid email address';
+      }
+      
+      if (!password.trim()) {
+        errors.password = 'Password is required';
+      } else if (!validatePassword(password.trim())) {
+        errors.password = 'Password must be at least 6 characters';
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        setIsLoading(false);
+        return;
+      }
+
+      await dispatch(emailSignInThunk(email.trim(), password.trim()));
+    } catch (err: any) {
+      console.error('Email sign in error:', err);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email first');
-      return;
-    }
-
     try {
+      clearValidationErrors();
+      
+      if (!email.trim()) {
+        setValidationErrors({ email: 'Please enter your email first' });
+        return;
+      }
+
+      if (!validateEmail(email.trim())) {
+        setValidationErrors({ email: 'Please enter a valid email address' });
+        return;
+      }
+
+      setIsLoading(true);
       await dispatch(resetPasswordThunk(email.trim()));
       Alert.alert(
         'Password Reset',
         'Password reset email sent! Please check your inbox.',
         [{ text: 'OK' }]
       );
-    } catch (error: any) {
-      // Error is handled in the thunk
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      Alert.alert('Error', 'Failed to send password reset email. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginMethodChange = (method: LoginMethod) => {
+    try {
+      clearValidationErrors();
+      setLoginMethod(method);
+    } catch (err) {
+      console.error('Login method change error:', err);
     }
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.background }
-      ]}
-    >
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        Welcome to RaaHeHaq
-      </Text>
-
-      <Text style={[styles.subtitle, { color: theme.colors.mutedText }]}>
-        Sign in to your account or create a new one
-      </Text>
-
-      {/* Login Method Toggle */}
-      <View style={styles.toggleContainer}>
-        <BrandButton
-          title="Phone"
-          onPress={() => setLoginMethod('phone')}
-          variant={loginMethod === 'phone' ? 'primary' : 'secondary'}
-          style={[styles.toggleButton, { flex: 1 }]}
-        />
-        <BrandButton
-          title="Email"
-          onPress={() => setLoginMethod('email')}
-          variant={loginMethod === 'email' ? 'primary' : 'secondary'}
-          style={[styles.toggleButton, { flex: 1 }]}
-        />
-      </View>
-
-      {/* Phone Login */}
-      {loginMethod === 'phone' && (
-        <>
-          <BrandButton
-            title="Sign in with Phone Number"
-            onPress={handlePhoneSignIn}
-            variant="primary"
-            style={styles.primaryButton}
-          />
-        </>
-      )}
-
-      {/* Email Login */}
-      {loginMethod === 'email' && (
-        <>
-          <ThemedTextInput
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <ThemedTextInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          
-          <BrandButton
-            title={status === 'loading' ? 'Signing in...' : 'Sign in with Email'}
-            onPress={handleEmailSignIn}
-            variant="primary"
-            disabled={status === 'loading'}
-            style={styles.primaryButton}
-          />
-          
-          <BrandButton
-            title="Forgot Password?"
-            onPress={handleForgotPassword}
-            variant="secondary"
-            style={styles.forgotButton}
-          />
-        </>
-      )}
-
-      <BrandButton
-        title="Create New Account"
-        onPress={handleCreateAccount}
-        variant="secondary"
-        style={styles.secondaryButton}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={BrandColors.primary}
+        translucent={false}
       />
+      <ImageBackground
+        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        {/* Fixed Header */}
+        <View style={styles.fixedHeader}>
+          {/* Decorative Circles */}
+          <View style={styles.decorativeCircle1} />
+          <View style={styles.decorativeCircle2} />
+          <View style={styles.decorativeCircle3} />
+          <View style={styles.decorativeCircle4} />
+          <View style={styles.decorativeCircle5} />
+          
+          <View style={styles.logoContainer}>
+            <View style={styles.logoWrapper}>
+              <Image 
+                source={require('../../assets/images/Logo.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.title}>Welcome to RaaHeHaq</Text>
+            <Text style={styles.subtitle}>
+              Sign in to your account or create a new one
+            </Text>
+          </View>
+        </View>
 
-      {error && (
-        <Text style={[styles.errorText, { color: theme.colors.warning }]}>
-          {error}
-        </Text>
-      )}
-    </View>
+        {/* Scrollable Content */}
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            {/* Login Form Card */}
+            <View style={styles.formCard}>
+              {/* Login Method Toggle */}
+              <View style={styles.toggleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    loginMethod === 'phone' ? styles.toggleButtonActive : styles.toggleButtonInactive
+                  ]}
+                  onPress={() => handleLoginMethodChange('phone')}
+                  activeOpacity={0.7}
+                >
+                  <Icon 
+                    name="phone" 
+                    size={20} 
+                    color={loginMethod === 'phone' ? '#ffffff' : BrandColors.primary} 
+                  />
+                  <Text style={[
+                    styles.toggleButtonText,
+                    loginMethod === 'phone' ? styles.toggleButtonTextActive : styles.toggleButtonTextInactive
+                  ]} numberOfLines={1}>
+                    Phone
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    loginMethod === 'email' ? styles.toggleButtonActive : styles.toggleButtonInactive
+                  ]}
+                  onPress={() => handleLoginMethodChange('email')}
+                  activeOpacity={0.7}
+                >
+                  <Icon 
+                    name="email" 
+                    size={20} 
+                    color={loginMethod === 'email' ? '#ffffff' : BrandColors.primary} 
+                  />
+                  <Text style={[
+                    styles.toggleButtonText,
+                    loginMethod === 'email' ? styles.toggleButtonTextActive : styles.toggleButtonTextInactive
+                  ]} numberOfLines={1}>
+                    Email
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Phone Login */}
+              {loginMethod === 'phone' && (
+                <View style={styles.phoneSection}>
+                  <View style={styles.phoneIconContainer}>
+                    <Icon name="smartphone" size={48} color={BrandColors.primary} />
+                  </View>
+                  <Text style={styles.sectionTitle}>Sign in with Phone</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    We'll send you a verification code
+                  </Text>
+                  <View style={styles.buttonContainer}>
+                    <BrandButton
+                      title="Continue with Phone"
+                      onPress={handlePhoneSignIn}
+                      variant="primary"
+                      style={styles.primaryButton}
+                      disabled={isLoading}
+                      textStyle={styles.buttonText}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Email Login */}
+              {loginMethod === 'email' && (
+                <View style={styles.emailSection}>
+                  <View style={styles.emailIconContainer}>
+                    <Icon name="email" size={48} color={BrandColors.primary} />
+                  </View>
+                  <Text style={styles.sectionTitle}>Sign in with Email</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Enter your email and password
+                  </Text>
+                  
+                  <View style={styles.inputContainer}>
+                    <ThemedTextInput
+                      placeholder="Email"
+                      value={email}
+                      onChangeText={(text) => {
+                        setEmail(text);
+                        if (validationErrors.email) {
+                          setValidationErrors(prev => ({ ...prev, email: '' }));
+                        }
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      style={styles.input}
+                    />
+                    {validationErrors.email && (
+                      <Text style={styles.errorText}>{validationErrors.email}</Text>
+                    )}
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <ThemedTextInput
+                      placeholder="Password"
+                      value={password}
+                      onChangeText={(text) => {
+                        setPassword(text);
+                        if (validationErrors.password) {
+                          setValidationErrors(prev => ({ ...prev, password: '' }));
+                        }
+                      }}
+                      secureTextEntry
+                      style={styles.input}
+                    />
+                    {validationErrors.password && (
+                      <Text style={styles.errorText}>{validationErrors.password}</Text>
+                    )}
+                  </View>
+                  
+                  <View style={styles.buttonContainer}>
+                    <BrandButton
+                      title={isLoading ? 'Signing in...' : 'Sign in with Email'}
+                      onPress={handleEmailSignIn}
+                      variant="primary"
+                      disabled={isLoading}
+                      style={styles.primaryButton}
+                      textStyle={styles.buttonText}
+                    />
+                  </View>
+                  
+                  <TouchableOpacity
+                    onPress={handleForgotPassword}
+                    style={styles.forgotPasswordContainer}
+                    disabled={isLoading}
+                  >
+                    <Text style={[styles.forgotPasswordText, isLoading && styles.disabledText]}>
+                      Forgot Password?
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {error && (
+                <View style={styles.errorContainer}>
+                  <Icon name="error" size={20} color="#ef4444" />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Create Account Section */}
+            <View style={styles.createAccountCard}>
+              <Text style={styles.createAccountTitle}>New to RaaHeHaq?</Text>
+              <Text style={styles.createAccountSubtitle}>
+                Create an account to get started
+              </Text>
+              <View style={styles.buttonContainer}>
+                <BrandButton
+                  title="Create New Account"
+                  onPress={handleCreateAccount}
+                  variant="secondary"
+                  style={styles.createAccountButton}
+                  disabled={isLoading}
+                  textStyle={styles.buttonText}
+                />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BrandColors.primary,
+  },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  fixedHeader: {
+    backgroundColor: BrandColors.primary,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    position: 'relative',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  scrollView: {
+    flex: 1,
+    marginTop: -20, // Overlap with header for seamless look
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
   container: {
     flex: 1,
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: isSmallScreen ? 16 : 20,
+    paddingTop: 20,
+    maxWidth: 500,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: -30,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    top: 20,
+    left: -20,
+  },
+  decorativeCircle3: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    bottom: 10,
+    right: 50,
+  },
+  decorativeCircle4: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    top: 60,
+    right: 80,
+  },
+  decorativeCircle5: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    bottom: -20,
+    left: 30,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  logoWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  logoImage: {
+    width: 60,
+    height: 60,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    color: '#ffffff',
+    fontSize: 32,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
+    color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 24,
+    lineHeight: 24,
+  },
+  formCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: isSmallScreen ? 20 : 25,
+    padding: isSmallScreen ? 20 : 28,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    width: '100%',
   },
   toggleContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 15,
+    padding: 6,
+    marginBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   toggleButton: {
-    marginBottom: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: isSmallScreen ? 12 : 14,
+    paddingHorizontal: isSmallScreen ? 16 : 20,
+    borderRadius: 12,
+    gap: isSmallScreen ? 8 : 10,
+    minHeight: 44,
   },
-  primaryButton: {
-    marginBottom: 16,
+  toggleButtonActive: {
+    backgroundColor: BrandColors.primary,
   },
-  secondaryButton: {
-    marginBottom: 16,
+  toggleButtonInactive: {
+    backgroundColor: 'transparent',
   },
-  forgotButton: {
+  toggleButtonText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  toggleButtonTextActive: {
+    color: '#ffffff',
+  },
+  toggleButtonTextInactive: {
+    color: BrandColors.primary,
+  },
+  phoneSection: {
+    alignItems: 'center',
+  },
+  emailSection: {
+    alignItems: 'center',
+  },
+  phoneIconContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    shadowColor: BrandColors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  emailIconContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    shadowColor: BrandColors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  errorText: {
+  sectionSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
     textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  inputContainer: {
+    marginBottom: 16,
+    width: '100%',
+  },
+  input: {
+    marginBottom: 4,
+  },
+  buttonContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  primaryButton: {
+    width: '100%',
+    minHeight: isSmallScreen ? 48 : 50,
+  },
+  buttonText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  forgotPasswordContainer: {
+    alignItems: 'center',
     marginTop: 8,
+  },
+  forgotPasswordText: {
+    color: BrandColors.primary,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  disabledText: {
+    color: '#9ca3af',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    gap: 8,
+    width: '100%',
+  },
+  errorText: {
+    color: '#ef4444',
     fontSize: 14,
+    flex: 1,
+    textAlign: 'left',
+  },
+  createAccountCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 25,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  createAccountTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  createAccountSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  createAccountButton: {
+    width: '100%',
+    minHeight: isSmallScreen ? 48 : 50,
   },
 });
