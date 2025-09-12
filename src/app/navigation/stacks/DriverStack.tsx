@@ -25,9 +25,21 @@ const Stack = createNativeStackNavigator<DriverStackParamList>();
 const DriverStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
-      <Stack.Screen name="DriverProfile" component={DriverProfile} />
-      <Stack.Screen name="DriverMessagesScreen" component={DriverMessagesScreen} />
+      <Stack.Screen 
+        name="DriverTabs" 
+        component={DriverBottomTabs} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="DriverProfile" 
+        component={DriverProfile} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="DriverMessagesScreen" 
+        component={DriverMessagesScreen} 
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };

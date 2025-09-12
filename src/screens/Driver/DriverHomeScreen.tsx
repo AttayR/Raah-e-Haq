@@ -8,6 +8,7 @@ import {
   Dimensions,
   StatusBar,
   ImageBackground,
+  SafeAreaView,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
@@ -100,20 +101,22 @@ export default function DriverHomeScreen() {
   ];
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/BackgroundRaaheHaq.png')}
-      style={styles.backgroundImage}
-      resizeMode="cover"
-    >
-      {/* Dull/Blur Overlay */}
-      <View style={styles.overlay} />
-      <View style={styles.overlay2} />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={BrandColors.primary}
+        translucent={false}
+      />
+      <ImageBackground
+        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        {/* Dull/Blur Overlay */}
+        <View style={styles.overlay} />
+        <View style={styles.overlay2} />
 
-      <View style={[styles.container, styles.transparentBackground]}>
-        <StatusBar
-          barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
-          backgroundColor={BrandColors.primary}
-        />
+        <View style={[styles.container, styles.transparentBackground]}>
 
         {/* Header with Cartoon-style Background */}
         <View style={[styles.header, styles.headerBackground]}>
@@ -247,15 +250,42 @@ export default function DriverHomeScreen() {
             </View>
           </View>
 
+          {/* Account Actions */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <View style={styles.actionsGrid}>
+              <TouchableOpacity
+                style={[styles.actionCard, { borderLeftColor: '#ef4444' }]}
+                onPress={() => dispatch(signOutThunk())}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionContent}>
+                  <View style={[styles.actionIcon, { backgroundColor: '#ef4444' }]}>
+                    <Icon name="logout" size={24} color="white" />
+                  </View>
+                  <View style={styles.actionTextContainer}>
+                    <Text style={styles.actionTitle}>Sign Out</Text>
+                    <Text style={styles.actionSubtitle}>Logout from your account</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Bottom Spacing */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
-      </View>
-    </ImageBackground>
+        </View>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BrandColors.primary,
+  },
   backgroundImage: {
     flex: 1,
     width: '100%',

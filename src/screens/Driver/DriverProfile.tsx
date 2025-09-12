@@ -68,20 +68,22 @@ const DriverProfile = () => {
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/BackgroundRaaheHaq.png')}
-      style={styles.backgroundImage}
-      resizeMode="cover"
-    >
-      {/* Dull/Blur Overlay */}
-      <View style={styles.overlay} />
-      <View style={styles.overlay2} />
-      
-      <SafeAreaView style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor={BrandColors.primary}
-        />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={BrandColors.primary}
+        translucent={false}
+      />
+      <ImageBackground
+        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        {/* Dull/Blur Overlay */}
+        <View style={styles.overlay} />
+        <View style={styles.overlay2} />
+        
+        <View style={styles.container}>
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
@@ -452,13 +454,18 @@ const DriverProfile = () => {
         </View>
 
         <View style={styles.bottomPadding} />
-      </ScrollView>
+        </ScrollView>
+        </View>
+      </ImageBackground>
     </SafeAreaView>
-    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BrandColors.primary,
+  },
   backgroundImage: {
     flex: 1,
     width: '100%',

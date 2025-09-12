@@ -30,13 +30,7 @@ const DriverBottomTabs = () => {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
         },
-        headerStyle: {
-          backgroundColor: theme.colors.surface,
-        },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerShown: false,
       }}
     >
       <Tab.Screen
