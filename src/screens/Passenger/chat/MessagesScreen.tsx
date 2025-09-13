@@ -8,20 +8,24 @@ import {
   SafeAreaView,
   Image,
   ImageBackground,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import Icon from 'src/assets/icons/index';
 import { BrandColors } from 'src/theme/colors';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import {
-  Bubble,
-  BubbleProps,
-  GiftedChat,
-  IMessage,
-  InputToolbar,
-  InputToolbarProps,
-  Send,
-  SendProps,
-} from 'react-native-gifted-chat';
+// Simple chat interface without external dependencies
+type Message = {
+  id: string;
+  text: string;
+  createdAt: Date;
+  user: {
+    id: string;
+    name: string;
+    avatar?: string;
+  };
+};
+
 type MessagesScreenRouteProp = RouteProp<
   {
     MessagesScreen: {
@@ -39,98 +43,39 @@ const MessagesScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<MessagesScreenRouteProp>();
   const chatData = route?.params?.chatData || {};
-  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+
   useEffect(() => {
     setMessages([
       {
-        _id: 1,
+        id: '1',
         text: 'Hello developer',
         createdAt: new Date(),
         user: {
-          _id: 2,
+          id: '2',
           name: 'React Native',
           avatar: 'https://placeimg.com/140/140/any',
         },
       },
     ]);
   }, []);
-  const renderBubble = (props: BubbleProps<IMessage>) => {
-    return (
-      <Bubble
-        {...props}
-        wrapperStyle={{
-          left: styles.leftBubble,
-          right: styles.rightBubble,
-        }}
-        textStyle={{
-          left: { color: BrandColors.light.background, fontSize: 14 },
-          right: { color: 'black', fontSize: 14 },
-        }}
-        timeTextStyle={{
-          left: { color: BrandColors.light.background },
-          right: { color: 'black' },
-        }}
-        linkStyle={{
-          right: {
-            color: 'blue',
-          },
-          left: {
-            color: 'blue',
-          },
-        }}
-      />
-    );
-  };
-  function renderInputToolbar(props: InputToolbarProps<IMessage>) {
-    return (
-      <>
-        <InputToolbar
-          {...props}
-          containerStyle={{
-            backgroundColor: '#f5f5f5',
-            margin: 10,
-            borderRadius: 25,
-            borderTopColor: '#f5f5f5',
-            borderTopWidth: 1,
-            paddingHorizontal: 5,
-          }}
-        />
-      </>
-    );
-  }
-  function renderSend(props: SendProps<IMessage>) {
-    return (
-      <Send
-        {...props}
-        containerStyle={{
-          justifyContent: 'center',
-          alignItems: 'center',
-          width: 48,
-          height: 48,
-        }}
-      >
-        <View
-          style={{
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginRight: 10,
-          }}
-        >
-          <Icon
-            type={'materialIcon'}
-            name="send"
-            size={30}
-            color={'black'}
-          />
-        </View>
-      </Send>
-    );
-  }
-  const onSend = useCallback((newMessages: IMessage[] = []) => {
-    setMessages(previousMessages =>
-      GiftedChat.append(previousMessages, newMessages),
-    );
-  }, []);
+
+  const onSend = useCallback(() => {
+    if (inputText.trim()) {
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        text: inputText.trim(),
+        createdAt: new Date(),
+        user: {
+          id: '1',
+          name: 'You',
+        },
+      };
+      setMessages(previousMessages => [...previousMessages, newMessage]);
+      setInputText('');
+    }
+  }, [inputText]);
   return (
     <ImageBackground
       source={require('../../../assets/images/BackgroundRaaheHaq.png')}
@@ -193,24 +138,50 @@ const MessagesScreen = () => {
           </View>
         </View>
         <View style={styles.chatContainer}>
-          <GiftedChat
-            messages={messages}
-            onSend={newMessages => onSend(newMessages)}
-            renderAvatar={props => {
-              return (
-                <Image
-                  source={{ uri: chatData?.avatar }}
-                  style={styles.avatar}
-                />
-              );
-            }}
-            user={{
-              _id: 1,
-            }}
-            renderSend={renderSend}
-            renderInputToolbar={renderInputToolbar}
-            renderBubble={renderBubble}
-          />
+          <ScrollView style={styles.messagesList}>
+            {messages.map((message) => (
+              <View
+                key={message.id}
+                style={[
+                  styles.messageContainer,
+                  message.user.id === '1' ? styles.myMessage : styles.otherMessage,
+                ]}
+              >
+                <View style={[
+                  styles.messageBubble,
+                  message.user.id === '1' ? styles.myMessageBubble : styles.otherMessageBubble,
+                ]}>
+                  <Text style={[
+                    styles.messageText,
+                    message.user.id === '1' ? styles.myMessageText : styles.otherMessageText,
+                  ]}>
+                    {message.text}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+          
+          <View style={styles.inputContainer}>
+            <View style={styles.textInputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type a message..."
+                placeholderTextColor="#999"
+                multiline
+              />
+            </View>
+            <TouchableOpacity style={styles.sendButton} onPress={onSend}>
+              <Icon
+                type={'materialIcon'}
+                name="send"
+                size={20}
+                color={'white'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     </ImageBackground>
@@ -356,6 +327,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
+  messagesList: {
+    flex: 1,
+    paddingHorizontal: 10,
+  },
+  messageContainer: {
+    marginVertical: 4,
+    paddingHorizontal: 8,
+  },
+  myMessage: {
+    alignItems: 'flex-end',
+  },
+  otherMessage: {
+    alignItems: 'flex-start',
+  },
   messageBubble: {
     padding: 12,
     borderRadius: 16,
@@ -388,12 +373,6 @@ const styles = StyleSheet.create({
     color: '#1B1B1B',
     fontWeight: '500',
   },
-  inputToolbar: {
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -401,6 +380,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 8,
+    margin: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
