@@ -260,7 +260,7 @@ export default function RegistrationScreen() {
             </View>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
-              Join RaaHeHaq as {formData.role === 'driver' ? 'Driver' : 'Passenger'}
+              Join RaaH-e-Haq as {formData.role === 'driver' ? 'Driver' : 'Passenger'}
             </Text>
           </View>
 

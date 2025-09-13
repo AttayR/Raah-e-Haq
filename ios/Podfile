@@ -20,7 +20,7 @@ target 'RaaHeHaq' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
-  # Firebase pods
+  # Firebase pods - let React Native Firebase handle versions
   pod 'Firebase/Core'
   pod 'Firebase/Auth'
   pod 'Firebase/Firestore'

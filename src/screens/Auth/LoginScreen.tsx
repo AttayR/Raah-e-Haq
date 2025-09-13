@@ -174,7 +174,7 @@ export default function LoginScreen() {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.title}>Welcome to RaaHeHaq</Text>
+            <Text style={styles.title}>Welcome to RaaH-E-Haq</Text>
             <Text style={styles.subtitle}>
               Sign in to your account or create a new one
             </Text>
@@ -339,7 +339,7 @@ export default function LoginScreen() {
 
             {/* Create Account Section */}
             <View style={styles.createAccountCard}>
-              <Text style={styles.createAccountTitle}>New to RaaHeHaq?</Text>
+              <Text style={styles.createAccountTitle}>New to RaaH-E-Haq?</Text>
               <Text style={styles.createAccountSubtitle}>
                 Create an account to get started
               </Text>
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
