@@ -16,7 +16,7 @@ import ThemedTextInput from '../../components/ThemedTextInput';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { emailSignInThunk, resetPasswordThunk } from '../../store/thunks/authThunks';
+import { emailSignInThunk, resetPasswordThunk, googleSignInThunk } from '../../store/thunks/authThunks';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -139,6 +139,19 @@ export default function LoginScreen() {
       setLoginMethod(method);
     } catch (err) {
       console.error('Login method change error:', err);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      clearValidationErrors();
+      setIsLoading(true);
+      await dispatch(googleSignInThunk());
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      showToast('error', 'Failed to sign in with Google. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -312,6 +325,34 @@ export default function LoginScreen() {
                       style={styles.primaryButton}
                       textStyle={styles.buttonText}
                     />
+                  </View>
+
+                  {/* Divider */}
+                  <View style={styles.dividerContainer}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>OR</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+
+                  {/* Google Sign-In Button */}
+                  <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                      style={styles.googleButton}
+                      onPress={handleGoogleSignIn}
+                      disabled={isLoading}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.googleLogoContainer}>
+                        <View style={styles.googleLogo}>
+                          <View style={styles.googleLogoInner}>
+                            <Text style={styles.googleG}>G</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <Text style={styles.googleButtonText}>
+                        {isLoading ? 'Signing in...' : 'Continue with Google'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                   
                   <TouchableOpacity
@@ -641,6 +682,84 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     textAlign: 'left',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    ...Typography.body,
+    color: '#6b7280',
+    marginHorizontal: 16,
+    fontSize: 14,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  googleLogoContainer: {
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 0.5,
+    borderColor: '#e5e7eb',
+  },
+  googleLogoInner: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleG: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'Roboto',
+    textAlign: 'center',
+  },
+  googleButtonText: {
+    ...Typography.body,
+    color: '#374151',
+    fontWeight: '600',
   },
   createAccountCard: {
     backgroundColor: '#ffffff',

@@ -6,7 +6,8 @@ import {
   onAuthStateChanged, 
   User,
   signInWithPhoneNumber,
-  UserCredential
+  UserCredential,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { 
   doc, 
@@ -278,6 +279,46 @@ export const isAuthenticated = async (): Promise<boolean> => {
     return session !== null && session.expiresAt > Date.now();
   } catch (error) {
     return false;
+  }
+};
+
+// Google Sign-In function
+export const googleSignIn = async (): Promise<{ success: boolean; user?: User; error?: string }> => {
+  try {
+    const { signInWithGoogle } = await import('./googleSignIn');
+    const result = await signInWithGoogle();
+    
+    if (result.success && result.user) {
+      // Check if user profile exists, if not create one
+      let userProfile = await getUserProfile(result.user.uid);
+      
+      if (!userProfile) {
+        // Create user profile for Google sign-in
+        userProfile = await createUserProfile(
+          result.user.uid,
+          result.user.phoneNumber || '', // Google users might not have phone
+          'passenger', // Default role, can be changed later
+          result.user.displayName || undefined,
+          result.user.email || undefined
+        );
+      }
+      
+      return {
+        success: true,
+        user: result.user,
+      };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Google Sign-In failed',
+      };
+    }
+  } catch (error: any) {
+    console.error('Google Sign-In Error:', error);
+    return {
+      success: false,
+      error: error.message || 'Google Sign-In failed',
+    };
   }
 };
 

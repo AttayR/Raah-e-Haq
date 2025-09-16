@@ -13,7 +13,8 @@ import {
   emailSignUp,
   emailSignIn,
   resetPassword,
-  createUserProfileWithDetails
+  createUserProfileWithDetails,
+  googleSignIn
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
 import { showToast } from '../../components/ToastProvider';
@@ -518,6 +519,75 @@ export const detailedRegistrationThunk = (
   } catch (error: any) {
     console.error('detailedRegistrationThunk - Error:', error);
     const errorMessage = error.message || 'Failed to create account';
+    dispatch(setAuthError(errorMessage));
+    showToast('error', errorMessage);
+    throw error;
+  }
+};
+
+// Google Sign-In Thunk
+export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
+  try {
+    console.log('googleSignInThunk - Starting Google sign-in...');
+    dispatch(setAuthLoading());
+    dispatch(clearError());
+    
+    const result = await googleSignIn();
+    
+    if (result.success && result.user) {
+      // Get user profile
+      const userProfile = await getUserProfile(result.user.uid);
+      
+      if (userProfile) {
+        // Create session
+        const session = await createAuthSession(result.user, userProfile);
+        
+        // Set authenticated state
+        dispatch(setAuthenticated({
+          uid: result.user.uid,
+          phoneNumber: userProfile.phoneNumber,
+          role: userProfile.role,
+          userProfile,
+          session,
+          profileCompleted: true
+        }));
+        
+        dispatch(setSession(session));
+        console.log('googleSignInThunk - Google sign-in successful');
+        showToast('success', 'Signed in with Google successfully');
+        return { user: result.user, userProfile, session };
+      } else {
+        // User profile not found, create one
+        const newUserProfile = await createUserProfile(
+          result.user.uid,
+          result.user.phoneNumber || '',
+          'passenger', // Default role
+          result.user.displayName || undefined,
+          result.user.email || undefined
+        );
+        
+        const session = await createAuthSession(result.user, newUserProfile);
+        
+        dispatch(setAuthenticated({
+          uid: result.user.uid,
+          phoneNumber: newUserProfile.phoneNumber,
+          role: newUserProfile.role,
+          userProfile: newUserProfile,
+          session,
+          profileCompleted: true
+        }));
+        
+        dispatch(setSession(session));
+        console.log('googleSignInThunk - Google sign-in successful with new profile');
+        showToast('success', 'Signed in with Google successfully');
+        return { user: result.user, userProfile: newUserProfile, session };
+      }
+    } else {
+      throw new Error(result.error || 'Google Sign-In failed');
+    }
+  } catch (error: any) {
+    console.error('googleSignInThunk - Error:', error);
+    const errorMessage = error.message || 'Failed to sign in with Google';
     dispatch(setAuthError(errorMessage));
     showToast('error', errorMessage);
     throw error;
