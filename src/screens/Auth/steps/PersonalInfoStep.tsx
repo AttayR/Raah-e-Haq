@@ -5,12 +5,12 @@ import {
   StyleSheet, 
   TouchableOpacity,
   Dimensions,
-  Alert,
+  Image,
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedTextInput from '../../../components/ThemedTextInput';
-import BrandButton from '../../../components/BrandButton';
+// import BrandButton from '../../../components/BrandButton';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -32,7 +32,7 @@ interface PersonalInfoStepProps {
   errors: Record<string, string>;
 }
 
-export default function PersonalInfoStep({ data, onDataChange, errors }: PersonalInfoStepProps) {
+export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoStepProps) {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -213,22 +213,18 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
             onPress={() => handleRoleChange('passenger')}
             activeOpacity={0.8}
           >
-            <Icon 
-              name="person" 
-              size={24} 
-              color={data.role === 'passenger' ? '#ffffff' : BrandColors.primary} 
+            <Image
+              source={require('../../../assets/images/4.png')}
+              style={styles.roleImage}
+              resizeMode="contain"
             />
-            <Text style={[
-              styles.roleButtonText,
-              data.role === 'passenger' ? styles.roleButtonTextActive : styles.roleButtonTextInactive
-            ]}>
+            <Text
+              style={[
+                styles.roleButtonText,
+                data.role === 'passenger' ? styles.roleButtonTextActive : styles.roleButtonTextInactive,
+              ]}
+            >
               Passenger
-            </Text>
-            <Text style={[
-              styles.roleButtonSubtext,
-              data.role === 'passenger' ? styles.roleButtonSubtextActive : styles.roleButtonSubtextInactive
-            ]}>
-              Book rides
             </Text>
           </TouchableOpacity>
           
@@ -240,22 +236,18 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
             onPress={() => handleRoleChange('driver')}
             activeOpacity={0.8}
           >
-            <Icon 
-              name="local-taxi" 
-              size={24} 
-              color={data.role === 'driver' ? '#ffffff' : BrandColors.primary} 
+            <Image
+              source={require('../../../assets/images/2.png')}
+              style={styles.roleImage}
+              resizeMode="contain"
             />
-            <Text style={[
-              styles.roleButtonText,
-              data.role === 'driver' ? styles.roleButtonTextActive : styles.roleButtonTextInactive
-            ]}>
+            <Text
+              style={[
+                styles.roleButtonText,
+                data.role === 'driver' ? styles.roleButtonTextActive : styles.roleButtonTextInactive,
+              ]}
+            >
               Driver
-            </Text>
-            <Text style={[
-              styles.roleButtonSubtext,
-              data.role === 'driver' ? styles.roleButtonSubtextActive : styles.roleButtonSubtextInactive
-            ]}>
-              Provide rides
             </Text>
           </TouchableOpacity>
         </View>
@@ -485,7 +477,7 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flex: 1,
-    padding: 20,
+    paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 2,
@@ -498,27 +490,20 @@ const styles = StyleSheet.create({
   roleButtonInactive: {
     backgroundColor: '#ffffff',
   },
+  roleImage: {
+    width: 80,
+    height: 80,
+  },
   roleButtonText: {
     fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    marginTop: 8,
-    marginBottom: 4,
+    fontWeight: '700',
+    marginTop: 10,
   },
   roleButtonTextActive: {
     color: '#ffffff',
   },
   roleButtonTextInactive: {
     color: BrandColors.primary,
-  },
-  roleButtonSubtext: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  roleButtonSubtextActive: {
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  roleButtonSubtextInactive: {
-    color: '#6b7280',
   },
   formCard: {
     backgroundColor: '#ffffff',

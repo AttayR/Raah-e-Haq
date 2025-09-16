@@ -10,6 +10,7 @@ import { StatusBar } from 'react-native';
 import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
+import Toast from 'react-native-toast-message';
 
 function ThemedNav() {
   const { theme } = useAppTheme();
@@ -46,6 +47,7 @@ function ThemedNav() {
       <NavigationContainer theme={navTheme}>
         <AuthFlow />
       </NavigationContainer>
+      <Toast />
     </>
   );
 }

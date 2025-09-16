@@ -16,6 +16,7 @@ import {
   createUserProfileWithDetails
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
+import { showToast } from '../../components/ToastProvider';
 import {
   setAuthError,
   setAuthLoading,
@@ -92,11 +93,13 @@ export const sendVerificationCodeThunk = (phoneNumber: string) => async (dispatc
       userStatus: result.isExistingUser ? 'existing' : 'new',
       userProfile: result.userProfile
     }));
+    showToast('success', `Verification code sent to ${formattedPhone}`);
     
     return result;
   } catch (error: any) {
     const errorMessage = error.message || 'Failed to send verification code';
     dispatch(setAuthError(errorMessage));
+    showToast('error', errorMessage);
     throw error;
   }
 };
@@ -152,6 +155,7 @@ export const verifyCodeThunk = (
       
       dispatch(setSession(session));
       console.log('verifyCodeThunk - Existing user signed in successfully');
+      showToast('success', 'Signed in successfully');
       return { user, userProfile: existingUserProfile, session, isExistingUser: true };
     }
     
@@ -183,6 +187,7 @@ export const verifyCodeThunk = (
       
       dispatch(setSession(session));
       console.log('verifyCodeThunk - User authenticated without role, ready for role selection');
+      showToast('success', 'Phone verified successfully');
       return { user, userProfile: null, session, isExistingUser: false };
     }
     
@@ -212,11 +217,13 @@ export const verifyCodeThunk = (
     dispatch(setSession(session));
     
     console.log('verifyCodeThunk - Verification completed successfully');
+    showToast('success', 'Account created successfully');
     return { user, userProfile, session, isExistingUser: false };
   } catch (error: any) {
     console.error('verifyCodeThunk - Error:', error);
     const errorMessage = error.message || 'Failed to verify code';
     dispatch(setAuthError(errorMessage));
+    showToast('error', errorMessage);
     throw error;
   }
 };
@@ -410,11 +417,13 @@ export const emailSignInThunk = (email: string, password: string) => async (disp
     
     dispatch(setSession(session));
     console.log('emailSignInThunk - Email signin successful');
+    showToast('success', 'Signed in successfully');
     return { user, userProfile, session, isExistingUser };
   } catch (error: any) {
     console.error('emailSignInThunk - Error:', error);
     const errorMessage = error.message || 'Failed to sign in';
     dispatch(setAuthError(errorMessage));
+    showToast('error', errorMessage);
     throw error;
   }
 };
@@ -433,11 +442,13 @@ export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatc
     
     await resetPassword(email.trim());
     console.log('resetPasswordThunk - Password reset email sent');
+    showToast('success', 'Password reset email sent');
     return true;
   } catch (error: any) {
     console.error('resetPasswordThunk - Error:', error);
     const errorMessage = error.message || 'Failed to send password reset email';
     dispatch(setAuthError(errorMessage));
+    showToast('error', errorMessage);
     throw error;
   }
 };
@@ -502,11 +513,13 @@ export const detailedRegistrationThunk = (
     
     dispatch(setSession(session));
     console.log('detailedRegistrationThunk - Detailed registration successful');
+    showToast('success', 'Account created successfully');
     return { user, userProfile, session };
   } catch (error: any) {
     console.error('detailedRegistrationThunk - Error:', error);
     const errorMessage = error.message || 'Failed to create account';
     dispatch(setAuthError(errorMessage));
+    showToast('error', errorMessage);
     throw error;
   }
 };
