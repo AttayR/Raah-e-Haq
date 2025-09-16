@@ -12,6 +12,8 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { showToast } from '../../components/ToastProvider';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUserRole } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
@@ -34,7 +36,7 @@ export default function RoleSelectionScreen() {
 
   const handleContinue = () => {
     if (!selectedRole) {
-      Alert.alert('Error', 'Please select a role to continue');
+      showToast('error', 'Please select a role to continue');
       return;
     }
 
@@ -111,14 +113,12 @@ export default function RoleSelectionScreen() {
                 activeOpacity={0.8}
               >
                 <View style={styles.roleIconContainer}>
-                  <Icon name="person" size={48} color={selectedRole === 'passenger' ? '#ffffff' : BrandColors.primary} />
+                  <Image
+                    source={require('../../assets/images/4.png')}
+                    style={styles.roleImage}
+                    resizeMode="contain"
+                  />
                 </View>
-                <Text style={[
-                  styles.roleTitle,
-                  selectedRole === 'passenger' ? styles.roleTitleSelected : styles.roleTitleUnselected
-                ]}>
-                  Passenger
-                </Text>
                 <Text style={[
                   styles.roleDescription,
                   selectedRole === 'passenger' ? styles.roleDescriptionSelected : styles.roleDescriptionUnselected
@@ -174,14 +174,12 @@ export default function RoleSelectionScreen() {
                 activeOpacity={0.8}
               >
                 <View style={styles.roleIconContainer}>
-                  <Icon name="local-taxi" size={48} color={selectedRole === 'driver' ? '#ffffff' : BrandColors.primary} />
+                  <Image
+                    source={require('../../assets/images/2.png')}
+                    style={styles.roleImage}
+                    resizeMode="contain"
+                  />
                 </View>
-                <Text style={[
-                  styles.roleTitle,
-                  selectedRole === 'driver' ? styles.roleTitleSelected : styles.roleTitleUnselected
-                ]}>
-                  Driver
-                </Text>
                 <Text style={[
                   styles.roleDescription,
                   selectedRole === 'driver' ? styles.roleDescriptionSelected : styles.roleDescriptionUnselected
@@ -340,12 +338,12 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -407,6 +405,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+  },
+  roleImage: {
+    width: 72,
+    height: 72,
   },
   roleTitle: {
     fontSize: 24,

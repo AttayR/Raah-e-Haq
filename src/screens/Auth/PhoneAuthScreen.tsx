@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   SafeAreaView,
   StatusBar,
   ImageBackground,
@@ -23,6 +22,7 @@ import {
 import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
 import Toast from '../../components/Toast';
+import { showToast } from '../../components/ToastProvider';
 import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
@@ -65,7 +65,7 @@ export default function PhoneAuthScreen() {
 
   const handleSendCode = async () => {
     if (!phoneInput.trim()) {
-      Alert.alert('Error', 'Please enter a phone number');
+      showToast('error', 'Please enter a phone number');
       return;
     }
 
@@ -80,7 +80,7 @@ export default function PhoneAuthScreen() {
 
   const handleVerifyCode = async () => {
     if (!verificationCode.trim()) {
-      Alert.alert('Error', 'Please enter the verification code');
+      showToast('error', 'Please enter the verification code');
       return;
     }
 

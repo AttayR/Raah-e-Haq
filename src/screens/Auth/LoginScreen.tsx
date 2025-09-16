@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  Alert, 
   SafeAreaView, 
   StatusBar, 
   ImageBackground, 
@@ -21,6 +20,7 @@ import { emailSignInThunk, resetPasswordThunk } from '../../store/thunks/authThu
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { showToast } from '../../components/ToastProvider';
 
 type LoginMethod = 'phone' | 'email';
 
@@ -59,7 +59,7 @@ export default function LoginScreen() {
       navigation.navigate('PhoneAuth');
     } catch (err) {
       console.error('Navigation error:', err);
-      Alert.alert('Error', 'Unable to navigate to phone authentication');
+      showToast('error', 'Unable to navigate to phone authentication');
     }
   };
 
@@ -69,7 +69,7 @@ export default function LoginScreen() {
       navigation.navigate('Signup');
     } catch (err) {
       console.error('Navigation error:', err);
-      Alert.alert('Error', 'Unable to navigate to signup');
+      showToast('error', 'Unable to navigate to signup');
     }
   };
 
@@ -102,7 +102,7 @@ export default function LoginScreen() {
       await dispatch(emailSignInThunk(email.trim(), password.trim()));
     } catch (err: any) {
       console.error('Email sign in error:', err);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      showToast('error', 'An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -124,14 +124,10 @@ export default function LoginScreen() {
 
       setIsLoading(true);
       await dispatch(resetPasswordThunk(email.trim()));
-      Alert.alert(
-        'Password Reset',
-        'Password reset email sent! Please check your inbox.',
-        [{ text: 'OK' }]
-      );
+      showToast('success', 'Password reset email sent! Please check your inbox.');
     } catch (err: any) {
       console.error('Password reset error:', err);
-      Alert.alert('Error', 'Failed to send password reset email. Please try again.');
+      showToast('error', 'Failed to send password reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }

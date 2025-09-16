@@ -17,6 +17,8 @@ import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
+import { Typography } from '../../theme/typography';
+import LinearGradient from 'react-native-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -118,8 +120,8 @@ export default function DriverHomeScreen() {
 
         <View style={[styles.container, styles.transparentBackground]}>
 
-        {/* Header with Cartoon-style Background */}
-        <View style={[styles.header, styles.headerBackground]}>
+        {/* Compact gradient header */}
+        <LinearGradient colors={[BrandColors.primary, '#2563eb']} style={styles.header}>
           {/* Decorative Circles */}
           <View style={styles.decorativeCircle1} />
           <View style={styles.decorativeCircle2} />
@@ -161,7 +163,7 @@ export default function DriverHomeScreen() {
               {isOnline ? 'Online' : 'Offline'}
             </Text>
           </View>
-        </View>
+        </LinearGradient>
 
         <ScrollView
           style={styles.scrollView}
@@ -383,14 +385,14 @@ const styles = StyleSheet.create({
   },
   greeting: {
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   userName: {
     color: '#ffffff',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginTop: 4,
+    fontSize: 26,
+    fontWeight: '800',
+    marginTop: 2,
   },
   profileButton: {
     width: 50,
@@ -460,8 +462,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#1f2937',
     marginBottom: 4,
   },
@@ -475,7 +477,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1f2937',
     marginBottom: 16,
   },
@@ -524,12 +526,12 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1f2937',
     marginBottom: 4,
   },
   actionSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
   },
   ridesList: {
@@ -569,17 +571,17 @@ const styles = StyleSheet.create({
   },
   passengerName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1f2937',
   },
   rideTime: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6b7280',
     marginTop: 2,
   },
   rideFare: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#10b981',
   },
   rideRoute: {
@@ -603,7 +605,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
   },
   routeText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
     flex: 1,
   },

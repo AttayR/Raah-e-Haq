@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
@@ -22,6 +21,7 @@ import PersonalInfoStep from './steps/PersonalInfoStep';
 import VehicleInfoStep from './steps/VehicleInfoStep';
 import DocumentsStep from './steps/DocumentsStep';
 import ReviewStep from './steps/ReviewStep';
+import { showToast } from '../../components/ToastProvider';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -59,7 +59,7 @@ export default function RegistrationScreen() {
   const navigation = useNavigation<any>();
   const dispatch = useDispatch<any>();
   
-  const { error } = useSelector((state: RootState) => state.auth);
+  const { } = useSelector((state: RootState) => state.auth);
   
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,6 +89,10 @@ export default function RegistrationScreen() {
     { key: 'documents', title: 'Documents', icon: 'description' },
     { key: 'review', title: 'Review', icon: 'check-circle' },
   ];
+
+  const updateFormData = (patch: Partial<RegistrationData>) => {
+    setFormData(prev => ({ ...prev, ...patch }));
+  };
 
   const getCurrentStepIndex = () => {
     return steps.findIndex(step => step.key === currentStep);
@@ -120,7 +124,7 @@ export default function RegistrationScreen() {
 
   const handleNext = () => {
     if (!canProceedToNext()) {
-      Alert.alert('Incomplete Information', 'Please fill in all required fields before proceeding.');
+      showToast('error', 'Please fill all required fields before proceeding');
       return;
     }
 
@@ -147,7 +151,7 @@ export default function RegistrationScreen() {
         cnic: formData.cnic,
         address: formData.address,
         ...(formData.role === 'driver' && {
-          vehicleType: formData.vehicleType,
+          vehicleType: formData.vehicleType as any,
           vehicleInfo: {
             number: formData.vehicleNumber,
             brand: formData.vehicleBrand,
@@ -168,15 +172,12 @@ export default function RegistrationScreen() {
         profileData
       ));
       
-      Alert.alert(
-        'Registration Successful',
-        'Your account has been created successfully!',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      showToast('success', 'Your account has been created successfully!');
+      // Do not navigate here; AuthFlow will route to the main app automatically
       
     } catch (registrationError: any) {
       console.error('Registration error:', registrationError);
-      Alert.alert('Registration Failed', registrationError.message || 'Something went wrong');
+      showToast('error', registrationError.message || 'Registration failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -197,7 +198,7 @@ export default function RegistrationScreen() {
         return (
           <PersonalInfoStep
             data={formData}
-            onDataChange={setFormData}
+            onDataChange={updateFormData}
             errors={{}}
           />
         );
@@ -205,7 +206,7 @@ export default function RegistrationScreen() {
         return (
           <VehicleInfoStep
             data={formData}
-            onDataChange={setFormData}
+            onDataChange={updateFormData}
             errors={{}}
           />
         );
@@ -213,7 +214,7 @@ export default function RegistrationScreen() {
         return (
           <DocumentsStep
             data={formData}
-            onDataChange={setFormData}
+            onDataChange={updateFormData}
             errors={{}}
           />
         );
@@ -221,7 +222,7 @@ export default function RegistrationScreen() {
         return (
           <ReviewStep
             data={formData}
-            onDataChange={setFormData}
+            onDataChange={updateFormData}
           />
         );
       default:
@@ -241,7 +242,7 @@ export default function RegistrationScreen() {
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        {/* Fixed Header */}
+        {/* Compact Header */}
         <View style={styles.fixedHeader}>
           {/* Decorative Circles */}
           <View style={styles.decorativeCircle1} />
@@ -317,24 +318,18 @@ export default function RegistrationScreen() {
         >
           <View style={styles.container}>
             {renderStepContent()}
-          </View>
-        </ScrollView>
-
-        {/* Navigation Buttons */}
-        <View style={styles.navigationContainer}>
-          <View style={styles.buttonContainer}>
-            {getCurrentStepIndex() > 0 && (
-              <TouchableOpacity
-                style={styles.previousButton}
-                onPress={handlePrevious}
-                disabled={isSubmitting}
-              >
-                <Icon name="arrow-back" size={20} color={BrandColors.primary} />
-                <Text style={styles.previousButtonText}>Previous</Text>
-              </TouchableOpacity>
-            )}
-            
-            <View style={styles.nextButtonContainer}>
+            {/* Buttons moved inside scrollable content */}
+            <View style={styles.buttonContainerScrollable}>
+              {getCurrentStepIndex() > 0 && (
+                <TouchableOpacity
+                  style={styles.previousButton}
+                  onPress={handlePrevious}
+                  disabled={isSubmitting}
+                >
+                  <Icon name="arrow-back" size={20} color={BrandColors.primary} />
+                  <Text style={styles.previousButtonText}>Previous</Text>
+                </TouchableOpacity>
+              )}
               {currentStep === 'review' ? (
                 <TouchableOpacity
                   style={[styles.submitButton, !canProceedToNext() && styles.submitButtonDisabled]}
@@ -357,7 +352,7 @@ export default function RegistrationScreen() {
               )}
             </View>
           </View>
-        </View>
+        </ScrollView>
       </ImageBackground>
     </SafeAreaView>
   );
@@ -375,11 +370,11 @@ const styles = StyleSheet.create({
   },
   fixedHeader: {
     backgroundColor: BrandColors.primary,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     position: 'relative',
     overflow: 'hidden',
     zIndex: 10,
@@ -432,18 +427,18 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     zIndex: 2,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   logoWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -454,30 +449,31 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoImage: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
   },
   title: {
     color: '#ffffff',
-    fontSize: isSmallScreen ? 24 : 28,
+    fontSize: isSmallScreen ? 20 : 22,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isSmallScreen ? 12 : 14,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 18,
   },
   progressContainer: {
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 8,
   },
   progressBar: {
     height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressFill: {
     height: '100%',
@@ -493,7 +489,7 @@ const styles = StyleSheet.create({
   stepIndicators: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
   },
   stepIndicator: {
     alignItems: 'center',
@@ -526,11 +522,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    marginTop: -20,
+    marginTop: -6,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100,
+    paddingBottom: 24,
   },
   container: {
     flex: 1,
@@ -540,24 +536,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
   },
-  navigationContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
+  buttonContainerScrollable: {
+    paddingHorizontal: isSmallScreen ? 16 : 20,
     paddingVertical: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
+    gap: 12,
   },
   buttonContainer: {
     flexDirection: 'row',
