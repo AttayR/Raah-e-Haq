@@ -35,6 +35,10 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
+    setIdle: (state) => {
+      console.log('authSlice - setIdle called');
+      state.status = 'idle';
+    },
     setAuthLoading: (state) => {
       console.log('authSlice - setAuthLoading called');
       state.status = 'loading';
@@ -144,6 +148,7 @@ const authSlice = createSlice({
 });
 
 export const {
+  setIdle,
   setAuthLoading,
   setVerifying,
   setAuthenticated,

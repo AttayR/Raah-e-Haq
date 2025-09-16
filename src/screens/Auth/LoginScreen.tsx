@@ -19,6 +19,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { emailSignInThunk, resetPasswordThunk } from '../../store/thunks/authThunks';
 import { BrandColors } from '../../theme/colors';
+import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 type LoginMethod = 'phone' | 'email';
@@ -373,27 +374,27 @@ const styles = StyleSheet.create({
   },
   fixedHeader: {
     backgroundColor: BrandColors.primary,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     position: 'relative',
     overflow: 'hidden',
     zIndex: 10,
   },
   scrollView: {
     flex: 1,
-    marginTop: -20, // Overlap with header for seamless look
+    marginTop: -8, // Light overlap to keep separation
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   container: {
     flex: 1,
     paddingHorizontal: isSmallScreen ? 16 : 20,
-    paddingTop: 20,
+    paddingTop: 28,
     maxWidth: 500,
     alignSelf: 'center',
     width: '100%',
@@ -448,13 +449,13 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   logoWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     shadowColor: '#000',
@@ -467,21 +468,19 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoImage: {
-    width: 60,
-    height: 60,
+    width: 52,
+    height: 52,
   },
   title: {
+    ...Typography.display,
     color: '#ffffff',
-    fontSize: 32,
-    fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   subtitle: {
+    ...Typography.subtitle,
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 24,
   },
   formCard: {
     backgroundColor: '#ffffff',
@@ -588,18 +587,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...Typography.title,
     color: '#1f2937',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   sectionSubtitle: {
-    fontSize: 16,
+    ...Typography.subtitle,
     color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
+    marginBottom: 20,
   },
   inputContainer: {
     marginBottom: 16,
@@ -617,8 +614,8 @@ const styles = StyleSheet.create({
     minHeight: isSmallScreen ? 48 : 50,
   },
   buttonText: {
+    ...Typography.button,
     fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
   },
@@ -627,9 +624,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   forgotPasswordText: {
+    ...Typography.body,
     color: BrandColors.primary,
-    fontSize: 16,
-    fontWeight: '500',
   },
   disabledText: {
     color: '#9ca3af',
@@ -667,17 +663,15 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.05)',
   },
   createAccountTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...Typography.title,
     color: '#1f2937',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   createAccountSubtitle: {
-    fontSize: 16,
+    ...Typography.subtitle,
     color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 24,
+    marginBottom: 16,
   },
   createAccountButton: {
     width: '100%',
