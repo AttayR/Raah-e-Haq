@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import LinearGradient from 'react-native-linear-gradient';
+import { showToast } from '../../components/ToastProvider';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +32,9 @@ export default function DriverHomeScreen() {
   // Get user data from Redux store
   const { userProfile } = useSelector((state: RootState) => state.auth);
 
+  // Check if driver is approved
+  const isDriverApproved = userProfile?.driverStatus === 'approved';
+
   const quickActions = [
     {
       id: 'online',
@@ -38,7 +42,13 @@ export default function DriverHomeScreen() {
       subtitle: isOnline ? 'Stop receiving rides' : 'Start receiving rides',
       icon: isOnline ? 'pause-circle-filled' : 'play-circle-filled',
       color: isOnline ? '#ef4444' : '#10b981',
-      onPress: () => setIsOnline(!isOnline),
+      onPress: () => {
+        if (!isDriverApproved) {
+          showToast('error', 'Your driver account is not approved yet');
+          return;
+        }
+        setIsOnline(!isOnline);
+      },
     },
     {
       id: 'earnings',
@@ -119,6 +129,16 @@ export default function DriverHomeScreen() {
         <View style={styles.overlay2} />
 
         <View style={[styles.container, styles.transparentBackground]}>
+
+        {/* Driver Status Banner */}
+        {!isDriverApproved && (
+          <View style={styles.statusBanner}>
+            <Icon name="info" size={20} color="#f59e0b" />
+            <Text style={styles.statusText}>
+              Your driver account is pending approval. You cannot accept rides until approved.
+            </Text>
+          </View>
+        )}
 
         {/* Compact gradient header */}
         <LinearGradient colors={[BrandColors.primary, '#2563eb']} style={styles.header}>
@@ -622,5 +642,24 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  statusBanner: {
+    backgroundColor: '#fef3c7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+    gap: 8,
+  },
+  statusText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400e',
+    fontWeight: '500',
   },
 });

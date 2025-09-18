@@ -14,6 +14,7 @@ import {
   emailSignIn,
   resetPassword,
   createUserProfileWithDetails,
+  createDriverProfileWithDetails,
   googleSignIn
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
@@ -604,3 +605,64 @@ export const signUpThunk = (email: string, password: string, role: 'driver' | 'p
   async (dispatch: AppDispatch) => {
     return dispatch(emailSignUpThunk(email, password, role));
   };
+
+// Driver-specific registration thunk for phone authentication
+export const driverRegistrationThunk = (
+  phoneNumber: string,
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    vehicleType: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo: {
+      number: string;
+      brand: string;
+      model: string;
+      year?: string;
+      color?: string;
+    };
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+) => async (dispatch: AppDispatch, getState: () => any) => {
+  try {
+    console.log('driverRegistrationThunk - Starting driver registration...');
+    dispatch(setAuthLoading());
+    
+    const { auth } = getState();
+    const { uid } = auth;
+    
+    if (!uid) {
+      throw new Error('User must be authenticated to complete driver registration');
+    }
+    
+    // Create driver profile with details
+    const userProfile = await createDriverProfileWithDetails(uid, phoneNumber, profileData);
+    
+    // Create session
+    const session = await createAuthSession({ uid } as any, userProfile);
+    
+    // Update auth state
+    dispatch(setAuthenticated({
+      uid: userProfile.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session,
+      profileCompleted: true
+    }));
+    
+    dispatch(setSession(session));
+    
+    console.log('driverRegistrationThunk - Driver registration completed successfully');
+    showToast('success', 'Driver registration submitted for approval');
+    
+    return { userProfile, session };
+  } catch (error: any) {
+    console.error('driverRegistrationThunk - Error:', error);
+    dispatch(setAuthError(error.message || 'Driver registration failed'));
+    showToast('error', error.message || 'Driver registration failed');
+    throw error;
+  }
+};

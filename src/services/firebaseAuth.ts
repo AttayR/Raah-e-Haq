@@ -27,6 +27,11 @@ export interface UserProfile {
   driverPicture?: string; // Firebase Storage URL
   cnicPicture?: string; // Firebase Storage URL
   vehiclePictures?: string[]; // Array of Firebase Storage URLs
+  // Driver approval system
+  driverStatus?: 'pending' | 'approved' | 'rejected' | 'suspended';
+  rejectionReason?: string;
+  approvedAt?: any;
+  approvedBy?: string; // Admin UID who approved
   // Common fields
   createdAt: any;
   updatedAt: any;
@@ -99,7 +104,11 @@ export const createUserProfile = async (
       createdAt: firestore.FieldValue.serverTimestamp(),
       updatedAt: firestore.FieldValue.serverTimestamp(),
       isVerified: true,
-      isActive: true
+      isActive: true,
+      // Set driver status based on role
+      ...(role === 'driver' && {
+        driverStatus: 'pending' as const,
+      }),
     };
 
     // Only add optional fields if they have values
@@ -505,6 +514,7 @@ export const createUserProfileWithDetails = async (
     if (role === 'driver') {
       userProfile.vehicleType = profileData.vehicleType;
       userProfile.vehicleInfo = profileData.vehicleInfo;
+      userProfile.driverStatus = 'pending'; // Set initial status as pending
       
       // Upload images for drivers
       const uploadPromises: Promise<string>[] = [];
@@ -593,5 +603,138 @@ export const googleSignIn = async (): Promise<{ success: boolean; user?: any; er
       success: false,
       error: error.message || 'Google Sign-In failed',
     };
+  }
+};
+
+// Driver-specific registration for phone authentication
+export const createDriverProfileWithDetails = async (
+  uid: string,
+  phoneNumber: string,
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    vehicleType: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo: VehicleInfo;
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+): Promise<UserProfile> => {
+  try {
+    console.log('createDriverProfileWithDetails - Starting...', { uid, phoneNumber, profileData });
+    
+    const userProfile: UserProfile = {
+      uid,
+      phoneNumber,
+      role: 'driver',
+      fullName: profileData.fullName,
+      displayName: profileData.fullName,
+      cnic: profileData.cnic,
+      address: profileData.address,
+      vehicleType: profileData.vehicleType,
+      vehicleInfo: profileData.vehicleInfo,
+      driverStatus: 'pending', // Set initial status as pending
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+      isVerified: true,
+      isActive: true
+    };
+    
+    // Upload images for drivers
+    const uploadPromises: Promise<string>[] = [];
+    
+    if (profileData.driverPictureUri) {
+      uploadPromises.push(
+        uploadImage(profileData.driverPictureUri, 'driver_picture', uid)
+      );
+    }
+    
+    if (profileData.cnicPictureUri) {
+      uploadPromises.push(
+        uploadImage(profileData.cnicPictureUri, 'cnic_picture', uid)
+      );
+    }
+    
+    if (profileData.vehiclePictureUris && profileData.vehiclePictureUris.length > 0) {
+      profileData.vehiclePictureUris.forEach((uri, index) => {
+        uploadPromises.push(
+          uploadImage(uri, `vehicle_picture_${index}`, uid)
+        );
+      });
+    }
+    
+    // Wait for all uploads to complete
+    if (uploadPromises.length > 0) {
+      const uploadedUrls = await Promise.all(uploadPromises);
+      let urlIndex = 0;
+      
+      if (profileData.driverPictureUri) {
+        userProfile.driverPicture = uploadedUrls[urlIndex++];
+      }
+      
+      if (profileData.cnicPictureUri) {
+        userProfile.cnicPicture = uploadedUrls[urlIndex++];
+      }
+      
+      if (profileData.vehiclePictureUris && profileData.vehiclePictureUris.length > 0) {
+        userProfile.vehiclePictures = uploadedUrls.slice(urlIndex);
+      }
+    }
+    
+    // Save to Firestore
+    await firestore().collection('users').doc(uid).set(userProfile);
+    
+    console.log('createDriverProfileWithDetails - Driver profile created successfully');
+    return userProfile;
+  } catch (error: any) {
+    console.error('createDriverProfileWithDetails - Error:', error);
+    throw new Error(error.message || 'Failed to create driver profile');
+  }
+};
+
+// Admin functions for driver approval
+export const approveDriver = async (driverUid: string, adminUid: string): Promise<void> => {
+  try {
+    await firestore().collection('users').doc(driverUid).update({
+      driverStatus: 'approved',
+      approvedAt: firestore.FieldValue.serverTimestamp(),
+      approvedBy: adminUid,
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    });
+    console.log('Driver approved successfully:', driverUid);
+  } catch (error: any) {
+    console.error('Error approving driver:', error);
+    throw new Error('Failed to approve driver');
+  }
+};
+
+export const rejectDriver = async (driverUid: string, adminUid: string, reason: string): Promise<void> => {
+  try {
+    await firestore().collection('users').doc(driverUid).update({
+      driverStatus: 'rejected',
+      rejectionReason: reason,
+      approvedBy: adminUid,
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    });
+    console.log('Driver rejected successfully:', driverUid);
+  } catch (error: any) {
+    console.error('Error rejecting driver:', error);
+    throw new Error('Failed to reject driver');
+  }
+};
+
+export const suspendDriver = async (driverUid: string, adminUid: string, reason: string): Promise<void> => {
+  try {
+    await firestore().collection('users').doc(driverUid).update({
+      driverStatus: 'suspended',
+      rejectionReason: reason,
+      approvedBy: adminUid,
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    });
+    console.log('Driver suspended successfully:', driverUid);
+  } catch (error: any) {
+    console.error('Error suspending driver:', error);
+    throw new Error('Failed to suspend driver');
   }
 };

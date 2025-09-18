@@ -62,10 +62,18 @@ export default function RoleSelectionScreen() {
       // Set the user role in the auth state
       dispatch(setUserRole(selectedRole));
 
-      console.log('RoleSelectionScreen - Role set, navigating to BasicInfo...');
+      console.log('RoleSelectionScreen - Role set, navigating based on role...');
 
-      // Navigate to basic information screen with selected role
-      navigation.navigate('BasicInfo', { role: selectedRole });
+      // Navigate based on role
+      if (selectedRole === 'driver') {
+        // Navigate to driver-specific registration
+        navigation.navigate('DriverRegistration', { 
+          phoneNumber: authState.phoneNumber 
+        });
+      } else {
+        // Navigate to basic information screen for passengers
+        navigation.navigate('BasicInfo', { role: selectedRole });
+      }
     } catch (error) {
       console.error('Error continuing with role selection:', error);
       showToast('error', 'Failed to continue. Please try again.');
