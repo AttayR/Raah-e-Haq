@@ -27,7 +27,7 @@ const DriverSettingsScreen = () => {
         translucent={false}
       />
       <ImageBackground
-        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        source={require('../../assets/images/background_raahe_haq.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >

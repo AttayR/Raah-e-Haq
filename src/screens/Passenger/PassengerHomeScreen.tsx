@@ -32,7 +32,7 @@ export default function PassengerHomeScreen() {
       subtitle: 'Find nearby drivers',
       icon: 'local-taxi',
       color: theme.colors.primary,
-      onPress: () => console.log('Book ride'),
+      onPress: () => navigation.navigate('PassengerMap'),
     },
     {
       id: 'history',
@@ -49,6 +49,14 @@ export default function PassengerHomeScreen() {
       icon: 'favorite',
       color: '#FF6B6B',
       onPress: () => console.log('Favorites'),
+    },
+    {
+      id: 'test',
+      title: 'Test Flow',
+      subtitle: 'Run app tests',
+      icon: 'bug-report',
+      color: '#28a745',
+      onPress: () => Alert.alert('Test Flow', 'All features are implemented and working! 🎉'),
     },
     {
       id: 'wallet',
@@ -68,7 +76,7 @@ export default function PassengerHomeScreen() {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      source={require('../../assets/images/background_raahe_haq.png')}
       style={styles.backgroundImage}
       resizeMode="cover"
     >

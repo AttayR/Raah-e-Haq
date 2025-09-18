@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DriverBottomTabs from '../tabs/DriverBottomTabs';
 import DriverProfile from 'src/screens/Driver/DriverProfile';
 import DriverMessagesScreen from 'src/screens/Driver/DriverMessagesScreen';
+import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -18,6 +19,7 @@ export type DriverStackParamList = {
       isPassenger: boolean;
     };
   };
+  DriverMap: undefined;
 };
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
@@ -38,6 +40,11 @@ const DriverStack = () => {
       <Stack.Screen 
         name="DriverMessagesScreen" 
         component={DriverMessagesScreen} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="DriverMap" 
+        component={DriverMapScreen} 
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

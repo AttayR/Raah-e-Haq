@@ -229,7 +229,7 @@ export default function BasicInfoScreen() {
         translucent={false}
       />
       <ImageBackground
-        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        source={require('../../assets/images/background_raahe_haq.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -245,7 +245,7 @@ export default function BasicInfoScreen() {
           <View style={styles.logoContainer}>
             <View style={styles.logoWrapper}>
               <Image 
-                source={require('../../assets/images/Logo.png')} 
+                source={require('../../assets/images/logo.png')} 
                 style={styles.logoImage}
                 resizeMode="contain"
               />

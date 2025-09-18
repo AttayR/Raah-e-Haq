@@ -15,14 +15,14 @@ import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
 
-const ProfileSettingsScreen = () => {
+const PassengerSettingsScreen = () => {
   const navigation = useNavigation();
   const { userProfile, phoneNumber, role } = useSelector(
     (state: RootState) => state.auth,
   );
   return (
     <ImageBackground
-      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      source={require('../../assets/images/background_raahe_haq.png')}
       style={styles.backgroundImage}
       resizeMode="cover"
     >
@@ -387,4 +387,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileSettingsScreen;
+export default PassengerSettingsScreen;

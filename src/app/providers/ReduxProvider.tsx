@@ -2,7 +2,7 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { store, persistor } from '../../store'; // <- use RELATIVE path first
+import { store, persistor, useAppDispatch, useAppSelector } from '../../store'; // <- use RELATIVE path first
 import Loading from '../../components/Loading';
 import AuthProvider from './AuthProvider';
 import ToastProvider from '../../components/ToastProvider';
@@ -22,3 +22,6 @@ export default function ReduxProvider({ children }: React.PropsWithChildren) {
     </Provider>
   );
 }
+
+// Export the typed hooks
+export { useAppDispatch, useAppSelector };
