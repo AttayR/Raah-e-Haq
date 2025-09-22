@@ -12,7 +12,12 @@
           "package_name": "com.raahehaq"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "611201086305-076gcaq4ab16gndcg0sth8ib4b35lpkc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDL3DQ9VgCY8nwHCZNFwLk1DjbDTyCwxaE"

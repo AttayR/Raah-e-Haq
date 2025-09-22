@@ -1,23 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity, 
   Alert, 
-  PermissionsAndroid,
-  Platform,
-  Dimensions,
   StatusBar
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import Geolocation from 'react-native-geolocation-service';
-import { useAppTheme } from '../../app/providers/ThemeProvider';
+import MapView from 'react-native-maps';
 import { BrandColors } from '../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { createRideRequest, calculateFare } from '../../services/rideService';
+import { createRideRequest } from '../../services/rideService';
 import { useAppSelector } from '../../app/providers/ReduxProvider';
-import { MAPS_CONFIG } from '../../config/mapsConfig';
+import { useNavigation } from '@react-navigation/native';
+// import PassengerMap from '../../components/passenger/PassengerMap';
+import VehicleSelector from '../../components/passenger/VehicleSelector';
+import useLocation from '../../hooks/useLocation';
+import useDirections from '../../hooks/useDirections';
+import useFare from '../../hooks/useFare';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // const { width, height } = Dimensions.get('window');
 
@@ -36,6 +36,7 @@ interface RideRequest {
 
 const PassengerMapScreen = () => {
   const mapRef = useRef<MapView>(null);
+  const navigation = useNavigation<any>();
   
   // Safe Redux state access with fallbacks
   const authState = useAppSelector(state => state?.auth);
@@ -49,145 +50,62 @@ const PassengerMapScreen = () => {
     hasUid: !!uid 
   });
   
-  const [_currentLocation, setCurrentLocation] = useState<Location | null>(null);
+  const { currentLocation, isInitialized, initializationTimeout } = useLocation();
   const [pickupLocation, setPickupLocation] = useState<Location | null>(null);
-  const [destinationLocation, setDestinationLocation] = useState<Location | null>(null);
+  const [destinationLocation, _setDestinationLocation] = useState<Location | null>(null);
   const [isRequestingRide, setIsRequestingRide] = useState(false);
   const [rideRequest, setRideRequest] = useState<RideRequest | null>(null);
-  const [nearbyDrivers, setNearbyDrivers] = useState<Location[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [initializationTimeout, setInitializationTimeout] = useState(false);
+  const [_nearbyDrivers, setNearbyDrivers] = useState<Location[]>([]);
+  const { routeCoordinates } = useDirections();
+  const { vehicleType, setVehicleType, getFare } = useFare();
+  const [mapReady, _setMapReady] = useState(false);
+  const [fallbackMode, setFallbackMode] = useState(false);
+  const DEBUG_DISABLE_MAP = true; // Temporarily disable MapView to debug crashes
 
-  // Request location permission
-  const requestLocationPermission = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        // Check if permission is already granted
-        const hasPermission = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        
-        if (hasPermission) {
-          return true;
-        }
-
-        // Request permission
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'RaaHeHaq needs access to your location to find nearby drivers and show your position on the map.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'Allow',
-          }
-        );
-        
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn('Permission request error:', err);
-        return false;
-      }
-    }
-    return true;
-  };
-
-  // Get current location
-  const getCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setCurrentLocation({ latitude, longitude });
-        setPickupLocation({ latitude, longitude });
-        
-        // Move map to current location
-        mapRef.current?.animateToRegion({
-          latitude,
-          longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      },
-      (error) => {
-        console.log('Location error:', error.code, error.message);
-        // Don't show alert immediately, try to get location again
-        setTimeout(() => {
-          getCurrentLocation();
-        }, 2000);
-      },
-      { 
-        enableHighAccuracy: true, 
-        timeout: 15000, 
-        maximumAge: 10000,
-        showLocationDialog: true,
-        forceRequestLocation: true
-      }
-    );
-  };
-
-  // Initialize location
+  // Seed pickup from current location when available
   useEffect(() => {
-    const initializeLocation = async () => {
-      try {
-        const hasPermission = await requestLocationPermission();
-        if (hasPermission) {
-          // Small delay to ensure permission is fully granted
-          setTimeout(() => {
-            getCurrentLocation();
-            setIsInitialized(true);
-          }, 1000);
-        } else {
-          Alert.alert(
-            'Permission Required', 
-            'Location permission is required to use this feature. Please enable it in settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Settings', onPress: () => {
-                // You can add logic to open app settings here
-                console.log('Open settings');
-              }}
-            ]
-          );
-          setIsInitialized(true);
-        }
-      } catch (error) {
-        console.error('Location initialization error:', error);
-        Alert.alert('Error', 'Failed to initialize location services');
-        setIsInitialized(true);
-      }
-    };
-
-    // Set a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.log('PassengerMapScreen - Initialization timeout reached');
-      setInitializationTimeout(true);
-      setIsInitialized(true);
-    }, 10000); // 10 seconds timeout
-
-    initializeLocation();
-
-    return () => clearTimeout(timeout);
-  }, []);
-
-  // Calculate fare using the service
-  const calculateFareData = (pickup: Location, destination: Location) => {
-    return calculateFare(pickup, destination, 'car');
-  };
-
-  // Handle map press for destination selection
-  const handleMapPress = (event: any) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    setDestinationLocation({ latitude, longitude });
-    
-    if (pickupLocation) {
-      const fareData = calculateFareData(pickupLocation, { latitude, longitude });
-      setRideRequest({
-        pickup: pickupLocation,
-        destination: { latitude, longitude },
-        ...fareData
+    if (currentLocation && !pickupLocation) {
+      setPickupLocation(currentLocation);
+      mapRef.current?.animateToRegion({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
       });
     }
-  };
+  }, [currentLocation, pickupLocation]);
+
+  // Force fallback while debugging map crashes
+  useEffect(() => {
+    if (DEBUG_DISABLE_MAP) {
+      setFallbackMode(true);
+    } else {
+      const t = setTimeout(() => {
+        if (!mapReady) setFallbackMode(true);
+      }, 7000);
+      return () => clearTimeout(t);
+    }
+  }, [mapReady, DEBUG_DISABLE_MAP]);
+
+  // Calculate fare using the service
+  const calculateFareData = useCallback((pickup: Location, destination: Location) => {
+    return getFare(pickup, destination);
+  }, [getFare]);
+
+  // Handle map press for destination selection
+  // Map press handler disabled while debugging map rendering
+
+  // Recalculate fare when vehicle type changes
+  useEffect(() => {
+    if (pickupLocation && destinationLocation) {
+      const fareData = calculateFareData(pickupLocation, destinationLocation);
+      setRideRequest({
+        pickup: pickupLocation,
+        destination: destinationLocation,
+        ...fareData,
+      });
+    }
+  }, [vehicleType, pickupLocation, destinationLocation, calculateFareData]);
 
   // Request ride
   const requestRide = async () => {
@@ -219,7 +137,7 @@ const PassengerMapScreen = () => {
         requestedAt: new Date(),
       };
 
-      const rideId = await createRideRequest(rideData);
+      const newRideId = await createRideRequest(rideData);
       
       // Mock nearby drivers for visualization
       const mockDrivers = [
@@ -232,7 +150,7 @@ const PassengerMapScreen = () => {
       Alert.alert(
         'Ride Requested!', 
         `Your ride request has been sent to nearby drivers.\nFare: PKR ${rideRequest?.fare}\nDistance: ${rideRequest?.distance}\nDuration: ${rideRequest?.duration}`,
-        [{ text: 'OK' }]
+        [{ text: 'Track Ride', onPress: () => navigation.navigate('PassengerRideTracking', { passengerId: uid, rideId: newRideId }) }]
       );
     } catch (error) {
       console.error('Error creating ride request:', error);
@@ -276,56 +194,31 @@ const PassengerMapScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       
-      {/* Map */}
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_GOOGLE}
-        style={styles.map}
-        initialRegion={MAPS_CONFIG.DEFAULT_REGION}
-        onPress={handleMapPress}
-        showsUserLocation={MAPS_CONFIG.CONTROLS.showUserLocation}
-        showsMyLocationButton={MAPS_CONFIG.CONTROLS.showMyLocationButton}
-      >
-        {/* Pickup Marker */}
-        {pickupLocation && (
-          <Marker
-            coordinate={pickupLocation}
-            title={MAPS_CONFIG.MARKERS.pickup.title}
-            pinColor={MAPS_CONFIG.MARKERS.pickup.color}
-          />
-        )}
-        
-        {/* Destination Marker */}
-        {destinationLocation && (
-          <Marker
-            coordinate={destinationLocation}
-            title={MAPS_CONFIG.MARKERS.destination.title}
-            pinColor={MAPS_CONFIG.MARKERS.destination.color}
-          />
-        )}
-        
-        {/* Nearby Drivers */}
-        {nearbyDrivers.map((driver, index) => (
-          <Marker
-            key={index}
-            coordinate={driver}
-            title={MAPS_CONFIG.MARKERS.driver.title}
-            pinColor={MAPS_CONFIG.MARKERS.driver.color}
-          />
-        ))}
-      </MapView>
-
-      {/* Top Controls */}
-      <View style={styles.topControls}>
-        <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation}>
-          <Icon name="my-location" size={24} color={BrandColors.primary} />
-        </TouchableOpacity>
+      {/* Map disabled for debugging */}
+      <View style={styles.mapDisabled}>
+        <Text style={styles.mapDisabledTitle}>Map disabled for debugging</Text>
+        <Text style={styles.mapDisabledText}>We are analyzing the crash root cause. Map rendering is paused.</Text>
       </View>
 
       {/* Bottom Panel */}
       <View style={styles.bottomPanel}>
+        {/* Diagnostic info panel */}
+        <View style={styles.debugPanel}>
+          <Text style={styles.debugTitle}>Map Debug Info</Text>
+          <Text style={styles.debugItem}>Authenticated: {authState?.status === 'authenticated' ? 'Yes' : 'No'}</Text>
+          <Text style={styles.debugItem}>UID: {uid || '-'}</Text>
+          <Text style={styles.debugItem}>Init OK: {isInitialized ? 'Yes' : 'No'} · Timeout: {initializationTimeout ? 'Yes' : 'No'}</Text>
+          <Text style={styles.debugItem}>Current Loc: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : '-'}</Text>
+          <Text style={styles.debugItem}>Pickup: {pickupLocation ? `${pickupLocation.latitude.toFixed(4)}, ${pickupLocation.longitude.toFixed(4)}` : '-'}</Text>
+          <Text style={styles.debugItem}>Destination: {destinationLocation ? `${destinationLocation.latitude.toFixed(4)}, ${destinationLocation.longitude.toFixed(4)}` : '-'}</Text>
+          <Text style={styles.debugItem}>Vehicle: {vehicleType}</Text>
+          <Text style={styles.debugItem}>Route Points: {routeCoordinates.length}</Text>
+          <Text style={styles.debugItem}>MapReady: {mapReady ? 'Yes' : 'No'} · Fallback: {fallbackMode ? 'Yes' : 'No'}</Text>
+        </View>
         {rideRequest ? (
           <View style={styles.rideRequestCard}>
+            {/* Vehicle selector */}
+            <VehicleSelector value={vehicleType} onChange={setVehicleType} />
             <View style={styles.rideInfo}>
               <View style={styles.locationRow}>
                 <View style={styles.locationDot} />
@@ -351,7 +244,7 @@ const PassengerMapScreen = () => {
             >
               <Text style={styles.requestButtonText}>
                 {isRequestingRide ? 'Requesting...' : 'Request Ride'}
-      </Text>
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -360,7 +253,7 @@ const PassengerMapScreen = () => {
             <Text style={styles.instructionTitle}>Select Destination</Text>
             <Text style={styles.instructionText}>
               Tap anywhere on the map to set your destination
-      </Text>
+            </Text>
           </View>
         )}
       </View>
@@ -372,28 +265,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  map: {
-    flex: 1,
-  },
-  topControls: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 1,
-  },
-  locationButton: {
-    backgroundColor: 'white',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
+  map: { flex: 1 },
   bottomPanel: {
     position: 'absolute',
     bottom: 0,
@@ -463,6 +335,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  debugPanel: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  debugTitle: {
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  debugItem: {
+    color: '#374151',
+    fontSize: 12,
+  },
   instructionCard: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -478,6 +367,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
+  },
+  mapDisabled: {
+    height: 260,
+    backgroundColor: '#FFF7ED',
+    borderBottomWidth: 1,
+    borderColor: '#FED7AA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapDisabledTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9A3412',
+    marginBottom: 6,
+  },
+  mapDisabledText: {
+    color: '#9A3412',
   },
   loadingContainer: {
     flex: 1,
