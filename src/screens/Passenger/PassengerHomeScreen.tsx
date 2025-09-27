@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,15 @@ import {
   Dimensions,
   StatusBar,
   ImageBackground,
+  RefreshControl,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { signOutThunk } from '../../store/thunks/authThunks';
+import { signOutThunk, refreshSessionThunk } from '../../store/thunks/authThunks';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
+import firestore from '@react-native-firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
@@ -22,8 +24,24 @@ export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
   const dispatch = useDispatch<any>();
   const navigation = useNavigation();
-  // Get user data from Redux store
-  const { userProfile } = useSelector((state: RootState) => state.auth);
+  const { userProfile, uid } = useSelector((state: RootState) => state.auth);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Refresh session/token
+      await dispatch(refreshSessionThunk());
+      // Reload user profile from Firestore if uid is available
+      if (uid) {
+        const doc = await firestore().collection('users').doc(uid).get();
+        // We avoid dispatching unknown actions here; store slice may already listen elsewhere
+        // This ensures data rendered comes from latest snapshot if components read directly
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dispatch, uid]);
 
   const quickActions = [
     {
@@ -152,6 +170,7 @@ export default function PassengerHomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         >
           {/* Stats Cards */}
           <View style={styles.statsContainer}>

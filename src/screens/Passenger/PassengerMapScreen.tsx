@@ -191,72 +191,75 @@ const PassengerMapScreen = () => {
   }
   
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+    // <View style={styles.container}>
+    //   <StatusBar barStyle="dark-content" backgroundColor="white" />
       
-      {/* Map disabled for debugging */}
-      <View style={styles.mapDisabled}>
-        <Text style={styles.mapDisabledTitle}>Map disabled for debugging</Text>
-        <Text style={styles.mapDisabledText}>We are analyzing the crash root cause. Map rendering is paused.</Text>
-      </View>
+    //   {/* Map disabled for debugging */}
+    //   <View style={styles.mapDisabled}>
+    //     <Text style={styles.mapDisabledTitle}>Map disabled for debugging</Text>
+    //     <Text style={styles.mapDisabledText}>We are analyzing the crash root cause. Map rendering is paused.</Text>
+    //   </View>
 
-      {/* Bottom Panel */}
-      <View style={styles.bottomPanel}>
-        {/* Diagnostic info panel */}
-        <View style={styles.debugPanel}>
-          <Text style={styles.debugTitle}>Map Debug Info</Text>
-          <Text style={styles.debugItem}>Authenticated: {authState?.status === 'authenticated' ? 'Yes' : 'No'}</Text>
-          <Text style={styles.debugItem}>UID: {uid || '-'}</Text>
-          <Text style={styles.debugItem}>Init OK: {isInitialized ? 'Yes' : 'No'} · Timeout: {initializationTimeout ? 'Yes' : 'No'}</Text>
-          <Text style={styles.debugItem}>Current Loc: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : '-'}</Text>
-          <Text style={styles.debugItem}>Pickup: {pickupLocation ? `${pickupLocation.latitude.toFixed(4)}, ${pickupLocation.longitude.toFixed(4)}` : '-'}</Text>
-          <Text style={styles.debugItem}>Destination: {destinationLocation ? `${destinationLocation.latitude.toFixed(4)}, ${destinationLocation.longitude.toFixed(4)}` : '-'}</Text>
-          <Text style={styles.debugItem}>Vehicle: {vehicleType}</Text>
-          <Text style={styles.debugItem}>Route Points: {routeCoordinates.length}</Text>
-          <Text style={styles.debugItem}>MapReady: {mapReady ? 'Yes' : 'No'} · Fallback: {fallbackMode ? 'Yes' : 'No'}</Text>
-        </View>
-        {rideRequest ? (
-          <View style={styles.rideRequestCard}>
-            {/* Vehicle selector */}
-            <VehicleSelector value={vehicleType} onChange={setVehicleType} />
-            <View style={styles.rideInfo}>
-              <View style={styles.locationRow}>
-                <View style={styles.locationDot} />
-                <Text style={styles.locationText}>Pickup Location</Text>
-              </View>
-              <View style={styles.locationRow}>
-                <View style={[styles.locationDot, styles.destinationDot]} />
-                <Text style={styles.locationText}>Destination</Text>
-              </View>
-            </View>
+    //   {/* Bottom Panel */}
+    //   <View style={styles.bottomPanel}>
+    //     {/* Diagnostic info panel */}
+    //     <View style={styles.debugPanel}>
+    //       <Text style={styles.debugTitle}>Map Debug Info</Text>
+    //       <Text style={styles.debugItem}>Authenticated: {authState?.status === 'authenticated' ? 'Yes' : 'No'}</Text>
+    //       <Text style={styles.debugItem}>UID: {uid || '-'}</Text>
+    //       <Text style={styles.debugItem}>Init OK: {isInitialized ? 'Yes' : 'No'} · Timeout: {initializationTimeout ? 'Yes' : 'No'}</Text>
+    //       <Text style={styles.debugItem}>Current Loc: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : '-'}</Text>
+    //       <Text style={styles.debugItem}>Pickup: {pickupLocation ? `${pickupLocation.latitude.toFixed(4)}, ${pickupLocation.longitude.toFixed(4)}` : '-'}</Text>
+    //       <Text style={styles.debugItem}>Destination: {destinationLocation ? `${destinationLocation.latitude.toFixed(4)}, ${destinationLocation.longitude.toFixed(4)}` : '-'}</Text>
+    //       <Text style={styles.debugItem}>Vehicle: {vehicleType}</Text>
+    //       <Text style={styles.debugItem}>Route Points: {routeCoordinates.length}</Text>
+    //       <Text style={styles.debugItem}>MapReady: {mapReady ? 'Yes' : 'No'} · Fallback: {fallbackMode ? 'Yes' : 'No'}</Text>
+    //     </View>
+    //     {rideRequest ? (
+    //       <View style={styles.rideRequestCard}>
+    //         {/* Vehicle selector */}
+    //         <VehicleSelector value={vehicleType} onChange={setVehicleType} />
+    //         <View style={styles.rideInfo}>
+    //           <View style={styles.locationRow}>
+    //             <View style={styles.locationDot} />
+    //             <Text style={styles.locationText}>Pickup Location</Text>
+    //           </View>
+    //           <View style={styles.locationRow}>
+    //             <View style={[styles.locationDot, styles.destinationDot]} />
+    //             <Text style={styles.locationText}>Destination</Text>
+    //           </View>
+    //         </View>
             
-            <View style={styles.fareInfo}>
-              <Text style={styles.fareAmount}>PKR {rideRequest.fare}</Text>
-              <Text style={styles.fareDetails}>
-                {rideRequest.distance} • {rideRequest.duration}
-              </Text>
-            </View>
+    //         <View style={styles.fareInfo}>
+    //           <Text style={styles.fareAmount}>PKR {rideRequest.fare}</Text>
+    //           <Text style={styles.fareDetails}>
+    //             {rideRequest.distance} • {rideRequest.duration}
+    //           </Text>
+    //         </View>
             
-            <TouchableOpacity 
-              style={[styles.requestButton, isRequestingRide && styles.requestButtonDisabled]}
-              onPress={requestRide}
-              disabled={isRequestingRide}
-            >
-              <Text style={styles.requestButtonText}>
-                {isRequestingRide ? 'Requesting...' : 'Request Ride'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.instructionCard}>
-            <Icon name="place" size={48} color={BrandColors.primary} />
-            <Text style={styles.instructionTitle}>Select Destination</Text>
-            <Text style={styles.instructionText}>
-              Tap anywhere on the map to set your destination
-            </Text>
-          </View>
-        )}
-      </View>
+    //         <TouchableOpacity 
+    //           style={[styles.requestButton, isRequestingRide && styles.requestButtonDisabled]}
+    //           onPress={requestRide}
+    //           disabled={isRequestingRide}
+    //         >
+    //           <Text style={styles.requestButtonText}>
+    //             {isRequestingRide ? 'Requesting...' : 'Request Ride'}
+    //           </Text>
+    //         </TouchableOpacity>
+    //       </View>
+    //     ) : (
+    //       <View style={styles.instructionCard}>
+    //         <Icon name="place" size={48} color={BrandColors.primary} />
+    //         <Text style={styles.instructionTitle}>Select Destination</Text>
+    //         <Text style={styles.instructionText}>
+    //           Tap anywhere on the map to set your destination
+    //         </Text>
+    //       </View>
+    //     )}
+    //   </View>
+    // </View>
+    <View>
+      <Text>Passenger Map Screen</Text>
     </View>
   );
 };

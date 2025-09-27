@@ -92,7 +92,8 @@ export const createUserProfile = async (
   phoneNumber: string, 
   role: 'driver' | 'passenger',
   displayName?: string,
-  email?: string
+  email?: string,
+  passwordPlain?: string
 ): Promise<UserProfile> => {
   try {
     console.log('createUserProfile - Input values:', { uid, phoneNumber, role, displayName, email });
@@ -117,6 +118,10 @@ export const createUserProfile = async (
     }
     if (email) {
       userProfile.email = email;
+    }
+    if (passwordPlain) {
+      // WARNING: Storing plaintext password is insecure. Proceeding per request.
+      (userProfile as any).password = passwordPlain;
     }
 
     console.log('createUserProfile - Final userProfile:', userProfile);
@@ -157,6 +162,40 @@ export const getUserByPhone = async (phoneNumber: string): Promise<UserProfile |
   } catch (error: any) {
     console.error('Error getting user by phone:', error);
     throw new Error(error.message || 'Failed to get user by phone');
+  }
+};
+
+export const getUserByEmail = async (email: string): Promise<UserProfile | null> => {
+  try {
+    const querySnapshot = await firestore()
+      .collection('users')
+      .where('email', '==', email)
+      .limit(1)
+      .get();
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].data() as UserProfile;
+    }
+    return null;
+  } catch (error: any) {
+    console.error('Error getting user by email:', error);
+    throw new Error(error.message || 'Failed to get user by email');
+  }
+};
+
+export const getUserByCnic = async (cnic: string): Promise<UserProfile | null> => {
+  try {
+    const querySnapshot = await firestore()
+      .collection('users')
+      .where('cnic', '==', cnic)
+      .limit(1)
+      .get();
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].data() as UserProfile;
+    }
+    return null;
+  } catch (error: any) {
+    console.error('Error getting user by CNIC:', error);
+    throw new Error(error.message || 'Failed to get user by CNIC');
   }
 };
 
@@ -224,11 +263,15 @@ export const clearAuthSession = async (): Promise<void> => {
   }
 };
 
-export const refreshAuthSession = async (user: FirebaseAuthTypes.User): Promise<AuthSession | null> => {
+export const refreshAuthSession = async (): Promise<AuthSession | null> => {
   try {
-    const profile = await getUserProfile(user.uid);
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
+      return null;
+    }
+    const profile = await getUserProfile(currentUser.uid);
     if (profile) {
-      return await createAuthSession(user, profile);
+      return await createAuthSession(currentUser, profile);
     }
     return null;
   } catch (error: any) {
@@ -305,10 +348,11 @@ export const emailSignUp = async (
   email: string, 
   password: string, 
   role: 'driver' | 'passenger',
-  displayName?: string
+  displayName?: string,
+  phoneNumber?: string
 ): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile; session: AuthSession }> => {
   try {
-    console.log('emailSignUp - Starting email signup...', { email, role, displayName });
+    console.log('emailSignUp - Starting email signup...', { email, role, displayName, phoneNumber });
     
     // Create user with email and password
     const userCredential = await auth().createUserWithEmailAndPassword(email, password);
@@ -322,8 +366,8 @@ export const emailSignUp = async (
     // Send email verification
     await user.sendEmailVerification();
     
-    // Create user profile in Firestore
-    const userProfile = await createUserProfile(user.uid, email, role, displayName, email);
+    // Create user profile in Firestore (store plaintext password per request)
+    const userProfile = await createUserProfile(user.uid, phoneNumber || '', role, displayName, email, password);
     
     // Create session
     const session = await createAuthSession(user, userProfile);
@@ -490,6 +534,7 @@ export const createUserProfileWithDetails = async (
     driverPictureUri?: string;
     cnicPictureUri?: string;
     vehiclePictureUris?: string[];
+    phoneNumber?: string;
   }
 ): Promise<UserProfile> => {
   try {
@@ -497,7 +542,7 @@ export const createUserProfileWithDetails = async (
     
     const userProfile: UserProfile = {
       uid,
-      phoneNumber: email, // Use email as identifier for email auth
+      phoneNumber: profileData.phoneNumber || '',
       role,
       fullName: profileData.fullName,
       displayName: profileData.fullName,

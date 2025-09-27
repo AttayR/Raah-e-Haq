@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,17 +9,35 @@ import {
   SafeAreaView,
   ScrollView,
   ImageBackground,
+  RefreshControl,
 } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
+import { refreshSessionThunk } from 'src/store/thunks/authThunks';
+import firestore from '@react-native-firebase/firestore';
 
 const PassengerSettingsScreen = () => {
   const navigation = useNavigation();
-  const { userProfile, phoneNumber, role } = useSelector(
+  const dispatch = useDispatch<any>();
+  const { userProfile, phoneNumber, role, uid } = useSelector(
     (state: RootState) => state.auth,
   );
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await dispatch(refreshSessionThunk());
+      if (uid) {
+        await firestore().collection('users').doc(uid).get();
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dispatch, uid]);
+
   return (
     <ImageBackground
       source={require('../../assets/images/background_raahe_haq.png')}
@@ -35,6 +53,7 @@ const PassengerSettingsScreen = () => {
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BrandColors.primary} />}
         >
           <View style={styles.header}>
             {/* Decorative Circles */}
