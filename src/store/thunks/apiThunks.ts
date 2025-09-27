@@ -6,12 +6,23 @@ export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials: LoginRequest, { rejectWithValue }) => {
     try {
+      console.log('🔄 Redux Thunk - Starting user login...');
+      console.log('📋 Credentials received:', credentials);
+      
       const response = await apiService.login(credentials);
       
+      console.log('📨 Redux Thunk - API response received:', response);
+      
       if (response.success && response.data) {
+        console.log('✅ Redux Thunk - Login successful');
+        console.log('👤 User data:', response.data.user);
+        console.log('🔑 Token:', response.data.token);
+        
         // Store auth data
         await apiService.setAuthToken(response.data.token);
         await apiService.setUserData(response.data.user);
+        
+        console.log('💾 Auth data stored successfully');
         
         return {
           user: response.data.user,
@@ -19,9 +30,16 @@ export const loginUser = createAsyncThunk(
           tokenType: response.data.token_type,
         };
       } else {
+        console.log('❌ Redux Thunk - Login failed:', response.message);
         return rejectWithValue(response.message || 'Login failed');
       }
     } catch (error: any) {
+      console.error('💥 Redux Thunk - Login error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       return rejectWithValue(
         error.response?.data?.message || 
         error.message || 
@@ -35,14 +53,28 @@ export const registerUser = createAsyncThunk(
   'auth/registerUser',
   async (userData: RegisterRequest, { rejectWithValue }) => {
     try {
+      console.log('🔄 Redux Thunk - Starting user registration...');
+      console.log('📋 User data received:', userData);
+      
       const response = await apiService.register(userData);
       
+      console.log('📨 Redux Thunk - API response received:', response);
+      
       if (response.success && response.data) {
+        console.log('✅ Redux Thunk - Registration successful');
+        console.log('👤 User created:', response.data.user);
         return response.data.user;
       } else {
+        console.log('❌ Redux Thunk - Registration failed:', response.message);
         return rejectWithValue(response.message || 'Registration failed');
       }
     } catch (error: any) {
+      console.error('💥 Redux Thunk - Registration error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       return rejectWithValue(
         error.response?.data?.message || 
         error.message || 

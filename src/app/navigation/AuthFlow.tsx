@@ -10,26 +10,36 @@ export default function AuthFlow() {
   
   console.log('AuthFlow - Current state:', { isAuthenticated, user, profileCompleted });
 
-  // Check if driver is approved (assuming user_type field in API response)
-  const isDriverApproved = user?.user_type === 'driver' ? 
-    (user?.status === 'active') : 
-    true; // Non-drivers are always "approved"
+  // Check if user is active and has a role
+  const isUserActive = user?.status === 'active';
+  const userRole = user?.role;
+  const isDriver = userRole === 'driver';
+  const isPassenger = userRole === 'passenger';
 
-  // If authenticated, has a user, profile is completed, AND (not a driver or driver is approved), show main app
-  if (isAuthenticated && user && profileCompleted && isDriverApproved) {
-    console.log('AuthFlow - User authenticated with completed profile, showing main app');
+  console.log('AuthFlow - User role check:', { 
+    role: userRole, 
+    isDriver, 
+    isPassenger, 
+    isUserActive 
+  });
+
+  // If authenticated, user is active, and has a role, show main app
+  if (isAuthenticated && user && isUserActive && userRole) {
+    console.log('AuthFlow - User authenticated and active with role, showing main app');
+    console.log('AuthFlow - User details:', user);
+    console.log('AuthFlow - User role:', userRole);
     return <RootNavigation />;
   }
 
-  // If driver is not approved, show pending approval screen
-  if (isAuthenticated && user?.user_type === 'driver' && profileCompleted && !isDriverApproved) {
-    console.log('AuthFlow - Driver not approved, showing pending approval screen');
+  // If authenticated but user is not active (pending approval), show pending approval screen
+  if (isAuthenticated && user && !isUserActive) {
+    console.log('AuthFlow - User not active (pending approval), showing pending approval screen');
     return <DriverPendingApprovalScreen />;
   }
 
-  // If authenticated but profile not completed, show auth screens
-  if (isAuthenticated && user && !profileCompleted) {
-    console.log('AuthFlow - User authenticated but needs to complete setup, showing auth screens');
+  // If authenticated but missing role, show auth screens for role selection
+  if (isAuthenticated && user && isUserActive && !userRole) {
+    console.log('AuthFlow - User authenticated but missing role, showing auth screens');
     return <AuthStack />;
   }
 

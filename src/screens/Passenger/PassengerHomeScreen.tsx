@@ -9,39 +9,41 @@ import {
   StatusBar,
   ImageBackground,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { signOutThunk, refreshSessionThunk } from '../../store/thunks/authThunks';
+import { refreshSessionThunk } from '../../store/thunks/authThunks';
+import { useApiAuth } from '../../hooks/useApiAuth';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
-import firestore from '@react-native-firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
   const dispatch = useDispatch<any>();
-  const navigation = useNavigation();
-  const { userProfile, uid } = useSelector((state: RootState) => state.auth);
+  const navigation = useNavigation<any>();
+  const { user } = useSelector((state: RootState) => state.apiAuth);
+  const { logout } = useApiAuth();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Debug logging
+  console.log('PassengerHomeScreen - User data:', user);
+  console.log('PassengerHomeScreen - User name:', user?.name);
+  console.log('PassengerHomeScreen - User status:', user?.status);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       // Refresh session/token
       await dispatch(refreshSessionThunk());
-      // Reload user profile from Firestore if uid is available
-      if (uid) {
-        const doc = await firestore().collection('users').doc(uid).get();
-        // We avoid dispatching unknown actions here; store slice may already listen elsewhere
-        // This ensures data rendered comes from latest snapshot if components read directly
-      }
+      // User data will be automatically updated from the API
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch, uid]);
+  }, [dispatch]);
 
   const quickActions = [
     {
@@ -128,7 +130,7 @@ export default function PassengerHomeScreen() {
                   : 'Evening'}
               </Text>
               <Text style={styles.userName}>
-                {userProfile?.fullName || 'Passenger'}
+                {user?.name || 'Passenger'}
               </Text>
             </View>
             <TouchableOpacity
@@ -143,18 +145,18 @@ export default function PassengerHomeScreen() {
           <View
             style={[
               styles.statusBadge,
-              userProfile?.isVerified
+              user?.status === 'active'
                 ? styles.statusVerified
                 : styles.statusPending,
             ]}
           >
             <Icon
-              name={userProfile?.isVerified ? 'verified' : 'schedule'}
+              name={user?.status === 'active' ? 'verified' : 'schedule'}
               size={16}
               color="white"
             />
             <Text style={styles.statusText}>
-              {userProfile?.isVerified ? 'Verified' : 'Pending'}
+              {user?.status === 'active' ? 'Active' : 'Pending'}
             </Text>
           </View>
 
@@ -390,7 +392,7 @@ export default function PassengerHomeScreen() {
 
               <TouchableOpacity
                 style={styles.accountItem}
-                onPress={() => dispatch(signOutThunk())}
+                onPress={() => logout()}
               >
                 <Icon name="logout" size={24} color={theme.colors.warning} />
                 <Text

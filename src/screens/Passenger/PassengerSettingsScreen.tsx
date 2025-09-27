@@ -15,28 +15,43 @@ import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
-import { refreshSessionThunk } from 'src/store/thunks/authThunks';
-import firestore from '@react-native-firebase/firestore';
+import { useApiAuth } from '../../hooks/useApiAuth';
+import { showToast } from '../../components/ToastProvider';
 
 const PassengerSettingsScreen = () => {
   const navigation = useNavigation();
-  const dispatch = useDispatch<any>();
-  const { userProfile, phoneNumber, role, uid } = useSelector(
-    (state: RootState) => state.auth,
+  const { user, isLoading } = useSelector(
+    (state: RootState) => state.apiAuth,
   );
+  const { logout } = useApiAuth();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Debug logging
+  console.log('PassengerSettingsScreen - User data:', user);
+  console.log('PassengerSettingsScreen - User name:', user?.name);
+  console.log('PassengerSettingsScreen - User email:', user?.email);
+  console.log('PassengerSettingsScreen - User phone:', user?.phone);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await dispatch(refreshSessionThunk());
-      if (uid) {
-        await firestore().collection('users').doc(uid).get();
-      }
+      // Refresh user data - this will be handled by the API auth system
+      console.log('PassengerSettingsScreen - Refreshing user data...');
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch, uid]);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      console.log('PassengerSettingsScreen - Logging out...');
+      await logout();
+      showToast('success', 'Logged out successfully');
+    } catch (error) {
+      console.error('PassengerSettingsScreen - Logout error:', error);
+      showToast('error', 'Failed to logout');
+    }
+  };
 
   return (
     <ImageBackground
@@ -73,7 +88,7 @@ const PassengerSettingsScreen = () => {
                 />
             </View>
 
-            <Text style={styles.passengerName}>{userProfile?.fullName}</Text>
+            <Text style={styles.passengerName}>{user?.name || 'Passenger'}</Text>
             <View style={styles.ratingContainer}>
               <Icon
                 name="star"
@@ -201,7 +216,11 @@ const PassengerSettingsScreen = () => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionItem, styles.borderTop]}>
+          <TouchableOpacity 
+            style={[styles.optionItem, styles.borderTop]}
+            onPress={handleLogout}
+            disabled={isLoading}
+          >
             <View style={styles.optionInfo}>
               <Icon
                 name="logout"
@@ -209,7 +228,9 @@ const PassengerSettingsScreen = () => {
                 color="#ef4444"
                 type="antDesignIcon"
               />
-              <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
+              <Text style={[styles.optionText, styles.logoutText]}>
+                {isLoading ? 'Logging out...' : 'Logout'}
+              </Text>
             </View>
             <Icon
               name="chevron-small-right"

@@ -138,6 +138,18 @@ export default function RegistrationScreen() {
 
   const handleSubmit = async () => {
     try {
+      console.log('🚀 Starting account creation process...');
+      console.log('📝 Form data:', {
+        fullName: formData.fullName,
+        email: formData.email,
+        role: formData.role,
+        phone: formData.phoneNumber,
+        cnic: formData.cnic,
+        address: formData.address,
+        vehicleType: formData.vehicleType,
+        vehicleNumber: formData.vehicleNumber
+      });
+
       // Prepare registration data for API
       const registrationData = {
         name: formData.fullName,
@@ -155,18 +167,34 @@ export default function RegistrationScreen() {
         }),
       };
       
+      console.log('📤 Sending registration request to API...');
+      console.log('📋 Registration payload:', registrationData);
+      
       const result = await register(registrationData);
       
+      console.log('📨 API Response received:', result);
+      console.log('🔍 Result type:', result.type);
+      console.log('📊 Result payload:', result.payload);
+      
       if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ Account created successfully!');
+        console.log('👤 User data:', result.payload);
         showToast('success', 'Your account has been created successfully! Please wait for admin approval.');
         // Navigate to login or phone verification
         navigation.navigate('Login');
       } else {
+        console.log('❌ Registration failed');
+        console.log('🚨 Error details:', result.payload);
         showToast('error', (result.payload as string) || 'Registration failed');
       }
       
     } catch (registrationError: any) {
-      console.error('Registration error:', registrationError);
+      console.error('💥 Registration error caught:', registrationError);
+      console.error('🔍 Error details:', {
+        message: registrationError.message,
+        stack: registrationError.stack,
+        response: registrationError.response?.data
+      });
       showToast('error', registrationError.message || 'Registration failed');
     }
   };

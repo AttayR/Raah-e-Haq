@@ -20,10 +20,17 @@ import { BrandColors } from 'src/theme/colors';
 
 const DriverProfile = () => {
   const navigation = useNavigation();
-  const { userProfile, phoneNumber, role } = useSelector(
-    (state: RootState) => state.auth,
+  const { user } = useSelector(
+    (state: RootState) => state.apiAuth,
   );
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Debug logging
+  console.log('DriverProfile - User data:', user);
+  console.log('DriverProfile - User name:', user?.name);
+  console.log('DriverProfile - User email:', user?.email);
+  console.log('DriverProfile - User phone:', user?.phone);
+  console.log('DriverProfile - User status:', user?.status);
 
   const imagePickerOptions = {
     mediaType: 'photo' as MediaType,
@@ -145,28 +152,28 @@ const DriverProfile = () => {
                 gap: 5,
               }}
             >
-              <Text style={styles.userName}>{userProfile?.fullName}</Text>
+              <Text style={styles.userName}>{user?.name}</Text>
               <Text
                 style={{
                   color: '#ffffff',
                   fontSize: 20,
                 }}
               >
-                ( {role} )
+                ( {user?.role} )
               </Text>
             </View>
-            <Text style={styles.userEmail}>{userProfile?.email}</Text>
+            <Text style={styles.userEmail}>{user?.email}</Text>
 
             <View style={styles.verifiedBadge}>
               <Icon
-                name={userProfile?.isVerified ? 'check' : ''}
+                name={user?.status === 'active' ? 'check' : ''}
                 size={14}
                 color="#ffffff"
                 style={styles.checkIcon}
                 type="antDesignIcon"
               />
               <Text style={styles.verifiedText}>
-                {userProfile?.isVerified ? 'Verified Driver' : 'Not verified'}
+                {user?.status === 'active' ? 'Verified Driver' : 'Not verified'}
               </Text>
             </View>
           </View>
@@ -222,7 +229,7 @@ const DriverProfile = () => {
               </View>
               <View style={styles.infoDetails}>
                 <Text style={styles.infoLabel}>Phone Number</Text>
-                <Text style={styles.infoValue}>{phoneNumber}</Text>
+                <Text style={styles.infoValue}>{user?.phone}</Text>
               </View>
               <Icon
                 name="right"
@@ -243,7 +250,7 @@ const DriverProfile = () => {
               </View>
               <View style={styles.infoDetails}>
                 <Text style={styles.infoLabel}>Email Address</Text>
-                <Text style={styles.infoValue}>{userProfile?.email}</Text>
+                <Text style={styles.infoValue}>{user?.email}</Text>
               </View>
               <Icon
                 name="right"
@@ -264,7 +271,7 @@ const DriverProfile = () => {
               </View>
               <View style={styles.infoDetails}>
                 <Text style={styles.infoLabel}>Location</Text>
-                <Text style={styles.infoValue}>{userProfile?.address}</Text>
+                <Text style={styles.infoValue}>{user?.address || 'Not provided'}</Text>
               </View>
               <Icon
                 name="right"

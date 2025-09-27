@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'https://raahehaq.com/api';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -87,6 +87,8 @@ export interface User {
   address?: string;
   country?: string;
   status: 'pending' | 'active' | 'suspended';
+  role: 'driver' | 'passenger' | 'admin';
+  roles: string[];
   emergency_contact?: string;
   license_number?: string;
   vehicle_type?: string;
@@ -145,12 +147,30 @@ export interface ResetPasswordRequest {
 class ApiService {
   // Authentication Methods
   async login(credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> {
+    console.log('🌐 API Service - Logging in user...');
+    console.log('📡 Endpoint: POST /auth/login');
+    console.log('📋 Request data:', credentials);
+    
     const response = await apiClient.post('/auth/login', credentials);
+    
+    console.log('📨 API Service - Login response received');
+    console.log('📊 Response status:', response.status);
+    console.log('📋 Response data:', response.data);
+    
     return response.data;
   }
 
   async register(userData: RegisterRequest): Promise<ApiResponse<{ user: User }>> {
+    console.log('🌐 API Service - Registering user...');
+    console.log('📡 Endpoint: POST /auth/register');
+    console.log('📋 Request data:', userData);
+    
     const response = await apiClient.post('/auth/register', userData);
+    
+    console.log('📨 API Service - Registration response received');
+    console.log('📊 Response status:', response.status);
+    console.log('📋 Response data:', response.data);
+    
     return response.data;
   }
 

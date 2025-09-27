@@ -93,12 +93,23 @@ export default function LoginScreen() {
         return;
       }
 
+      console.log('🔐 Starting login process...');
+      console.log('📧 Email:', email.trim());
+      
       const result = await login({ email: email.trim(), password: password.trim() });
       
+      console.log('📨 Login result received:', result);
+      console.log('🔍 Result type:', result.type);
+      console.log('📊 Result payload:', result.payload);
+      
       if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ Login successful!');
+        console.log('👤 User data:', result.payload);
         showToast('success', 'Login successful!');
         // Navigation will be handled by the auth state change
       } else {
+        console.log('❌ Login failed');
+        console.log('🚨 Error details:', result.payload);
         showToast('error', (result.payload as string) || 'Login failed. Please try again.');
       }
     } catch (err: any) {

@@ -30,10 +30,10 @@ export default function DriverHomeScreen() {
   const [isOnline, setIsOnline] = useState(false);
   
   // Get user data from Redux store
-  const { userProfile } = useSelector((state: RootState) => state.auth);
+  const { user } = useSelector((state: RootState) => state.apiAuth);
 
   // Check if driver is approved
-  const isDriverApproved = userProfile?.driverStatus === 'approved';
+  const isDriverApproved = user?.status === 'active';
 
   const quickActions = [
     {
@@ -160,7 +160,7 @@ export default function DriverHomeScreen() {
                   : 'Evening'}
               </Text>
               <Text style={styles.userName}>
-                {userProfile?.fullName || 'Driver'}
+                {user?.name || 'Driver'}
               </Text>
             </View>
             <TouchableOpacity

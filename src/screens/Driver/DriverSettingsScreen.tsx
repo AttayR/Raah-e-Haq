@@ -11,13 +11,35 @@ import {
 } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
-import { useDispatch } from 'react-redux';
-import { signOutThunk } from '../../store/thunks/authThunks';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { useApiAuth } from '../../hooks/useApiAuth';
+import { showToast } from '../../components/ToastProvider';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const DriverSettingsScreen = () => {
   const { theme } = useAppTheme();
-  const dispatch = useDispatch<any>();
+  const { user, isLoading } = useSelector(
+    (state: RootState) => state.apiAuth,
+  );
+  const { logout } = useApiAuth();
+
+  // Debug logging
+  console.log('DriverSettingsScreen - User data:', user);
+  console.log('DriverSettingsScreen - User name:', user?.name);
+  console.log('DriverSettingsScreen - User email:', user?.email);
+  console.log('DriverSettingsScreen - User phone:', user?.phone);
+
+  const handleLogout = async () => {
+    try {
+      console.log('DriverSettingsScreen - Logging out...');
+      await logout();
+      showToast('success', 'Logged out successfully');
+    } catch (error) {
+      console.error('DriverSettingsScreen - Logout error:', error);
+      showToast('error', 'Failed to logout');
+    }
+  };
   
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -53,6 +75,25 @@ const DriverSettingsScreen = () => {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.contentContainer}>
+              {/* User Profile Section */}
+              <View style={styles.profileSection}>
+                <View style={styles.profileImage}>
+                  <Icon name="person" size={40} color="#6b7280" />
+                </View>
+                <Text style={styles.userName}>{user?.name || 'Driver'}</Text>
+                <Text style={styles.userEmail}>{user?.email}</Text>
+                <View style={styles.statusBadge}>
+                  <Icon 
+                    name={user?.status === 'active' ? 'check-circle' : 'schedule'} 
+                    size={16} 
+                    color={user?.status === 'active' ? '#10b981' : '#f59e0b'} 
+                  />
+                  <Text style={styles.statusText}>
+                    {user?.status === 'active' ? 'Active' : 'Pending'}
+                  </Text>
+                </View>
+              </View>
+
               <Text style={styles.title}>Driver Settings</Text>
               <Text style={styles.subtitle}>
                 Manage your account preferences and app settings
@@ -118,13 +159,16 @@ const DriverSettingsScreen = () => {
 
                 <TouchableOpacity
                   style={[styles.settingItem, styles.logoutItem]}
-                  onPress={() => dispatch(signOutThunk())}
+                  onPress={handleLogout}
+                  disabled={isLoading}
                 >
                   <View style={[styles.settingIcon, styles.logoutIcon]}>
                     <Icon name="logout" size={24} color="#ef4444" />
                   </View>
                   <View style={styles.settingContent}>
-                    <Text style={[styles.settingTitle, styles.logoutText]}>Sign Out</Text>
+                    <Text style={[styles.settingTitle, styles.logoutText]}>
+                      {isLoading ? 'Signing Out...' : 'Sign Out'}
+                    </Text>
                     <Text style={styles.settingSubtitle}>Logout from your account</Text>
                   </View>
                   <Icon name="chevron-right" size={24} color="#9ca3af" />
@@ -243,6 +287,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
+  },
+  profileSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10b981',
+    marginLeft: 4,
   },
   title: {
     color: '#1f2937',
