@@ -14,9 +14,7 @@ import {
 import BrandButton from '../../components/BrandButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import { useNavigation } from '@react-navigation/native';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
-import { emailSignInThunk, resetPasswordThunk, googleSignInThunk } from '../../store/thunks/authThunks';
+import { useApiAuth } from '../../hooks/useApiAuth';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -29,14 +27,11 @@ const isSmallScreen = screenWidth < 375;
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
-  const dispatch = useDispatch<any>();
-  
-  const { error } = useSelector((state: RootState) => state.auth);
+  const { login, error, isLoading, clearAuthError, forgotPasswordRequest } = useApiAuth();
   
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('phone');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
   // Validation functions
@@ -76,7 +71,7 @@ export default function LoginScreen() {
   const handleEmailSignIn = async () => {
     try {
       clearValidationErrors();
-      setIsLoading(true);
+      clearAuthError();
 
       // Validation
       const errors: {[key: string]: string} = {};
@@ -95,22 +90,27 @@ export default function LoginScreen() {
 
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
-        setIsLoading(false);
         return;
       }
 
-      await dispatch(emailSignInThunk(email.trim(), password.trim()));
+      const result = await login({ email: email.trim(), password: password.trim() });
+      
+      if (result.type.endsWith('/fulfilled')) {
+        showToast('success', 'Login successful!');
+        // Navigation will be handled by the auth state change
+      } else {
+        showToast('error', (result.payload as string) || 'Login failed. Please try again.');
+      }
     } catch (err: any) {
       console.error('Email sign in error:', err);
       showToast('error', 'An unexpected error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
     try {
       clearValidationErrors();
+      clearAuthError();
       
       if (!email.trim()) {
         setValidationErrors({ email: 'Please enter your email first' });
@@ -122,14 +122,16 @@ export default function LoginScreen() {
         return;
       }
 
-      setIsLoading(true);
-      await dispatch(resetPasswordThunk(email.trim()));
-      showToast('success', 'Password reset email sent! Please check your inbox.');
+      const result = await forgotPasswordRequest(email.trim());
+      
+      if (result.type.endsWith('/fulfilled')) {
+        showToast('success', 'Password reset email sent! Please check your inbox.');
+      } else {
+        showToast('error', (result.payload as string) || 'Failed to send password reset email. Please try again.');
+      }
     } catch (err: any) {
       console.error('Password reset error:', err);
       showToast('error', 'Failed to send password reset email. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -145,13 +147,10 @@ export default function LoginScreen() {
   const handleGoogleSignIn = async () => {
     try {
       clearValidationErrors();
-      setIsLoading(true);
-      await dispatch(googleSignInThunk());
+      showToast('info', 'Google Sign-In is not available with API authentication. Please use email or phone authentication.');
     } catch (err: any) {
       console.error('Google sign-in error:', err);
-      showToast('error', 'Failed to sign in with Google. Please try again.');
-    } finally {
-      setIsLoading(false);
+      showToast('error', 'Google Sign-In is not available. Please use email or phone authentication.');
     }
   };
 

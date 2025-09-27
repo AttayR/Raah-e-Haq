@@ -12,18 +12,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
-import { clearError, setIdle } from '../../store/slices/authSlice';
-import {
-  sendVerificationCodeThunk,
-  verifyCodeThunk,
-} from '../../store/thunks/authThunks';
+import { useApiAuth } from '../../hooks/useApiAuth';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
 import Toast from '../../components/Toast';
 import { showToast } from '../../components/ToastProvider';
-import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -34,17 +27,12 @@ const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
 export default function PhoneAuthScreen() {
-  const navigation = useNavigation<any>();
-  const dispatch = useDispatch<any>();
-
-  const { status, error, phoneNumber, isExistingUser, userStatus, userProfile } = useSelector(
-    (state: RootState) => state.auth
-  );
+  const { sendOtpToPhone, verifyOtpCode, error, isLoading, isOtpSent, isOtpVerified } = useApiAuth();
 
   // Debug logging for state changes
   useEffect(() => {
-    console.log('PhoneAuthScreen - Auth state changed:', { status, error, phoneNumber, isExistingUser, userStatus });
-  }, [status, error, phoneNumber, isExistingUser, userStatus]);
+    console.log('PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
+  }, [isLoading, error, isOtpSent, isOtpVerified]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
   const [phoneInput, setPhoneInput] = useState('');
@@ -70,11 +58,17 @@ export default function PhoneAuthScreen() {
     }
 
     try {
-      await dispatch(sendVerificationCodeThunk(phoneInput.trim()));
-      setCurrentStep('verification');
-      setCountdown(60); // 60 seconds countdown
+      const result = await sendOtpToPhone(phoneInput.trim());
+      if (result.type.endsWith('/fulfilled')) {
+        setCurrentStep('verification');
+        setCountdown(60); // 60 seconds countdown
+        showToast('success', 'OTP sent successfully');
+      } else {
+        showToast('error', (result.payload as string) || 'Failed to send OTP');
+      }
     } catch (err: any) {
-      // Error is handled in the thunk
+      console.error('Error sending verification code:', err);
+      showToast('error', 'Failed to send OTP');
     }
   };
 
@@ -85,45 +79,47 @@ export default function PhoneAuthScreen() {
     }
 
     try {
-      // Verify the code without setting a role
-      const result = await dispatch(verifyCodeThunk(verificationCode.trim()));
+      const result = await verifyOtpCode({
+        phone: phoneInput.trim(),
+        otp_code: verificationCode.trim()
+      });
       
-      // Show success toast
-      setShowSuccessToast(true);
-      
-      // Handle navigation based on user status
-      if (result.isExistingUser) {
-        // Existing user - navigate directly to dashboard
-        console.log('PhoneAuthScreen - Existing user verified, navigating to dashboard');
-        // The navigation will be handled by AuthFlow component based on auth state
+      if (result.type.endsWith('/fulfilled')) {
+        // Show success toast
+        setShowSuccessToast(true);
+        showToast('success', 'Phone number verified successfully!');
+        
+        // Navigation will be handled by AuthFlow component based on auth state
+        console.log('PhoneAuthScreen - Phone verified successfully');
       } else {
-        // New user - navigate to role selection
-        console.log('PhoneAuthScreen - New user verified, navigating to role selection');
-        setTimeout(() => {
-          navigation.navigate('RoleSelection');
-        }, 2000);
+        showToast('error', (result.payload as string) || 'Invalid verification code');
       }
       
     } catch (err: any) {
-      // Error is handled in the thunk
+      console.error('Error verifying code:', err);
+      showToast('error', 'Failed to verify code');
     }
   };
 
   const handleResendCode = async () => {
     try {
-      await dispatch(sendVerificationCodeThunk(phoneInput.trim()));
-      setCountdown(60);
-      setVerificationCode('');
+      const result = await sendOtpToPhone(phoneInput.trim());
+      if (result.type.endsWith('/fulfilled')) {
+        setCountdown(60);
+        setVerificationCode('');
+        showToast('success', 'Verification code sent again');
+      } else {
+        showToast('error', (result.payload as string) || 'Failed to resend code');
+      }
     } catch (err: any) {
-      // Error is handled in the thunk
+      console.error('Error resending code:', err);
+      showToast('error', 'Failed to resend code');
     }
   };
 
   const handleBackToPhone = () => {
     setCurrentStep('phone');
     setVerificationCode('');
-    dispatch(clearError());
-    dispatch(setIdle());
   };
 
   const renderPhoneStep = () => (
@@ -149,10 +145,10 @@ export default function PhoneAuthScreen() {
 
       <View style={styles.buttonContainer}>
         <BrandButton
-          title={status === 'loading' ? 'Sending...' : 'Send Code'}
+          title={isLoading ? 'Sending...' : 'Send Code'}
           onPress={handleSendCode}
           variant="primary"
-          disabled={status === 'loading'}
+          disabled={isLoading}
           style={styles.primaryButton}
           textStyle={styles.buttonText}
         />
@@ -173,19 +169,11 @@ export default function PhoneAuthScreen() {
         <Icon name="verified-user" size={48} color={BrandColors.primary} />
       </View>
       <Text style={styles.sectionTitle}>
-        {isExistingUser ? 'Welcome back!' : 'Enter verification code'}
+        Enter verification code
       </Text>
       <Text style={styles.sectionSubtitle}>
-        {isExistingUser 
-          ? `We sent a code to ${phoneNumber}. Enter it to sign in.`
-          : `We sent a code to ${phoneNumber}`
-        }
+        We sent a code to {phoneInput}. Enter it to verify your phone number.
       </Text>
-      {isExistingUser && userProfile && (
-        <Text style={styles.welcomeText}>
-          Welcome back, {userProfile.displayName || userProfile.fullName || 'User'}!
-        </Text>
-      )}
       <Text style={styles.testInfo}>
         Test Code: 123456
       </Text>
@@ -204,10 +192,10 @@ export default function PhoneAuthScreen() {
 
       <View style={styles.buttonContainer}>
         <BrandButton
-          title={status === 'verifying' ? 'Verifying...' : (isExistingUser ? 'Sign In' : 'Verify Code')}
+          title={isLoading ? 'Verifying...' : 'Verify Code'}
           onPress={handleVerifyCode}
           variant="primary"
-          disabled={status === 'verifying'}
+          disabled={isLoading}
           style={styles.primaryButton}
           textStyle={styles.buttonText}
         />
@@ -309,10 +297,7 @@ export default function PhoneAuthScreen() {
       </ImageBackground>
 
       <Toast
-        message={isExistingUser 
-          ? "Welcome back! Redirecting to dashboard..." 
-          : "Phone number verified successfully! Redirecting to role selection..."
-        }
+        message="Phone number verified successfully! Redirecting..."
         type="success"
         visible={showSuccessToast}
         onHide={() => setShowSuccessToast(false)}

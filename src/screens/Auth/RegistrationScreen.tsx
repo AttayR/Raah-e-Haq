@@ -12,9 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
-import { detailedRegistrationThunk } from '../../store/thunks/authThunks';
+import { useApiAuth } from '../../hooks/useApiAuth';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import PersonalInfoStep from './steps/PersonalInfoStep';
@@ -57,12 +55,9 @@ interface RegistrationData {
 
 export default function RegistrationScreen() {
   const navigation = useNavigation<any>();
-  const dispatch = useDispatch<any>();
-  
-  const { } = useSelector((state: RootState) => state.auth);
+  const { register, isLoading } = useApiAuth();
   
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<RegistrationData>({
     fullName: '',
     email: '',
@@ -143,43 +138,36 @@ export default function RegistrationScreen() {
 
   const handleSubmit = async () => {
     try {
-      setIsSubmitting(true);
-      
-      // Prepare profile data
-      const profileData = {
-        fullName: formData.fullName,
+      // Prepare registration data for API
+      const registrationData = {
+        name: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        password_confirmation: formData.confirmPassword,
+        user_type: formData.role,
+        phone: formData.phoneNumber,
         cnic: formData.cnic,
         address: formData.address,
         ...(formData.role === 'driver' && {
-          vehicleType: formData.vehicleType as any,
-          vehicleInfo: {
-            number: formData.vehicleNumber,
-            brand: formData.vehicleBrand,
-            model: formData.vehicleModel,
-            year: formData.vehicleYear,
-            color: formData.vehicleColor,
-          },
-          driverPictureUri: formData.driverPicture,
-          cnicPictureUri: formData.cnicPicture,
-          vehiclePictureUris: formData.vehiclePictures,
+          vehicle_type: formData.vehicleType,
+          license_number: formData.vehicleNumber, // Using vehicle number as license number for now
+          preferred_payment: 'Cash', // Default payment method
         }),
       };
       
-      await dispatch(detailedRegistrationThunk(
-        formData.email,
-        formData.password,
-        formData.role,
-        profileData
-      ));
+      const result = await register(registrationData);
       
-      showToast('success', 'Your account has been created successfully!');
-      // Do not navigate here; AuthFlow will route to the main app automatically
+      if (result.type.endsWith('/fulfilled')) {
+        showToast('success', 'Your account has been created successfully! Please wait for admin approval.');
+        // Navigate to login or phone verification
+        navigation.navigate('Login');
+      } else {
+        showToast('error', (result.payload as string) || 'Registration failed');
+      }
       
     } catch (registrationError: any) {
       console.error('Registration error:', registrationError);
       showToast('error', registrationError.message || 'Registration failed');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -324,7 +312,7 @@ export default function RegistrationScreen() {
                 <TouchableOpacity
                   style={styles.previousButton}
                   onPress={handlePrevious}
-                  disabled={isSubmitting}
+                  disabled={isLoading}
                 >
                   <Icon name="arrow-back" size={20} color={BrandColors.primary} />
                   <Text style={styles.previousButtonText}>Previous</Text>
@@ -334,17 +322,17 @@ export default function RegistrationScreen() {
                 <TouchableOpacity
                   style={[styles.submitButton, !canProceedToNext() && styles.submitButtonDisabled]}
                   onPress={handleSubmit}
-                  disabled={!canProceedToNext() || isSubmitting}
+                  disabled={!canProceedToNext() || isLoading}
                 >
                   <Text style={styles.submitButtonText}>
-                    {isSubmitting ? 'Creating Account...' : 'Create Account'}
+                    {isLoading ? 'Creating Account...' : 'Create Account'}
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={[styles.nextButton, !canProceedToNext() && styles.nextButtonDisabled]}
                   onPress={handleNext}
-                  disabled={!canProceedToNext() || isSubmitting}
+                  disabled={!canProceedToNext() || isLoading}
                 >
                   <Text style={styles.nextButtonText}>Next</Text>
                   <Icon name="arrow-forward" size={20} color="#ffffff" />
