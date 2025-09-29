@@ -88,19 +88,43 @@ export const sendOtp = createAsyncThunk(
   'auth/sendOtp',
   async (phone: string, { rejectWithValue }) => {
     try {
+      console.log('🔄 Redux Thunk - Starting OTP send process...');
+      console.log('📱 Phone number:', phone);
+      console.log('⏰ Thunk timestamp:', new Date().toISOString());
+      
       const response = await apiService.sendOtp(phone);
       
+      console.log('📨 Redux Thunk - OTP send API response received');
+      console.log('📊 Response success:', response.success);
+      console.log('📋 Response data:', response.data);
+      
       if (response.success && response.data) {
+        console.log('✅ Redux Thunk - OTP sent successfully');
+        console.log('📱 Phone verified:', response.data.phone);
+        console.log('⏰ OTP expires in:', response.data.expires_in, 'seconds');
+        console.log('🔢 OTP code (for testing):', response.data.otp_code);
+        
         return response.data;
       } else {
+        console.log('❌ Redux Thunk - OTP send failed:', response.message);
+        console.log('🔍 Error details:', response.errors);
         return rejectWithValue(response.message || 'Failed to send OTP');
       }
     } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
+      console.error('💥 Redux Thunk - OTP send error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        phone: phone
+      });
+      
+      const errorMessage = error.response?.data?.message || 
         error.message || 
-        'Failed to send OTP'
-      );
+        'Failed to send OTP';
+      
+      console.log('📤 Redux Thunk - Rejecting with error:', errorMessage);
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -109,12 +133,32 @@ export const verifyOtp = createAsyncThunk(
   'auth/verifyOtp',
   async (otpData: VerifyOtpRequest, { rejectWithValue }) => {
     try {
+      console.log('🔄 Redux Thunk - Starting OTP verification process...');
+      console.log('📋 OTP data:', {
+        phone: otpData.phone,
+        otp_code: otpData.otp_code ? '***' + otpData.otp_code.slice(-2) : 'undefined'
+      });
+      console.log('⏰ Thunk timestamp:', new Date().toISOString());
+      
       const response = await apiService.verifyOtp(otpData);
       
+      console.log('📨 Redux Thunk - OTP verification API response received');
+      console.log('📊 Response success:', response.success);
+      console.log('📋 Response data:', response.data);
+      
       if (response.success && response.data) {
+        console.log('✅ Redux Thunk - OTP verification successful');
+        console.log('👤 User authenticated:', response.data.user?.name || 'Unknown');
+        console.log('🔑 Token received:', response.data.token ? 'Yes' : 'No');
+        console.log('📱 Phone verified:', response.data.user?.phone);
+        console.log('👤 User role:', response.data.user?.role);
+        console.log('📊 User status:', response.data.user?.status);
+        
         // Store auth data
+        console.log('💾 Storing authentication data...');
         await apiService.setAuthToken(response.data.token);
         await apiService.setUserData(response.data.user);
+        console.log('✅ Authentication data stored successfully');
         
         return {
           user: response.data.user,
@@ -122,14 +166,26 @@ export const verifyOtp = createAsyncThunk(
           tokenType: response.data.token_type,
         };
       } else {
+        console.log('❌ Redux Thunk - OTP verification failed:', response.message);
+        console.log('🔍 Error details:', response.errors);
         return rejectWithValue(response.message || 'OTP verification failed');
       }
     } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
+      console.error('💥 Redux Thunk - OTP verification error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        phone: otpData.phone,
+        otp_length: otpData.otp_code?.length
+      });
+      
+      const errorMessage = error.response?.data?.message || 
         error.message || 
-        'OTP verification failed'
-      );
+        'OTP verification failed';
+      
+      console.log('📤 Redux Thunk - Rejecting with error:', errorMessage);
+      return rejectWithValue(errorMessage);
     }
   }
 );

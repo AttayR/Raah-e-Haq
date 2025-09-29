@@ -19,6 +19,7 @@ import Toast from '../../components/Toast';
 import { showToast } from '../../components/ToastProvider';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
+import OtpService from '../../services/otpService';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 type AuthStep = 'phone' | 'verification';
@@ -31,7 +32,7 @@ export default function PhoneAuthScreen() {
 
   // Debug logging for state changes
   useEffect(() => {
-    console.log('PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
+    console.log('📱 PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
   }, [isLoading, error, isOtpSent, isOtpVerified]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
@@ -39,6 +40,12 @@ export default function PhoneAuthScreen() {
   const [verificationCode, setVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [_otpSentAt, setOtpSentAt] = useState<Date | null>(null);
+  const [_otpExpiresIn, setOtpExpiresIn] = useState<number>(0);
+  const [phoneError, setPhoneError] = useState<string>('');
+  const [otpError, setOtpError] = useState<string>('');
+  const [isResending, setIsResending] = useState(false);
+  const [receivedOtpCode, setReceivedOtpCode] = useState<string>('');
 
   // Countdown timer for resend code
   useEffect(() => {
@@ -52,39 +59,81 @@ export default function PhoneAuthScreen() {
   }, [countdown]);
 
   const handleSendCode = async () => {
-    if (!phoneInput.trim()) {
-      showToast('error', 'Please enter a phone number');
+    console.log('📱 PhoneAuthScreen - Starting send OTP process');
+    console.log('📞 Phone input:', phoneInput);
+    
+    // Clear previous errors
+    setPhoneError('');
+    
+    // Validate phone number
+    const validation = OtpService.validatePhoneNumber(phoneInput.trim());
+    if (!validation.isValid) {
+      console.log('❌ PhoneAuthScreen - Phone validation failed:', validation.error);
+      setPhoneError(validation.error || 'Invalid phone number');
+      showToast('error', validation.error || 'Invalid phone number');
       return;
     }
 
+    console.log('✅ PhoneAuthScreen - Phone validation passed');
+
     try {
       const result = await sendOtpToPhone(phoneInput.trim());
+      console.log('📨 PhoneAuthScreen - Send OTP result:', result.type);
+      
       if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ PhoneAuthScreen - OTP sent successfully');
+        console.log('🔢 PhoneAuthScreen - Received OTP code:', (result.payload as any)?.otp_code);
+        
         setCurrentStep('verification');
         setCountdown(60); // 60 seconds countdown
+        setOtpSentAt(new Date());
+        setOtpExpiresIn(300); // 5 minutes expiration
+        setPhoneError('');
+        setReceivedOtpCode((result.payload as any)?.otp_code || '');
         showToast('success', 'OTP sent successfully');
       } else {
-        showToast('error', (result.payload as string) || 'Failed to send OTP');
+        const errorMessage = (result.payload as string) || 'Failed to send OTP';
+        console.log('❌ PhoneAuthScreen - OTP send failed:', errorMessage);
+        setPhoneError(errorMessage);
+        showToast('error', errorMessage);
       }
     } catch (err: any) {
-      console.error('Error sending verification code:', err);
-      showToast('error', 'Failed to send OTP');
+      console.error('💥 PhoneAuthScreen - Error sending verification code:', err);
+      const errorMessage = err.message || 'Failed to send OTP';
+      setPhoneError(errorMessage);
+      showToast('error', errorMessage);
     }
   };
 
   const handleVerifyCode = async () => {
-    if (!verificationCode.trim()) {
-      showToast('error', 'Please enter the verification code');
+    console.log('📱 PhoneAuthScreen - Starting verify OTP process');
+    console.log('🔢 OTP input:', verificationCode);
+    
+    // Clear previous errors
+    setOtpError('');
+    
+    // Validate OTP data
+    const otpData = {
+      phone: phoneInput.trim(),
+      otp_code: verificationCode.trim()
+    };
+    
+    const validation = OtpService.validateOtpData(otpData);
+    if (!validation.isValid) {
+      console.log('❌ PhoneAuthScreen - OTP validation failed:', validation.error);
+      setOtpError(validation.error || 'Invalid OTP code');
+      showToast('error', validation.error || 'Invalid OTP code');
       return;
     }
 
+    console.log('✅ PhoneAuthScreen - OTP validation passed');
+
     try {
-      const result = await verifyOtpCode({
-        phone: phoneInput.trim(),
-        otp_code: verificationCode.trim()
-      });
+      const result = await verifyOtpCode(otpData);
+      console.log('📨 PhoneAuthScreen - Verify OTP result:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ PhoneAuthScreen - Phone verified successfully');
         // Show success toast
         setShowSuccessToast(true);
         showToast('success', 'Phone number verified successfully!');
@@ -92,34 +141,59 @@ export default function PhoneAuthScreen() {
         // Navigation will be handled by AuthFlow component based on auth state
         console.log('PhoneAuthScreen - Phone verified successfully');
       } else {
-        showToast('error', (result.payload as string) || 'Invalid verification code');
+        const errorMessage = (result.payload as string) || 'Invalid verification code';
+        console.log('❌ PhoneAuthScreen - OTP verification failed:', errorMessage);
+        setOtpError(errorMessage);
+        showToast('error', errorMessage);
       }
       
     } catch (err: any) {
-      console.error('Error verifying code:', err);
-      showToast('error', 'Failed to verify code');
+      console.error('💥 PhoneAuthScreen - Error verifying code:', err);
+      const errorMessage = err.message || 'Failed to verify code';
+      setOtpError(errorMessage);
+      showToast('error', errorMessage);
     }
   };
 
   const handleResendCode = async () => {
+    console.log('📱 PhoneAuthScreen - Starting resend OTP process');
+    setIsResending(true);
+    
     try {
       const result = await sendOtpToPhone(phoneInput.trim());
+      console.log('📨 PhoneAuthScreen - Resend OTP result:', result.type);
+      
       if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ PhoneAuthScreen - OTP resent successfully');
+        console.log('🔢 PhoneAuthScreen - New OTP code:', (result.payload as any)?.otp_code);
+        
         setCountdown(60);
         setVerificationCode('');
+        setOtpSentAt(new Date());
+        setOtpExpiresIn(300); // 5 minutes expiration
+        setOtpError('');
+        setReceivedOtpCode((result.payload as any)?.otp_code || '');
         showToast('success', 'Verification code sent again');
       } else {
-        showToast('error', (result.payload as string) || 'Failed to resend code');
+        const errorMessage = (result.payload as string) || 'Failed to resend code';
+        console.log('❌ PhoneAuthScreen - Resend OTP failed:', errorMessage);
+        setOtpError(errorMessage);
+        showToast('error', errorMessage);
       }
     } catch (err: any) {
-      console.error('Error resending code:', err);
-      showToast('error', 'Failed to resend code');
+      console.error('💥 PhoneAuthScreen - Error resending code:', err);
+      const errorMessage = err.message || 'Failed to resend code';
+      setOtpError(errorMessage);
+      showToast('error', errorMessage);
+    } finally {
+      setIsResending(false);
     }
   };
 
   const handleBackToPhone = () => {
     setCurrentStep('phone');
     setVerificationCode('');
+    setReceivedOtpCode('');
   };
 
   const renderPhoneStep = () => (
@@ -136,11 +210,21 @@ export default function PhoneAuthScreen() {
         <ThemedTextInput
           placeholder="Phone number (e.g., +923486716994)"
           value={phoneInput}
-          onChangeText={setPhoneInput}
+          onChangeText={(text) => {
+            setPhoneInput(text);
+            setPhoneError(''); // Clear error when user types
+          }}
           keyboardType="phone-pad"
           autoFocus
-          style={styles.input}
+          style={[styles.input, phoneError && styles.inputError]}
+          maxLength={15}
         />
+        {phoneError ? (
+          <View style={styles.errorContainer}>
+            <Icon name="error" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{phoneError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.buttonContainer}>
@@ -148,7 +232,7 @@ export default function PhoneAuthScreen() {
           title={isLoading ? 'Sending...' : 'Send Code'}
           onPress={handleSendCode}
           variant="primary"
-          disabled={isLoading}
+          disabled={isLoading || !phoneInput.trim()}
           style={styles.primaryButton}
           textStyle={styles.buttonText}
         />
@@ -174,20 +258,46 @@ export default function PhoneAuthScreen() {
       <Text style={styles.sectionSubtitle}>
         We sent a code to {phoneInput}. Enter it to verify your phone number.
       </Text>
-      <Text style={styles.testInfo}>
-        Test Code: 123456
-      </Text>
+      {receivedOtpCode ? (
+        <View style={styles.otpCodeContainer}>
+          <Text style={styles.otpCodeLabel}>Your OTP Code:</Text>
+          <Text style={styles.otpCodeValue}>{receivedOtpCode}</Text>
+          <BrandButton
+            title="Use This OTP"
+            onPress={() => {
+              setVerificationCode(receivedOtpCode);
+              showToast('success', 'OTP code filled in input field');
+            }}
+            variant="secondary"
+            style={styles.copyButton}
+            textStyle={styles.copyButtonText}
+          />
+        </View>
+      ) : (
+        <Text style={styles.testInfo}>
+          Test Code: 123456
+        </Text>
+      )}
 
       <View style={styles.inputContainer}>
         <ThemedTextInput
           placeholder="6-digit code"
           value={verificationCode}
-          onChangeText={setVerificationCode}
+          onChangeText={(text) => {
+            setVerificationCode(text);
+            setOtpError(''); // Clear error when user types
+          }}
           keyboardType="number-pad"
           maxLength={6}
           autoFocus
-          style={styles.input}
+          style={[styles.input, otpError && styles.inputError]}
         />
+        {otpError ? (
+          <View style={styles.errorContainer}>
+            <Icon name="error" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{otpError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.buttonContainer}>
@@ -195,7 +305,7 @@ export default function PhoneAuthScreen() {
           title={isLoading ? 'Verifying...' : 'Verify Code'}
           onPress={handleVerifyCode}
           variant="primary"
-          disabled={isLoading}
+          disabled={isLoading || !verificationCode.trim()}
           style={styles.primaryButton}
           textStyle={styles.buttonText}
         />
@@ -208,9 +318,10 @@ export default function PhoneAuthScreen() {
           </Text>
         ) : (
           <BrandButton
-            title="Resend Code"
+            title={isResending ? 'Resending...' : 'Resend Code'}
             onPress={handleResendCode}
             variant="secondary"
+            disabled={isResending}
             style={styles.resendButton}
             textStyle={styles.buttonText}
           />
@@ -510,12 +621,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
+  otpCodeContainer: {
+    backgroundColor: '#f0f9ff',
+    borderColor: BrandColors.primary,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  otpCodeLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  otpCodeValue: {
+    fontSize: 24,
+    color: BrandColors.primary,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    fontFamily: 'monospace',
+  },
+  copyButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 36,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   inputContainer: {
     marginBottom: 16,
     width: '100%',
   },
   input: {
     marginBottom: 4,
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1,
   },
   buttonContainer: {
     width: '100%',

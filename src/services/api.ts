@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
@@ -175,13 +175,80 @@ class ApiService {
   }
 
   async sendOtp(phone: string): Promise<ApiResponse<{ phone: string; otp_code: string; expires_in: number }>> {
-    const response = await apiClient.post('/auth/send-otp', { phone });
-    return response.data;
+    console.log('🌐 API Service - Sending OTP to phone number...');
+    console.log('📡 Endpoint: POST /auth/send-otp');
+    console.log('📱 Phone number:', phone);
+    console.log('⏰ Request timestamp:', new Date().toISOString());
+    
+    try {
+      const response = await apiClient.post('/auth/send-otp', { phone });
+      
+      console.log('📨 API Service - OTP send response received');
+      console.log('📊 Response status:', response.status);
+      console.log('📋 Response data:', response.data);
+      
+      if (response.data.success) {
+        console.log('✅ OTP sent successfully');
+        console.log('📱 Phone:', response.data.data?.phone);
+        console.log('⏰ Expires in:', response.data.data?.expires_in, 'seconds');
+        console.log('🔢 OTP Code (for testing):', response.data.data?.otp_code);
+      } else {
+        console.log('❌ OTP send failed:', response.data.message);
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('💥 API Service - OTP send error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        phone: phone
+      });
+      throw error;
+    }
   }
 
   async verifyOtp(otpData: VerifyOtpRequest): Promise<ApiResponse<AuthResponse>> {
-    const response = await apiClient.post('/auth/verify-otp', otpData);
-    return response.data;
+    console.log('🌐 API Service - Verifying OTP...');
+    console.log('📡 Endpoint: POST /auth/verify-otp');
+    console.log('📋 OTP data:', {
+      phone: otpData.phone,
+      otp_code: otpData.otp_code ? '***' + otpData.otp_code.slice(-2) : 'undefined'
+    });
+    console.log('⏰ Request timestamp:', new Date().toISOString());
+    
+    try {
+      const response = await apiClient.post('/auth/verify-otp', otpData);
+      
+      console.log('📨 API Service - OTP verification response received');
+      console.log('📊 Response status:', response.status);
+      console.log('📋 Response data:', response.data);
+      
+      if (response.data.success && response.data.data) {
+        console.log('✅ OTP verification successful');
+        console.log('👤 User authenticated:', response.data.data.user?.name || 'Unknown');
+        console.log('🔑 Token received:', response.data.data.token ? 'Yes' : 'No');
+        console.log('📱 Phone verified:', response.data.data.user?.phone);
+        console.log('👤 User role:', response.data.data.user?.role);
+        console.log('📊 User status:', response.data.data.user?.status);
+      } else {
+        console.log('❌ OTP verification failed:', response.data.message);
+        console.log('🔍 Error details:', response.data.errors);
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('💥 API Service - OTP verification error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        phone: otpData.phone,
+        otp_length: otpData.otp_code?.length
+      });
+      throw error;
+    }
   }
 
   async forgotPassword(email: string): Promise<ApiResponse> {
