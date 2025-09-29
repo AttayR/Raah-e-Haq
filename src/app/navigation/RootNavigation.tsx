@@ -13,8 +13,10 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { role } = useSelector((s: RootState) => s.auth);
+  const { user } = useSelector((s: RootState) => s.apiAuth);
+  const role = user?.role;
 
+  console.log('RootNavigation - Current user:', user);
   console.log('RootNavigation - Current role:', role);
   console.log('RootNavigation - Role type:', typeof role);
   console.log('RootNavigation - Role === "passenger":', role === 'passenger');

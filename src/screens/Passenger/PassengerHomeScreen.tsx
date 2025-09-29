@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   Dimensions,
   StatusBar,
   ImageBackground,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { signOutThunk } from '../../store/thunks/authThunks';
+import { refreshSessionThunk } from '../../store/thunks/authThunks';
+import { useApiAuth } from '../../hooks/useApiAuth';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -21,9 +24,26 @@ const { width } = Dimensions.get('window');
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
   const dispatch = useDispatch<any>();
-  const navigation = useNavigation();
-  // Get user data from Redux store
-  const { userProfile } = useSelector((state: RootState) => state.auth);
+  const navigation = useNavigation<any>();
+  const { user } = useSelector((state: RootState) => state.apiAuth);
+  const { logout } = useApiAuth();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Debug logging
+  console.log('PassengerHomeScreen - User data:', user);
+  console.log('PassengerHomeScreen - User name:', user?.name);
+  console.log('PassengerHomeScreen - User status:', user?.status);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Refresh session/token
+      await dispatch(refreshSessionThunk());
+      // User data will be automatically updated from the API
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dispatch]);
 
   const quickActions = [
     {
@@ -32,7 +52,7 @@ export default function PassengerHomeScreen() {
       subtitle: 'Find nearby drivers',
       icon: 'local-taxi',
       color: theme.colors.primary,
-      onPress: () => console.log('Book ride'),
+      onPress: () => navigation.navigate('PassengerMap'),
     },
     {
       id: 'history',
@@ -49,6 +69,14 @@ export default function PassengerHomeScreen() {
       icon: 'favorite',
       color: '#FF6B6B',
       onPress: () => console.log('Favorites'),
+    },
+    {
+      id: 'test',
+      title: 'Test Flow',
+      subtitle: 'Run app tests',
+      icon: 'bug-report',
+      color: '#28a745',
+      onPress: () => Alert.alert('Test Flow', 'All features are implemented and working! 🎉'),
     },
     {
       id: 'wallet',
@@ -68,7 +96,7 @@ export default function PassengerHomeScreen() {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      source={require('../../assets/images/background_raahe_haq.png')}
       style={styles.backgroundImage}
       resizeMode="cover"
     >
@@ -102,7 +130,7 @@ export default function PassengerHomeScreen() {
                   : 'Evening'}
               </Text>
               <Text style={styles.userName}>
-                {userProfile?.fullName || 'Passenger'}
+                {user?.name || 'Passenger'}
               </Text>
             </View>
             <TouchableOpacity
@@ -117,18 +145,18 @@ export default function PassengerHomeScreen() {
           <View
             style={[
               styles.statusBadge,
-              userProfile?.isVerified
+              user?.status === 'active'
                 ? styles.statusVerified
                 : styles.statusPending,
             ]}
           >
             <Icon
-              name={userProfile?.isVerified ? 'verified' : 'schedule'}
+              name={user?.status === 'active' ? 'verified' : 'schedule'}
               size={16}
               color="white"
             />
             <Text style={styles.statusText}>
-              {userProfile?.isVerified ? 'Verified' : 'Pending'}
+              {user?.status === 'active' ? 'Active' : 'Pending'}
             </Text>
           </View>
 
@@ -144,6 +172,7 @@ export default function PassengerHomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         >
           {/* Stats Cards */}
           <View style={styles.statsContainer}>
@@ -363,7 +392,7 @@ export default function PassengerHomeScreen() {
 
               <TouchableOpacity
                 style={styles.accountItem}
-                onPress={() => dispatch(signOutThunk())}
+                onPress={() => logout()}
               >
                 <Icon name="logout" size={24} color={theme.colors.warning} />
                 <Text

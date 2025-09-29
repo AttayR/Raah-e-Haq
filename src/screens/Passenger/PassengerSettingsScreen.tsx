@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,20 +9,53 @@ import {
   SafeAreaView,
   ScrollView,
   ImageBackground,
+  RefreshControl,
 } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
+import { useApiAuth } from '../../hooks/useApiAuth';
+import { showToast } from '../../components/ToastProvider';
 
-const ProfileSettingsScreen = () => {
+const PassengerSettingsScreen = () => {
   const navigation = useNavigation();
-  const { userProfile, phoneNumber, role } = useSelector(
-    (state: RootState) => state.auth,
+  const { user, isLoading } = useSelector(
+    (state: RootState) => state.apiAuth,
   );
+  const { logout } = useApiAuth();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Debug logging
+  console.log('PassengerSettingsScreen - User data:', user);
+  console.log('PassengerSettingsScreen - User name:', user?.name);
+  console.log('PassengerSettingsScreen - User email:', user?.email);
+  console.log('PassengerSettingsScreen - User phone:', user?.phone);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Refresh user data - this will be handled by the API auth system
+      console.log('PassengerSettingsScreen - Refreshing user data...');
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      console.log('PassengerSettingsScreen - Logging out...');
+      await logout();
+      showToast('success', 'Logged out successfully');
+    } catch (error) {
+      console.error('PassengerSettingsScreen - Logout error:', error);
+      showToast('error', 'Failed to logout');
+    }
+  };
+
   return (
     <ImageBackground
-      source={require('../../assets/images/BackgroundRaaheHaq.png')}
+      source={require('../../assets/images/background_raahe_haq.png')}
       style={styles.backgroundImage}
       resizeMode="cover"
     >
@@ -35,6 +68,7 @@ const ProfileSettingsScreen = () => {
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BrandColors.primary} />}
         >
           <View style={styles.header}>
             {/* Decorative Circles */}
@@ -54,7 +88,7 @@ const ProfileSettingsScreen = () => {
                 />
             </View>
 
-            <Text style={styles.passengerName}>{userProfile?.fullName}</Text>
+            <Text style={styles.passengerName}>{user?.name || 'Passenger'}</Text>
             <View style={styles.ratingContainer}>
               <Icon
                 name="star"
@@ -182,7 +216,11 @@ const ProfileSettingsScreen = () => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionItem, styles.borderTop]}>
+          <TouchableOpacity 
+            style={[styles.optionItem, styles.borderTop]}
+            onPress={handleLogout}
+            disabled={isLoading}
+          >
             <View style={styles.optionInfo}>
               <Icon
                 name="logout"
@@ -190,7 +228,9 @@ const ProfileSettingsScreen = () => {
                 color="#ef4444"
                 type="antDesignIcon"
               />
-              <Text style={[styles.optionText, styles.logoutText]}>Logout</Text>
+              <Text style={[styles.optionText, styles.logoutText]}>
+                {isLoading ? 'Logging out...' : 'Logout'}
+              </Text>
             </View>
             <Icon
               name="chevron-small-right"
@@ -387,4 +427,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileSettingsScreen;
+export default PassengerSettingsScreen;

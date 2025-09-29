@@ -12,20 +12,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
-import { clearError, setIdle } from '../../store/slices/authSlice';
-import {
-  sendVerificationCodeThunk,
-  verifyCodeThunk,
-} from '../../store/thunks/authThunks';
+import { useApiAuth } from '../../hooks/useApiAuth';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
 import Toast from '../../components/Toast';
 import { showToast } from '../../components/ToastProvider';
-import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
+import OtpService from '../../services/otpService';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 type AuthStep = 'phone' | 'verification';
@@ -34,23 +28,24 @@ const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
 export default function PhoneAuthScreen() {
-  const navigation = useNavigation<any>();
-  const dispatch = useDispatch<any>();
-
-  const { status, error, phoneNumber, isExistingUser, userStatus, userProfile } = useSelector(
-    (state: RootState) => state.auth
-  );
+  const { sendOtpToPhone, verifyOtpCode, error, isLoading, isOtpSent, isOtpVerified } = useApiAuth();
 
   // Debug logging for state changes
   useEffect(() => {
-    console.log('PhoneAuthScreen - Auth state changed:', { status, error, phoneNumber, isExistingUser, userStatus });
-  }, [status, error, phoneNumber, isExistingUser, userStatus]);
+    console.log('📱 PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
+  }, [isLoading, error, isOtpSent, isOtpVerified]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
   const [phoneInput, setPhoneInput] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [_otpSentAt, setOtpSentAt] = useState<Date | null>(null);
+  const [_otpExpiresIn, setOtpExpiresIn] = useState<number>(0);
+  const [phoneError, setPhoneError] = useState<string>('');
+  const [otpError, setOtpError] = useState<string>('');
+  const [isResending, setIsResending] = useState(false);
+  const [receivedOtpCode, setReceivedOtpCode] = useState<string>('');
 
   // Countdown timer for resend code
   useEffect(() => {
@@ -64,66 +59,141 @@ export default function PhoneAuthScreen() {
   }, [countdown]);
 
   const handleSendCode = async () => {
-    if (!phoneInput.trim()) {
-      showToast('error', 'Please enter a phone number');
+    console.log('📱 PhoneAuthScreen - Starting send OTP process');
+    console.log('📞 Phone input:', phoneInput);
+    
+    // Clear previous errors
+    setPhoneError('');
+    
+    // Validate phone number
+    const validation = OtpService.validatePhoneNumber(phoneInput.trim());
+    if (!validation.isValid) {
+      console.log('❌ PhoneAuthScreen - Phone validation failed:', validation.error);
+      setPhoneError(validation.error || 'Invalid phone number');
+      showToast('error', validation.error || 'Invalid phone number');
       return;
     }
 
+    console.log('✅ PhoneAuthScreen - Phone validation passed');
+
     try {
-      await dispatch(sendVerificationCodeThunk(phoneInput.trim()));
-      setCurrentStep('verification');
-      setCountdown(60); // 60 seconds countdown
+      const result = await sendOtpToPhone(phoneInput.trim());
+      console.log('📨 PhoneAuthScreen - Send OTP result:', result.type);
+      
+      if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ PhoneAuthScreen - OTP sent successfully');
+        console.log('🔢 PhoneAuthScreen - Received OTP code:', (result.payload as any)?.otp_code);
+        
+        setCurrentStep('verification');
+        setCountdown(60); // 60 seconds countdown
+        setOtpSentAt(new Date());
+        setOtpExpiresIn(300); // 5 minutes expiration
+        setPhoneError('');
+        setReceivedOtpCode((result.payload as any)?.otp_code || '');
+        showToast('success', 'OTP sent successfully');
+      } else {
+        const errorMessage = (result.payload as string) || 'Failed to send OTP';
+        console.log('❌ PhoneAuthScreen - OTP send failed:', errorMessage);
+        setPhoneError(errorMessage);
+        showToast('error', errorMessage);
+      }
     } catch (err: any) {
-      // Error is handled in the thunk
+      console.error('💥 PhoneAuthScreen - Error sending verification code:', err);
+      const errorMessage = err.message || 'Failed to send OTP';
+      setPhoneError(errorMessage);
+      showToast('error', errorMessage);
     }
   };
 
   const handleVerifyCode = async () => {
-    if (!verificationCode.trim()) {
-      showToast('error', 'Please enter the verification code');
+    console.log('📱 PhoneAuthScreen - Starting verify OTP process');
+    console.log('🔢 OTP input:', verificationCode);
+    
+    // Clear previous errors
+    setOtpError('');
+    
+    // Validate OTP data
+    const otpData = {
+      phone: phoneInput.trim(),
+      otp_code: verificationCode.trim()
+    };
+    
+    const validation = OtpService.validateOtpData(otpData);
+    if (!validation.isValid) {
+      console.log('❌ PhoneAuthScreen - OTP validation failed:', validation.error);
+      setOtpError(validation.error || 'Invalid OTP code');
+      showToast('error', validation.error || 'Invalid OTP code');
       return;
     }
 
+    console.log('✅ PhoneAuthScreen - OTP validation passed');
+
     try {
-      // Verify the code without setting a role
-      const result = await dispatch(verifyCodeThunk(verificationCode.trim()));
+      const result = await verifyOtpCode(otpData);
+      console.log('📨 PhoneAuthScreen - Verify OTP result:', result.type);
       
-      // Show success toast
-      setShowSuccessToast(true);
-      
-      // Handle navigation based on user status
-      if (result.isExistingUser) {
-        // Existing user - navigate directly to dashboard
-        console.log('PhoneAuthScreen - Existing user verified, navigating to dashboard');
-        // The navigation will be handled by AuthFlow component based on auth state
+      if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ PhoneAuthScreen - Phone verified successfully');
+        // Show success toast
+        setShowSuccessToast(true);
+        showToast('success', 'Phone number verified successfully!');
+        
+        // Navigation will be handled by AuthFlow component based on auth state
+        console.log('PhoneAuthScreen - Phone verified successfully');
       } else {
-        // New user - navigate to role selection
-        console.log('PhoneAuthScreen - New user verified, navigating to role selection');
-        setTimeout(() => {
-          navigation.navigate('RoleSelection');
-        }, 2000);
+        const errorMessage = (result.payload as string) || 'Invalid verification code';
+        console.log('❌ PhoneAuthScreen - OTP verification failed:', errorMessage);
+        setOtpError(errorMessage);
+        showToast('error', errorMessage);
       }
       
     } catch (err: any) {
-      // Error is handled in the thunk
+      console.error('💥 PhoneAuthScreen - Error verifying code:', err);
+      const errorMessage = err.message || 'Failed to verify code';
+      setOtpError(errorMessage);
+      showToast('error', errorMessage);
     }
   };
 
   const handleResendCode = async () => {
+    console.log('📱 PhoneAuthScreen - Starting resend OTP process');
+    setIsResending(true);
+    
     try {
-      await dispatch(sendVerificationCodeThunk(phoneInput.trim()));
-      setCountdown(60);
-      setVerificationCode('');
+      const result = await sendOtpToPhone(phoneInput.trim());
+      console.log('📨 PhoneAuthScreen - Resend OTP result:', result.type);
+      
+      if (result.type.endsWith('/fulfilled')) {
+        console.log('✅ PhoneAuthScreen - OTP resent successfully');
+        console.log('🔢 PhoneAuthScreen - New OTP code:', (result.payload as any)?.otp_code);
+        
+        setCountdown(60);
+        setVerificationCode('');
+        setOtpSentAt(new Date());
+        setOtpExpiresIn(300); // 5 minutes expiration
+        setOtpError('');
+        setReceivedOtpCode((result.payload as any)?.otp_code || '');
+        showToast('success', 'Verification code sent again');
+      } else {
+        const errorMessage = (result.payload as string) || 'Failed to resend code';
+        console.log('❌ PhoneAuthScreen - Resend OTP failed:', errorMessage);
+        setOtpError(errorMessage);
+        showToast('error', errorMessage);
+      }
     } catch (err: any) {
-      // Error is handled in the thunk
+      console.error('💥 PhoneAuthScreen - Error resending code:', err);
+      const errorMessage = err.message || 'Failed to resend code';
+      setOtpError(errorMessage);
+      showToast('error', errorMessage);
+    } finally {
+      setIsResending(false);
     }
   };
 
   const handleBackToPhone = () => {
     setCurrentStep('phone');
     setVerificationCode('');
-    dispatch(clearError());
-    dispatch(setIdle());
+    setReceivedOtpCode('');
   };
 
   const renderPhoneStep = () => (
@@ -140,19 +210,29 @@ export default function PhoneAuthScreen() {
         <ThemedTextInput
           placeholder="Phone number (e.g., +923486716994)"
           value={phoneInput}
-          onChangeText={setPhoneInput}
+          onChangeText={(text) => {
+            setPhoneInput(text);
+            setPhoneError(''); // Clear error when user types
+          }}
           keyboardType="phone-pad"
           autoFocus
-          style={styles.input}
+          style={[styles.input, phoneError && styles.inputError]}
+          maxLength={15}
         />
+        {phoneError ? (
+          <View style={styles.errorContainer}>
+            <Icon name="error" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{phoneError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.buttonContainer}>
         <BrandButton
-          title={status === 'loading' ? 'Sending...' : 'Send Code'}
+          title={isLoading ? 'Sending...' : 'Send Code'}
           onPress={handleSendCode}
           variant="primary"
-          disabled={status === 'loading'}
+          disabled={isLoading || !phoneInput.trim()}
           style={styles.primaryButton}
           textStyle={styles.buttonText}
         />
@@ -173,41 +253,59 @@ export default function PhoneAuthScreen() {
         <Icon name="verified-user" size={48} color={BrandColors.primary} />
       </View>
       <Text style={styles.sectionTitle}>
-        {isExistingUser ? 'Welcome back!' : 'Enter verification code'}
+        Enter verification code
       </Text>
       <Text style={styles.sectionSubtitle}>
-        {isExistingUser 
-          ? `We sent a code to ${phoneNumber}. Enter it to sign in.`
-          : `We sent a code to ${phoneNumber}`
-        }
+        We sent a code to {phoneInput}. Enter it to verify your phone number.
       </Text>
-      {isExistingUser && userProfile && (
-        <Text style={styles.welcomeText}>
-          Welcome back, {userProfile.displayName || userProfile.fullName || 'User'}!
+      {receivedOtpCode ? (
+        <View style={styles.otpCodeContainer}>
+          <Text style={styles.otpCodeLabel}>Your OTP Code:</Text>
+          <Text style={styles.otpCodeValue}>{receivedOtpCode}</Text>
+          <BrandButton
+            title="Use This OTP"
+            onPress={() => {
+              setVerificationCode(receivedOtpCode);
+              showToast('success', 'OTP code filled in input field');
+            }}
+            variant="secondary"
+            style={styles.copyButton}
+            textStyle={styles.copyButtonText}
+          />
+        </View>
+      ) : (
+        <Text style={styles.testInfo}>
+          Test Code: 123456
         </Text>
       )}
-      <Text style={styles.testInfo}>
-        Test Code: 123456
-      </Text>
 
       <View style={styles.inputContainer}>
         <ThemedTextInput
           placeholder="6-digit code"
           value={verificationCode}
-          onChangeText={setVerificationCode}
+          onChangeText={(text) => {
+            setVerificationCode(text);
+            setOtpError(''); // Clear error when user types
+          }}
           keyboardType="number-pad"
           maxLength={6}
           autoFocus
-          style={styles.input}
+          style={[styles.input, otpError && styles.inputError]}
         />
+        {otpError ? (
+          <View style={styles.errorContainer}>
+            <Icon name="error" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{otpError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.buttonContainer}>
         <BrandButton
-          title={status === 'verifying' ? 'Verifying...' : (isExistingUser ? 'Sign In' : 'Verify Code')}
+          title={isLoading ? 'Verifying...' : 'Verify Code'}
           onPress={handleVerifyCode}
           variant="primary"
-          disabled={status === 'verifying'}
+          disabled={isLoading || !verificationCode.trim()}
           style={styles.primaryButton}
           textStyle={styles.buttonText}
         />
@@ -220,9 +318,10 @@ export default function PhoneAuthScreen() {
           </Text>
         ) : (
           <BrandButton
-            title="Resend Code"
+            title={isResending ? 'Resending...' : 'Resend Code'}
             onPress={handleResendCode}
             variant="secondary"
+            disabled={isResending}
             style={styles.resendButton}
             textStyle={styles.buttonText}
           />
@@ -256,7 +355,7 @@ export default function PhoneAuthScreen() {
         translucent={false}
       />
       <ImageBackground
-        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        source={require('../../assets/images/background_raahe_haq.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -272,7 +371,7 @@ export default function PhoneAuthScreen() {
           <View style={styles.logoContainer}>
             <View style={styles.logoWrapper}>
               <Image 
-                source={require('../../assets/images/Logo.png')} 
+                source={require('../../assets/images/logo.png')} 
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -309,10 +408,7 @@ export default function PhoneAuthScreen() {
       </ImageBackground>
 
       <Toast
-        message={isExistingUser 
-          ? "Welcome back! Redirecting to dashboard..." 
-          : "Phone number verified successfully! Redirecting to role selection..."
-        }
+        message="Phone number verified successfully! Redirecting..."
         type="success"
         visible={showSuccessToast}
         onHide={() => setShowSuccessToast(false)}
@@ -525,12 +621,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
+  otpCodeContainer: {
+    backgroundColor: '#f0f9ff',
+    borderColor: BrandColors.primary,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  otpCodeLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  otpCodeValue: {
+    fontSize: 24,
+    color: BrandColors.primary,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    fontFamily: 'monospace',
+  },
+  copyButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 36,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   inputContainer: {
     marginBottom: 16,
     width: '100%',
   },
   input: {
     marginBottom: 4,
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1,
   },
   buttonContainer: {
     width: '100%',

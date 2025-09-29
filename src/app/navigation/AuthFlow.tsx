@@ -3,24 +3,43 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import AuthStack from './stacks/AuthStack';
 import RootNavigation from './RootNavigation';
+import DriverPendingApprovalScreen from '../../screens/Driver/DriverPendingApprovalScreen';
 
 export default function AuthFlow() {
-  const { status, uid, phoneNumber, role, profileCompleted } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, user, profileCompleted } = useSelector((state: RootState) => state.apiAuth);
   
-  console.log('AuthFlow - Current state:', { status, uid, phoneNumber, role, profileCompleted });
-  console.log('AuthFlow - profileCompleted type:', typeof profileCompleted, 'value:', profileCompleted);
-  console.log('AuthFlow - role type:', typeof role, 'value:', role);
+  console.log('AuthFlow - Current state:', { isAuthenticated, user, profileCompleted });
 
-  // If authenticated, has a role, AND profile is completed, show main app
-  if (status === 'authenticated' && uid && role && profileCompleted) {
-    console.log('AuthFlow - User authenticated with role and completed profile, showing main app');
+  // Check if user is active and has a role
+  const isUserActive = user?.status === 'active';
+  const userRole = user?.role;
+  const isDriver = userRole === 'driver';
+  const isPassenger = userRole === 'passenger';
+
+  console.log('AuthFlow - User role check:', { 
+    role: userRole, 
+    isDriver, 
+    isPassenger, 
+    isUserActive 
+  });
+
+  // If authenticated, user is active, and has a role, show main app
+  if (isAuthenticated && user && isUserActive && userRole) {
+    console.log('AuthFlow - User authenticated and active with role, showing main app');
+    console.log('AuthFlow - User details:', user);
+    console.log('AuthFlow - User role:', userRole);
     return <RootNavigation />;
   }
 
-  // If authenticated but missing role OR profile not completed, show auth screens
-  if (status === 'authenticated' && uid && (!role || !profileCompleted)) {
-    console.log('AuthFlow - User authenticated but needs to complete setup, showing auth screens');
-    console.log('AuthFlow - Missing role:', !role, 'Missing profileCompleted:', !profileCompleted);
+  // If authenticated but user is not active (pending approval), show pending approval screen
+  if (isAuthenticated && user && !isUserActive) {
+    console.log('AuthFlow - User not active (pending approval), showing pending approval screen');
+    return <DriverPendingApprovalScreen />;
+  }
+
+  // If authenticated but missing role, show auth screens for role selection
+  if (isAuthenticated && user && isUserActive && !userRole) {
+    console.log('AuthFlow - User authenticated but missing role, showing auth screens');
     return <AuthStack />;
   }
 

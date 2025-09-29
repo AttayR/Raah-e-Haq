@@ -14,7 +14,10 @@ import {
   emailSignIn,
   resetPassword,
   createUserProfileWithDetails,
-  googleSignIn
+  createDriverProfileWithDetails,
+  googleSignIn,
+  getUserByEmail,
+  getUserByCnic,
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
 import { showToast } from '../../components/ToastProvider';
@@ -33,6 +36,7 @@ import {
   clearUserStatus,
   setProfileCompleted
 } from '../slices/authSlice';
+import authModule from '@react-native-firebase/auth';
 
 // Start authentication listener
 export const startAuthListener = () => (dispatch: AppDispatch, _getState: () => any) => {
@@ -299,13 +303,12 @@ export const checkAuthStatusThunk = () => async (dispatch: AppDispatch, getState
 // Refresh session
 export const refreshSessionThunk = () => async (dispatch: AppDispatch, getState: () => any) => {
   try {
-    const { auth } = getState();
-    if (auth.uid) {
-      const session = await refreshAuthSession({ uid: auth.uid } as any);
-      if (session) {
-        dispatch(setSession(session));
-        return session;
-      }
+    const currentUser = authModule().currentUser;
+    if (!currentUser) return null;
+    const session = await refreshAuthSession();
+    if (session) {
+      dispatch(setSession(session));
+      return session;
     }
   } catch (error: any) {
     console.error('Session refresh error:', error);
@@ -335,7 +338,8 @@ export const emailSignUpThunk = (
   email: string, 
   password: string, 
   role: 'driver' | 'passenger',
-  displayName?: string
+  displayName?: string,
+  phoneNumber?: string
 ) => async (dispatch: AppDispatch) => {
   try {
     console.log('emailSignUpThunk - Starting email signup...');
@@ -352,9 +356,24 @@ export const emailSignUpThunk = (
     if (password.length < 6) {
       throw new Error('Password must be at least 6 characters long');
     }
+
+    // Optional phone validations
+    if (phoneNumber && phoneNumber.trim().length > 0) {
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+      const phoneExists = await getUserByPhone(formattedPhone);
+      if (phoneExists) throw new Error('Phone number already exists');
+    }
+
+    // Uniqueness checks
+    const [emailExists] = await Promise.all([
+      getUserByEmail(email.trim()),
+    ]);
+    if (emailExists) {
+      throw new Error('An account with this email already exists');
+    }
     
     // Sign up with email and password
-    const result = await emailSignUp(email.trim(), password, role, displayName?.trim());
+    const result = await emailSignUp(email.trim(), password, role, displayName?.trim(), phoneNumber);
     const { user, userProfile, session } = result;
     
     // Set authenticated state
@@ -474,6 +493,7 @@ export const detailedRegistrationThunk = (
     driverPictureUri?: string;
     cnicPictureUri?: string;
     vehiclePictureUris?: string[];
+    phoneNumber?: string;
   }
 ) => async (dispatch: AppDispatch) => {
   try {
@@ -491,9 +511,23 @@ export const detailedRegistrationThunk = (
     if (password.length < 6) {
       throw new Error('Password must be at least 6 characters long');
     }
+
+    // Uniqueness checks: email + CNIC + optional phone
+    const checks: Array<Promise<any>> = [getUserByEmail(email.trim()), getUserByCnic(profileData.cnic.trim())];
+    if (profileData.phoneNumber && profileData.phoneNumber.trim().length > 0) {
+      const formattedPhone = profileData.phoneNumber.startsWith('+') ? profileData.phoneNumber : `+${profileData.phoneNumber}`;
+      checks.push(getUserByPhone(formattedPhone));
+    }
+    const results = await Promise.all(checks);
+    const emailExists = results[0];
+    const cnicExists = results[1];
+    const phoneExists = results[2];
+    if (emailExists) throw new Error('Email already exists');
+    if (cnicExists) throw new Error('CNIC already exists');
+    if (phoneExists) throw new Error('Phone number already exists');
     
     // Create user with email and password
-    const userCredential = await emailSignUp(email.trim(), password, role, profileData.fullName);
+    const userCredential = await emailSignUp(email.trim(), password, role, profileData.fullName, profileData.phoneNumber);
     const user = userCredential.user;
     
     // Create detailed profile with images
@@ -604,3 +638,64 @@ export const signUpThunk = (email: string, password: string, role: 'driver' | 'p
   async (dispatch: AppDispatch) => {
     return dispatch(emailSignUpThunk(email, password, role));
   };
+
+// Driver-specific registration thunk for phone authentication
+export const driverRegistrationThunk = (
+  phoneNumber: string,
+  profileData: {
+    fullName: string;
+    cnic: string;
+    address: string;
+    vehicleType: 'car' | 'bike' | 'van' | 'truck';
+    vehicleInfo: {
+      number: string;
+      brand: string;
+      model: string;
+      year?: string;
+      color?: string;
+    };
+    driverPictureUri?: string;
+    cnicPictureUri?: string;
+    vehiclePictureUris?: string[];
+  }
+) => async (dispatch: AppDispatch, getState: () => any) => {
+  try {
+    console.log('driverRegistrationThunk - Starting driver registration...');
+    dispatch(setAuthLoading());
+    
+    const { auth } = getState();
+    const { uid } = auth;
+    
+    if (!uid) {
+      throw new Error('User must be authenticated to complete driver registration');
+    }
+    
+    // Create driver profile with details
+    const userProfile = await createDriverProfileWithDetails(uid, phoneNumber, profileData);
+    
+    // Create session
+    const session = await createAuthSession({ uid } as any, userProfile);
+    
+    // Update auth state
+    dispatch(setAuthenticated({
+      uid: userProfile.uid,
+      phoneNumber: userProfile.phoneNumber,
+      role: userProfile.role,
+      userProfile,
+      session,
+      profileCompleted: true
+    }));
+    
+    dispatch(setSession(session));
+    
+    console.log('driverRegistrationThunk - Driver registration completed successfully');
+    showToast('success', 'Driver registration submitted for approval');
+    
+    return { userProfile, session };
+  } catch (error: any) {
+    console.error('driverRegistrationThunk - Error:', error);
+    dispatch(setAuthError(error.message || 'Driver registration failed'));
+    showToast('error', error.message || 'Driver registration failed');
+    throw error;
+  }
+};

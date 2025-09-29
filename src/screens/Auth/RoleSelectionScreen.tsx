@@ -10,6 +10,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
@@ -26,31 +27,59 @@ export default function RoleSelectionScreen() {
   const navigation = useNavigation<any>();
   const dispatch = useDispatch<any>();
   const [selectedRole, setSelectedRole] = useState<'driver' | 'passenger' | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Get current auth state for debugging
   const authState = useSelector((state: RootState) => state.auth);
 
   const handleRoleSelect = (role: 'driver' | 'passenger') => {
-    setSelectedRole(role);
+    try {
+      setSelectedRole(role);
+      console.log('Role selected:', role);
+    } catch (error) {
+      console.error('Error selecting role:', error);
+      showToast('error', 'Failed to select role. Please try again.');
+    }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selectedRole) {
       showToast('error', 'Please select a role to continue');
       return;
     }
 
-    console.log('RoleSelectionScreen - Selected role:', selectedRole);
-    console.log('RoleSelectionScreen - Current auth state:', authState);
-    console.log('RoleSelectionScreen - Dispatching setUserRole...');
+    if (isLoading) {
+      return; // Prevent multiple submissions
+    }
 
-    // Set the user role in the auth state
-    dispatch(setUserRole(selectedRole));
+    try {
+      setIsLoading(true);
+      
+      console.log('RoleSelectionScreen - Selected role:', selectedRole);
+      console.log('RoleSelectionScreen - Current auth state:', authState);
+      console.log('RoleSelectionScreen - Dispatching setUserRole...');
 
-    console.log('RoleSelectionScreen - Role set, navigating to BasicInfo...');
+      // Set the user role in the auth state
+      dispatch(setUserRole(selectedRole));
 
-    // Navigate to basic information screen with selected role
-    navigation.navigate('BasicInfo', { role: selectedRole });
+      console.log('RoleSelectionScreen - Role set, navigating based on role...');
+
+      // Navigate based on role
+      if (selectedRole === 'driver') {
+        // Navigate to driver-specific registration
+        navigation.navigate('DriverRegistration', { 
+          phoneNumber: authState.phoneNumber 
+        });
+      } else {
+        // Navigate to basic information screen for passengers
+        navigation.navigate('BasicInfo', { role: selectedRole });
+      }
+    } catch (error) {
+      console.error('Error continuing with role selection:', error);
+      showToast('error', 'Failed to continue. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -65,7 +94,7 @@ export default function RoleSelectionScreen() {
         translucent={false}
       />
       <ImageBackground
-        source={require('../../assets/images/BackgroundRaaheHaq.png')}
+        source={require('../../assets/images/background_raahe_haq.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -82,7 +111,7 @@ export default function RoleSelectionScreen() {
           <View style={styles.logoContainer}>
             <View style={styles.logoWrapper}>
               <Image 
-                source={require('../../assets/images/Logo.png')} 
+                source={require('../../assets/images/logo.png')} 
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -104,13 +133,19 @@ export default function RoleSelectionScreen() {
 
             {/* Role Selection Cards */}
             <View style={styles.roleContainer}>
+              <Text style={styles.selectionHint}>
+                Tap on a card below to select your role
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.roleCard,
                   selectedRole === 'passenger' ? styles.roleCardSelected : styles.roleCardUnselected
                 ]}
                 onPress={() => handleRoleSelect('passenger')}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Select Passenger role"
+                accessibilityHint="Tap to select passenger role for booking rides"
               >
                 <View style={styles.roleIconContainer}>
                   <Image
@@ -119,6 +154,12 @@ export default function RoleSelectionScreen() {
                     resizeMode="contain"
                   />
                 </View>
+                <Text style={[
+                  styles.roleTitle,
+                  selectedRole === 'passenger' ? styles.roleTitleSelected : styles.roleTitleUnselected
+                ]}>
+                  Passenger
+                </Text>
                 <Text style={[
                   styles.roleDescription,
                   selectedRole === 'passenger' ? styles.roleDescriptionSelected : styles.roleDescriptionUnselected
@@ -171,7 +212,10 @@ export default function RoleSelectionScreen() {
                   selectedRole === 'driver' ? styles.roleCardSelected : styles.roleCardUnselected
                 ]}
                 onPress={() => handleRoleSelect('driver')}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Select Driver role"
+                accessibilityHint="Tap to select driver role for providing rides"
               >
                 <View style={styles.roleIconContainer}>
                   <Image
@@ -180,6 +224,12 @@ export default function RoleSelectionScreen() {
                     resizeMode="contain"
                   />
                 </View>
+                <Text style={[
+                  styles.roleTitle,
+                  selectedRole === 'driver' ? styles.roleTitleSelected : styles.roleTitleUnselected
+                ]}>
+                  Driver
+                </Text>
                 <Text style={[
                   styles.roleDescription,
                   selectedRole === 'driver' ? styles.roleDescriptionSelected : styles.roleDescriptionUnselected
@@ -230,10 +280,10 @@ export default function RoleSelectionScreen() {
             {/* Action Buttons */}
             <View style={styles.buttonContainer}>
               <BrandButton
-                title="Continue"
+                title={isLoading ? "Processing..." : "Continue"}
                 onPress={handleContinue}
                 variant="primary"
-                disabled={!selectedRole}
+                disabled={!selectedRole || isLoading}
                 style={styles.continueButton}
               />
 
@@ -374,6 +424,13 @@ const styles = StyleSheet.create({
     gap: 20,
     marginBottom: 30,
   },
+  selectionHint: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
   roleCard: {
     padding: 24,
     borderRadius: 20,
@@ -382,21 +439,29 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    minHeight: 280,
+    justifyContent: 'center',
   },
   roleCardSelected: {
     backgroundColor: BrandColors.primary,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 4,
+    borderColor: '#ffffff',
+    transform: [{ scale: 1.02 }],
+    shadowColor: BrandColors.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   roleCardUnselected: {
     backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: '#e5e7eb',
+    transform: [{ scale: 1 }],
   },
   roleIconContainer: {
     width: 80,
@@ -411,13 +476,17 @@ const styles = StyleSheet.create({
     height: 72,
   },
   roleTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+    letterSpacing: 0.5,
   },
   roleTitleSelected: {
     color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   roleTitleUnselected: {
     color: '#1f2937',
@@ -469,16 +538,25 @@ const styles = StyleSheet.create({
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    backgroundColor: '#10b981',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     gap: 6,
+    shadowColor: '#10b981',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   selectedText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   buttonContainer: {
     gap: 16,

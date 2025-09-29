@@ -1,12 +1,11 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { createUserProfile, getUserProfile } from './auth';
 
 // Configure Google Sign-In
 export const configureGoogleSignIn = () => {
   GoogleSignin.configure({
-    webClientId: '19712791802-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // You need to get this from Firebase Console
+    webClientId: '611201086305-076gcaq4ab16gndcg0sth8ib4b35lpkc.apps.googleusercontent.com',
     offlineAccess: true,
     hostedDomain: '',
     forceCodeForRefreshToken: true,
@@ -20,7 +19,8 @@ export const signInWithGoogle = async () => {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     
     // Get the users ID token
-    const { idToken, user } = await GoogleSignin.signIn();
+    const signInResult = await GoogleSignin.signIn();
+    const idToken = signInResult.data?.idToken;
     
     // Create a Google credential with the token
     const googleCredential = GoogleAuthProvider.credential(idToken);
@@ -31,7 +31,6 @@ export const signInWithGoogle = async () => {
     return {
       success: true,
       user: result.user,
-      additionalUserInfo: result.additionalUserInfo,
     };
   } catch (error: any) {
     console.error('Google Sign-In Error:', error);
@@ -77,8 +76,8 @@ export const signOutFromGoogle = async () => {
 // Check if user is signed in with Google
 export const isSignedInWithGoogle = async () => {
   try {
-    const isSignedIn = await GoogleSignin.isSignedIn();
-    return isSignedIn;
+    const userInfo = await GoogleSignin.getCurrentUser();
+    return userInfo !== null;
   } catch (error) {
     console.error('Error checking Google sign-in status:', error);
     return false;
