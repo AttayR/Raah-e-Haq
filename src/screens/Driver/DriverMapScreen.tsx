@@ -11,7 +11,7 @@ import {
   StatusBar
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import Geolocation from 'react-native-geolocation-service';
+import Geolocation from '@react-native-community/geolocation';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -136,9 +136,7 @@ const DriverMapScreen = () => {
       { 
         enableHighAccuracy: true, 
         timeout: 15000, 
-        maximumAge: 10000,
-        showLocationDialog: true,
-        forceRequestLocation: true
+        maximumAge: 10000
       }
     );
   };
@@ -147,6 +145,12 @@ const DriverMapScreen = () => {
   useEffect(() => {
     const initializeLocation = async () => {
       try {
+        // Configure Geolocation service
+        Geolocation.setRNConfiguration({
+          skipPermissionRequests: false,
+          authorizationLevel: 'whenInUse',
+        });
+
         const hasPermission = await requestLocationPermission();
         if (hasPermission) {
           // Small delay to ensure permission is fully granted

@@ -36,7 +36,7 @@ export default function PhoneAuthScreen() {
   }, [isLoading, error, isOtpSent, isOtpVerified]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
-  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('+92');
   const [verificationCode, setVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
@@ -208,16 +208,34 @@ export default function PhoneAuthScreen() {
 
       <View style={styles.inputContainer}>
         <ThemedTextInput
-          placeholder="Phone number (e.g., +923486716994)"
+          placeholder="Enter phone number"
           value={phoneInput}
           onChangeText={(text) => {
-            setPhoneInput(text);
-            setPhoneError(''); // Clear error when user types
+            // Enforce +92 prefix and allow up to 10 digits after it
+            const digits = text.replace(/\D/g, '');
+            let next = text;
+            if (text.startsWith('+92')) {
+              // Keep only up to 10 digits after +92
+              const after = text.slice(3).replace(/\D/g, '').slice(0, 10);
+              next = `+92${after}`;
+            } else if (/^03\d{0,9}$/.test(digits)) {
+              // 03XXXXXXXXX -> +92XXXXXXXXXX (partial as user types)
+              const after = digits.slice(1, 11);
+              next = `+92${after}`;
+            } else if (/^92\d{0,10}$/.test(digits)) {
+              next = `+${digits.slice(0, 12)}`;
+            } else {
+              // Fallback: always ensure +92 prefix
+              const after = digits.replace(/^92/, '').replace(/^0/, '').slice(0, 10);
+              next = `+92${after}`;
+            }
+            setPhoneInput(next);
+            setPhoneError('');
           }}
           keyboardType="phone-pad"
           autoFocus
           style={[styles.input, phoneError && styles.inputError]}
-          maxLength={15}
+          maxLength={13}
         />
         {phoneError ? (
           <View style={styles.errorContainer}>

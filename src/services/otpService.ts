@@ -11,8 +11,15 @@ export class OtpService {
       console.log('📱 Target phone:', phone);
       console.log('⏰ Service timestamp:', new Date().toISOString());
       
+      // Normalize to Pakistani E.164 format +92XXXXXXXXXX
+      const normalized = this.normalizePakistanPhone(phone);
+      if (!normalized.success) {
+        console.log('❌ OTP Service - Phone normalization failed:', normalized.error);
+        return { success: false, error: normalized.error };
+      }
+
       // Validate phone number format
-      const validation = this.validatePhoneNumber(phone);
+      const validation = this.validatePhoneNumber(normalized.phone!);
       if (!validation.isValid) {
         console.log('❌ OTP Service - Phone validation failed:', validation.error);
         return { success: false, error: validation.error };
@@ -21,7 +28,7 @@ export class OtpService {
       console.log('✅ OTP Service - Phone validation passed');
       
       // Call API service
-      const response = await apiService.sendOtp(phone);
+      const response = await apiService.sendOtp(normalized.phone!);
       
       if (response.success && response.data) {
         console.log('✅ OTP Service - OTP sent successfully via API');
@@ -104,19 +111,11 @@ export class OtpService {
       return { isValid: false, error: 'Phone number is required' };
     }
 
-    // Remove all non-digit characters for validation
-    const cleanPhone = phone.replace(/\D/g, '');
-    
-    // Check if phone number has reasonable length (7-15 digits)
-    if (cleanPhone.length < 7 || cleanPhone.length > 15) {
-      return { isValid: false, error: 'Phone number must be between 7 and 15 digits' };
+    // Enforce Pakistani E.164: +92XXXXXXXXXX (10 digits after +92)
+    const pkRegex = /^\+92\d{10}$/;
+    if (!pkRegex.test(phone)) {
+      return { isValid: false, error: 'Phone must be in +92XXXXXXXXXX format' };
     }
-
-    // Check if phone starts with valid country code or local number
-    if (cleanPhone.length < 10) {
-      return { isValid: false, error: 'Phone number too short' };
-    }
-
     return { isValid: true };
   }
 
@@ -126,6 +125,11 @@ export class OtpService {
   static validateOtpData(otpData: VerifyOtpRequest): { isValid: boolean; error?: string } {
     if (!otpData.phone || otpData.phone.trim().length === 0) {
       return { isValid: false, error: 'Phone number is required' };
+    }
+
+    const phoneCheck = this.validatePhoneNumber(otpData.phone.trim());
+    if (!phoneCheck.isValid) {
+      return { isValid: false, error: phoneCheck.error };
     }
 
     if (!otpData.otp_code || otpData.otp_code.trim().length === 0) {
@@ -147,15 +151,15 @@ export class OtpService {
   static formatPhoneNumber(phone: string): string {
     const cleanPhone = phone.replace(/\D/g, '');
     
-    if (cleanPhone.length === 10) {
-      // Format as (XXX) XXX-XXXX
-      return `(${cleanPhone.slice(0, 3)}) ${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}`;
-    } else if (cleanPhone.length === 11 && cleanPhone.startsWith('1')) {
-      // Format as +1 (XXX) XXX-XXXX
-      return `+1 (${cleanPhone.slice(1, 4)}) ${cleanPhone.slice(4, 7)}-${cleanPhone.slice(7)}`;
+    // Prefer returning +92XXXXXXXXXX when possible
+    if (cleanPhone.startsWith('92') && cleanPhone.length === 12) {
+      return `+${cleanPhone}`;
     }
-    
-    return phone; // Return original if can't format
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('03')) {
+      // 03XXXXXXXXX -> +92XXXXXXXXXX
+      return `+92${cleanPhone.slice(1)}`;
+    }
+    return phone;
   }
 
   /**
@@ -182,6 +186,27 @@ export class OtpService {
     const expirationTime = new Date(sentAt.getTime() + (expiresIn * 1000));
     const remaining = Math.max(0, Math.floor((expirationTime.getTime() - now.getTime()) / 1000));
     return remaining;
+  }
+
+  /**
+   * Normalize various Pakistani inputs to +92XXXXXXXXXX
+   */
+  static normalizePakistanPhone(phone: string): { success: boolean; phone?: string; error?: string } {
+    if (!phone) return { success: false, error: 'Phone number is required' };
+    const trimmed = phone.trim();
+    // Already correct
+    if (/^\+92\d{10}$/.test(trimmed)) return { success: true, phone: trimmed };
+    // 03XXXXXXXXX -> +92XXXXXXXXXX
+    const onlyDigits = trimmed.replace(/\D/g, '');
+    if (/^03\d{9}$/.test(onlyDigits)) {
+      return { success: true, phone: `+92${onlyDigits.slice(1)}` };
+    }
+    // 92XXXXXXXXXX -> +92XXXXXXXXXX
+    if (/^92\d{10}$/.test(onlyDigits)) {
+      return { success: true, phone: `+${onlyDigits}` };
+    }
+    // Fallback: reject
+    return { success: false, error: 'Please enter phone as +92XXXXXXXXXX' };
   }
 }
 
