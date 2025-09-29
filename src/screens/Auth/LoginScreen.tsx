@@ -267,7 +267,7 @@ export default function LoginScreen() {
                   </Text>
                   <View style={styles.buttonContainer}>
                     <BrandButton
-                      title="Continue with Phone"
+                      title="Sign in with Phone"
                       onPress={handlePhoneSignIn}
                       variant="primary"
                       style={styles.primaryButton}
