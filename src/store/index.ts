@@ -7,12 +7,14 @@ import authReducer from './slices/authSlice';
 import apiAuthReducer from './slices/apiAuthSlice';
 import userReducer from './slices/userSlice';
 import tripReducer from './slices/tripSlice';
+import rideReducer from './slices/rideSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   apiAuth: apiAuthReducer,
   user: userReducer,
   trip: tripReducer,
+  ride: rideReducer,
 });
 
 const persistConfig = {

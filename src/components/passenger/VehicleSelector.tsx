@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BrandColors } from '../../theme/colors';
 
 type Vehicle = 'car' | 'bike' | 'van';
@@ -10,6 +11,9 @@ interface Props {
 }
 
 const VehicleSelector: React.FC<Props> = ({ value, onChange }) => {
+  const iconName = (v: Vehicle) => (v === 'car' ? 'directions-car' : v === 'bike' ? 'motorcycle' : 'airport-shuttle');
+  const label = (v: Vehicle) => (v === 'car' ? 'Car' : v === 'bike' ? 'Bike' : 'Van');
+
   return (
     <View style={styles.row}>
       {(['car','bike','van'] as const).map(v => (
@@ -18,8 +22,9 @@ const VehicleSelector: React.FC<Props> = ({ value, onChange }) => {
           style={[styles.chip, value === v && styles.activeChip]}
           onPress={() => onChange(v)}
         >
+          <Icon name={iconName(v)} size={20} color={value === v ? BrandColors.primary : '#374151'} />
           <Text style={[styles.chipText, value === v && styles.activeChipText]}>
-            {v.toUpperCase()}
+            {label(v)}
           </Text>
         </TouchableOpacity>
       ))}
@@ -41,6 +46,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     alignItems: 'center',
+    gap: 6,
     backgroundColor: 'white',
   },
   activeChip: {
