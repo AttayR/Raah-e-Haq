@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import LocationSearch from './LocationSearch';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -13,6 +13,7 @@ type Props = {
 };
 
 const StopsEditor: React.FC<Props> = ({ stops, onAddStop, onRemoveStop, maxStops = 5 }) => {
+  const [query, setQuery] = useState('');
   return (
     <View style={{ gap: 8 }}>
       {stops.map((s, idx) => (
@@ -28,9 +29,9 @@ const StopsEditor: React.FC<Props> = ({ stops, onAddStop, onRemoveStop, maxStops
         <View style={{ marginTop: 4 }}>
           <LocationSearch
             mode="destination"
-            query={''}
-            onChangeQuery={() => {}}
-            onSelect={(sel) => onAddStop(sel.coords)}
+            query={query}
+            onChangeQuery={setQuery}
+            onSelect={(sel) => { onAddStop(sel.coords); setQuery(''); }}
           />
         </View>
       )}

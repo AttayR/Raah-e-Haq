@@ -48,12 +48,12 @@ const DualLocationPicker: React.FC<Props> = ({
       <View style={styles.actions}>
         {onUseCurrentLocation && (
           <TouchableOpacity style={styles.actionBtn} onPress={onUseCurrentLocation}>
-            <Text style={styles.actionText}>Use current location</Text>
+            <Text style={styles.actionText}>📍 Use current location</Text>
           </TouchableOpacity>
         )}
         {onSwap && (
           <TouchableOpacity style={styles.swapBtn} onPress={onSwap}>
-            <Text style={styles.swapText}>Swap</Text>
+            <Text style={styles.swapText}>⇅ Swap</Text>
           </TouchableOpacity>
         )}
       </View>

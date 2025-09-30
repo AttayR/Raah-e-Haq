@@ -17,6 +17,7 @@ import RequestingCard from '../../components/passenger/RequestingCard';
 import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
 import { reverseGeocode } from '../../services/placesService';
 import StopsEditor from '../../components/passenger/StopsEditor';
+import StageChips from '../../components/passenger/StageChips';
 
 const PassengerMapScreen = () => {
   const mapRef = useRef<MapView>(null);
@@ -68,10 +69,10 @@ const PassengerMapScreen = () => {
       setStage('vehicle');
       return;
     }
-    if (addingStop && stops.length < 1) {
-      const newStops = [newStop];
-      setStops(newStops);
-      fetchRouteWithWaypoints(pickup, newStops, destination);
+    if (addingStop && stops.length < 5) {
+      const ns = [...stops, newStop];
+      setStops(ns);
+      fetchRouteWithWaypoints(pickup, ns, destination);
       setAddingStop(false);
       return;
     }
@@ -82,7 +83,7 @@ const PassengerMapScreen = () => {
     setAddingStop(false);
     clearRoute();
     setStage('destination');
-  }, [pickup, stops.length, destination, addingStop, fetchRouteWithWaypoints, clearRoute]);
+  }, [pickup, stops, destination, addingStop, fetchRouteWithWaypoints, clearRoute]);
 
   const centerOnUser = useCallback(() => {
     getCurrentLocation();
@@ -256,6 +257,7 @@ const PassengerMapScreen = () => {
       </View>
 
       <View style={styles.bottomPanel}>
+        <StageChips stage={stage} />
         {stage === 'home' && (
           <DualLocationPicker
             pickup={pickup}
@@ -375,6 +377,11 @@ const PassengerMapScreen = () => {
                   }}
                   maxStops={5}
                 />
+                {stops.length < 5 && (
+                  <TouchableOpacity onPress={() => setAddingStop(true)} style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9999 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '700' }}>+ Add via map</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>

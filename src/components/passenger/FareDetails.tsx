@@ -13,9 +13,9 @@ const FareDetails: React.FC<Props> = ({ vehicleName, distanceKm, estimate, break
   return (
     <View style={{ padding: 16 }}>
       <View style={{ alignItems: 'center', marginBottom: 16 }}>
-        <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Estimated Fare</Text>
+        <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>💰 Estimated Fare</Text>
         <Text style={{ fontSize: 28, fontWeight: '800', color: '#667eea' }}>{estimate}</Text>
-        <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{vehicleName} • {distanceKm}</Text>
+        <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>🚗 {vehicleName} • 📏 {distanceKm}</Text>
       </View>
       <View style={styles.box}>
         <Text style={styles.boxTitle}>Fare Breakdown</Text>
@@ -31,7 +31,7 @@ const FareDetails: React.FC<Props> = ({ vehicleName, distanceKm, estimate, break
         </View>
       </View>
       <TouchableOpacity style={styles.cta} onPress={onConfirm}>
-        <Text style={styles.ctaText}>Confirm & Request</Text>
+        <Text style={styles.ctaText}>🔔 Confirm & Request</Text>
       </TouchableOpacity>
     </View>
   );

@@ -40,7 +40,10 @@ const VehicleOptions: React.FC<Props> = ({ options, selectedId, onSelect }) => {
                 <Text style={styles.detail}>{opt.desc}</Text>
               </View>
             </View>
-            <Text style={styles.price}>{opt.price}</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.price}>{opt.price}</Text>
+              {selected && <Text style={{ color: '#10b981', fontWeight: '700', fontSize: 12 }}>Selected ✓</Text>}
+            </View>
           </TouchableOpacity>
         );
       })}
