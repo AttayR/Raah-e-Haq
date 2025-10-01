@@ -10,6 +10,7 @@ import {
   ScrollView,
   ImageBackground,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'src/assets/icons/index';
@@ -25,6 +26,9 @@ const PassengerSettingsScreen = () => {
   );
   const { logout } = useApiAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [rideUpdatesEnabled, setRideUpdatesEnabled] = useState(true);
+  const [promoEnabled, setPromoEnabled] = useState(false);
 
   // Debug logging
   console.log('PassengerSettingsScreen - User data:', user);
@@ -122,122 +126,106 @@ const PassengerSettingsScreen = () => {
           </View>
         </View>
 
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity style={styles.optionItem}>
+        {/* Account Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity style={styles.optionItem} onPress={() => navigation.navigate('Wallet')}>
             <View style={styles.optionInfo}>
-              <Icon
-                name="creditcard"
-                size={20}
-                color={BrandColors.primary}
-                type="antDesignIcon"
-              />
+              <Icon name="creditcard" size={20} color={BrandColors.primary} type="antDesignIcon" />
               <Text style={styles.optionText}>My Wallet</Text>
             </View>
-            <Icon
-              name="chevron-small-right"
-              size={20}
-              color="#9ca3af"
-              type={'entypoIcon'}
-            />
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
           </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.optionItem, styles.borderTop]}>
+          <TouchableOpacity style={[styles.optionItem, styles.borderTop]} onPress={() => navigation.navigate('RideHistory')}>
             <View style={styles.optionInfo}>
-              <Icon
-                name="clockcircleo"
-                size={20}
-                color={BrandColors.primary}
-                type="antDesignIcon"
-              />
-              <Text style={styles.optionText}>History</Text>
+              <Icon name="clockcircleo" size={20} color={BrandColors.primary} type="antDesignIcon" />
+              <Text style={styles.optionText}>Ride History</Text>
             </View>
-            <Icon
-              name="chevron-small-right"
-              size={20}
-              color="#9ca3af"
-              type={'entypoIcon'}
-            />
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.optionItem, styles.borderTop]}
-            onPress={() => navigation.navigate('PassengerPofile')}
-          >
+          <TouchableOpacity style={[styles.optionItem, styles.borderTop]} onPress={() => navigation.navigate('FavoriteLocations')}>
             <View style={styles.optionInfo}>
-              <Icon
-                name="user"
-                size={20}
-                color={BrandColors.primary}
-                type="antDesignIcon"
-              />
+              <Icon name="staro" size={20} color={BrandColors.primary} type="antDesignIcon" />
+              <Text style={styles.optionText}>Favorite Locations</Text>
+            </View>
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.optionItem, styles.borderTop]} onPress={() => navigation.navigate('PassengerNotifications')}>
+            <View style={styles.optionInfo}>
+              <Icon name="bells" size={20} color={BrandColors.primary} type="antDesignIcon" />
+              <Text style={styles.optionText}>Notifications</Text>
+            </View>
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.optionItem, styles.borderTop]} onPress={() => navigation.navigate('PassengerPofile')}>
+            <View style={styles.optionInfo}>
+              <Icon name="user" size={20} color={BrandColors.primary} type="antDesignIcon" />
               <Text style={styles.optionText}>Profile Settings</Text>
             </View>
-            <Icon
-              name="chevron-small-right"
-              size={25}
-              color="#9ca3af"
-              type={'entypoIcon'}
-            />
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
           </TouchableOpacity>
+        </View>
 
-          <TouchableOpacity style={[styles.optionItem, styles.borderTop]}>
+        {/* Preferences Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.optionItem}>
             <View style={styles.optionInfo}>
-              <Icon
-                name="filetext1"
-                size={20}
-                color={BrandColors.primary}
-                type="antDesignIcon"
-              />
-              <Text style={styles.optionText}>Subscription</Text>
+              <Icon name="notifications" size={20} color={BrandColors.primary} type={'materialIcon'} />
+              <Text style={styles.optionText}>Push Notifications</Text>
             </View>
-            <Icon
-              name="chevron-small-right"
-              size={25}
-              color="#9ca3af"
-              type={'entypoIcon'}
-            />
-          </TouchableOpacity>
+            <Switch value={pushEnabled} onValueChange={setPushEnabled} thumbColor={pushEnabled ? BrandColors.primary : '#f3f4f6'} trackColor={{ true: BrandColors.primary, false: '#d1d5db' }} />
+          </View>
+          <View style={[styles.optionItem, styles.borderTop]}>
+            <View style={styles.optionInfo}>
+              <Icon name="local-taxi" size={20} color={BrandColors.primary} type={'materialIcon'} />
+              <Text style={styles.optionText}>Ride Updates</Text>
+            </View>
+            <Switch value={rideUpdatesEnabled} onValueChange={setRideUpdatesEnabled} thumbColor={rideUpdatesEnabled ? BrandColors.primary : '#f3f4f6'} trackColor={{ true: BrandColors.primary, false: '#d1d5db' }} />
+          </View>
+          <View style={[styles.optionItem, styles.borderTop]}>
+            <View style={styles.optionInfo}>
+              <Icon name="local-offer" size={20} color={BrandColors.primary} type={'materialIcon'} />
+              <Text style={styles.optionText}>Promotional Alerts</Text>
+            </View>
+            <Switch value={promoEnabled} onValueChange={setPromoEnabled} thumbColor={promoEnabled ? BrandColors.primary : '#f3f4f6'} trackColor={{ true: BrandColors.primary, false: '#d1d5db' }} />
+          </View>
+        </View>
 
+        {/* Support Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          <TouchableOpacity style={styles.optionItem}>
+            <View style={styles.optionInfo}>
+              <Icon name="questioncircle" size={20} color={BrandColors.primary} type="antDesignIcon" />
+              <Text style={styles.optionText}>Help & Support</Text>
+            </View>
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.optionItem, styles.borderTop]}>
             <View style={styles.optionInfo}>
-              <Icon
-                name="adduser"
-                size={20}
-                color={BrandColors.primary}
-                type="antDesignIcon"
-              />
+              <Icon name="sharealt" size={20} color={BrandColors.primary} type="antDesignIcon" />
               <Text style={styles.optionText}>Invite Friends</Text>
             </View>
-            <Icon
-              name="chevron-small-right"
-              size={25}
-              color="#9ca3af"
-              type={'entypoIcon'}
-            />
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
           </TouchableOpacity>
+        </View>
 
+        {/* Danger Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Danger Zone</Text>
           <TouchableOpacity 
-            style={[styles.optionItem, styles.borderTop]}
+            style={styles.optionItem}
             onPress={handleLogout}
             disabled={isLoading}
           >
             <View style={styles.optionInfo}>
-              <Icon
-                name="logout"
-                size={20}
-                color="#ef4444"
-                type="antDesignIcon"
-              />
+              <Icon name="logout" size={20} color="#ef4444" type="antDesignIcon" />
               <Text style={[styles.optionText, styles.logoutText]}>
                 {isLoading ? 'Logging out...' : 'Logout'}
               </Text>
             </View>
-            <Icon
-              name="chevron-small-right"
-              size={25}
-              color="#9ca3af"
-              type={'entypoIcon'}
-            />
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
           </TouchableOpacity>
         </View>
 
@@ -384,19 +372,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#22c55e',
   },
-  optionsContainer: {
+  sectionCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     marginHorizontal: 20,
+    marginBottom: 16,
     paddingHorizontal: 20,
+    paddingTop: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6b7280',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   optionItem: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
+import { useNavigation } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -20,6 +21,7 @@ import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
 
 const PassengerMapScreen = () => {
+  const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
   const { currentLocation, isInitialized, initializationTimeout, getCurrentLocation } = useLocation();
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
@@ -35,6 +37,9 @@ const PassengerMapScreen = () => {
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
+  const [rideHistory, setRideHistory] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const swapPickupDrop = useCallback(() => {
     if (pickup && destination) {
       const newPickup = destination;
@@ -117,8 +122,74 @@ const PassengerMapScreen = () => {
     setStops([]);
     setDestination(null);
     setAddingStop(false);
+    setStage('home');
+    setSelectedVehicle(undefined);
+    setPickupQuery('');
+    setDestQuery('');
+    setError(null);
     clearRoute();
   }, [clearRoute]);
+
+  // Navigation functions
+  const goBack = useCallback(() => {
+    const stageOrder: Array<typeof stage> = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
+    const currentIndex = stageOrder.indexOf(stage);
+    if (currentIndex > 0) {
+      const prevStage = stageOrder[currentIndex - 1];
+      setStage(prevStage);
+      setError(null);
+    } else {
+      // Go back to home screen
+      navigation.goBack();
+    }
+  }, [stage, navigation]);
+
+  // Cancel ride functionality
+  const cancelRide = useCallback(() => {
+    Alert.alert(
+      'Cancel Ride',
+      'Are you sure you want to cancel this ride?',
+      [
+        { text: 'Keep Ride', style: 'cancel' },
+        { 
+          text: 'Cancel Ride', 
+          style: 'destructive',
+          onPress: () => {
+            // Add cancel ride logic here
+            resetSelection();
+          }
+        }
+      ]
+    );
+  }, [resetSelection]);
+
+  // Edit field functionality
+  const editField = useCallback((field: 'pickup' | 'destination' | 'vehicle') => {
+    switch (field) {
+      case 'pickup':
+        setStage('pickup');
+        break;
+      case 'destination':
+        setStage('destination');
+        break;
+      case 'vehicle':
+        setStage('vehicle');
+        break;
+    }
+  }, []);
+
+  // Save state to history
+  const saveToHistory = useCallback((action: string, data: any) => {
+    const historyEntry = {
+      id: Date.now(),
+      action,
+      data,
+      timestamp: new Date().toISOString(),
+      stage
+    };
+    setRideHistory(prev => [historyEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
+  }, [stage]);
+
 
   // optional stop flow not used in staged UI; keep data for future use
 
@@ -141,10 +212,16 @@ const PassengerMapScreen = () => {
 
   const onRequestRide = useCallback(async () => {
     if (!pickup || !destination || !fareInfo) {
-      Alert.alert('Select locations', 'Please select both pickup and destination.');
+      setError('Please select both pickup and destination.');
       return;
     }
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
+      saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle });
+      
       const rideId = await requestRide(
         pickup,
         destination,
@@ -152,11 +229,17 @@ const PassengerMapScreen = () => {
         (selectedVehicle as any) || vehicleType,
         'cash'
       );
+      
+      setStage('requesting');
       Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare}\n${fareInfo.distance} • ${fareInfo.duration}`);
     } catch (err) {
-      Alert.alert('Error', 'Failed to request ride. Please try again.');
+      console.error('Ride request error:', err);
+      setError('Failed to request ride. Please try again.');
+      setStage('fare'); // Go back to fare stage on error
+    } finally {
+      setIsLoading(false);
     }
-  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRide]);
+  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRide, saveToHistory]);
 
   // Auto-fit map to the route whenever it updates
   useEffect(() => {
@@ -254,9 +337,25 @@ const PassengerMapScreen = () => {
         <TouchableOpacity style={styles.iconButton} onPress={resetSelection}>
           <Icon name="refresh" size={22} color={BrandColors.primary} />
         </TouchableOpacity>
+        {stage !== 'home' && (
+          <TouchableOpacity style={styles.iconButton} onPress={goBack}>
+            <Icon name="arrow-back" size={22} color={BrandColors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.bottomPanel}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <View style={styles.errorContent}>
+              <Text style={styles.errorTitle}>Error</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setError(null)} style={styles.errorClose}>
+              <Icon name="close" size={16} color="#dc2626" />
+            </TouchableOpacity>
+          </View>
+        )}
         <StageChips stage={stage} />
         {stage === 'home' && (
           <DualLocationPicker
@@ -344,9 +443,17 @@ const PassengerMapScreen = () => {
               <Text style={{ fontSize: 12, color: '#666' }}>Trip Details</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontWeight: '700', color: '#2d3748' }}>Pickup → Destination</Text>
-                <TouchableOpacity onPress={swapPickupDrop} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'white', borderRadius: 8 }}>
-                  <Text style={{ color: BrandColors.primary, fontWeight: '700' }}>Swap</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity onPress={() => editField('pickup')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Edit Pickup</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => editField('destination')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Edit Dest</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={swapPickupDrop} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Swap</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance} • {fareInfo.duration}</Text>}
             </View>
@@ -388,22 +495,54 @@ const PassengerMapScreen = () => {
         )}
 
         {stage === 'fare' && fareInfo && (
-          <FareDetails
-            vehicleName={(selectedVehicle || vehicleType).toString()}
-            distanceKm={fareInfo.distance}
-            estimate={`Rs ${fareInfo.fare}`}
-            breakdown={[
-              { label: 'Base Fare', value: 'Rs 50' },
-              { label: `Distance (${fareInfo.distance} @ Rs 30/km)`, value: `Rs ${Math.max(0, fareInfo.fare - 50 - 16)}` },
-              { label: `Time (${fareInfo.duration} @ Rs 2/min)`, value: 'Rs 16' },
-              { label: 'Discount', value: 'Rs 0' },
-            ]}
-            onConfirm={() => { onRequestRide(); setStage('requesting'); }}
-          />
+          <View>
+            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Review & Confirm</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity onPress={() => editField('vehicle')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Change Vehicle</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                    <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance} • {fareInfo.duration}</Text>
+            </View>
+            <FareDetails
+              vehicleName={(selectedVehicle || vehicleType).toString()}
+              distanceKm={fareInfo.distance}
+              estimate={`Rs ${fareInfo.fare}`}
+              breakdown={[
+                { label: 'Base Fare', value: 'Rs 50' },
+                { label: `Distance (${fareInfo.distance} @ Rs 30/km)`, value: `Rs ${Math.max(0, fareInfo.fare - 50 - 16)}` },
+                { label: `Time (${fareInfo.duration} @ Rs 2/min)`, value: 'Rs 16' },
+                { label: 'Discount', value: 'Rs 0' },
+              ]}
+              onConfirm={() => { onRequestRide(); setStage('requesting'); }}
+            />
+          </View>
         )}
 
         {stage === 'requesting' && (
-          <RequestingCard />
+          <View>
+            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Requesting Ride...</Text>
+                <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                  <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel Request</Text>
+                </TouchableOpacity>
+              </View>
+              {isLoading && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Icon name="refresh" size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
+            <Text style={{ fontSize: 11, color: '#9CA3AF' }}>Please wait while we find a driver...</Text>
+          </View>
+        )}
+            </View>
+            <RequestingCard />
+          </View>
         )}
 
         {ride.activeRide && ride.activeRide.status === 'accepted' && (
@@ -567,6 +706,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  errorContainer: { backgroundColor: '#fee2e2', margin: 4, marginBottom: 8, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  errorContent: { flex: 1 },
+  errorTitle: { color: '#dc2626', fontWeight: '600', fontSize: 12 },
+  errorMessage: { color: '#dc2626', fontSize: 11, marginTop: 2 },
+  errorClose: { padding: 4 },
 });
 
 export default PassengerMapScreen;
