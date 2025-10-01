@@ -60,37 +60,40 @@ export const useLocation = () => {
   }, []);
 
   const getCurrentLocation = useCallback(() => {
+    console.log('getCurrentLocation called, hasFinePermission:', hasFinePermission, 'currentLocation:', currentLocation);
     try {
       Geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          console.log('Location obtained:', { latitude, longitude });
+          console.log('Location obtained successfully:', { latitude, longitude });
           setCurrentLocation({ latitude, longitude });
         },
         (error) => {
-          console.warn('Location error:', error);
+          console.warn('Location error details:', error);
+          console.log('Error code:', error.code, 'Error message:', error.message);
           
           // Don't retry indefinitely - limit retries
           if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
           
           // Only retry if we haven't gotten a location yet
           if (!currentLocation) {
+            console.log('Retrying location in 3 seconds...');
             retryTimerRef.current = setTimeout(() => {
               getCurrentLocation();
             }, 3000);
           }
         },
         {
-          enableHighAccuracy: hasFinePermission, // only request high accuracy if precise granted
-          timeout: 15000,
-          maximumAge: 30000, // Accept location up to 30 seconds old
+          enableHighAccuracy: false, // Use less accurate but faster location
+          timeout: 10000, // Reduced timeout
+          maximumAge: 60000, // Accept location up to 1 minute old
         }
       );
     } catch (e) {
       console.warn('Location service error:', e);
       // Fallback: set a default location if all else fails
       if (!currentLocation) {
-        console.log('Setting fallback location');
+        console.log('Setting fallback location to Karachi');
         setCurrentLocation({ latitude: 24.8607, longitude: 67.0011 }); // Karachi, Pakistan
       }
     }
@@ -98,6 +101,7 @@ export const useLocation = () => {
 
   useEffect(() => {
     const init = async () => {
+      console.log('Initializing location service...');
       try {
         // Configure Geolocation service
         Geolocation.setRNConfiguration({
@@ -106,12 +110,15 @@ export const useLocation = () => {
         });
 
         const hasPermission = await requestLocationPermission();
+        console.log('Location permission result:', hasPermission);
         if (hasPermission) {
+          console.log('Permission granted, getting location in 1 second...');
           setTimeout(() => {
             getCurrentLocation();
             setIsInitialized(true);
           }, 1000);
         } else {
+          console.log('Permission denied');
           Alert.alert(
             'Permission Required',
             'Location permission is required to use this feature. Please enable it in settings.'
@@ -126,6 +133,7 @@ export const useLocation = () => {
     };
 
     const timeout = setTimeout(() => {
+      console.log('Location initialization timeout after 10 seconds');
       setInitializationTimeout(true);
       setIsInitialized(true);
     }, 10000);

@@ -284,15 +284,15 @@ const PassengerProfile = () => {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Actions</Text>
           <View style={styles.actionsCard}>
-            <TouchableOpacity style={styles.actionItem}>
+            <TouchableOpacity style={styles.actionItem} onPress={() => (navigation as any).navigate('RideHistory')}>
               <View style={styles.actionInfo}>
                 <Icon
-                  name="questioncircle"
+                  name="clockcircleo"
                   size={20}
                   color={BrandColors.primary}
                   type={'antDesignIcon'}
                 />
-                <Text style={styles.actionText}>Help & Support</Text>
+                <Text style={styles.actionText}>Ride History</Text>
               </View>
               <Icon
                 name="right"
@@ -302,15 +302,15 @@ const PassengerProfile = () => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.actionItem, styles.borderTop]}>
+            <TouchableOpacity style={[styles.actionItem, styles.borderTop]} onPress={() => (navigation as any).navigate('FavoriteLocations')}>
               <View style={styles.actionInfo}>
                 <Icon
-                  name="sharealt"
+                  name="staro"
                   size={20}
                   color={BrandColors.primary}
                   type={'antDesignIcon'}
                 />
-                <Text style={styles.actionText}>Share App</Text>
+                <Text style={styles.actionText}>Favorite Locations</Text>
               </View>
               <Icon
                 name="right"
@@ -320,17 +320,15 @@ const PassengerProfile = () => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.actionItem, styles.borderTop]}>
+            <TouchableOpacity style={[styles.actionItem, styles.borderTop]} onPress={() => (navigation as any).navigate('Wallet')}>
               <View style={styles.actionInfo}>
                 <Icon
-                  name="delete"
+                  name="wallet"
                   size={20}
-                  color="#ef4444"
+                  color={BrandColors.primary}
                   type={'antDesignIcon'}
                 />
-                <Text style={[styles.actionText, styles.deleteText]}>
-                  Delete Account
-                </Text>
+                <Text style={styles.actionText}>Wallet</Text>
               </View>
               <Icon
                 name="right"
