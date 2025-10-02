@@ -1,7 +1,7 @@
 // Google Maps Configuration
 export const MAPS_CONFIG = {
   // Google Maps API Key
-  API_KEY: 'AIzaSyB9UdTqlABhdZsmv3oswAm9nfrbPF5NLsI',
+  API_KEY: 'AIzaSyBx-73GJ6HchOWC_zCTsg8uRUBuxKnOHUc',
   
   // Default map settings
   DEFAULT_REGION: {
@@ -21,7 +21,7 @@ export const MAPS_CONFIG = {
       },
       {
         elementType: 'labels.text.stroke',
-        stylers: [{ color: '#242f3e' }],
+        stylers: [{ color: '#242f3e' }],  
       },
       {
         elementType: 'labels.text.fill',

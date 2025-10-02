@@ -39,9 +39,12 @@ export const useDirections = () => {
 
   const fetchRoute = useCallback(async (pickup: Coordinates, destination: Coordinates) => {
     try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&key=${MAPS_CONFIG.API_KEY}`;
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
       const res = await fetch(url);
       const json = await res.json();
+      if (json.status !== 'OK') {
+        console.warn('Directions API status:', json.status, json.error_message);
+      }
       if (json.routes && json.routes[0] && json.routes[0].overview_polyline) {
         const points = decodePolyline(json.routes[0].overview_polyline.points);
         setRouteCoordinates(points);
@@ -55,7 +58,7 @@ export const useDirections = () => {
 
   const fetchRouteWithWaypoints = useCallback(async (pickup: Coordinates, waypoints: Coordinates[], destination: Coordinates) => {
     try {
-      let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&key=${MAPS_CONFIG.API_KEY}`;
+      let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
       
       if (waypoints.length > 0) {
         const waypointStr = waypoints.map(wp => `${wp.latitude},${wp.longitude}`).join('|');
@@ -64,6 +67,9 @@ export const useDirections = () => {
       
       const res = await fetch(url);
       const json = await res.json();
+      if (json.status !== 'OK') {
+        console.warn('Directions API status:', json.status, json.error_message);
+      }
       if (json.routes && json.routes[0] && json.routes[0].overview_polyline) {
         const points = decodePolyline(json.routes[0].overview_polyline.points);
         setRouteCoordinates(points);

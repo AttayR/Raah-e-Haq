@@ -1,26 +1,55 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
+import { useNavigation } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useLocation } from '../../hooks/useLocation';
 import { useDirections } from '../../hooks/useDirections';
 import { useFare } from '../../hooks/useFare';
-import VehicleSelector from '../../components/passenger/VehicleSelector';
-import { createRideRequest } from '../../services/rideService';
+import LocationSearch from '../../components/passenger/LocationSearch';
+import DualLocationPicker from '../../components/passenger/DualLocationPicker';
+import VehicleOptions, { VehicleOption } from '../../components/passenger/VehicleOptions';
+import FareDetails from '../../components/passenger/FareDetails';
+import AnimatedPolyline from '../../components/AnimatedPolyline';
+import { useRide } from '../../hooks/useRide';
+import RequestingCard from '../../components/passenger/RequestingCard';
+import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
+import { reverseGeocode } from '../../services/placesService';
+import StopsEditor from '../../components/passenger/StopsEditor';
+import StageChips from '../../components/passenger/StageChips';
 
 const PassengerMapScreen = () => {
+  const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
   const { currentLocation, isInitialized, initializationTimeout, getCurrentLocation } = useLocation();
-  const { routeCoordinates, fetchRouteWithWaypoints, clearRoute } = useDirections();
-  const { vehicleType, setVehicleType, getFare } = useFare();
+  const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
+  const { vehicleType, getFare } = useFare();
 
   const [pickup, setPickup] = useState<{ latitude: number; longitude: number } | null>(null);
   const [stops, setStops] = useState<{ latitude: number; longitude: number }[]>([]);
   const [destination, setDestination] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [isRequesting, setIsRequesting] = useState(false);
+  const [addingStop, setAddingStop] = useState(false);
+  const { ride, requestRide } = useRide();
   const [enableGeoUI, setEnableGeoUI] = useState(false);
+  const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
+  const [pickupQuery, setPickupQuery] = useState('');
+  const [destQuery, setDestQuery] = useState('');
+  const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
+  const [rideHistory, setRideHistory] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const swapPickupDrop = useCallback(() => {
+    if (pickup && destination) {
+      const newPickup = destination;
+      const newDest = pickup;
+      setPickup(newPickup);
+      setDestination(newDest);
+      clearRoute();
+      fetchRoute(newPickup, newDest);
+    }
+  }, [pickup, destination, fetchRoute, clearRoute]);
 
   const fareInfo = useMemo(() => {
     if (pickup && destination) {
@@ -34,30 +63,32 @@ const PassengerMapScreen = () => {
     const newStop = { latitude: coord.latitude, longitude: coord.longitude };
     
     if (!pickup) {
-      // First tap: set pickup
       setPickup(newStop);
       clearRoute();
-    } else if (stops.length < 6) {
-      // Add stops (up to 6)
-      const newStops = [...stops, newStop];
-      setStops(newStops);
-      
-      // Fetch route with all waypoints
-      if (destination) {
-        fetchRouteWithWaypoints(pickup, newStops, destination);
-      }
-    } else if (!destination) {
-      // Set destination after max stops reached
-      setDestination(newStop);
-      fetchRouteWithWaypoints(pickup, stops, newStop);
-    } else {
-      // Reset to start over
-      setPickup(newStop);
-      setStops([]);
-      setDestination(null);
-      clearRoute();
+      setStage('destination');
+      return;
     }
-  }, [pickup, stops, destination, fetchRouteWithWaypoints, clearRoute]);
+    if (!destination) {
+      setDestination(newStop);
+      fetchRouteWithWaypoints(pickup, [], newStop);
+      setStage('vehicle');
+      return;
+    }
+    if (addingStop && stops.length < 5) {
+      const ns = [...stops, newStop];
+      setStops(ns);
+      fetchRouteWithWaypoints(pickup, ns, destination);
+      setAddingStop(false);
+      return;
+    }
+    // If everything is set and user taps again, start fresh from new pickup
+    setPickup(newStop);
+    setStops([]);
+    setDestination(null);
+    setAddingStop(false);
+    clearRoute();
+    setStage('destination');
+  }, [pickup, stops, destination, addingStop, fetchRouteWithWaypoints, clearRoute]);
 
   const centerOnUser = useCallback(() => {
     getCurrentLocation();
@@ -90,51 +121,136 @@ const PassengerMapScreen = () => {
     setPickup(null);
     setStops([]);
     setDestination(null);
+    setAddingStop(false);
+    setStage('home');
+    setSelectedVehicle(undefined);
+    setPickupQuery('');
+    setDestQuery('');
+    setError(null);
     clearRoute();
   }, [clearRoute]);
 
-  const removeStop = useCallback((index: number) => {
-    const newStops = stops.filter((_, i) => i !== index);
-    setStops(newStops);
-    
-    // Re-fetch route if destination exists
-    if (destination) {
-      fetchRouteWithWaypoints(pickup!, newStops, destination);
+  // Navigation functions
+  const goBack = useCallback(() => {
+    const stageOrder: Array<typeof stage> = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
+    const currentIndex = stageOrder.indexOf(stage);
+    if (currentIndex > 0) {
+      const prevStage = stageOrder[currentIndex - 1];
+      setStage(prevStage);
+      setError(null);
+    } else {
+      // Go back to home screen
+      navigation.goBack();
     }
-  }, [stops, destination, pickup, fetchRouteWithWaypoints]);
+  }, [stage, navigation]);
 
-  const requestRide = useCallback(async () => {
+  // Cancel ride functionality
+  const cancelRide = useCallback(() => {
+    Alert.alert(
+      'Cancel Ride',
+      'Are you sure you want to cancel this ride?',
+      [
+        { text: 'Keep Ride', style: 'cancel' },
+        { 
+          text: 'Cancel Ride', 
+          style: 'destructive',
+          onPress: () => {
+            // Add cancel ride logic here
+            resetSelection();
+          }
+        }
+      ]
+    );
+  }, [resetSelection]);
+
+  // Edit field functionality
+  const editField = useCallback((field: 'pickup' | 'destination' | 'vehicle') => {
+    switch (field) {
+      case 'pickup':
+        setStage('pickup');
+        break;
+      case 'destination':
+        setStage('destination');
+        break;
+      case 'vehicle':
+        setStage('vehicle');
+        break;
+    }
+  }, []);
+
+  // Save state to history
+  const saveToHistory = useCallback((action: string, data: any) => {
+    const historyEntry = {
+      id: Date.now(),
+      action,
+      data,
+      timestamp: new Date().toISOString(),
+      stage
+    };
+    setRideHistory(prev => [historyEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
+  }, [stage]);
+
+
+  // optional stop flow not used in staged UI; keep data for future use
+
+  // Default: populate pickup with current location and resolve address when location becomes available
+  useEffect(() => {
+    (async () => {
+      if (!currentLocation) return;
+      if (pickup) return; // don't override if user already set it
+      const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
+      setPickup(cur);
+      try {
+        setPickupQuery('Resolving address…');
+        const addr = await reverseGeocode(cur.latitude, cur.longitude);
+        setPickupQuery(addr || 'Current Location');
+      } catch {
+        setPickupQuery('Current Location');
+      }
+    })();
+  }, [currentLocation, pickup]);
+
+  const onRequestRide = useCallback(async () => {
     if (!pickup || !destination || !fareInfo) {
-      Alert.alert('Select locations', 'Please select both pickup and destination.');
+      setError('Please select both pickup and destination.');
       return;
     }
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsRequesting(true);
-      // Mocked passenger until auth wiring; replace with real user from store
-      const rideId = await createRideRequest({
-        passengerId: 'mock-passenger',
-        passengerName: 'Passenger',
-        passengerPhone: '',
-        passengerRating: 5,
-        pickup: { ...pickup },
-        destination: { ...destination },
-        fare: fareInfo.fare,
-        distance: fareInfo.distance,
-        duration: fareInfo.duration,
-        status: 'pending',
-        vehicleInfo: { type: vehicleType, brand: '', model: '', color: '', plateNumber: '' },
-        paymentMethod: 'cash',
-      } as any);
-      Alert.alert('Ride Requested', `Your ride request has been created.
-Ride ID: ${rideId}
-Fare: PKR ${fareInfo.fare}
-${fareInfo.distance} • ${fareInfo.duration}`);
+      saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle });
+      
+      const rideId = await requestRide(
+        pickup,
+        destination,
+        { fare: fareInfo.fare, distance: fareInfo.distance, duration: fareInfo.duration },
+        (selectedVehicle as any) || vehicleType,
+        'cash'
+      );
+      
+      setStage('requesting');
+      Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare}\n${fareInfo.distance} • ${fareInfo.duration}`);
     } catch (err) {
-      Alert.alert('Error', 'Failed to request ride. Please try again.');
+      console.error('Ride request error:', err);
+      setError('Failed to request ride. Please try again.');
+      setStage('fare'); // Go back to fare stage on error
     } finally {
-      setIsRequesting(false);
+      setIsLoading(false);
     }
-  }, [pickup, destination, fareInfo, vehicleType]);
+  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRide, saveToHistory]);
+
+  // Auto-fit map to the route whenever it updates
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (routeCoordinates && routeCoordinates.length > 1) {
+      mapRef.current.fitToCoordinates(routeCoordinates as any, {
+        edgePadding: { top: 80, right: 40, bottom: 300, left: 40 },
+        animated: true,
+      });
+    }
+  }, [routeCoordinates]);
 
   if (!isInitialized) {
     return (
@@ -177,7 +293,6 @@ ${fareInfo.distance} • ${fareInfo.duration}`);
       <StatusBar barStyle="dark-content" backgroundColor="white" />
 
       <MapView
-        key={Platform.OS === 'android' ? (canShowUserLocation ? 'map-geo-on' : 'map-geo-off') : 'map'}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
@@ -211,7 +326,7 @@ ${fareInfo.distance} • ${fareInfo.duration}`);
           <Marker coordinate={destination} title={MAPS_CONFIG.MARKERS.destination.title} pinColor={MAPS_CONFIG.MARKERS.destination.color} />
         )}
         {routeCoordinates.length > 0 && (
-          <Polyline coordinates={routeCoordinates as any} strokeWidth={5} strokeColor={BrandColors.primary} />
+          <AnimatedPolyline coordinates={routeCoordinates as any} strokeWidth={5} strokeColor={BrandColors.primary} durationMs={1200} />
         )}
       </MapView>
 
@@ -222,51 +337,217 @@ ${fareInfo.distance} • ${fareInfo.duration}`);
         <TouchableOpacity style={styles.iconButton} onPress={resetSelection}>
           <Icon name="refresh" size={22} color={BrandColors.primary} />
         </TouchableOpacity>
+        {stage !== 'home' && (
+          <TouchableOpacity style={styles.iconButton} onPress={goBack}>
+            <Icon name="arrow-back" size={22} color={BrandColors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.bottomPanel}>
-        <View style={styles.selectionRow}>
-          <View style={styles.dotPickup} />
-          <Text style={styles.selectionText}>{pickup ? `Pickup: ${pickup.latitude.toFixed(4)}, ${pickup.longitude.toFixed(4)}` : 'Tap map to set pickup'}</Text>
-        </View>
-        
-        {stops.map((stop, index) => (
-          <View key={`stop-${index}`} style={styles.selectionRow}>
-            <View style={styles.dotStop} />
-            <Text style={styles.selectionText}>Stop {index + 1}: {stop.latitude.toFixed(4)}, {stop.longitude.toFixed(4)}</Text>
-            <TouchableOpacity onPress={() => removeStop(index)} style={styles.removeButton}>
-              <Icon name="close" size={16} color="#ef4444" />
+        {error && (
+          <View style={styles.errorContainer}>
+            <View style={styles.errorContent}>
+              <Text style={styles.errorTitle}>Error</Text>
+              <Text style={styles.errorMessage}>{error}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setError(null)} style={styles.errorClose}>
+              <Icon name="close" size={16} color="#dc2626" />
             </TouchableOpacity>
           </View>
-        ))}
-        
-        <View style={styles.selectionRow}>
-          <View style={styles.dotDestination} />
-          <Text style={styles.selectionText}>{destination ? `Destination: ${destination.latitude.toFixed(4)}, ${destination.longitude.toFixed(4)}` : 'Tap map to set destination'}</Text>
-        </View>
-        
-        {stops.length < 6 && !destination && (
-          <Text style={styles.instructionText}>Tap map to add stop {stops.length + 1} (max 6 stops)</Text>
+        )}
+        <StageChips stage={stage} />
+        {stage === 'home' && (
+          <DualLocationPicker
+            pickup={pickup}
+            destination={destination}
+            pickupQuery={pickupQuery}
+            destQuery={destQuery}
+            onPickupQuery={setPickupQuery}
+            onDestQuery={setDestQuery}
+            onSelectPickup={(c) => {
+              setPickup(c);
+              if (destination) {
+                fetchRoute(c, destination);
+                setStage('vehicle');
+              } else {
+                setStage('destination');
+              }
+            }}
+            onSelectDestination={(c) => {
+              setDestination(c);
+              if (pickup) {
+                fetchRoute(pickup, c);
+                setStage('vehicle');
+              } else {
+                setStage('pickup');
+              }
+            }}
+            onUseCurrentLocation={async () => {
+              if (currentLocation) {
+                const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
+                setPickup(cur);
+                try {
+                  setPickupQuery('Resolving address…');
+                  const addr = await reverseGeocode(cur.latitude, cur.longitude);
+                  setPickupQuery(addr || 'Current Location');
+                } catch {
+                  setPickupQuery('Current Location');
+                }
+                if (destination) {
+                  fetchRoute(cur, destination);
+                  setStage('vehicle');
+                }
+              }
+            }}
+            onSwap={() => {
+              if (pickup && destination) {
+                const p = pickup; const d = destination;
+                setPickup(d);
+                setDestination(p);
+                clearRoute();
+                fetchRoute(d, p);
+              }
+            }}
+          />
         )}
 
-        <View style={styles.divider} />
+        {stage === 'pickup' && (
+          <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup(s.coords); setStage('destination'); }} />
+        )}
 
-        <VehicleSelector value={vehicleType} onChange={setVehicleType} />
-
-        {fareInfo && (
-          <View style={styles.fareRow}>
-            <Text style={styles.fareAmount}>PKR {fareInfo.fare}</Text>
-            <Text style={styles.fareMeta}>{fareInfo.distance} • {fareInfo.duration}</Text>
+        {stage === 'destination' && (
+          <View>
+            <LocationSearch
+              mode="destination"
+              query={destQuery}
+              onChangeQuery={setDestQuery}
+              onSelect={(s) => {
+                if (!pickup && currentLocation) {
+                  setPickup({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
+                }
+                const nextPickup = pickup || (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined);
+                setDestination(s.coords);
+                if (nextPickup) {
+                  fetchRoute(nextPickup, s.coords);
+                }
+                setStage('vehicle');
+              }}
+            />
           </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.requestButton, (!pickup || !destination || isRequesting) && styles.requestButtonDisabled]}
-          disabled={!pickup || !destination || isRequesting}
-          onPress={requestRide}
-        >
-          <Text style={styles.requestButtonText}>{isRequesting ? 'Requesting…' : 'Request Ride'}</Text>
-        </TouchableOpacity>
+        {stage === 'vehicle' && (
+          <View>
+            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 0, borderRadius: 12, padding: 12 }}>
+              <Text style={{ fontSize: 12, color: '#666' }}>Trip Details</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontWeight: '700', color: '#2d3748' }}>Pickup → Destination</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity onPress={() => editField('pickup')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Edit Pickup</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => editField('destination')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Edit Dest</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={swapPickupDrop} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Swap</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance} • {fareInfo.duration}</Text>}
+            </View>
+            <VehicleOptions
+              options={[
+                { id: 'bike', name: 'Bike', eta: '5 min', desc: 'Affordable', price: `Rs ${Math.max(50, Math.round((fareInfo?.fare || 100) * 0.6))}`, icon: '🏍️' },
+                { id: 'economy', name: 'Economy', eta: '7 min', desc: 'Comfortable', price: `Rs ${fareInfo?.fare || 150}`, icon: '🚗' },
+                { id: 'comfort', name: 'Comfort', eta: '8 min', desc: 'AC • Premium', price: `Rs ${Math.round((fareInfo?.fare || 200) * 1.4)}`, icon: '🚙' },
+                { id: 'premium', name: 'Premium', eta: '10 min', desc: 'Luxury • AC', price: `Rs ${Math.round((fareInfo?.fare || 300) * 2)}`, icon: '🏎️' },
+              ] as VehicleOption[]}
+              selectedId={selectedVehicle}
+              onSelect={(id) => { setSelectedVehicle(id); setStage('fare'); }}
+            />
+            {pickup && destination && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ fontWeight: '700', color: '#111827', marginBottom: 6 }}>Add optional stops (up to 5)</Text>
+                <StopsEditor
+                  stops={stops}
+                  onAddStop={(c) => {
+                    const ns = [...stops, c].slice(0, 5);
+                    setStops(ns);
+                    fetchRouteWithWaypoints(pickup, ns, destination);
+                  }}
+                  onRemoveStop={(index) => {
+                    const ns = stops.filter((_, i) => i !== index);
+                    setStops(ns);
+                    fetchRouteWithWaypoints(pickup, ns, destination);
+                  }}
+                  maxStops={5}
+                />
+                {stops.length < 5 && (
+                  <TouchableOpacity onPress={() => setAddingStop(true)} style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9999 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '700' }}>+ Add via map</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {stage === 'fare' && fareInfo && (
+          <View>
+            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Review & Confirm</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity onPress={() => editField('vehicle')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
+                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Change Vehicle</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                    <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance} • {fareInfo.duration}</Text>
+            </View>
+            <FareDetails
+              vehicleName={(selectedVehicle || vehicleType).toString()}
+              distanceKm={fareInfo.distance}
+              estimate={`Rs ${fareInfo.fare}`}
+              breakdown={[
+                { label: 'Base Fare', value: 'Rs 50' },
+                { label: `Distance (${fareInfo.distance} @ Rs 30/km)`, value: `Rs ${Math.max(0, fareInfo.fare - 50 - 16)}` },
+                { label: `Time (${fareInfo.duration} @ Rs 2/min)`, value: 'Rs 16' },
+                { label: 'Discount', value: 'Rs 0' },
+              ]}
+              onConfirm={() => { onRequestRide(); setStage('requesting'); }}
+            />
+          </View>
+        )}
+
+        {stage === 'requesting' && (
+          <View>
+            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#666' }}>Requesting Ride...</Text>
+                <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                  <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel Request</Text>
+                </TouchableOpacity>
+              </View>
+              {isLoading && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Icon name="refresh" size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
+            <Text style={{ fontSize: 11, color: '#9CA3AF' }}>Please wait while we find a driver...</Text>
+          </View>
+        )}
+            </View>
+            <RequestingCard />
+          </View>
+        )}
+
+        {ride.activeRide && ride.activeRide.status === 'accepted' && (
+          <DriverAssignedCard name={ride.activeRide.driverName || 'Driver'} vehicle={ride.activeRide.vehicleType} eta={'5 min'} />
+        )}
       </View>
     </View>
   );
@@ -378,6 +659,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     marginVertical: 6,
   },
+  stopRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  stopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  stopButtonText: {
+    color: BrandColors.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
   fareRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -406,6 +706,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  errorContainer: { backgroundColor: '#fee2e2', margin: 4, marginBottom: 8, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  errorContent: { flex: 1 },
+  errorTitle: { color: '#dc2626', fontWeight: '600', fontSize: 12 },
+  errorMessage: { color: '#dc2626', fontSize: 11, marginTop: 2 },
+  errorClose: { padding: 4 },
 });
 
 export default PassengerMapScreen;
