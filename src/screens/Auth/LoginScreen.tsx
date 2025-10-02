@@ -515,8 +515,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoImage: {
-    width: 52,
-    height: 52,
+    width: 75,
+    height: 75,
   },
   title: {
     ...Typography.display,

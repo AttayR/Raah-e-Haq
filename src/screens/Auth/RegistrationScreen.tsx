@@ -465,8 +465,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoImage: {
-    width: 44,
-    height: 44,
+    width: 70,
+    height: 70,
   },
   title: {
     color: '#ffffff',
@@ -570,6 +570,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: BrandColors.primary,
+    color: BrandColors.secondary,
     gap: 8,
   },
   previousButtonText: {
