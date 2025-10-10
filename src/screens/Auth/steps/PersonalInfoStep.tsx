@@ -23,6 +23,10 @@ interface PersonalInfoData {
   cnic: string;
   address: string;
   phoneNumber: string;
+  emergencyContactNumber: string;
+  emergencyContactName: string;
+  emergencyRelationship: string;
+  preferredPayment: 'cash' | 'card' | 'wallet' | '';
   role: 'driver' | 'passenger';
 }
 
@@ -81,6 +85,11 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
     if (!cnic || !cnic.trim()) return 'CNIC is required';
     const cnicRegex = /^\d{5}-\d{7}-\d$/;
     if (!cnicRegex.test(cnic.trim())) return 'Please enter CNIC in format: 00000-0000000-0';
+    
+    // Additional validation for Pakistani CNIC
+    const cnicDigits = cnic.replace(/\D/g, '');
+    if (cnicDigits.length !== 13) return 'CNIC must have exactly 13 digits';
+    
     return undefined;
   };
 
@@ -437,6 +446,64 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
           )}
         </View>
       </View>
+
+      {/* Emergency Contact */}
+      <View style={styles.formCard}>
+        <Text style={styles.formTitle}>Emergency Contact Details</Text>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Emergency Contact Number *</Text>
+          <ThemedTextInput
+            placeholder="+92XXXXXXXXXX"
+            value={data.emergencyContactNumber || ''}
+            onChangeText={(value) => handleInputChange('emergencyContactNumber', value)}
+            keyboardType="phone-pad"
+            style={styles.input}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Emergency Contact Name *</Text>
+          <ThemedTextInput
+            placeholder="Full name of emergency contact"
+            value={data.emergencyContactName || ''}
+            onChangeText={(value) => handleInputChange('emergencyContactName', value)}
+            autoCapitalize="words"
+            style={styles.input}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Relationship *</Text>
+          <ThemedTextInput
+            placeholder="e.g., Father, Mother, Spouse, Friend"
+            value={data.emergencyRelationship || ''}
+            onChangeText={(value) => handleInputChange('emergencyRelationship', value)}
+            style={styles.input}
+          />
+        </View>
+      </View>
+
+      {/* Preferences */}
+      <View style={styles.formCard}>
+        <Text style={styles.formTitle}>Preferences</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Preferred Payment Method</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {(['cash','card','wallet'] as const).map((method) => (
+              <TouchableOpacity
+                key={method}
+                onPress={() => onDataChange({ preferredPayment: method })}
+                style={[styles.chip, data.preferredPayment === method && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, data.preferredPayment === method && styles.chipTextActive]}>
+                  {method.charAt(0).toUpperCase() + method.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -583,5 +650,25 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 12,
     flex: 1,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+  },
+  chipActive: {
+    backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
+  },
+  chipText: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  chipTextActive: {
+    color: '#ffffff',
   },
 });

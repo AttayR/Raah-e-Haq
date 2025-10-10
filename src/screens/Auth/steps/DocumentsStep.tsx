@@ -19,6 +19,11 @@ const isSmallScreen = screenWidth < 375;
 interface DocumentsData {
   driverPicture: string;
   cnicPicture: string;
+  licenseFrontPicture: string;
+  licenseBackPicture: string;
+  cnicFrontPicture: string; // For passengers
+  cnicBackPicture: string;  // For passengers
+  profilePicture: string;
   vehiclePictures: string[];
   role: 'driver' | 'passenger';
 }
@@ -42,27 +47,30 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
     );
   }
 
-  const openImagePicker = (type: 'driver' | 'cnic' | 'vehicle') => {
+  const openImagePicker = (type: 'driver' | 'cnic' | 'cnicFront' | 'cnicBack' | 'vehicle' | 'licenseFront' | 'licenseBack' | 'profile') => {
     const options = {
       mediaType: 'photo' as MediaType,
       quality: 0.8 as PhotoQuality,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      allowsEditing: true,
-      aspect: type === 'vehicle' ? [4, 3] : [1, 1],
+      maxWidth: 2000,
+      maxHeight: 2000,
+      selectionLimit: 1,
+      includeBase64: false,
     };
 
     setIsUploading(true);
     launchImageLibrary(options, (response: ImagePickerResponse) => {
       setIsUploading(false);
       
-      if (response.didCancel || response.errorMessage) {
-        console.log('Image picker cancelled or error:', response.errorMessage);
+      if (response.didCancel) {
+        console.log('Image picker cancelled');
         return;
       }
 
-      const imageUri = response.assets?.[0]?.uri;
+      // Some providers return an errorMessage but still include a valid asset
+      const asset = response.assets && response.assets[0];
+      const imageUri = asset?.uri;
       if (!imageUri) {
+        console.log('Image picker cancelled or error:', response.errorMessage);
         console.log('No image URI found in response:', response);
         Alert.alert('Error', 'Failed to get image. Please try again.');
         return;
@@ -70,9 +78,9 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
       
       console.log('Image picker response:', {
         imageUri,
-        fileName: response.assets?.[0]?.fileName,
-        fileSize: response.assets?.[0]?.fileSize,
-        type: response.assets?.[0]?.type
+        fileName: asset?.fileName,
+        fileSize: asset?.fileSize,
+        type: asset?.type
       });
 
       switch (type) {
@@ -83,6 +91,26 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         case 'cnic':
           onDataChange({ cnicPicture: imageUri });
           setValidationErrors(prev => ({ ...prev, cnicPicture: '' }));
+          break;
+        case 'licenseFront':
+          onDataChange({ licenseFrontPicture: imageUri });
+          setValidationErrors(prev => ({ ...prev, licenseFrontPicture: '' }));
+          break;
+        case 'licenseBack':
+          onDataChange({ licenseBackPicture: imageUri });
+          setValidationErrors(prev => ({ ...prev, licenseBackPicture: '' }));
+          break;
+        case 'cnicFront':
+          onDataChange({ cnicFrontPicture: imageUri });
+          setValidationErrors(prev => ({ ...prev, cnicFrontPicture: '' }));
+          break;
+        case 'cnicBack':
+          onDataChange({ cnicBackPicture: imageUri });
+          setValidationErrors(prev => ({ ...prev, cnicBackPicture: '' }));
+          break;
+        case 'profile':
+          onDataChange({ profilePicture: imageUri });
+          setValidationErrors(prev => ({ ...prev, profilePicture: '' }));
           break;
         case 'vehicle':
           const currentPictures = data.vehiclePictures || [];
@@ -111,6 +139,16 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
 
   const validateCnicPicture = (picture: string): string | undefined => {
     if (!picture || !picture.trim()) return 'CNIC picture is required';
+    return undefined;
+  };
+
+  const validateCnicFrontPicture = (picture: string): string | undefined => {
+    if (!picture || !picture.trim()) return 'CNIC front picture is required';
+    return undefined;
+  };
+
+  const validateCnicBackPicture = (picture: string): string | undefined => {
+    if (!picture || !picture.trim()) return 'CNIC back picture is required';
     return undefined;
   };
 
@@ -220,16 +258,64 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
 
   if (data.role === 'passenger') {
     return (
-      <View style={styles.container}>
-        <View style={styles.skipCard}>
-          <Icon name="check-circle" size={48} color="#10b981" />
-          <Text style={styles.skipTitle}>Document Upload Skipped</Text>
-          <Text style={styles.skipSubtitle}>
-            As a passenger, you don't need to upload documents. 
-            Your account will be verified through your phone number.
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>CNIC Verification</Text>
+          <Text style={styles.formSubtitle}>
+            Please upload a clear picture of your CNIC for verification
           </Text>
+
+          {/* Profile Picture (optional) */}
+          {renderImagePicker(
+            'Profile Image (optional)',
+            data.profilePicture,
+            () => openImagePicker('profile'),
+            validationErrors.profilePicture,
+            false
+          )}
+
+          {/* CNIC Front Picture for Passengers */}
+          {renderImagePicker(
+            'CNIC Front Picture',
+            data.cnicFrontPicture,
+            () => openImagePicker('cnicFront'),
+            validationErrors.cnicFrontPicture,
+            true
+          )}
+
+          {/* CNIC Back Picture for Passengers */}
+          {renderImagePicker(
+            'CNIC Back Picture',
+            data.cnicBackPicture,
+            () => openImagePicker('cnicBack'),
+            validationErrors.cnicBackPicture,
+            true
+          )}
         </View>
-      </View>
+
+        {/* Guidelines Card */}
+        <View style={styles.guidelinesCard}>
+          <Text style={styles.guidelinesTitle}>Photo Guidelines</Text>
+          <View style={styles.guidelinesList}>
+            <View style={styles.guidelineItem}>
+              <Icon name="check-circle" size={16} color="#10b981" />
+              <Text style={styles.guidelineText}>Use good lighting and clear focus</Text>
+            </View>
+            <View style={styles.guidelineItem}>
+              <Icon name="check-circle" size={16} color="#10b981" />
+              <Text style={styles.guidelineText}>Ensure all text is readable</Text>
+            </View>
+            <View style={styles.guidelineItem}>
+              <Icon name="check-circle" size={16} color="#10b981" />
+              <Text style={styles.guidelineText}>Avoid shadows and reflections</Text>
+            </View>
+            <View style={styles.guidelineItem}>
+              <Icon name="check-circle" size={16} color="#10b981" />
+              <Text style={styles.guidelineText}>Make sure CNIC is fully visible</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -256,6 +342,22 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           data.cnicPicture,
           () => openImagePicker('cnic'),
           validationErrors.cnicPicture,
+          true
+        )}
+
+        {/* License Front/Back */}
+        {renderImagePicker(
+          'License Front',
+          data.licenseFrontPicture,
+          () => openImagePicker('licenseFront'),
+          validationErrors.licenseFrontPicture,
+          true
+        )}
+        {renderImagePicker(
+          'License Back',
+          data.licenseBackPicture,
+          () => openImagePicker('licenseBack'),
+          validationErrors.licenseBackPicture,
           true
         )}
 
