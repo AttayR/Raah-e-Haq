@@ -12,18 +12,11 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { 
-  listenToRideRequests, 
-  acceptRideRequest, 
-  startRide, 
-  completeRide,
-  updateDriverLocation,
-  setDriverStatus,
-  RideRequest 
-} from '../../services/rideService';
+import { useRide } from '../../hooks/useRide';
 import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 
 const { width, height } = Dimensions.get('window');
 
@@ -48,6 +41,32 @@ const DriverMapScreen = () => {
     hasUid: !!uid 
   });
   
+  // Use driver notifications
+  const {
+    isInitialized: notificationsInitialized,
+    fcmToken,
+    hasPermission: hasNotificationPermission,
+    subscribeToDriverNotifications,
+    unsubscribeFromDriverNotifications,
+    sendRideAcceptedNotification,
+    sendDriverArrivedNotification,
+    sendRideStartedNotification,
+    sendRideCompletedNotification,
+  } = useDriverNotifications(uid || undefined);
+  
+  // Use comprehensive ride service
+  const {
+    currentRide,
+    rideHistory,
+    isLoading: rideLoading,
+    error: rideError,
+    acceptRide,
+    startRide,
+    completeRide,
+    updateDriverLocation,
+    refreshRideHistory,
+  } = useRide(uid ? parseInt(uid) : undefined, 'driver');
+  
   // Use native location hook
   const {
     currentLocation,
@@ -56,9 +75,6 @@ const DriverMapScreen = () => {
   } = useNativeLocation();
   
   const [isOnline, setIsOnline] = useState(false);
-  const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
-  const [incomingRide, setIncomingRide] = useState<RideRequest | null>(null);
-  const [rideHistory, setRideHistory] = useState<RideRequest[]>([]);
   const isLoadingLocation = locationLoading || !currentLocation;
 
   // Get current location
@@ -104,6 +120,31 @@ const DriverMapScreen = () => {
     }
   }, [isOnline, uid]);
 
+  // Subscribe to driver notifications when online
+  useEffect(() => {
+    if (isOnline && uid && notificationsInitialized) {
+      subscribeToDriverNotifications();
+      
+      return () => {
+        unsubscribeFromDriverNotifications();
+      };
+    }
+  }, [isOnline, uid, notificationsInitialized, subscribeToDriverNotifications, unsubscribeFromDriverNotifications]);
+
+  // Log FCM token for driver
+  useEffect(() => {
+    if (fcmToken) {
+      console.log('🚗 DriverMapScreen - FCM Token:', fcmToken);
+      console.log('🚗 DriverMapScreen - Driver ID:', uid);
+      console.log('🚗 DriverMapScreen - Token Status:', {
+        token: fcmToken,
+        driverId: uid,
+        isInitialized: notificationsInitialized,
+        hasPermission: hasNotificationPermission,
+      });
+    }
+  }, [fcmToken, uid, notificationsInitialized, hasNotificationPermission]);
+
   const toggleOnlineStatus = () => {
     if (!currentLocation) {
       Alert.alert(
@@ -123,14 +164,15 @@ const DriverMapScreen = () => {
     }
   };
 
-  const handleAcceptRide = async (rideId: string) => {
+  const handleAcceptRide = async (rideId: number) => {
     try {
-      await acceptRideRequest(rideId, uid!);
-      setActiveRide(incomingRide);
-      setIncomingRide(null);
+      console.log('Accepting ride:', rideId);
+      await acceptRide(rideId, uid ? parseInt(uid) : 0);
+      
+      Alert.alert('Ride Accepted', 'You have accepted the ride request');
     } catch (error) {
       console.error('Error accepting ride:', error);
-      Alert.alert('Error', 'Failed to accept ride request');
+      Alert.alert('Error', 'Failed to accept ride');
     }
   };
 
@@ -139,9 +181,9 @@ const DriverMapScreen = () => {
   };
 
   const handleStartRide = async () => {
-    if (activeRide && uid) {
+    if (currentRide) {
       try {
-        await startRide(activeRide.id, uid);
+        await startRide(currentRide.id);
         Alert.alert('Ride Started', 'You can now navigate to the passenger');
       } catch (error) {
         console.error('Error starting ride:', error);
@@ -151,11 +193,15 @@ const DriverMapScreen = () => {
   };
 
   const handleCompleteRide = async () => {
-    if (activeRide && uid) {
+    if (currentRide) {
       try {
-        await completeRide(activeRide.id, uid);
-        setActiveRide(null);
-        Alert.alert('Ride Completed', 'Thank you for the ride!');
+        // Calculate fare, distance, duration (mock values for now)
+        const fare = 150; // PKR
+        const distance = 5.2; // km
+        const duration = 15; // minutes
+        
+        await completeRide(currentRide.id, fare, distance, duration);
+        Alert.alert('Ride Completed', `Fare: PKR ${fare}`);
       } catch (error) {
         console.error('Error completing ride:', error);
         Alert.alert('Error', 'Failed to complete ride');
@@ -244,30 +290,30 @@ const DriverMapScreen = () => {
       </View>
 
       {/* Incoming Ride Request */}
-      {incomingRide && (
+      {currentRide && currentRide.status === 'requested' && (
         <View style={styles.rideRequestCard}>
           <View style={styles.rideRequestHeader}>
             <Text style={styles.rideRequestTitle}>New Ride Request</Text>
-            <TouchableOpacity onPress={handleRejectRide}>
+            <TouchableOpacity onPress={() => {/* TODO: Implement reject */}}>
               <Icon name="close" size={24} color={BrandColors.error} />
             </TouchableOpacity>
           </View>
           
           <View style={styles.rideRequestInfo}>
-            <Text style={styles.passengerName}>{incomingRide.passenger.name}</Text>
-            <Text style={styles.passengerPhone}>{incomingRide.passenger.phone}</Text>
-            <Text style={styles.passengerRating}>⭐ {incomingRide.passenger.rating}</Text>
+            <Text style={styles.passengerName}>{currentRide.passenger?.name || 'Passenger'}</Text>
+            <Text style={styles.passengerPhone}>{currentRide.passenger?.phone || 'N/A'}</Text>
+            <Text style={styles.passengerRating}>⭐ {currentRide.passenger?.rating || '5.0'}</Text>
           </View>
           
           <View style={styles.rideRequestDetails}>
-            <Text style={styles.fare}>₨ {incomingRide.fare}</Text>
-            <Text style={styles.distance}>{incomingRide.distance}</Text>
-            <Text style={styles.duration}>{incomingRide.duration}</Text>
+            <Text style={styles.fare}>₨ {currentRide.fare || '150'}</Text>
+            <Text style={styles.distance}>{currentRide.distance_km || '5.2'} km</Text>
+            <Text style={styles.duration}>{currentRide.duration_min || '15'} min</Text>
           </View>
           
           <TouchableOpacity 
             style={styles.acceptButton}
-            onPress={() => handleAcceptRide(incomingRide.id)}
+            onPress={() => handleAcceptRide(currentRide.id)}
           >
             <Text style={styles.acceptButtonText}>Accept Ride</Text>
           </TouchableOpacity>
@@ -275,25 +321,29 @@ const DriverMapScreen = () => {
       )}
 
       {/* Active Ride Controls */}
-      {activeRide && (
+      {currentRide && (currentRide.status === 'accepted' || currentRide.status === 'ongoing') && (
         <View style={styles.activeRideCard}>
           <Text style={styles.activeRideTitle}>Active Ride</Text>
-          <Text style={styles.activeRidePassenger}>{activeRide.passenger.name}</Text>
+          <Text style={styles.activeRidePassenger}>{currentRide.passenger?.name || 'Passenger'}</Text>
           
           <View style={styles.activeRideButtons}>
-            <TouchableOpacity 
-              style={styles.startButton}
-              onPress={handleStartRide}
-            >
-              <Text style={styles.startButtonText}>Start Ride</Text>
-            </TouchableOpacity>
+            {currentRide.status === 'accepted' && (
+              <TouchableOpacity 
+                style={styles.startButton}
+                onPress={handleStartRide}
+              >
+                <Text style={styles.startButtonText}>Start Ride</Text>
+              </TouchableOpacity>
+            )}
             
-            <TouchableOpacity 
-              style={styles.completeButton}
-              onPress={handleCompleteRide}
-            >
-              <Text style={styles.completeButtonText}>Complete Ride</Text>
-            </TouchableOpacity>
+            {currentRide.status === 'ongoing' && (
+              <TouchableOpacity 
+                style={styles.completeButton}
+                onPress={handleCompleteRide}
+              >
+                <Text style={styles.completeButtonText}>Complete Ride</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}

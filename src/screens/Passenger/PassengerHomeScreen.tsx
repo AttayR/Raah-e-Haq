@@ -17,6 +17,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { refreshSessionThunk } from '../../store/thunks/authThunks';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { reverseGeocode } from '../../services/placesService';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -43,6 +44,15 @@ export default function PassengerHomeScreen() {
     permissionStatus,
     requestLocationPermission,
   } = useNativeLocation();
+  
+  // Use passenger notifications
+  const {
+    isInitialized: notificationsInitialized,
+    fcmToken,
+    hasPermission: hasNotificationPermission,
+    subscribeToPassengerNotifications,
+    unsubscribeFromPassengerNotifications,
+  } = usePassengerNotifications(user?.id?.toString());
 
   useEffect(() => {
     // Animate on mount
@@ -66,6 +76,31 @@ export default function PassengerHomeScreen() {
 
     return () => clearInterval(timer);
   }, [fadeAnim, slideAnim]);
+
+  // Subscribe to passenger notifications
+  useEffect(() => {
+    if (notificationsInitialized && user?.id) {
+      subscribeToPassengerNotifications();
+      
+      return () => {
+        unsubscribeFromPassengerNotifications();
+      };
+    }
+  }, [notificationsInitialized, user?.id, subscribeToPassengerNotifications, unsubscribeFromPassengerNotifications]);
+
+  // Log FCM token for passenger
+  useEffect(() => {
+    if (fcmToken) {
+      console.log('👤 PassengerHomeScreen - FCM Token:', fcmToken);
+      console.log('👤 PassengerHomeScreen - Passenger ID:', user?.id);
+      console.log('👤 PassengerHomeScreen - Token Status:', {
+        token: fcmToken,
+        passengerId: user?.id,
+        isInitialized: notificationsInitialized,
+        hasPermission: hasNotificationPermission,
+      });
+    }
+  }, [fcmToken, user?.id, notificationsInitialized, hasNotificationPermission]);
 
   // Update address when location changes
   useEffect(() => {

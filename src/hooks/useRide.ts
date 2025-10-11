@@ -1,111 +1,361 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useAppDispatch, useAppSelector } from '../store';
-import { addBid, setActiveRide, setBids, setCurrentRequestId, setIsRequesting } from '../store/slices/rideSlice';
-import { createRideRequest, listenToActiveRide, RideRequest } from '../services/rideService';
-import { listenRideBids } from '../services/bidService';
+import { useState, useEffect, useCallback } from 'react';
+import rideService, { RideResource, RideRequest, DriverInRadius, DriverLocation } from '../services/rideService';
+import { usePassengerNotifications } from './usePassengerNotifications';
+import { useDriverNotifications } from './useDriverNotifications';
 
-type Coords = { latitude: number; longitude: number };
-
-export function useRide() {
-  const dispatch = useAppDispatch();
-  const ride = useAppSelector((s) => s.ride);
-  const auth = useAppSelector((s) => s.auth);
-  const bidsUnsubRef = useRef<null | (() => void)>(null);
-  const activeRideUnsubRef = useRef<null | (() => void)>(null);
-
-  useEffect(() => {
-    if (!auth.uid) return;
-    if (activeRideUnsubRef.current) activeRideUnsubRef.current();
-    activeRideUnsubRef.current = listenToActiveRide(auth.uid, (r) => {
-      if (!r) {
-        dispatch(setActiveRide(undefined));
-        return;
-      }
-      const summary = {
-        rideId: r.id!,
-        status: r.status,
-        pickup: r.pickup,
-        destination: r.destination,
-        fare: r.fare,
-        distance: r.distance,
-        duration: r.duration,
-        vehicleType: r.vehicleInfo?.type || 'car',
-        driverId: r.driverId,
-        driverName: r.driverName,
-      };
-      dispatch(setActiveRide(summary));
-    });
-    return () => {
-      if (activeRideUnsubRef.current) activeRideUnsubRef.current();
-    };
-  }, [auth.uid, dispatch]);
-
-  useEffect(() => {
-    if (bidsUnsubRef.current) {
-      bidsUnsubRef.current();
-      bidsUnsubRef.current = null;
-    }
-    if (ride.currentRequestId) {
-      bidsUnsubRef.current = listenRideBids(ride.currentRequestId, (bids) => {
-        dispatch(
-          setBids(
-            bids.map((b) => ({
-              id: b.id!,
-              rideId: b.rideId,
-              driverId: b.driverId,
-              driverName: b.driverName,
-              price: b.price,
-              createdAt: Date.now(),
-            }))
-          )
-        );
-      });
-    }
-    return () => {
-      if (bidsUnsubRef.current) bidsUnsubRef.current();
-    };
-  }, [ride.currentRequestId, dispatch]);
-
-  const requestRide = async (
-    pickup: Coords,
-    destination: Coords,
-    fareInfo: { fare: number; distance: string; duration: string },
-    vehicleType: string,
-    paymentMethod: 'cash' | 'card' | 'wallet' = 'cash'
-  ) => {
-    if (!auth.uid || !auth.userProfile) throw new Error('Not authenticated');
-    try {
-      dispatch(setIsRequesting(true));
-      const rideId = await createRideRequest({
-        passengerId: auth.uid,
-        passengerName: auth.userProfile.name || 'Passenger',
-        passengerPhone: auth.userProfile.phone || '',
-        passengerRating: auth.userProfile.rating || 5,
-        pickup: { ...pickup },
-        destination: { ...destination },
-        fare: fareInfo.fare,
-        distance: fareInfo.distance,
-        duration: fareInfo.duration,
-        status: 'pending',
-        vehicleInfo: { type: vehicleType, brand: '', model: '', color: '', plateNumber: '' },
-        paymentMethod,
-      } as unknown as RideRequest);
-      dispatch(setCurrentRequestId(rideId));
-      return rideId;
-    } finally {
-      dispatch(setIsRequesting(false));
-    }
-  };
-
-  const value = useMemo(
-    () => ({
-      ride,
-      requestRide,
-    }),
-    [ride]
-  );
-
-  return value;
+export interface RideState {
+  currentRide: RideResource | null;
+  rideHistory: RideResource[];
+  availableDrivers: DriverInRadius[];
+  isLoading: boolean;
+  error: string | null;
 }
 
+export interface RideActions {
+  requestRide: (rideData: RideRequest) => Promise<RideResource>;
+  acceptRide: (rideId: number, driverId: number) => Promise<RideResource>;
+  startRide: (rideId: number) => Promise<RideResource>;
+  completeRide: (rideId: number, fare?: number, distance?: number, duration?: number) => Promise<RideResource>;
+  cancelRide: (rideId: number) => Promise<RideResource>;
+  updateDriverLocation: (location: DriverLocation) => Promise<void>;
+  findNearbyDrivers: (latitude: number, longitude: number, radius?: number) => Promise<DriverInRadius[]>;
+  refreshRide: (rideId: number) => Promise<RideResource>;
+  refreshRideHistory: () => Promise<void>;
+  clearError: () => void;
+}
 
+export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
+  const [state, setState] = useState<RideState>({
+    currentRide: null,
+    rideHistory: [],
+    availableDrivers: [],
+    isLoading: false,
+    error: null,
+  });
+
+  // Use notifications based on user type
+  const passengerNotifications = usePassengerNotifications(userId?.toString());
+  const driverNotifications = useDriverNotifications(userId?.toString());
+
+  // Request a ride (Passenger)
+  const requestRide = useCallback(async (rideData: RideRequest): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      console.log('🚗 Requesting ride:', rideData);
+      const ride = await rideService.createRide(rideData);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: ride,
+        isLoading: false,
+      }));
+
+      // Find nearby drivers and send notifications
+      const drivers = await findNearbyDrivers(
+        rideData.pickup_latitude,
+        rideData.pickup_longitude,
+        5 // 5km radius
+      );
+
+      // Send notifications to nearby drivers
+      for (const driver of drivers) {
+        await passengerNotifications.sendRideRequestNotification(driver.id, {
+          rideId: ride.id,
+          passengerName: 'Passenger', // TODO: Get actual passenger name
+          pickup: {
+            latitude: rideData.pickup_latitude,
+            longitude: rideData.pickup_longitude,
+            address: rideData.pickup_address,
+          },
+          destination: {
+            latitude: rideData.dropoff_latitude,
+            longitude: rideData.dropoff_longitude,
+            address: rideData.dropoff_address,
+          },
+          fare: 0, // Will be calculated
+          distance: '0 km', // Will be calculated
+        });
+      }
+
+      console.log('✅ Ride requested successfully:', ride);
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to request ride:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to request ride',
+      }));
+      throw error;
+    }
+  }, [passengerNotifications]);
+
+  // Accept a ride (Driver)
+  const acceptRide = useCallback(async (rideId: number, driverId: number): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      console.log('✅ Accepting ride:', rideId, driverId);
+      const ride = await rideService.acceptRide(rideId, driverId);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: ride,
+        isLoading: false,
+      }));
+
+      // Send notification to passenger
+      await driverNotifications.sendRideAcceptedNotification(ride.passenger_id, {
+        rideId: ride.id,
+        driverName: 'Driver', // TODO: Get actual driver name
+        driverPhone: 'N/A', // TODO: Get actual driver phone
+        estimatedArrival: '5 minutes',
+      });
+
+      console.log('✅ Ride accepted successfully:', ride);
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to accept ride:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to accept ride',
+      }));
+      throw error;
+    }
+  }, [driverNotifications]);
+
+  // Start a ride (Driver)
+  const startRide = useCallback(async (rideId: number): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      console.log('🚀 Starting ride:', rideId);
+      const ride = await rideService.startRide(rideId);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: ride,
+        isLoading: false,
+      }));
+
+      // Send notification to passenger
+      await driverNotifications.sendRideStartedNotification(ride.passenger_id, {
+        rideId: ride.id,
+        driverName: 'Driver', // TODO: Get actual driver name
+        destination: ride.dropoff_address,
+        estimatedDuration: '15 minutes',
+      });
+
+      console.log('✅ Ride started successfully:', ride);
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to start ride:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to start ride',
+      }));
+      throw error;
+    }
+  }, [driverNotifications]);
+
+  // Complete a ride (Driver)
+  const completeRide = useCallback(async (
+    rideId: number,
+    fare?: number,
+    distance?: number,
+    duration?: number
+  ): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      console.log('🏁 Completing ride:', rideId, { fare, distance, duration });
+      const ride = await rideService.completeRide(rideId, fare, distance, duration);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: null,
+        rideHistory: [ride, ...prev.rideHistory],
+        isLoading: false,
+      }));
+
+      // Send notification to passenger
+      await driverNotifications.sendRideCompletedNotification(ride.passenger_id, {
+        rideId: ride.id,
+        driverName: 'Driver', // TODO: Get actual driver name
+        fare: fare || 0,
+        duration: `${duration || 0} minutes`,
+        distance: `${distance || 0} km`,
+      });
+
+      console.log('✅ Ride completed successfully:', ride);
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to complete ride:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to complete ride',
+      }));
+      throw error;
+    }
+  }, [driverNotifications]);
+
+  // Cancel a ride
+  const cancelRide = useCallback(async (rideId: number): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      console.log('❌ Cancelling ride:', rideId);
+      const ride = await rideService.cancelRide(rideId);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: null,
+        rideHistory: [ride, ...prev.rideHistory],
+        isLoading: false,
+      }));
+
+      console.log('✅ Ride cancelled successfully:', ride);
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to cancel ride:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to cancel ride',
+      }));
+      throw error;
+    }
+  }, []);
+
+  // Update driver location
+  const updateDriverLocation = useCallback(async (location: DriverLocation): Promise<void> => {
+    try {
+      console.log('📍 Updating driver location:', location);
+      await rideService.updateDriverLocation(location);
+      console.log('✅ Driver location updated successfully');
+    } catch (error) {
+      console.error('❌ Failed to update driver location:', error);
+      throw error;
+    }
+  }, []);
+
+  // Find nearby drivers
+  const findNearbyDrivers = useCallback(async (
+    latitude: number,
+    longitude: number,
+    radius: number = 5
+  ): Promise<DriverInRadius[]> => {
+    try {
+      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius });
+      const drivers = await rideService.getDriversInRadius(latitude, longitude, radius);
+      
+      setState(prev => ({
+        ...prev,
+        availableDrivers: drivers,
+      }));
+
+      console.log('✅ Nearby drivers found:', drivers);
+      return drivers;
+    } catch (error) {
+      console.error('❌ Failed to find nearby drivers:', error);
+      throw error;
+    }
+  }, []);
+
+  // Refresh current ride
+  const refreshRide = useCallback(async (rideId: number): Promise<RideResource> => {
+    try {
+      console.log('🔄 Refreshing ride:', rideId);
+      const ride = await rideService.getRide(rideId);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: ride,
+      }));
+
+      console.log('✅ Ride refreshed successfully:', ride);
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to refresh ride:', error);
+      throw error;
+    }
+  }, []);
+
+  // Refresh ride history
+  const refreshRideHistory = useCallback(async (): Promise<void> => {
+    if (!userId) return;
+    
+    try {
+      console.log('📋 Refreshing ride history:', userId, userType);
+      let rides: RideResource[];
+      
+      if (userType === 'passenger') {
+        rides = await rideService.getPassengerRides(userId);
+      } else if (userType === 'driver') {
+        rides = await rideService.getDriverRides(userId);
+      } else {
+        return;
+      }
+      
+      setState(prev => ({
+        ...prev,
+        rideHistory: rides,
+      }));
+
+      console.log('✅ Ride history refreshed successfully:', rides);
+    } catch (error) {
+      console.error('❌ Failed to refresh ride history:', error);
+    }
+  }, [userId, userType]);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+  // Auto-refresh current ride if it exists
+  useEffect(() => {
+    if (!state.currentRide) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await refreshRide(state.currentRide!.id);
+      } catch (error) {
+        console.warn('Failed to auto-refresh ride:', error);
+      }
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [state.currentRide, refreshRide]);
+
+  // Load ride history on mount
+  useEffect(() => {
+    if (userId && userType) {
+      refreshRideHistory();
+    }
+  }, [userId, userType, refreshRideHistory]);
+
+  const actions: RideActions = {
+    requestRide,
+    acceptRide,
+    startRide,
+    completeRide,
+    cancelRide,
+    updateDriverLocation,
+    findNearbyDrivers,
+    refreshRide,
+    refreshRideHistory,
+    clearError,
+  };
+
+  return {
+    ...state,
+    ...actions,
+  };
+};
+
+export default useRide;

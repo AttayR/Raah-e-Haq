@@ -2,18 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
 import { useFare } from '../../hooks/useFare';
+import { useRide } from '../../hooks/useRide';
 import LocationSearch from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
 import VehicleOptions, { VehicleOption } from '../../components/passenger/VehicleOptions';
 import FareDetails from '../../components/passenger/FareDetails';
 import AnimatedPolyline from '../../components/AnimatedPolyline';
-import { useRide } from '../../hooks/useRide';
 import RequestingCard from '../../components/passenger/RequestingCard';
 import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
 import { reverseGeocode } from '../../services/placesService';
@@ -28,6 +30,30 @@ const PassengerMapScreen = () => {
     isLoading: locationLoading,
     requestLocationPermission,
   } = useNativeLocation();
+  
+  // Use passenger notifications
+  const {
+    isInitialized: notificationsInitialized,
+    fcmToken,
+    hasPermission: hasNotificationPermission,
+    subscribeToPassengerNotifications,
+    unsubscribeFromPassengerNotifications,
+    sendRideRequestNotification,
+  } = usePassengerNotifications('passenger_id'); // TODO: Get actual passenger ID from auth
+  // Use comprehensive ride service
+  const rideHook = useRide(11, 'passenger'); // TODO: Get actual passenger ID from auth
+  const {
+    currentRide,
+    rideHistory,
+    availableDrivers,
+    isLoading: rideLoading,
+    error: rideError,
+    requestRide: requestRideService,
+    cancelRide: cancelRideService,
+    findNearbyDrivers,
+    refreshRide,
+  } = rideHook || {};
+  
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
   const { vehicleType, getFare } = useFare();
 
@@ -35,14 +61,13 @@ const PassengerMapScreen = () => {
   const [stops, setStops] = useState<{ latitude: number; longitude: number }[]>([]);
   const [destination, setDestination] = useState<{ latitude: number; longitude: number } | null>(null);
   const [addingStop, setAddingStop] = useState(false);
-  const { ride, requestRide } = useRide();
   const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
   const [_rideHistory, setRideHistory] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const swapPickupDrop = useCallback(() => {
     if (pickup && destination) {
       const newPickup = destination;
@@ -54,11 +79,32 @@ const PassengerMapScreen = () => {
     }
   }, [pickup, destination, fetchRoute, clearRoute]);
 
-  const fareInfo = useMemo(() => {
-    if (pickup && destination) {
-      return getFare(pickup, destination);
-    }
-    return null;
+  const [fareInfo, setFareInfo] = useState<{ fare: number; distance: number; duration: number } | null>(null);
+
+  // Calculate fare when pickup and destination change
+  useEffect(() => {
+    const calculateFare = async () => {
+      if (pickup && destination) {
+        try {
+          console.log('💰 Calculating fare in PassengerMapScreen:', { pickup, destination });
+          const result = await getFare(pickup, destination);
+          console.log('✅ Fare calculated in PassengerMapScreen:', result);
+          setFareInfo(result);
+        } catch (error) {
+          console.error('❌ Error calculating fare in PassengerMapScreen:', error);
+          // Set fallback fare info
+          setFareInfo({
+            fare: 150,
+            distance: 5.0,
+            duration: 10
+          });
+        }
+      } else {
+        setFareInfo(null);
+      }
+    };
+
+    calculateFare();
   }, [pickup, destination, getFare]);
 
   const onPressMap = useCallback((e: MapPressEvent) => {
@@ -118,6 +164,59 @@ const PassengerMapScreen = () => {
     }
   }, [currentLocation]);
 
+  const handleRequestRide = async () => {
+    if (!pickup || !destination) {
+      Alert.alert('Error', 'Please select pickup and destination');
+      return;
+    }
+
+    if (!requestRideService) {
+      console.warn('requestRideService not available');
+      Alert.alert('Error', 'Ride service not available');
+      return;
+    }
+
+    // Check authentication
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Authentication Required', 'Please login to request a ride');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+    }
+
+    try {
+      console.log('Requesting ride:', { pickup, destination, vehicleType });
+      
+      const rideData = {
+        passenger_id: 11, // TODO: Get actual passenger ID from auth
+        pickup_address: 'Pickup Location', // TODO: Get actual address
+        dropoff_address: 'Destination Location', // TODO: Get actual address
+        pickup_latitude: pickup.latitude,
+        pickup_longitude: pickup.longitude,
+        dropoff_latitude: destination.latitude,
+        dropoff_longitude: destination.longitude,
+        vehicle_type: vehicleType,
+      };
+
+      await requestRideService(rideData);
+      Alert.alert('Ride Requested', 'Looking for nearby drivers...');
+    } catch (error) {
+      console.error('Error requesting ride:', error);
+      
+      // Show more specific error message
+      let errorMessage = 'Failed to request ride';
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Ride Request Failed', errorMessage);
+      setError(errorMessage);
+    }
+  };
+
   const resetSelection = useCallback(() => {
     setPickup(null);
     setStops([]);
@@ -146,7 +245,7 @@ const PassengerMapScreen = () => {
   }, [stage, navigation]);
 
   // Cancel ride functionality
-  const cancelRide = useCallback(() => {
+  const handleCancelRide = useCallback(() => {
     Alert.alert(
       'Cancel Ride',
       'Are you sure you want to cancel this ride?',
@@ -155,14 +254,24 @@ const PassengerMapScreen = () => {
         { 
           text: 'Cancel Ride', 
           style: 'destructive',
-          onPress: () => {
-            // Add cancel ride logic here
-            resetSelection();
+          onPress: async () => {
+            if (currentRide && cancelRideService) {
+              try {
+                await cancelRideService(currentRide.id);
+                Alert.alert('Ride Cancelled', 'Your ride has been cancelled.');
+                resetSelection();
+              } catch (error) {
+                console.error('Error cancelling ride:', error);
+                Alert.alert('Error', 'Failed to cancel ride.');
+              }
+            } else {
+              resetSelection();
+            }
           }
         }
       ]
     );
-  }, [resetSelection]);
+  }, [currentRide, cancelRideService, resetSelection]);
 
   // Edit field functionality
   const editField = useCallback((field: 'pickup' | 'destination' | 'vehicle') => {
@@ -223,16 +332,21 @@ const PassengerMapScreen = () => {
     try {
       saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle });
       
-      const rideId = await requestRide(
-        pickup,
-        destination,
-        { fare: fareInfo.fare, distance: fareInfo.distance, duration: fareInfo.duration },
-        (selectedVehicle as any) || vehicleType,
-        'cash'
-      );
+      const ride = await requestRideService({
+        passenger_id: 11, // TODO: Get actual passenger ID from auth
+        pickup_address: 'Pickup Location', // TODO: Get actual address
+        dropoff_address: 'Destination Location', // TODO: Get actual address
+        pickup_latitude: pickup.latitude,
+        pickup_longitude: pickup.longitude,
+        dropoff_latitude: destination.latitude,
+        dropoff_longitude: destination.longitude,
+        vehicle_type: (selectedVehicle as any) || vehicleType,
+      });
+      
+      const rideId = ride.id;
       
       setStage('requesting');
-      Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare}\n${fareInfo.distance} • ${fareInfo.duration}`);
+      Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare || 0}\n${fareInfo.distance || 0} km • ${fareInfo.duration || 0} min`);
     } catch (err) {
       console.error('Ride request error:', err);
       setError('Failed to request ride. Please try again.');
@@ -240,7 +354,7 @@ const PassengerMapScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRide, saveToHistory]);
+  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRideService, saveToHistory]);
 
   // Auto-fit map to the route whenever it updates
   useEffect(() => {
@@ -457,7 +571,7 @@ const PassengerMapScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-              {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance} • {fareInfo.duration}</Text>}
+              {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>}
             </View>
             <VehicleOptions
               options={[
@@ -505,21 +619,27 @@ const PassengerMapScreen = () => {
                   <TouchableOpacity onPress={() => editField('vehicle')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
                     <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Change Vehicle</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                  <TouchableOpacity onPress={handleCancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
                     <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance} • {fareInfo.duration}</Text>
+              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>
             </View>
             <FareDetails
               vehicleName={(selectedVehicle || vehicleType).toString()}
-              distanceKm={fareInfo.distance}
-              estimate={`Rs ${fareInfo.fare}`}
+              distanceKm={`${fareInfo.distance || 0} km`}
+              estimate={`Rs ${fareInfo.fare || 0}`}
               breakdown={[
                 { label: 'Base Fare', value: 'Rs 50' },
-                { label: `Distance (${fareInfo.distance} @ Rs 30/km)`, value: `Rs ${Math.max(0, fareInfo.fare - 50 - 16)}` },
-                { label: `Time (${fareInfo.duration} @ Rs 2/min)`, value: 'Rs 16' },
+                { 
+                  label: `Distance (${fareInfo.distance || 0} km @ Rs 30/km)`, 
+                  value: `Rs ${Math.max(0, Math.round((fareInfo.distance || 0) * 30))}` 
+                },
+                { 
+                  label: `Time (${fareInfo.duration || 0} min @ Rs 2/min)`, 
+                  value: `Rs ${Math.max(0, Math.round((fareInfo.duration || 0) * 2))}` 
+                },
                 { label: 'Discount', value: 'Rs 0' },
               ]}
               onConfirm={() => { onRequestRide(); setStage('requesting'); }}
@@ -532,7 +652,7 @@ const PassengerMapScreen = () => {
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 12, color: '#666' }}>Requesting Ride...</Text>
-                <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                <TouchableOpacity onPress={handleCancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
                   <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel Request</Text>
                 </TouchableOpacity>
               </View>
@@ -547,8 +667,8 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {ride.activeRide && ride.activeRide.status === 'accepted' && (
-          <DriverAssignedCard name={ride.activeRide.driverName || 'Driver'} vehicle={ride.activeRide.vehicleType} eta={'5 min'} />
+        {currentRide && currentRide.status === 'accepted' && (
+          <DriverAssignedCard name={currentRide.driver?.name || 'Driver'} vehicle={currentRide.vehicle_type || 'Car'} eta={'5 min'} />
         )}
       </View>
     </View>

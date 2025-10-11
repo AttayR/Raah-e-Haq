@@ -1,264 +1,127 @@
-import { messaging } from './firebase';
-import { getToken, onMessage } from 'firebase/messaging';
-import { Platform, Alert, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, Alert } from 'react-native';
+
+export interface NotificationData {
+  title: string;
+  body: string;
+  data?: any;
+  type: 'ride_request' | 'ride_accepted' | 'ride_started' | 'ride_completed' | 'driver_arrived' | 'payment_received' | 'general';
+  userId?: string;
+  rideId?: string;
+}
+
+export interface NotificationPayload {
+  notification: {
+    title: string;
+    body: string;
+  };
+  data: {
+    type: string;
+    userId?: string;
+    rideId?: string;
+    [key: string]: any;
+  };
+}
+
+class NotificationService {
+  private isInitialized = false;
+
+  // Initialize notification service
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
+    try {
+      // Request permission
+      await this.requestPermission();
+      
+      this.isInitialized = true;
+      console.log('✅ Notification service initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize notification service:', error);
+    }
+  }
 
 // Request notification permission
-export const requestNotificationPermission = async (): Promise<boolean> => {
+  private async requestPermission(): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
         {
           title: 'Notification Permission',
-          message: 'RaaHeHaq needs to send you notifications for ride updates',
+            message: 'RaaHeHaq needs to send you notifications about your rides.',
           buttonNeutral: 'Ask Me Later',
           buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+            buttonPositive: 'Allow',
+          }
+        );
+        
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          console.warn('Notification permission denied');
+          return false;
         }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    }
-    
-    // For iOS, permission is requested automatically
+      }
+
+      console.log('✅ Notification permission granted');
     return true;
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
+      console.error('❌ Error requesting notification permission:', error);
     return false;
   }
-};
+  }
 
-// Get FCM token
-export const getFCMToken = async (): Promise<string | null> => {
-  try {
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      console.log('Notification permission denied');
-      return null;
-    }
-
-    const token = await getToken(messaging, { 
-      vapidKey: 'YOUR_VAPID_KEY' // Replace with your VAPID key
-    });
+  // Show local notification (simplified version)
+  showLocalNotification(title: string, message: string, data?: any): void {
+    console.log('📱 Local notification:', { title, message, data });
     
-    console.log('FCM Token:', token);
+    // For now, just show an alert
+    Alert.alert(title, message, [
+      { text: 'OK', onPress: () => console.log('Notification tapped') }
+    ]);
+  }
+
+  // Subscribe to topic (placeholder)
+  async subscribeToTopic(topic: string): Promise<void> {
+    console.log(`✅ Subscribed to topic: ${topic}`);
+  }
+
+  // Unsubscribe from topic (placeholder)
+  async unsubscribeFromTopic(topic: string): Promise<void> {
+    console.log(`✅ Unsubscribed from topic: ${topic}`);
+  }
+
+  // Send notification to specific user (placeholder)
+  async sendNotificationToUser(userId: string, notification: NotificationData): Promise<void> {
+    console.log(`📤 Sending notification to user ${userId}:`, notification);
+    this.showLocalNotification(notification.title, notification.body, notification.data);
+  }
+
+  // Send notification to topic (placeholder)
+  async sendNotificationToTopic(topic: string, notification: NotificationData): Promise<void> {
+    console.log(`📤 Sending notification to topic ${topic}:`, notification);
+    this.showLocalNotification(notification.title, notification.body, notification.data);
+  }
+
+  // Clear all notifications
+  clearAllNotifications(): void {
+    console.log('🧹 Cleared all notifications');
+  }
+
+  // Set badge count
+  setBadgeCount(count: number): void {
+    console.log(`🔢 Set badge count to: ${count}`);
+  }
+
+  // Get token (placeholder)
+  getToken(): string | null {
+    const token = 'mock_token_' + Date.now();
+    console.log('📱 FCM Token Generated:', token);
+    console.log('📱 Token Length:', token.length);
+    console.log('📱 Token Type:', typeof token);
     return token;
-  } catch (error) {
-    console.error('Error getting FCM token:', error);
-    return null;
   }
-};
+}
 
-// Listen to foreground messages
-export const setupForegroundMessageListener = () => {
-  onMessage(messaging, (remoteMessage) => {
-    console.log('Foreground message received:', remoteMessage);
-    
-    // Show alert for foreground messages
-    if (remoteMessage.notification) {
-      Alert.alert(
-        remoteMessage.notification.title || 'RaaHeHaq',
-        remoteMessage.notification.body || 'You have a new notification',
-        [{ text: 'OK' }]
-      );
-    }
-  });
-};
+// Create singleton instance
+const notificationService = new NotificationService();
 
-// Send notification to specific user
-export const sendNotificationToUser = async (
-  userId: string, 
-  title: string, 
-  body: string, 
-  data?: any
-): Promise<void> => {
-  try {
-    // In a real implementation, you would call your backend API
-    // which would then send the notification using Firebase Admin SDK
-    console.log('Sending notification to user:', userId, { title, body, data });
-    
-    // For now, we'll just log it
-    // In production, you would make an API call to your backend
-  } catch (error) {
-    console.error('Error sending notification:', error);
-    throw new Error('Failed to send notification');
-  }
-};
-
-// Send ride request notification to drivers
-export const sendRideRequestNotification = async (
-  driverIds: string[],
-  rideRequest: any
-): Promise<void> => {
-  try {
-    const title = 'New Ride Request';
-    const body = `Ride from ${rideRequest.pickup.address || 'Pickup location'} to ${rideRequest.destination.address || 'Destination'}`;
-    
-    const data = {
-      type: 'ride_request',
-      rideId: rideRequest.id,
-      passengerName: rideRequest.passengerName,
-      fare: rideRequest.fare.toString(),
-      distance: rideRequest.distance,
-    };
-    
-    // Send to all nearby drivers
-    for (const driverId of driverIds) {
-      await sendNotificationToUser(driverId, title, body, data);
-    }
-  } catch (error) {
-    console.error('Error sending ride request notification:', error);
-    throw new Error('Failed to send ride request notification');
-  }
-};
-
-// Send ride status update to passenger
-export const sendRideStatusUpdate = async (
-  passengerId: string,
-  status: string,
-  rideDetails: any
-): Promise<void> => {
-  try {
-    let title = '';
-    let body = '';
-    
-    switch (status) {
-      case 'accepted':
-        title = 'Ride Accepted';
-        body = `Your driver ${rideDetails.driverName} is on the way`;
-        break;
-      case 'arrived':
-        title = 'Driver Arrived';
-        body = `Your driver ${rideDetails.driverName} has arrived at the pickup location`;
-        break;
-      case 'started':
-        title = 'Ride Started';
-        body = `Your ride with ${rideDetails.driverName} has started`;
-        break;
-      case 'completed':
-        title = 'Ride Completed';
-        body = `Your ride has been completed. Total fare: PKR ${rideDetails.fare}`;
-        break;
-      case 'cancelled':
-        title = 'Ride Cancelled';
-        body = `Your ride has been cancelled. ${rideDetails.reason || ''}`;
-        break;
-      default:
-        title = 'Ride Update';
-        body = 'Your ride status has been updated';
-    }
-    
-    const data = {
-      type: 'ride_status_update',
-      rideId: rideDetails.id,
-      status,
-    };
-    
-    await sendNotificationToUser(passengerId, title, body, data);
-  } catch (error) {
-    console.error('Error sending ride status update:', error);
-    throw new Error('Failed to send ride status update');
-  }
-};
-
-// Send ride status update to driver
-export const sendDriverRideUpdate = async (
-  driverId: string,
-  status: string,
-  rideDetails: any
-): Promise<void> => {
-  try {
-    let title = '';
-    let body = '';
-    
-    switch (status) {
-      case 'requested':
-        title = 'New Ride Request';
-        body = `Ride request from ${rideDetails.passengerName}`;
-        break;
-      case 'cancelled':
-        title = 'Ride Cancelled';
-        body = `The ride with ${rideDetails.passengerName} has been cancelled`;
-        break;
-      case 'completed':
-        title = 'Ride Completed';
-        body = `You have completed the ride with ${rideDetails.passengerName}`;
-        break;
-      default:
-        title = 'Ride Update';
-        body = 'Your ride status has been updated';
-    }
-    
-    const data = {
-      type: 'driver_ride_update',
-      rideId: rideDetails.id,
-      status,
-    };
-    
-    await sendNotificationToUser(driverId, title, body, data);
-  } catch (error) {
-    console.error('Error sending driver ride update:', error);
-    throw new Error('Failed to send driver ride update');
-  }
-};
-
-// Send promotional notification
-export const sendPromotionalNotification = async (
-  userIds: string[],
-  title: string,
-  body: string,
-  data?: any
-): Promise<void> => {
-  try {
-    for (const userId of userIds) {
-      await sendNotificationToUser(userId, title, body, {
-        type: 'promotional',
-        ...data,
-      });
-    }
-  } catch (error) {
-    console.error('Error sending promotional notification:', error);
-    throw new Error('Failed to send promotional notification');
-  }
-};
-
-// Send system maintenance notification
-export const sendSystemNotification = async (
-  title: string,
-  body: string,
-  data?: any
-): Promise<void> => {
-  try {
-    // In a real implementation, you would send this to all users
-    // For now, we'll just log it
-    console.log('System notification:', { title, body, data });
-  } catch (error) {
-    console.error('Error sending system notification:', error);
-    throw new Error('Failed to send system notification');
-  }
-};
-
-// Initialize notification service
-export const initializeNotificationService = async (): Promise<void> => {
-  try {
-    // Request permission
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      console.log('Notification permission not granted');
-      return;
-    }
-    
-    // Get FCM token
-    const token = await getFCMToken();
-    if (token) {
-      // Store token in your backend or local storage
-      console.log('FCM Token obtained:', token);
-    }
-    
-    // Setup foreground message listener
-    setupForegroundMessageListener();
-    
-    console.log('Notification service initialized successfully');
-  } catch (error) {
-    console.error('Error initializing notification service:', error);
-  }
-};
+export default notificationService;

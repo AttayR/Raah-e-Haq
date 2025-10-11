@@ -481,6 +481,31 @@ class ApiService {
       return null;
     }
   }
+
+  // Generic HTTP methods for external services
+  async get(url: string, config?: any): Promise<any> {
+    console.log('🌐 API Service - GET request:', url);
+    const response = await apiClient.get(url, config);
+    return response.data;
+  }
+
+  async post(url: string, data?: any, config?: any): Promise<any> {
+    console.log('🌐 API Service - POST request:', url);
+    const response = await apiClient.post(url, data, config);
+    return response.data;
+  }
+
+  async put(url: string, data?: any, config?: any): Promise<any> {
+    console.log('🌐 API Service - PUT request:', url);
+    const response = await apiClient.put(url, data, config);
+    return response.data;
+  }
+
+  async delete(url: string, config?: any): Promise<any> {
+    console.log('🌐 API Service - DELETE request:', url);
+    const response = await apiClient.delete(url, config);
+    return response.data;
+  }
 }
 
 // Export singleton instance
