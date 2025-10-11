@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useLocation } from '../../hooks/useLocation';
+import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDirections } from '../../hooks/useDirections';
 import { useFare } from '../../hooks/useFare';
 import LocationSearch from '../../components/passenger/LocationSearch';
@@ -23,7 +23,11 @@ import StageChips from '../../components/passenger/StageChips';
 const PassengerMapScreen = () => {
   const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
-  const { currentLocation, isInitialized, initializationTimeout, getCurrentLocation } = useLocation();
+  const { 
+    currentLocation, 
+    isLoading: locationLoading,
+    requestLocationPermission,
+  } = useNativeLocation();
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
   const { vehicleType, getFare } = useFare();
 
@@ -32,12 +36,11 @@ const PassengerMapScreen = () => {
   const [destination, setDestination] = useState<{ latitude: number; longitude: number } | null>(null);
   const [addingStop, setAddingStop] = useState(false);
   const { ride, requestRide } = useRide();
-  const [enableGeoUI, setEnableGeoUI] = useState(false);
   const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
-  const [rideHistory, setRideHistory] = useState<any[]>([]);
+  const [_rideHistory, setRideHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const swapPickupDrop = useCallback(() => {
@@ -91,7 +94,6 @@ const PassengerMapScreen = () => {
   }, [pickup, stops, destination, addingStop, fetchRouteWithWaypoints, clearRoute]);
 
   const centerOnUser = useCallback(() => {
-    getCurrentLocation();
     if (currentLocation) {
       mapRef.current?.animateToRegion({
         latitude: currentLocation.latitude,
@@ -99,21 +101,20 @@ const PassengerMapScreen = () => {
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       });
-    }
-  }, [currentLocation, getCurrentLocation]);
-
-  // Android-only: after a fresh location appears (post-permission), wait briefly before enabling UI
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      if (currentLocation) {
-        setEnableGeoUI(false);
-        const t = setTimeout(() => setEnableGeoUI(true), 1200);
-        return () => clearTimeout(t);
-      } else {
-        setEnableGeoUI(false);
-      }
     } else {
-      setEnableGeoUI(!!currentLocation);
+      requestLocationPermission();
+    }
+  }, [currentLocation, requestLocationPermission]);
+
+  // Initialize location
+  useEffect(() => {
+    if (currentLocation) {
+      mapRef.current?.animateToRegion({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
     }
   }, [currentLocation]);
 
@@ -252,23 +253,23 @@ const PassengerMapScreen = () => {
     }
   }, [routeCoordinates]);
 
-  if (!isInitialized) {
+  if (!currentLocation && !locationLoading) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="white" />
-        <Text style={styles.loadingTitle}>{initializationTimeout ? 'Initialization Timeout' : 'Initializing Map...'}</Text>
+        <Text style={styles.loadingTitle}>{locationLoading ? 'Getting Location...' : 'Initializing Map...'}</Text>
         <Text style={styles.loadingText}>
-          {initializationTimeout 
-            ? 'Please retry or check your connection' 
+          {locationLoading 
+            ? 'Please enable location services' 
             : 'Setting up location services'
           }
         </Text>
-        {initializationTimeout && (
+        {locationLoading && (
           <TouchableOpacity 
             style={styles.retryButton} 
             onPress={() => {
-              // Force re-initialization by calling getCurrentLocation
-              getCurrentLocation();
+              // Force re-initialization by requesting location permission
+              requestLocationPermission();
             }}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
@@ -278,7 +279,7 @@ const PassengerMapScreen = () => {
     );
   }
 
-  const canShowUserLocation = !!currentLocation && enableGeoUI;
+  const canShowUserLocation = !!currentLocation;
   const initialRegion = currentLocation
     ? {
         latitude: currentLocation.latitude,
@@ -292,6 +293,7 @@ const PassengerMapScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
 
+      {/* Location Permission Modal */}
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
