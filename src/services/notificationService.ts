@@ -1,5 +1,5 @@
 import { messaging } from './firebase';
-import { getToken, onMessage } from 'firebase/messaging';
+import { getToken, onMessage } from '@react-native-firebase/messaging';
 import { Platform, Alert, PermissionsAndroid } from 'react-native';
 
 // Request notification permission

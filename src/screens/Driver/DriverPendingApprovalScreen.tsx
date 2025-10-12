@@ -120,7 +120,7 @@ export default function DriverPendingApprovalScreen() {
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <Image 
-                  source={require('../../assets/images/logo.png')} 
+                  source={require('../../assets/images/Logo.png')} 
                   style={styles.logoImage}
                   resizeMode="contain"
                 />
