@@ -77,6 +77,20 @@ const DriverMapScreen = () => {
   const [isOnline, setIsOnline] = useState(false);
   const isLoadingLocation = locationLoading || !currentLocation;
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup any pending operations
+      if (mapRef.current) {
+        try {
+          mapRef.current = null;
+        } catch (error) {
+          console.log('Map cleanup error:', error);
+        }
+      }
+    };
+  }, []);
+
   // Get current location
   const getCurrentLocation = () => {
     if (currentLocation) {
@@ -86,15 +100,32 @@ const DriverMapScreen = () => {
     }
   };
 
-  // Move map to current location
-  useEffect(() => {
-    if (currentLocation && mapRef.current) {
-      mapRef.current.animateToRegion({
+  // Get safe region for map
+  const getSafeRegion = () => {
+    if (currentLocation && currentLocation.latitude && currentLocation.longitude) {
+      return {
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
-      });
+      };
+    }
+    return MAPS_CONFIG.DEFAULT_REGION;
+  };
+
+  // Move map to current location
+  useEffect(() => {
+    if (currentLocation && mapRef.current && currentLocation.latitude && currentLocation.longitude) {
+      try {
+        mapRef.current.animateToRegion({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      } catch (error) {
+        console.error('Error animating to region:', error);
+      }
     }
   }, [currentLocation]);
 
@@ -217,14 +248,15 @@ const DriverMapScreen = () => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        initialRegion={{
-          latitude: MAPS_CONFIG.defaultLatitude,
-          longitude: MAPS_CONFIG.defaultLongitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }}
+        initialRegion={getSafeRegion()}
         showsUserLocation={true}
         showsMyLocationButton={false}
+        onMapReady={() => {
+          console.log('Map is ready');
+        }}
+        onError={(error) => {
+          console.error('Map error:', error);
+        }}
       >
         {/* Driver location marker */}
         {currentLocation && (
@@ -240,15 +272,15 @@ const DriverMapScreen = () => {
         )}
 
         {/* Active ride markers */}
-        {activeRide && (
+        {currentRide && (
           <>
             <Marker
-              coordinate={activeRide.pickup}
+              coordinate={currentRide.pickup}
               title="Pickup Location"
               pinColor="green"
             />
             <Marker
-              coordinate={activeRide.destination}
+              coordinate={currentRide.destination}
               title="Destination"
               pinColor="red"
             />
