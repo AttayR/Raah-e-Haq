@@ -11,6 +11,8 @@ import { usePassengerNotifications } from '../../hooks/usePassengerNotifications
 import { useDirections } from '../../hooks/useDirections';
 import { useFare } from '../../hooks/useFare';
 import { useRide } from '../../hooks/useRide';
+import { useErrorHandler } from '../../hooks/useErrorHandler';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import LocationSearch from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
 import VehicleOptions, { VehicleOption } from '../../components/passenger/VehicleOptions';
@@ -25,6 +27,8 @@ import StageChips from '../../components/passenger/StageChips';
 const PassengerMapScreen = () => {
   const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
+  const { handleError } = useErrorHandler();
+  
   const { 
     currentLocation, 
     isLoading: locationLoading,
@@ -165,29 +169,24 @@ const PassengerMapScreen = () => {
   }, [currentLocation]);
 
   const handleRequestRide = async () => {
-    if (!pickup || !destination) {
-      Alert.alert('Error', 'Please select pickup and destination');
-      return;
-    }
-
-    if (!requestRideService) {
-      console.warn('requestRideService not available');
-      Alert.alert('Error', 'Ride service not available');
-      return;
-    }
-
-    // Check authentication
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) {
-        Alert.alert('Authentication Required', 'Please login to request a ride');
+      if (!pickup || !destination) {
+        handleError('Please select both pickup and destination locations', 'VALIDATION_ERROR');
         return;
       }
-    } catch (error) {
-      console.error('Error checking authentication:', error);
-    }
 
-    try {
+      if (!requestRideService) {
+        handleError('Ride service is not available. Please restart the app.', 'SERVICE_ERROR');
+        return;
+      }
+
+      // Check authentication
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        handleError('Please log in to request a ride', 'AUTHENTICATION_ERROR');
+        return;
+      }
+
       console.log('Requesting ride:', { pickup, destination, vehicleType });
       
       const rideData = {
@@ -203,17 +202,10 @@ const PassengerMapScreen = () => {
 
       await requestRideService(rideData);
       Alert.alert('Ride Requested', 'Looking for nearby drivers...');
+      setError(null); // Clear any previous errors
     } catch (error) {
-      console.error('Error requesting ride:', error);
-      
-      // Show more specific error message
-      let errorMessage = 'Failed to request ride';
-      if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      Alert.alert('Ride Request Failed', errorMessage);
-      setError(errorMessage);
+      handleError(error as Error, 'RIDE_REQUEST_ERROR');
+      setError('Failed to request ride. Please try again.');
     }
   };
 
@@ -404,8 +396,14 @@ const PassengerMapScreen = () => {
     : MAPS_CONFIG.DEFAULT_REGION;
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('PassengerMapScreen Error:', error, errorInfo);
+        handleError(error, 'PASSENGER_MAP_ERROR');
+      }}
+    >
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
 
       {/* Location Permission Modal */}
       <MapView
@@ -672,6 +670,7 @@ const PassengerMapScreen = () => {
         )}
       </View>
     </View>
+    </ErrorBoundary>
   );
 };
 

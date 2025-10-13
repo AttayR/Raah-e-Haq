@@ -21,7 +21,9 @@ import { Typography } from '../../theme/typography';
 import LinearGradient from 'react-native-linear-gradient';
 import { showToast } from '../../components/ToastProvider';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
+const isLargeScreen = width >= 1024;
 
 export default function DriverHomeScreen() {
   const { theme } = useAppTheme();
@@ -77,10 +79,57 @@ export default function DriverHomeScreen() {
   ];
 
   const stats = [
-    { label: 'Total Rides', value: '156', icon: 'local-taxi' },
-    { label: 'Rating', value: '4.9', icon: 'star' },
-    { label: 'Earnings', value: '$2.4k', icon: 'attach-money' },
+    { 
+      label: 'Total Rides', 
+      value: '156', 
+      icon: 'local-taxi', 
+      color: '#3b82f6',
+      subtitle: '+12 this week'
+    },
+    { 
+      label: 'Rating', 
+      value: '4.9', 
+      icon: 'star', 
+      color: '#f59e0b',
+      subtitle: 'Excellent'
+    },
+    { 
+      label: 'Earnings', 
+      value: 'PKR 24k', 
+      icon: 'attach-money', 
+      color: '#10b981',
+      subtitle: 'This month'
+    },
+    { 
+      label: 'Online Hours', 
+      value: '8.5h', 
+      icon: 'schedule', 
+      color: '#8b5cf6',
+      subtitle: 'Today'
+    },
   ];
+
+  // Get vehicle type and info
+  const vehicleType = user?.vehicle_type || 'car';
+  const vehicleInfo = user?.vehicleInfo || null;
+  
+  // Format vehicle display text
+  const getVehicleDisplayText = () => {
+    if (vehicleInfo) {
+      return `${vehicleInfo.brand} ${vehicleInfo.model} ${vehicleInfo.year || ''}`.trim();
+    }
+    return vehicleType.charAt(0).toUpperCase() + vehicleType.slice(1);
+  };
+
+  const getVehicleIcon = () => {
+    switch (vehicleType) {
+      case 'car': return 'directions-car';
+      case 'bike': return 'motorcycle';
+      case 'van': return 'local-shipping';
+      case 'truck': return 'local-shipping';
+      default: return 'directions-car';
+    }
+  };
 
   const recentRides = [
     {
@@ -171,6 +220,26 @@ export default function DriverHomeScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Vehicle Information Card */}
+          <View style={styles.vehicleCard}>
+            <View style={styles.vehicleInfo}>
+              <Icon name={getVehicleIcon()} size={24} color="#ffffff" />
+              <View style={styles.vehicleDetails}>
+                <Text style={styles.vehicleType}>
+                  {vehicleType.charAt(0).toUpperCase() + vehicleType.slice(1)}
+                </Text>
+                <Text style={styles.vehicleModel}>
+                  {getVehicleDisplayText()}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.vehicleStatus}>
+              <Text style={styles.vehicleStatusText}>
+                {isDriverApproved ? 'Verified' : 'Pending'}
+              </Text>
+            </View>
+          </View>
+
           {/* Status Badge with Cartoon Style */}
           <View
             style={[
@@ -190,17 +259,31 @@ export default function DriverHomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Stats Cards */}
-          <View style={styles.statsContainer}>
-            {stats.map((stat, index) => (
-              <View key={index} style={styles.statCard}>
-                <View style={styles.statIconContainer}>
-                  <Icon name={stat.icon} size={24} color={BrandColors.primary} />
+          {/* Enhanced Stats Section */}
+          <View style={styles.statsSection}>
+            <Text style={styles.statsSectionTitle}>Performance Overview</Text>
+            <View style={styles.statsGrid}>
+              {stats.map((stat, index) => (
+                <View key={index} style={styles.statCard}>
+                  <LinearGradient
+                    colors={[`${stat.color}20`, `${stat.color}10`]}
+                    style={styles.statGradient}
+                  >
+                    <View style={styles.statContent}>
+                      <View style={[styles.statIconWrapper, { backgroundColor: stat.color }]}>
+                        <Icon name={stat.icon} size={20} color="white" />
+                      </View>
+                      <View style={styles.statTextContainer}>
+                        <Text style={styles.statValue}>{stat.value}</Text>
+                        <Text style={styles.statLabel}>{stat.label}</Text>
+                        <Text style={styles.statSubtitle}>{stat.subtitle}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.statAccent, { backgroundColor: stat.color }]} />
+                  </LinearGradient>
                 </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
 
           {/* Quick Actions */}
@@ -210,16 +293,29 @@ export default function DriverHomeScreen() {
               {quickActions.map((action) => (
                 <TouchableOpacity
                   key={action.id}
-                  style={[styles.actionCard, { borderLeftColor: action.color }]}
+                  style={[
+                    styles.actionCard, 
+                    { borderLeftColor: action.color },
+                    action.id === 'online' && isOnline && styles.activeActionCard
+                  ]}
                   onPress={action.onPress}
                   activeOpacity={0.7}
                 >
                   <View style={styles.actionContent}>
-                    <View style={[styles.actionIcon, { backgroundColor: action.color }]}>
+                    <View style={[
+                      styles.actionIcon, 
+                      { backgroundColor: action.color },
+                      action.id === 'online' && isOnline && styles.activeActionIcon
+                    ]}>
                       <Icon name={action.icon} size={24} color="white" />
                     </View>
                     <View style={styles.actionTextContainer}>
-                      <Text style={styles.actionTitle}>{action.title}</Text>
+                      <Text style={[
+                        styles.actionTitle,
+                        action.id === 'online' && isOnline && styles.activeActionTitle
+                      ]}>
+                        {action.title}
+                      </Text>
                       <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
                     </View>
                   </View>
@@ -249,7 +345,17 @@ export default function DriverHomeScreen() {
                         <Text style={styles.rideTime}>{ride.time}</Text>
                       </View>
                     </View>
-                    <Text style={styles.rideFare}>{ride.fare}</Text>
+                    <View style={styles.rideFareContainer}>
+                      <Text style={styles.rideFare}>{ride.fare}</Text>
+                      <View style={[
+                        styles.statusBadgeSmall,
+                        { backgroundColor: ride.status === 'completed' ? '#10b981' : '#f59e0b' }
+                      ]}>
+                        <Text style={styles.statusBadgeText}>
+                          {ride.status.charAt(0).toUpperCase() + ride.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                   <View style={styles.rideRoute}>
                     <View style={styles.routePoint}>
@@ -445,52 +551,138 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  vehicleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  vehicleDetails: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  vehicleType: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  vehicleModel: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  vehicleStatus: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  vehicleStatusText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  statsSection: {
     marginBottom: 30,
+  },
+  statsSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
   statCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+    width: isTablet ? (width - 80) / 4 : (width - 60) / 2, // Responsive width calculation
+    marginBottom: 12,
+    minWidth: isTablet ? 160 : 140,
+  },
+  statGradient: {
     borderRadius: 16,
-    padding: 20,
+    padding: isTablet ? 20 : 16,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    zIndex: 2,
+  },
+  statIconWrapper: {
+    width: isTablet ? 48 : 40,
+    height: isTablet ? 48 : 40,
+    borderRadius: isTablet ? 24 : 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: isTablet ? 16 : 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 3,
   },
-  statIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+  statTextContainer: {
+    flex: 1,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: isTablet ? 24 : 20,
     fontWeight: '800',
     color: '#1f2937',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: isTablet ? 14 : 12,
     color: '#6b7280',
-    textAlign: 'center',
+    fontWeight: '500',
+  },
+  statSubtitle: {
+    fontSize: isTablet ? 12 : 10,
+    color: '#9ca3af',
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  statAccent: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 4,
+    height: '100%',
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
   },
   sectionContainer: {
     marginBottom: 30,
@@ -554,6 +746,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6b7280',
   },
+  activeActionCard: {
+    backgroundColor: '#f0f9ff',
+    borderColor: '#0ea5e9',
+    borderWidth: 1,
+  },
+  activeActionIcon: {
+    backgroundColor: '#0ea5e9',
+    transform: [{ scale: 1.1 }],
+  },
+  activeActionTitle: {
+    color: '#0ea5e9',
+    fontWeight: '700',
+  },
   ridesList: {
     gap: 12,
   },
@@ -603,6 +808,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#10b981',
+  },
+  rideFareContainer: {
+    alignItems: 'flex-end',
+  },
+  statusBadgeSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  statusBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   rideRoute: {
     marginBottom: 16,

@@ -82,10 +82,31 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       return ride;
     } catch (error) {
       console.error('❌ Failed to request ride:', error);
+      
+      // Handle different types of errors
+      let errorMessage = 'Failed to request ride';
+      
+      if (error && typeof error === 'object') {
+        if ('message' in error) {
+          const errorObj = error as Error;
+          if (errorObj.message.includes('Property') && errorObj.message.includes("doesn't exist")) {
+            errorMessage = 'There was an issue with the app data. Please restart the app.';
+          } else if (errorObj.message.includes('Network')) {
+            errorMessage = 'Network connection issue. Please check your internet connection.';
+          } else if (errorObj.message.includes('Authentication')) {
+            errorMessage = 'Authentication error. Please log in again.';
+          } else if (errorObj.message.includes('Database') || errorObj.message.includes('SQL')) {
+            errorMessage = 'Server error. Please try again in a moment.';
+          } else {
+            errorMessage = errorObj.message;
+          }
+        }
+      }
+      
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to request ride',
+        error: errorMessage,
       }));
       throw error;
     }
