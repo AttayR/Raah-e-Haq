@@ -7,7 +7,7 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '@react-native-firebase/firestore';
 
 export interface RideBidDoc {
   id?: string;

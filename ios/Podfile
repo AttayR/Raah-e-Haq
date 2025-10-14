@@ -8,16 +8,18 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-# Force dynamic frameworks to resolve Swift pod issues
-use_frameworks! :linkage => :static
-
 target 'RaaHeHaq' do
   config = use_native_modules!
-
+  use_frameworks! :linkage => :static
+  $RNFirebaseAsStaticFramework = true
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    # Enable New Architecture but with proper configuration
+    :fabric_enabled => true,
+    :hermes_enabled => true,
+    :new_arch_enabled => true
   )
 
   # Firebase pods - let React Native Firebase handle versions
@@ -27,6 +29,9 @@ target 'RaaHeHaq' do
   pod 'Firebase/Storage'
   pod 'Firebase/Messaging'
   pod 'Firebase/Analytics'
+ # React Native Maps dependencies
+rn_maps_path = '../node_modules/react-native-maps'
+pod 'react-native-maps/Google', :path => rn_maps_path
 
   post_install do |installer|
     # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202

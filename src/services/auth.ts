@@ -8,7 +8,7 @@ import {
   signInWithPhoneNumber,
   UserCredential,
   GoogleAuthProvider
-} from 'firebase/auth';
+} from '@react-native-firebase/auth';
 import { 
   doc, 
   setDoc, 
@@ -18,7 +18,7 @@ import {
   where,
   getDocs,
   serverTimestamp 
-} from 'firebase/firestore';
+} from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types

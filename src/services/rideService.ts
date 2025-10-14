@@ -12,7 +12,7 @@ import {
   orderBy,
   limit,
   serverTimestamp 
-} from 'firebase/firestore';
+} from '@react-native-firebase/firestore';
 
 export interface Location {
   latitude: number;

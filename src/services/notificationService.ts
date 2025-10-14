@@ -1,8 +1,7 @@
 import { messaging } from './firebase';
-import { getToken, onMessage } from 'firebase/messaging';
+import { getToken, onMessage } from '@react-native-firebase/messaging';
 import { Platform, Alert, PermissionsAndroid } from 'react-native';
 
-// Request notification permission
 export const requestNotificationPermission = async (): Promise<boolean> => {
   try {
     if (Platform.OS === 'android') {
@@ -17,65 +16,64 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
         }
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } else if (Platform.OS === 'ios') {
+      await messaging().registerDeviceForRemoteMessages();
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      if (enabled) {
+        console.log('ios Authorization status:', authStatus);
+        return true;
+      }
+      return false;
     }
-    
-    // For iOS, permission is requested automatically
-    return true;
+    return false;
   } catch (error) {
     console.error('Error requesting notification permission:', error);
     return false;
   }
 };
 
-// Get FCM token
+
 export const getFCMToken = async (): Promise<string | null> => {
   try {
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      console.log('Notification permission denied');
-      return null;
+    const token = await messaging().getToken();
+    if (token) {
+      console.log('FCM token', token);
+      return token;
     }
-
-    const token = await getToken(messaging, { 
-      vapidKey: 'YOUR_VAPID_KEY' // Replace with your VAPID key
-    });
-    
-    console.log('FCM Token:', token);
-    return token;
   } catch (error) {
-    console.error('Error getting FCM token:', error);
+    console.error(' Error getting FCM token:', error);
     return null;
   }
 };
 
+
 // Listen to foreground messages
 export const setupForegroundMessageListener = () => {
-  onMessage(messaging, (remoteMessage) => {
-    console.log('Foreground message received:', remoteMessage);
-    
-    // Show alert for foreground messages
-    if (remoteMessage.notification) {
-      Alert.alert(
-        remoteMessage.notification.title || 'RaaHeHaq',
-        remoteMessage.notification.body || 'You have a new notification',
-        [{ text: 'OK' }]
-      );
-    }
-  });
+  try {
+    messaging().onMessage(async remoteMessage => {
+      Alert.alert('A new FCM message arrived!', JSON.stringify(remoteMessage));
+    });
+  } catch (err) {
+    console.log('error set up foreground', err)
+  }
+
 };
 
 // Send notification to specific user
 export const sendNotificationToUser = async (
-  userId: string, 
-  title: string, 
-  body: string, 
+  userId: string,
+  title: string,
+  body: string,
   data?: any
 ): Promise<void> => {
   try {
     // In a real implementation, you would call your backend API
     // which would then send the notification using Firebase Admin SDK
     console.log('Sending notification to user:', userId, { title, body, data });
-    
+
     // For now, we'll just log it
     // In production, you would make an API call to your backend
   } catch (error) {
@@ -92,7 +90,7 @@ export const sendRideRequestNotification = async (
   try {
     const title = 'New Ride Request';
     const body = `Ride from ${rideRequest.pickup.address || 'Pickup location'} to ${rideRequest.destination.address || 'Destination'}`;
-    
+
     const data = {
       type: 'ride_request',
       rideId: rideRequest.id,
@@ -100,7 +98,7 @@ export const sendRideRequestNotification = async (
       fare: rideRequest.fare.toString(),
       distance: rideRequest.distance,
     };
-    
+
     // Send to all nearby drivers
     for (const driverId of driverIds) {
       await sendNotificationToUser(driverId, title, body, data);
@@ -120,7 +118,7 @@ export const sendRideStatusUpdate = async (
   try {
     let title = '';
     let body = '';
-    
+
     switch (status) {
       case 'accepted':
         title = 'Ride Accepted';
@@ -146,13 +144,13 @@ export const sendRideStatusUpdate = async (
         title = 'Ride Update';
         body = 'Your ride status has been updated';
     }
-    
+
     const data = {
       type: 'ride_status_update',
       rideId: rideDetails.id,
       status,
     };
-    
+
     await sendNotificationToUser(passengerId, title, body, data);
   } catch (error) {
     console.error('Error sending ride status update:', error);
@@ -169,7 +167,7 @@ export const sendDriverRideUpdate = async (
   try {
     let title = '';
     let body = '';
-    
+
     switch (status) {
       case 'requested':
         title = 'New Ride Request';
@@ -187,13 +185,13 @@ export const sendDriverRideUpdate = async (
         title = 'Ride Update';
         body = 'Your ride status has been updated';
     }
-    
+
     const data = {
       type: 'driver_ride_update',
       rideId: rideDetails.id,
       status,
     };
-    
+
     await sendNotificationToUser(driverId, title, body, data);
   } catch (error) {
     console.error('Error sending driver ride update:', error);
@@ -237,28 +235,19 @@ export const sendSystemNotification = async (
   }
 };
 
-// Initialize notification service
 export const initializeNotificationService = async (): Promise<void> => {
   try {
-    // Request permission
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
       console.log('Notification permission not granted');
       return;
     }
-    
-    // Get FCM token
     const token = await getFCMToken();
     if (token) {
-      // Store token in your backend or local storage
       console.log('FCM Token obtained:', token);
     }
-    
-    // Setup foreground message listener
     setupForegroundMessageListener();
-    
-    console.log('Notification service initialized successfully');
   } catch (error) {
-    console.error('Error initializing notification service:', error);
+    console.error('❌ Error initializing notification service:', error);
   }
 };

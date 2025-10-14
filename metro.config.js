@@ -1,4 +1,5 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const path = require('path');
 
 /**
  * Metro configuration
@@ -7,14 +8,23 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const config = {
-  watchFolders: [],
   resolver: {
-    blockList: [
-      // Ignore CMake build directories that cause file watcher errors
-      /.*\/\.cxx\/.*/,
-      /.*\/build\/.*/,
-      /.*\/CMakeFiles\/.*/,
-    ],
+    // Add .cjs extension support
+    sourceExts: ['js', 'jsx', 'ts', 'tsx', 'json', 'cjs'],
+    // Handle pretty-format module resolution issue
+    resolveRequest: (context, moduleName, platform) => {
+      // Handle pretty-format package resolution issue
+      if (moduleName === 'pretty-format') {
+        const prettyFormatPath = path.resolve(__dirname, 'node_modules/pretty-format/build/index.js');
+        return {
+          type: 'sourceFile',
+          filePath: prettyFormatPath,
+        };
+      }
+      
+      // Use default resolver for other modules
+      return context.resolveRequest(context, moduleName, platform);
+    },
   },
 };
 
