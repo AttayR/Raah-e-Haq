@@ -13,6 +13,16 @@ import notificationService from '../services/notificationService';
 import locationTrackingService from '../services/locationTrackingService';
 import { usePassengerNotifications } from './usePassengerNotifications';
 import { useDriverNotifications } from './useDriverNotifications';
+import { 
+  showRideRequestedModal, 
+  showDriverFoundToast, 
+  showRideStartedToast, 
+  showRideCompletedToast,
+  showErrorModal,
+  showSuccessToast,
+  showLoadingToast,
+  hideToast
+} from '../components/NotificationManager';
 
 export interface RideState {
   currentRide: RideResource | null;
@@ -78,9 +88,15 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   const requestRide = useCallback(async (rideData: RideRequest): Promise<RideResource> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
+    // Show loading toast
+    showLoadingToast('Creating Ride Request', 'Please wait while we process your request...');
+    
     try {
       console.log('🚗 Requesting ride:', rideData);
       const ride = await rideService.createRide(rideData);
+      
+      // Hide loading toast
+      hideToast();
       
       setState(prev => ({
         ...prev,
@@ -95,44 +111,57 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         5 // 5km radius
       );
 
-      // Send notifications to nearby drivers
-      for (const driver of drivers) {
-        await passengerNotifications.sendRideRequestNotification(driver.id, {
-          rideId: ride.id,
-          passengerName: 'Passenger', // TODO: Get actual passenger name
-          pickup: {
-            latitude: rideData.pickup_latitude,
-            longitude: rideData.pickup_longitude,
-            address: rideData.pickup_address,
-          },
-          destination: {
-            latitude: rideData.dropoff_latitude,
-            longitude: rideData.dropoff_longitude,
-            address: rideData.dropoff_address,
-          },
-          fare: 0, // Will be calculated
-          distance: '0 km', // Will be calculated
-        });
+      // Send notifications to nearby drivers (only if drivers exist)
+      if (drivers && Array.isArray(drivers)) {
+        for (const driver of drivers) {
+          await passengerNotifications.sendRideRequestNotification(driver.id, {
+            rideId: ride.id,
+            passengerName: 'Passenger', // TODO: Get actual passenger name
+            pickup: {
+              latitude: rideData.pickup_latitude,
+              longitude: rideData.pickup_longitude,
+              address: rideData.pickup_address,
+            },
+            destination: {
+              latitude: rideData.dropoff_latitude,
+              longitude: rideData.dropoff_longitude,
+              address: rideData.dropoff_address,
+            },
+            fare: 0, // Will be calculated
+            distance: '0 km', // Will be calculated
+          });
+        }
       }
+
+      // Show success modal
+      showRideRequestedModal();
 
       console.log('✅ Ride requested successfully:', ride);
       return ride;
     } catch (error) {
+      // Hide loading toast
+      hideToast();
+      
       console.error('❌ Failed to request ride:', error);
       
       // Handle different types of errors
       let errorMessage = 'Failed to request ride';
+      let errorTitle = 'Ride Request Failed';
       
       if (error && typeof error === 'object') {
         if ('message' in error) {
           const errorObj = error as Error;
           if (errorObj.message.includes('Property') && errorObj.message.includes("doesn't exist")) {
+            errorTitle = 'App Data Error';
             errorMessage = 'There was an issue with the app data. Please restart the app.';
           } else if (errorObj.message.includes('Network')) {
+            errorTitle = 'Network Error';
             errorMessage = 'Network connection issue. Please check your internet connection.';
           } else if (errorObj.message.includes('Authentication')) {
+            errorTitle = 'Authentication Error';
             errorMessage = 'Authentication error. Please log in again.';
           } else if (errorObj.message.includes('Database') || errorObj.message.includes('SQL')) {
+            errorTitle = 'Server Error';
             errorMessage = 'Server error. Please try again in a moment.';
           } else {
             errorMessage = errorObj.message;
@@ -145,6 +174,26 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
         error: errorMessage,
       }));
+
+      // Show error modal
+      showErrorModal(
+        errorTitle,
+        errorMessage,
+        {
+          label: 'Try Again',
+          onPress: () => {
+            // Retry logic could be added here
+            console.log('Retry ride request');
+          },
+        },
+        {
+          label: 'Cancel',
+          onPress: () => {
+            console.log('Cancel ride request');
+          },
+        }
+      );
+      
       throw error;
     }
   }, [passengerNotifications]);
@@ -171,6 +220,18 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         estimatedArrival: '5 minutes',
       });
 
+      // Show success toast
+      showSuccessToast(
+        'Ride Accepted! 🎉',
+        'You have successfully accepted the ride. Head to the pickup location.',
+        {
+          label: 'View Details',
+          onPress: () => {
+            console.log('Navigate to ride details');
+          },
+        }
+      );
+
       console.log('✅ Ride accepted successfully:', ride);
       return ride;
     } catch (error) {
@@ -180,6 +241,19 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to accept ride',
       }));
+
+      // Show error modal
+      showErrorModal(
+        'Failed to Accept Ride',
+        error instanceof Error ? error.message : 'Failed to accept ride',
+        {
+          label: 'Try Again',
+          onPress: () => {
+            console.log('Retry accept ride');
+          },
+        }
+      );
+      
       throw error;
     }
   }, [driverNotifications]);
@@ -206,6 +280,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         estimatedDuration: '15 minutes',
       });
 
+      // Show success toast
+      showRideStartedToast();
+
       console.log('✅ Ride started successfully:', ride);
       return ride;
     } catch (error) {
@@ -215,6 +292,19 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to start ride',
       }));
+
+      // Show error modal
+      showErrorModal(
+        'Failed to Start Ride',
+        error instanceof Error ? error.message : 'Failed to start ride',
+        {
+          label: 'Try Again',
+          onPress: () => {
+            console.log('Retry start ride');
+          },
+        }
+      );
+      
       throw error;
     }
   }, [driverNotifications]);
@@ -248,6 +338,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         distance: `${distance || 0} km`,
       });
 
+      // Show success toast
+      showRideCompletedToast(fare || 0);
+
       console.log('✅ Ride completed successfully:', ride);
       return ride;
     } catch (error) {
@@ -257,6 +350,19 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to complete ride',
       }));
+
+      // Show error modal
+      showErrorModal(
+        'Failed to Complete Ride',
+        error instanceof Error ? error.message : 'Failed to complete ride',
+        {
+          label: 'Try Again',
+          onPress: () => {
+            console.log('Retry complete ride');
+          },
+        }
+      );
+      
       throw error;
     }
   }, [driverNotifications]);
@@ -311,16 +417,25 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius });
       const drivers = await rideService.getDriversInRadius(latitude, longitude, radius);
       
+      // Ensure drivers is always an array
+      const safeDrivers = Array.isArray(drivers) ? drivers : [];
+      
       setState(prev => ({
         ...prev,
-        availableDrivers: drivers,
+        availableDrivers: safeDrivers,
       }));
 
-      console.log('✅ Nearby drivers found:', drivers);
-      return drivers;
+      console.log('✅ Nearby drivers found:', safeDrivers);
+      return safeDrivers;
     } catch (error) {
       console.error('❌ Failed to find nearby drivers:', error);
-      throw error;
+      // Return empty array on error instead of throwing
+      const emptyDrivers: DriverInRadius[] = [];
+      setState(prev => ({
+        ...prev,
+        availableDrivers: emptyDrivers,
+      }));
+      return emptyDrivers;
     }
   }, []);
 

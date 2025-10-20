@@ -298,11 +298,34 @@ const PassengerMapScreen = () => {
         return;
       }
 
-      console.log('Requesting ride with advanced data:', rideData);
+      // Map vehicle types to API-compatible values
+      const vehicleTypeMapping: { [key: string]: string } = {
+        'bike': 'bike',
+        'economy': 'car',
+        'comfort': 'car',
+        'premium': 'car',
+        'van': 'van'
+      };
+
+      const mappedVehicleType = vehicleTypeMapping[rideData.vehicle_type] || rideData.vehicle_type;
+      
+      console.log('Original vehicle type:', rideData.vehicle_type);
+      console.log('Mapped vehicle type:', mappedVehicleType);
+
+      const processedRideData = {
+        ...rideData,
+        vehicle_type: mappedVehicleType,
+        // Add service level for car variants
+        ...(rideData.vehicle_type !== 'bike' && rideData.vehicle_type !== 'van' && {
+          service_level: rideData.vehicle_type // economy, comfort, premium
+        })
+      };
+
+      console.log('Requesting ride with processed data:', processedRideData);
       
       const fullRideData = {
         passenger_id: 11, // TODO: Get actual passenger ID from auth
-        ...rideData
+        ...processedRideData
       };
 
       await requestRideService(fullRideData);

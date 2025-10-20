@@ -10,7 +10,7 @@ import { StatusBar } from 'react-native';
 import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
-import Toast from 'react-native-toast-message';
+import NotificationManager from './src/components/NotificationManager';
 import { configureGoogleSignIn } from './src/services/googleSignIn';
 
 function ThemedNav() {
@@ -48,7 +48,6 @@ function ThemedNav() {
       <NavigationContainer theme={navTheme}>
         <AuthFlow />
       </NavigationContainer>
-      <Toast />
     </>
   );
 }
@@ -62,7 +61,9 @@ export default function App() {
   return (
     <ReduxProvider>
       <ThemeProvider>
-        <ThemedNav />
+        <NotificationManager>
+          <ThemedNav />
+        </NotificationManager>
       </ThemeProvider>
     </ReduxProvider>
   );

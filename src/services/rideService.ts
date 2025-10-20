@@ -15,6 +15,7 @@ export interface RideRequest {
   dropoff_latitude: number;
   dropoff_longitude: number;
   vehicle_type: string;
+  service_level?: string; // economy, comfort, premium for car variants
   passenger_count: number;
   special_instructions: string;
   stops: RideStopRequest[];
@@ -241,15 +242,40 @@ class RideService {
       // Provide more specific error messages
       if (error.response) {
         const status = error.response.status;
-        const message = error.response.data?.message || error.response.data?.error || 'Unknown server error';
+        const responseData = error.response.data;
         
         if (status === 401) {
           throw new Error('Authentication required. Please login again.');
         } else if (status === 422) {
-          throw new Error(`Validation error: ${message}`);
+          // Handle validation errors with detailed field information
+          let validationMessage = 'Validation error';
+          
+          if (responseData?.errors) {
+            // Laravel-style validation errors
+            const errors = responseData.errors;
+            const errorMessages = Object.keys(errors).map(field => {
+              const fieldErrors = Array.isArray(errors[field]) ? errors[field] : [errors[field]];
+              return `${field}: ${fieldErrors.join(', ')}`;
+            });
+            validationMessage = `Validation error: ${errorMessages.join('; ')}`;
+          } else if (responseData?.message) {
+            validationMessage = `Validation error: ${responseData.message}`;
+          } else if (responseData?.error) {
+            validationMessage = `Validation error: ${responseData.error}`;
+          } else if (typeof responseData === 'string') {
+            validationMessage = `Validation error: ${responseData}`;
+          } else {
+            // Log the full response for debugging
+            console.log('Full validation error response:', JSON.stringify(responseData, null, 2));
+            validationMessage = `Validation error: ${JSON.stringify(responseData)}`;
+          }
+          
+          throw new Error(validationMessage);
         } else if (status === 500) {
+          const message = responseData?.message || responseData?.error || 'Unknown server error';
           throw new Error(`Server error: ${message}`);
         } else {
+          const message = responseData?.message || responseData?.error || 'Unknown server error';
           throw new Error(`Request failed (${status}): ${message}`);
         }
       } else if (error.request) {
@@ -441,7 +467,7 @@ class RideService {
         }
       });
       console.log('✅ Drivers found successfully:', response.data);
-      return response.data.data;
+      return response.data.data || [];
     } catch (error) {
       console.error('❌ Failed to find drivers in radius:', error);
       throw error;
