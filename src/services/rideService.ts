@@ -1,4 +1,4 @@
-import apiService from './api';
+import apiService, { createCancellableRequest, removeRequest } from './api';
 
 export interface RideLocation {
   latitude: number;
@@ -14,7 +14,17 @@ export interface RideRequest {
   pickup_longitude: number;
   dropoff_latitude: number;
   dropoff_longitude: number;
-  vehicle_type?: string;
+  vehicle_type: string;
+  passenger_count: number;
+  special_instructions: string;
+  stops: RideStopRequest[];
+}
+
+export interface RideStopRequest {
+  address: string;
+  latitude: number;
+  longitude: number;
+  stop_order: number;
 }
 
 export interface RideUpdate {
@@ -27,6 +37,7 @@ export interface RideUpdate {
 
 export interface RideResource {
   id: number;
+  ride_id: string;
   passenger_id: number;
   driver_id?: number;
   pickup_address: string;
@@ -36,10 +47,24 @@ export interface RideResource {
   dropoff_latitude: number;
   dropoff_longitude: number;
   status: 'requested' | 'accepted' | 'ongoing' | 'completed' | 'cancelled';
-  fare?: number;
+  vehicle_type: string;
+  passenger_count: number;
+  special_instructions?: string;
+  base_fare: number;
+  distance_fare: number;
+  time_fare: number;
+  total_fare: number;
+  driver_earnings: number;
+  platform_commission: number;
   distance_km?: number;
-  duration_min?: number;
-  vehicle_type?: string;
+  duration_minutes?: number;
+  payment_method: string;
+  payment_status: string;
+  stops: RideStopResource[];
+  current_stop_index: number;
+  active_stops_count: number;
+  completed_stops_count: number;
+  estimated_arrival?: string;
   created_at: string;
   updated_at: string;
   passenger?: {
@@ -56,6 +81,38 @@ export interface RideResource {
     vehicle_type?: string;
     license_number?: string;
   };
+  vehicle?: {
+    id: number;
+    brand: string;
+    model: string;
+    year?: string;
+    color?: string;
+    license_plate: string;
+  };
+  requested_at: string;
+  accepted_at?: string;
+  arrived_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  cancelled_at?: string;
+}
+
+export interface RideStopResource {
+  id: number;
+  ride_id: number;
+  address: string;
+  latitude: number;
+  longitude: number;
+  stop_order: number;
+  status: 'active' | 'completed' | 'cancelled' | 'skipped';
+  status_label: string;
+  status_color: string;
+  arrived_at?: string;
+  completed_at?: string;
+  notes?: string;
+  estimated_arrival?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PaginatedRides {
@@ -85,16 +142,60 @@ export interface DriverInRadius {
   distance_km: number;
   estimated_arrival_min: number;
   location: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+export interface DriverLocation {
+  driver_id: number;
   latitude: number;
   longitude: number;
-  };
+  status: 'online' | 'offline' | 'busy';
+  speed?: number;
+  heading?: number;
+  accuracy?: number;
+  last_seen_at: string;
+}
+
+export interface LocationUpdate {
+  latitude: number;
+  longitude: number;
+  status: 'online' | 'offline' | 'busy';
+  speed?: number;
+  heading?: number;
+  accuracy?: number;
+}
+
+export interface NotificationResource {
+  id: number;
+  user_id: number;
+  type: string;
+  title: string;
+  message: string;
+  data?: any;
+  read_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebSocketSubscription {
+  ride_id: number;
+  user_type: 'passenger' | 'driver';
+  websocket_url: string;
+  channels: string[];
 }
 
 class RideService {
   private baseUrl = '/rides';
+  private trackingUrl = '/tracking';
+  private notificationsUrl = '/notifications';
+  private websocketUrl = '/websocket';
 
-  // Create a new ride request
+  // Create a new ride request with stops support
   async createRide(rideData: RideRequest): Promise<RideResource> {
+    const cancelSource = createCancellableRequest();
+    
     try {
       console.log('🚗 Creating ride request:', rideData);
       
@@ -109,8 +210,13 @@ class RideService {
         throw new Error('Dropoff coordinates are required');
       }
       
-      const response = await apiService.post(`${this.baseUrl}`, rideData);
+      const response = await apiService.post(`${this.baseUrl}`, rideData, {
+        cancelToken: cancelSource.token
+      });
       console.log('✅ Ride created successfully:', response.data);
+      
+      // Remove from tracking when successful
+      removeRequest(cancelSource);
       
       // Handle different response formats
       if (response.data && response.data.data) {
@@ -121,6 +227,15 @@ class RideService {
         throw new Error('Invalid response format from server');
       }
     } catch (error) {
+      // Remove from tracking on error
+      removeRequest(cancelSource);
+      
+      // Handle cancelled requests
+      if (error.name === 'CanceledError' || error.message?.includes('canceled')) {
+        console.log('🚫 Ride creation cancelled');
+        throw new Error('Request was cancelled');
+      }
+      
       console.error('❌ Failed to create ride:', error);
       
       // Provide more specific error messages
@@ -472,6 +587,221 @@ class RideService {
 
   private deg2rad(deg: number): number {
     return deg * (Math.PI / 180);
+  }
+
+  // ==================== STOP MANAGEMENT METHODS ====================
+
+  // Add stop to ride
+  async addStop(rideId: number, stopData: RideStopRequest): Promise<RideResource> {
+    try {
+      console.log('📍 Adding stop to ride:', rideId, stopData);
+      const response = await apiService.post(`${this.baseUrl}/${rideId}/stops`, stopData);
+      console.log('✅ Stop added successfully:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to add stop:', error);
+      throw error;
+    }
+  }
+
+  // Remove stop from ride
+  async removeStop(rideId: number, stopId: number): Promise<RideResource> {
+    try {
+      console.log('🗑️ Removing stop from ride:', rideId, stopId);
+      const response = await apiService.delete(`${this.baseUrl}/${rideId}/stops/${stopId}`);
+      console.log('✅ Stop removed successfully:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to remove stop:', error);
+      throw error;
+    }
+  }
+
+  // Update stop order
+  async updateStopOrder(rideId: number, stopOrders: Array<{stop_id: number, new_order: number}>): Promise<RideResource> {
+    try {
+      console.log('🔄 Updating stop order:', rideId, stopOrders);
+      const response = await apiService.put(`${this.baseUrl}/${rideId}/stops/reorder`, { stop_orders: stopOrders });
+      console.log('✅ Stop order updated successfully:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to update stop order:', error);
+      throw error;
+    }
+  }
+
+  // ==================== DRIVER NAVIGATION METHODS ====================
+
+  // Navigate to next stop
+  async navigateToNextStop(rideId: number): Promise<any> {
+    try {
+      console.log('🧭 Navigating to next stop:', rideId);
+      const response = await apiService.post(`${this.baseUrl}/${rideId}/navigate-next-stop`);
+      console.log('✅ Navigation started successfully:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to start navigation:', error);
+      throw error;
+    }
+  }
+
+  // Mark stop as completed
+  async markStopCompleted(rideId: number, stopId: number): Promise<any> {
+    try {
+      console.log('✅ Marking stop as completed:', rideId, stopId);
+      const response = await apiService.post(`${this.baseUrl}/${rideId}/stops/${stopId}/complete`);
+      console.log('✅ Stop marked as completed:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to mark stop as completed:', error);
+      throw error;
+    }
+  }
+
+  // Get navigation instructions
+  async getNavigationInstructions(rideId: number): Promise<any> {
+    try {
+      console.log('🧭 Getting navigation instructions:', rideId);
+      const response = await apiService.get(`${this.baseUrl}/${rideId}/navigation-instructions`);
+      console.log('✅ Navigation instructions fetched:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to get navigation instructions:', error);
+      throw error;
+    }
+  }
+
+  // ==================== LOCATION TRACKING METHODS ====================
+
+  // Update driver location
+  async updateDriverLocation(locationData: LocationUpdate): Promise<any> {
+    try {
+      console.log('📍 Updating driver location:', locationData);
+      const response = await apiService.post(`${this.trackingUrl}/update-location`, locationData);
+      console.log('✅ Driver location updated successfully:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Failed to update driver location:', error);
+      throw error;
+    }
+  }
+
+  // Get driver location
+  async getDriverLocationById(driverId: number): Promise<DriverLocation> {
+    try {
+      console.log('📍 Fetching driver location:', driverId);
+      const response = await apiService.get(`${this.trackingUrl}/driver/${driverId}/location`);
+      console.log('✅ Driver location fetched successfully:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to fetch driver location:', error);
+      throw error;
+    }
+  }
+
+  // ==================== NOTIFICATION METHODS ====================
+
+  // Get user notifications
+  async getNotifications(page: number = 1, perPage: number = 20): Promise<{data: NotificationResource[], pagination: any}> {
+    try {
+      console.log('🔔 Fetching notifications:', { page, perPage });
+      const response = await apiService.get(`${this.notificationsUrl}`, {
+        params: { page, per_page: perPage }
+      });
+      console.log('✅ Notifications fetched successfully:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Failed to fetch notifications:', error);
+      throw error;
+    }
+  }
+
+  // Mark notification as read
+  async markNotificationAsRead(notificationId: number): Promise<any> {
+    try {
+      console.log('✅ Marking notification as read:', notificationId);
+      const response = await apiService.post(`${this.notificationsUrl}/${notificationId}/read`);
+      console.log('✅ Notification marked as read:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Failed to mark notification as read:', error);
+      throw error;
+    }
+  }
+
+  // Mark all notifications as read
+  async markAllNotificationsAsRead(): Promise<any> {
+    try {
+      console.log('✅ Marking all notifications as read');
+      const response = await apiService.post(`${this.notificationsUrl}/read-all`);
+      console.log('✅ All notifications marked as read:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Failed to mark all notifications as read:', error);
+      throw error;
+    }
+  }
+
+  // Get unread count
+  async getUnreadCount(): Promise<number> {
+    try {
+      console.log('🔢 Getting unread count');
+      const response = await apiService.get(`${this.notificationsUrl}/unread-count`);
+      console.log('✅ Unread count fetched:', response.data);
+      return response.data.data.unread_count;
+    } catch (error) {
+      console.error('❌ Failed to get unread count:', error);
+      throw error;
+    }
+  }
+
+  // ==================== WEBSOCKET METHODS ====================
+
+  // Subscribe to ride updates
+  async subscribeToRideUpdates(rideId: number, userType: 'passenger' | 'driver'): Promise<WebSocketSubscription> {
+    try {
+      console.log('🔌 Subscribing to ride updates:', { rideId, userType });
+      const response = await apiService.post(`${this.websocketUrl}/subscribe-ride`, {
+        ride_id: rideId,
+        user_type: userType
+      });
+      console.log('✅ Subscribed to ride updates:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to subscribe to ride updates:', error);
+      throw error;
+    }
+  }
+
+  // Subscribe to driver requests
+  async subscribeToDriverRequests(driverId: number, latitude: number, longitude: number, radius: number = 10): Promise<WebSocketSubscription> {
+    try {
+      console.log('🔌 Subscribing to driver requests:', { driverId, latitude, longitude, radius });
+      const response = await apiService.post(`${this.websocketUrl}/subscribe-driver`, {
+        driver_id: driverId,
+        latitude,
+        longitude,
+        radius
+      });
+      console.log('✅ Subscribed to driver requests:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to subscribe to driver requests:', error);
+      throw error;
+    }
+  }
+
+  // Get WebSocket events documentation
+  async getWebSocketEvents(): Promise<any> {
+    try {
+      console.log('📋 Getting WebSocket events documentation');
+      const response = await apiService.get(`${this.websocketUrl}/events`);
+      console.log('✅ WebSocket events fetched:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ Failed to get WebSocket events:', error);
+      throw error;
+    }
   }
 }
 

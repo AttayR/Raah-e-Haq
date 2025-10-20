@@ -8,7 +8,9 @@ import {
   Dimensions,
   StatusBar
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
+import SafeMapView from '../../components/SafeMapView';
+import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -27,7 +29,7 @@ interface Location {
 
 const DriverMapScreen = () => {
   const { theme } = useAppTheme();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   
   // Safe Redux state access with fallbacks
   const authState = useAppSelector(state => state?.auth);
@@ -244,20 +246,25 @@ const DriverMapScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={getSafeRegion()}
-        showsUserLocation={true}
-        showsMyLocationButton={false}
-        onMapReady={() => {
-          console.log('Map is ready');
-        }}
-        onError={(error) => {
-          console.error('Map error:', error);
-        }}
-      >
+      <MapErrorBoundary>
+        <SafeMapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={getSafeRegion()}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          onMapReady={() => {
+            console.log('SafeMapView is ready');
+          }}
+          onError={(error) => {
+            console.error('SafeMapView error:', error);
+          }}
+          fallbackComponent={
+            <View style={styles.map}>
+              <Text style={styles.fallbackText}>Map loading...</Text>
+            </View>
+          }
+        >
         {/* Driver location marker */}
         {currentLocation && (
           <Marker
@@ -286,7 +293,8 @@ const DriverMapScreen = () => {
             />
           </>
         )}
-      </MapView>
+        </SafeMapView>
+      </MapErrorBoundary>
 
       {/* Status Bar */}
       <View style={styles.statusBar}>
@@ -390,6 +398,13 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  fallbackText: {
+    fontSize: 16,
+    color: BrandColors.primary,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 50,
   },
   statusBar: {
     position: 'absolute',

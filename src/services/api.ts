@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, CancelTokenSource } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
@@ -14,6 +14,33 @@ const apiClient: AxiosInstance = axios.create({
     'Accept': 'application/json',
   },
 });
+
+// Track active requests for cleanup
+const activeRequests = new Set<CancelTokenSource>();
+
+// Helper function to create a cancellable request
+export const createCancellableRequest = () => {
+  const source = axios.CancelToken.source();
+  activeRequests.add(source);
+  return source;
+};
+
+// Helper function to cancel all active requests
+export const cancelAllRequests = () => {
+  activeRequests.forEach(source => {
+    try {
+      source.cancel('Component unmounted');
+    } catch (error) {
+      console.log('Error cancelling request:', error);
+    }
+  });
+  activeRequests.clear();
+};
+
+// Helper function to remove a request from tracking
+export const removeRequest = (source: CancelTokenSource) => {
+  activeRequests.delete(source);
+};
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -39,6 +66,12 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Handle cancelled requests (don't process them)
+    if (axios.isCancel(error)) {
+      console.log('Request cancelled:', error.message);
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
 
     // Handle 401 errors (unauthorized)

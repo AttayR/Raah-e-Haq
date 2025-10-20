@@ -1,117 +1,160 @@
 import { useState, useEffect, useCallback } from 'react';
-import notificationService, { NotificationData } from '../services/notificationService';
+import notificationService from '../services/notificationService';
+import { NotificationResource } from '../services/rideService';
 
 export interface NotificationState {
   isInitialized: boolean;
-  fcmToken: string | null;
-  hasPermission: boolean;
-  notifications: NotificationData[];
+  notifications: NotificationResource[];
+  unreadCount: number;
+  isLoading: boolean;
 }
 
 export const useNotifications = () => {
   const [state, setState] = useState<NotificationState>({
     isInitialized: false,
-    fcmToken: null,
-    hasPermission: false,
     notifications: [],
+    unreadCount: 0,
+    isLoading: false,
   });
 
   // Initialize notifications
   const initializeNotifications = useCallback(async () => {
     try {
       console.log('🔄 Initializing notifications...');
-      await notificationService.initialize();
-      const token = notificationService.getToken();
       
-      console.log('📱 FCM Token Retrieved:', token);
-      console.log('📱 Token Details:', {
-        token,
-        length: token?.length,
-        type: typeof token,
-        isNull: token === null,
-        isUndefined: token === undefined,
-      });
+      // Load initial notifications and unread count
+      const [notificationsResult, unreadCount] = await Promise.all([
+        notificationService.getNotifications(1, 20),
+        notificationService.getUnreadCount()
+      ]);
       
       setState(prev => ({
         ...prev,
         isInitialized: true,
-        fcmToken: token,
-        hasPermission: !!token,
+        notifications: notificationsResult.data,
+        unreadCount: unreadCount,
       }));
       
       console.log('✅ Notifications initialized successfully');
-      console.log('📊 Notification State:', {
-        isInitialized: true,
-        fcmToken: token,
-        hasPermission: !!token,
-      });
     } catch (error) {
       console.error('❌ Failed to initialize notifications:', error);
+      setState(prev => ({
+        ...prev,
+        isInitialized: true, // Still mark as initialized even if failed
+      }));
     }
   }, []);
 
-  // Subscribe to driver topic
-  const subscribeToDriverTopic = useCallback(async (driverId: string) => {
+  // Get notifications
+  const getNotifications = useCallback(async (page: number = 1, perPage: number = 20) => {
     try {
-      await notificationService.subscribeToTopic(`driver_${driverId}`);
-      console.log(`✅ Subscribed to driver topic: driver_${driverId}`);
+      setState(prev => ({ ...prev, isLoading: true }));
+      const result = await notificationService.getNotifications(page, perPage);
+      
+      setState(prev => ({
+        ...prev,
+        notifications: page === 1 ? result.data : [...prev.notifications, ...result.data],
+        isLoading: false,
+      }));
+      
+      return result;
     } catch (error) {
-      console.error('❌ Failed to subscribe to driver topic:', error);
+      console.error('❌ Failed to get notifications:', error);
+      setState(prev => ({ ...prev, isLoading: false }));
+      throw error;
     }
   }, []);
 
-  // Subscribe to passenger topic
-  const subscribeToPassengerTopic = useCallback(async (passengerId: string) => {
+  // Mark notification as read
+  const markAsRead = useCallback(async (notificationId: number) => {
     try {
-      await notificationService.subscribeToTopic(`passenger_${passengerId}`);
-      console.log(`✅ Subscribed to passenger topic: passenger_${passengerId}`);
+      await notificationService.markAsRead(notificationId);
+      
+      // Update local state
+      setState(prev => ({
+        ...prev,
+        notifications: prev.notifications.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read_at: new Date().toISOString() }
+            : notification
+        ),
+        unreadCount: Math.max(0, prev.unreadCount - 1),
+      }));
+      
     } catch (error) {
-      console.error('❌ Failed to subscribe to passenger topic:', error);
+      console.error('❌ Failed to mark notification as read:', error);
+      throw error;
     }
   }, []);
 
-  // Unsubscribe from topic
-  const unsubscribeFromTopic = useCallback(async (topic: string) => {
+  // Mark all notifications as read
+  const markAllAsRead = useCallback(async () => {
     try {
-      await notificationService.unsubscribeFromTopic(topic);
-      console.log(`✅ Unsubscribed from topic: ${topic}`);
+      await notificationService.markAllAsRead();
+      
+      // Update local state
+      setState(prev => ({
+        ...prev,
+        notifications: prev.notifications.map(notification => ({
+          ...notification,
+          read_at: new Date().toISOString()
+        })),
+        unreadCount: 0,
+      }));
+      
     } catch (error) {
-      console.error('❌ Failed to unsubscribe from topic:', error);
+      console.error('❌ Failed to mark all notifications as read:', error);
+      throw error;
     }
   }, []);
 
-  // Send notification to user
-  const sendNotificationToUser = useCallback(async (userId: string, notification: NotificationData) => {
+  // Get unread count
+  const getUnreadCount = useCallback(async () => {
     try {
-      await notificationService.sendNotificationToUser(userId, notification);
-      console.log(`✅ Notification sent to user ${userId}`);
+      const count = await notificationService.getUnreadCount();
+      setState(prev => ({ ...prev, unreadCount: count }));
+      return count;
     } catch (error) {
-      console.error('❌ Failed to send notification:', error);
+      console.error('❌ Failed to get unread count:', error);
+      throw error;
     }
   }, []);
 
-  // Send notification to topic
-  const sendNotificationToTopic = useCallback(async (topic: string, notification: NotificationData) => {
+  // Refresh notifications
+  const refreshNotifications = useCallback(async () => {
     try {
-      await notificationService.sendNotificationToTopic(topic, notification);
-      console.log(`✅ Notification sent to topic ${topic}`);
+      await Promise.all([
+        getNotifications(1, 20),
+        getUnreadCount()
+      ]);
     } catch (error) {
-      console.error('❌ Failed to send notification to topic:', error);
+      console.error('❌ Failed to refresh notifications:', error);
     }
-  }, []);
+  }, [getNotifications, getUnreadCount]);
 
-  // Clear all notifications
-  const clearAllNotifications = useCallback(() => {
-    notificationService.clearAllNotifications();
+  // Handle incoming notification
+  const handleIncomingNotification = useCallback((notification: NotificationResource) => {
+    console.log('📨 Received new notification:', notification);
+    
     setState(prev => ({
       ...prev,
-      notifications: [],
+      notifications: [notification, ...prev.notifications],
+      unreadCount: prev.unreadCount + 1,
     }));
   }, []);
 
-  // Set badge count
-  const setBadgeCount = useCallback((count: number) => {
-    notificationService.setBadgeCount(count);
+  // Clear all notifications
+  const clearAllNotifications = useCallback(async () => {
+    try {
+      await notificationService.clearStoredNotifications();
+      setState(prev => ({
+        ...prev,
+        notifications: [],
+        unreadCount: 0,
+      }));
+    } catch (error) {
+      console.error('❌ Failed to clear notifications:', error);
+    }
   }, []);
 
   // Initialize on mount
@@ -122,13 +165,13 @@ export const useNotifications = () => {
   return {
     ...state,
     initializeNotifications,
-    subscribeToDriverTopic,
-    subscribeToPassengerTopic,
-    unsubscribeFromTopic,
-    sendNotificationToUser,
-    sendNotificationToTopic,
+    getNotifications,
+    markAsRead,
+    markAllAsRead,
+    getUnreadCount,
+    refreshNotifications,
+    handleIncomingNotification,
     clearAllNotifications,
-    setBadgeCount,
   };
 };
 
