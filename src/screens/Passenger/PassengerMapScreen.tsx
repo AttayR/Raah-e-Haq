@@ -1,29 +1,67 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
-import { useNavigation } from '@react-navigation/native';
+import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet, AppState } from 'react-native';
+import { Marker, MapPressEvent } from 'react-native-maps';
+import SafeMapView from '../../components/SafeMapView';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useLocation } from '../../hooks/useLocation';
+import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
 import { useFare } from '../../hooks/useFare';
+import { useRide } from '../../hooks/useRide';
+import { useErrorHandler } from '../../hooks/useErrorHandler';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import MapErrorBoundary from '../../components/MapErrorBoundary';
+import { cancelAllRequests } from '../../services/api';
 import LocationSearch from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
 import VehicleOptions, { VehicleOption } from '../../components/passenger/VehicleOptions';
 import FareDetails from '../../components/passenger/FareDetails';
 import AnimatedPolyline from '../../components/AnimatedPolyline';
-import { useRide } from '../../hooks/useRide';
 import RequestingCard from '../../components/passenger/RequestingCard';
 import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
 import { reverseGeocode } from '../../services/placesService';
 import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
+import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
 
 const PassengerMapScreen = () => {
   const navigation = useNavigation();
-  const mapRef = useRef<MapView>(null);
-  const { currentLocation, isInitialized, initializationTimeout, getCurrentLocation } = useLocation();
+  const mapRef = useRef<any>(null);
+  const { handleError } = useErrorHandler();
+  
+  const { 
+    currentLocation, 
+    isLoading: locationLoading,
+    requestLocationPermission,
+  } = useNativeLocation();
+  
+  // Use passenger notifications
+  const {
+    isInitialized: notificationsInitialized,
+    fcmToken,
+    hasPermission: hasNotificationPermission,
+    subscribeToPassengerNotifications,
+    unsubscribeFromPassengerNotifications,
+    sendRideRequestNotification,
+  } = usePassengerNotifications('passenger_id'); // TODO: Get actual passenger ID from auth
+  // Use comprehensive ride service
+  const rideHook = useRide(11, 'passenger'); // TODO: Get actual passenger ID from auth
+  const {
+    currentRide,
+    rideHistory,
+    availableDrivers,
+    isLoading: rideLoading,
+    error: rideError,
+    requestRide: requestRideService,
+    cancelRide: cancelRideService,
+    findNearbyDrivers,
+    refreshRide,
+  } = rideHook || {};
+  
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
   const { vehicleType, getFare } = useFare();
 
@@ -31,15 +69,106 @@ const PassengerMapScreen = () => {
   const [stops, setStops] = useState<{ latitude: number; longitude: number }[]>([]);
   const [destination, setDestination] = useState<{ latitude: number; longitude: number } | null>(null);
   const [addingStop, setAddingStop] = useState(false);
-  const { ride, requestRide } = useRide();
-  const [enableGeoUI, setEnableGeoUI] = useState(false);
   const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
-  const [rideHistory, setRideHistory] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [_rideHistory, setRideHistory] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
+
+  // Initialize map ready state
+  useEffect(() => {
+    // Set a timeout to show map after a short delay
+    const timer = setTimeout(() => {
+      setIsMapReady(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle MapView lifecycle to prevent crashes
+  useEffect(() => {
+    return () => {
+      // Cleanup MapView when component unmounts
+      if (mapRef.current) {
+        try {
+          // Safely clear the map reference
+          mapRef.current = null;
+        } catch (error) {
+          console.log('MapView cleanup error:', error);
+        }
+      }
+      
+      // Cancel all active network requests
+      try {
+        cancelAllRequests();
+      } catch (error) {
+        console.log('Error cancelling requests:', error);
+      }
+    };
+  }, []);
+
+  // Handle app state changes to prevent MapView crashes
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // Pause MapView when app goes to background
+        if (mapRef.current) {
+          try {
+            // Don't call any MapView methods when app is backgrounded
+            console.log('App backgrounded, pausing MapView operations');
+          } catch (error) {
+            console.log('Error handling app state change:', error);
+          }
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
+
+  // Handle screen focus changes
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is focused
+      console.log('PassengerMapScreen focused');
+      
+      return () => {
+        // Screen is unfocused - cleanup
+        console.log('PassengerMapScreen unfocused - cleaning up');
+        try {
+          cancelAllRequests();
+        } catch (error) {
+          console.log('Error cancelling requests on unfocus:', error);
+        }
+      };
+    }, [])
+  );
+
+  // Handle app state changes to prevent MapView crashes
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'background' && mapRef.current) {
+        try {
+          // Pause MapView when app goes to background
+          mapRef.current.setNativeProps({ onPause: true });
+        } catch (error) {
+          console.log('MapView pause error:', error);
+        }
+      }
+    };
+
+    // Note: AppState is not imported, but this is a common pattern
+    // You might need to import AppState from 'react-native' if needed
+    return () => {
+      // Cleanup
+    };
+  }, []);
+
   const swapPickupDrop = useCallback(() => {
     if (pickup && destination) {
       const newPickup = destination;
@@ -51,11 +180,32 @@ const PassengerMapScreen = () => {
     }
   }, [pickup, destination, fetchRoute, clearRoute]);
 
-  const fareInfo = useMemo(() => {
-    if (pickup && destination) {
-      return getFare(pickup, destination);
-    }
-    return null;
+  const [fareInfo, setFareInfo] = useState<{ fare: number; distance: number; duration: number } | null>(null);
+
+  // Calculate fare when pickup and destination change
+  useEffect(() => {
+    const calculateFare = async () => {
+      if (pickup && destination) {
+        try {
+          console.log('💰 Calculating fare in PassengerMapScreen:', { pickup, destination });
+          const result = await getFare(pickup, destination);
+          console.log('✅ Fare calculated in PassengerMapScreen:', result);
+          setFareInfo(result);
+        } catch (error) {
+          console.error('❌ Error calculating fare in PassengerMapScreen:', error);
+          // Set fallback fare info
+          setFareInfo({
+            fare: 150,
+            distance: 5.0,
+            duration: 10
+          });
+        }
+      } else {
+        setFareInfo(null);
+      }
+    };
+
+    calculateFare();
   }, [pickup, destination, getFare]);
 
   const onPressMap = useCallback((e: MapPressEvent) => {
@@ -91,31 +241,102 @@ const PassengerMapScreen = () => {
   }, [pickup, stops, destination, addingStop, fetchRouteWithWaypoints, clearRoute]);
 
   const centerOnUser = useCallback(() => {
-    getCurrentLocation();
-    if (currentLocation) {
-      mapRef.current?.animateToRegion({
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-    }
-  }, [currentLocation, getCurrentLocation]);
-
-  // Android-only: after a fresh location appears (post-permission), wait briefly before enabling UI
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      if (currentLocation) {
-        setEnableGeoUI(false);
-        const t = setTimeout(() => setEnableGeoUI(true), 1200);
-        return () => clearTimeout(t);
-      } else {
-        setEnableGeoUI(false);
+    if (currentLocation && mapRef.current && isMapReady) {
+      try {
+        mapRef.current.animateToRegion({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      } catch (error) {
+        console.log('Error centering on user:', error);
       }
-    } else {
-      setEnableGeoUI(!!currentLocation);
+    } else if (!currentLocation) {
+      requestLocationPermission();
     }
-  }, [currentLocation]);
+  }, [currentLocation, requestLocationPermission, isMapReady]);
+
+  // Initialize location
+  useEffect(() => {
+    if (currentLocation && mapRef.current && isMapReady) {
+      try {
+        mapRef.current.animateToRegion({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      } catch (error) {
+        console.log('Error animating to current location:', error);
+      }
+    }
+  }, [currentLocation, isMapReady]);
+
+  const handleRequestRide = async (rideData: {
+    pickup_address: string;
+    dropoff_address: string;
+    pickup_latitude: number;
+    pickup_longitude: number;
+    dropoff_latitude: number;
+    dropoff_longitude: number;
+    vehicle_type: string;
+    passenger_count: number;
+    special_instructions: string;
+    stops: any[];
+  }) => {
+    try {
+      if (!requestRideService) {
+        handleError('Ride service is not available. Please restart the app.', 'SERVICE_ERROR');
+        return;
+      }
+
+      // Check authentication
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        handleError('Please log in to request a ride', 'AUTHENTICATION_ERROR');
+        return;
+      }
+
+      // Map vehicle types to API-compatible values
+      const vehicleTypeMapping: { [key: string]: string } = {
+        'bike': 'bike',
+        'economy': 'car',
+        'comfort': 'car',
+        'premium': 'car',
+        'van': 'van'
+      };
+
+      const mappedVehicleType = vehicleTypeMapping[rideData.vehicle_type] || rideData.vehicle_type;
+      
+      console.log('Original vehicle type:', rideData.vehicle_type);
+      console.log('Mapped vehicle type:', mappedVehicleType);
+
+      const processedRideData = {
+        ...rideData,
+        vehicle_type: mappedVehicleType,
+        // Add service level for car variants
+        ...(rideData.vehicle_type !== 'bike' && rideData.vehicle_type !== 'van' && {
+          service_level: rideData.vehicle_type // economy, comfort, premium
+        })
+      };
+
+      console.log('Requesting ride with processed data:', processedRideData);
+      
+      const fullRideData = {
+        passenger_id: 11, // TODO: Get actual passenger ID from auth
+        ...processedRideData
+      };
+
+      await requestRideService(fullRideData);
+      Alert.alert('Ride Requested', 'Looking for nearby drivers...');
+      setError(null); // Clear any previous errors
+      setShowAdvancedRidePanel(false);
+    } catch (error) {
+      handleError(error as Error, 'RIDE_REQUEST_ERROR');
+      setError('Failed to request ride. Please try again.');
+    }
+  };
 
   const resetSelection = useCallback(() => {
     setPickup(null);
@@ -145,7 +366,7 @@ const PassengerMapScreen = () => {
   }, [stage, navigation]);
 
   // Cancel ride functionality
-  const cancelRide = useCallback(() => {
+  const handleCancelRide = useCallback(() => {
     Alert.alert(
       'Cancel Ride',
       'Are you sure you want to cancel this ride?',
@@ -154,14 +375,24 @@ const PassengerMapScreen = () => {
         { 
           text: 'Cancel Ride', 
           style: 'destructive',
-          onPress: () => {
-            // Add cancel ride logic here
-            resetSelection();
+          onPress: async () => {
+            if (currentRide && cancelRideService) {
+              try {
+                await cancelRideService(currentRide.id);
+                Alert.alert('Ride Cancelled', 'Your ride has been cancelled.');
+                resetSelection();
+              } catch (error) {
+                console.error('Error cancelling ride:', error);
+                Alert.alert('Error', 'Failed to cancel ride.');
+              }
+            } else {
+              resetSelection();
+            }
           }
         }
       ]
     );
-  }, [resetSelection]);
+  }, [currentRide, cancelRideService, resetSelection]);
 
   // Edit field functionality
   const editField = useCallback((field: 'pickup' | 'destination' | 'vehicle') => {
@@ -222,16 +453,21 @@ const PassengerMapScreen = () => {
     try {
       saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle });
       
-      const rideId = await requestRide(
-        pickup,
-        destination,
-        { fare: fareInfo.fare, distance: fareInfo.distance, duration: fareInfo.duration },
-        (selectedVehicle as any) || vehicleType,
-        'cash'
-      );
+      const ride = await requestRideService({
+        passenger_id: 11, // TODO: Get actual passenger ID from auth
+        pickup_address: 'Pickup Location', // TODO: Get actual address
+        dropoff_address: 'Destination Location', // TODO: Get actual address
+        pickup_latitude: pickup.latitude,
+        pickup_longitude: pickup.longitude,
+        dropoff_latitude: destination.latitude,
+        dropoff_longitude: destination.longitude,
+        vehicle_type: (selectedVehicle as any) || vehicleType,
+      });
+      
+      const rideId = ride.id;
       
       setStage('requesting');
-      Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare}\n${fareInfo.distance} • ${fareInfo.duration}`);
+      Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare || 0}\n${fareInfo.distance || 0} km • ${fareInfo.duration || 0} min`);
     } catch (err) {
       console.error('Ride request error:', err);
       setError('Failed to request ride. Please try again.');
@@ -239,36 +475,41 @@ const PassengerMapScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRide, saveToHistory]);
+  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRideService, saveToHistory]);
 
   // Auto-fit map to the route whenever it updates
   useEffect(() => {
     if (!mapRef.current) return;
     if (routeCoordinates && routeCoordinates.length > 1) {
-      mapRef.current.fitToCoordinates(routeCoordinates as any, {
-        edgePadding: { top: 80, right: 40, bottom: 300, left: 40 },
-        animated: true,
-      });
+      try {
+        // Use fitToElements to fit the map to show all route coordinates
+        mapRef.current.fitToElements({
+          edgePadding: { top: 80, right: 40, bottom: 300, left: 40 },
+          animated: true,
+        });
+      } catch (error) {
+        console.log('Error fitting map to route:', error);
+      }
     }
   }, [routeCoordinates]);
 
-  if (!isInitialized) {
+  if (!currentLocation && !locationLoading) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="white" />
-        <Text style={styles.loadingTitle}>{initializationTimeout ? 'Initialization Timeout' : 'Initializing Map...'}</Text>
+        <Text style={styles.loadingTitle}>{locationLoading ? 'Getting Location...' : 'Initializing Map...'}</Text>
         <Text style={styles.loadingText}>
-          {initializationTimeout 
-            ? 'Please retry or check your connection' 
+          {locationLoading 
+            ? 'Please enable location services' 
             : 'Setting up location services'
           }
         </Text>
-        {initializationTimeout && (
+        {locationLoading && (
           <TouchableOpacity 
             style={styles.retryButton} 
             onPress={() => {
-              // Force re-initialization by calling getCurrentLocation
-              getCurrentLocation();
+              // Force re-initialization by requesting location permission
+              requestLocationPermission();
             }}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
@@ -278,7 +519,7 @@ const PassengerMapScreen = () => {
     );
   }
 
-  const canShowUserLocation = !!currentLocation && enableGeoUI;
+  const canShowUserLocation = !!currentLocation;
   const initialRegion = currentLocation
     ? {
         latitude: currentLocation.latitude,
@@ -289,28 +530,69 @@ const PassengerMapScreen = () => {
     : MAPS_CONFIG.DEFAULT_REGION;
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('PassengerMapScreen Error:', error, errorInfo);
+        handleError(error, 'PASSENGER_MAP_ERROR');
+      }}
+    >
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
 
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_GOOGLE}
-        style={styles.map}
-        initialRegion={initialRegion}
-        onPress={onPressMap}
-        showsUserLocation={MAPS_CONFIG.CONTROLS.showUserLocation && canShowUserLocation}
-        showsMyLocationButton={Platform.OS === 'ios' ? (MAPS_CONFIG.CONTROLS.showMyLocationButton && canShowUserLocation) : false}
-        onMapReady={() => {
-          if (currentLocation) {
-            mapRef.current?.animateToRegion({
-              latitude: currentLocation.latitude,
-              longitude: currentLocation.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            });
-          }
-        }}
-      >
+      {/* Location Permission Modal */}
+       {!isMapReady ? (
+         <View style={styles.map}>
+           <View style={styles.mapLoadingContainer}>
+             <Text style={styles.mapLoadingText}>Loading Map...</Text>
+           </View>
+         </View>
+       ) : (
+         <MapErrorBoundary
+           fallback={
+             <View style={styles.map}>
+               <View style={styles.mapLoadingContainer}>
+                 <Text style={styles.mapLoadingText}>Map Error - Please restart the app</Text>
+               </View>
+             </View>
+           }
+         >
+           <MapErrorBoundary>
+             <SafeMapView
+               ref={mapRef}
+               style={styles.map}
+               initialRegion={initialRegion}
+               onPress={onPressMap}
+               showsUserLocation={MAPS_CONFIG.CONTROLS.showUserLocation && canShowUserLocation}
+               showsMyLocationButton={Platform.OS === 'ios' ? (MAPS_CONFIG.CONTROLS.showMyLocationButton && canShowUserLocation) : false}
+               onMapReady={() => {
+                 console.log('SafeMapView onMapReady called');
+                 setIsMapReady(true);
+                 // Delay the region animation to ensure map is fully ready
+                 setTimeout(() => {
+                   if (currentLocation && mapRef.current) {
+                     try {
+                       mapRef.current.animateToRegion({
+                         latitude: currentLocation.latitude,
+                         longitude: currentLocation.longitude,
+                         latitudeDelta: 0.01,
+                         longitudeDelta: 0.01,
+                       }, 1000);
+                     } catch (error) {
+                       console.log('Error in onMapReady animation:', error);
+                     }
+                   }
+                 }, 500);
+               }}
+               onMapLoaded={() => {
+                 console.log('SafeMapView onMapLoaded called');
+                 setIsMapReady(true);
+               }}
+               fallbackComponent={
+                 <View style={styles.map}>
+                   <Text style={styles.fallbackText}>Map loading...</Text>
+                 </View>
+               }
+             >
         {pickup && (
           <Marker coordinate={pickup} title={MAPS_CONFIG.MARKERS.pickup.title} pinColor={MAPS_CONFIG.MARKERS.pickup.color} />
         )}
@@ -327,8 +609,11 @@ const PassengerMapScreen = () => {
         )}
         {routeCoordinates.length > 0 && (
           <AnimatedPolyline coordinates={routeCoordinates as any} strokeWidth={5} strokeColor={BrandColors.primary} durationMs={1200} />
-        )}
-      </MapView>
+         )}
+             </SafeMapView>
+           </MapErrorBoundary>
+         </MapErrorBoundary>
+       )}
 
       <View style={styles.topControls}>
         <TouchableOpacity style={styles.iconButton} onPress={centerOnUser}>
@@ -342,6 +627,12 @@ const PassengerMapScreen = () => {
             <Icon name="arrow-back" size={22} color={BrandColors.primary} />
           </TouchableOpacity>
         )}
+        <TouchableOpacity 
+          style={[styles.iconButton, styles.advancedButton]} 
+          onPress={() => setShowAdvancedRidePanel(true)}
+        >
+          <Icon name="add" size={22} color="white" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.bottomPanel}>
@@ -455,7 +746,7 @@ const PassengerMapScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-              {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance} • {fareInfo.duration}</Text>}
+              {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>}
             </View>
             <VehicleOptions
               options={[
@@ -503,21 +794,27 @@ const PassengerMapScreen = () => {
                   <TouchableOpacity onPress={() => editField('vehicle')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
                     <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Change Vehicle</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                  <TouchableOpacity onPress={handleCancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
                     <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance} • {fareInfo.duration}</Text>
+              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>
             </View>
             <FareDetails
               vehicleName={(selectedVehicle || vehicleType).toString()}
-              distanceKm={fareInfo.distance}
-              estimate={`Rs ${fareInfo.fare}`}
+              distanceKm={`${fareInfo.distance || 0} km`}
+              estimate={`Rs ${fareInfo.fare || 0}`}
               breakdown={[
                 { label: 'Base Fare', value: 'Rs 50' },
-                { label: `Distance (${fareInfo.distance} @ Rs 30/km)`, value: `Rs ${Math.max(0, fareInfo.fare - 50 - 16)}` },
-                { label: `Time (${fareInfo.duration} @ Rs 2/min)`, value: 'Rs 16' },
+                { 
+                  label: `Distance (${fareInfo.distance || 0} km @ Rs 30/km)`, 
+                  value: `Rs ${Math.max(0, Math.round((fareInfo.distance || 0) * 30))}` 
+                },
+                { 
+                  label: `Time (${fareInfo.duration || 0} min @ Rs 2/min)`, 
+                  value: `Rs ${Math.max(0, Math.round((fareInfo.duration || 0) * 2))}` 
+                },
                 { label: 'Discount', value: 'Rs 0' },
               ]}
               onConfirm={() => { onRequestRide(); setStage('requesting'); }}
@@ -530,7 +827,7 @@ const PassengerMapScreen = () => {
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 12, color: '#666' }}>Requesting Ride...</Text>
-                <TouchableOpacity onPress={cancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                <TouchableOpacity onPress={handleCancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
                   <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel Request</Text>
                 </TouchableOpacity>
               </View>
@@ -545,11 +842,20 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {ride.activeRide && ride.activeRide.status === 'accepted' && (
-          <DriverAssignedCard name={ride.activeRide.driverName || 'Driver'} vehicle={ride.activeRide.vehicleType} eta={'5 min'} />
+        {currentRide && currentRide.status === 'accepted' && (
+          <DriverAssignedCard name={currentRide.driver?.name || 'Driver'} vehicle={currentRide.vehicle_type || 'Car'} eta={'5 min'} />
         )}
       </View>
+      
+      {/* Advanced Ride Request Panel */}
+      <AdvancedRideRequestPanel
+        visible={showAdvancedRidePanel}
+        onClose={() => setShowAdvancedRidePanel(false)}
+        onRequestRide={handleRequestRide}
+        isLoading={isLoading}
+      />
     </View>
+    </ErrorBoundary>
   );
 };
 
@@ -559,6 +865,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   map: { flex: 1 },
+  fallbackText: {
+    fontSize: 16,
+    color: BrandColors.primary,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 50,
+  },
+  mapLoadingContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapLoadingText: {
+    fontSize: 16,
+    color: BrandColors.primary,
+    fontWeight: '600',
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: 'white',
@@ -602,6 +926,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 22,
     elevation: 2,
+  },
+  advancedButton: {
+    backgroundColor: BrandColors.primary,
   },
   bottomPanel: {
     position: 'absolute',

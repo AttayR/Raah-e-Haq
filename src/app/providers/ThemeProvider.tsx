@@ -29,3 +29,4 @@ return (
 
 
 export function useAppTheme() { return useContext(ThemeCtx); }
+export const useTheme = useAppTheme; // Alias for compatibility

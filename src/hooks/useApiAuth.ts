@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import {
   loginUser,
   registerUser,
+  registerUserWithImages,
   sendOtp,
   verifyOtp,
   forgotPassword,
@@ -40,6 +41,14 @@ export const useApiAuth = () => {
   // Register new user
   const register = useCallback(async (userData: RegisterRequest) => {
     return dispatch(registerUser(userData));
+  }, [dispatch]);
+
+  // Register new user with images
+  const registerWithImages = useCallback(async (userData: RegisterRequest & { 
+    passenger_cnic_front_image?: string; 
+    passenger_cnic_back_image?: string; 
+  }) => {
+    return dispatch(registerUserWithImages(userData));
   }, [dispatch]);
 
   // Send OTP to phone number
@@ -130,6 +139,7 @@ export const useApiAuth = () => {
     initialize,
     login,
     register,
+    registerWithImages,
     sendOtpToPhone,
     verifyOtpCode,
     forgotPasswordRequest,

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useApiAuth } from '../../hooks/useApiAuth';
@@ -35,6 +36,10 @@ interface RegistrationData {
   cnic: string;
   address: string;
   phoneNumber: string;
+  // Emergency Contact (per passenger/driver forms)
+  emergencyContactNumber: string;
+  emergencyContactName: string;
+  emergencyRelationship: string; // e.g., Father, Mother, Spouse, Friend
   
   // Vehicle Info (for drivers)
   vehicleType: string;
@@ -47,17 +52,25 @@ interface RegistrationData {
   // Documents
   driverPicture: string;
   cnicPicture: string;
+  licenseFrontPicture: string; // For drivers
+  licenseBackPicture: string;  // For drivers
+  cnicFrontPicture: string; // For passengers
+  cnicBackPicture: string;  // For passengers
+  profilePicture: string;    // For passengers (and optional for drivers)
   vehiclePictures: string[];
   
   // Role
   role: 'driver' | 'passenger';
+  // Preferences
+  preferredPayment: 'cash' | 'card' | 'wallet' | '';
 }
 
 export default function RegistrationScreen() {
   const navigation = useNavigation<any>();
-  const { register, isLoading } = useApiAuth();
+  const { registerWithImages, isLoading } = useApiAuth();
   
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<RegistrationData>({
     fullName: '',
     email: '',
@@ -66,6 +79,9 @@ export default function RegistrationScreen() {
     cnic: '',
     address: '',
     phoneNumber: '',
+    emergencyContactNumber: '',
+    emergencyContactName: '',
+    emergencyRelationship: '',
     vehicleType: '',
     vehicleNumber: '',
     vehicleBrand: '',
@@ -74,8 +90,14 @@ export default function RegistrationScreen() {
     vehicleColor: '',
     driverPicture: '',
     cnicPicture: '',
+    licenseFrontPicture: '',
+    licenseBackPicture: '',
+    cnicFrontPicture: '',
+    cnicBackPicture: '',
+    profilePicture: '',
     vehiclePictures: [],
     role: 'passenger',
+    preferredPayment: '',
   });
 
   const steps = [
@@ -108,8 +130,18 @@ export default function RegistrationScreen() {
                  formData.vehicleNumber && formData.vehicleBrand && 
                  formData.vehicleModel && formData.vehicleYear && formData.vehicleColor);
       case 'documents':
-        return formData.role === 'passenger' || !!(formData.driverPicture && 
-                 formData.cnicPicture && formData.vehiclePictures.length >= 4);
+        if (formData.role === 'passenger') {
+          // Temporarily skip CNIC image validation for testing
+          // TODO: Re-enable when proper image upload is implemented
+          return true; // Allow progression without images for now
+          // return !!(formData.cnicFrontPicture && formData.cnicFrontPicture.trim() !== '' &&
+          //          formData.cnicBackPicture && formData.cnicBackPicture.trim() !== '');
+        } else {
+          // Drivers need driver picture, CNIC picture, and vehicle pictures
+          return !!(formData.driverPicture && 
+                   formData.cnicPicture && 
+                   formData.vehiclePictures.length >= 4);
+        }
       case 'review':
         return true;
       default:
@@ -138,6 +170,7 @@ export default function RegistrationScreen() {
 
   const handleSubmit = async () => {
     try {
+      setSubmitting(true);
       console.log('🚀 Starting account creation process...');
       console.log('📝 Form data:', {
         fullName: formData.fullName,
@@ -150,31 +183,81 @@ export default function RegistrationScreen() {
         vehicleNumber: formData.vehicleNumber
       });
 
+      // Test network connectivity first
+      console.log('🌐 Testing network connectivity...');
+      const { apiService } = await import('../../services/api');
+      const isConnected = await apiService.testNetworkConnectivity();
+      if (!isConnected) {
+        showToast('error', 'Network connection failed. Please check your internet connection.');
+        return;
+      }
+
+      // Ensure phone number is properly formatted
+      const formattedPhone = formData.phoneNumber.startsWith('+') 
+        ? formData.phoneNumber 
+        : `+${formData.phoneNumber}`;
+
+      // Validate password strength
+      if (formData.password.length < 8) {
+        showToast('error', 'Password must be at least 8 characters long');
+        return;
+      }
+
+      // Temporarily skip CNIC image validation for testing
+      // TODO: Re-enable when proper image upload is implemented
+      // if (formData.role === 'passenger' && 
+      //     (!formData.cnicFrontPicture || formData.cnicFrontPicture.trim() === '' ||
+      //      !formData.cnicBackPicture || formData.cnicBackPicture.trim() === '')) {
+      //   showToast('error', 'CNIC front and back images are required for passenger registration. Please complete the document upload step.');
+      //   return;
+      // }
+
       // Prepare registration data for API
       const registrationData = {
-        name: formData.fullName,
-        email: formData.email,
+        name: formData.fullName.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
         password_confirmation: formData.confirmPassword,
         user_type: formData.role,
-        phone: formData.phoneNumber,
-        cnic: formData.cnic,
-        address: formData.address,
+        phone: formattedPhone,
+        cnic: formData.cnic.trim(),
+        address: formData.address.trim(),
+        emergency_contact: formData.emergencyContactNumber || formattedPhone,
+        // Add CNIC images for passengers
+        ...(formData.role === 'passenger' && {
+          passenger_cnic_front_image: formData.cnicFrontPicture,
+          passenger_cnic_back_image: formData.cnicBackPicture,
+          passenger_profile_image: formData.profilePicture,
+          passenger_emergency_contact: formData.emergencyContactNumber || formattedPhone,
+          passenger_emergency_contact_name: formData.emergencyContactName,
+          passenger_emergency_contact_relation: formData.emergencyRelationship,
+          passenger_preferred_payment: formData.preferredPayment || 'cash',
+        }),
         ...(formData.role === 'driver' && {
           vehicle_type: formData.vehicleType,
           license_number: formData.vehicleNumber, // Using vehicle number as license number for now
-          preferred_payment: 'Cash', // Default payment method
+          preferred_payment: formData.preferredPayment || 'cash',
         }),
       };
       
       console.log('📤 Sending registration request to API...');
       console.log('📋 Registration payload:', registrationData);
       
-      const result = await register(registrationData);
+      // Use the new registration method with images
+      const result = await registerWithImages(registrationData);
       
       console.log('📨 API Response received:', result);
       console.log('🔍 Result type:', result.type);
       console.log('📊 Result payload:', result.payload);
+      
+      // Log detailed error information if registration failed
+      if (result.type.endsWith('/rejected')) {
+        console.log('❌ Registration failed with details:', {
+          payload: result.payload,
+          error: 'error' in result ? result.error : 'Unknown error',
+          meta: result.meta
+        });
+      }
       
       if (result.type.endsWith('/fulfilled')) {
         console.log('✅ Account created successfully!');
@@ -196,6 +279,8 @@ export default function RegistrationScreen() {
         response: registrationError.response?.data
       });
       showToast('error', registrationError.message || 'Registration failed');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -350,17 +435,22 @@ export default function RegistrationScreen() {
                 <TouchableOpacity
                   style={[styles.submitButton, !canProceedToNext() && styles.submitButtonDisabled]}
                   onPress={handleSubmit}
-                  disabled={!canProceedToNext() || isLoading}
+                  disabled={!canProceedToNext() || isLoading || submitting}
                 >
-                  <Text style={styles.submitButtonText}>
-                    {isLoading ? 'Creating Account...' : 'Create Account'}
-                  </Text>
+                  {submitting || isLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator color="#ffffff" />
+                      <Text style={styles.submitButtonText}>Creating Account...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.submitButtonText}>Create Account</Text>
+                  )}
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={[styles.nextButton, !canProceedToNext() && styles.nextButtonDisabled]}
                   onPress={handleNext}
-                  disabled={!canProceedToNext() || isLoading}
+                  disabled={!canProceedToNext() || isLoading || submitting}
                 >
                   <Text style={styles.nextButtonText}>Next</Text>
                   <Icon name="arrow-forward" size={20} color="#ffffff" />
@@ -618,5 +708,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     padding: 20,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

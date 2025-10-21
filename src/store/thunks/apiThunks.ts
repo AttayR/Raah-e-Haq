@@ -84,6 +84,59 @@ export const registerUser = createAsyncThunk(
   }
 );
 
+export const registerUserWithImages = createAsyncThunk(
+  'auth/registerUserWithImages',
+  async (userData: RegisterRequest & { 
+    passenger_cnic_front_image?: string; 
+    passenger_cnic_back_image?: string; 
+  }, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Redux Thunk - Starting user registration with images...');
+      console.log('📋 User data received:', userData);
+      
+      const response = await apiService.registerWithImages(userData);
+      
+      console.log('📨 Redux Thunk - Registration with images API response received');
+      console.log('📊 Response success:', response.success);
+      console.log('📋 Response data:', response.data);
+      
+      if (response.success && response.data) {
+        console.log('✅ Redux Thunk - Registration with images successful');
+        console.log('👤 User data:', response.data.user);
+        console.log('🔑 Token:', response.data.token);
+        
+        // Store auth data
+        await apiService.setAuthToken(response.data.token);
+        await apiService.setUserData(response.data.user);
+        
+        console.log('💾 Auth data stored successfully');
+        
+        return {
+          user: response.data.user,
+          token: response.data.token,
+          tokenType: response.data.token_type,
+        };
+      } else {
+        console.log('❌ Redux Thunk - Registration with images failed:', response.message);
+        return rejectWithValue(response.message || 'Registration with images failed');
+      }
+    } catch (error: any) {
+      console.error('💥 Redux Thunk - Registration with images error:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      return rejectWithValue(
+        error.response?.data?.message || 
+        error.message || 
+        'Registration with images failed'
+      );
+    }
+  }
+);
+
 export const sendOtp = createAsyncThunk(
   'auth/sendOtp',
   async (phone: string, { rejectWithValue }) => {

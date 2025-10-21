@@ -98,6 +98,11 @@ export default function BasicInfoScreen() {
     if (!cnicRegex.test(cnic.trim())) {
       return 'Please enter CNIC in format: 00000-0000000-0';
     }
+    
+    // Additional validation for Pakistani CNIC
+    const cnicDigits = cnic.replace(/\D/g, '');
+    if (cnicDigits.length !== 13) return 'CNIC must have exactly 13 digits';
+    
     return undefined;
   };
 
