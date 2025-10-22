@@ -9,12 +9,10 @@ platform :ios, '16.0'
 ENV['NODE_BINARY'] = '/usr/local/bin/node'
 prepare_react_native_project!
 
-# Force dynamic frameworks to resolve Swift pod issues
-use_frameworks! :linkage => :static
-
 target 'RaaHeHaq' do
   config = use_native_modules!
-
+  use_frameworks! :linkage => :static
+  $RNFirebaseAsStaticFramework = true
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

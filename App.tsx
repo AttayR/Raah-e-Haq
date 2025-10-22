@@ -12,6 +12,7 @@ import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
 import NotificationManager from './src/components/NotificationManager';
 import { configureGoogleSignIn } from './src/services/googleSignIn';
+import { initializeNotificationService } from 'src/services/notificationService';
 
 function ThemedNav() {
   const { theme } = useAppTheme();
@@ -55,6 +56,7 @@ function ThemedNav() {
 export default function App() {
   useEffect(() => {
     // Configure Google Sign-In when app starts
+    initializeNotificationService()
     configureGoogleSignIn();
   }, []);
 
