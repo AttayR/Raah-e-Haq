@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { auth, db } from '../services/firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
+import { collection, addDoc, getDocs } from '@react-native-firebase/firestore';
+import { signInAnonymously } from '@react-native-firebase/auth';
 import { createTestUser } from '../services/firebaseAuth';
 
 const FirebaseTest: React.FC = () => {

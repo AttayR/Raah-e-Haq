@@ -3,6 +3,7 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import Firebase
+import GoogleMaps   // 👈 Add this line
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,9 +17,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     
-    // Configure Firebase
+    // Configure Firebase first
     FirebaseApp.configure()
     
+    // 👇 Add Google Maps API key setup right after Firebase
+    GMSServices.provideAPIKey("AIzaSyBx-73GJ6HchOWC_zCTsg8uRUBuxKnOHUc")
+
     // Configure Firebase Messaging
     UNUserNotificationCenter.current().delegate = self
     

@@ -1,3 +1,18 @@
+import { db } from './firebase';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  getDocs, 
+  onSnapshot,
+  orderBy,
+  limit,
+  serverTimestamp 
+} from '@react-native-firebase/firestore';
 import apiService, { createCancellableRequest, removeRequest } from './api';
 
 export interface RideLocation {

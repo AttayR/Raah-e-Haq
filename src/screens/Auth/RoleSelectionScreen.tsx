@@ -110,11 +110,11 @@ export default function RoleSelectionScreen() {
           
           <View style={styles.logoContainer}>
             <View style={styles.logoWrapper}>
-              <Image 
+              {/* <Image 
                 source={require('../../assets/images/logo.png')} 
                 style={styles.logoImage}
                 resizeMode="contain"
-              />
+              /> */}
             </View>
             <Text style={styles.title}>Choose Your Role</Text>
             <Text style={styles.subtitle}>

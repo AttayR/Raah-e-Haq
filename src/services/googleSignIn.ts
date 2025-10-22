@@ -1,6 +1,6 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { auth } from './firebase';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential } from '@react-native-firebase/auth';
 
 // Configure Google Sign-In
 export const configureGoogleSignIn = () => {
