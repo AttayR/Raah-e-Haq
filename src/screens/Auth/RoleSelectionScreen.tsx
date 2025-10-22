@@ -111,7 +111,7 @@ export default function RoleSelectionScreen() {
           <View style={styles.logoContainer}>
             <View style={styles.logoWrapper}>
               {/* <Image 
-                source={require('../../assets/images/Logo.png')} 
+                source={require('../../assets/images/logo.png')} 
                 style={styles.logoImage}
                 resizeMode="contain"
               /> */}

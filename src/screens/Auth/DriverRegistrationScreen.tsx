@@ -380,7 +380,7 @@ export default function DriverRegistrationScreen() {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <Image 
-              source={require('../../assets/images/Logo.png')} 
+              source={require('../../assets/images/logo.png')} 
               style={styles.logoImage}
               resizeMode="contain"
             />
