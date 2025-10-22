@@ -1878,7 +1878,14 @@
   resolved "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.0.tgz"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
-"@react-native-async-storage/async-storage@^1.18.1", "@react-native-async-storage/async-storage@^2.2.0":
+"@react-native-async-storage/async-storage@^1.18.1":
+  version "1.24.0"
+  resolved "https://registry.npmjs.org/@react-native-async-storage/async-storage/-/async-storage-1.24.0.tgz"
+  integrity sha512-W4/vbwUOYOjco0x3toB8QCr7EjIP6nE9G7o8PMguvvjYT5Awg09lyV4enACRx4s++PPulBiBSjL0KTFx2u0Z/g==
+  dependencies:
+    merge-options "^3.0.4"
+
+"@react-native-async-storage/async-storage@^2.2.0":
   version "2.2.0"
   resolved "https://registry.npmjs.org/@react-native-async-storage/async-storage/-/async-storage-2.2.0.tgz"
   integrity sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw==
@@ -2112,21 +2119,21 @@
   resolved "https://registry.npmjs.org/@react-native-community/netinfo/-/netinfo-11.4.1.tgz"
   integrity sha512-B0BYAkghz3Q2V09BF88RA601XursIEA111tnc2JOaN7axJWmNefmfjZqw/KdSxKZp7CZUuPpjBmz/WCR9uaHYg==
 
-"@react-native-firebase/app@^23.4.0", "@react-native-firebase/app@23.4.0":
+"@react-native-firebase/app@^23.2.0", "@react-native-firebase/app@23.4.0":
   version "23.4.0"
   resolved "https://registry.npmjs.org/@react-native-firebase/app/-/app-23.4.0.tgz"
   integrity sha512-HaHFrr5D2o5EAKbDOds579Vp8f6QtH3pMeteZuIj/0UaHYD2wdTutNWOsiiJ1tmNJZi7kbfgY0qL/cSgzBGZjw==
   dependencies:
     firebase "12.2.1"
 
-"@react-native-firebase/auth@^23.4.0":
+"@react-native-firebase/auth@^23.2.0":
   version "23.4.0"
   resolved "https://registry.npmjs.org/@react-native-firebase/auth/-/auth-23.4.0.tgz"
   integrity sha512-oDvNr5F9/3mAi7DiO5+9X/WSmFwtwIC4hfG+TigX65McgllUor5bRbCy+esGd6RGMm36pwglDvbCzUMMK740bw==
   dependencies:
     plist "^3.1.0"
 
-"@react-native-firebase/firestore@^23.4.0":
+"@react-native-firebase/firestore@^23.2.0":
   version "23.4.0"
   resolved "https://registry.npmjs.org/@react-native-firebase/firestore/-/firestore-23.4.0.tgz"
   integrity sha512-fp+9GofSc/qb6ijEUOyAYt+fgtAc+oAGMbKMz6m3ZhPUGXiawnTziSv26j9bUmvRM3w/ZO9a+Eoe86tqZ7/GDg==
@@ -2138,7 +2145,7 @@
   resolved "https://registry.npmjs.org/@react-native-firebase/messaging/-/messaging-23.4.0.tgz"
   integrity sha512-wxdgl6teo+OsS4nG3KBQM8bFwmZNY4ZzR6UAYB0e7vvp0J/dMfduErkZ6uzEkEjjt2UsOeWB2PBLcgxKjYsX4A==
 
-"@react-native-firebase/storage@^23.4.0":
+"@react-native-firebase/storage@^23.3.1":
   version "23.4.0"
   resolved "https://registry.npmjs.org/@react-native-firebase/storage/-/storage-23.4.0.tgz"
   integrity sha512-e2eauvysisa7fdg+rWxr3c1cvLILpEREiKWR5kTMbzsJuA/8ILrvGTHMYzqPv0QttoYisFHl8MNe8plXWb/Luw==
@@ -4446,11 +4453,6 @@ fs.realpath@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz"
   integrity sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==
-
-fsevents@^2.3.2:
-  version "2.3.3"
-  resolved "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz"
-  integrity sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==
 
 function-bind@^1.1.2:
   version "1.1.2"
@@ -6851,7 +6853,7 @@ react-native-worklets@^0.5.1, react-native-worklets@>=0.5.0:
     convert-source-map "^2.0.0"
     semver "7.7.2"
 
-react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.76.0", react-native@>=0.42.0, react-native@>=0.59, react-native@>=0.60.0, react-native@>=0.61.0, react-native@0.80.1:
+react-native@*, "react-native@^0.0.0-0 || >=0.60 <1.0", "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.76.0", react-native@>=0.42.0, react-native@>=0.59, react-native@>=0.60.0, react-native@>=0.61.0, react-native@0.80.1:
   version "0.80.1"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.80.1.tgz"
   integrity sha512-cIiJiPItdC2+Z9n30FmE2ef1y4522kgmOjMIoDtlD16jrOMNTUdB2u+CylLTy3REkWkWTS6w8Ub7skUthkeo5w==
