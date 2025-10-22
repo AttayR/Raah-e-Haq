@@ -16,7 +16,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { refreshSessionThunk } from '../../store/thunks/authThunks';
 import { useApiAuth } from '../../hooks/useApiAuth';
-import { useLocation } from '../../hooks/useLocation';
+import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { reverseGeocode } from '../../services/placesService';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -38,7 +39,20 @@ export default function PassengerHomeScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   
-  const { currentLocation, isInitialized } = useLocation();
+  const { 
+    currentLocation, 
+    permissionStatus,
+    requestLocationPermission,
+  } = useNativeLocation();
+  
+  // Use passenger notifications
+  const {
+    isInitialized: notificationsInitialized,
+    fcmToken,
+    hasPermission: hasNotificationPermission,
+    subscribeToPassengerNotifications,
+    unsubscribeFromPassengerNotifications,
+  } = usePassengerNotifications(user?.id?.toString());
 
   useEffect(() => {
     // Animate on mount
@@ -63,42 +77,67 @@ export default function PassengerHomeScreen() {
     return () => clearInterval(timer);
   }, [fadeAnim, slideAnim]);
 
+  // Subscribe to passenger notifications
+  useEffect(() => {
+    if (notificationsInitialized && user?.id) {
+      subscribeToPassengerNotifications();
+      
+      return () => {
+        unsubscribeFromPassengerNotifications();
+      };
+    }
+  }, [notificationsInitialized, user?.id, subscribeToPassengerNotifications, unsubscribeFromPassengerNotifications]);
+
+  // Log FCM token for passenger
+  useEffect(() => {
+    if (fcmToken) {
+      console.log('👤 PassengerHomeScreen - FCM Token:', fcmToken);
+      console.log('👤 PassengerHomeScreen - Passenger ID:', user?.id);
+      console.log('👤 PassengerHomeScreen - Token Status:', {
+        token: fcmToken,
+        passengerId: user?.id,
+        isInitialized: notificationsInitialized,
+        hasPermission: hasNotificationPermission,
+      });
+    }
+  }, [fcmToken, user?.id, notificationsInitialized, hasNotificationPermission]);
+
   // Update address when location changes
   useEffect(() => {
     const updateAddress = async () => {
-      console.log('Location update effect:', { currentLocation, isInitialized });
+      console.log('Location update effect:', { currentLocation, permissionStatus });
       
-      if (currentLocation && isInitialized) {
+      if (currentLocation && permissionStatus.isGranted) {
         console.log('Got location, reverse geocoding:', currentLocation);
         try {
           const address = await reverseGeocode(currentLocation.latitude, currentLocation.longitude);
           console.log('Reverse geocode result:', address);
           if (address && typeof address === 'string' && address.trim().length > 0) {
-            // Show full formatted address to be precise (no slicing)
             setCurrentAddress(address.trim());
             return;
           } else {
-            // Fallback to coordinates if reverse geocoding fails
             console.log('Reverse geocoding failed, showing coordinates');
             setCurrentAddress(`${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`);
             return;
           }
         } catch (error) {
           console.warn('Reverse geocoding error:', error);
-          // Fallback to coordinates on error
           setCurrentAddress(`${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`);
         }
-      } else if (!isInitialized) {
-        console.log('Location not initialized yet');
-        setCurrentAddress('Getting location...');
+      } else if (!permissionStatus.isGranted) {
+        console.log('Location permission not granted');
+        setCurrentAddress('Location permission required');
+      } else if (!permissionStatus.isLocationEnabled) {
+        console.log('Location services disabled');
+        setCurrentAddress('Location services disabled');
       } else if (!currentLocation) {
         console.log('No current location available');
-        setCurrentAddress('Location unavailable');
+        setCurrentAddress('Getting location...');
       }
     };
 
     updateAddress();
-  }, [currentLocation, isInitialized]);
+  }, [currentLocation, permissionStatus]);
 
   // Debug logging
   console.log('PassengerHomeScreen - User data:', user);
@@ -125,6 +164,21 @@ export default function PassengerHomeScreen() {
       color: '#3B82F6',
       gradient: ['#3B82F6', '#1D4ED8'],
       onPress: () => navigation.navigate('PassengerMap'),
+    },
+    {
+      id: 'location',
+      title: currentLocation ? 'Location Active' : 'Enable Location',
+      subtitle: currentLocation ? 'Location services working' : 'Tap to enable location',
+      icon: currentLocation ? 'location-on' : 'location-off',
+      color: currentLocation ? '#10B981' : '#F59E0B',
+      gradient: currentLocation ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706'],
+      onPress: () => {
+        if (!currentLocation) {
+          requestLocationPermission();
+        } else {
+          requestLocationPermission(); // Refresh location
+        }
+      },
     },
     {
       id: 'history',
@@ -292,10 +346,22 @@ export default function PassengerHomeScreen() {
                 <Text style={styles.weatherText}>{weatherInfo.temp} • {weatherInfo.condition}</Text>
               </View>
               <View style={styles.locationInfo}>
-                <Icon name="location-on" size={16} color="rgba(255,255,255,0.8)" />
+                <Icon 
+                  name={currentLocation ? "location-on" : "location-off"} 
+                  size={16} 
+                  color={currentLocation ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.5)"} 
+                />
                 <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
                   {currentAddress}
                 </Text>
+                {!currentLocation && (
+                  <TouchableOpacity
+                    style={styles.locationPermissionButton}
+                    onPress={() => requestLocationPermission()}
+                  >
+                    <Icon name="settings" size={14} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -712,6 +778,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
     marginLeft: 4,
+  },
+  locationPermissionButton: {
+    padding: 4,
+    marginLeft: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   notificationButton: {
     position: 'relative',

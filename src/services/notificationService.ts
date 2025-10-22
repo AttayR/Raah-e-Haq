@@ -1,264 +1,385 @@
-import { messaging } from './firebase';
-import { getToken, onMessage } from 'firebase/messaging';
-import { Platform, Alert, PermissionsAndroid } from 'react-native';
+import { NotificationResource } from './rideService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Request notification permission
-export const requestNotificationPermission = async (): Promise<boolean> => {
-  try {
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-        {
-          title: 'Notification Permission',
-          message: 'RaaHeHaq needs to send you notifications for ride updates',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
+export interface NotificationData {
+  ride_id?: number;
+  driver_name?: string;
+  driver_phone?: string;
+  passenger_name?: string;
+  passenger_phone?: string;
+  estimated_arrival?: string;
+  fare?: number;
+  [key: string]: any;
+}
+
+class NotificationService {
+  private baseUrl = '/notifications';
+  private unreadCount: number = 0;
+  private listeners: Set<(count: number) => void> = new Set();
+
+  // Get user notifications with pagination
+  async getNotifications(page: number = 1, perPage: number = 20): Promise<{
+    data: NotificationResource[];
+    pagination: {
+      current_page: number;
+      last_page: number;
+      per_page: number;
+      total: number;
+    };
+  }> {
+    try {
+      console.log('🔔 Fetching notifications:', { page, perPage });
+      
+      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}?page=${page}&per_page=${perPage}`, {
+        headers: {
+          'Authorization': `Bearer ${await this.getAuthToken()}`
         }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    }
-    
-    // For iOS, permission is requested automatically
-    return true;
-  } catch (error) {
-    console.error('Error requesting notification permission:', error);
-    return false;
-  }
-};
-
-// Get FCM token
-export const getFCMToken = async (): Promise<string | null> => {
-  try {
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      console.log('Notification permission denied');
-      return null;
-    }
-
-    const token = await getToken(messaging, { 
-      vapidKey: 'YOUR_VAPID_KEY' // Replace with your VAPID key
-    });
-    
-    console.log('FCM Token:', token);
-    return token;
-  } catch (error) {
-    console.error('Error getting FCM token:', error);
-    return null;
-  }
-};
-
-// Listen to foreground messages
-export const setupForegroundMessageListener = () => {
-  onMessage(messaging, (remoteMessage) => {
-    console.log('Foreground message received:', remoteMessage);
-    
-    // Show alert for foreground messages
-    if (remoteMessage.notification) {
-      Alert.alert(
-        remoteMessage.notification.title || 'RaaHeHaq',
-        remoteMessage.notification.body || 'You have a new notification',
-        [{ text: 'OK' }]
-      );
-    }
-  });
-};
-
-// Send notification to specific user
-export const sendNotificationToUser = async (
-  userId: string, 
-  title: string, 
-  body: string, 
-  data?: any
-): Promise<void> => {
-  try {
-    // In a real implementation, you would call your backend API
-    // which would then send the notification using Firebase Admin SDK
-    console.log('Sending notification to user:', userId, { title, body, data });
-    
-    // For now, we'll just log it
-    // In production, you would make an API call to your backend
-  } catch (error) {
-    console.error('Error sending notification:', error);
-    throw new Error('Failed to send notification');
-  }
-};
-
-// Send ride request notification to drivers
-export const sendRideRequestNotification = async (
-  driverIds: string[],
-  rideRequest: any
-): Promise<void> => {
-  try {
-    const title = 'New Ride Request';
-    const body = `Ride from ${rideRequest.pickup.address || 'Pickup location'} to ${rideRequest.destination.address || 'Destination'}`;
-    
-    const data = {
-      type: 'ride_request',
-      rideId: rideRequest.id,
-      passengerName: rideRequest.passengerName,
-      fare: rideRequest.fare.toString(),
-      distance: rideRequest.distance,
-    };
-    
-    // Send to all nearby drivers
-    for (const driverId of driverIds) {
-      await sendNotificationToUser(driverId, title, body, data);
-    }
-  } catch (error) {
-    console.error('Error sending ride request notification:', error);
-    throw new Error('Failed to send ride request notification');
-  }
-};
-
-// Send ride status update to passenger
-export const sendRideStatusUpdate = async (
-  passengerId: string,
-  status: string,
-  rideDetails: any
-): Promise<void> => {
-  try {
-    let title = '';
-    let body = '';
-    
-    switch (status) {
-      case 'accepted':
-        title = 'Ride Accepted';
-        body = `Your driver ${rideDetails.driverName} is on the way`;
-        break;
-      case 'arrived':
-        title = 'Driver Arrived';
-        body = `Your driver ${rideDetails.driverName} has arrived at the pickup location`;
-        break;
-      case 'started':
-        title = 'Ride Started';
-        body = `Your ride with ${rideDetails.driverName} has started`;
-        break;
-      case 'completed':
-        title = 'Ride Completed';
-        body = `Your ride has been completed. Total fare: PKR ${rideDetails.fare}`;
-        break;
-      case 'cancelled':
-        title = 'Ride Cancelled';
-        body = `Your ride has been cancelled. ${rideDetails.reason || ''}`;
-        break;
-      default:
-        title = 'Ride Update';
-        body = 'Your ride status has been updated';
-    }
-    
-    const data = {
-      type: 'ride_status_update',
-      rideId: rideDetails.id,
-      status,
-    };
-    
-    await sendNotificationToUser(passengerId, title, body, data);
-  } catch (error) {
-    console.error('Error sending ride status update:', error);
-    throw new Error('Failed to send ride status update');
-  }
-};
-
-// Send ride status update to driver
-export const sendDriverRideUpdate = async (
-  driverId: string,
-  status: string,
-  rideDetails: any
-): Promise<void> => {
-  try {
-    let title = '';
-    let body = '';
-    
-    switch (status) {
-      case 'requested':
-        title = 'New Ride Request';
-        body = `Ride request from ${rideDetails.passengerName}`;
-        break;
-      case 'cancelled':
-        title = 'Ride Cancelled';
-        body = `The ride with ${rideDetails.passengerName} has been cancelled`;
-        break;
-      case 'completed':
-        title = 'Ride Completed';
-        body = `You have completed the ride with ${rideDetails.passengerName}`;
-        break;
-      default:
-        title = 'Ride Update';
-        body = 'Your ride status has been updated';
-    }
-    
-    const data = {
-      type: 'driver_ride_update',
-      rideId: rideDetails.id,
-      status,
-    };
-    
-    await sendNotificationToUser(driverId, title, body, data);
-  } catch (error) {
-    console.error('Error sending driver ride update:', error);
-    throw new Error('Failed to send driver ride update');
-  }
-};
-
-// Send promotional notification
-export const sendPromotionalNotification = async (
-  userIds: string[],
-  title: string,
-  body: string,
-  data?: any
-): Promise<void> => {
-  try {
-    for (const userId of userIds) {
-      await sendNotificationToUser(userId, title, body, {
-        type: 'promotional',
-        ...data,
       });
-    }
-  } catch (error) {
-    console.error('Error sending promotional notification:', error);
-    throw new Error('Failed to send promotional notification');
-  }
-};
 
-// Send system maintenance notification
-export const sendSystemNotification = async (
-  title: string,
-  body: string,
-  data?: any
-): Promise<void> => {
-  try {
-    // In a real implementation, you would send this to all users
-    // For now, we'll just log it
-    console.log('System notification:', { title, body, data });
-  } catch (error) {
-    console.error('Error sending system notification:', error);
-    throw new Error('Failed to send system notification');
-  }
-};
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('⚠️ Notifications endpoint not implemented yet, returning empty list');
+          return {
+            data: [],
+            pagination: {
+              current_page: 1,
+              last_page: 1,
+              per_page: perPage,
+              total: 0
+            }
+          };
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-// Initialize notification service
-export const initializeNotificationService = async (): Promise<void> => {
-  try {
-    // Request permission
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      console.log('Notification permission not granted');
-      return;
+      const result = await response.json();
+      console.log('✅ Notifications fetched successfully:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to fetch notifications:', error);
+      // Return empty result as fallback when notifications are not implemented
+      return {
+        data: [],
+        pagination: {
+          current_page: 1,
+          last_page: 1,
+          per_page: perPage,
+          total: 0
+        }
+      };
     }
-    
-    // Get FCM token
-    const token = await getFCMToken();
-    if (token) {
-      // Store token in your backend or local storage
-      console.log('FCM Token obtained:', token);
-    }
-    
-    // Setup foreground message listener
-    setupForegroundMessageListener();
-    
-    console.log('Notification service initialized successfully');
-  } catch (error) {
-    console.error('Error initializing notification service:', error);
   }
-};
+
+  // Mark notification as read
+  async markAsRead(notificationId: number): Promise<void> {
+    try {
+      console.log('✅ Marking notification as read:', notificationId);
+      
+      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await this.getAuthToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('⚠️ Mark as read endpoint not implemented yet, skipping');
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Notification marked as read:', result);
+      
+      // Update unread count
+      await this.updateUnreadCount();
+    } catch (error) {
+      console.error('❌ Failed to mark notification as read:', error);
+      // Don't throw error, just log it
+    }
+  }
+
+  // Mark all notifications as read
+  async markAllAsRead(): Promise<void> {
+    try {
+      console.log('✅ Marking all notifications as read');
+      
+      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}/read-all`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await this.getAuthToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('⚠️ Mark all as read endpoint not implemented yet, skipping');
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ All notifications marked as read:', result);
+      
+      // Update unread count
+      this.unreadCount = 0;
+      this.notifyListeners();
+    } catch (error) {
+      console.error('❌ Failed to mark all notifications as read:', error);
+      // Don't throw error, just log it
+    }
+  }
+
+  // Get unread count
+  async getUnreadCount(): Promise<number> {
+    try {
+      console.log('🔢 Getting unread count');
+      
+      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}/unread-count`, {
+        headers: {
+          'Authorization': `Bearer ${await this.getAuthToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('⚠️ Notifications endpoint not implemented yet, returning 0');
+          this.unreadCount = 0;
+          this.notifyListeners();
+          return 0;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Unread count fetched:', result);
+      
+      this.unreadCount = result.data.unread_count;
+      this.notifyListeners();
+      
+      return this.unreadCount;
+    } catch (error) {
+      console.error('❌ Failed to get unread count:', error);
+      // Return 0 as fallback when notifications are not implemented
+      this.unreadCount = 0;
+      this.notifyListeners();
+      return 0;
+    }
+  }
+
+  // Update unread count
+  private async updateUnreadCount(): Promise<void> {
+    try {
+      const count = await this.getUnreadCount();
+      this.unreadCount = count;
+      this.notifyListeners();
+    } catch (error) {
+      console.error('❌ Failed to update unread count:', error);
+      // Set to 0 as fallback
+      this.unreadCount = 0;
+      this.notifyListeners();
+    }
+  }
+
+  // Add listener for unread count changes
+  addUnreadCountListener(listener: (count: number) => void): () => void {
+    this.listeners.add(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  // Notify all listeners
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => {
+      try {
+        listener(this.unreadCount);
+      } catch (error) {
+        console.error('❌ Error notifying listener:', error);
+      }
+    });
+  }
+
+  // Get current unread count (cached)
+  getCurrentUnreadCount(): number {
+    return this.unreadCount;
+  }
+
+  // Handle incoming notification
+  handleIncomingNotification(notification: NotificationResource): void {
+    console.log('📨 Received new notification:', notification);
+    
+    // Increment unread count
+    this.unreadCount++;
+    this.notifyListeners();
+    
+    // Store notification locally for offline access
+    this.storeNotificationLocally(notification);
+    
+    // Show local notification if app is in background
+    this.showLocalNotification(notification);
+  }
+
+  // Store notification locally
+  private async storeNotificationLocally(notification: NotificationResource): Promise<void> {
+    try {
+      const stored = await AsyncStorage.getItem('notifications');
+      const notifications = stored ? JSON.parse(stored) : [];
+      
+      // Add new notification at the beginning
+      notifications.unshift(notification);
+      
+      // Keep only last 100 notifications
+      if (notifications.length > 100) {
+        notifications.splice(100);
+      }
+      
+      await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
+    } catch (error) {
+      console.error('❌ Failed to store notification locally:', error);
+    }
+  }
+
+  // Get stored notifications
+  async getStoredNotifications(): Promise<NotificationResource[]> {
+    try {
+      const stored = await AsyncStorage.getItem('notifications');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('❌ Failed to get stored notifications:', error);
+      return [];
+    }
+  }
+
+  // Show local notification
+  private showLocalNotification(notification: NotificationResource): void {
+    // This would integrate with your push notification service
+    // For now, just log it
+    console.log('📱 Showing local notification:', {
+      title: notification.title,
+      message: notification.message,
+      type: notification.type
+    });
+  }
+
+  // Clear all stored notifications
+  async clearStoredNotifications(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('notifications');
+      console.log('✅ Cleared stored notifications');
+    } catch (error) {
+      console.error('❌ Failed to clear stored notifications:', error);
+    }
+  }
+
+  // Get authentication token
+  private async getAuthToken(): Promise<string> {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+      return token;
+    } catch (error) {
+      console.error('❌ Failed to get auth token:', error);
+      throw error;
+    }
+  }
+
+  // Format notification message based on type
+  formatNotificationMessage(notification: NotificationResource): string {
+    switch (notification.type) {
+      case 'driver_assigned':
+        return `Your ride has been accepted by ${notification.data?.driver_name || 'a driver'}`;
+      
+      case 'driver_arrived':
+        return `Your driver has arrived at the pickup location`;
+      
+      case 'ride_started':
+        return `Your ride has started`;
+      
+      case 'ride_completed':
+        return `Your ride has been completed. Fare: PKR ${notification.data?.fare || 'N/A'}`;
+      
+      case 'ride_cancelled':
+        return `Your ride has been cancelled`;
+      
+      case 'new_ride_request':
+        return `New ride request from ${notification.data?.passenger_name || 'a passenger'}`;
+      
+      case 'stop_completed':
+        return `Stop completed: ${notification.data?.stop_address || 'Unknown location'}`;
+      
+      case 'payment_received':
+        return `Payment received: PKR ${notification.data?.amount || 'N/A'}`;
+      
+      default:
+        return notification.message;
+    }
+  }
+
+  // Get notification icon based on type
+  getNotificationIcon(notification: NotificationResource): string {
+    switch (notification.type) {
+      case 'driver_assigned':
+      case 'driver_arrived':
+        return '🚗';
+      
+      case 'ride_started':
+      case 'ride_completed':
+        return '✅';
+      
+      case 'ride_cancelled':
+        return '❌';
+      
+      case 'new_ride_request':
+        return '📱';
+      
+      case 'stop_completed':
+        return '📍';
+      
+      case 'payment_received':
+        return '💰';
+      
+      default:
+        return '🔔';
+    }
+  }
+
+  // Get notification color based on type
+  getNotificationColor(notification: NotificationResource): string {
+    switch (notification.type) {
+      case 'driver_assigned':
+      case 'driver_arrived':
+      case 'ride_started':
+      case 'ride_completed':
+        return '#10B981'; // Green
+      
+      case 'ride_cancelled':
+        return '#EF4444'; // Red
+      
+      case 'new_ride_request':
+        return '#3B82F6'; // Blue
+      
+      case 'stop_completed':
+        return '#8B5CF6'; // Purple
+      
+      case 'payment_received':
+        return '#F59E0B'; // Yellow
+      
+      default:
+        return '#6B7280'; // Gray
+    }
+  }
+}
+
+// Create singleton instance
+const notificationService = new NotificationService();
+
+export default notificationService;
