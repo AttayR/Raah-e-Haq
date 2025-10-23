@@ -679,6 +679,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Get notifications
   const getNotifications = useCallback(async (page: number = 1, perPage: number = 20): Promise<{data: NotificationResource[], pagination: any}> => {
     try {
+      if (!notificationService || !notificationService.getNotifications) {
+        throw new Error('Notification service not available');
+      }
       console.log('🔔 Getting notifications:', { page, perPage });
       const result = await notificationService.getNotifications(page, perPage);
       console.log('✅ Notifications fetched:', result);
@@ -692,6 +695,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Mark notification as read
   const markNotificationAsRead = useCallback(async (notificationId: number): Promise<void> => {
     try {
+      if (!notificationService || !notificationService.markAsRead) {
+        throw new Error('Notification service not available');
+      }
       console.log('✅ Marking notification as read:', notificationId);
       await notificationService.markAsRead(notificationId);
       console.log('✅ Notification marked as read');
@@ -704,6 +710,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Mark all notifications as read
   const markAllNotificationsAsRead = useCallback(async (): Promise<void> => {
     try {
+      if (!notificationService || !notificationService.markAllAsRead) {
+        throw new Error('Notification service not available');
+      }
       console.log('✅ Marking all notifications as read');
       await notificationService.markAllAsRead();
       console.log('✅ All notifications marked as read');
@@ -716,6 +725,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Get unread count
   const getUnreadCount = useCallback(async (): Promise<number> => {
     try {
+      if (!notificationService || !notificationService.getUnreadCount) {
+        throw new Error('Notification service not available');
+      }
       console.log('🔢 Getting unread count');
       const count = await notificationService.getUnreadCount();
       console.log('✅ Unread count fetched:', count);

@@ -16,7 +16,7 @@ import { Typography } from '../../theme/typography';
 import { useRide } from '../../hooks/useRide';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { NotificationResource } from '../../services/rideService';
+import { NotificationResource } from '../../services/notificationService';
 
 interface NotificationScreenProps {
   userId: number;
@@ -41,7 +41,10 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
 
   // Load notifications
   const loadNotifications = useCallback(async (page: number = 1, refresh: boolean = false) => {
-    if (!getNotifications) return;
+    if (!getNotifications) {
+      console.warn('getNotifications method not available');
+      return;
+    }
 
     try {
       if (refresh) {
@@ -62,6 +65,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       setCurrentPage(page);
       
     } catch (error) {
+      console.error('Error loading notifications:', error);
       handleError(error, 'NOTIFICATION_LOAD_ERROR');
     } finally {
       setIsLoading(false);
@@ -71,19 +75,26 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
 
   // Load unread count
   const loadUnreadCount = useCallback(async () => {
-    if (!getUnreadCount) return;
+    if (!getUnreadCount) {
+      console.warn('getUnreadCount method not available');
+      return;
+    }
 
     try {
       const count = await getUnreadCount();
       setUnreadCount(count);
     } catch (error) {
+      console.error('Error loading unread count:', error);
       handleError(error, 'UNREAD_COUNT_ERROR');
     }
   }, [getUnreadCount, handleError]);
 
   // Mark notification as read
   const handleMarkAsRead = useCallback(async (notificationId: number) => {
-    if (!markNotificationAsRead) return;
+    if (!markNotificationAsRead) {
+      console.warn('markNotificationAsRead method not available');
+      return;
+    }
 
     try {
       await markNotificationAsRead(notificationId);
@@ -101,13 +112,17 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       setUnreadCount(prev => Math.max(0, prev - 1));
       
     } catch (error) {
+      console.error('Error marking notification as read:', error);
       handleError(error, 'MARK_READ_ERROR');
     }
   }, [markNotificationAsRead, handleError]);
 
   // Mark all as read
   const handleMarkAllAsRead = useCallback(async () => {
-    if (!markAllNotificationsAsRead) return;
+    if (!markAllNotificationsAsRead) {
+      console.warn('markAllNotificationsAsRead method not available');
+      return;
+    }
 
     try {
       await markAllNotificationsAsRead();
@@ -124,28 +139,39 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       Alert.alert('Success', 'All notifications marked as read');
       
     } catch (error) {
+      console.error('Error marking all notifications as read:', error);
       handleError(error, 'MARK_ALL_READ_ERROR');
     }
   }, [markAllNotificationsAsRead, handleError]);
 
   // Load more notifications
   const loadMore = useCallback(() => {
-    if (!isLoading && hasMorePages) {
+    if (!isLoading && hasMorePages && getNotifications) {
       loadNotifications(currentPage + 1, false);
     }
-  }, [isLoading, hasMorePages, currentPage, loadNotifications]);
+  }, [isLoading, hasMorePages, currentPage, loadNotifications, getNotifications]);
 
   // Refresh notifications
   const refreshNotifications = useCallback(() => {
-    loadNotifications(1, true);
-    loadUnreadCount();
-  }, [loadNotifications, loadUnreadCount]);
+    if (getNotifications && getUnreadCount) {
+      loadNotifications(1, true);
+      loadUnreadCount();
+    } else {
+      console.warn('Cannot refresh notifications - methods not available');
+    }
+  }, [loadNotifications, loadUnreadCount, getNotifications, getUnreadCount]);
 
   // Initial load
   useEffect(() => {
-    loadNotifications(1, false);
-    loadUnreadCount();
-  }, [loadNotifications, loadUnreadCount]);
+    // Only load if the methods are available
+    if (getNotifications && getUnreadCount) {
+      loadNotifications(1, false);
+      loadUnreadCount();
+    } else {
+      console.warn('Notification methods not available, skipping initial load');
+      setIsLoading(false);
+    }
+  }, [loadNotifications, loadUnreadCount, getNotifications, getUnreadCount]);
 
   // Format notification time
   const formatTime = (timestamp: string): string => {
@@ -267,15 +293,30 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
   };
 
   // Render empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Icon name="notifications-none" size={64} color="#d1d5db" />
-      <Text style={styles.emptyTitle}>No Notifications</Text>
-      <Text style={styles.emptyMessage}>
-        You don't have any notifications yet. When you request rides or receive updates, they'll appear here.
-      </Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    // Check if notification methods are not available
+    if (!getNotifications || !getUnreadCount) {
+      return (
+        <View style={styles.emptyState}>
+          <Icon name="error-outline" size={64} color="#ef4444" />
+          <Text style={styles.emptyTitle}>Notification Service Unavailable</Text>
+          <Text style={styles.emptyMessage}>
+            The notification service is currently unavailable. Please check your connection and try again.
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <Icon name="notifications-none" size={64} color="#d1d5db" />
+        <Text style={styles.emptyTitle}>No Notifications</Text>
+        <Text style={styles.emptyMessage}>
+          You don't have any notifications yet. When you request rides or receive updates, they'll appear here.
+        </Text>
+      </View>
+    );
+  };
 
   // Render header
   const renderHeader = () => (

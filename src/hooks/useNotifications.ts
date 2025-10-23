@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import notificationService from '../services/notificationService';
-import { NotificationResource } from '../services/rideService';
+import { NotificationResource } from '../services/notificationService';
 
 export interface NotificationState {
   isInitialized: boolean;
@@ -31,8 +31,8 @@ export const useNotifications = () => {
       setState(prev => ({
         ...prev,
         isInitialized: true,
-        notifications: notificationsResult.data,
-        unreadCount: unreadCount,
+        notifications: notificationsResult?.data || [],
+        unreadCount: unreadCount || 0,
       }));
       
       console.log('✅ Notifications initialized successfully');
@@ -41,6 +41,8 @@ export const useNotifications = () => {
       setState(prev => ({
         ...prev,
         isInitialized: true, // Still mark as initialized even if failed
+        notifications: [],
+        unreadCount: 0,
       }));
     }
   }, []);
@@ -53,7 +55,7 @@ export const useNotifications = () => {
       
       setState(prev => ({
         ...prev,
-        notifications: page === 1 ? result.data : [...prev.notifications, ...result.data],
+        notifications: page === 1 ? (result?.data || []) : [...prev.notifications, ...(result?.data || [])],
         isLoading: false,
       }));
       
@@ -112,11 +114,12 @@ export const useNotifications = () => {
   const getUnreadCount = useCallback(async () => {
     try {
       const count = await notificationService.getUnreadCount();
-      setState(prev => ({ ...prev, unreadCount: count }));
-      return count;
+      setState(prev => ({ ...prev, unreadCount: count || 0 }));
+      return count || 0;
     } catch (error) {
       console.error('❌ Failed to get unread count:', error);
-      throw error;
+      setState(prev => ({ ...prev, unreadCount: 0 }));
+      return 0;
     }
   }, []);
 
