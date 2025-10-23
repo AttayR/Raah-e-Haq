@@ -1,5 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { apiService, LoginRequest, RegisterRequest, SendOtpRequest, VerifyOtpRequest, ForgotPasswordRequest, ResetPasswordRequest, User } from '../../services/api';
+import { apiService, LoginRequest, RegisterRequest, RegisterWithImagesRequest, SendOtpRequest, VerifyOtpRequest, ForgotPasswordRequest, ResetPasswordRequest, User } from '../../services/api';
 
 // Auth Thunks
 export const loginUser = createAsyncThunk(
@@ -86,10 +86,7 @@ export const registerUser = createAsyncThunk(
 
 export const registerUserWithImages = createAsyncThunk(
   'auth/registerUserWithImages',
-  async (userData: RegisterRequest & { 
-    passenger_cnic_front_image?: string; 
-    passenger_cnic_back_image?: string; 
-  }, { rejectWithValue }) => {
+  async (userData: RegisterWithImagesRequest, { rejectWithValue }) => {
     try {
       console.log('🔄 Redux Thunk - Starting user registration with images...');
       console.log('📋 User data received:', userData);

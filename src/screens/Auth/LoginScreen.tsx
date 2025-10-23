@@ -61,10 +61,10 @@ export default function LoginScreen() {
   const handleCreateAccount = () => {
     try {
       clearValidationErrors();
-      navigation.navigate('Signup');
+      navigation.navigate('CompleteRegistration');
     } catch (err) {
       console.error('Navigation error:', err);
-      showToast('error', 'Unable to navigate to signup');
+      showToast('error', 'Unable to navigate to registration');
     }
   };
 

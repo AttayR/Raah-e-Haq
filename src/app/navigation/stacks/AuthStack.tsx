@@ -6,6 +6,8 @@ import PhoneAuthScreen from '../../../screens/Auth/PhoneAuthScreen';
 import RoleSelectionScreen from '../../../screens/Auth/RoleSelectionScreen';
 import BasicInfoScreen from '../../../screens/Auth/BasicInfoScreen';
 import DriverRegistrationScreen from '../../../screens/Auth/DriverRegistrationScreen';
+import CompleteRegistrationScreen from '../../../screens/Auth/CompleteRegistrationScreen';
+import CompleteLoginScreen from '../../../screens/Auth/CompleteLoginScreen';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -14,6 +16,8 @@ export type AuthStackParamList = {
   RoleSelection: undefined;
   BasicInfo: { role: 'driver' | 'passenger' };
   DriverRegistration: { phoneNumber: string };
+  CompleteRegistration: undefined;
+  CompleteLogin: undefined;
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -27,6 +31,8 @@ export default function AuthStack() {
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
       <Stack.Screen name="BasicInfo" component={BasicInfoScreen} />
       <Stack.Screen name="DriverRegistration" component={DriverRegistrationScreen} />
+      <Stack.Screen name="CompleteRegistration" component={CompleteRegistrationScreen} />
+      <Stack.Screen name="CompleteLogin" component={CompleteLoginScreen} />
     </Stack.Navigator>
   );
 }

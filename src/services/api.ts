@@ -143,6 +143,7 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
+  // Basic Info
   name: string;
   email: string;
   password: string;
@@ -151,10 +152,52 @@ export interface RegisterRequest {
   phone: string;
   cnic: string;
   address: string;
-  emergency_contact: string;
+  date_of_birth: string;
+  gender: 'male' | 'female';
+  emergency_contact_name: string;
+  emergency_contact_relation: string;
+  languages: string;
+  bio: string;
+  
+  // Passenger specific fields
+  passenger_preferred_payment?: string;
+  passenger_emergency_contact?: string;
+  passenger_emergency_contact_name?: string;
+  passenger_emergency_contact_relation?: string;
+  
+  // Driver specific fields
   license_number?: string;
+  license_type?: string;
+  license_expiry_date?: string;
+  driving_experience?: string;
+  bank_account_number?: string;
+  bank_name?: string;
+  bank_branch?: string;
   vehicle_type?: string;
+  vehicle_make?: string;
+  vehicle_model?: string;
+  vehicle_year?: string;
+  vehicle_color?: string;
+  license_plate?: string;
+  registration_number?: string;
   preferred_payment?: string;
+}
+
+export interface RegisterWithImagesRequest extends RegisterRequest {
+  // Image fields for passengers
+  passenger_cnic_front_image?: string;
+  passenger_cnic_back_image?: string;
+  passenger_profile_image?: string;
+  
+  // Image fields for drivers
+  cnic_front_image?: string;
+  cnic_back_image?: string;
+  license_image?: string;
+  profile_image?: string;
+  vehicle_front_image?: string;
+  vehicle_back_image?: string;
+  vehicle_left_image?: string;
+  vehicle_right_image?: string;
 }
 
 export interface SendOtpRequest {
@@ -229,103 +272,66 @@ class ApiService {
     }
   }
 
-  // Alternative registration method using /users endpoint with multipart/form-data
-  async registerWithImages(userData: RegisterRequest & { 
-    passenger_cnic_front_image?: string; 
-    passenger_cnic_back_image?: string; 
-    passenger_profile_image?: string;
-    passenger_preferred_payment?: 'cash' | 'card' | 'mobile_wallet';
-    passenger_emergency_contact?: string;
-    passenger_emergency_contact_name?: string;
-    passenger_emergency_contact_relation?: string;
-  }): Promise<ApiResponse<{ user: User }>> {
+  // Register with images using FormData
+  async registerWithImages(userData: RegisterWithImagesRequest): Promise<ApiResponse<{ user: User }>> {
     console.log('🌐 API Service - Registering user with images...');
-    console.log('📡 Endpoint: POST /auth/register (multipart/form-data)');
-    console.log('📋 Request data (redacted passwords):', {
-      ...userData,
-      password: userData.password ? '***' : undefined,
-      password_confirmation: userData.password_confirmation ? '***' : undefined,
-    });
-
-    // Helper to build a RN-compatible file object from a URI
-    const buildFile = (uri?: string, fallbackName?: string) => {
-      if (!uri) return undefined;
-      // React Native requires the raw URI, including file:// on Android
-      const normalizedUri = uri;
-      const filenameFromUri = () => {
-        try {
-          const lastSlash = normalizedUri.lastIndexOf('/');
-          const name = lastSlash >= 0 ? normalizedUri.substring(lastSlash + 1) : fallbackName || 'upload.jpg';
-          return name || 'upload.jpg';
-        } catch {
-          return fallbackName || 'upload.jpg';
-        }
-      };
-      const inferredName = filenameFromUri();
-      // Best-effort type inference
-      const lower = inferredName.toLowerCase();
-      const type = lower.endsWith('.png') ? 'image/png' : lower.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-      return { uri: normalizedUri, name: inferredName, type } as any;
-    };
-
+    console.log('📡 Endpoint: POST /auth/register');
+    console.log('📋 Request data:', userData);
+    
     try {
+      // Sanitize the data before sending
+      const sanitizedData = this.sanitizeRegistrationData(userData);
+      
+      // Create FormData for multipart/form-data request
       const formData = new FormData();
-      formData.append('name', userData.name);
-      formData.append('email', userData.email);
-      formData.append('password', userData.password);
-      formData.append('password_confirmation', userData.password_confirmation);
-      formData.append('user_type', userData.user_type);
-      formData.append('phone', userData.phone);
-      formData.append('cnic', userData.cnic);
-      formData.append('address', userData.address);
-      formData.append('emergency_contact', userData.emergency_contact);
-      if (userData.license_number) formData.append('license_number', userData.license_number);
-      if (userData.vehicle_type) formData.append('vehicle_type', userData.vehicle_type);
-      if (userData.preferred_payment) formData.append('preferred_payment', userData.preferred_payment);
-
-      // Log form data for debugging
-      console.log('📋 FormData entries:');
-      // Note: FormData.entries() is not available in React Native
-      // We'll log the known fields instead
-      console.log('  name:', userData.name);
-      console.log('  email:', userData.email);
-      console.log('  password: ***');
-      console.log('  password_confirmation: ***');
-      console.log('  user_type:', userData.user_type);
-      console.log('  phone:', userData.phone);
-      console.log('  cnic:', userData.cnic);
-      console.log('  address:', userData.address);
-      console.log('  emergency_contact:', userData.emergency_contact);
-
-      // Attach passenger CNIC images when applicable
-      if (userData.user_type === 'passenger') {
-        const front = buildFile(userData.passenger_cnic_front_image, 'cnic_front.jpg');
-        const back = buildFile(userData.passenger_cnic_back_image, 'cnic_back.jpg');
-        if (front) formData.append('passenger_cnic_front_image', front);
-        if (back) formData.append('passenger_cnic_back_image', back);
-        const profile = buildFile(userData.passenger_profile_image, 'profile.jpg');
-        if (profile) formData.append('passenger_profile_image', profile);
-        if (userData.passenger_emergency_contact) formData.append('passenger_emergency_contact', userData.passenger_emergency_contact);
-        if (userData.passenger_emergency_contact_name) formData.append('passenger_emergency_contact_name', userData.passenger_emergency_contact_name);
-        if (userData.passenger_emergency_contact_relation) formData.append('passenger_emergency_contact_relation', userData.passenger_emergency_contact_relation);
-        if (userData.passenger_preferred_payment) formData.append('passenger_preferred_payment', userData.passenger_preferred_payment);
-      }
-
-      console.log('📤 Sending multipart/form-data registration request...');
-      console.log('🌐 API Base URL:', API_BASE_URL);
-      console.log('🔗 Full URL:', `${API_BASE_URL}/auth/register`);
-
+      
+      // Add all text fields
+      Object.entries(sanitizedData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && typeof value === 'string') {
+          formData.append(key, value);
+        }
+      });
+      
+      // Add image fields if they exist
+      const imageFields = [
+        'passenger_cnic_front_image',
+        'passenger_cnic_back_image', 
+        'passenger_profile_image',
+        'cnic_front_image',
+        'cnic_back_image',
+        'license_image',
+        'profile_image',
+        'vehicle_front_image',
+        'vehicle_back_image',
+        'vehicle_left_image',
+        'vehicle_right_image'
+      ];
+      
+      imageFields.forEach(field => {
+        if (userData[field as keyof RegisterWithImagesRequest]) {
+          const imageUri = userData[field as keyof RegisterWithImagesRequest] as string;
+          if (imageUri) {
+            formData.append(field, {
+              uri: imageUri,
+              type: 'image/jpeg',
+              name: `${field}.jpg`,
+            } as any);
+          }
+        }
+      });
+      
+      console.log('📤 FormData created with images');
+      
       const response = await apiClient.post('/auth/register', formData, {
         headers: {
-          // Let axios set boundary automatically; just indicate multipart
           'Content-Type': 'multipart/form-data',
-          'Accept': 'application/json',
         },
       });
-
+      
       console.log('📨 API Service - Registration with images response received');
       console.log('📊 Response status:', response.status);
       console.log('📋 Response data:', response.data);
+      
       return response.data;
     } catch (error: any) {
       console.error('💥 API Service - Registration with images error:', error);
@@ -333,17 +339,115 @@ class ApiService {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        userData: { ...userData, password: userData.password ? '***' : undefined, password_confirmation: userData.password_confirmation ? '***' : undefined },
+        userData: userData
       });
+      
+      // Log validation errors if available
       if (error.response?.data?.errors) {
         console.error('📋 Validation errors:', error.response.data.errors);
         Object.entries(error.response.data.errors).forEach(([field, messages]) => {
           console.error(`❌ ${field}:`, messages);
         });
       }
+      
       throw error;
     }
   }
+
+  // Format phone number for API calls (with dashes)
+  private formatPhoneForApi(phone: string): string {
+    // Remove all non-digit characters except +
+    let cleaned = phone.replace(/[^\d+]/g, '');
+    
+    // Ensure it starts with +92
+    if (!cleaned.startsWith('+92')) {
+      if (cleaned.startsWith('92')) {
+        cleaned = '+' + cleaned;
+      } else if (cleaned.startsWith('0')) {
+        cleaned = '+92' + cleaned.substring(1);
+      } else {
+        cleaned = '+92' + cleaned;
+      }
+    }
+    
+    // Format as +92-XXX-XXXXXXX
+    if (cleaned.length >= 13) {
+      const countryCode = cleaned.substring(0, 3); // +92
+      const areaCode = cleaned.substring(3, 6);    // XXX
+      const number = cleaned.substring(6, 13);      // XXXXXXX
+      
+      return `${countryCode}-${areaCode}-${number}`;
+    }
+    
+    return phone; // Return original if not long enough
+  }
+
+  // Sanitize registration data to fix common issues
+  private sanitizeRegistrationData(data: RegisterWithImagesRequest): RegisterWithImagesRequest {
+    const sanitized = { ...data };
+    
+    // Trim whitespace from string fields
+    const stringFields = [
+      'name', 'email', 'phone', 'cnic', 'address', 'emergency_contact_name',
+      'emergency_contact_relation', 'languages', 'bio', 'passenger_emergency_contact',
+      'passenger_emergency_contact_name', 'passenger_emergency_contact_relation',
+      'license_number', 'license_type', 'driving_experience', 'bank_account_number',
+      'bank_name', 'bank_branch', 'vehicle_make', 'vehicle_model', 'vehicle_color',
+      'license_plate', 'registration_number'
+    ];
+    
+    stringFields.forEach(field => {
+      if (sanitized[field as keyof RegisterWithImagesRequest] && 
+          typeof sanitized[field as keyof RegisterWithImagesRequest] === 'string') {
+        (sanitized as any)[field] = ((sanitized as any)[field] as string).trim();
+      }
+    });
+    
+    // Fix specific relation values
+    if (sanitized.emergency_contact_relation) {
+      const relation = sanitized.emergency_contact_relation.toLowerCase().trim();
+      
+      // Map common variations to valid values
+      const relationMap: Record<string, string> = {
+        'brother ': 'brother',
+        'sister ': 'sister',
+        'father ': 'father',
+        'mother ': 'mother',
+        'spouse ': 'spouse',
+        'friend ': 'friend',
+        'other ': 'other'
+      };
+      
+      sanitized.emergency_contact_relation = relationMap[relation] || relation;
+    }
+    
+    if (sanitized.passenger_emergency_contact_relation) {
+      const relation = sanitized.passenger_emergency_contact_relation.toLowerCase().trim();
+      
+      // Map common variations to valid values
+      const relationMap: Record<string, string> = {
+        'brother ': 'brother',
+        'sister ': 'sister',
+        'father ': 'father',
+        'mother ': 'mother',
+        'spouse ': 'spouse',
+        'friend ': 'friend',
+        'other ': 'other'
+      };
+      
+      sanitized.passenger_emergency_contact_relation = relationMap[relation] || relation;
+    }
+    
+    // Ensure email is lowercase
+    if (sanitized.email) {
+      sanitized.email = sanitized.email.toLowerCase();
+    }
+    
+    console.log('🧹 Sanitized registration data:', sanitized);
+    
+    return sanitized;
+  }
+
 
   async sendOtp(phone: string): Promise<ApiResponse<{ phone: string; otp_code: string; expires_in: number }>> {
     console.log('🌐 API Service - Sending OTP to phone number...');
@@ -352,7 +456,11 @@ class ApiService {
     console.log('⏰ Request timestamp:', new Date().toISOString());
     
     try {
-      const response = await apiClient.post('/auth/send-otp', { phone });
+      // Format phone number with dashes for API
+      const formattedPhone = this.formatPhoneForApi(phone);
+      console.log('📱 Formatted phone for API:', formattedPhone);
+      
+      const response = await apiClient.post('/auth/send-otp', { phone: formattedPhone });
       
       console.log('📨 API Service - OTP send response received');
       console.log('📊 Response status:', response.status);
@@ -390,7 +498,17 @@ class ApiService {
     console.log('⏰ Request timestamp:', new Date().toISOString());
     
     try {
-      const response = await apiClient.post('/auth/verify-otp', otpData);
+      // Format phone number with dashes for API
+      const formattedOtpData = {
+        ...otpData,
+        phone: this.formatPhoneForApi(otpData.phone)
+      };
+      console.log('📱 Formatted OTP data for API:', {
+        phone: formattedOtpData.phone,
+        otp_code: formattedOtpData.otp_code ? '***' + formattedOtpData.otp_code.slice(-2) : 'undefined'
+      });
+      
+      const response = await apiClient.post('/auth/verify-otp', formattedOtpData);
       
       console.log('📨 API Service - OTP verification response received');
       console.log('📊 Response status:', response.status);
@@ -468,9 +586,10 @@ class ApiService {
   async testNetworkConnectivity(): Promise<boolean> {
     try {
       console.log('🌐 Testing network connectivity...');
-      console.log('🔗 Testing URL:', `${API_BASE_URL}/auth/login`);
+      console.log('🔗 Testing URL:', `${API_BASE_URL}/health`);
       
-      const response = await apiClient.get('/auth/login', {
+      // Try a simple health check endpoint first
+      const response = await apiClient.get('/health', {
         timeout: 10000, // 10 second timeout
       });
       
@@ -478,14 +597,27 @@ class ApiService {
       console.log('📊 Response status:', response.status);
       return true;
     } catch (error: any) {
-      console.error('❌ Network connectivity test failed');
-      console.error('🔍 Error details:', {
-        message: error.message,
-        code: error.code,
-        response: error.response?.status,
-        url: `${API_BASE_URL}/auth/login`
-      });
-      return false;
+      console.log('⚠️ Health endpoint not available, trying alternative...');
+      
+      try {
+        // If health endpoint doesn't exist, try a simple GET to root
+        const response = await apiClient.get('/', {
+          timeout: 10000,
+        });
+        
+        console.log('✅ Network connectivity test successful (alternative)');
+        console.log('📊 Response status:', response.status);
+        return true;
+      } catch (secondError: any) {
+        console.error('❌ Network connectivity test failed');
+        console.error('🔍 Error details:', {
+          message: secondError.message,
+          code: secondError.code,
+          response: secondError.response?.status,
+          url: `${API_BASE_URL}`
+        });
+        return false;
+      }
     }
   }
 

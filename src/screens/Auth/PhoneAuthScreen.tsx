@@ -36,7 +36,7 @@ export default function PhoneAuthScreen() {
   }, [isLoading, error, isOtpSent, isOtpVerified]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
-  const [phoneInput, setPhoneInput] = useState('+92');
+  const [phoneInput, setPhoneInput] = useState('+92-');
   const [verificationCode, setVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
@@ -65,8 +65,17 @@ export default function PhoneAuthScreen() {
     // Clear previous errors
     setPhoneError('');
     
-    // Validate phone number
-    const validation = OtpService.validatePhoneNumber(phoneInput.trim());
+    // Normalize phone number first
+    const normalized = OtpService.normalizePakistanPhone(phoneInput.trim());
+    if (!normalized.success) {
+      console.log('❌ PhoneAuthScreen - Phone normalization failed:', normalized.error);
+      setPhoneError(normalized.error || 'Invalid phone number');
+      showToast('error', normalized.error || 'Invalid phone number');
+      return;
+    }
+
+    // Validate normalized phone number
+    const validation = OtpService.validatePhoneNumber(normalized.phone!);
     if (!validation.isValid) {
       console.log('❌ PhoneAuthScreen - Phone validation failed:', validation.error);
       setPhoneError(validation.error || 'Invalid phone number');
@@ -77,7 +86,7 @@ export default function PhoneAuthScreen() {
     console.log('✅ PhoneAuthScreen - Phone validation passed');
 
     try {
-      const result = await sendOtpToPhone(phoneInput.trim());
+      const result = await sendOtpToPhone(normalized.phone!);
       console.log('📨 PhoneAuthScreen - Send OTP result:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
@@ -113,8 +122,16 @@ export default function PhoneAuthScreen() {
     setOtpError('');
     
     // Validate OTP data
+    const normalized = OtpService.normalizePakistanPhone(phoneInput.trim());
+    if (!normalized.success) {
+      console.log('❌ PhoneAuthScreen - Phone normalization failed:', normalized.error);
+      setOtpError(normalized.error || 'Invalid phone number');
+      showToast('error', normalized.error || 'Invalid phone number');
+      return;
+    }
+
     const otpData = {
-      phone: phoneInput.trim(),
+      phone: normalized.phone!,
       otp_code: verificationCode.trim()
     };
     
@@ -160,7 +177,16 @@ export default function PhoneAuthScreen() {
     setIsResending(true);
     
     try {
-      const result = await sendOtpToPhone(phoneInput.trim());
+      // Normalize phone number first
+      const normalized = OtpService.normalizePakistanPhone(phoneInput.trim());
+      if (!normalized.success) {
+        console.log('❌ PhoneAuthScreen - Phone normalization failed:', normalized.error);
+        setOtpError(normalized.error || 'Invalid phone number');
+        showToast('error', normalized.error || 'Invalid phone number');
+        return;
+      }
+
+      const result = await sendOtpToPhone(normalized.phone!);
       console.log('📨 PhoneAuthScreen - Resend OTP result:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
@@ -196,6 +222,51 @@ export default function PhoneAuthScreen() {
     setReceivedOtpCode('');
   };
 
+  const formatPhoneNumber = (phone: string): string => {
+    // Remove all non-digit characters except +
+    let cleaned = phone.replace(/[^\d+]/g, '');
+    
+    // If it starts with 92, add +
+    if (cleaned.startsWith('92') && !cleaned.startsWith('+92')) {
+      cleaned = '+' + cleaned;
+    }
+    
+    // If it starts with 0, replace with +92
+    if (cleaned.startsWith('0')) {
+      cleaned = '+92' + cleaned.substring(1);
+    }
+    
+    // If it doesn't start with +92, add it
+    if (!cleaned.startsWith('+92')) {
+      cleaned = '+92' + cleaned;
+    }
+    
+    // Format as +92-XXX-XXXXXXX
+    if (cleaned.length >= 4) {
+      const countryCode = cleaned.substring(0, 3); // +92
+      const areaCode = cleaned.substring(3, 6);    // XXX
+      const number = cleaned.substring(6, 13);      // XXXXXXX
+      
+      let formatted = countryCode;
+      if (areaCode) {
+        formatted += '-' + areaCode;
+      }
+      if (number) {
+        formatted += '-' + number;
+      }
+      
+      return formatted;
+    }
+    
+    return cleaned;
+  };
+
+  const handlePhoneInputChange = (text: string) => {
+    const formattedPhone = formatPhoneNumber(text);
+    setPhoneInput(formattedPhone);
+    setPhoneError('');
+  };
+
   const renderPhoneStep = () => (
     <View style={styles.formCard}>
       <View style={styles.phoneIconContainer}>
@@ -208,34 +279,13 @@ export default function PhoneAuthScreen() {
 
       <View style={styles.inputContainer}>
         <ThemedTextInput
-          placeholder="Enter phone number"
+          placeholder="+92-300-1234567"
           value={phoneInput}
-          onChangeText={(text) => {
-            // Enforce +92 prefix and allow up to 10 digits after it
-            const digits = text.replace(/\D/g, '');
-            let next = text;
-            if (text.startsWith('+92')) {
-              // Keep only up to 10 digits after +92
-              const after = text.slice(3).replace(/\D/g, '').slice(0, 10);
-              next = `+92${after}`;
-            } else if (/^03\d{0,9}$/.test(digits)) {
-              // 03XXXXXXXXX -> +92XXXXXXXXXX (partial as user types)
-              const after = digits.slice(1, 11);
-              next = `+92${after}`;
-            } else if (/^92\d{0,10}$/.test(digits)) {
-              next = `+${digits.slice(0, 12)}`;
-            } else {
-              // Fallback: always ensure +92 prefix
-              const after = digits.replace(/^92/, '').replace(/^0/, '').slice(0, 10);
-              next = `+92${after}`;
-            }
-            setPhoneInput(next);
-            setPhoneError('');
-          }}
+          onChangeText={handlePhoneInputChange}
           keyboardType="phone-pad"
           autoFocus
           style={[styles.input, phoneError && styles.inputError]}
-          maxLength={13}
+          maxLength={15}
         />
         {phoneError ? (
           <View style={styles.errorContainer}>

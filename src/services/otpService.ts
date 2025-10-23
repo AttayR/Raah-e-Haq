@@ -111,10 +111,13 @@ export class OtpService {
       return { isValid: false, error: 'Phone number is required' };
     }
 
+    // Remove all non-digit characters except +
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    
     // Enforce Pakistani E.164: +92XXXXXXXXXX (10 digits after +92)
     const pkRegex = /^\+92\d{10}$/;
-    if (!pkRegex.test(phone)) {
-      return { isValid: false, error: 'Phone must be in +92XXXXXXXXXX format' };
+    if (!pkRegex.test(cleaned)) {
+      return { isValid: false, error: 'Phone must be in +92-XXX-XXXXXXX format' };
     }
     return { isValid: true };
   }
@@ -193,20 +196,25 @@ export class OtpService {
    */
   static normalizePakistanPhone(phone: string): { success: boolean; phone?: string; error?: string } {
     if (!phone) return { success: false, error: 'Phone number is required' };
-    const trimmed = phone.trim();
+    
+    // Remove all non-digit characters except +
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    
     // Already correct
-    if (/^\+92\d{10}$/.test(trimmed)) return { success: true, phone: trimmed };
+    if (/^\+92\d{10}$/.test(cleaned)) return { success: true, phone: cleaned };
+    
     // 03XXXXXXXXX -> +92XXXXXXXXXX
-    const onlyDigits = trimmed.replace(/\D/g, '');
-    if (/^03\d{9}$/.test(onlyDigits)) {
-      return { success: true, phone: `+92${onlyDigits.slice(1)}` };
+    if (/^03\d{9}$/.test(cleaned)) {
+      return { success: true, phone: `+92${cleaned.slice(1)}` };
     }
+    
     // 92XXXXXXXXXX -> +92XXXXXXXXXX
-    if (/^92\d{10}$/.test(onlyDigits)) {
-      return { success: true, phone: `+${onlyDigits}` };
+    if (/^92\d{10}$/.test(cleaned)) {
+      return { success: true, phone: `+${cleaned}` };
     }
+    
     // Fallback: reject
-    return { success: false, error: 'Please enter phone as +92XXXXXXXXXX' };
+    return { success: false, error: 'Please enter phone as +92-XXX-XXXXXXX' };
   }
 }
 

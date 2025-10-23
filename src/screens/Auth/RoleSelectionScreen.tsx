@@ -66,13 +66,11 @@ export default function RoleSelectionScreen() {
 
       // Navigate based on role
       if (selectedRole === 'driver') {
-        // Navigate to driver-specific registration
-        navigation.navigate('DriverRegistration', { 
-          phoneNumber: authState.phoneNumber 
-        });
+        // Navigate to complete registration screen for drivers
+        navigation.navigate('CompleteRegistration');
       } else {
-        // Navigate to basic information screen for passengers
-        navigation.navigate('BasicInfo', { role: selectedRole });
+        // Navigate to complete registration screen for passengers
+        navigation.navigate('CompleteRegistration');
       }
     } catch (error) {
       console.error('Error continuing with role selection:', error);

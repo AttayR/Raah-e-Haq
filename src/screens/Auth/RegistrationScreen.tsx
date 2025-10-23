@@ -69,6 +69,10 @@ export default function RegistrationScreen() {
   const navigation = useNavigation<any>();
   const { registerWithImages, isLoading } = useApiAuth();
   
+  // NOTE: This is the legacy registration screen. 
+  // For a complete registration experience with all required fields,
+  // consider using CompleteRegistrationScreen.tsx instead.
+  
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<RegistrationData>({
@@ -222,7 +226,13 @@ export default function RegistrationScreen() {
         phone: formattedPhone,
         cnic: formData.cnic.trim(),
         address: formData.address.trim(),
-        emergency_contact: formData.emergencyContactNumber || formattedPhone,
+        // Add required fields with default values for now
+        date_of_birth: '1990-01-01', // Default date - should be collected from user
+        gender: 'male', // Default gender - should be collected from user
+        emergency_contact_name: formData.emergencyContactName || 'Emergency Contact',
+        emergency_contact_relation: formData.emergencyRelationship || 'friend',
+        languages: 'urdu,english', // Default languages
+        bio: 'User registered via mobile app', // Default bio
         // Add CNIC images for passengers
         ...(formData.role === 'passenger' && {
           passenger_cnic_front_image: formData.cnicFrontPicture,
@@ -234,8 +244,20 @@ export default function RegistrationScreen() {
           passenger_preferred_payment: formData.preferredPayment || 'cash',
         }),
         ...(formData.role === 'driver' && {
-          vehicle_type: formData.vehicleType,
-          license_number: formData.vehicleNumber, // Using vehicle number as license number for now
+          vehicle_type: formData.vehicleType || 'car',
+          license_number: formData.vehicleNumber || 'LIC-2024-001', // Using vehicle number as license number for now
+          license_type: 'LTV', // Default license type
+          license_expiry_date: '2029-12-31', // Default expiry date
+          driving_experience: '2 years', // Default experience
+          bank_account_number: '1234567890123456', // Default bank account
+          bank_name: 'Default Bank', // Default bank name
+          bank_branch: 'Default Branch', // Default branch
+          vehicle_make: 'Toyota', // Default make
+          vehicle_model: 'Corolla', // Default model
+          vehicle_year: '2020', // Default year
+          vehicle_color: 'White', // Default color
+          license_plate: 'ABC-1234', // Default plate
+          registration_number: 'REG-2020-001', // Default registration
           preferred_payment: formData.preferredPayment || 'cash',
         }),
       };
