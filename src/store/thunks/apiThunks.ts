@@ -101,17 +101,26 @@ export const registerUserWithImages = createAsyncThunk(
         console.log('✅ Redux Thunk - Registration with images successful');
         console.log('👤 User data:', response.data.user);
         console.log('🔑 Token:', response.data.token);
+        console.log('📊 User status:', response.data.user?.status);
         
-        // Store auth data
-        await apiService.setAuthToken(response.data.token);
+        // Only store token if it exists (not null)
+        // Driver accounts with pending status return null token
+        if (response.data.token) {
+          await apiService.setAuthToken(response.data.token);
+          console.log('💾 Auth token stored successfully');
+        } else {
+          console.log('⚠️ No token returned (driver pending approval)');
+        }
+        
+        // Store user data
         await apiService.setUserData(response.data.user);
-        
-        console.log('💾 Auth data stored successfully');
+        console.log('💾 User data stored successfully');
         
         return {
           user: response.data.user,
           token: response.data.token,
           tokenType: response.data.token_type,
+          message: response.message, // Include the server message about approval
         };
       } else {
         console.log('❌ Redux Thunk - Registration with images failed:', response.message);

@@ -13,11 +13,13 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+// Custom date picker implementation without external dependencies
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { RegisterWithImagesRequest } from '../../services/api';
 import AuthErrorHandler from '../../utils/AuthErrorHandler';
@@ -122,7 +124,13 @@ const CompleteRegistrationScreen: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [fieldValidations, setFieldValidations] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const totalSteps = userType === 'passenger' ? 4 : 5;
 
@@ -249,9 +257,21 @@ const CompleteRegistrationScreen: React.FC = () => {
       const result = await registerWithImages(registrationData);
       
       if (result.type === 'auth/registerUserWithImages/fulfilled') {
+        const userStatus = result.payload?.user?.status;
+        const isDriver = userType === 'driver';
+        const isPending = userStatus === 'pending';
+        
+        // Show appropriate message based on status
+        let title = 'Registration Successful!';
+        let message = result.payload?.message || 'Your account has been created successfully.';
+        
+        if (isDriver && isPending) {
+          message = result.payload?.message || 'Your driver account is pending admin approval. You will be notified when your account is approved and you can login.';
+        }
+        
         AuthErrorHandler.showSuccessMessage(
-          'Registration Successful!',
-          'Your account has been created successfully. You can now login.',
+          title,
+          message,
           () => navigation.navigate('CompleteLogin')
         );
       } else {
@@ -265,18 +285,81 @@ const CompleteRegistrationScreen: React.FC = () => {
     }
   };
 
+  // Real-time validation function
+  const validateField = (field: keyof FormData, value: any): string | null => {
+    const rules = ValidationUtils.getRegistrationRules(userType);
+    const fieldRules = rules[field];
+    
+    if (!fieldRules) return null;
+    
+    // Special handling for password confirmation
+    if (field === 'password_confirmation') {
+      if (!value) return 'Please confirm your password';
+      if (formData.password && value !== formData.password) {
+        return 'Passwords do not match';
+      }
+      return null;
+    }
+    
+    // Special handling for password
+    if (field === 'password') {
+      const error = ValidationUtils.validateField(value, fieldRules);
+      // If password changed, revalidate confirmation
+      if (!error && touched.password_confirmation && formData.password_confirmation) {
+        const confirmValue = formData.password_confirmation;
+        if (value !== confirmValue) {
+          setErrors(prev => ({ ...prev, password_confirmation: 'Passwords do not match' }));
+        } else {
+          setErrors(prev => ({ ...prev, password_confirmation: '' }));
+        }
+      }
+    }
+    
+    return ValidationUtils.validateField(value, fieldRules);
+  };
+
   const updateFormData = (field: keyof FormData, value: string) => {
     if (field === 'phone' || field === 'passenger_emergency_contact') {
       // Auto-format phone numbers as user types
       const formattedPhone = formatPhoneNumber(value);
       setFormData(prev => ({ ...prev, [field]: formattedPhone }));
+      // Validate the formatted phone
+      if (touched[field]) {
+        const error = validateField(field, formattedPhone);
+        if (error) {
+          setErrors(prev => ({ ...prev, [field]: error }));
+          setFieldValidations(prev => ({ ...prev, [field]: false }));
+        } else {
+          setErrors(prev => ({ ...prev, [field]: '' }));
+          setFieldValidations(prev => ({ ...prev, [field]: true }));
+        }
+      }
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
+      // Real-time validation
+      if (touched[field]) {
+        const error = validateField(field, value);
+        if (error) {
+          setErrors(prev => ({ ...prev, [field]: error }));
+          setFieldValidations(prev => ({ ...prev, [field]: false }));
+        } else {
+          setErrors(prev => ({ ...prev, [field]: '' }));
+          setFieldValidations(prev => ({ ...prev, [field]: true }));
+        }
+      }
     }
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
+  };
+
+  const handleBlur = (field: keyof FormData) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    const value = formData[field];
+    const error = validateField(field, value);
+    if (error) {
+      setErrors(prev => ({ ...prev, [field]: error }));
+      setFieldValidations(prev => ({ ...prev, [field]: false }));
+    } else {
       setErrors(prev => ({ ...prev, [field]: '' }));
+      setFieldValidations(prev => ({ ...prev, [field]: true }));
     }
   };
 
@@ -319,6 +402,35 @@ const CompleteRegistrationScreen: React.FC = () => {
     return cleaned;
   };
 
+  // Date picker functions
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || new Date();
+    setShowDatePicker(Platform.OS === 'ios');
+    setSelectedDate(currentDate);
+    
+    // Format date as YYYY-MM-DD
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+    
+    updateFormData('date_of_birth', formattedDate);
+  };
+
+  const showDatePickerModal = () => {
+    setShowDatePicker(true);
+  };
+
+  const formatDisplayDate = (dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   const renderImagePicker = (field: keyof FormData, label: string, required: boolean = false) => {
     const imageUri = formData[field] as string;
     
@@ -345,33 +457,86 @@ const CompleteRegistrationScreen: React.FC = () => {
     );
   };
 
+  // Get field hints/help text
+  const getFieldHints = (field: keyof FormData): string => {
+    const hints: Record<string, string> = {
+      name: 'e.g., Muhammad Hassan',
+      email: 'e.g., m.hassan@email.com',
+      password: 'Min 8 chars, include uppercase, lowercase, number & special char',
+      password_confirmation: 'Must match password above',
+      phone: 'Format: +92-XXX-XXXXXXX',
+      cnic: 'Format: XXXXX-XXXXXXX-X',
+      address: 'Enter complete address',
+      date_of_birth: 'Must be at least 18 years old',
+      emergency_contact_name: 'e.g., Hassan Ahmed',
+      emergency_contact_relation: 'Select from options below',
+      languages: 'e.g., urdu,english',
+      bio: 'Brief description about yourself',
+      license_number: 'e.g., LIC-2023-00875',
+      license_type: 'Select: LTV, MC, or HTV',
+      license_expiry_date: 'Format: YYYY-MM-DD',
+      driving_experience: 'e.g., 5 years',
+      bank_account_number: '16-digit account number',
+      bank_name: 'e.g., Habib Bank Limited',
+      bank_branch: 'Branch location',
+      vehicle_make: 'e.g., Toyota, Honda',
+      vehicle_model: 'e.g., Corolla, Civic',
+      vehicle_year: 'e.g., 2020',
+      vehicle_color: 'e.g., White, Red',
+      license_plate: 'Format: ABC-1234-5678',
+      registration_number: 'e.g., REG-2020-5667',
+    };
+    return hints[field] || '';
+  };
+
   const renderInput = (
     field: keyof FormData,
     label: string,
     placeholder: string,
     required: boolean = false,
     keyboardType: 'default' | 'email-address' | 'numeric' | 'phone-pad' = 'default',
-    secureTextEntry: boolean = false
+    secureTextEntry: boolean = false,
+    showHint: boolean = true
   ) => (
     <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>
-        {label} {required && <Text style={styles.required}>*</Text>}
-      </Text>
+      <View style={styles.inputLabelRow}>
+        <Text style={styles.inputLabel}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+        {fieldValidations[field] && touched[field] && (
+          <Icon name="check-circle" size={20} color="#10b981" />
+        )}
+      </View>
       <TextInput
-        style={[styles.input, errors[field] && styles.inputError]}
+        style={[
+          styles.input, 
+          errors[field] && touched[field] && styles.inputError,
+          fieldValidations[field] && touched[field] && styles.inputSuccess
+        ]}
         placeholder={placeholder}
         value={formData[field] as string}
         onChangeText={(value) => updateFormData(field, value)}
+        onBlur={() => handleBlur(field)}
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
       />
-      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
+      {showHint && !touched[field] && (
+        <Text style={styles.hintText}>{getFieldHints(field)}</Text>
+      )}
+      {touched[field] && errors[field] && (
+        <Text style={styles.errorText}>
+          <Icon name="error" size={14} color="#ef4444" /> {errors[field]}
+        </Text>
+      )}
     </View>
   );
 
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Basic Information</Text>
+      <Text style={styles.stepSubtitle}>
+        Please fill in your personal details below. All fields marked with * are required.
+      </Text>
       
       <View style={styles.userTypeContainer}>
         <Text style={styles.sectionTitle}>I want to register as:</Text>
@@ -423,7 +588,25 @@ const CompleteRegistrationScreen: React.FC = () => {
       {renderInput('phone', 'Phone Number', '+92-300-1234567', true, 'phone-pad')}
       {renderInput('cnic', 'CNIC', 'Enter your CNIC number', true, 'numeric')}
       {renderInput('address', 'Address', 'Enter your address', true)}
-      {renderInput('date_of_birth', 'Date of Birth', 'YYYY-MM-DD', true)}
+      {/* Date of Birth Picker */}
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>
+          Date of Birth <Text style={styles.required}>*</Text>
+        </Text>
+        <TouchableOpacity
+          style={[styles.datePickerButton, errors.date_of_birth && styles.inputError]}
+          onPress={showDatePickerModal}
+        >
+          <Text style={[
+            styles.datePickerText,
+            !formData.date_of_birth && styles.datePickerPlaceholder
+          ]}>
+            {formData.date_of_birth ? formatDisplayDate(formData.date_of_birth) : 'Select your date of birth'}
+          </Text>
+          <Icon name="calendar-today" size={20} color={BrandColors.primary} />
+        </TouchableOpacity>
+        {errors.date_of_birth && <Text style={styles.errorText}>{errors.date_of_birth}</Text>}
+      </View>
       
       <View style={styles.genderContainer}>
         <Text style={styles.inputLabel}>Gender <Text style={styles.required}>*</Text></Text>
@@ -729,8 +912,149 @@ const CompleteRegistrationScreen: React.FC = () => {
             )}
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+        
+        {/* Date Picker Modal */}
+        {showDatePicker && (
+          <Modal
+            transparent={true}
+            animationType="slide"
+            visible={showDatePicker}
+            onRequestClose={() => setShowDatePicker(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Date of Birth</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(false)}
+                    style={styles.modalCloseButton}
+                  >
+                    <Icon name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.customDatePicker}>
+                  {/* Year Picker */}
+                  <View style={styles.pickerContainer}>
+                    <Text style={styles.pickerLabel}>Year</Text>
+                    <ScrollView style={styles.pickerScrollView}>
+                      {Array.from({ length: 125 }, (_, i) => {
+                        const year = new Date().getFullYear() - i;
+                        return (
+                          <TouchableOpacity
+                            key={year}
+                            style={[
+                              styles.pickerItem,
+                              selectedDate.getFullYear() === year && styles.pickerItemSelected
+                            ]}
+                            onPress={() => {
+                              const newDate = new Date(selectedDate);
+                              newDate.setFullYear(year);
+                              setSelectedDate(newDate);
+                            }}
+                          >
+                            <Text style={[
+                              styles.pickerItemText,
+                              selectedDate.getFullYear() === year && styles.pickerItemTextSelected
+                            ]}>
+                              {year}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+
+                  {/* Month Picker */}
+                  <View style={styles.pickerContainer}>
+                    <Text style={styles.pickerLabel}>Month</Text>
+                    <ScrollView style={styles.pickerScrollView}>
+                      {Array.from({ length: 12 }, (_, i) => {
+                        const month = i + 1;
+                        const monthName = new Date(2000, i).toLocaleString('default', { month: 'long' });
+                        return (
+                          <TouchableOpacity
+                            key={month}
+                            style={[
+                              styles.pickerItem,
+                              selectedDate.getMonth() === i && styles.pickerItemSelected
+                            ]}
+                            onPress={() => {
+                              const newDate = new Date(selectedDate);
+                              newDate.setMonth(i);
+                              setSelectedDate(newDate);
+                            }}
+                          >
+                            <Text style={[
+                              styles.pickerItemText,
+                              selectedDate.getMonth() === i && styles.pickerItemTextSelected
+                            ]}>
+                              {monthName}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+
+                  {/* Day Picker */}
+                  <View style={styles.pickerContainer}>
+                    <Text style={styles.pickerLabel}>Day</Text>
+                    <ScrollView style={styles.pickerScrollView}>
+                      {Array.from({ length: 31 }, (_, i) => {
+                        const day = i + 1;
+                        const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+                        if (day > daysInMonth) return null;
+                        
+                        return (
+                          <TouchableOpacity
+                            key={day}
+                            style={[
+                              styles.pickerItem,
+                              selectedDate.getDate() === day && styles.pickerItemSelected
+                            ]}
+                            onPress={() => {
+                              const newDate = new Date(selectedDate);
+                              newDate.setDate(day);
+                              setSelectedDate(newDate);
+                            }}
+                          >
+                            <Text style={[
+                              styles.pickerItemText,
+                              selectedDate.getDate() === day && styles.pickerItemTextSelected
+                            ]}>
+                              {day}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </View>
+                
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonPrimary]}
+                    onPress={() => {
+                      handleDateChange(null, selectedDate);
+                      setShowDatePicker(false);
+                    }}
+                  >
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+      </SafeAreaView>
   );
 };
 
@@ -786,7 +1110,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#1f2937',
+    marginBottom: 8,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
     marginBottom: 20,
+    lineHeight: 20,
   },
   sectionTitle: {
     fontSize: 18,
@@ -828,11 +1158,26 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 20,
   },
+  inputLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+  },
+  hintText: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  inputSuccess: {
+    borderColor: '#10b981',
+    borderWidth: 2,
   },
   required: {
     color: '#ef4444',
@@ -1035,6 +1380,127 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  
+  // Date picker styles
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    backgroundColor: 'white',
+    marginBottom: 4,
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: '#374151',
+    flex: 1,
+  },
+  datePickerPlaceholder: {
+    color: '#9ca3af',
+  },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+  },
+  modalButtonPrimary: {
+    backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  modalButtonTextPrimary: {
+    color: 'white',
+  },
+  
+  // Custom date picker styles
+  customDatePicker: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 20,
+  },
+  pickerContainer: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  pickerLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  pickerScrollView: {
+    height: 200,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    backgroundColor: '#f9fafb',
+  },
+  pickerItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  pickerItemSelected: {
+    backgroundColor: BrandColors.primary,
+  },
+  pickerItemText: {
+    fontSize: 16,
+    color: '#374151',
+    textAlign: 'center',
+  },
+  pickerItemTextSelected: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 

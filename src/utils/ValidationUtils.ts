@@ -154,8 +154,11 @@ export class ValidationUtils {
     
     dateOfBirth: {
       required: true,
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
       custom: (value: string) => {
         if (!value) return 'Date of birth is required';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Date must be in format YYYY-MM-DD (e.g., 2001-01-01)';
+        
         const date = new Date(value);
         const today = new Date();
         const age = today.getFullYear() - date.getFullYear();
@@ -263,10 +266,7 @@ export class ValidationUtils {
       password_confirmation: {
         required: true,
         custom: (value: string, formData?: any) => {
-          if (!value) return 'Password confirmation is required';
-          if (formData?.password && value !== formData.password) {
-            return 'Passwords do not match';
-          }
+          if (!value) return 'Please confirm your password';
           return null;
         }
       },
@@ -351,8 +351,11 @@ export class ValidationUtils {
         },
         license_expiry_date: {
           required: true,
+          pattern: /^\d{4}-\d{2}-\d{2}$/,
           custom: (value: string) => {
             if (!value) return 'License expiry date is required';
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Date must be in format YYYY-MM-DD (e.g., 2028-12-31)';
+            
             const date = new Date(value);
             const today = new Date();
             
