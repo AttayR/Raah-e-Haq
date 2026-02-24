@@ -1,4 +1,4 @@
- import React, { useState } from 'react';
+ import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -33,6 +33,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+
+  // Clear any persisted auth error when this screen is shown (e.g. after killing app mid-login).
+  useEffect(() => {
+    clearAuthError();
+  }, [clearAuthError]);
 
   // Validation functions
   const validateEmail = (emailValue: string): boolean => {

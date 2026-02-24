@@ -152,6 +152,8 @@ export interface RegisterRequest {
   cnic: string;
   address: string;
   emergency_contact: string;
+  date_of_birth?: string; // YYYY-MM-DD
+  gender?: 'male' | 'female' | 'other';
   license_number?: string;
   vehicle_type?: string;
   preferred_payment?: string;
@@ -279,6 +281,8 @@ class ApiService {
       formData.append('cnic', userData.cnic);
       formData.append('address', userData.address);
       formData.append('emergency_contact', userData.emergency_contact);
+      if (userData.date_of_birth) formData.append('date_of_birth', userData.date_of_birth);
+      if (userData.gender) formData.append('gender', userData.gender);
       if (userData.license_number) formData.append('license_number', userData.license_number);
       if (userData.vehicle_type) formData.append('vehicle_type', userData.vehicle_type);
       if (userData.preferred_payment) formData.append('preferred_payment', userData.preferred_payment);
@@ -305,9 +309,9 @@ class ApiService {
         if (back) formData.append('passenger_cnic_back_image', back);
         const profile = buildFile(userData.passenger_profile_image, 'profile.jpg');
         if (profile) formData.append('passenger_profile_image', profile);
-        if (userData.passenger_emergency_contact) formData.append('passenger_emergency_contact', userData.passenger_emergency_contact);
+        formData.append('passenger_emergency_contact', userData.passenger_emergency_contact || userData.emergency_contact);
         if (userData.passenger_emergency_contact_name) formData.append('passenger_emergency_contact_name', userData.passenger_emergency_contact_name);
-        if (userData.passenger_emergency_contact_relation) formData.append('passenger_emergency_contact_relation', userData.passenger_emergency_contact_relation);
+        formData.append('passenger_emergency_contact_relation', userData.passenger_emergency_contact_relation || 'other');
         if (userData.passenger_preferred_payment) formData.append('passenger_preferred_payment', userData.passenger_preferred_payment);
       }
 
@@ -465,25 +469,31 @@ class ApiService {
   }
 
   // Test Network Connectivity
+  // Uses a GET to the base API; any HTTP response (including 4xx/5xx) means the server is reachable.
+  // Only network failures (timeout, no connection, DNS) are treated as no connectivity.
   async testNetworkConnectivity(): Promise<boolean> {
     try {
       console.log('🌐 Testing network connectivity...');
-      console.log('🔗 Testing URL:', `${API_BASE_URL}/auth/login`);
-      
-      const response = await apiClient.get('/auth/login', {
-        timeout: 10000, // 10 second timeout
+      console.log('🔗 Testing URL:', API_BASE_URL);
+
+      const response = await apiClient.get('/', {
+        timeout: 10000,
+        validateStatus: () => true, // Accept any status so we only fail on network error
       });
-      
+
       console.log('✅ Network connectivity test successful');
       console.log('📊 Response status:', response.status);
       return true;
     } catch (error: any) {
+      // Server responded with an error (e.g. 404) = we have connectivity
+      if (error.response != null) {
+        console.log('✅ Server reachable (response status:', error.response.status, ')');
+        return true;
+      }
       console.error('❌ Network connectivity test failed');
       console.error('🔍 Error details:', {
         message: error.message,
         code: error.code,
-        response: error.response?.status,
-        url: `${API_BASE_URL}/auth/login`
       });
       return false;
     }

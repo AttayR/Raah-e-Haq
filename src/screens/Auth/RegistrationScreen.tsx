@@ -36,6 +36,8 @@ interface RegistrationData {
   cnic: string;
   address: string;
   phoneNumber: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  gender: 'male' | 'female' | 'other' | '';
   // Emergency Contact (per passenger/driver forms)
   emergencyContactNumber: string;
   emergencyContactName: string;
@@ -71,6 +73,7 @@ export default function RegistrationScreen() {
   
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
   const [submitting, setSubmitting] = useState(false);
+  const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<RegistrationData>({
     fullName: '',
     email: '',
@@ -79,6 +82,8 @@ export default function RegistrationScreen() {
     cnic: '',
     address: '',
     phoneNumber: '',
+    dateOfBirth: '',
+    gender: '',
     emergencyContactNumber: '',
     emergencyContactName: '',
     emergencyRelationship: '',
@@ -202,6 +207,25 @@ export default function RegistrationScreen() {
         showToast('error', 'Password must be at least 8 characters long');
         return;
       }
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(formData.password)) {
+        showToast('error', 'Password must contain at least one uppercase letter, one lowercase letter, and one number');
+        return;
+      }
+      if (!formData.dateOfBirth || !formData.dateOfBirth.trim()) {
+        showToast('error', 'Date of birth is required');
+        setCurrentStep('personal');
+        return;
+      }
+      if (!formData.gender) {
+        showToast('error', 'Gender is required');
+        setCurrentStep('personal');
+        return;
+      }
+      if (formData.role === 'passenger' && !formData.emergencyRelationship?.trim()) {
+        showToast('error', 'Emergency contact relationship is required');
+        setCurrentStep('personal');
+        return;
+      }
 
       // Temporarily skip CNIC image validation for testing
       // TODO: Re-enable when proper image upload is implemented
@@ -211,6 +235,8 @@ export default function RegistrationScreen() {
       //   showToast('error', 'CNIC front and back images are required for passenger registration. Please complete the document upload step.');
       //   return;
       // }
+
+      setApiValidationErrors({});
 
       // Prepare registration data for API
       const registrationData = {
@@ -223,6 +249,8 @@ export default function RegistrationScreen() {
         cnic: formData.cnic.trim(),
         address: formData.address.trim(),
         emergency_contact: formData.emergencyContactNumber || formattedPhone,
+        ...(formData.dateOfBirth && { date_of_birth: formData.dateOfBirth }),
+        ...(formData.gender && { gender: formData.gender }),
         // Add CNIC images for passengers
         ...(formData.role === 'passenger' && {
           passenger_cnic_front_image: formData.cnicFrontPicture,
@@ -230,7 +258,7 @@ export default function RegistrationScreen() {
           passenger_profile_image: formData.profilePicture,
           passenger_emergency_contact: formData.emergencyContactNumber || formattedPhone,
           passenger_emergency_contact_name: formData.emergencyContactName,
-          passenger_emergency_contact_relation: formData.emergencyRelationship,
+          passenger_emergency_contact_relation: formData.emergencyRelationship || 'other',
           passenger_preferred_payment: formData.preferredPayment || 'cash',
         }),
         ...(formData.role === 'driver' && {
@@ -263,12 +291,24 @@ export default function RegistrationScreen() {
         console.log('✅ Account created successfully!');
         console.log('👤 User data:', result.payload);
         showToast('success', 'Your account has been created successfully! Please wait for admin approval.');
-        // Navigate to login or phone verification
         navigation.navigate('Login');
       } else {
         console.log('❌ Registration failed');
-        console.log('🚨 Error details:', result.payload);
-        showToast('error', (result.payload as string) || 'Registration failed');
+        const payload = result.payload as any;
+        const isValidationError = payload && typeof payload === 'object' && payload.errors;
+        if (isValidationError) {
+          const fieldErrors: Record<string, string> = {};
+          Object.entries(payload.errors || {}).forEach(([field, messages]) => {
+            const msg = Array.isArray(messages) ? messages[0] : String(messages);
+            fieldErrors[field] = msg;
+          });
+          setApiValidationErrors(fieldErrors);
+          setCurrentStep('personal');
+          showToast('error', payload.message || 'Please fix the errors below.');
+        } else {
+          const message = typeof payload === 'string' ? payload : payload?.message || 'Registration failed';
+          showToast('error', message);
+        }
       }
       
     } catch (registrationError: any) {
@@ -301,6 +341,12 @@ export default function RegistrationScreen() {
             data={formData}
             onDataChange={updateFormData}
             errors={{}}
+            apiErrors={apiValidationErrors}
+            onClearApiError={(field) => setApiValidationErrors((prev) => {
+              const next = { ...prev };
+              delete next[field];
+              return next;
+            })}
           />
         );
       case 'vehicle':
