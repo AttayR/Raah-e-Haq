@@ -255,13 +255,6 @@ export default function PhoneAuthScreen() {
           textStyle={styles.buttonText}
         />
       </View>
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Icon name="error" size={20} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
     </View>
   );
 
@@ -355,13 +348,6 @@ export default function PhoneAuthScreen() {
           textStyle={styles.buttonText}
         />
       </View>
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Icon name="error" size={20} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
     </View>
   );
 

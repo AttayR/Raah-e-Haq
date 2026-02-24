@@ -21,6 +21,14 @@ interface VehicleInfoData {
   vehicleModel: string;
   vehicleYear: string;
   vehicleColor: string;
+  licenseType: string;
+  licenseExpiryDate: string;
+  licensePlate: string;
+  registrationNumber: string;
+  drivingExperience: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
   role: 'driver' | 'passenger';
 }
 
@@ -28,7 +36,19 @@ interface VehicleInfoStepProps {
   data: VehicleInfoData;
   onDataChange: (data: Partial<VehicleInfoData>) => void;
   errors: Record<string, string>;
+  apiErrors?: Record<string, string>;
+  onClearApiError?: (field: string) => void;
 }
+
+const LICENSE_TYPES = [
+  { value: 'LTV', label: 'LTV (Light Transport Vehicle)' },
+  { value: 'HTV', label: 'HTV (Heavy Transport Vehicle)' },
+  { value: 'Motorcycle', label: 'Motorcycle' },
+  { value: 'PSV', label: 'PSV (Public Service Vehicle)' },
+  { value: 'other', label: 'Other' },
+];
+
+const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '20', '25', '30'];
 
 const vehicleTypes = [
   { 
@@ -68,14 +88,17 @@ const vehicleColors = [
   'Orange', 'Brown', 'Gold', 'Purple', 'Pink', 'Other'
 ];
 
-const currentYear = new Date().getFullYear();
-const vehicleYears = Array.from({ length: 20 }, (_, i) => (currentYear - i).toString());
+// API allows vehicle year up to 2025 (must not be greater than 2025)
+const MAX_VEHICLE_YEAR = 2025;
+const vehicleYears = Array.from({ length: 20 }, (_, i) => (MAX_VEHICLE_YEAR - i).toString());
 
-export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleInfoStepProps) {
+export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors = {}, onClearApiError }: VehicleInfoStepProps) {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showLicenseTypeDropdown, setShowLicenseTypeDropdown] = useState(false);
+  const [showExperienceDropdown, setShowExperienceDropdown] = useState(false);
 
   // Safety check for undefined data
   if (!data) {
@@ -113,9 +136,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
 
   const validateVehicleYear = (year: string): string | undefined => {
     if (!year || !year.trim()) return 'Vehicle year is required';
-    const yearNum = parseInt(year);
-    if (isNaN(yearNum) || yearNum < 2000 || yearNum > currentYear) {
-      return `Please enter a valid year between 2000 and ${currentYear}`;
+    const yearNum = parseInt(year, 10);
+    if (isNaN(yearNum) || yearNum < 2000 || yearNum > MAX_VEHICLE_YEAR) {
+      return `Please enter a valid year between 2000 and ${MAX_VEHICLE_YEAR}`;
     }
     return undefined;
   };
@@ -177,6 +200,30 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
         break;
       case 'vehicleColor':
         error = validateVehicleColor(safeValue);
+        break;
+      case 'licenseType':
+        error = !safeValue ? 'License type is required' : undefined;
+        break;
+      case 'licenseExpiryDate':
+        error = !safeValue ? 'License expiry date is required' : undefined;
+        break;
+      case 'licensePlate':
+        error = !safeValue ? 'License plate is required' : undefined;
+        break;
+      case 'registrationNumber':
+        error = !safeValue ? 'Registration number is required' : undefined;
+        break;
+      case 'drivingExperience':
+        error = !safeValue ? 'Driving experience is required' : undefined;
+        break;
+      case 'bankName':
+        error = !safeValue ? 'Bank name is required' : undefined;
+        break;
+      case 'bankBranch':
+        error = !safeValue ? 'Bank branch is required' : undefined;
+        break;
+      case 'bankAccountNumber':
+        error = !safeValue ? 'Bank account number is required' : undefined;
         break;
     }
     
@@ -267,10 +314,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
               </TouchableOpacity>
             ))}
           </View>
-          {validationErrors.vehicleType && (
+          {(validationErrors.vehicleType || apiErrors.vehicle_type) && (
             <View style={styles.errorContainer}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleType}</Text>
+              <Text style={styles.errorText}>{validationErrors.vehicleType || apiErrors.vehicle_type}</Text>
             </View>
           )}
         </View>
@@ -286,7 +333,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             autoCapitalize="characters"
             style={styles.input}
           />
-          {validationErrors.vehicleNumber && (
+          {(validationErrors.vehicleNumber) && (
             <View style={styles.errorContainer}>
               <Icon name="error" size={16} color="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.vehicleNumber}</Text>
@@ -328,10 +375,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
               </ScrollView>
             </View>
           )}
-          {validationErrors.vehicleBrand && (
+          {(validationErrors.vehicleBrand || apiErrors.vehicle_make) && (
             <View style={styles.errorContainer}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleBrand}</Text>
+              <Text style={styles.errorText}>{validationErrors.vehicleBrand || apiErrors.vehicle_make}</Text>
             </View>
           )}
         </View>
@@ -346,10 +393,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             onBlur={() => validateField('vehicleModel', data.vehicleModel || '')}
             style={styles.input}
           />
-          {validationErrors.vehicleModel && (
+          {(validationErrors.vehicleModel || apiErrors.vehicle_model) && (
             <View style={styles.errorContainer}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleModel}</Text>
+              <Text style={styles.errorText}>{validationErrors.vehicleModel || apiErrors.vehicle_model}</Text>
             </View>
           )}
         </View>
@@ -389,10 +436,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                 </ScrollView>
               </View>
             )}
-            {validationErrors.vehicleYear && (
+            {(validationErrors.vehicleYear || apiErrors.vehicle_year) && (
               <View style={styles.errorContainer}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.vehicleYear}</Text>
+                <Text style={styles.errorText}>{validationErrors.vehicleYear || apiErrors.vehicle_year}</Text>
               </View>
             )}
           </View>
@@ -431,10 +478,187 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                 </ScrollView>
               </View>
             )}
-            {validationErrors.vehicleColor && (
+            {(validationErrors.vehicleColor || apiErrors.vehicle_color) && (
               <View style={styles.errorContainer}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.vehicleColor}</Text>
+                <Text style={styles.errorText}>{validationErrors.vehicleColor || apiErrors.vehicle_color}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* License plate & Registration number */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>License Plate *</Text>
+          <ThemedTextInput
+            placeholder="e.g. ABC-1234-D"
+            value={data.licensePlate || ''}
+            onChangeText={(v) => { onDataChange({ licensePlate: v }); onClearApiError?.('license_plate'); }}
+            style={styles.input}
+          />
+          {(validationErrors.licensePlate || apiErrors.license_plate) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.licensePlate || apiErrors.license_plate}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Vehicle Registration Number *</Text>
+          <ThemedTextInput
+            placeholder="Official registration number"
+            value={data.registrationNumber || ''}
+            onChangeText={(v) => { onDataChange({ registrationNumber: v }); onClearApiError?.('registration_number'); }}
+            style={styles.input}
+          />
+          {(validationErrors.registrationNumber || apiErrors.registration_number) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.registrationNumber || apiErrors.registration_number}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* License type & expiry & experience */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>License Type *</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setShowLicenseTypeDropdown(!showLicenseTypeDropdown)}
+          >
+            <Text style={[styles.dropdownText, !data.licenseType && styles.dropdownPlaceholder]}>
+              {LICENSE_TYPES.find((t) => t.value === data.licenseType)?.label || 'Select license type'}
+            </Text>
+            <Icon name={showLicenseTypeDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#6b7280" />
+          </TouchableOpacity>
+          {showLicenseTypeDropdown && (
+            <View style={styles.dropdownList}>
+              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+                {LICENSE_TYPES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      onDataChange({ licenseType: opt.value });
+                      setShowLicenseTypeDropdown(false);
+                      onClearApiError?.('license_type');
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{opt.label}</Text>
+                    {data.licenseType === opt.value && <Icon name="check" size={20} color={BrandColors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          {(validationErrors.licenseType || apiErrors.license_type) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.licenseType || apiErrors.license_type}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>License Expiry Date *</Text>
+          <ThemedTextInput
+            placeholder="YYYY-MM-DD"
+            value={data.licenseExpiryDate || ''}
+            onChangeText={(v) => { onDataChange({ licenseExpiryDate: v }); onClearApiError?.('license_expiry_date'); }}
+            style={styles.input}
+          />
+          {(validationErrors.licenseExpiryDate || apiErrors.license_expiry_date) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.licenseExpiryDate || apiErrors.license_expiry_date}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Driving Experience (years) *</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setShowExperienceDropdown(!showExperienceDropdown)}
+          >
+            <Text style={[styles.dropdownText, !data.drivingExperience && styles.dropdownPlaceholder]}>
+              {data.drivingExperience ? `${data.drivingExperience} years` : 'Select years'}
+            </Text>
+            <Icon name={showExperienceDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#6b7280" />
+          </TouchableOpacity>
+          {showExperienceDropdown && (
+            <View style={styles.dropdownList}>
+              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+                {DRIVING_EXPERIENCE_OPTIONS.map((y) => (
+                  <TouchableOpacity
+                    key={y}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      onDataChange({ drivingExperience: y });
+                      setShowExperienceDropdown(false);
+                      onClearApiError?.('driving_experience');
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{y} years</Text>
+                    {data.drivingExperience === y && <Icon name="check" size={20} color={BrandColors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          {(validationErrors.drivingExperience || apiErrors.driving_experience) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.drivingExperience || apiErrors.driving_experience}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Bank details */}
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Bank Details</Text>
+          <Text style={styles.formSubtitle}>Required for driver payouts</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Bank Name *</Text>
+            <ThemedTextInput
+              placeholder="e.g. HBL, UBL, MCB"
+              value={data.bankName || ''}
+              onChangeText={(v) => { onDataChange({ bankName: v }); onClearApiError?.('bank_name'); }}
+              style={styles.input}
+            />
+            {(validationErrors.bankName || apiErrors.bank_name) && (
+              <View style={styles.errorContainer}>
+                <Icon name="error" size={16} color="#ef4444" />
+                <Text style={styles.errorText}>{validationErrors.bankName || apiErrors.bank_name}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Bank Branch *</Text>
+            <ThemedTextInput
+              placeholder="Branch name or address"
+              value={data.bankBranch || ''}
+              onChangeText={(v) => { onDataChange({ bankBranch: v }); onClearApiError?.('bank_branch'); }}
+              style={styles.input}
+            />
+            {(validationErrors.bankBranch || apiErrors.bank_branch) && (
+              <View style={styles.errorContainer}>
+                <Icon name="error" size={16} color="#ef4444" />
+                <Text style={styles.errorText}>{validationErrors.bankBranch || apiErrors.bank_branch}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Bank Account Number *</Text>
+            <ThemedTextInput
+              placeholder="IBAN or account number"
+              value={data.bankAccountNumber || ''}
+              onChangeText={(v) => { onDataChange({ bankAccountNumber: v }); onClearApiError?.('bank_account_number'); }}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+            {(validationErrors.bankAccountNumber || apiErrors.bank_account_number) && (
+              <View style={styles.errorContainer}>
+                <Icon name="error" size={16} color="#ef4444" />
+                <Text style={styles.errorText}>{validationErrors.bankAccountNumber || apiErrors.bank_account_number}</Text>
               </View>
             )}
           </View>
