@@ -79,6 +79,13 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.raahehaq"
+    // 16 KB page size compatibility: use legacy packaging so .so files are compressed,
+    // avoiding ELF alignment issues on Android 15+ devices with 16 KB page size.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
     defaultConfig {
         applicationId "com.raahehaq"
         minSdkVersion rootProject.ext.minSdkVersion

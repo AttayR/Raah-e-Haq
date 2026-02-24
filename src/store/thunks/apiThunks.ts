@@ -127,11 +127,25 @@ export const registerUserWithImages = createAsyncThunk(
         response: error.response?.data,
         status: error.response?.status
       });
-      
+
+      const status = error.response?.status;
+      const data = error.response?.data;
+      if (status === 422 && data?.errors && typeof data.errors === 'object') {
+        const firstMessages = Object.entries(data.errors).map(([field, messages]) => {
+          const msg = Array.isArray(messages) ? messages[0] : String(messages);
+          return `${field}: ${msg}`;
+        });
+        return rejectWithValue({
+          message: data.message || 'Validation failed. Please check the fields below.',
+          errors: data.errors as Record<string, string[]>,
+          summary: firstMessages.join(' '),
+        });
+      }
+
       return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Registration with images failed'
+        data?.message ||
+        error.message ||
+        'Registration failed'
       );
     }
   }

@@ -23,6 +23,8 @@ interface PersonalInfoData {
   cnic: string;
   address: string;
   phoneNumber: string;
+  dateOfBirth: string;
+  gender: 'male' | 'female' | 'other' | '';
   emergencyContactNumber: string;
   emergencyContactName: string;
   emergencyRelationship: string;
@@ -34,9 +36,27 @@ interface PersonalInfoStepProps {
   data: PersonalInfoData;
   onDataChange: (data: Partial<PersonalInfoData>) => void;
   errors: Record<string, string>;
+  apiErrors?: Record<string, string>;
+  onClearApiError?: (field: string) => void;
 }
 
-export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoStepProps) {
+const API_FIELD_MAP: Record<string, string> = {
+  dateOfBirth: 'date_of_birth',
+  emergencyRelationship: 'passenger_emergency_contact_relation',
+};
+
+// API expects one of these values for passenger_emergency_contact_relation
+export const EMERGENCY_RELATION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'father', label: 'Father' },
+  { value: 'mother', label: 'Mother' },
+  { value: 'spouse', label: 'Spouse' },
+  { value: 'brother', label: 'Brother' },
+  { value: 'sister', label: 'Sister' },
+  { value: 'friend', label: 'Friend' },
+  { value: 'other', label: 'Other' },
+];
+
+export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, onClearApiError }: PersonalInfoStepProps) {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -109,6 +129,18 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
     return undefined;
   };
 
+  const validateDateOfBirth = (value: string): string | undefined => {
+    if (!value || !value.trim()) return 'Date of birth is required';
+    const trimmed = value.trim();
+    const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isoRegex.test(trimmed)) return 'Use format YYYY-MM-DD (e.g. 1990-01-15)';
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) return 'Enter a valid date';
+    const today = new Date();
+    if (date > today) return 'Date of birth cannot be in the future';
+    return undefined;
+  };
+
   const formatCNIC = (value: string): string => {
     if (!value) return '';
     const digits = value.replace(/\D/g, '');
@@ -145,9 +177,12 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
     
     onDataChange({ [field]: processedValue });
     
-    // Clear validation error when user starts typing
     if (validationErrors[field]) {
       setValidationErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    const apiField = API_FIELD_MAP[field] || field;
+    if (apiErrors[apiField] && onClearApiError) {
+      onClearApiError(apiField);
     }
   };
 
@@ -176,6 +211,15 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
         break;
       case 'phoneNumber':
         error = validatePhoneNumber(safeValue);
+        break;
+      case 'dateOfBirth':
+        error = validateDateOfBirth(safeValue);
+        break;
+      case 'gender':
+        error = !safeValue ? 'Gender is required' : undefined;
+        break;
+      case 'emergencyRelationship':
+        error = !safeValue || !safeValue.trim() ? 'Relationship is required' : undefined;
         break;
     }
     
@@ -352,10 +396,55 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
             textAlignVertical="top"
             style={[styles.input, styles.textArea]}
           />
-          {validationErrors.address && (
+          {(validationErrors.address || apiErrors.address) && (
             <View style={styles.errorContainer}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.address}</Text>
+              <Text style={styles.errorText}>{validationErrors.address || apiErrors.address}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Date of Birth *</Text>
+          <ThemedTextInput
+            placeholder="YYYY-MM-DD (e.g. 1990-01-15)"
+            value={data.dateOfBirth || ''}
+            onChangeText={(value) => handleInputChange('dateOfBirth', value)}
+            onBlur={() => validateField('dateOfBirth', data.dateOfBirth || '')}
+            keyboardType="numeric"
+            maxLength={10}
+            style={styles.input}
+          />
+          {(validationErrors.dateOfBirth || apiErrors.date_of_birth) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.dateOfBirth || apiErrors.date_of_birth}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Gender *</Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            {(['male', 'female', 'other'] as const).map((g) => (
+              <TouchableOpacity
+                key={g}
+                onPress={() => {
+                  onDataChange({ gender: g });
+                  if (apiErrors.gender && onClearApiError) onClearApiError('gender');
+                }}
+                style={[styles.chip, data.gender === g && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, data.gender === g && styles.chipTextActive]}>
+                  {g.charAt(0).toUpperCase() + g.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {(validationErrors.gender || apiErrors.gender) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.gender || apiErrors.gender}</Text>
             </View>
           )}
         </View>
@@ -408,10 +497,10 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
             </View>
           )}
           
-          {validationErrors.password && (
+          {(validationErrors.password || apiErrors.password) && (
             <View style={styles.errorContainer}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.password}</Text>
+              <Text style={styles.errorText}>{validationErrors.password || apiErrors.password}</Text>
             </View>
           )}
         </View>
@@ -475,12 +564,29 @@ export default function PersonalInfoStep({ data, onDataChange }: PersonalInfoSte
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Relationship *</Text>
-          <ThemedTextInput
-            placeholder="e.g., Father, Mother, Spouse, Friend"
-            value={data.emergencyRelationship || ''}
-            onChangeText={(value) => handleInputChange('emergencyRelationship', value)}
-            style={styles.input}
-          />
+          <Text style={styles.inputHint}>Select the relationship to your emergency contact (API accepts only these values)</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {EMERGENCY_RELATION_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => {
+                  onDataChange({ emergencyRelationship: opt.value });
+                  if (apiErrors.passenger_emergency_contact_relation && onClearApiError) onClearApiError('passenger_emergency_contact_relation');
+                }}
+                style={[styles.chip, data.emergencyRelationship === opt.value && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, data.emergencyRelationship === opt.value && styles.chipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {(validationErrors.emergencyRelationship || apiErrors.passenger_emergency_contact_relation) && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.emergencyRelationship || apiErrors.passenger_emergency_contact_relation}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -599,6 +705,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
   },
   input: {
     marginBottom: 4,
