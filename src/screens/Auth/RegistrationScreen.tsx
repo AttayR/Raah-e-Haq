@@ -50,6 +50,14 @@ interface RegistrationData {
   vehicleModel: string;
   vehicleYear: string;
   vehicleColor: string;
+  licenseType: string;
+  licenseExpiryDate: string; // YYYY-MM-DD
+  licensePlate: string;
+  registrationNumber: string;
+  drivingExperience: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
   
   // Documents
   driverPicture: string;
@@ -93,6 +101,14 @@ export default function RegistrationScreen() {
     vehicleModel: '',
     vehicleYear: '',
     vehicleColor: '',
+    licenseType: '',
+    licenseExpiryDate: '',
+    licensePlate: '',
+    registrationNumber: '',
+    drivingExperience: '',
+    bankName: '',
+    bankBranch: '',
+    bankAccountNumber: '',
     driverPicture: '',
     cnicPicture: '',
     licenseFrontPicture: '',
@@ -131,9 +147,12 @@ export default function RegistrationScreen() {
         return !!(formData.fullName && formData.email && formData.password && 
                  formData.confirmPassword && formData.cnic && formData.address);
       case 'vehicle':
-        return formData.role === 'passenger' || !!(formData.vehicleType && 
-                 formData.vehicleNumber && formData.vehicleBrand && 
-                 formData.vehicleModel && formData.vehicleYear && formData.vehicleColor);
+        if (formData.role === 'passenger') return true;
+        return !!(formData.vehicleType && formData.vehicleNumber && formData.vehicleBrand &&
+                 formData.vehicleModel && formData.vehicleYear && formData.vehicleColor &&
+                 formData.licenseType && formData.licenseExpiryDate && formData.licensePlate &&
+                 formData.registrationNumber && formData.drivingExperience &&
+                 formData.bankName && formData.bankBranch && formData.bankAccountNumber);
       case 'documents':
         if (formData.role === 'passenger') {
           // Temporarily skip CNIC image validation for testing
@@ -227,6 +246,39 @@ export default function RegistrationScreen() {
         return;
       }
 
+      // Driver: validate required vehicle and bank fields before submit
+      if (formData.role === 'driver') {
+        const driverRequired: { key: keyof typeof formData; label: string }[] = [
+          { key: 'licenseType', label: 'License type' },
+          { key: 'licenseExpiryDate', label: 'License expiry date' },
+          { key: 'licensePlate', label: 'License plate' },
+          { key: 'registrationNumber', label: 'Registration number' },
+          { key: 'drivingExperience', label: 'Driving experience' },
+          { key: 'vehicleBrand', label: 'Vehicle make' },
+          { key: 'vehicleModel', label: 'Vehicle model' },
+          { key: 'vehicleYear', label: 'Vehicle year' },
+          { key: 'vehicleColor', label: 'Vehicle color' },
+          { key: 'bankName', label: 'Bank name' },
+          { key: 'bankBranch', label: 'Bank branch' },
+          { key: 'bankAccountNumber', label: 'Bank account number' },
+        ];
+        const missing = driverRequired.find(({ key }) => {
+          const v = formData[key];
+          return v === undefined || v === null || String(v).trim() === '';
+        });
+        if (missing) {
+          showToast('error', `${missing.label} is required`);
+          setCurrentStep('vehicle');
+          return;
+        }
+        const vehicleYearNum = parseInt(String(formData.vehicleYear || ''), 10);
+        if (!Number.isNaN(vehicleYearNum) && vehicleYearNum > 2025) {
+          showToast('error', 'Vehicle year must not be greater than 2025');
+          setCurrentStep('vehicle');
+          return;
+        }
+      }
+
       // Temporarily skip CNIC image validation for testing
       // TODO: Re-enable when proper image upload is implemented
       // if (formData.role === 'passenger' && 
@@ -263,8 +315,20 @@ export default function RegistrationScreen() {
         }),
         ...(formData.role === 'driver' && {
           vehicle_type: formData.vehicleType,
-          license_number: formData.vehicleNumber, // Using vehicle number as license number for now
+          license_number: formData.vehicleNumber,
           preferred_payment: formData.preferredPayment || 'cash',
+          license_type: formData.licenseType,
+          license_expiry_date: formData.licenseExpiryDate,
+          license_plate: formData.licensePlate || formData.vehicleNumber,
+          registration_number: formData.registrationNumber || formData.vehicleNumber,
+          driving_experience: formData.drivingExperience,
+          vehicle_make: formData.vehicleBrand,
+          vehicle_model: formData.vehicleModel,
+          vehicle_year: formData.vehicleYear,
+          vehicle_color: formData.vehicleColor,
+          bank_name: formData.bankName,
+          bank_branch: formData.bankBranch,
+          bank_account_number: formData.bankAccountNumber,
         }),
       };
       
@@ -303,7 +367,9 @@ export default function RegistrationScreen() {
             fieldErrors[field] = msg;
           });
           setApiValidationErrors(fieldErrors);
-          setCurrentStep('personal');
+          const driverFields = ['license_type', 'license_expiry_date', 'license_plate', 'registration_number', 'driving_experience', 'vehicle_make', 'vehicle_model', 'vehicle_year', 'vehicle_color', 'bank_name', 'bank_branch', 'bank_account_number'];
+          const hasDriverError = Object.keys(fieldErrors).some((k) => driverFields.includes(k));
+          setCurrentStep(hasDriverError && formData.role === 'driver' ? 'vehicle' : 'personal');
           showToast('error', payload.message || 'Please fix the errors below.');
         } else {
           const message = typeof payload === 'string' ? payload : payload?.message || 'Registration failed';
@@ -355,6 +421,12 @@ export default function RegistrationScreen() {
             data={formData}
             onDataChange={updateFormData}
             errors={{}}
+            apiErrors={apiValidationErrors}
+            onClearApiError={(field) => setApiValidationErrors((prev) => {
+              const next = { ...prev };
+              delete next[field];
+              return next;
+            })}
           />
         );
       case 'documents':

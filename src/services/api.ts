@@ -157,6 +157,19 @@ export interface RegisterRequest {
   license_number?: string;
   vehicle_type?: string;
   preferred_payment?: string;
+  // Driver-only (required by API for user_type === 'driver')
+  license_type?: string;
+  license_expiry_date?: string; // YYYY-MM-DD
+  license_plate?: string;
+  registration_number?: string;
+  driving_experience?: string;
+  vehicle_make?: string;
+  vehicle_model?: string;
+  vehicle_year?: string;
+  vehicle_color?: string;
+  bank_name?: string;
+  bank_branch?: string;
+  bank_account_number?: string;
 }
 
 export interface SendOtpRequest {
@@ -286,6 +299,21 @@ class ApiService {
       if (userData.license_number) formData.append('license_number', userData.license_number);
       if (userData.vehicle_type) formData.append('vehicle_type', userData.vehicle_type);
       if (userData.preferred_payment) formData.append('preferred_payment', userData.preferred_payment);
+
+      if (userData.user_type === 'driver') {
+        if (userData.license_type) formData.append('license_type', userData.license_type);
+        if (userData.license_expiry_date) formData.append('license_expiry_date', userData.license_expiry_date);
+        if (userData.license_plate) formData.append('license_plate', userData.license_plate);
+        if (userData.registration_number) formData.append('registration_number', userData.registration_number);
+        if (userData.driving_experience) formData.append('driving_experience', userData.driving_experience);
+        if (userData.vehicle_make) formData.append('vehicle_make', userData.vehicle_make);
+        if (userData.vehicle_model) formData.append('vehicle_model', userData.vehicle_model);
+        if (userData.vehicle_year) formData.append('vehicle_year', userData.vehicle_year);
+        if (userData.vehicle_color) formData.append('vehicle_color', userData.vehicle_color);
+        if (userData.bank_name) formData.append('bank_name', userData.bank_name);
+        if (userData.bank_branch) formData.append('bank_branch', userData.bank_branch);
+        if (userData.bank_account_number) formData.append('bank_account_number', userData.bank_account_number);
+      }
 
       // Log form data for debugging
       console.log('📋 FormData entries:');
@@ -500,8 +528,12 @@ class ApiService {
   }
 
   // Utility Methods
-  async setAuthToken(token: string): Promise<void> {
-    await AsyncStorage.setItem('auth_token', token);
+  async setAuthToken(token: string | null | undefined): Promise<void> {
+    if (token != null && token !== '') {
+      await AsyncStorage.setItem('auth_token', token);
+    } else {
+      await AsyncStorage.removeItem('auth_token');
+    }
   }
 
   async getAuthToken(): Promise<string | null> {
