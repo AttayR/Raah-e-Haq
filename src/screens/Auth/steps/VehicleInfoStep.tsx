@@ -31,30 +31,9 @@ interface VehicleInfoStepProps {
 }
 
 const vehicleTypes = [
-  { 
-    id: 'car', 
-    label: 'Car', 
-    icon: 'directions-car',
-    description: 'Sedan, Hatchback, SUV'
-  },
-  { 
-    id: 'bike', 
-    label: 'Bike', 
-    icon: 'motorcycle',
-    description: 'Motorcycle, Scooter'
-  },
-  { 
-    id: 'van', 
-    label: 'Van', 
-    icon: 'local-shipping',
-    description: 'Minivan, Cargo Van'
-  },
-  { 
-    id: 'truck', 
-    label: 'Truck', 
-    icon: 'local-shipping',
-    description: 'Pickup, Delivery Truck'
-  },
+  { id: 'bike', label: 'Bike', icon: 'motorcycle', description: 'Motorcycle, Scooter' },
+  { id: 'rickshaw', label: 'Rickshaw', icon: 'local-taxi', description: 'Auto Rickshaw' },
+  { id: 'car', label: 'Car', icon: 'directions-car', description: 'Sedan, Hatchback, SUV' },
 ];
 
 const vehicleBrands = [

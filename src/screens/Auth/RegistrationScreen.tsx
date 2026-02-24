@@ -354,8 +354,8 @@ export default function RegistrationScreen() {
           
           <View style={styles.logoContainer}>
             <View style={styles.logoWrapper}>
-              <Image 
-                source={require('../../assets/images/logo.png')} 
+              <Image
+                source={require('../../assets/images/Logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />

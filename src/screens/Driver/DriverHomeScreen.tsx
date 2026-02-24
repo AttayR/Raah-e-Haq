@@ -74,7 +74,7 @@ export default function DriverHomeScreen() {
       subtitle: 'Edit your profile',
       icon: 'person',
       color: '#8b5cf6',
-      onPress: () => navigation.navigate('DriverProfile'),
+      onPress: () => (navigation as any).navigate('DriverProfile'),
     },
   ];
 
@@ -111,7 +111,7 @@ export default function DriverHomeScreen() {
 
   // Get vehicle type and info
   const vehicleType = user?.vehicle_type || 'car';
-  const vehicleInfo = user?.vehicleInfo || null;
+  const vehicleInfo = (user as any)?.vehicleInfo ?? null;
   
   // Format vehicle display text
   const getVehicleDisplayText = () => {
@@ -123,10 +123,9 @@ export default function DriverHomeScreen() {
 
   const getVehicleIcon = () => {
     switch (vehicleType) {
-      case 'car': return 'directions-car';
       case 'bike': return 'motorcycle';
-      case 'van': return 'local-shipping';
-      case 'truck': return 'local-shipping';
+      case 'rickshaw': return 'local-taxi';
+      case 'car': return 'directions-car';
       default: return 'directions-car';
     }
   };
@@ -183,7 +182,7 @@ export default function DriverHomeScreen() {
         {!isDriverApproved && (
           <View style={styles.statusBanner}>
             <Icon name="info" size={20} color="#f59e0b" />
-            <Text style={styles.statusText}>
+            <Text style={styles.statusBannerText}>
               Your driver account is pending approval. You cannot accept rides until approved.
             </Text>
           </View>
@@ -214,7 +213,7 @@ export default function DriverHomeScreen() {
             </View>
             <TouchableOpacity
               style={styles.profileButton}
-              onPress={() => navigation.navigate('DriverProfile')}
+              onPress={() => (navigation as any).navigate('DriverProfile')}
             >
               <Icon name="person" size={24} color="white" />
             </TouchableOpacity>
@@ -875,7 +874,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#f59e0b',
     gap: 8,
   },
-  statusText: {
+  statusBannerText: {
     flex: 1,
     fontSize: 14,
     color: '#92400e',

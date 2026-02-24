@@ -22,7 +22,7 @@ export interface UserProfile {
   cnic?: string;
   address?: string;
   // Driver-specific fields
-  vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+  vehicleType?: 'bike' | 'rickshaw' | 'car';
   vehicleInfo?: VehicleInfo;
   driverPicture?: string; // Firebase Storage URL
   cnicPicture?: string; // Firebase Storage URL
@@ -529,7 +529,7 @@ export const createUserProfileWithDetails = async (
     cnic: string;
     address: string;
     // Driver-specific fields
-    vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+    vehicleType?: 'bike' | 'rickshaw' | 'car';
     vehicleInfo?: VehicleInfo;
     driverPictureUri?: string;
     cnicPictureUri?: string;
@@ -659,7 +659,7 @@ export const createDriverProfileWithDetails = async (
     fullName: string;
     cnic: string;
     address: string;
-    vehicleType: 'car' | 'bike' | 'van' | 'truck';
+    vehicleType: 'bike' | 'rickshaw' | 'car';
     vehicleInfo: VehicleInfo;
     driverPictureUri?: string;
     cnicPictureUri?: string;

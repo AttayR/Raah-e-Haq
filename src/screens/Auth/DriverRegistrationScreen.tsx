@@ -18,7 +18,7 @@ import { driverRegistrationThunk } from '../../store/thunks/authThunks';
 import { showToast } from '../../components/ToastProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
+import { launchImageLibrary, ImagePickerResponse, MediaType, PhotoQuality } from 'react-native-image-picker';
 
 type RegistrationStep = 'personal' | 'vehicle' | 'documents' | 'review';
 
@@ -26,7 +26,7 @@ interface DriverRegistrationData {
   fullName: string;
   cnic: string;
   address: string;
-  vehicleType: 'car' | 'bike' | 'van' | 'truck';
+  vehicleType: 'bike' | 'rickshaw' | 'car';
   vehicleNumber: string;
   vehicleBrand: string;
   vehicleModel: string;
@@ -43,14 +43,15 @@ export default function DriverRegistrationScreen() {
   const dispatch = useDispatch<any>();
   
   const { phoneNumber } = route.params || {};
-  const { isLoading } = useSelector((state: RootState) => state.auth);
+  const authStatus = useSelector((state: RootState) => state.auth.status);
+  const isLoading = authStatus === 'loading';
   
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
   const [formData, setFormData] = useState<DriverRegistrationData>({
     fullName: '',
     cnic: '',
     address: '',
-    vehicleType: 'car',
+    vehicleType: 'car' as const,
     vehicleNumber: '',
     vehicleBrand: '',
     vehicleModel: '',
@@ -116,7 +117,7 @@ export default function DriverRegistrationScreen() {
   const handleImagePicker = (type: 'driver' | 'cnic' | 'vehicle') => {
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8,
+      quality: 0.8 as PhotoQuality,
       maxWidth: 1024,
       maxHeight: 1024,
     };
@@ -223,7 +224,7 @@ export default function DriverRegistrationScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Vehicle Type *</Text>
               <View style={styles.vehicleTypeContainer}>
-                {['car', 'bike', 'van', 'truck'].map((type) => (
+                {(['bike', 'rickshaw', 'car'] as const).map((type) => (
                   <TouchableOpacity
                     key={type}
                     style={[
@@ -379,8 +380,8 @@ export default function DriverRegistrationScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Image 
-              source={require('../../assets/images/logo.png')} 
+            <Image
+              source={require('../../assets/images/Logo.png')}
               style={styles.logoImage}
               resizeMode="contain"
             />

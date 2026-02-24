@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -19,6 +19,7 @@ import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
+import type { RideResource, DriverRideRequestDoc } from '../../services/rideService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,23 +32,18 @@ const DriverMapScreen = () => {
   const { theme } = useAppTheme();
   const mapRef = useRef<any>(null);
   
-  // Safe Redux state access with fallbacks
   const authState = useAppSelector(state => state?.auth);
+  const apiAuth = useAppSelector(state => state?.apiAuth);
   const userProfile = authState?.userProfile || null;
   const uid = authState?.uid || null;
-  
-  // Debug logging
-  console.log('DriverMapScreen - Auth state:', { 
-    hasAuthState: !!authState, 
-    hasUserProfile: !!userProfile, 
-    hasUid: !!uid 
-  });
-  
-  // Use driver notifications
+  // Backend assign-driver expects the API user id (number), not Firebase uid
+  const driverId = (apiAuth?.user?.id != null && Number.isFinite(apiAuth.user.id))
+    ? Number(apiAuth.user.id)
+    : (uid ? parseInt(uid, 10) : undefined);
+  const hasValidDriverId = typeof driverId === 'number' && driverId > 0;
+
   const {
     isInitialized: notificationsInitialized,
-    fcmToken,
-    hasPermission: hasNotificationPermission,
     subscribeToDriverNotifications,
     unsubscribeFromDriverNotifications,
     sendRideAcceptedNotification,
@@ -55,29 +51,68 @@ const DriverMapScreen = () => {
     sendRideStartedNotification,
     sendRideCompletedNotification,
   } = useDriverNotifications(uid || undefined);
-  
-  // Use comprehensive ride service
+
   const {
     currentRide,
     rideHistory,
     isLoading: rideLoading,
-    error: rideError,
     acceptRide,
+    acceptDriverRequest,
+    rejectDriverRequest,
     startRide,
     completeRide,
     updateDriverLocation,
+    updateDriverStatus,
+    getPendingRides,
+    getDriverRideRequests,
+    driverArrived,
+    driverStartRide,
     refreshRideHistory,
-  } = useRide(uid ? parseInt(uid) : undefined, 'driver');
-  
-  // Use native location hook
+  } = useRide(driverId, 'driver');
+
   const {
     currentLocation,
     isLoading: locationLoading,
     requestLocationPermission,
   } = useNativeLocation();
-  
+
   const [isOnline, setIsOnline] = useState(false);
+  const [incomingRide, setIncomingRide] = useState<RideResource | null>(null);
+  const [incomingDriverRequest, setIncomingDriverRequest] = useState<DriverRideRequestDoc | null>(null);
   const isLoadingLocation = locationLoading || !currentLocation;
+
+  const rideRequest = incomingDriverRequest ?? incomingRide ?? (currentRide?.status === 'requested' ? currentRide : null);
+  const isDocRequest = !!incomingDriverRequest;
+
+  const rideRequestDisplay = useMemo(() => {
+    if (!rideRequest) return null;
+    if (isDocRequest) {
+      const r = rideRequest as DriverRideRequestDoc;
+      return {
+        name: r.passenger ? `${r.passenger.firstName || ''} ${r.passenger.lastName || ''}`.trim() || 'Passenger' : 'Passenger',
+        phone: 'N/A',
+        rating: r.passenger?.rating ?? 5.0,
+        fare: r.estimatedFare ?? 150,
+        distance: r.distance ?? 5.2,
+        duration: r.estimatedDuration ?? 15,
+        acceptId: r.requestId as number | string,
+        pickupAddress: r.pickupLocation?.address ?? 'Pickup',
+        dropoffAddress: r.dropoffLocation?.address ?? 'Destination',
+      };
+    }
+    const r = rideRequest as RideResource;
+    return {
+      name: r.passenger?.name || 'Passenger',
+      phone: r.passenger?.phone || 'N/A',
+      rating: r.passenger?.rating ?? 5.0,
+      fare: r.total_fare ?? 150,
+      distance: r.distance_km ?? 5.2,
+      duration: r.duration_minutes ?? 15,
+      acceptId: r.id as number | string,
+      pickupAddress: r.pickup_address || 'Pickup',
+      dropoffAddress: r.dropoff_address || 'Destination',
+    };
+  }, [rideRequest, isDocRequest]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -86,8 +121,8 @@ const DriverMapScreen = () => {
       if (mapRef.current) {
         try {
           mapRef.current = null;
-        } catch (error) {
-          console.log('Map cleanup error:', error);
+        } catch (e) {
+          console.log('Map cleanup error:', e);
         }
       }
     };
@@ -125,8 +160,8 @@ const DriverMapScreen = () => {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         });
-      } catch (error) {
-        console.error('Error animating to region:', error);
+      } catch (e) {
+        console.error('Error animating to region:', e);
       }
     }
   }, [currentLocation]);
@@ -135,23 +170,62 @@ const DriverMapScreen = () => {
   useEffect(() => {
     if (isOnline && currentLocation && uid) {
       const interval = setInterval(() => {
-        updateDriverLocation(uid, currentLocation);
+        updateDriverLocation({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          status: isOnline ? 'online' : 'offline',
+        });
       }, 5000); // Update every 5 seconds
 
       return () => clearInterval(interval);
     }
-  }, [isOnline, currentLocation, uid]);
+  }, [isOnline, currentLocation, uid, updateDriverLocation]);
 
-  // Listen to ride requests when online
+  // Sync incoming display when currentRide is in 'requested' state (e.g. after refresh). Do not clear when currentRide is null so polling can show pending rides.
   useEffect(() => {
-    if (isOnline && uid) {
-      const unsubscribe = listenToRideRequests(uid, (ride) => {
-        setIncomingRide(ride);
-      });
-
-      return () => unsubscribe();
+    if (currentRide && currentRide.status === 'requested') {
+      setIncomingRide(currentRide);
     }
-  }, [isOnline, uid]);
+    // When currentRide exists and is not requested, clear only if we were showing that ride (avoid clearing rides from getPendingRides)
+    if (currentRide && currentRide.status !== 'requested') {
+      setIncomingRide(prev => (prev?.id === currentRide.id ? null : prev));
+    }
+  }, [currentRide?.id, currentRide?.status]);
+
+  // Poll for pending ride requests when driver is online (doc API first, then legacy)
+  useEffect(() => {
+    if (!isOnline) return;
+    const hasActiveRide = currentRide && (currentRide.status === 'accepted' || currentRide.status === 'ongoing');
+    if (hasActiveRide) return;
+
+    const fetchPending = async () => {
+      try {
+        if (getDriverRideRequests) {
+          const requests = await getDriverRideRequests();
+          if (Array.isArray(requests) && requests.length > 0) {
+            setIncomingDriverRequest(requests[0]);
+            setIncomingRide(null);
+            return;
+          }
+        }
+        setIncomingDriverRequest(null);
+        if (getPendingRides) {
+          const rides = await getPendingRides();
+          if (Array.isArray(rides) && rides.length > 0) {
+            setIncomingRide(rides[0]);
+          } else {
+            setIncomingRide(null);
+          }
+        }
+      } catch (e) {
+        console.warn('DriverMapScreen: failed to fetch pending rides', e);
+      }
+    };
+
+    fetchPending();
+    const interval = setInterval(fetchPending, 12000);
+    return () => clearInterval(interval);
+  }, [isOnline, getDriverRideRequests, getPendingRides, currentRide?.status]);
 
   // Subscribe to driver notifications when online
   useEffect(() => {
@@ -163,20 +237,6 @@ const DriverMapScreen = () => {
       };
     }
   }, [isOnline, uid, notificationsInitialized, subscribeToDriverNotifications, unsubscribeFromDriverNotifications]);
-
-  // Log FCM token for driver
-  useEffect(() => {
-    if (fcmToken) {
-      console.log('🚗 DriverMapScreen - FCM Token:', fcmToken);
-      console.log('🚗 DriverMapScreen - Driver ID:', uid);
-      console.log('🚗 DriverMapScreen - Token Status:', {
-        token: fcmToken,
-        driverId: uid,
-        isInitialized: notificationsInitialized,
-        hasPermission: hasNotificationPermission,
-      });
-    }
-  }, [fcmToken, uid, notificationsInitialized, hasNotificationPermission]);
 
   const toggleOnlineStatus = () => {
     if (!currentLocation) {
@@ -191,36 +251,95 @@ const DriverMapScreen = () => {
       return;
     }
 
-    setIsOnline(!isOnline);
-    if (uid) {
-      setDriverStatus(uid, !isOnline);
+    const nextOnline = !isOnline;
+    setIsOnline(nextOnline);
+
+    if (updateDriverStatus && currentLocation) {
+      updateDriverStatus({
+        status: nextOnline ? 'online' : 'offline',
+        currentLocation: {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        },
+      }).catch(() => {});
     }
   };
 
-  const handleAcceptRide = async (rideId: number) => {
+  const handleAcceptRide = async (rideIdOrRequestId: number | string) => {
+    if (!currentLocation) {
+      Alert.alert('Location required', 'Enable location to accept the ride.');
+      return;
+    }
     try {
-      console.log('Accepting ride:', rideId);
-      await acceptRide(rideId, uid ? parseInt(uid) : 0);
-      
+      if (isDocRequest && typeof rideIdOrRequestId === 'string' && acceptDriverRequest) {
+        await acceptDriverRequest(rideIdOrRequestId, {
+          currentLocation: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+          estimatedArrival: 5,
+        });
+        setIncomingDriverRequest(null);
+      } else if (typeof rideIdOrRequestId === 'number' && hasValidDriverId && acceptRide) {
+        await acceptRide(rideIdOrRequestId, driverId);
+        setIncomingRide(null);
+      }
       Alert.alert('Ride Accepted', 'You have accepted the ride request');
-    } catch (error) {
-      console.error('Error accepting ride:', error);
-      Alert.alert('Error', 'Failed to accept ride');
+    } catch (err: unknown) {
+      console.error('Accept ride failed', err);
+      const axiosErr = err as { response?: { data?: any }; message?: string };
+      const data = axiosErr.response?.data;
+      const message =
+        (data && (data.message || data.error)) ||
+        axiosErr.message ||
+        'Failed to accept ride';
+      Alert.alert('Could not accept ride', String(message));
     }
   };
 
-  const handleRejectRide = () => {
-    setIncomingRide(null);
+  const handleRejectRide = async () => {
+    if (isDocRequest && incomingDriverRequest && rejectDriverRequest) {
+      try {
+        await rejectDriverRequest(incomingDriverRequest.requestId, { reason: 'other' });
+      } catch (e) {
+        console.warn('Reject driver request failed', e);
+      }
+      setIncomingDriverRequest(null);
+    } else {
+      setIncomingRide(null);
+    }
+  };
+
+  const handleArrived = async () => {
+    if (currentRide && currentLocation && driverArrived) {
+      try {
+        await driverArrived(currentRide.id, {
+          currentLocation: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+        });
+        Alert.alert('Arrived', "You've arrived at the pickup location");
+      } catch (e) {
+        console.error('Error marking arrived:', e);
+        Alert.alert('Error', 'Failed to mark arrival');
+      }
+    }
   };
 
   const handleStartRide = async () => {
-    if (currentRide) {
+    if (currentRide && currentLocation) {
       try {
-        await startRide(currentRide.id);
+        if (driverStartRide) {
+          await driverStartRide(currentRide.id, {
+            currentLocation: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+          });
+        } else {
+          await startRide(currentRide.id);
+        }
         Alert.alert('Ride Started', 'You can now navigate to the passenger');
-      } catch (error) {
-        console.error('Error starting ride:', error);
-        Alert.alert('Error', 'Failed to start ride');
+      } catch (e) {
+        console.error('Error starting ride:', e);
+        try {
+          await startRide(currentRide.id);
+          Alert.alert('Ride Started', 'You can now navigate to the passenger');
+        } catch (e2) {
+          Alert.alert('Error', 'Failed to start ride');
+        }
       }
     }
   };
@@ -235,8 +354,8 @@ const DriverMapScreen = () => {
         
         await completeRide(currentRide.id, fare, distance, duration);
         Alert.alert('Ride Completed', `Fare: PKR ${fare}`);
-      } catch (error) {
-        console.error('Error completing ride:', error);
+      } catch (e) {
+        console.error('Error completing ride:', e);
         Alert.alert('Error', 'Failed to complete ride');
       }
     }
@@ -255,9 +374,6 @@ const DriverMapScreen = () => {
           showsMyLocationButton={false}
           onMapReady={() => {
             console.log('SafeMapView is ready');
-          }}
-          onError={(error) => {
-            console.error('SafeMapView error:', error);
           }}
           fallbackComponent={
             <View style={styles.map}>
@@ -282,13 +398,15 @@ const DriverMapScreen = () => {
         {currentRide && (
           <>
             <Marker
-              coordinate={currentRide.pickup}
-              title="Pickup Location"
+              coordinate={{ latitude: currentRide.pickup_latitude, longitude: currentRide.pickup_longitude }}
+              title="Pickup"
+              description={currentRide.pickup_address}
               pinColor="green"
             />
             <Marker
-              coordinate={currentRide.destination}
+              coordinate={{ latitude: currentRide.dropoff_latitude, longitude: currentRide.dropoff_longitude }}
               title="Destination"
+              description={currentRide.dropoff_address}
               pinColor="red"
             />
           </>
@@ -329,34 +447,47 @@ const DriverMapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Incoming Ride Request */}
-      {currentRide && currentRide.status === 'requested' && (
+      {/* Incoming Ride Request — InDrive-style card with pickup/dropoff */}
+      {rideRequest && rideRequestDisplay && (
         <View style={styles.rideRequestCard}>
           <View style={styles.rideRequestHeader}>
-            <Text style={styles.rideRequestTitle}>New Ride Request</Text>
-            <TouchableOpacity onPress={() => {/* TODO: Implement reject */}}>
-              <Icon name="close" size={24} color={BrandColors.error} />
+            <Text style={styles.rideRequestTitle}>New ride request</Text>
+            <TouchableOpacity onPress={handleRejectRide} style={styles.rejectIconButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Icon name="close" size={26} color={BrandColors.light.mutedText} />
             </TouchableOpacity>
           </View>
-          
-          <View style={styles.rideRequestInfo}>
-            <Text style={styles.passengerName}>{currentRide.passenger?.name || 'Passenger'}</Text>
-            <Text style={styles.passengerPhone}>{currentRide.passenger?.phone || 'N/A'}</Text>
-            <Text style={styles.passengerRating}>⭐ {currentRide.passenger?.rating || '5.0'}</Text>
+
+          <View style={styles.rideRequestRoute}>
+            <View style={styles.rideRequestRouteRow}>
+              <View style={[styles.rideRequestDot, styles.rideRequestDotGreen]} />
+              <Text style={styles.rideRequestAddress} numberOfLines={2}>{rideRequestDisplay.pickupAddress}</Text>
+            </View>
+            <View style={styles.rideRequestRouteLine} />
+            <View style={styles.rideRequestRouteRow}>
+              <View style={[styles.rideRequestDot, styles.rideRequestDotRed]} />
+              <Text style={styles.rideRequestAddress} numberOfLines={2}>{rideRequestDisplay.dropoffAddress}</Text>
+            </View>
           </View>
-          
-          <View style={styles.rideRequestDetails}>
-            <Text style={styles.fare}>₨ {currentRide.fare || '150'}</Text>
-            <Text style={styles.distance}>{currentRide.distance_km || '5.2'} km</Text>
-            <Text style={styles.duration}>{currentRide.duration_min || '15'} min</Text>
+
+          <View style={styles.rideRequestMeta}>
+            <Text style={styles.rideRequestPassenger}>👤 {rideRequestDisplay.name}</Text>
+            <Text style={styles.rideRequestStats}>{rideRequestDisplay.distance} km · ~{rideRequestDisplay.duration} min</Text>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.acceptButton}
-            onPress={() => handleAcceptRide(currentRide.id)}
-          >
-            <Text style={styles.acceptButtonText}>Accept Ride</Text>
-          </TouchableOpacity>
+
+          <View style={styles.rideRequestFooter}>
+            <View>
+              <Text style={styles.rideRequestFareLabel}>Fare</Text>
+              <Text style={styles.rideRequestFare}>₨ {rideRequestDisplay.fare}</Text>
+            </View>
+            <View style={styles.rideRequestActions}>
+              <TouchableOpacity style={styles.rejectButton} onPress={handleRejectRide}>
+                <Text style={styles.rejectButtonText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRide(rideRequestDisplay.acceptId)}>
+                <Text style={styles.acceptButtonText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       )}
 
@@ -365,10 +496,18 @@ const DriverMapScreen = () => {
         <View style={styles.activeRideCard}>
           <Text style={styles.activeRideTitle}>Active Ride</Text>
           <Text style={styles.activeRidePassenger}>{currentRide.passenger?.name || 'Passenger'}</Text>
-          
+
           <View style={styles.activeRideButtons}>
             {currentRide.status === 'accepted' && (
-              <TouchableOpacity 
+              <TouchableOpacity
+                style={[styles.startButton, { marginRight: 8 }]}
+                onPress={handleArrived}
+              >
+                <Text style={styles.startButtonText}>I've Arrived</Text>
+              </TouchableOpacity>
+            )}
+            {currentRide.status === 'accepted' && (
+              <TouchableOpacity
                 style={styles.startButton}
                 onPress={handleStartRide}
               >
@@ -428,7 +567,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
     fontWeight: '600',
-    color: BrandColors.text,
+    color: BrandColors.light.text,
   },
   controls: {
     position: 'absolute',
@@ -482,24 +621,112 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     backgroundColor: 'white',
-    borderRadius: 15,
+    borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   rideRequestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
   rideRequestTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: BrandColors.text,
+    color: BrandColors.light.text,
+  },
+  rejectIconButton: {
+    padding: 4,
+  },
+  rideRequestRoute: {
+    marginBottom: 14,
+  },
+  rideRequestRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  rideRequestDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+    marginTop: 5,
+  },
+  rideRequestDotGreen: {
+    backgroundColor: BrandColors.success,
+  },
+  rideRequestDotRed: {
+    backgroundColor: '#E53935',
+  },
+  rideRequestRouteLine: {
+    width: 2,
+    height: 16,
+    backgroundColor: BrandColors.light.mutedText + '60',
+    marginLeft: 11,
+    marginVertical: 2,
+  },
+  rideRequestAddress: {
+    flex: 1,
+    fontSize: 14,
+    color: BrandColors.light.text,
+    lineHeight: 20,
+  },
+  rideRequestMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: BrandColors.light.background || '#f5f5f5',
+    borderRadius: 10,
+  },
+  rideRequestPassenger: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: BrandColors.light.text,
+  },
+  rideRequestStats: {
+    fontSize: 13,
+    color: BrandColors.light.mutedText,
+  },
+  rideRequestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: BrandColors.light.mutedText + '30',
+    paddingTop: 14,
+  },
+  rideRequestFareLabel: {
+    fontSize: 12,
+    color: BrandColors.light.mutedText,
+    marginBottom: 2,
+  },
+  rideRequestFare: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BrandColors.success,
+  },
+  rideRequestActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  rejectButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: BrandColors.light.mutedText + '25',
+  },
+  rejectButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: BrandColors.light.mutedText,
   },
   rideRequestInfo: {
     marginBottom: 15,
@@ -507,13 +734,13 @@ const styles = StyleSheet.create({
   passengerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: BrandColors.text,
     marginBottom: 5,
+    color: BrandColors.light.text,
   },
   passengerPhone: {
     fontSize: 14,
-    color: BrandColors.mutedText,
     marginBottom: 5,
+    color: BrandColors.light.mutedText,
   },
   passengerRating: {
     fontSize: 14,
@@ -531,11 +758,11 @@ const styles = StyleSheet.create({
   },
   distance: {
     fontSize: 14,
-    color: BrandColors.mutedText,
+    color: BrandColors.light.mutedText,
   },
   duration: {
     fontSize: 14,
-    color: BrandColors.mutedText,
+    color: BrandColors.light.mutedText,
   },
   acceptButton: {
     backgroundColor: BrandColors.success,
@@ -565,13 +792,13 @@ const styles = StyleSheet.create({
   activeRideTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: BrandColors.text,
     marginBottom: 10,
+    color: BrandColors.light.text,
   },
   activeRidePassenger: {
     fontSize: 16,
-    color: BrandColors.mutedText,
     marginBottom: 20,
+    color: BrandColors.light.mutedText,
   },
   activeRideButtons: {
     flexDirection: 'row',
