@@ -482,7 +482,7 @@ export const detailedRegistrationThunk = (
     fullName: string;
     cnic: string;
     address: string;
-    vehicleType?: 'car' | 'bike' | 'van' | 'truck';
+    vehicleType?: 'bike' | 'rickshaw' | 'car';
     vehicleInfo?: {
       number: string;
       brand: string;
@@ -646,7 +646,7 @@ export const driverRegistrationThunk = (
     fullName: string;
     cnic: string;
     address: string;
-    vehicleType: 'car' | 'bike' | 'van' | 'truck';
+    vehicleType: 'bike' | 'rickshaw' | 'car';
     vehicleInfo: {
       number: string;
       brand: string;

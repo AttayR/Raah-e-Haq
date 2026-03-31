@@ -6,7 +6,11 @@ import rideService, {
   DriverInRadius, 
   DriverLocation,
   LocationUpdate,
-  NotificationResource
+  NotificationResource,
+  CancelRideRequestDoc,
+  DriverRideRequestDoc,
+  AcceptDriverRequestDoc,
+  RejectDriverRequestDoc,
 } from '../services/rideService';
 import webSocketService from '../services/webSocketService';
 import notificationService from '../services/notificationService';
@@ -37,9 +41,16 @@ export interface RideActions {
   acceptRide: (rideId: number, driverId: number) => Promise<RideResource>;
   startRide: (rideId: number) => Promise<RideResource>;
   completeRide: (rideId: number, fare?: number, distance?: number, duration?: number) => Promise<RideResource>;
-  cancelRide: (rideId: number) => Promise<RideResource>;
+  cancelRide: (rideId: number, options?: CancelRideRequestDoc) => Promise<RideResource>;
   updateDriverLocation: (location: LocationUpdate) => Promise<void>;
   findNearbyDrivers: (latitude: number, longitude: number, radius?: number) => Promise<DriverInRadius[]>;
+  getPendingRides: (params?: { driver_id?: number; latitude?: number; longitude?: number; radius_km?: number; radius?: number; vehicle_type?: string }) => Promise<RideResource[]>;
+  getDriverRideRequests: () => Promise<DriverRideRequestDoc[]>;
+  acceptDriverRequest: (requestId: string, body: AcceptDriverRequestDoc) => Promise<RideResource>;
+  rejectDriverRequest: (requestId: string, body?: RejectDriverRequestDoc) => Promise<void>;
+  updateDriverStatus: (body: { status: 'online' | 'offline' | 'busy' | 'break'; currentLocation?: { latitude: number; longitude: number; heading?: number; speed?: number; accuracy?: number } }) => Promise<any>;
+  driverArrived: (rideId: number, body: { currentLocation: { latitude: number; longitude: number }; arrivedAt?: string }) => Promise<RideResource>;
+  driverStartRide: (rideId: number, body: { currentLocation: { latitude: number; longitude: number }; startOTP?: string }) => Promise<RideResource>;
   refreshRide: (rideId: number) => Promise<RideResource>;
   refreshRideHistory: () => Promise<void>;
   clearError: () => void;
@@ -84,6 +95,31 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   const passengerNotifications = usePassengerNotifications(userId?.toString());
   const driverNotifications = useDriverNotifications(userId?.toString());
 
+  // Cancel a ride (optional reason/comments/cancelledBy per doc)
+  const cancelRide = useCallback(async (rideId: number, options?: CancelRideRequestDoc): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      console.log('❌ Cancelling ride:', rideId, options);
+      const ride = await rideService.cancelRide(rideId, options);
+      
+      setState(prev => ({
+        ...prev,
+        currentRide: null,
+        rideHistory: [ride, ...prev.rideHistory],
+        isLoading: false,
+      }));
+
+      console.log('✅ Ride cancelled successfully:', ride);
+      return ride;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to cancel ride';
+      console.error('❌ Failed to cancel ride:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
+    }
+  }, []);
+
   // Request a ride (Passenger)
   const requestRide = useCallback(async (rideData: RideRequest): Promise<RideResource> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -94,10 +130,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     try {
       console.log('🚗 Requesting ride:', rideData);
       const ride = await rideService.createRide(rideData);
-      
+
       // Hide loading toast
       hideToast();
-      
+
       setState(prev => ({
         ...prev,
         currentRide: ride,
@@ -114,7 +150,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       // Send notifications to nearby drivers (only if drivers exist)
       if (drivers && Array.isArray(drivers)) {
         for (const driver of drivers) {
-          await passengerNotifications.sendRideRequestNotification(driver.id, {
+          await passengerNotifications.sendRideRequestNotification(String(driver.id), {
             rideId: ride.id,
             passengerName: 'Passenger', // TODO: Get actual passenger name
             pickup: {
@@ -133,21 +169,32 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         }
       }
 
-      // Show success modal
-      showRideRequestedModal();
+      // Show success modal with actions:
+      // - View Status: just closes the modal (handled inside NotificationManager)
+      // - Cancel Ride: calls the existing cancelRide action to hit the cancel endpoint
+      showRideRequestedModal(
+        () => {
+          // View status: modal already closes via hideModal; no extra action needed here.
+        },
+        () => {
+          cancelRide(ride.id, { cancelledBy: 'passenger' }).catch(err => {
+            console.error('❌ Failed to cancel ride from modal:', err);
+          });
+        }
+      );
 
       console.log('✅ Ride requested successfully:', ride);
       return ride;
     } catch (error) {
       // Hide loading toast
       hideToast();
-      
+
       console.error('❌ Failed to request ride:', error);
-      
+
       // Handle different types of errors
       let errorMessage = 'Failed to request ride';
       let errorTitle = 'Ride Request Failed';
-      
+
       if (error && typeof error === 'object') {
         if ('message' in error) {
           const errorObj = error as Error;
@@ -168,7 +215,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
           }
         }
       }
-      
+
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -196,7 +243,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       throw error;
     }
-  }, [passengerNotifications]);
+  }, [passengerNotifications, cancelRide]);
 
   // Accept a ride (Driver)
   const acceptRide = useCallback(async (rideId: number, driverId: number): Promise<RideResource> => {
@@ -213,7 +260,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       }));
 
       // Send notification to passenger
-      await driverNotifications.sendRideAcceptedNotification(ride.passenger_id, {
+      await driverNotifications.sendRideAcceptedNotification(String(ride.passenger_id), {
         rideId: ride.id,
         driverName: 'Driver', // TODO: Get actual driver name
         driverPhone: 'N/A', // TODO: Get actual driver phone
@@ -234,27 +281,16 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
 
       console.log('✅ Ride accepted successfully:', ride);
       return ride;
-    } catch (error) {
-      console.error('❌ Failed to accept ride:', error);
+    } catch (err) {
+      const errMessage = err instanceof Error ? err.message : 'Failed to accept ride';
+      console.error('❌ Failed to accept ride:', err);
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to accept ride',
+        error: errMessage,
       }));
-
-      // Show error modal
-      showErrorModal(
-        'Failed to Accept Ride',
-        error instanceof Error ? error.message : 'Failed to accept ride',
-        {
-          label: 'Try Again',
-          onPress: () => {
-            console.log('Retry accept ride');
-          },
-        }
-      );
-      
-      throw error;
+      // Let the caller (e.g. DriverMapScreen) show Alert; avoid showErrorModal to prevent crash on re-render
+      throw err;
     }
   }, [driverNotifications]);
 
@@ -273,7 +309,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       }));
 
       // Send notification to passenger
-      await driverNotifications.sendRideStartedNotification(ride.passenger_id, {
+      await driverNotifications.sendRideStartedNotification(String(ride.passenger_id), {
         rideId: ride.id,
         driverName: 'Driver', // TODO: Get actual driver name
         destination: ride.dropoff_address,
@@ -285,27 +321,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
 
       console.log('✅ Ride started successfully:', ride);
       return ride;
-    } catch (error) {
-      console.error('❌ Failed to start ride:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to start ride',
-      }));
-
-      // Show error modal
-      showErrorModal(
-        'Failed to Start Ride',
-        error instanceof Error ? error.message : 'Failed to start ride',
-        {
-          label: 'Try Again',
-          onPress: () => {
-            console.log('Retry start ride');
-          },
-        }
-      );
-      
-      throw error;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start ride';
+      console.error('❌ Failed to start ride:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
     }
   }, [driverNotifications]);
 
@@ -330,7 +350,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       }));
 
       // Send notification to passenger
-      await driverNotifications.sendRideCompletedNotification(ride.passenger_id, {
+      await driverNotifications.sendRideCompletedNotification(String(ride.passenger_id), {
         rideId: ride.id,
         driverName: 'Driver', // TODO: Get actual driver name
         fare: fare || 0,
@@ -343,60 +363,16 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
 
       console.log('✅ Ride completed successfully:', ride);
       return ride;
-    } catch (error) {
-      console.error('❌ Failed to complete ride:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to complete ride',
-      }));
-
-      // Show error modal
-      showErrorModal(
-        'Failed to Complete Ride',
-        error instanceof Error ? error.message : 'Failed to complete ride',
-        {
-          label: 'Try Again',
-          onPress: () => {
-            console.log('Retry complete ride');
-          },
-        }
-      );
-      
-      throw error;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to complete ride';
+      console.error('❌ Failed to complete ride:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
     }
   }, [driverNotifications]);
 
-  // Cancel a ride
-  const cancelRide = useCallback(async (rideId: number): Promise<RideResource> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      console.log('❌ Cancelling ride:', rideId);
-      const ride = await rideService.cancelRide(rideId);
-      
-      setState(prev => ({
-        ...prev,
-        currentRide: null,
-        rideHistory: [ride, ...prev.rideHistory],
-        isLoading: false,
-      }));
-
-      console.log('✅ Ride cancelled successfully:', ride);
-      return ride;
-    } catch (error) {
-      console.error('❌ Failed to cancel ride:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to cancel ride',
-      }));
-      throw error;
-    }
-  }, []);
-
   // Update driver location
-  const updateDriverLocation = useCallback(async (location: DriverLocation): Promise<void> => {
+  const updateDriverLocation = useCallback(async (location: LocationUpdate): Promise<void> => {
     try {
       console.log('📍 Updating driver location:', location);
       await rideService.updateDriverLocation(location);
@@ -407,35 +383,100 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     }
   }, []);
 
-  // Find nearby drivers
+  // Find nearby drivers — uses GET /api/rides/nearby-drivers (doc Phase 3.2), fallback to tracking/drivers-in-radius
   const findNearbyDrivers = useCallback(async (
     latitude: number,
     longitude: number,
-    radius: number = 5
+    radius: number = 5,
+    vehicleType?: string
   ): Promise<DriverInRadius[]> => {
     try {
-      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius });
-      const drivers = await rideService.getDriversInRadius(latitude, longitude, radius);
-      
-      // Ensure drivers is always an array
-      const safeDrivers = Array.isArray(drivers) ? drivers : [];
-      
-      setState(prev => ({
-        ...prev,
-        availableDrivers: safeDrivers,
-      }));
+      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius, vehicleType });
+      const drivers = await rideService.getNearbyDrivers(latitude, longitude, radius, vehicleType);
 
-      console.log('✅ Nearby drivers found:', safeDrivers);
+      const safeDrivers = Array.isArray(drivers) ? drivers : [];
+      setState(prev => ({ ...prev, availableDrivers: safeDrivers }));
+      console.log('✅ Nearby drivers found:', safeDrivers.length);
       return safeDrivers;
     } catch (error) {
       console.error('❌ Failed to find nearby drivers:', error);
-      // Return empty array on error instead of throwing
       const emptyDrivers: DriverInRadius[] = [];
-      setState(prev => ({
-        ...prev,
-        availableDrivers: emptyDrivers,
-      }));
+      setState(prev => ({ ...prev, availableDrivers: emptyDrivers }));
       return emptyDrivers;
+    }
+  }, []);
+
+  // Get pending ride requests — GET /api/rides/pending (doc Phase 4.1)
+  const getPendingRides = useCallback(async (params?: {
+    driver_id?: number;
+    latitude?: number;
+    longitude?: number;
+    radius_km?: number;
+    radius?: number;
+    vehicle_type?: string;
+  }): Promise<RideResource[]> => {
+    try {
+      const rides = await rideService.getPendingRides(params);
+      return Array.isArray(rides) ? rides : [];
+    } catch (error) {
+      console.error('❌ Failed to fetch pending rides:', error);
+      return [];
+    }
+  }, []);
+
+  // GET /drivers/ride-requests (doc 9.2). Params: location + radius_km + vehicle_type for backend filtering.
+  const getDriverRideRequests = useCallback(async (): Promise<DriverRideRequestDoc[]> => {
+    return await rideService.getDriverRideRequests();
+  }, []);
+
+  const acceptDriverRequest = useCallback(async (requestId: string, body: AcceptDriverRequestDoc): Promise<RideResource> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const ride = await rideService.acceptDriverRequest(requestId, body);
+      setState(prev => ({ ...prev, currentRide: ride, isLoading: false }));
+      return ride;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to accept';
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
+    }
+  }, []);
+
+  const rejectDriverRequest = useCallback(async (requestId: string, body?: RejectDriverRequestDoc): Promise<void> => {
+    await rideService.rejectDriverRequest(requestId, body);
+  }, []);
+
+  // PUT /drivers/status (doc 9.1)
+  const updateDriverStatus = useCallback(async (body: { status: 'online' | 'offline' | 'busy' | 'break'; currentLocation?: { latitude: number; longitude: number; heading?: number; speed?: number; accuracy?: number } }): Promise<any> => {
+    try {
+      return await rideService.updateDriverStatus(body);
+    } catch (error) {
+      console.error('❌ Failed to update driver status:', error);
+      throw error;
+    }
+  }, []);
+
+  // POST /drivers/rides/:rideId/arrived (doc 9.3)
+  const driverArrived = useCallback(async (rideId: number, body: { currentLocation: { latitude: number; longitude: number }; arrivedAt?: string }): Promise<RideResource> => {
+    try {
+      const ride = await rideService.driverArrived(rideId, body);
+      setState(prev => ({ ...prev, currentRide: ride }));
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to mark arrived:', error);
+      throw error;
+    }
+  }, []);
+
+  // POST /drivers/rides/:rideId/start (doc 9.3)
+  const driverStartRide = useCallback(async (rideId: number, body: { currentLocation: { latitude: number; longitude: number }; startOTP?: string }): Promise<RideResource> => {
+    try {
+      const ride = await rideService.driverStartRide(rideId, body);
+      setState(prev => ({ ...prev, currentRide: ride }));
+      return ride;
+    } catch (error) {
+      console.error('❌ Failed to start ride (driver):', error);
+      throw error;
     }
   }, []);
 
@@ -530,14 +571,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       console.log('✅ Stop added successfully:', updatedRide);
       return updatedRide;
-    } catch (error) {
-      console.error('❌ Failed to add stop:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to add stop',
-      }));
-      throw error;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to add stop';
+      console.error('❌ Failed to add stop:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
     }
   }, []);
 
@@ -557,14 +595,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       console.log('✅ Stop removed successfully:', updatedRide);
       return updatedRide;
-    } catch (error) {
-      console.error('❌ Failed to remove stop:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to remove stop',
-      }));
-      throw error;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to remove stop';
+      console.error('❌ Failed to remove stop:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
     }
   }, []);
 
@@ -584,14 +619,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       console.log('✅ Stop order updated successfully:', updatedRide);
       return updatedRide;
-    } catch (error) {
-      console.error('❌ Failed to update stop order:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to update stop order',
-      }));
-      throw error;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update stop order';
+      console.error('❌ Failed to update stop order:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: msg }));
+      throw err;
     }
   }, []);
 
@@ -789,6 +821,13 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     cancelRide,
     updateDriverLocation,
     findNearbyDrivers,
+    getPendingRides,
+    getDriverRideRequests,
+    acceptDriverRequest,
+    rejectDriverRequest,
+    updateDriverStatus,
+    driverArrived,
+    driverStartRide,
     refreshRide,
     refreshRideHistory,
     clearError,

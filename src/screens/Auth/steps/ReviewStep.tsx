@@ -45,10 +45,9 @@ interface ReviewStepProps {
 }
 
 const vehicleTypeLabels: Record<string, string> = {
-  car: 'Car',
   bike: 'Bike',
-  van: 'Van',
-  truck: 'Truck',
+  rickshaw: 'Rickshaw',
+  car: 'Car',
 };
 
 export default function ReviewStep({ data }: ReviewStepProps) {

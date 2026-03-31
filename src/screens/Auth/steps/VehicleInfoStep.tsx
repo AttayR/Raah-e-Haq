@@ -51,30 +51,9 @@ const LICENSE_TYPES = [
 const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '20', '25', '30'];
 
 const vehicleTypes = [
-  { 
-    id: 'car', 
-    label: 'Car', 
-    icon: 'directions-car',
-    description: 'Sedan, Hatchback, SUV'
-  },
-  { 
-    id: 'bike', 
-    label: 'Bike', 
-    icon: 'motorcycle',
-    description: 'Motorcycle, Scooter'
-  },
-  { 
-    id: 'van', 
-    label: 'Van', 
-    icon: 'local-shipping',
-    description: 'Minivan, Cargo Van'
-  },
-  { 
-    id: 'truck', 
-    label: 'Truck', 
-    icon: 'local-shipping',
-    description: 'Pickup, Delivery Truck'
-  },
+  { id: 'bike', label: 'Bike', icon: 'motorcycle', description: 'Motorcycle, Scooter' },
+  { id: 'rickshaw', label: 'Rickshaw', icon: 'local-taxi', description: 'Auto Rickshaw' },
+  { id: 'car', label: 'Car', icon: 'directions-car', description: 'Sedan, Hatchback, SUV' },
 ];
 
 const vehicleBrands = [

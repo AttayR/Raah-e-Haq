@@ -149,7 +149,10 @@ export const showRideRequestedToast = () => {
   );
 };
 
-export const showRideRequestedModal = () => {
+export const showRideRequestedModal = (
+  onViewStatus: () => void = () => {},
+  onCancelRide: () => void = () => {}
+) => {
   showSuccessModal(
     'Ride Requested Successfully! 🎉',
     'Your ride request has been created and we\'re searching for nearby drivers. You\'ll be notified when a driver accepts your ride.',
@@ -157,16 +160,14 @@ export const showRideRequestedModal = () => {
       label: 'View Ride Status',
       onPress: () => {
         hideModal();
-        // Navigate to ride status screen
-        console.log('Navigate to ride status');
+        onViewStatus();
       },
     },
     {
       label: 'Cancel Ride',
       onPress: () => {
         hideModal();
-        // Show cancel confirmation
-        console.log('Show cancel confirmation');
+        onCancelRide();
       },
     }
   );

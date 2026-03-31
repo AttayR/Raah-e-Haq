@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
@@ -28,28 +29,39 @@ import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
 import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
 
+// Vehicle types: Bike, Rickshaw, Car (sent as-is to API)
+const VEHICLE_TYPE_TO_API: Record<string, string> = {
+  bike: 'bike',
+  rickshaw: 'rickshaw',
+  car: 'car',
+};
+
+const mapVehicleTypeForApi = (uiVehicleType: string): string =>
+  VEHICLE_TYPE_TO_API[uiVehicleType] ?? uiVehicleType;
+
 const PassengerMapScreen = () => {
   const navigation = useNavigation();
   const mapRef = useRef<any>(null);
   const { handleError } = useErrorHandler();
-  
-  const { 
-    currentLocation, 
+
+  const apiAuth = useAppSelector(state => state?.apiAuth);
+  const passengerId = (apiAuth?.user?.id != null && Number.isFinite(apiAuth.user.id))
+    ? Number(apiAuth.user.id)
+    : undefined;
+
+  const {
+    currentLocation,
     isLoading: locationLoading,
     requestLocationPermission,
   } = useNativeLocation();
-  
-  // Use passenger notifications
+
   const {
     isInitialized: notificationsInitialized,
-    fcmToken,
-    hasPermission: hasNotificationPermission,
     subscribeToPassengerNotifications,
     unsubscribeFromPassengerNotifications,
     sendRideRequestNotification,
-  } = usePassengerNotifications('passenger_id'); // TODO: Get actual passenger ID from auth
-  // Use comprehensive ride service
-  const rideHook = useRide(11, 'passenger'); // TODO: Get actual passenger ID from auth
+  } = usePassengerNotifications(passengerId?.toString() ?? 'passenger');
+  const rideHook = useRide(passengerId, 'passenger');
   const {
     currentRide,
     rideHistory,
@@ -73,6 +85,7 @@ const PassengerMapScreen = () => {
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
+  const [vehicleFares, setVehicleFares] = useState<{ [key: string]: { fare: number; distance: number; duration: number } }>({});
   const [_rideHistory, setRideHistory] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -187,21 +200,66 @@ const PassengerMapScreen = () => {
     const calculateFare = async () => {
       if (pickup && destination) {
         try {
-          console.log('💰 Calculating fare in PassengerMapScreen:', { pickup, destination });
-          const result = await getFare(pickup, destination);
-          console.log('✅ Fare calculated in PassengerMapScreen:', result);
-          setFareInfo(result);
+          console.log('💰 Calculating fares for all vehicle types:', { pickup, destination });
+
+          // Calculate base fare (using car as default)
+          const baseResult = await getFare(pickup, destination);
+          console.log('✅ Base fare calculated:', baseResult);
+          setFareInfo(baseResult);
+
+          // Calculate fares for all vehicle types: Bike, Rickshaw, Car
+          const vehicleTypes = ['bike', 'rickshaw', 'car'];
+          const fares: { [key: string]: { fare: number; distance: number; duration: number } } = {};
+
+          // Base fare multiplier for each vehicle type
+          const multipliers: { [key: string]: number } = {
+            bike: 0.6,
+            rickshaw: 0.8,
+            car: 1.0,
+          };
+
+          vehicleTypes.forEach(type => {
+            fares[type] = {
+              fare: Math.round(baseResult.fare * multipliers[type]),
+              distance: baseResult.distance,
+              duration: baseResult.duration
+            };
+          });
+
+          console.log('✅ All vehicle fares calculated:', fares);
+          setVehicleFares(fares);
         } catch (error) {
           console.error('❌ Error calculating fare in PassengerMapScreen:', error);
           // Set fallback fare info
-          setFareInfo({
+          const fallbackFare = {
             fare: 150,
             distance: 5.0,
             duration: 10
+          };
+          setFareInfo(fallbackFare);
+
+          // Set fallback fares for all vehicles
+          const vehicleTypes = ['bike', 'rickshaw', 'car'];
+          const fares: { [key: string]: { fare: number; distance: number; duration: number } } = {};
+          const multipliers: { [key: string]: number } = {
+            bike: 0.6,
+            rickshaw: 0.8,
+            car: 1.0,
+          };
+
+          vehicleTypes.forEach(type => {
+            fares[type] = {
+              fare: Math.round(fallbackFare.fare * multipliers[type]),
+              distance: fallbackFare.distance,
+              duration: fallbackFare.duration
+            };
           });
+
+          setVehicleFares(fares);
         }
       } else {
         setFareInfo(null);
+        setVehicleFares({});
       }
     };
 
@@ -298,43 +356,78 @@ const PassengerMapScreen = () => {
         return;
       }
 
-      // Map vehicle types to API-compatible values
-      const vehicleTypeMapping: { [key: string]: string } = {
-        'bike': 'bike',
-        'economy': 'car',
-        'comfort': 'car',
-        'premium': 'car',
-        'van': 'van'
-      };
+      const mappedVehicleType = mapVehicleTypeForApi(rideData.vehicle_type);
 
-      const mappedVehicleType = vehicleTypeMapping[rideData.vehicle_type] || rideData.vehicle_type;
-      
-      console.log('Original vehicle type:', rideData.vehicle_type);
-      console.log('Mapped vehicle type:', mappedVehicleType);
-
-      const processedRideData = {
+      const apiRideData = {
+        ...(passengerId != null && { passenger_id: passengerId }),
         ...rideData,
         vehicle_type: mappedVehicleType,
-        // Add service level for car variants
-        ...(rideData.vehicle_type !== 'bike' && rideData.vehicle_type !== 'van' && {
-          service_level: rideData.vehicle_type // economy, comfort, premium
-        })
       };
 
-      console.log('Requesting ride with processed data:', processedRideData);
-      
-      const fullRideData = {
-        passenger_id: 11, // TODO: Get actual passenger ID from auth
-        ...processedRideData
-      };
-
-      await requestRideService(fullRideData);
+      await requestRideService(apiRideData);
       Alert.alert('Ride Requested', 'Looking for nearby drivers...');
       setError(null); // Clear any previous errors
       setShowAdvancedRidePanel(false);
-    } catch (error) {
-      handleError(error as Error, 'RIDE_REQUEST_ERROR');
-      setError('Failed to request ride. Please try again.');
+    } catch (error: any) {
+      console.error('❌ === RIDE REQUEST ERROR ===');
+      console.error('Error object:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error response:', error?.response);
+      console.error('Error response data:', error?.response?.data);
+
+      // Parse the error message
+      let errorMessage = 'Failed to request ride. Please try again.';
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      // Show alert with Try Again option
+      Alert.alert(
+        'Ride Request Failed',
+        errorMessage,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              console.log('User cancelled the ride request');
+              setStage('fare'); // Go back to fare stage
+            }
+          },
+          {
+            text: 'Try Again',
+            style: 'default',
+            onPress: () => {
+              console.log('User wants to try again');
+              if (!pickup || !destination) return;
+              handleRequestRide({
+                pickup_address: (pickup as any).address || (pickup as any).name || 'Pickup Location',
+                dropoff_address: (destination as any).address || (destination as any).name || 'Destination Location',
+                pickup_latitude: pickup.latitude,
+                pickup_longitude: pickup.longitude,
+                dropoff_latitude: destination.latitude,
+                dropoff_longitude: destination.longitude,
+                vehicle_type: (selectedVehicle as any) || vehicleType,
+                passenger_count: 1,
+                special_instructions: '',
+                stops: stops.map(stop => ({
+                  address: (stop as any).address || 'Stop',
+                  latitude: stop.latitude,
+                  longitude: stop.longitude,
+                  stop_order: 0
+                }))
+              });
+            }
+          }
+        ]
+      );
+
+      handleError(error as Error, 'RIDE_REQUEST_ERROR', false); // Don't show duplicate alert
+      setError(errorMessage);
     }
   };
 
@@ -378,7 +471,10 @@ const PassengerMapScreen = () => {
           onPress: async () => {
             if (currentRide && cancelRideService) {
               try {
-                await cancelRideService(currentRide.id);
+                await cancelRideService(currentRide.id, {
+                  reason: 'changed_mind',
+                  cancelledBy: 'passenger',
+                });
                 Alert.alert('Ride Cancelled', 'Your ride has been cancelled.');
                 resetSelection();
               } catch (error) {
@@ -449,29 +545,85 @@ const PassengerMapScreen = () => {
     
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle });
-      
-      const ride = await requestRideService({
-        passenger_id: 11, // TODO: Get actual passenger ID from auth
-        pickup_address: 'Pickup Location', // TODO: Get actual address
-        dropoff_address: 'Destination Location', // TODO: Get actual address
+      console.log('🚗 === RIDE REQUEST START (onRequestRide) ===');
+      console.log('📍 Pickup:', pickup);
+      console.log('📍 Destination:', destination);
+      console.log('🚗 Selected Vehicle (from UI):', selectedVehicle);
+      console.log('🚗 Vehicle Type (from useFare hook):', vehicleType);
+      console.log('💰 Fare Info (base):', fareInfo);
+      console.log('💰 All Vehicle Fares:', vehicleFares);
+      console.log('💰 Selected Vehicle Fare:', selectedVehicle ? vehicleFares[selectedVehicle] : 'Not selected');
+
+      saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle, vehicleFares });
+
+      const finalVehicleType = (selectedVehicle as any) || vehicleType;
+      const vehicleTypeForApi = mapVehicleTypeForApi(finalVehicleType);
+
+      const rideRequestData = {
+        ...(passengerId != null && { passenger_id: passengerId }),
+        pickup_address: (pickup as any).address || (pickup as any).name || 'Pickup Location',
+        dropoff_address: (destination as any).address || (destination as any).name || 'Destination Location',
         pickup_latitude: pickup.latitude,
         pickup_longitude: pickup.longitude,
         dropoff_latitude: destination.latitude,
         dropoff_longitude: destination.longitude,
-        vehicle_type: (selectedVehicle as any) || vehicleType,
-      });
-      
+        vehicle_type: vehicleTypeForApi,
+      };
+
+      const ride = await requestRideService(rideRequestData);
+
       const rideId = ride.id;
-      
+
+      console.log('✅ === RIDE REQUEST SUCCESS ===');
+      console.log('🎫 Ride ID:', rideId);
+      console.log('📋 Full Ride Response:', JSON.stringify(ride, null, 2));
+
       setStage('requesting');
       Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare || 0}\n${fareInfo.distance || 0} km • ${fareInfo.duration || 0} min`);
-    } catch (err) {
-      console.error('Ride request error:', err);
-      setError('Failed to request ride. Please try again.');
-      setStage('fare'); // Go back to fare stage on error
+    } catch (err: any) {
+      console.error('❌ === RIDE REQUEST ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error message:', err?.message);
+      console.error('Error response:', err?.response);
+      console.error('Error response data:', err?.response?.data);
+
+      // Parse the error message
+      let errorMessage = 'Failed to request ride. Please try again.';
+      if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.response?.data?.error?.message) {
+        errorMessage = err.response.data.error.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+
+      // Show alert with Try Again option
+      Alert.alert(
+        'Ride Request Failed',
+        errorMessage,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              console.log('User cancelled the ride request');
+              setStage('fare'); // Go back to fare stage
+            }
+          },
+          {
+            text: 'Try Again',
+            style: 'default',
+            onPress: () => {
+              console.log('User wants to try again - calling onRequestRide again');
+              onRequestRide(); // Retry the ride request
+            }
+          }
+        ]
+      );
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -750,13 +902,17 @@ const PassengerMapScreen = () => {
             </View>
             <VehicleOptions
               options={[
-                { id: 'bike', name: 'Bike', eta: '5 min', desc: 'Affordable', price: `Rs ${Math.max(50, Math.round((fareInfo?.fare || 100) * 0.6))}`, icon: '🏍️' },
-                { id: 'economy', name: 'Economy', eta: '7 min', desc: 'Comfortable', price: `Rs ${fareInfo?.fare || 150}`, icon: '🚗' },
-                { id: 'comfort', name: 'Comfort', eta: '8 min', desc: 'AC • Premium', price: `Rs ${Math.round((fareInfo?.fare || 200) * 1.4)}`, icon: '🚙' },
-                { id: 'premium', name: 'Premium', eta: '10 min', desc: 'Luxury • AC', price: `Rs ${Math.round((fareInfo?.fare || 300) * 2)}`, icon: '🏎️' },
+                { id: 'bike', name: 'Bike', eta: '5 min', desc: 'Affordable', price: `Rs ${vehicleFares['bike']?.fare || Math.max(50, Math.round((fareInfo?.fare || 100) * 0.6))}`, icon: '🏍️' },
+                { id: 'rickshaw', name: 'Rickshaw', eta: '6 min', desc: 'Auto', price: `Rs ${vehicleFares['rickshaw']?.fare || Math.round((fareInfo?.fare || 100) * 0.8)}`, icon: '🛺' },
+                { id: 'car', name: 'Car', eta: '8 min', desc: 'Comfortable', price: `Rs ${vehicleFares['car']?.fare || fareInfo?.fare || 150}`, icon: '🚗' },
               ] as VehicleOption[]}
               selectedId={selectedVehicle}
-              onSelect={(id) => { setSelectedVehicle(id); setStage('fare'); }}
+              onSelect={(id) => {
+                console.log('🚗 Vehicle selected:', id);
+                console.log('💰 Fare for this vehicle:', vehicleFares[id]);
+                setSelectedVehicle(id);
+                setStage('fare');
+              }}
             />
             {pickup && destination && (
               <View style={{ marginTop: 8 }}>
@@ -785,7 +941,7 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {stage === 'fare' && fareInfo && (
+        {stage === 'fare' && fareInfo && selectedVehicle && vehicleFares[selectedVehicle] && (
           <View>
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -799,21 +955,21 @@ const PassengerMapScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>
+              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {vehicleFares[selectedVehicle]?.distance || fareInfo.distance || 0} km • {vehicleFares[selectedVehicle]?.duration || fareInfo.duration || 0} min</Text>
             </View>
             <FareDetails
               vehicleName={(selectedVehicle || vehicleType).toString()}
-              distanceKm={`${fareInfo.distance || 0} km`}
-              estimate={`Rs ${fareInfo.fare || 0}`}
+              distanceKm={`${vehicleFares[selectedVehicle]?.distance || fareInfo.distance || 0} km`}
+              estimate={`Rs ${vehicleFares[selectedVehicle]?.fare || fareInfo.fare || 0}`}
               breakdown={[
                 { label: 'Base Fare', value: 'Rs 50' },
-                { 
-                  label: `Distance (${fareInfo.distance || 0} km @ Rs 30/km)`, 
-                  value: `Rs ${Math.max(0, Math.round((fareInfo.distance || 0) * 30))}` 
+                {
+                  label: `Distance (${vehicleFares[selectedVehicle]?.distance || fareInfo.distance || 0} km @ Rs 30/km)`,
+                  value: `Rs ${Math.max(0, Math.round(((vehicleFares[selectedVehicle]?.distance || fareInfo.distance || 0)) * 30))}`
                 },
-                { 
-                  label: `Time (${fareInfo.duration || 0} min @ Rs 2/min)`, 
-                  value: `Rs ${Math.max(0, Math.round((fareInfo.duration || 0) * 2))}` 
+                {
+                  label: `Time (${vehicleFares[selectedVehicle]?.duration || fareInfo.duration || 0} min @ Rs 2/min)`,
+                  value: `Rs ${Math.max(0, Math.round(((vehicleFares[selectedVehicle]?.duration || fareInfo.duration || 0)) * 2))}`
                 },
                 { label: 'Discount', value: 'Rs 0' },
               ]}

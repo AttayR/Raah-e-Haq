@@ -49,7 +49,7 @@ const driverSchema = baseSchema.shape({
   vehicleType: yup
     .string()
     .required('Vehicle type is required')
-    .oneOf(['car', 'bike', 'van', 'truck'], 'Please select a valid vehicle type'),
+    .oneOf(['bike', 'rickshaw', 'car'], 'Please select a valid vehicle type'),
   
   vehicleNumber: yup
     .string()
@@ -135,7 +135,7 @@ export interface BaseRegistrationData {
 
 export interface DriverRegistrationData extends BaseRegistrationData {
   role: 'driver';
-  vehicleType: 'car' | 'bike' | 'van' | 'truck';
+  vehicleType: 'bike' | 'rickshaw' | 'car';
   vehicleNumber: string;
   vehicleBrand: string;
   vehicleModel: string;
