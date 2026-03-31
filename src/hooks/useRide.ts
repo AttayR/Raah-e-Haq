@@ -44,7 +44,7 @@ export interface RideActions {
   cancelRide: (rideId: number, options?: CancelRideRequestDoc) => Promise<RideResource>;
   updateDriverLocation: (location: LocationUpdate) => Promise<void>;
   findNearbyDrivers: (latitude: number, longitude: number, radius?: number) => Promise<DriverInRadius[]>;
-  getPendingRides: (params?: { driver_id?: number; latitude?: number; longitude?: number; radius_km?: number; vehicle_type?: string }) => Promise<RideResource[]>;
+  getPendingRides: (params?: { driver_id?: number; latitude?: number; longitude?: number; radius_km?: number; radius?: number; vehicle_type?: string }) => Promise<RideResource[]>;
   getDriverRideRequests: () => Promise<DriverRideRequestDoc[]>;
   acceptDriverRequest: (requestId: string, body: AcceptDriverRequestDoc) => Promise<RideResource>;
   rejectDriverRequest: (requestId: string, body?: RejectDriverRequestDoc) => Promise<void>;
@@ -383,44 +383,36 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     }
   }, []);
 
-  // Find nearby drivers
+  // Find nearby drivers — uses GET /api/rides/nearby-drivers (doc Phase 3.2), fallback to tracking/drivers-in-radius
   const findNearbyDrivers = useCallback(async (
     latitude: number,
     longitude: number,
-    radius: number = 5
+    radius: number = 5,
+    vehicleType?: string
   ): Promise<DriverInRadius[]> => {
     try {
-      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius });
-      const drivers = await rideService.getDriversInRadius(latitude, longitude, radius);
-      
-      // Ensure drivers is always an array
-      const safeDrivers = Array.isArray(drivers) ? drivers : [];
-      
-      setState(prev => ({
-        ...prev,
-        availableDrivers: safeDrivers,
-      }));
+      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius, vehicleType });
+      const drivers = await rideService.getNearbyDrivers(latitude, longitude, radius, vehicleType);
 
-      console.log('✅ Nearby drivers found:', safeDrivers);
+      const safeDrivers = Array.isArray(drivers) ? drivers : [];
+      setState(prev => ({ ...prev, availableDrivers: safeDrivers }));
+      console.log('✅ Nearby drivers found:', safeDrivers.length);
       return safeDrivers;
     } catch (error) {
       console.error('❌ Failed to find nearby drivers:', error);
-      // Return empty array on error instead of throwing
       const emptyDrivers: DriverInRadius[] = [];
-      setState(prev => ({
-        ...prev,
-        availableDrivers: emptyDrivers,
-      }));
+      setState(prev => ({ ...prev, availableDrivers: emptyDrivers }));
       return emptyDrivers;
     }
   }, []);
 
-  // Get pending ride requests (for drivers when online)
+  // Get pending ride requests — GET /api/rides/pending (doc Phase 4.1)
   const getPendingRides = useCallback(async (params?: {
     driver_id?: number;
     latitude?: number;
     longitude?: number;
     radius_km?: number;
+    radius?: number;
     vehicle_type?: string;
   }): Promise<RideResource[]> => {
     try {

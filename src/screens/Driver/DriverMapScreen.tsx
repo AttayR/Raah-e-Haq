@@ -168,18 +168,27 @@ const DriverMapScreen = () => {
 
   // Update driver location when online
   useEffect(() => {
-    if (isOnline && currentLocation && uid) {
+    if (isOnline && currentLocation) {
       const interval = setInterval(() => {
+        const hasActiveRide = !!currentRide && (
+          currentRide.status === 'accepted' ||
+          currentRide.status === 'arrived' ||
+          currentRide.status === 'ongoing'
+        );
         updateDriverLocation({
           latitude: currentLocation.latitude,
           longitude: currentLocation.longitude,
-          status: isOnline ? 'online' : 'offline',
+          // Backend typically gates accept on "available" (not just "online")
+          status: hasActiveRide ? 'busy' : 'available',
+          speed: 0,
+          heading: 0,
+          accuracy: 10,
         });
       }, 5000); // Update every 5 seconds
 
       return () => clearInterval(interval);
     }
-  }, [isOnline, currentLocation, uid, updateDriverLocation]);
+  }, [isOnline, currentLocation, currentRide?.status, updateDriverLocation]);
 
   // Sync incoming display when currentRide is in 'requested' state (e.g. after refresh). Do not clear when currentRide is null so polling can show pending rides.
   useEffect(() => {
@@ -209,13 +218,24 @@ const DriverMapScreen = () => {
           }
         }
         setIncomingDriverRequest(null);
-        if (getPendingRides) {
-          const rides = await getPendingRides();
+        if (getPendingRides && hasValidDriverId && currentLocation) {
+          const rides = await getPendingRides({
+            driver_id: driverId,
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            radius: 10,
+          });
           if (Array.isArray(rides) && rides.length > 0) {
             setIncomingRide(rides[0]);
           } else {
             setIncomingRide(null);
           }
+        } else if (getPendingRides && !currentLocation) {
+          const rides = await getPendingRides({ driver_id: driverId, radius: 10 });
+          if (Array.isArray(rides) && rides.length > 0) setIncomingRide(rides[0]);
+          else setIncomingRide(null);
+        } else {
+          setIncomingRide(null);
         }
       } catch (e) {
         console.warn('DriverMapScreen: failed to fetch pending rides', e);
@@ -225,7 +245,7 @@ const DriverMapScreen = () => {
     fetchPending();
     const interval = setInterval(fetchPending, 12000);
     return () => clearInterval(interval);
-  }, [isOnline, getDriverRideRequests, getPendingRides, currentRide?.status]);
+  }, [isOnline, getDriverRideRequests, getPendingRides, currentRide?.status, hasValidDriverId, driverId, currentLocation]);
 
   // Subscribe to driver notifications when online
   useEffect(() => {
@@ -238,7 +258,7 @@ const DriverMapScreen = () => {
     }
   }, [isOnline, uid, notificationsInitialized, subscribeToDriverNotifications, unsubscribeFromDriverNotifications]);
 
-  const toggleOnlineStatus = () => {
+  const toggleOnlineStatus = async () => {
     if (!currentLocation) {
       Alert.alert(
         'Location Required',
@@ -252,45 +272,107 @@ const DriverMapScreen = () => {
     }
 
     const nextOnline = !isOnline;
-    setIsOnline(nextOnline);
 
-    if (updateDriverStatus && currentLocation) {
-      updateDriverStatus({
-        status: nextOnline ? 'online' : 'offline',
-        currentLocation: {
+    try {
+      // Updated flow: POST /api/tracking/update-location with status online/offline
+      if (nextOnline) {
+        // Many backends require driver to be "available" to accept rides.
+        await updateDriverLocation({
           latitude: currentLocation.latitude,
           longitude: currentLocation.longitude,
-        },
-      }).catch(() => {});
+          status: 'online',
+          speed: 0,
+          heading: 0,
+          accuracy: 10,
+        });
+        await updateDriverLocation({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          status: 'available',
+          speed: 0,
+          heading: 0,
+          accuracy: 10,
+        });
+      } else {
+        await updateDriverLocation({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          status: 'offline',
+          speed: 0,
+          heading: 0,
+          accuracy: 10,
+        });
+      }
+      setIsOnline(nextOnline);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: any }; message?: string };
+      const data = axiosErr.response?.data;
+      const message =
+        (data && (data.message ?? data.error ?? (typeof data.errors === 'object' ? JSON.stringify(data.errors) : data.errors))) ||
+        axiosErr.message ||
+        (nextOnline ? 'Failed to go online. Please try again.' : 'Failed to go offline.');
+      Alert.alert(nextOnline ? 'Could not go online' : 'Could not go offline', String(message));
     }
   };
 
+  // Accept button: triggers one of two endpoints depending on where the request came from.
   const handleAcceptRide = async (rideIdOrRequestId: number | string) => {
     if (!currentLocation) {
       Alert.alert('Location required', 'Enable location to accept the ride.');
       return;
     }
     try {
-      if (isDocRequest && typeof rideIdOrRequestId === 'string' && acceptDriverRequest) {
-        await acceptDriverRequest(rideIdOrRequestId, {
+      // Request from GET /drivers/ride-requests → POST /api/drivers/ride-requests/:requestId/accept
+      if (isDocRequest && acceptDriverRequest) {
+        const requestId = String(rideIdOrRequestId);
+        await acceptDriverRequest(requestId, {
           currentLocation: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
           estimatedArrival: 5,
         });
         setIncomingDriverRequest(null);
-      } else if (typeof rideIdOrRequestId === 'number' && hasValidDriverId && acceptRide) {
-        await acceptRide(rideIdOrRequestId, driverId);
-        setIncomingRide(null);
+        Alert.alert('Ride Accepted', 'You have accepted the ride request');
+        return;
       }
-      Alert.alert('Ride Accepted', 'You have accepted the ride request');
+      // Request from GET /api/rides/pending → POST /api/rides/:id/assign-driver with { driver_id }
+      if (hasValidDriverId && acceptRide) {
+        const rideId = Number(rideIdOrRequestId);
+        if (!Number.isFinite(rideId) || rideId <= 0) {
+          Alert.alert('Could not accept ride', 'Invalid ride id.');
+          return;
+        }
+        await acceptRide(rideId, driverId);
+        setIncomingRide(null);
+        Alert.alert('Ride Accepted', 'You have accepted the ride request');
+        return;
+      }
+      Alert.alert('Could not accept ride', 'Missing driver id or accept is not available.');
     } catch (err: unknown) {
-      console.error('Accept ride failed', err);
-      const axiosErr = err as { response?: { data?: any }; message?: string };
+      const axiosErr = err as {
+        response?: { status?: number; data?: any };
+        config?: { url?: string; method?: string };
+        message?: string;
+      };
+      const status = axiosErr.response?.status;
       const data = axiosErr.response?.data;
-      const message =
-        (data && (data.message || data.error)) ||
+
+      // Keep logs compact but useful for 400 debugging
+      console.error('Accept ride failed', {
+        status,
+        method: axiosErr.config?.method,
+        url: axiosErr.config?.url,
+        data,
+      });
+
+      const messageValue =
+        (data && (data.message ?? data.error ?? data.errors)) ||
         axiosErr.message ||
         'Failed to accept ride';
-      Alert.alert('Could not accept ride', String(message));
+      const message =
+        typeof messageValue === 'string'
+          ? messageValue
+          : JSON.stringify(messageValue);
+
+      Alert.alert('Could not accept ride', message);
     }
   };
 
@@ -395,20 +477,22 @@ const DriverMapScreen = () => {
         )}
 
         {/* Active ride markers */}
-        {currentRide && (
+        {currentRide && Number.isFinite(Number(currentRide.pickup_latitude)) && Number.isFinite(Number(currentRide.pickup_longitude)) && (
           <>
             <Marker
-              coordinate={{ latitude: currentRide.pickup_latitude, longitude: currentRide.pickup_longitude }}
+              coordinate={{ latitude: Number(currentRide.pickup_latitude), longitude: Number(currentRide.pickup_longitude) }}
               title="Pickup"
               description={currentRide.pickup_address}
               pinColor="green"
             />
-            <Marker
-              coordinate={{ latitude: currentRide.dropoff_latitude, longitude: currentRide.dropoff_longitude }}
-              title="Destination"
-              description={currentRide.dropoff_address}
-              pinColor="red"
-            />
+            {Number.isFinite(Number(currentRide.dropoff_latitude)) && Number.isFinite(Number(currentRide.dropoff_longitude)) && (
+              <Marker
+                coordinate={{ latitude: Number(currentRide.dropoff_latitude), longitude: Number(currentRide.dropoff_longitude) }}
+                title="Destination"
+                description={currentRide.dropoff_address}
+                pinColor="red"
+              />
+            )}
           </>
         )}
         </SafeMapView>

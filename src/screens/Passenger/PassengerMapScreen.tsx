@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
@@ -43,6 +44,11 @@ const PassengerMapScreen = () => {
   const mapRef = useRef<any>(null);
   const { handleError } = useErrorHandler();
 
+  const apiAuth = useAppSelector(state => state?.apiAuth);
+  const passengerId = (apiAuth?.user?.id != null && Number.isFinite(apiAuth.user.id))
+    ? Number(apiAuth.user.id)
+    : undefined;
+
   const {
     currentLocation,
     isLoading: locationLoading,
@@ -54,8 +60,8 @@ const PassengerMapScreen = () => {
     subscribeToPassengerNotifications,
     unsubscribeFromPassengerNotifications,
     sendRideRequestNotification,
-  } = usePassengerNotifications('passenger_id');
-  const rideHook = useRide(11, 'passenger');
+  } = usePassengerNotifications(passengerId?.toString() ?? 'passenger');
+  const rideHook = useRide(passengerId, 'passenger');
   const {
     currentRide,
     rideHistory,
@@ -353,7 +359,7 @@ const PassengerMapScreen = () => {
       const mappedVehicleType = mapVehicleTypeForApi(rideData.vehicle_type);
 
       const apiRideData = {
-        passenger_id: 8,
+        ...(passengerId != null && { passenger_id: passengerId }),
         ...rideData,
         vehicle_type: mappedVehicleType,
       };
@@ -556,8 +562,7 @@ const PassengerMapScreen = () => {
       const vehicleTypeForApi = mapVehicleTypeForApi(finalVehicleType);
 
       const rideRequestData = {
-        // TODO: use authenticated passenger id from API auth when backend is ready
-        passenger_id: 8,
+        ...(passengerId != null && { passenger_id: passengerId }),
         pickup_address: (pickup as any).address || (pickup as any).name || 'Pickup Location',
         dropoff_address: (destination as any).address || (destination as any).name || 'Destination Location',
         pickup_latitude: pickup.latitude,

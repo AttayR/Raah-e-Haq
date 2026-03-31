@@ -37,11 +37,13 @@ export interface RideRequest {
 }
 
 export interface RideUpdate {
-  status?: 'requested' | 'accepted' | 'ongoing' | 'completed' | 'cancelled';
+  status?: 'requested' | 'accepted' | 'arrived' | 'ongoing' | 'completed' | 'cancelled';
   driver_id?: number;
   fare?: number;
   distance_km?: number;
   duration_min?: number;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export interface RideResource {
@@ -55,7 +57,7 @@ export interface RideResource {
   pickup_longitude: number;
   dropoff_latitude: number;
   dropoff_longitude: number;
-  status: 'requested' | 'accepted' | 'ongoing' | 'completed' | 'cancelled';
+  status: 'requested' | 'accepted' | 'arrived' | 'ongoing' | 'completed' | 'cancelled';
   vehicle_type: string;
   passenger_count: number;
   special_instructions?: string;
@@ -169,7 +171,7 @@ export interface DriverInRadius {
 export interface LocationUpdate {
   latitude: number;
   longitude: number;
-  status: 'online' | 'offline' | 'busy';
+  status: 'online' | 'available' | 'offline' | 'busy';
   speed?: number;
   heading?: number;
   accuracy?: number;
@@ -506,13 +508,13 @@ class RideService {
     }
   }
 
-  // Update ride status and details
+  // Update ride status and details — PUT /api/rides/:id (doc Phases 5.3, 6.1, 7.1)
   async updateRide(rideId: number, updateData: RideUpdate): Promise<RideResource> {
     try {
       console.log('🔄 Updating ride:', rideId, updateData);
       const response = await apiService.put(`${this.baseUrl}/${rideId}`, updateData);
       console.log('✅ Ride updated successfully:', response.data);
-      return response.data.data;
+      return response.data?.data ?? response.data;
     } catch (error) {
       console.error('❌ Failed to update ride:', error);
       throw error;
@@ -557,12 +559,14 @@ class RideService {
     return this.assignDriver(rideId, driverId);
   }
 
-  // Start a ride
+  // Start a ride — PUT /api/rides/:id with { status: 'ongoing', started_at } (doc Phase 6.1)
   async startRide(rideId: number): Promise<RideResource> {
     try {
       console.log('🚀 Starting ride:', rideId);
+      const startedAt = new Date().toISOString();
       const response = await this.updateRide(rideId, {
-        status: 'ongoing'
+        status: 'ongoing',
+        started_at: startedAt,
       });
       console.log('✅ Ride started successfully:', response);
       return response;
@@ -572,15 +576,17 @@ class RideService {
     }
   }
 
-  // Complete a ride
+  // Complete a ride — PUT /api/rides/:id with status, fare, distance_km, duration_min, completed_at (doc Phase 7.1)
   async completeRide(rideId: number, fare?: number, distanceKm?: number, durationMin?: number): Promise<RideResource> {
     try {
       console.log('🏁 Completing ride:', rideId, { fare, distanceKm, durationMin });
+      const completedAt = new Date().toISOString();
       const response = await this.updateRide(rideId, {
         status: 'completed',
         fare,
         distance_km: distanceKm,
-        duration_min: durationMin
+        duration_min: durationMin,
+        completed_at: completedAt,
       });
       console.log('✅ Ride completed successfully:', response);
       return response;
@@ -603,7 +609,7 @@ class RideService {
     }
   }
 
-  // Get drivers in radius
+  // Get drivers in radius (legacy) — GET /tracking/drivers-in-radius
   async getDriversInRadius(
     latitude: number,
     longitude: number,
@@ -612,16 +618,35 @@ class RideService {
     try {
       console.log('🔍 Finding drivers in radius:', { latitude, longitude, radiusKm });
       const response = await apiService.get('/tracking/drivers-in-radius', {
-        params: {
-          latitude,
-          longitude,
-          radius_km: radiusKm
-        }
+        params: { latitude, longitude, radius_km: radiusKm },
       });
       console.log('✅ Drivers found successfully:', response.data);
       return response.data.data || [];
     } catch (error) {
       console.error('❌ Failed to find drivers in radius:', error);
+      throw error;
+    }
+  }
+
+  // Get nearby drivers — GET /api/rides/nearby-drivers (doc Phase 3.2).
+  async getNearbyDrivers(
+    latitude: number,
+    longitude: number,
+    radius: number = 10,
+    vehicleType?: string
+  ): Promise<DriverInRadius[]> {
+    try {
+      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius, vehicle_type: vehicleType });
+      const response = await apiService.get(`${this.baseUrl}/nearby-drivers`, {
+        params: { latitude, longitude, radius, vehicle_type: vehicleType ?? 'car' },
+      });
+      const data = response.data?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        return this.getDriversInRadius(latitude, longitude, radius);
+      }
+      console.error('❌ Failed to find nearby drivers:', error);
       throw error;
     }
   }
@@ -700,30 +725,38 @@ class RideService {
     }
   }
 
-  // Get pending rides for driver (rides with status 'requested').
-  // Pass driver_id, latitude, longitude, radius_km, vehicle_type so backend can filter by distance and vehicle.
+  // Get pending rides for driver — GET /api/rides/pending (doc Phase 4.1).
+  // Params: driver_id, latitude, longitude, radius, vehicle_type.
   async getPendingRides(params?: {
     driver_id?: number;
     latitude?: number;
     longitude?: number;
     radius_km?: number;
+    radius?: number;
     vehicle_type?: string;
   }): Promise<RideResource[]> {
     try {
+      const { radius_km, radius, ...rest } = params ?? {};
+      const radiusParam = radius ?? radius_km ?? 10;
       console.log('⏳ Fetching pending rides', params);
-      const response = await this.getRides({
-        status: 'requested',
-        ...params,
+      const response = await apiService.get(`${this.baseUrl}/pending`, {
+        params: { ...rest, radius: radiusParam },
       });
-      if (!response) {
-        console.warn('⚠️ getRides returned undefined');
-        return [];
-      }
-      const list = Array.isArray(response) ? response : response.data || [];
+      const raw = response.data;
+      const list = Array.isArray(raw) ? raw : raw?.data ?? [];
       const arr = Array.isArray(list) ? list : [];
-      // Only show rides that are still requested (exclude cancelled, etc.)
       return arr.filter((r: RideResource) => r && r.status === 'requested');
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.response?.status === 404 || error?.response?.status === 422) {
+        const response = await this.getRides({
+          status: 'requested',
+          ...params,
+        });
+        if (!response) return [];
+        const list = Array.isArray(response.data) ? response.data : response.data || [];
+        const arr = Array.isArray(list) ? list : [];
+        return arr.filter((r: RideResource) => r && r.status === 'requested');
+      }
       console.error('❌ Failed to fetch pending rides:', error);
       throw error;
     }
@@ -736,11 +769,6 @@ class RideService {
       const requests = response.data?.data?.requests ?? response.data?.requests ?? [];
       return Array.isArray(requests) ? requests : [];
     } catch (error: any) {
-      if (error?.response?.status === 404) {
-        console.log('GET /drivers/ride-requests not available (404)');
-      } else {
-        console.warn('Driver ride requests failed:', error?.response?.status ?? error?.message);
-      }
       return [];
     }
   }
@@ -757,41 +785,40 @@ class RideService {
     await apiService.post(`${this.driversUrl}/ride-requests/${requestId}/reject`, body ?? {});
   }
 
-  // POST /drivers/rides/:rideId/arrived (doc 9.3)
-  async driverArrived(rideId: number, body: { currentLocation: { latitude: number; longitude: number }; arrivedAt?: string }): Promise<RideResource> {
+  // Driver arrives at pickup — PUT /api/rides/:id with { status: 'arrived' } (doc Phase 5.3)
+  async driverArrived(rideId: number, _body?: { currentLocation: { latitude: number; longitude: number }; arrivedAt?: string }): Promise<RideResource> {
     try {
-      const response = await apiService.post(`${this.driversUrl}/rides/${rideId}/arrived`, body);
-      return response.data?.data ?? response.data;
-    } catch (error) {
+      const response = await this.updateRide(rideId, { status: 'arrived' });
+      return response;
+    } catch (error: any) {
+      if (error?.response?.status === 404 || error?.response?.status === 422) {
+        const response = await apiService.post(`${this.driversUrl}/rides/${rideId}/arrived`, _body ?? {});
+        return response.data?.data ?? response.data;
+      }
       console.error('❌ Failed to mark arrived:', error);
       throw error;
     }
   }
 
-  // POST /drivers/rides/:rideId/start (doc 9.3)
-  async driverStartRide(rideId: number, body: { currentLocation: { latitude: number; longitude: number }; startOTP?: string }): Promise<RideResource> {
+  // Driver starts ride — PUT /api/rides/:id with { status: 'ongoing', started_at } (doc Phase 6.1)
+  async driverStartRide(rideId: number, _body?: { currentLocation: { latitude: number; longitude: number }; startOTP?: string }): Promise<RideResource> {
     try {
-      const response = await apiService.post(`${this.driversUrl}/rides/${rideId}/start`, body);
-      return response.data?.data ?? response.data;
-    } catch (error) {
+      const startedAt = new Date().toISOString();
+      return await this.updateRide(rideId, { status: 'ongoing', started_at: startedAt });
+    } catch (error: any) {
+      if (error?.response?.status === 404 || error?.response?.status === 422) {
+        const response = await apiService.post(`${this.driversUrl}/rides/${rideId}/start`, _body ?? {});
+        return response.data?.data ?? response.data;
+      }
       console.error('❌ Failed to start ride (driver):', error);
       throw error;
     }
   }
 
-  // PUT /drivers/status — online/offline with location. Not called from app when backend returns 404.
+  // PUT /drivers/status — toggle driver online/offline with real-time location. Call before accepting rides.
   async updateDriverStatus(body: { status: 'online' | 'offline' | 'busy' | 'break'; currentLocation?: { latitude: number; longitude: number; heading?: number; speed?: number; accuracy?: number } }): Promise<any> {
-    try {
-      const response = await apiService.put(`${this.driversUrl}/status`, body);
-      return response.data?.data ?? response.data;
-    } catch (error: any) {
-      if (error?.response?.status === 404) {
-        console.log('PUT /drivers/status not available (404)');
-      } else {
-        console.warn('Update driver status failed:', error?.response?.status ?? error?.message);
-      }
-      return undefined;
-    }
+    const response = await apiService.put(`${this.driversUrl}/status`, body);
+    return response.data?.data ?? response.data;
   }
 
   // Calculate fare estimate
