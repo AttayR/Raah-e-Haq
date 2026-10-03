@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { showToast } from './ToastProvider';
+import { showToast } from '../components/ToastProvider';
 
 export interface AppError {
   code: string;

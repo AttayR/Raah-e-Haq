@@ -5,8 +5,9 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, '16.0'
-ENV['NODE_BINARY'] = '/usr/local/bin/node'
+APP_DEPLOYMENT_TARGET = '16.0'
+platform :ios, APP_DEPLOYMENT_TARGET
+# NODE_BINARY comes from ios/.xcode.env (+ .xcode.env.local), not a hardcoded path.
 prepare_react_native_project!
 
 # Force dynamic frameworks to resolve Swift pod issues
@@ -44,5 +45,24 @@ pod 'react-native-maps/Google', :path => rn_maps_path
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Newer Xcode versions reject pods that declare an old minimum iOS version
+    # ("The iOS Simulator deployment target ... is set to 9.0/10.0/12.0").
+    # Raise every pod to the app's minimum so they all build.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |build_config|
+        current = build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if current.nil? || Gem::Version.new(current) < Gem::Version.new(APP_DEPLOYMENT_TARGET)
+          build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = APP_DEPLOYMENT_TARGET
+        end
+
+        # fmt 11.0.x (bundled with RN 0.80) fails under the newer Clang in Xcode 26.4+/27
+        # with "call to consteval function ... is not a constant expression".
+        # Compiling fmt as C++17 disables its consteval format-string checks.
+        if target.name == 'fmt'
+          build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+      end
+    end
   end
 end

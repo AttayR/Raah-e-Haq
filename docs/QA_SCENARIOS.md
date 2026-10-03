@@ -8,8 +8,8 @@ QA runs against the **production** backend (the owner's choice, 2026-10-03). Rea
 
 | Role | Account identifier (email or phone, masked ok) | Simulator | Notes |
 |---|---|---|---|
-| Passenger | _TBD_ | iPhone 16 (passenger) | |
-| Driver | _TBD_ | iPhone 16 Pro (driver) | Approved/active |
+| Passenger | naveed…lar@gmail.com | iPhone 17 (iOS 26.5) | Added 2026-10-03 |
+| Driver | attayk@…gmail.com | second simulator (e.g. iPhone 17 Pro) | Added 2026-10-03; confirm approved/active |
 | Pending user (optional) | _TBD_ | | For T-106 |
 
 **Safe test location:** _TBD_. These are the pickup and dropoff coordinates where real users won't match. Set them on the simulator via Features → Location → Custom Location.

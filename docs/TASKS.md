@@ -11,10 +11,10 @@
 
 | ID | Phase | Title | Depends | QA | Owner | Status | Notes |
 |---|---|---|---|---|---|---|---|
-| T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | todo | |
+| T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | todo | logo rename + useErrorHandler import done early (iOS build fix commit); NotificationScreen + gate bundle check remain |
 | T-002 | 0 | Make Jest work (setup, native mocks, App smoke test) | | no | agent | todo | |
 | T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | todo | |
-| T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | |
+| T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | Podfile NODE_BINARY removed early (iOS build fix commit) |
 | T-005 | 0 | Env config: single source for API/WS URLs and keys | T-002 | yes | agent | todo | |
 | T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | todo | |
 | T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | todo | |
