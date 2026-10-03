@@ -73,6 +73,7 @@
 | B-06 | – | Backend: passenger from token, atomic assign-driver, WS auth | | | owner | todo | |
 | B-07 | – | Test accounts + safe test location in QA_SCENARIOS.md | | | owner | todo | **Needed before any QA** |
 | B-08 | – | Product decisions: background location, chat, wallet | | | owner | todo | |
+| B-09 | – | **Production backend down: SSL missing for raahehaq.com + /api not served** (see docs/api/HEALTH_2026-10-03.md) | | | owner | todo | **Blocks all QA and real use** |
 
 ---
 

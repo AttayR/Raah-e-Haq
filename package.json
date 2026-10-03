@@ -10,7 +10,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "verify": "node scripts/quality-gate.js",
-    "verify:update": "node scripts/quality-gate.js --update"
+    "verify:update": "node scripts/quality-gate.js --update",
+    "api:health": "node scripts/api-health.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
