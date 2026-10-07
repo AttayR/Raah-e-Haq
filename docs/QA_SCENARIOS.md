@@ -2,7 +2,22 @@
 
 QA runs against the **production** backend (the owner's choice, 2026-10-03). Read the safety rules in `CLAUDE.md` first.
 
-## Test accounts (owner fills this in; task B-07)
+## Local test accounts (default for all agent QA; owner approved 2026-10-08)
+
+Local backend only (`http://localhost:8000`, Debug build). Fake seeded data from `~/My-Projects/Raah-e-Haq-backend/database/seeders/UserSeeder.php`. Password: the Laravel factory default in `database/factories/UserFactory.php` (agents read it there; never copy it into docs or reports).
+
+| Role | Email | Simulator |
+|---|---|---|
+| Passenger | passenger@raah-e-haq.com | iPhone 17 (iOS 26.5) |
+| Driver | driver@raah-e-haq.com | second simulator (e.g. iPhone 17 Pro) |
+| Pending user | pending@raah-e-haq.com | for T-106 |
+| Admin (web panel) | admin@raah-e-haq.com | browser, http://localhost:8000 |
+
+Safe test location (local): Gulberg III, Lahore (31.5204, 74.3587). After `migrate:fresh --seed` these accounts are recreated.
+
+## Production test accounts (owner only; agents never sign in to production)
+
+### Test accounts (owner fills this in; task B-07)
 
 > Agents must stop if this table is empty. Don't write passwords here. The owner signs in on the simulator manually.
 
@@ -15,9 +30,9 @@ QA runs against the **production** backend (the owner's choice, 2026-10-03). Rea
 **Safe test location:** _TBD_. These are the pickup and dropoff coordinates where real users won't match. Set them on the simulator via Features → Location → Custom Location.
 
 ## Rules
-- **Data creation.** Scenarios marked **Creates data** need the owner's go-ahead per run, and must finish with their cleanup step.
+- **Data creation.** On the local backend, scenarios marked **Creates data** run without asking (owner approved 2026-10-08) and must finish with their cleanup step. On production they need the owner's go-ahead per run.
 - **Two simulators.** Two-device scenarios run the passenger and driver apps on two different simulators, each with its own signed-in test account.
-- **Credentials.** Agents never type passwords or OTPs. If the app shows a login screen, QA is `BLOCKED` until the owner signs in.
+- **Credentials.** On the local backend, agents sign in with the local test accounts above. Agents never type production passwords or OTPs; a production login screen means `BLOCKED` until the owner signs in. OTP on local: read it from the local database or Laravel log, never from production.
 
 ## Smoke (read-only)
 

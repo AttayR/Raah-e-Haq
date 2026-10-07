@@ -61,8 +61,6 @@ Also run `yarn verify` yourself as a final check. Don't trust either report blin
 <2-4 lines: what changed and why; findings fixed: AUTH-01, ...>
 
 Verified: reviewer PASS, gate TS <n>→<m>, ESLint <a>→<b>, Jest <status>; QA <PASS|n/a>
-
-Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ```
 
 5. Never push. Never open a PR unless the user asks.

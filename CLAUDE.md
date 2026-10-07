@@ -22,6 +22,9 @@ The app is being taken from prototype to production through a tracked fix progra
 | Unit tests | `yarn test` |
 | **Quality gate** | `yarn verify` (must PASS before any commit) |
 | Lower the baseline after a fix | `yarn verify:update` |
+| Backend server (local) | `cd ~/My-Projects/Raah-e-Haq-backend && /opt/homebrew/opt/php@8.3/bin/php artisan serve` |
+| Backend tests | `cd ~/My-Projects/Raah-e-Haq-backend && /opt/homebrew/opt/php@8.3/bin/php artisan test` |
+| Backend reset local DB | `… php artisan migrate:fresh --seed` (local only) |
 
 ## Quality gate (ratchet)
 
@@ -31,35 +34,55 @@ The app is being taken from prototype to production through a tracked fix progra
 - After a verified fix, run `yarn verify:update` so the baseline drops and the gain is locked in. Commit `.quality/baseline.json` with the fix.
 - Never edit `.quality/baseline.json` by hand, never add `// @ts-ignore`, `eslint-disable` or `any` just to make numbers drop. The reviewer agent rejects this.
 
+## Owner decisions (2026-10-08) — agents act on these without asking again
+
+- **Autonomy.** The owner is away and wants the app taken to production level end to end: every screen and feature working with real (dynamic) data, mature consistent design, security handled. Agents implement, test, verify, debug and fix on their own. Stop and ask only for the items under "Still needs the owner" below.
+- **We own the backend now.** The Laravel backend lives at `~/My-Projects/Raah-e-Haq-backend` (GitHub `Mubashir-Majeed/Raah-e-haq`). Backend tasks are `BE-xx` in `docs/TASKS.md`, done by **rh-backend**.
+- **Product defaults (B-08):** payments are **cash only** for now (wallet shows balance/history, no top-up flow); **in-ride chat** between passenger and driver; location is **foreground only** (app open or ride active), no background location.
+- **Branches and pushing.** Never commit to or push `main`/`master` (either repo). Work happens on separate branches (see "Branches"). Pushing those non-main branches to `origin` is allowed; never force-push, never open or merge a PR, never delete remote branches.
+- **Commits.** Commit message: `fix(T-012): <summary>` (or `feat`, `refactor`, `test`, `chore`, `style`). **No `Co-Authored-By` trailer and no mention of Claude or AI in any commit message.**
+- **Still needs the owner:** anything on Hostinger/hPanel or a server, Google Cloud/Firebase consoles (key rotation), Apple/Google store accounts and signing keys, real payment gateways, spending money, and anything touching production data or real users.
+
+## Branches
+
+- App repo: `fix/production-hardening` holds Phase 0 work done so far. Each later phase gets its own branch cut from the previous phase branch: `fix/phase-1-auth`, `fix/phase-2-onboarding`, … (names from `docs/FIX_PLAN.md`). One task = one commit on the current phase branch.
+- Backend repo: `fix/production-hardening` cut from `main`; same one-task-one-commit rule.
+- At the end of a phase (all tasks `done`/`verified-no-qa`/`blocked`), push that phase branch with `git push -u origin <branch>` (never `--force`).
+
 ## Workflow (agents)
 
-Work goes through `/fix-next` (see `.claude/skills/fix-next/SKILL.md`):
+`/autopilot` drives everything (`.claude/skills/autopilot/SKILL.md`); `/fix-next` runs one task (`.claude/skills/fix-next/SKILL.md`).
 
-1. **rh-implementer** makes the change for exactly one task.
-2. **rh-reviewer** independently checks the diff, the acceptance criteria and the gate. It does not edit code.
-3. **rh-qa** drives the app in the iOS Simulator for tasks marked `QA: yes` and records evidence.
-4. The orchestrator (the main session) commits only after the reviewer and QA have passed, then updates `docs/TASKS.md`.
+| Agent | Role | Edits code? |
+|---|---|---|
+| **rh-auditor** | Maps every screen/action to real data and backend routes; turns MOCK/BROKEN/MISSING items into tasks | No (docs only) |
+| **rh-implementer** | Implements one app task (`T-…`) with tests | Yes (app) |
+| **rh-backend** | Implements one backend task (`BE-…`) with feature tests | Yes (backend) |
+| **rh-designer** | Design system and screen redesign tasks (`UI-…` / design tasks) | Yes (app UI) |
+| **rh-debugger** | Root-causes failures, fixes with a regression test | Yes |
+| **rh-reviewer** | Independent PASS/FAIL on the diff, criteria and gate | No |
+| **rh-security** | Security PASS/FAIL on every diff; phase/area audits | No (docs only) |
+| **rh-qa** | Drives the app in the iOS Simulator against the local backend, screenshots, report | No (reports only) |
 
-One task = one commit on branch `fix/production-hardening`. Commit message: `fix(T-012): <summary>` (or `feat`, `refactor`, `test`, `chore`), with the Co-Authored-By trailer. Never push, open a PR, rebase or force anything without the owner asking.
+The orchestrator (main session) commits only after reviewer, security and (when required) QA pass, then updates `docs/TASKS.md`.
 
-## PRODUCTION SAFETY (non-negotiable)
+## QA and backend safety (non-negotiable)
 
-The owner chose to test against the **production** backend. Real passengers and drivers use it.
+**Default target is the LOCAL backend** (`http://localhost:8000`, Debug build, `.env.development`). It holds only fake seeded data.
 
-- **Only test accounts.** Use only the accounts listed in `docs/QA_SCENARIOS.md`, under "Test accounts". If that list is empty, stop and ask the owner.
-- **Claude never types passwords or OTP codes and never creates accounts.** The owner signs in on the simulator manually. The session persists through redux-persist, and QA continues from there.
-- **Never touch real users' data.** Never accept, cancel, rate or message a ride that a test account did not create. A driver test account must not go online in an area where real passengers could match. Coordinate the passenger and driver test accounts so they match each other.
-- **Clean up.** Every ride created during QA is cancelled or completed before the QA run ends. Record its ID in the QA report.
-- **No load.** No scripted request loops, no load tests, no polling faster than the app itself does.
-- **No destructive API calls** (DELETE endpoints, profile wipes) outside the test accounts.
-- When unsure whether an action could reach a real user, stop and ask.
+- **Local backend:** agents may sign in on the simulator with the seeded local test accounts listed in `docs/QA_SCENARIOS.md` → "Local test accounts" (owner approved, 2026-10-08), create/accept/cancel/complete test rides, and reseed with `php artisan migrate:fresh --seed` when needed. Only do this when the Debug build points at `localhost` (check `.env.development`).
+- **Production (`raahehaq.com`) — owner only.** Agents never sign in to, write to, or test against production. Never type production credentials or OTPs, never create production accounts, never touch real users' data. Read-only health checks (single requests, like `scripts/api-health.js`) are fine.
+- **No load.** No scripted request loops, no load tests, no polling faster than the app itself does, against any server.
+- **Never deploy.** No SSH, FTP or hPanel actions; no migrations against any remote database.
+- When unsure whether an action could reach a real user, don't do it; record it for the owner.
 
 ## Code conventions (target state; apply to code you touch)
 
 - TypeScript strict. No new `any`; type API responses in `src/services/api` types.
-- All HTTP through the shared axios client in `src/services/api.ts`. No raw `fetch` to the backend, no hardcoded base URLs. Configuration comes from the env config once task T-0xx lands (see TASKS).
+- All HTTP through the shared axios client in `src/services/api.ts`. No raw `fetch` to the backend, no hardcoded base URLs. Configuration comes from `src/config/env.ts` (T-005).
 - No `console.log` in new code; use the logger once it exists. Never log tokens, phone numbers, CNIC or full user objects.
 - Colours, spacing and typography come from `src/theme`. No hardcoded hex colours in screens.
+- **Nothing user-facing is hardcoded.** Stats, lists, offers, banners, notifications, chats, prices, fares, settings and profile data come from the backend (or a documented config/i18n file for static copy). If the endpoint doesn't exist, create a `BE-…` task instead of faking data. Demo arrays and fake numbers in screens are bugs.
 - Every async UI path has loading, error and empty states.
 - Every `setInterval`, listener, WebSocket and geolocation watcher is cleaned up on unmount.
 - Keep screens under ~400 lines. Extract components and hooks when touching a large screen.
