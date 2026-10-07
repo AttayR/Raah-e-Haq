@@ -11,7 +11,7 @@
 
 | ID | Phase | Title | Depends | QA | Owner | Status | Notes |
 |---|---|---|---|---|---|---|---|
-| T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | todo | logo rename + useErrorHandler import done early (iOS build fix commit); NotificationScreen + gate bundle check remain |
+| T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | done | logo rename + useErrorHandler import done early (iOS build fix commit); NotificationScreen + gate bundle check remain; 2026-10-08. Bundle check in gate (bundleOk); NotificationScreen imports fixed (delete denied by permissions, owner may delete; INF-34) |
 | T-002 | 0 | Make Jest work (setup, native mocks, App smoke test) | | no | agent | done | 2026-10-07 (904b918). Also fixed no-undef in scripts/api-health.js (added after baseline). Follow-up: stub WebSocket in jest.setup (do in T-005) |
 | T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | todo | |
 | T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | Podfile NODE_BINARY removed early (iOS build fix commit) |
@@ -20,7 +20,7 @@
 | T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | todo | |
 | T-008 | 0 | One working toast system | T-002 | yes | agent | todo | |
 | T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01) |
-| T-102 | 1 | Single logout thunk used everywhere | T-007 | yes | agent | todo | |
+| T-102 | 1 | Single logout thunk used everywhere | T-007 | yes | agent | todo | QA 2026-10-08: add a confirmation dialog before logout |
 | T-103 | 1 | Auth bootstrap: splash, offline-tolerant init | T-102 | yes | agent | todo | |
 | T-104 | 1 | Token in Keychain + single-flight 401 handling | T-103 | yes | agent | todo | |
 | T-105 | 1 | normalizeUser + role/status routing | T-103 | yes | agent | todo | Confirm with B-03 |
@@ -62,8 +62,8 @@
 | T-511 | 5 | Settings, support, invite, account deletion (both roles) | BE-11, BE-15, BE-17, T-102 | yes | agent | todo | FEAT-11/15/17 |
 | T-601 | 6 | Theme tokens complete; useColorScheme; persisted choice | T-008 | yes | agent | todo | Builder: rh-designer |
 | T-602 | 6 | UI kit (Screen, Header, Button, Input, Card, states) | T-601 | yes | agent | todo | Builder: rh-designer |
-| T-603 | 6 | Migrate auth screens to UI kit | T-602, T-204 | yes | agent | todo | Builder: rh-designer |
-| T-604 | 6 | Passenger screens: split + migrate | T-602, T-309 | yes | agent | todo | Builder: rh-designer |
+| T-603 | 6 | Migrate auth screens to UI kit | T-602, T-204 | yes | agent | todo | Builder: rh-designer; QA 2026-10-08: Login bottom navy band clips "Create New Account" on first view |
+| T-604 | 6 | Passenger screens: split + migrate | T-602, T-309 | yes | agent | todo | Builder: rh-designer; QA 2026-10-08: Settings status bar low contrast; Home address overflows without ellipsis |
 | T-605 | 6 | Driver screens: split + migrate | T-602, T-405 | yes | agent | todo | Builder: rh-designer |
 | T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | |
 | T-607 | 6 | Shared screens to UI kit: notifications, chat, wallet/history, settings/profile | T-602, T-508, T-510, T-511 | yes | agent | todo | Builder: rh-designer |
@@ -84,7 +84,7 @@
 | B-09 | – | **Production backend down: SSL missing for raahehaq.com + /api not served** (see docs/api/HEALTH_2026-10-03.md) | | | owner | todo | **Blocks all QA and real use** |
 | B-10 | – | Production hosting for Laravel Reverb + queue worker (process manager, TLS/wss proxy) | BE-12 | | owner | todo | Server/hPanel work; agents only prepare code + docs |
 | B-11 | – | Credentials: Firebase service-account JSON for FCM (BE-11), SMS gateway account (BE-16) | | | owner | todo | Never commit; set in production `.env` |
-| BE-00 | 0 | Backend test harness: SQLite-safe migrations, factories, helpers | | no | agent | todo | FEAT-19: `php artisan test` 33/35 failing today. Prerequisite for every BE task |
+| BE-00 | 0 | Backend test harness: SQLite-safe migrations, factories, helpers | | no | agent | done | 2026-10-08 (backend 363d127). tests 2/35 → 39 pass, 3 incomplete (BE-02/18/20/21). FEAT-19: `php artisan test` 33/35 failing today. Prerequisite for every BE task |
 | BE-01 | 3 | Rides scoped to caller; passenger from token; ownership checks | BE-00 | yes | agent | todo | FEAT-02 (supersedes B-06 part) |
 | BE-02 | 4 | Fix route shadowing of /rides/pending + nearby-drivers; driver from token | BE-00 | yes | agent | todo | FEAT-01 (supersedes B-04 part); Driver privacy (no phone/name, coarse position, radius cap) is owned by BE-20 |
 | BE-03 | 4 | Atomic assign-driver with 409; driver from token | BE-01 | yes | agent | todo | FEAT-03 (supersedes B-06 part) |
@@ -95,14 +95,14 @@
 | BE-08 | 5 | Personal stats (`/me/stats`) + driver earnings | BE-04 | yes | agent | todo | FEAT-08 (supersedes B-04 part) |
 | BE-09 | 5 | My wallet (cash only): balance + transactions; lock admin payment routes | BE-04 | yes | agent | todo | FEAT-09; Admin-only locking of payments/* is owned by BE-18; BE-09 does only the user wallet endpoints |
 | BE-10 | 5 | Fix banners 500 + filter by date/audience/position | BE-00 | yes | agent | todo | FEAT-10 |
-| BE-11 | 5 | Push: device tokens, FCM send, preferences, broadcasts in list | BE-00 | yes | agent | todo | FEAT-11; prod creds = B-11 |
+| BE-11 | 5 | Push: device tokens, FCM send, preferences, broadcasts in list | BE-00, BE-18 | yes | agent | todo | FEAT-11; prod creds = B-11; must land after BE-18 (BE-00 security review: admin broadcast path works now) |
 | BE-12 | 4 | Realtime with Laravel Reverb (channels, Sanctum broadcast auth, events) | BE-03 | yes | agent | todo | FEAT-12 (supersedes B-06 part); prod hosting = B-10 |
 | BE-13 | 5 | In-ride chat API (messages, chats list, broadcast) | BE-12 | yes | agent | todo | FEAT-13 |
 | BE-14 | 5 | Saved places CRUD | BE-00 | yes | agent | todo | FEAT-14 |
 | BE-15 | 5 | Profile completeness (driver vehicle/licence, stats) + account deletion | BE-00 | yes | agent | todo | FEAT-15 |
 | BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | todo | FEAT-16 (supersedes B-01 code part) |
 | BE-17 | 5 | Referral code column fix; support scoping tests; public settings URLs | BE-00 | yes | agent | todo | FEAT-17 |
-| BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | todo | SEC-01 (critical) |
+| BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | in-progress | SEC-01 (critical) |
 | BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | todo | SEC-02 (critical); live part = B-12 |
 | BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | todo | SEC-03 (high); complements BE-06 |
 | BE-21 | 1 | Remove registration request logging (API + web) | BE-00 | no | agent | todo | SEC-04 (high) |

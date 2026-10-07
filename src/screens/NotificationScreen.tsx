@@ -11,12 +11,11 @@ import {
   StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { BrandColors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { useRide } from '../../hooks/useRide';
-import { useErrorHandler } from '../../hooks/useErrorHandler';
-import ErrorBoundary from '../../components/ErrorBoundary';
-import { NotificationResource } from '../../services/rideService';
+import { BrandColors } from '../theme/colors';
+import { useRide } from '../hooks/useRide';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import ErrorBoundary from '../components/ErrorBoundary';
+import { NotificationResource } from '../services/rideService';
 
 interface NotificationScreenProps {
   userId: number;
@@ -62,7 +61,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       setCurrentPage(page);
       
     } catch (error) {
-      handleError(error, 'NOTIFICATION_LOAD_ERROR');
+      handleError(error instanceof Error ? error : String(error), 'NOTIFICATION_LOAD_ERROR');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -77,7 +76,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       const count = await getUnreadCount();
       setUnreadCount(count);
     } catch (error) {
-      handleError(error, 'UNREAD_COUNT_ERROR');
+      handleError(error instanceof Error ? error : String(error), 'UNREAD_COUNT_ERROR');
     }
   }, [getUnreadCount, handleError]);
 
@@ -101,7 +100,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       setUnreadCount(prev => Math.max(0, prev - 1));
       
     } catch (error) {
-      handleError(error, 'MARK_READ_ERROR');
+      handleError(error instanceof Error ? error : String(error), 'MARK_READ_ERROR');
     }
   }, [markNotificationAsRead, handleError]);
 
@@ -124,7 +123,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
       Alert.alert('Success', 'All notifications marked as read');
       
     } catch (error) {
-      handleError(error, 'MARK_ALL_READ_ERROR');
+      handleError(error instanceof Error ? error : String(error), 'MARK_ALL_READ_ERROR');
     }
   }, [markAllNotificationsAsRead, handleError]);
 
