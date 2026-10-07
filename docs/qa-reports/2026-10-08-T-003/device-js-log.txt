@@ -1,0 +1,235 @@
+getpwuid_r did not find a match for uid 501
+Filtering the log data using "process == "RaaHeHaq" AND subsystem == "com.facebook.react.log""
+Timestamp               Ty Process[PID:TID]
+2026-10-08 02:08:41.761 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:native] Unbalanced calls start/end for tag 20
+2026-10-08 02:08:41.761 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:native] Unbalanced calls start/end for tag 19
+2026-10-08 02:08:41.766 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] Running "RaaHeHaq" with {"rootTag":1,"initialProps":null,"fabric":true}
+2026-10-08 02:08:41.901 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - Rendering children
+2026-10-08 02:08:41.921 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - Current state:', { isAuthenticated: false,
+  hasUser: false,
+  profileCompleted: false }
+2026-10-08 02:08:41.921 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - User role check:', { role: undefined,
+  isDriver: false,
+  isPassenger: false,
+  isUserActive: false }
+2026-10-08 02:08:41.921 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthFlow - User not authenticated, showing auth screens
+2026-10-08 02:08:42.036 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] authSlice - clearError called
+2026-10-08 02:08:42.041 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - Initializing API authentication...
+2026-10-08 02:08:42.061 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - API authentication initialized
+2026-10-08 02:08:42.064 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - Rendering children
+2026-10-08 02:08:42.064 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - Current state:', { isAuthenticated: false,
+  hasUser: false,
+  profileCompleted: false }
+2026-10-08 02:08:42.064 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - User role check:', { role: undefined,
+  isDriver: false,
+  isPassenger: false,
+  isUserActive: false }
+2026-10-08 02:08:42.064 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthFlow - User not authenticated, showing auth screens
+2026-10-08 02:08:42.084 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - Rendering children
+2026-10-08 02:08:42.084 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - Current state:', { isAuthenticated: false,
+  hasUser: false,
+  profileCompleted: false }
+2026-10-08 02:08:42.084 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - User role check:', { role: undefined,
+  isDriver: false,
+  isPassenger: false,
+  isUserActive: false }
+2026-10-08 02:08:42.084 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthFlow - User not authenticated, showing auth screens
+2026-10-08 02:09:41.959 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] authSlice - clearError called
+2026-10-08 02:09:41.959 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔐 Starting login process...
+2026-10-08 02:09:41.960 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔄 Redux Thunk - Starting user login...
+2026-10-08 02:09:41.960 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🌐 API Service - Logging in user...
+2026-10-08 02:09:41.960 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 📡 Endpoint: POST /auth/login
+2026-10-08 02:09:41.963 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - Rendering children
+2026-10-08 02:09:41.964 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - Current state:', { isAuthenticated: false,
+  hasUser: false,
+  profileCompleted: false }
+2026-10-08 02:09:41.964 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - User role check:', { role: undefined,
+  isDriver: false,
+  isPassenger: false,
+  isUserActive: false }
+2026-10-08 02:09:41.964 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthFlow - User not authenticated, showing auth screens
+2026-10-08 02:09:42.299 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 📨 API Service - Login response received
+2026-10-08 02:09:42.299 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '📊 Response status:', 200
+2026-10-08 02:09:42.299 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Redux Thunk - Login successful
+2026-10-08 02:09:42.301 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 💾 Auth data stored successfully
+2026-10-08 02:09:42.301 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthProvider - Rendering children
+2026-10-08 02:09:42.301 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - Current state:', { isAuthenticated: true, hasUser: true, profileCompleted: false }
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - User role check:', { role: 'passenger',
+  isDriver: false,
+  isPassenger: true,
+  isUserActive: true }
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] AuthFlow - User authenticated and active with role, showing main app
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'AuthFlow - User role:', 'passenger'
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'RootNavigation - Current role:', 'passenger'
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'RootNavigation - Role type:', 'string'
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'RootNavigation - Role === "passenger":', true
+2026-10-08 02:09:42.302 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'RootNavigation - Role === "driver":', false
+2026-10-08 02:09:42.420 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔄 Initializing notifications...
+2026-10-08 02:09:42.421 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🔔 Fetching notifications:', { page: 1, perPage: 20 }
+2026-10-08 02:09:42.422 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔢 Getting unread count
+2026-10-08 02:09:42.422 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Passenger ID:', '3'
+2026-10-08 02:09:42.423 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Passenger Details:', { passengerId: '3', timestamp: '2026-10-07T21:09:42.422Z' }
+2026-10-08 02:09:42.426 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Location update effect:', { currentLocation: null,
+  permissionStatus: { isGranted: false, canAskAgain: true, isLocationEnabled: false } }
+2026-10-08 02:09:42.427 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] Location permission not granted
+2026-10-08 02:09:42.459 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🔍 Result type:', 'auth/loginUser/fulfilled'
+2026-10-08 02:09:42.460 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Login successful!
+2026-10-08 02:09:42.460 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] [SUCCESS] Login successful!
+2026-10-08 02:09:42.500 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Location update effect:', { currentLocation: null,
+  permissionStatus: { isGranted: true, canAskAgain: false, isLocationEnabled: true } }
+2026-10-08 02:09:42.501 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] No current location available
+2026-10-08 02:09:42.563 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Location update effect:', { currentLocation: { latitude: 31.5204, longitude: 74.3587 },
+  permissionStatus: { isGranted: true, canAskAgain: false, isLocationEnabled: true } }
+2026-10-08 02:09:42.564 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Got location, reverse geocoding:', { latitude: 31.5204, longitude: 74.3587 }
+2026-10-08 02:09:42.573 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Notifications fetched successfully:', { success: true,
+  data: [],
+  pagination: { current_page: 1, last_page: 1, per_page: 20, total: 0 } }
+2026-10-08 02:09:42.574 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Unread count fetched:', { success: true, data: { unread_count: 0 } }
+2026-10-08 02:09:42.574 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Notifications initialized successfully
+2026-10-08 02:09:42.601 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Passenger 3 subscribed to notifications
+2026-10-08 02:09:42.602 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🔔 Fetching notifications:', { page: 1, perPage: 20 }
+2026-10-08 02:09:42.603 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔢 Getting unread count
+2026-10-08 02:09:42.647 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Notifications fetched successfully:', { success: true,
+  data: [],
+  pagination: { current_page: 1, last_page: 1, per_page: 20, total: 0 } }
+2026-10-08 02:09:42.674 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Unread count fetched:', { success: true, data: { unread_count: 0 } }
+2026-10-08 02:09:43.386 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocoding response status:', 200
+2026-10-08 02:09:43.392 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocoding response:', { plus_code: 
+   { compound_code: 'G9C5+5F Lahore, Pakistan',
+     global_code: '8J3PG9C5+5F' },
+  results: 
+   [ { address_components: '[REDACTED]',
+       formatted_address: '[REDACTED]',
+       geometry: 
+        { location: { lat: 31.5203969, lng: 74.358739 },
+          location_type: 'ROOFTOP',
+          viewport: 
+           { northeast: { lat: 31.5217525802915, lng: 74.3601123802915 },
+             southwest: { lat: 31.5190546197085, lng: 74.35741441970849 } } },
+       place_id: 'ChIJoZr0NwAFGTkRs_a8UKjZQYM',
+       types: [ 'establishment', 'point_of_interest' ] },
+     { address_components: '[REDACTED]',
+       formatted_address: '[REDACTED]',
+       geometry: 
+        { location: { lat: 31.5203696, lng: 74.35874729999999 },
+          location_type: 'ROOFTOP',
+          viewport: 
+           { northeast: { lat: 31.52172568029149, lng: 74.36012248029151 },
+             southwest: { lat: 31.5190277197085, lng: 74.3574245197085 } } },
+       place_id: 'ChIJh8X_Jw<…>
+2026-10-08 02:09:43.392 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocoding success:', 'G9C5+5F5, Block N Gulberg III, Lahore, Pakistan'
+2026-10-08 02:09:43.392 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocode result:', 'G9C5+5F5, Block N Gulberg III, Lahore, Pakistan'
+2026-10-08 02:10:36.922 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔄 Initializing notifications...
+2026-10-08 02:10:36.923 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🔔 Fetching notifications:', { page: 1, perPage: 20 }
+2026-10-08 02:10:36.924 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔢 Getting unread count
+2026-10-08 02:10:36.925 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Passenger ID:', 'passenger_id'
+2026-10-08 02:10:36.926 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Passenger Details:', { passengerId: 'passenger_id',
+  timestamp: '2026-10-07T21:10:36.925Z' }
+2026-10-08 02:10:36.927 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔄 Initializing notifications...
+2026-10-08 02:10:36.927 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🔔 Fetching notifications:', { page: 1, perPage: 20 }
+2026-10-08 02:10:36.928 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔢 Getting unread count
+2026-10-08 02:10:36.929 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Passenger ID:', '11'
+2026-10-08 02:10:36.930 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Passenger Details:', { passengerId: '11', timestamp: '2026-10-07T21:10:36.929Z' }
+2026-10-08 02:10:36.931 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔄 Initializing notifications...
+2026-10-08 02:10:36.931 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🔔 Fetching notifications:', { page: 1, perPage: 20 }
+2026-10-08 02:10:36.932 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 🔢 Getting unread count
+2026-10-08 02:10:36.933 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🚗 Driver ID:', '11'
+2026-10-08 02:10:36.934 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🚗 Driver Details:', { driverId: '11', timestamp: '2026-10-07T21:10:36.933Z' }
+2026-10-08 02:10:36.935 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '📋 Refreshing ride history:', 11, 'passenger'
+2026-10-08 02:10:36.936 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '👤 Fetching passenger rides:', 11, undefined
+2026-10-08 02:10:36.937 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '📋 Fetching rides:', { passenger_id: 11, status: undefined }
+2026-10-08 02:10:36.937 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '🌐 API Service - GET request:', '/rides'
+2026-10-08 02:10:36.939 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] PassengerMapScreen focused
+2026-10-08 02:10:37.048 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Notifications fetched successfully:', { success: true,
+  data: [],
+  pagination: { current_page: 1, last_page: 1, per_page: 20, total: 0 } }
+2026-10-08 02:10:37.064 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Unread count fetched:', { success: true, data: { unread_count: 0 } }
+2026-10-08 02:10:37.064 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Notifications initialized successfully
+2026-10-08 02:10:37.081 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Notifications fetched successfully:', { success: true,
+  data: [],
+  pagination: { current_page: 1, last_page: 1, per_page: 20, total: 0 } }
+2026-10-08 02:10:37.081 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Unread count fetched:', { success: true, data: { unread_count: 0 } }
+2026-10-08 02:10:37.081 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Notifications initialized successfully
+2026-10-08 02:10:37.098 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Notifications fetched successfully:', { success: true,
+  data: [],
+  pagination: { current_page: 1, last_page: 1, per_page: 20, total: 0 } }
+2026-10-08 02:10:37.114 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Unread count fetched:', { success: true, data: { unread_count: 0 } }
+2026-10-08 02:10:37.114 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] ✅ Notifications initialized successfully
+2026-10-08 02:10:37.182 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Rides fetched successfully:', [ { id: 25,
+    ride_id: 'RIDE-6AC6B37F41E86',
+    passenger_id: 3,
+    driver_id: 2,
+    pickup_address: '[REDACTED]',
+    dropoff_address: '[REDACTED]',
+    pickup_latitude: '24.84940000',
+    pickup_longitude: '66.99520000',
+    dropoff_latitude: '24.81400000',
+    dropoff_longitude: '67.02870000',
+    status: 'completed',
+    vehicle_type: 'van',
+    passenger_count: 1,
+    special_instructions: null,
+    base_fare: '0.00',
+    distance_fare: '0.00',
+    time_fare: '0.00',
+    total_fare: '375.01',
+    driver_earnings: '281.26',
+    platform_commission: '93.75',
+    distance_km: null,
+    duration_minutes: null,
+    payment_method: 'cash',
+    payment_status: 'pending',
+    stops: [],
+    current_stop_index: 0,
+    active_stops_count: 0,
+    completed_stops_count: 0,
+    estimated_arrival: null,
+    passenger: 
+     { id: 3,
+       name: 'Test Passenger',
+       email: '[REDACTED]',
+       phone: '[REDACTED]',
+       status: 'active',
+       gender: null,
+      <…>
+2026-10-08 02:10:37.182 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Passenger rides fetched successfully:', { data: [], current_page: 1, last_page: 1, per_page: 10, total: 0 }
+2026-10-08 02:10:37.182 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] '✅ Ride history refreshed successfully:', []
+2026-10-08 02:10:37.581 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocoding response status:', 200
+2026-10-08 02:10:37.592 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocoding response:', { plus_code: 
+   { compound_code: 'G9C5+5F Lahore, Pakistan',
+     global_code: '8J3PG9C5+5F' },
+  results: 
+   [ { address_components: '[REDACTED]',
+       formatted_address: '[REDACTED]',
+       geometry: 
+        { location: { lat: 31.5203969, lng: 74.358739 },
+          location_type: 'ROOFTOP',
+          viewport: 
+           { northeast: { lat: 31.5217525802915, lng: 74.3601123802915 },
+             southwest: { lat: 31.5190546197085, lng: 74.35741441970849 } } },
+       place_id: 'ChIJoZr0NwAFGTkRs_a8UKjZQYM',
+       types: [ 'establishment', 'point_of_interest' ] },
+     { address_components: '[REDACTED]',
+       formatted_address: '[REDACTED]',
+       geometry: 
+        { location: { lat: 31.5203696, lng: 74.35874729999999 },
+          location_type: 'ROOFTOP',
+          viewport: 
+           { northeast: { lat: 31.52172568029149, lng: 74.36012248029151 },
+             southwest: { lat: 31.5190277197085, lng: 74.3574245197085 } } },
+       place_id: 'ChIJh8X_Jw<…>
+2026-10-08 02:10:37.593 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'Reverse geocoding success:', 'G9C5+5F5, Block N Gulberg III, Lahore, Pakistan'
+2026-10-08 02:10:37.955 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'SafeMapView: Rendering MapView - isMounted:', true, 'hasError:', false, 'isMapReady:', false
+2026-10-08 02:10:38.112 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'SafeMapView: Map ready - isMounted:', true, 'hasError:', false
+2026-10-08 02:10:38.114 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView onMapReady called
+2026-10-08 02:10:38.115 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'SafeMapView: Rendering MapView - isMounted:', true, 'hasError:', false, 'isMapReady:', true
+2026-10-08 02:10:38.118 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'SafeMapView: Rendering MapView - isMounted:', true, 'hasError:', false, 'isMapReady:', true
+2026-10-08 02:10:38.699 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView: Map loaded
+2026-10-08 02:10:38.700 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView onMapLoaded called
+2026-10-08 02:10:48.100 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView: Map loaded
+2026-10-08 02:10:48.100 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView onMapLoaded called
+2026-10-08 02:11:00.490 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] 'SafeMapView: Rendering MapView - isMounted:', true, 'hasError:', false, 'isMapReady:', true
+2026-10-08 02:11:48.530 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView: Map loaded
+2026-10-08 02:11:48.531 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] SafeMapView onMapLoaded called
+2026-10-08 02:12:02.501 I  RaaHeHaq[14841:1fd54b] [com.facebook.react.log:javascript] PassengerMapScreen unfocused - cleaning up
+Child process terminated with signal 15: Terminated

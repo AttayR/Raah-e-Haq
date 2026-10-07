@@ -131,8 +131,14 @@ function isDev(): boolean {
 
 function emit(level: 'log' | 'info' | 'warn' | 'error', args: unknown[]): void {
   // The logger is the only module that should call console directly.
-  const strict = level === 'error';
-  console[level](...args.map(arg => redact(arg, strict)));
+  if (level === 'error') {
+    // Must stay a static `console.error(...)` call: release builds run
+    // babel-plugin-transform-remove-console with `exclude: ['error']`, which strips any
+    // computed `console[level](...)` call, so a dynamic call here would silence errors.
+    console.error(...args.map(arg => redact(arg, true)));
+    return;
+  }
+  console[level](...args.map(arg => redact(arg, false)));
 }
 
 export const logger: {

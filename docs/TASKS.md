@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|---|
 | T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | done | logo rename + useErrorHandler import done early (iOS build fix commit); NotificationScreen + gate bundle check remain; 2026-10-08. Bundle check in gate (bundleOk); NotificationScreen imports fixed (delete denied by permissions, owner may delete; INF-34) |
 | T-002 | 0 | Make Jest work (setup, native mocks, App smoke test) | | no | agent | done | 2026-10-07 (904b918). Also fixed no-undef in scripts/api-health.js (added after baseline). Follow-up: stub WebSocket in jest.setup (do in T-005) |
-| T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | in-progress | |
+| T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | done | 2026-10-08. worklets plugin last; remove-console in production keeps error; logger.error calls console.error statically; App.test cold-cache timeout 30s |
 | T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | Podfile NODE_BINARY removed early (iOS build fix commit) |
 | T-005 | 0 | Env config: single source for API/WS URLs and keys | T-002 | yes | agent | done | 2026-10-08 (6963f4b). QA on local backend (prod down). Debug→.env.development, Release→.env.production |
 | T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | done | 2026-10-08. src/core/logging/logger.ts (strict set on error path); 790 console calls migrated; ESLint no-console in src/ |
@@ -65,10 +65,10 @@
 | T-608 | 6 | UI kit feedback + overlays: BottomSheet, Dialog, Toast, Banner/offline, Skeleton, EmptyState, ErrorState | T-602, T-008 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-609 | 6 | UI kit ride components: map style, pins, route line, address pair, vehicle card, fare breakdown, driver/passenger card, status timeline, rating, stat tile, promo card, slide-to-confirm | T-602, T-608 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-610 | 6 | Navigation shell: 4-tab IA per role, headers, tab bar, remove duplicate mounts | T-602, T-309 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director. IA change in DESIGN_SYSTEM §8 |
-| T-603 | 6 | Auth screens: login, phone code, forgot-password sheet | T-602, T-608, T-204, T-101 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director; QA 2026-10-08: Login bottom navy band clips "Create New Account" on first view |
+| T-603 | 6 | Auth screens: login, phone code, forgot-password sheet | T-602, T-608, T-204, T-101 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director; QA 2026-10-08: Login bottom navy band clips "Create New Account" on first view; QA T-003: keyboard covers Login email/password (no keyboard avoidance) — medium |
 | T-611 | 6 | Auth: registration wizard (role choice, steps, review) | T-602, T-608, T-202, T-203 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-612 | 6 | Splash, account status (pending/rejected/suspended), permission prompts | T-602, T-608, T-103, T-106, T-308 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
-| T-604 | 6 | Passenger home + destination search | T-609, T-610, T-506, T-303 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director; QA 2026-10-08: Settings status bar low contrast; Home address overflows without ellipsis |
+| T-604 | 6 | Passenger home + destination search | T-609, T-610, T-506, T-303 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director; QA 2026-10-08: Settings status bar low contrast; Home address overflows without ellipsis; QA T-003: keyboard covers Map destination search; map buttons under status bar/Dynamic Island |
 | T-613 | 6 | Passenger choose ride (vehicle + fare) + finding driver | T-604, T-306, T-310, T-305 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-614 | 6 | Passenger driver assigned/arrived, on trip, trip complete + rating | T-613, T-307, T-505 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-605 | 6 | Driver Drive home (offline/online) + incoming request | T-609, T-610, T-401, T-403, T-404, T-507 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
@@ -78,7 +78,7 @@
 | T-617 | 6 | Activity: ride history, ride details/receipt, wallet | T-608, T-609, T-610, T-501, T-508 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-618 | 6 | Account: settings, profile view/edit, saved places (both roles) | T-608, T-610, T-504, T-509, T-511 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-619 | 6 | Help & support, invite friends, delete account | T-618, T-511 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
-| T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | Fallback UI follows ErrorState (DESIGN_SYSTEM §5.20) once T-608 lands |
+| T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | Fallback UI follows ErrorState (DESIGN_SYSTEM §5.20) once T-608 lands; T-003 security: gate should assert release bundle has no console.log; strict mode could mask phone/email/CNIC-shaped substrings in strings and drop stack in release |
 | T-701 | 7 | Delete dead code + unused dependencies | T-605, T-615, T-616 | yes | agent | todo | |
 | T-702 | 7 | TypeScript + ESLint to zero; gate requires zero | T-701 | no | agent | todo | |
 | T-703 | 7 | Maestro E2E flows for QA scenarios | T-405 | no | agent | todo | |
