@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { UserProfile, AuthSession } from '../../services/firebaseAuth';
+import { logger } from '../../core/logging/logger';
 
 export type AuthState = {
   uid: string | null;
@@ -36,16 +37,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setIdle: (state) => {
-      console.log('authSlice - setIdle called');
+      logger.debug('authSlice - setIdle called');
       state.status = 'idle';
     },
     setAuthLoading: (state) => {
-      console.log('authSlice - setAuthLoading called');
+      logger.debug('authSlice - setAuthLoading called');
       state.status = 'loading';
       state.error = null;
     },
     setVerifying: (state) => {
-      console.log('authSlice - setVerifying called');
+      logger.debug('authSlice - setVerifying called');
       state.status = 'verifying';
       state.error = null;
     },
@@ -57,7 +58,6 @@ const authSlice = createSlice({
       session: AuthSession;
       profileCompleted?: boolean;
     }>) => {
-      console.log('authSlice - setAuthenticated called with:', action.payload);
       state.uid = action.payload.uid;
       state.phoneNumber = action.payload.phoneNumber;
       state.role = action.payload.role || null;
@@ -73,7 +73,7 @@ const authSlice = createSlice({
       }
     },
     setSignedOut: (state) => {
-      console.log('authSlice - setSignedOut called');
+      logger.debug('authSlice - setSignedOut called');
       state.uid = null;
       state.phoneNumber = null;
       state.role = null;
@@ -86,53 +86,47 @@ const authSlice = createSlice({
       state.error = null;
     },
     setAuthError: (state, action: PayloadAction<string>) => {
-      console.log('authSlice - setAuthError called with:', action.payload);
+      logger.debug('authSlice - setAuthError called with:', action.payload);
       state.error = action.payload;
       state.status = 'error';
     },
     setVerificationId: (state, action: PayloadAction<string>) => {
-      console.log('authSlice - setVerificationId called with:', action.payload);
       state.verificationId = action.payload;
     },
     setPhoneNumber: (state, action: PayloadAction<string>) => {
-      console.log('authSlice - setPhoneNumber called with:', action.payload);
       state.phoneNumber = action.payload;
     },
     setUserRole: (state, action: PayloadAction<'driver' | 'passenger' | 'admin'>) => {
-      console.log('authSlice - setUserRole called with:', action.payload);
+      logger.debug('authSlice - setUserRole called with:', action.payload);
       state.role = action.payload;
     },
     setProfileCompleted: (state) => {
-      console.log('authSlice - setProfileCompleted called');
-      console.log('authSlice - Before: profileCompleted =', state.profileCompleted);
+      logger.debug('authSlice - setProfileCompleted called');
+      logger.debug('authSlice - Before: profileCompleted =', state.profileCompleted);
       state.profileCompleted = true;
-      console.log('authSlice - After: profileCompleted =', state.profileCompleted);
-      console.log('authSlice - Full state after setProfileCompleted:', state);
+      logger.debug('authSlice - After: profileCompleted =', state.profileCompleted);
     },
     setUserProfile: (state, action: PayloadAction<UserProfile>) => {
-      console.log('authSlice - setUserProfile called with:', action.payload);
       state.userProfile = action.payload;
     },
     clearProfileCompleted: (state) => {
-      console.log('authSlice - clearProfileCompleted called');
+      logger.debug('authSlice - clearProfileCompleted called');
       state.profileCompleted = false;
     },
     updateUserProfile: (state, action: PayloadAction<Partial<UserProfile>>) => {
-      console.log('authSlice - updateUserProfile called with:', action.payload);
       if (state.userProfile) {
         state.userProfile = { ...state.userProfile, ...action.payload };
       }
     },
     clearError: (state) => {
-      console.log('authSlice - clearError called');
+      logger.debug('authSlice - clearError called');
       state.error = null;
     },
     setSession: (state, action: PayloadAction<AuthSession>) => {
-      console.log('authSlice - setSession called with:', action.payload);
       state.session = action.payload;
     },
     setUserStatus: (state, action: PayloadAction<{ isExistingUser: boolean; userStatus: 'new' | 'existing' | 'unknown'; userProfile?: UserProfile }>) => {
-      console.log('authSlice - setUserStatus called with:', action.payload);
+      logger.debug('authSlice - setUserStatus called with:', action.payload);
       state.isExistingUser = action.payload.isExistingUser;
       state.userStatus = action.payload.userStatus;
       if (action.payload.userProfile) {
@@ -140,7 +134,7 @@ const authSlice = createSlice({
       }
     },
     clearUserStatus: (state) => {
-      console.log('authSlice - clearUserStatus called');
+      logger.debug('authSlice - clearUserStatus called');
       state.isExistingUser = false;
       state.userStatus = 'unknown';
     }

@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } f
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import MapView, { MapViewProps, PROVIDER_GOOGLE } from 'react-native-maps';
 import { BrandColors } from '../theme/colors';
+import { logger } from '../core/logging/logger';
 
 interface SafeMapViewProps extends MapViewProps {
   fallbackComponent?: React.ReactNode;
@@ -28,7 +29,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           try {
             mapRef.current.animateToRegion(region, duration);
           } catch (error) {
-            console.log('SafeMapView: Error animating to region:', error);
+            logger.debug('SafeMapView: Error animating to region:', error);
           }
         }
       },
@@ -37,7 +38,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           try {
             mapRef.current.animateToCoordinate(coordinate, duration);
           } catch (error) {
-            console.log('SafeMapView: Error animating to coordinate:', error);
+            logger.debug('SafeMapView: Error animating to coordinate:', error);
           }
         }
       },
@@ -51,7 +52,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
               mapRef.current.fitToElements(options.animated);
             }
           } catch (error) {
-            console.log('SafeMapView: Error fitting to elements:', error);
+            logger.debug('SafeMapView: Error fitting to elements:', error);
           }
         }
       },
@@ -60,7 +61,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           try {
             mapRef.current.fitToSuppliedMarkers(markers, animated);
           } catch (error) {
-            console.log('SafeMapView: Error fitting to markers:', error);
+            logger.debug('SafeMapView: Error fitting to markers:', error);
           }
         }
       },
@@ -76,7 +77,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
             // Clear any pending operations
             mapRef.current = null;
           } catch (error) {
-            console.log('SafeMapView: Cleanup error:', error);
+            logger.debug('SafeMapView: Cleanup error:', error);
           }
         }
       };
@@ -84,7 +85,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
 
     const handleMapReady = () => {
       if (isMounted && mapRef.current) {
-        console.log('SafeMapView: Map ready - isMounted:', isMounted, 'hasError:', hasError);
+        logger.debug('SafeMapView: Map ready - isMounted:', isMounted, 'hasError:', hasError);
         setIsMapReady(true);
         setHasError(false);
         
@@ -93,7 +94,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           try {
             props.onMapReady();
           } catch (error) {
-            console.log('SafeMapView: Error in onMapReady callback:', error);
+            logger.debug('SafeMapView: Error in onMapReady callback:', error);
             setHasError(true);
           }
         }
@@ -102,7 +103,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
 
     const handleMapLoaded = () => {
       if (isMounted && mapRef.current) {
-        console.log('SafeMapView: Map loaded');
+        logger.debug('SafeMapView: Map loaded');
         setIsMapReady(true);
         
         // Call original onMapLoaded if provided
@@ -110,7 +111,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           try {
             props.onMapLoaded();
           } catch (error) {
-            console.log('SafeMapView: Error in onMapLoaded callback:', error);
+            logger.debug('SafeMapView: Error in onMapLoaded callback:', error);
             setHasError(true);
           }
         }
@@ -118,7 +119,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
     };
 
     const handleError = (error: any) => {
-      console.log('SafeMapView: Map error:', error);
+      logger.debug('SafeMapView: Map error:', error);
       setHasError(true);
       setIsMapReady(false);
     };
@@ -136,7 +137,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       );
     }
 
-    console.log('SafeMapView: Rendering MapView - isMounted:', isMounted, 'hasError:', hasError, 'isMapReady:', isMapReady);
+    logger.debug('SafeMapView: Rendering MapView - isMounted:', isMounted, 'hasError:', hasError, 'isMapReady:', isMapReady);
     
     return (
       <MapView

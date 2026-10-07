@@ -21,6 +21,7 @@ import VehicleInfoStep from './steps/VehicleInfoStep';
 import DocumentsStep from './steps/DocumentsStep';
 import ReviewStep from './steps/ReviewStep';
 import { showToast } from '../../components/ToastProvider';
+import { logger } from '../../core/logging/logger';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -195,20 +196,10 @@ export default function RegistrationScreen() {
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
-      console.log('🚀 Starting account creation process...');
-      console.log('📝 Form data:', {
-        fullName: formData.fullName,
-        email: formData.email,
-        role: formData.role,
-        phone: formData.phoneNumber,
-        cnic: formData.cnic,
-        address: formData.address,
-        vehicleType: formData.vehicleType,
-        vehicleNumber: formData.vehicleNumber
-      });
+      logger.debug('🚀 Starting account creation process...');
 
       // Test network connectivity first
-      console.log('🌐 Testing network connectivity...');
+      logger.debug('🌐 Testing network connectivity...');
       const { apiService } = await import('../../services/api');
       const isConnected = await apiService.testNetworkConnectivity();
       if (!isConnected) {
@@ -332,32 +323,27 @@ export default function RegistrationScreen() {
         }),
       };
       
-      console.log('📤 Sending registration request to API...');
-      console.log('📋 Registration payload:', registrationData);
+      logger.debug('📤 Sending registration request to API...');
       
       // Use the new registration method with images
       const result = await registerWithImages(registrationData);
       
-      console.log('📨 API Response received:', result);
-      console.log('🔍 Result type:', result.type);
-      console.log('📊 Result payload:', result.payload);
+      logger.debug('🔍 Result type:', result.type);
       
       // Log detailed error information if registration failed
       if (result.type.endsWith('/rejected')) {
-        console.log('❌ Registration failed with details:', {
+        logger.debug('❌ Registration failed with details:', {
           payload: result.payload,
           error: 'error' in result ? result.error : 'Unknown error',
-          meta: result.meta
         });
       }
       
       if (result.type.endsWith('/fulfilled')) {
-        console.log('✅ Account created successfully!');
-        console.log('👤 User data:', result.payload);
+        logger.debug('✅ Account created successfully!');
         showToast('success', 'Your account has been created successfully! Please wait for admin approval.');
         navigation.navigate('Login');
       } else {
-        console.log('❌ Registration failed');
+        logger.debug('❌ Registration failed');
         const payload = result.payload as any;
         const isValidationError = payload && typeof payload === 'object' && payload.errors;
         if (isValidationError) {
@@ -378,8 +364,8 @@ export default function RegistrationScreen() {
       }
       
     } catch (registrationError: any) {
-      console.error('💥 Registration error caught:', registrationError);
-      console.error('🔍 Error details:', {
+      logger.error('💥 Registration error caught:', registrationError);
+      logger.error('🔍 Error details:', {
         message: registrationError.message,
         stack: registrationError.stack,
         response: registrationError.response?.data

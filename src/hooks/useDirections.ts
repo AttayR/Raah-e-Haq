@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { MAPS_CONFIG } from '../config/mapsConfig';
+import { logger } from '../core/logging/logger';
 
 export interface Coordinates {
   latitude: number;
@@ -39,13 +40,13 @@ export const useDirections = () => {
 
   const fetchRoute = useCallback(async (pickup: Coordinates, destination: Coordinates) => {
     try {
-      console.log('🗺️ Fetching route:', { pickup, destination });
+      logger.debug('🗺️ Fetching route:', { pickup, destination });
       
       // Validate coordinates
       if (!pickup || !destination || 
           !pickup.latitude || !pickup.longitude || 
           !destination.latitude || !destination.longitude) {
-        console.warn('⚠️ Invalid coordinates provided:', { pickup, destination });
+        logger.warn('⚠️ Invalid coordinates provided:', { pickup, destination });
         setRouteCoordinates([]);
         return;
       }
@@ -53,39 +54,38 @@ export const useDirections = () => {
       // Check if coordinates are reasonable (not 0,0 or extreme values)
       if (pickup.latitude === 0 && pickup.longitude === 0 || 
           destination.latitude === 0 && destination.longitude === 0) {
-        console.warn('⚠️ Coordinates are 0,0 - likely invalid:', { pickup, destination });
+        logger.warn('⚠️ Coordinates are 0,0 - likely invalid:', { pickup, destination });
         setRouteCoordinates([]);
         return;
       }
       
       const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
-      console.log('🌐 Directions API URL:', url);
       
       const res = await fetch(url);
       const json = await res.json();
       
-      console.log('📊 Directions API Response:', json);
+      logger.debug('📊 Directions API Response:', json);
       
       if (json.status !== 'OK') {
-        console.warn('⚠️ Directions API status:', json.status, json.error_message);
+        logger.warn('⚠️ Directions API status:', json.status, json.error_message);
         
         // Handle specific error cases
         if (json.status === 'ZERO_RESULTS') {
-          console.warn('🚫 No route found between coordinates:', { pickup, destination });
+          logger.warn('🚫 No route found between coordinates:', { pickup, destination });
           // Create a simple straight line route as fallback
           const fallbackRoute = [
             { latitude: pickup.latitude, longitude: pickup.longitude },
             { latitude: destination.latitude, longitude: destination.longitude }
           ];
-          console.log('🔄 Using fallback straight line route');
+          logger.debug('🔄 Using fallback straight line route');
           setRouteCoordinates(fallbackRoute);
           return;
         } else if (json.status === 'INVALID_REQUEST') {
-          console.warn('❌ Invalid request to Directions API');
+          logger.warn('❌ Invalid request to Directions API');
         } else if (json.status === 'OVER_QUERY_LIMIT') {
-          console.warn('⏰ Directions API quota exceeded');
+          logger.warn('⏰ Directions API quota exceeded');
         } else if (json.status === 'REQUEST_DENIED') {
-          console.warn('🔒 Directions API request denied - check API key');
+          logger.warn('🔒 Directions API request denied - check API key');
         }
         
         setRouteCoordinates([]);
@@ -94,14 +94,14 @@ export const useDirections = () => {
       
       if (json.routes && json.routes[0] && json.routes[0].overview_polyline) {
         const points = decodePolyline(json.routes[0].overview_polyline.points);
-        console.log('✅ Route decoded successfully:', points.length, 'points');
+        logger.debug('✅ Route decoded successfully:', points.length, 'points');
         setRouteCoordinates(points);
       } else {
-        console.warn('⚠️ No route data in response');
+        logger.warn('⚠️ No route data in response');
         setRouteCoordinates([]);
       }
     } catch (error) {
-      console.error('❌ Error fetching route:', error);
+      logger.error('❌ Error fetching route:', error);
       setRouteCoordinates([]);
     }
   }, []);
@@ -118,7 +118,7 @@ export const useDirections = () => {
       const res = await fetch(url);
       const json = await res.json();
       if (json.status !== 'OK') {
-        console.warn('Directions API status:', json.status, json.error_message);
+        logger.warn('Directions API status:', json.status, json.error_message);
       }
       if (json.routes && json.routes[0] && json.routes[0].overview_polyline) {
         const points = decodePolyline(json.routes[0].overview_polyline.points);

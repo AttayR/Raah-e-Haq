@@ -14,6 +14,7 @@ import {
   serverTimestamp 
 } from '@react-native-firebase/firestore';
 import apiService, { createCancellableRequest, removeRequest } from './api';
+import { logger } from '../core/logging/logger';
 
 export interface RideLocation {
   latitude: number;
@@ -213,7 +214,7 @@ class RideService {
     const cancelSource = createCancellableRequest();
     
     try {
-      console.log('🚗 Creating ride request:', rideData);
+      logger.debug('🚗 Creating ride request:', rideData);
       
       // Validate required fields
       if (!rideData.passenger_id) {
@@ -229,7 +230,7 @@ class RideService {
       const response = await apiService.post(`${this.baseUrl}`, rideData, {
         cancelToken: cancelSource.token
       });
-      console.log('✅ Ride created successfully:', response.data);
+      logger.debug('✅ Ride created successfully:', response.data);
       
       // Remove from tracking when successful
       removeRequest(cancelSource);
@@ -248,11 +249,11 @@ class RideService {
       
       // Handle cancelled requests
       if (error.name === 'CanceledError' || error.message?.includes('canceled')) {
-        console.log('🚫 Ride creation cancelled');
+        logger.debug('🚫 Ride creation cancelled');
         throw new Error('Request was cancelled');
       }
       
-      console.error('❌ Failed to create ride:', error);
+      logger.error('❌ Failed to create ride:', error);
       
       // Provide more specific error messages
       if (error.response) {
@@ -281,7 +282,7 @@ class RideService {
             validationMessage = `Validation error: ${responseData}`;
           } else {
             // Log the full response for debugging
-            console.log('Full validation error response:', JSON.stringify(responseData, null, 2));
+            logger.debug('Full validation error response:', responseData);
             validationMessage = `Validation error: ${JSON.stringify(responseData)}`;
           }
           
@@ -309,19 +310,19 @@ class RideService {
     driver_id?: number;
   }): Promise<PaginatedRides> {
     try {
-      console.log('📋 Fetching rides:', params);
+      logger.debug('📋 Fetching rides:', params);
       const response = await apiService.get(`${this.baseUrl}`, { params });
-      console.log('✅ Rides fetched successfully:', response.data);
+      logger.debug('✅ Rides fetched successfully:', response.data);
       
       // Handle case where response.data might be undefined
       if (!response || !response.data) {
-        console.warn('⚠️ API returned empty response');
+        logger.warn('⚠️ API returned empty response');
         return { data: [], current_page: 1, last_page: 1, per_page: 10, total: 0 };
       }
       
       return response.data.data || { data: [], current_page: 1, last_page: 1, per_page: 10, total: 0 };
     } catch (error) {
-      console.error('❌ Failed to fetch rides:', error);
+      logger.error('❌ Failed to fetch rides:', error);
       throw error;
     }
   }
@@ -329,12 +330,12 @@ class RideService {
   // Get a specific ride by ID
   async getRide(rideId: number): Promise<RideResource> {
     try {
-      console.log('🔍 Fetching ride:', rideId);
+      logger.debug('🔍 Fetching ride:', rideId);
       const response = await apiService.get(`${this.baseUrl}/${rideId}`);
-      console.log('✅ Ride fetched successfully:', response.data);
+      logger.debug('✅ Ride fetched successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to fetch ride:', error);
+      logger.error('❌ Failed to fetch ride:', error);
       throw error;
     }
   }
@@ -342,12 +343,12 @@ class RideService {
   // Update ride status and details
   async updateRide(rideId: number, updateData: RideUpdate): Promise<RideResource> {
     try {
-      console.log('🔄 Updating ride:', rideId, updateData);
+      logger.debug('🔄 Updating ride:', rideId, updateData);
       const response = await apiService.put(`${this.baseUrl}/${rideId}`, updateData);
-      console.log('✅ Ride updated successfully:', response.data);
+      logger.debug('✅ Ride updated successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to update ride:', error);
+      logger.error('❌ Failed to update ride:', error);
       throw error;
     }
   }
@@ -355,11 +356,11 @@ class RideService {
   // Delete a ride
   async deleteRide(rideId: number): Promise<void> {
     try {
-      console.log('🗑️ Deleting ride:', rideId);
+      logger.debug('🗑️ Deleting ride:', rideId);
       const response = await apiService.delete(`${this.baseUrl}/${rideId}`);
-      console.log('✅ Ride deleted successfully:', response.data);
+      logger.debug('✅ Ride deleted successfully:', response.data);
     } catch (error) {
-      console.error('❌ Failed to delete ride:', error);
+      logger.error('❌ Failed to delete ride:', error);
       throw error;
     }
   }
@@ -367,14 +368,14 @@ class RideService {
   // Assign driver to a ride
   async assignDriver(rideId: number, driverId: number): Promise<RideResource> {
     try {
-      console.log('👨‍💼 Assigning driver:', rideId, driverId);
+      logger.debug('👨‍💼 Assigning driver:', rideId, driverId);
       const response = await apiService.post(`${this.baseUrl}/${rideId}/assign-driver`, {
         driver_id: driverId
       });
-      console.log('✅ Driver assigned successfully:', response.data);
+      logger.debug('✅ Driver assigned successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to assign driver:', error);
+      logger.error('❌ Failed to assign driver:', error);
       throw error;
     }
   }
@@ -382,12 +383,12 @@ class RideService {
   // Cancel a ride
   async cancelRide(rideId: number): Promise<RideResource> {
     try {
-      console.log('❌ Cancelling ride:', rideId);
+      logger.debug('❌ Cancelling ride:', rideId);
       const response = await apiService.post(`${this.baseUrl}/${rideId}/cancel`);
-      console.log('✅ Ride cancelled successfully:', response.data);
+      logger.debug('✅ Ride cancelled successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to cancel ride:', error);
+      logger.error('❌ Failed to cancel ride:', error);
       throw error;
     }
   }
@@ -395,15 +396,15 @@ class RideService {
   // Driver accepts a ride
   async acceptRide(rideId: number, driverId: number): Promise<RideResource> {
     try {
-      console.log('✅ Driver accepting ride:', rideId, driverId);
+      logger.debug('✅ Driver accepting ride:', rideId, driverId);
       const response = await this.updateRide(rideId, {
         status: 'accepted',
         driver_id: driverId
       });
-      console.log('✅ Ride accepted successfully:', response);
+      logger.debug('✅ Ride accepted successfully:', response);
       return response;
     } catch (error) {
-      console.error('❌ Failed to accept ride:', error);
+      logger.error('❌ Failed to accept ride:', error);
       throw error;
     }
   }
@@ -411,14 +412,14 @@ class RideService {
   // Start a ride
   async startRide(rideId: number): Promise<RideResource> {
     try {
-      console.log('🚀 Starting ride:', rideId);
+      logger.debug('🚀 Starting ride:', rideId);
       const response = await this.updateRide(rideId, {
         status: 'ongoing'
       });
-      console.log('✅ Ride started successfully:', response);
+      logger.debug('✅ Ride started successfully:', response);
       return response;
     } catch (error) {
-      console.error('❌ Failed to start ride:', error);
+      logger.error('❌ Failed to start ride:', error);
       throw error;
     }
   }
@@ -426,17 +427,17 @@ class RideService {
   // Complete a ride
   async completeRide(rideId: number, fare?: number, distanceKm?: number, durationMin?: number): Promise<RideResource> {
     try {
-      console.log('🏁 Completing ride:', rideId, { fare, distanceKm, durationMin });
+      logger.debug('🏁 Completing ride:', rideId, { fare, distanceKm, durationMin });
       const response = await this.updateRide(rideId, {
         status: 'completed',
         fare,
         distance_km: distanceKm,
         duration_min: durationMin
       });
-      console.log('✅ Ride completed successfully:', response);
+      logger.debug('✅ Ride completed successfully:', response);
       return response;
     } catch (error) {
-      console.error('❌ Failed to complete ride:', error);
+      logger.error('❌ Failed to complete ride:', error);
       throw error;
     }
   }
@@ -444,11 +445,11 @@ class RideService {
   // Update driver location
   async updateDriverLocation(locationData: DriverLocation): Promise<void> {
     try {
-      console.log('📍 Updating driver location:', locationData);
+      logger.debug('📍 Updating driver location:', locationData);
       const response = await apiService.post('/tracking/update-location', locationData);
-      console.log('✅ Driver location updated successfully:', response.data);
+      logger.debug('✅ Driver location updated successfully:', response.data);
     } catch (error) {
-      console.error('❌ Failed to update driver location:', error);
+      logger.error('❌ Failed to update driver location:', error);
       throw error;
     }
   }
@@ -456,12 +457,12 @@ class RideService {
   // Get latest driver location
   async getDriverLocation(driverId: number): Promise<DriverLocation> {
     try {
-      console.log('📍 Fetching driver location:', driverId);
+      logger.debug('📍 Fetching driver location:', driverId);
       const response = await apiService.get(`/tracking/driver/${driverId}/latest`);
-      console.log('✅ Driver location fetched successfully:', response.data);
+      logger.debug('✅ Driver location fetched successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to fetch driver location:', error);
+      logger.error('❌ Failed to fetch driver location:', error);
       throw error;
     }
   }
@@ -473,7 +474,7 @@ class RideService {
     radiusKm: number = 5
   ): Promise<DriverInRadius[]> {
     try {
-      console.log('🔍 Finding drivers in radius:', { latitude, longitude, radiusKm });
+      logger.debug('🔍 Finding drivers in radius:', { latitude, longitude, radiusKm });
       const response = await apiService.get('/tracking/drivers-in-radius', {
         params: {
           latitude,
@@ -481,10 +482,10 @@ class RideService {
           radius_km: radiusKm
         }
       });
-      console.log('✅ Drivers found successfully:', response.data);
+      logger.debug('✅ Drivers found successfully:', response.data);
       return response.data.data || [];
     } catch (error) {
-      console.error('❌ Failed to find drivers in radius:', error);
+      logger.error('❌ Failed to find drivers in radius:', error);
       throw error;
     }
   }
@@ -492,12 +493,12 @@ class RideService {
   // Get ride path/tracking
   async getRidePath(rideId: number): Promise<any> {
     try {
-      console.log('🗺️ Fetching ride path:', rideId);
+      logger.debug('🗺️ Fetching ride path:', rideId);
       const response = await apiService.get(`/tracking/ride/${rideId}/path`);
-      console.log('✅ Ride path fetched successfully:', response.data);
+      logger.debug('✅ Ride path fetched successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to fetch ride path:', error);
+      logger.error('❌ Failed to fetch ride path:', error);
       throw error;
     }
   }
@@ -505,23 +506,23 @@ class RideService {
   // Get passenger rides
   async getPassengerRides(passengerId: number, status?: string): Promise<RideResource[]> {
     try {
-      console.log('👤 Fetching passenger rides:', passengerId, status);
+      logger.debug('👤 Fetching passenger rides:', passengerId, status);
       const response = await this.getRides({
         passenger_id: passengerId,
         status
       });
-      console.log('✅ Passenger rides fetched successfully:', response);
+      logger.debug('✅ Passenger rides fetched successfully:', response);
       
       // Handle case where response might be undefined or null
       if (!response) {
-        console.warn('⚠️ getRides returned undefined');
+        logger.warn('⚠️ getRides returned undefined');
         return [];
       }
       
       // Handle both array and object responses
       return Array.isArray(response) ? response : response.data || [];
     } catch (error) {
-      console.error('❌ Failed to fetch passenger rides:', error);
+      logger.error('❌ Failed to fetch passenger rides:', error);
       throw error;
     }
   }
@@ -529,23 +530,23 @@ class RideService {
   // Get driver rides
   async getDriverRides(driverId: number, status?: string): Promise<RideResource[]> {
     try {
-      console.log('👨‍💼 Fetching driver rides:', driverId, status);
+      logger.debug('👨‍💼 Fetching driver rides:', driverId, status);
       const response = await this.getRides({
         driver_id: driverId,
         status
       });
-      console.log('✅ Driver rides fetched successfully:', response);
+      logger.debug('✅ Driver rides fetched successfully:', response);
       
       // Handle case where response might be undefined or null
       if (!response) {
-        console.warn('⚠️ getRides returned undefined');
+        logger.warn('⚠️ getRides returned undefined');
         return [];
       }
       
       // Handle both array and object responses
       return Array.isArray(response) ? response : response.data || [];
     } catch (error) {
-      console.error('❌ Failed to fetch driver rides:', error);
+      logger.error('❌ Failed to fetch driver rides:', error);
       throw error;
     }
   }
@@ -553,12 +554,12 @@ class RideService {
   // Get active rides for driver
   async getActiveDriverRides(driverId: number): Promise<RideResource[]> {
     try {
-      console.log('🚗 Fetching active driver rides:', driverId);
+      logger.debug('🚗 Fetching active driver rides:', driverId);
       const response = await this.getDriverRides(driverId, 'accepted,ongoing');
-      console.log('✅ Active driver rides fetched successfully:', response);
+      logger.debug('✅ Active driver rides fetched successfully:', response);
       return response;
       } catch (error) {
-      console.error('❌ Failed to fetch active driver rides:', error);
+      logger.error('❌ Failed to fetch active driver rides:', error);
       throw error;
     }
   }
@@ -566,20 +567,20 @@ class RideService {
   // Get pending rides for driver
   async getPendingRides(): Promise<RideResource[]> {
     try {
-      console.log('⏳ Fetching pending rides');
+      logger.debug('⏳ Fetching pending rides');
       const response = await this.getRides({ status: 'requested' });
-      console.log('✅ Pending rides fetched successfully:', response);
+      logger.debug('✅ Pending rides fetched successfully:', response);
       
       // Handle case where response might be undefined or null
       if (!response) {
-        console.warn('⚠️ getRides returned undefined');
+        logger.warn('⚠️ getRides returned undefined');
         return [];
       }
       
       // Handle both array and object responses
       return Array.isArray(response) ? response : response.data || [];
     } catch (error) {
-      console.error('❌ Failed to fetch pending rides:', error);
+      logger.error('❌ Failed to fetch pending rides:', error);
       throw error;
     }
   }
@@ -593,7 +594,7 @@ class RideService {
     vehicleType?: string
   ): Promise<{ fare: number; distance: number; duration: number }> {
     try {
-      console.log('💰 Calculating fare:', { pickupLat, pickupLng, dropoffLat, dropoffLng, vehicleType });
+      logger.debug('💰 Calculating fare:', { pickupLat, pickupLng, dropoffLat, dropoffLng, vehicleType });
       
       // For now, return a mock calculation
       // In real implementation, this would call a fare calculation API
@@ -604,10 +605,10 @@ class RideService {
   const duration = Math.round(distance * 2); // Rough estimate: 2 minutes per km
   
       const result = { fare, distance, duration };
-      console.log('✅ Fare calculated successfully:', result);
+      logger.debug('✅ Fare calculated successfully:', result);
       return result;
   } catch (error) {
-      console.error('❌ Failed to calculate fare:', error);
+      logger.error('❌ Failed to calculate fare:', error);
       throw error;
     }
   }
@@ -635,12 +636,12 @@ class RideService {
   // Add stop to ride
   async addStop(rideId: number, stopData: RideStopRequest): Promise<RideResource> {
     try {
-      console.log('📍 Adding stop to ride:', rideId, stopData);
+      logger.debug('📍 Adding stop to ride:', rideId, stopData);
       const response = await apiService.post(`${this.baseUrl}/${rideId}/stops`, stopData);
-      console.log('✅ Stop added successfully:', response.data);
+      logger.debug('✅ Stop added successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to add stop:', error);
+      logger.error('❌ Failed to add stop:', error);
       throw error;
     }
   }
@@ -648,12 +649,12 @@ class RideService {
   // Remove stop from ride
   async removeStop(rideId: number, stopId: number): Promise<RideResource> {
     try {
-      console.log('🗑️ Removing stop from ride:', rideId, stopId);
+      logger.debug('🗑️ Removing stop from ride:', rideId, stopId);
       const response = await apiService.delete(`${this.baseUrl}/${rideId}/stops/${stopId}`);
-      console.log('✅ Stop removed successfully:', response.data);
+      logger.debug('✅ Stop removed successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to remove stop:', error);
+      logger.error('❌ Failed to remove stop:', error);
       throw error;
     }
   }
@@ -661,12 +662,12 @@ class RideService {
   // Update stop order
   async updateStopOrder(rideId: number, stopOrders: Array<{stop_id: number, new_order: number}>): Promise<RideResource> {
     try {
-      console.log('🔄 Updating stop order:', rideId, stopOrders);
+      logger.debug('🔄 Updating stop order:', rideId, stopOrders);
       const response = await apiService.put(`${this.baseUrl}/${rideId}/stops/reorder`, { stop_orders: stopOrders });
-      console.log('✅ Stop order updated successfully:', response.data);
+      logger.debug('✅ Stop order updated successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to update stop order:', error);
+      logger.error('❌ Failed to update stop order:', error);
       throw error;
     }
   }
@@ -676,12 +677,12 @@ class RideService {
   // Navigate to next stop
   async navigateToNextStop(rideId: number): Promise<any> {
     try {
-      console.log('🧭 Navigating to next stop:', rideId);
+      logger.debug('🧭 Navigating to next stop:', rideId);
       const response = await apiService.post(`${this.baseUrl}/${rideId}/navigate-next-stop`);
-      console.log('✅ Navigation started successfully:', response.data);
+      logger.debug('✅ Navigation started successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to start navigation:', error);
+      logger.error('❌ Failed to start navigation:', error);
       throw error;
     }
   }
@@ -689,12 +690,12 @@ class RideService {
   // Mark stop as completed
   async markStopCompleted(rideId: number, stopId: number): Promise<any> {
     try {
-      console.log('✅ Marking stop as completed:', rideId, stopId);
+      logger.debug('✅ Marking stop as completed:', rideId, stopId);
       const response = await apiService.post(`${this.baseUrl}/${rideId}/stops/${stopId}/complete`);
-      console.log('✅ Stop marked as completed:', response.data);
+      logger.debug('✅ Stop marked as completed:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to mark stop as completed:', error);
+      logger.error('❌ Failed to mark stop as completed:', error);
       throw error;
     }
   }
@@ -702,12 +703,12 @@ class RideService {
   // Get navigation instructions
   async getNavigationInstructions(rideId: number): Promise<any> {
     try {
-      console.log('🧭 Getting navigation instructions:', rideId);
+      logger.debug('🧭 Getting navigation instructions:', rideId);
       const response = await apiService.get(`${this.baseUrl}/${rideId}/navigation-instructions`);
-      console.log('✅ Navigation instructions fetched:', response.data);
+      logger.debug('✅ Navigation instructions fetched:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to get navigation instructions:', error);
+      logger.error('❌ Failed to get navigation instructions:', error);
       throw error;
     }
   }
@@ -717,12 +718,12 @@ class RideService {
   // Update driver location
   async updateDriverLocation(locationData: LocationUpdate): Promise<any> {
     try {
-      console.log('📍 Updating driver location:', locationData);
+      logger.debug('📍 Updating driver location:', locationData);
       const response = await apiService.post(`${this.trackingUrl}/update-location`, locationData);
-      console.log('✅ Driver location updated successfully:', response.data);
+      logger.debug('✅ Driver location updated successfully:', response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to update driver location:', error);
+      logger.error('❌ Failed to update driver location:', error);
       throw error;
     }
   }
@@ -730,12 +731,12 @@ class RideService {
   // Get driver location
   async getDriverLocationById(driverId: number): Promise<DriverLocation> {
     try {
-      console.log('📍 Fetching driver location:', driverId);
+      logger.debug('📍 Fetching driver location:', driverId);
       const response = await apiService.get(`${this.trackingUrl}/driver/${driverId}/location`);
-      console.log('✅ Driver location fetched successfully:', response.data);
+      logger.debug('✅ Driver location fetched successfully:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to fetch driver location:', error);
+      logger.error('❌ Failed to fetch driver location:', error);
       throw error;
     }
   }
@@ -745,14 +746,14 @@ class RideService {
   // Get user notifications
   async getNotifications(page: number = 1, perPage: number = 20): Promise<{data: NotificationResource[], pagination: any}> {
     try {
-      console.log('🔔 Fetching notifications:', { page, perPage });
+      logger.debug('🔔 Fetching notifications:', { page, perPage });
       const response = await apiService.get(`${this.notificationsUrl}`, {
         params: { page, per_page: perPage }
       });
-      console.log('✅ Notifications fetched successfully:', response.data);
+      logger.debug('✅ Notifications fetched successfully:', response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to fetch notifications:', error);
+      logger.error('❌ Failed to fetch notifications:', error);
       throw error;
     }
   }
@@ -760,12 +761,12 @@ class RideService {
   // Mark notification as read
   async markNotificationAsRead(notificationId: number): Promise<any> {
     try {
-      console.log('✅ Marking notification as read:', notificationId);
+      logger.debug('✅ Marking notification as read:', notificationId);
       const response = await apiService.post(`${this.notificationsUrl}/${notificationId}/read`);
-      console.log('✅ Notification marked as read:', response.data);
+      logger.debug('✅ Notification marked as read:', response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to mark notification as read:', error);
+      logger.error('❌ Failed to mark notification as read:', error);
       throw error;
     }
   }
@@ -773,12 +774,12 @@ class RideService {
   // Mark all notifications as read
   async markAllNotificationsAsRead(): Promise<any> {
     try {
-      console.log('✅ Marking all notifications as read');
+      logger.debug('✅ Marking all notifications as read');
       const response = await apiService.post(`${this.notificationsUrl}/read-all`);
-      console.log('✅ All notifications marked as read:', response.data);
+      logger.debug('✅ All notifications marked as read:', response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to mark all notifications as read:', error);
+      logger.error('❌ Failed to mark all notifications as read:', error);
       throw error;
     }
   }
@@ -786,12 +787,12 @@ class RideService {
   // Get unread count
   async getUnreadCount(): Promise<number> {
     try {
-      console.log('🔢 Getting unread count');
+      logger.debug('🔢 Getting unread count');
       const response = await apiService.get(`${this.notificationsUrl}/unread-count`);
-      console.log('✅ Unread count fetched:', response.data);
+      logger.debug('✅ Unread count fetched:', response.data);
       return response.data.data.unread_count;
     } catch (error) {
-      console.error('❌ Failed to get unread count:', error);
+      logger.error('❌ Failed to get unread count:', error);
       throw error;
     }
   }
@@ -801,15 +802,15 @@ class RideService {
   // Subscribe to ride updates
   async subscribeToRideUpdates(rideId: number, userType: 'passenger' | 'driver'): Promise<WebSocketSubscription> {
     try {
-      console.log('🔌 Subscribing to ride updates:', { rideId, userType });
+      logger.debug('🔌 Subscribing to ride updates:', { rideId, userType });
       const response = await apiService.post(`${this.websocketUrl}/subscribe-ride`, {
         ride_id: rideId,
         user_type: userType
       });
-      console.log('✅ Subscribed to ride updates:', response.data);
+      logger.debug('✅ Subscribed to ride updates:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to subscribe to ride updates:', error);
+      logger.error('❌ Failed to subscribe to ride updates:', error);
       throw error;
     }
   }
@@ -817,17 +818,17 @@ class RideService {
   // Subscribe to driver requests
   async subscribeToDriverRequests(driverId: number, latitude: number, longitude: number, radius: number = 10): Promise<WebSocketSubscription> {
     try {
-      console.log('🔌 Subscribing to driver requests:', { driverId, latitude, longitude, radius });
+      logger.debug('🔌 Subscribing to driver requests:', { driverId, latitude, longitude, radius });
       const response = await apiService.post(`${this.websocketUrl}/subscribe-driver`, {
         driver_id: driverId,
         latitude,
         longitude,
         radius
       });
-      console.log('✅ Subscribed to driver requests:', response.data);
+      logger.debug('✅ Subscribed to driver requests:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to subscribe to driver requests:', error);
+      logger.error('❌ Failed to subscribe to driver requests:', error);
       throw error;
     }
   }
@@ -835,12 +836,12 @@ class RideService {
   // Get WebSocket events documentation
   async getWebSocketEvents(): Promise<any> {
     try {
-      console.log('📋 Getting WebSocket events documentation');
+      logger.debug('📋 Getting WebSocket events documentation');
       const response = await apiService.get(`${this.websocketUrl}/events`);
-      console.log('✅ WebSocket events fetched:', response.data);
+      logger.debug('✅ WebSocket events fetched:', response.data);
       return response.data.data;
     } catch (error) {
-      console.error('❌ Failed to get WebSocket events:', error);
+      logger.error('❌ Failed to get WebSocket events:', error);
       throw error;
     }
   }

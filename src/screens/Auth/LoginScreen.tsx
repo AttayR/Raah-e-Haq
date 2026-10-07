@@ -19,6 +19,7 @@ import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { showToast } from '../../components/ToastProvider';
+import { logger } from '../../core/logging/logger';
 
 type LoginMethod = 'phone' | 'email';
 
@@ -58,7 +59,7 @@ export default function LoginScreen() {
       clearValidationErrors();
       navigation.navigate('PhoneAuth');
     } catch (err) {
-      console.error('Navigation error:', err);
+      logger.error('Navigation error:', err);
       showToast('error', 'Unable to navigate to phone authentication');
     }
   };
@@ -68,7 +69,7 @@ export default function LoginScreen() {
       clearValidationErrors();
       navigation.navigate('Signup');
     } catch (err) {
-      console.error('Navigation error:', err);
+      logger.error('Navigation error:', err);
       showToast('error', 'Unable to navigate to signup');
     }
   };
@@ -98,27 +99,23 @@ export default function LoginScreen() {
         return;
       }
 
-      console.log('🔐 Starting login process...');
-      console.log('📧 Email:', email.trim());
+      logger.debug('🔐 Starting login process...');
       
       const result = await login({ email: email.trim(), password: password.trim() });
       
-      console.log('📨 Login result received:', result);
-      console.log('🔍 Result type:', result.type);
-      console.log('📊 Result payload:', result.payload);
+      logger.debug('🔍 Result type:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
-        console.log('✅ Login successful!');
-        console.log('👤 User data:', result.payload);
+        logger.debug('✅ Login successful!');
         showToast('success', 'Login successful!');
         // Navigation will be handled by the auth state change
       } else {
-        console.log('❌ Login failed');
-        console.log('🚨 Error details:', result.payload);
+        logger.debug('❌ Login failed');
+        logger.debug('🚨 Error details:', result.payload);
         showToast('error', (result.payload as string) || 'Login failed. Please try again.');
       }
     } catch (err: any) {
-      console.error('Email sign in error:', err);
+      logger.error('Email sign in error:', err);
       showToast('error', 'An unexpected error occurred. Please try again.');
     }
   };
@@ -146,7 +143,7 @@ export default function LoginScreen() {
         showToast('error', (result.payload as string) || 'Failed to send password reset email. Please try again.');
       }
     } catch (err: any) {
-      console.error('Password reset error:', err);
+      logger.error('Password reset error:', err);
       showToast('error', 'Failed to send password reset email. Please try again.');
     }
   };
@@ -156,7 +153,7 @@ export default function LoginScreen() {
       clearValidationErrors();
       setLoginMethod(method);
     } catch (err) {
-      console.error('Login method change error:', err);
+      logger.error('Login method change error:', err);
     }
   };
 
@@ -165,7 +162,7 @@ export default function LoginScreen() {
       clearValidationErrors();
       showToast('info', 'Google Sign-In is not available with API authentication. Please use email or phone authentication.');
     } catch (err: any) {
-      console.error('Google sign-in error:', err);
+      logger.error('Google sign-in error:', err);
       showToast('error', 'Google Sign-In is not available. Please use email or phone authentication.');
     }
   };

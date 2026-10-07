@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { showToast } from '../components/ToastProvider';
+import { logger } from '../core/logging/logger';
 
 export interface AppError {
   code: string;
@@ -31,7 +32,7 @@ export const useErrorHandler = () => {
     }
 
     // Log error for debugging
-    console.error(`[${context || 'APP_ERROR'}]`, error);
+    logger.error(`[${context || 'APP_ERROR'}]`, error);
 
     // Add to errors list
     setErrors(prev => [...prev.slice(-9), errorObj]); // Keep only last 10 errors

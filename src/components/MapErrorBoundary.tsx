@@ -2,6 +2,7 @@ import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BrandColors } from '../theme/colors';
+import { logger } from '../core/logging/logger';
 
 interface Props {
   children: ReactNode;
@@ -34,7 +35,7 @@ export class MapErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
-    console.error('MapErrorBoundary caught an error:', error, errorInfo);
+    logger.error('MapErrorBoundary caught an error:', error, errorInfo);
     
     this.setState({
       error,

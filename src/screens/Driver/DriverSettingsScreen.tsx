@@ -16,6 +16,7 @@ import { RootState } from '../../store';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { showToast } from '../../components/ToastProvider';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { logger } from '../../core/logging/logger';
 
 const DriverSettingsScreen = () => {
   const { theme } = useAppTheme();
@@ -24,19 +25,13 @@ const DriverSettingsScreen = () => {
   );
   const { logout } = useApiAuth();
 
-  // Debug logging
-  console.log('DriverSettingsScreen - User data:', user);
-  console.log('DriverSettingsScreen - User name:', user?.name);
-  console.log('DriverSettingsScreen - User email:', user?.email);
-  console.log('DriverSettingsScreen - User phone:', user?.phone);
-
   const handleLogout = async () => {
     try {
-      console.log('DriverSettingsScreen - Logging out...');
+      logger.debug('DriverSettingsScreen - Logging out...');
       await logout();
       showToast('success', 'Logged out successfully');
     } catch (error) {
-      console.error('DriverSettingsScreen - Logout error:', error);
+      logger.error('DriverSettingsScreen - Logout error:', error);
       showToast('error', 'Failed to logout');
     }
   };
@@ -103,7 +98,7 @@ const DriverSettingsScreen = () => {
               <View style={styles.settingsContainer}>
                 <TouchableOpacity
                   style={styles.settingItem}
-                  onPress={() => console.log('Edit Profile')}
+                  onPress={() => logger.debug('Edit Profile')}
                 >
                   <View style={styles.settingIcon}>
                     <Icon name="person" size={24} color={BrandColors.primary} />
@@ -117,7 +112,7 @@ const DriverSettingsScreen = () => {
 
                 <TouchableOpacity
                   style={styles.settingItem}
-                  onPress={() => console.log('Notifications')}
+                  onPress={() => logger.debug('Notifications')}
                 >
                   <View style={styles.settingIcon}>
                     <Icon name="notifications" size={24} color={BrandColors.primary} />
@@ -131,7 +126,7 @@ const DriverSettingsScreen = () => {
 
                 <TouchableOpacity
                   style={styles.settingItem}
-                  onPress={() => console.log('Privacy')}
+                  onPress={() => logger.debug('Privacy')}
                 >
                   <View style={styles.settingIcon}>
                     <Icon name="privacy-tip" size={24} color={BrandColors.primary} />
@@ -145,7 +140,7 @@ const DriverSettingsScreen = () => {
 
                 <TouchableOpacity
                   style={styles.settingItem}
-                  onPress={() => console.log('Help')}
+                  onPress={() => logger.debug('Help')}
                 >
                   <View style={styles.settingIcon}>
                     <Icon name="help" size={24} color={BrandColors.primary} />

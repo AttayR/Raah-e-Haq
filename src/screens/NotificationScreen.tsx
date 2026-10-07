@@ -16,6 +16,7 @@ import { useRide } from '../hooks/useRide';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { NotificationResource } from '../services/rideService';
+import { logger } from '../core/logging/logger';
 
 interface NotificationScreenProps {
   userId: number;
@@ -294,7 +295,7 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ userId }) => {
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
-        console.error('NotificationScreen Error:', error, errorInfo);
+        logger.error('NotificationScreen Error:', error, errorInfo);
         handleError(error, 'NOTIFICATION_SCREEN_ERROR');
       }}
     >

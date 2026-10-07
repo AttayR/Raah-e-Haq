@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useApiAuth } from '../../hooks/useApiAuth';
+import { logger } from '../../core/logging/logger';
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -9,15 +10,15 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const { initialize } = useApiAuth();
 
   useEffect(() => {
-    console.log('AuthProvider - Initializing API authentication...');
+    logger.debug('AuthProvider - Initializing API authentication...');
     
     // Initialize auth state
     initialize();
     
-    console.log('AuthProvider - API authentication initialized');
+    logger.debug('AuthProvider - API authentication initialized');
   }, [initialize]);
 
-  console.log('AuthProvider - Rendering children');
+  logger.debug('AuthProvider - Rendering children');
   // Always render children - let AuthFlow handle the routing logic
   return <>{children}</>;
 }

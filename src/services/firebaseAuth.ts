@@ -2,6 +2,7 @@ import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../core/logging/logger';
 
 // Types
 export interface VehicleInfo {
@@ -66,7 +67,7 @@ export const sendPhoneVerification = async (phoneNumber: string): Promise<{ veri
       userProfile: existingUser || undefined
     };
   } catch (error: any) {
-    console.error('Error sending verification code:', error);
+    logger.error('Error sending verification code:', error);
     throw new Error(error.message || 'Failed to send verification code');
   }
 };
@@ -81,7 +82,7 @@ export const verifyPhoneCode = async (
     const result = await auth().signInWithCredential(credential);
     return result;
   } catch (error: any) {
-    console.error('Error verifying code:', error);
+    logger.error('Error verifying code:', error);
     throw new Error(error.message || 'Invalid verification code');
   }
 };
@@ -96,7 +97,7 @@ export const createUserProfile = async (
   passwordPlain?: string
 ): Promise<UserProfile> => {
   try {
-    console.log('createUserProfile - Input values:', { uid, phoneNumber, role, displayName, email });
+    logger.debug('createUserProfile - Input values:', { uid, role });
     
     const userProfile: UserProfile = {
       uid,
@@ -124,12 +125,11 @@ export const createUserProfile = async (
       (userProfile as any).password = passwordPlain;
     }
 
-    console.log('createUserProfile - Final userProfile:', userProfile);
 
     await firestore().collection('users').doc(uid).set(userProfile);
     return userProfile;
   } catch (error: any) {
-    console.error('Error creating user profile:', error);
+    logger.error('Error creating user profile:', error);
     throw new Error(error.message || 'Failed to create user profile');
   }
 };
@@ -142,7 +142,7 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting user profile:', error);
+    logger.error('Error getting user profile:', error);
     throw new Error(error.message || 'Failed to get user profile');
   }
 };
@@ -160,7 +160,7 @@ export const getUserByPhone = async (phoneNumber: string): Promise<UserProfile |
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting user by phone:', error);
+    logger.error('Error getting user by phone:', error);
     throw new Error(error.message || 'Failed to get user by phone');
   }
 };
@@ -177,7 +177,7 @@ export const getUserByEmail = async (email: string): Promise<UserProfile | null>
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting user by email:', error);
+    logger.error('Error getting user by email:', error);
     throw new Error(error.message || 'Failed to get user by email');
   }
 };
@@ -194,7 +194,7 @@ export const getUserByCnic = async (cnic: string): Promise<UserProfile | null> =
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting user by CNIC:', error);
+    logger.error('Error getting user by CNIC:', error);
     throw new Error(error.message || 'Failed to get user by CNIC');
   }
 };
@@ -209,7 +209,7 @@ export const updateUserProfile = async (
       updatedAt: firestore.FieldValue.serverTimestamp()
     });
   } catch (error: any) {
-    console.error('Error updating user profile:', error);
+    logger.error('Error updating user profile:', error);
     throw new Error(error.message || 'Failed to update user profile');
   }
 };
@@ -229,7 +229,7 @@ export const createAuthSession = async (user: FirebaseAuthTypes.User, profile: U
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return session;
   } catch (error: any) {
-    console.error('Error creating auth session:', error);
+    logger.error('Error creating auth session:', error);
     throw new Error(error.message || 'Failed to create auth session');
   }
 };
@@ -250,7 +250,7 @@ export const getAuthSession = async (): Promise<AuthSession | null> => {
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting auth session:', error);
+    logger.error('Error getting auth session:', error);
     return null;
   }
 };
@@ -259,7 +259,7 @@ export const clearAuthSession = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SESSION_KEY);
   } catch (error: any) {
-    console.error('Error clearing auth session:', error);
+    logger.error('Error clearing auth session:', error);
   }
 };
 
@@ -275,7 +275,7 @@ export const refreshAuthSession = async (): Promise<AuthSession | null> => {
     }
     return null;
   } catch (error: any) {
-    console.error('Error refreshing auth session:', error);
+    logger.error('Error refreshing auth session:', error);
     return null;
   }
 };
@@ -291,7 +291,7 @@ export const signOutUser = async () => {
     await clearAuthSession();
     await auth().signOut();
   } catch (error: any) {
-    console.error('Error signing out:', error);
+    logger.error('Error signing out:', error);
     throw new Error(error.message || 'Failed to sign out');
   }
 };
@@ -335,10 +335,9 @@ export const createTestUser = async (phoneNumber: string, role: 'driver' | 'pass
     };
 
     await firestore().collection('users').doc(testUid).set(userProfile);
-    console.log('Test user created:', userProfile);
     return userProfile;
   } catch (error: any) {
-    console.error('Error creating test user:', error);
+    logger.error('Error creating test user:', error);
     throw new Error(error.message || 'Failed to create test user');
   }
 };
@@ -352,7 +351,7 @@ export const emailSignUp = async (
   phoneNumber?: string
 ): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile; session: AuthSession }> => {
   try {
-    console.log('emailSignUp - Starting email signup...', { email, role, displayName, phoneNumber });
+    logger.debug('emailSignUp - Starting email signup...', { role });
     
     // Create user with email and password
     const userCredential = await auth().createUserWithEmailAndPassword(email, password);
@@ -372,11 +371,11 @@ export const emailSignUp = async (
     // Create session
     const session = await createAuthSession(user, userProfile);
     
-    console.log('emailSignUp - Email signup successful:', { uid: user.uid, email });
+    logger.debug('emailSignUp - Email signup successful:', { uid: user.uid });
     
     return { user, userProfile, session };
   } catch (error: any) {
-    console.error('emailSignUp - Error:', error);
+    logger.error('emailSignUp - Error:', error);
     throw new Error(error.message || 'Failed to create account with email');
   }
 };
@@ -386,7 +385,7 @@ export const emailSignIn = async (
   password: string
 ): Promise<{ user: FirebaseAuthTypes.User; userProfile: UserProfile | null; session: AuthSession; isExistingUser: boolean }> => {
   try {
-    console.log('emailSignIn - Starting email signin...', { email });
+    logger.debug('emailSignIn - Starting email signin...');
     
     // Sign in with email and password
     const userCredential = await auth().signInWithEmailAndPassword(email, password);
@@ -404,11 +403,11 @@ export const emailSignIn = async (
       // Create session for existing user
       const session = await createAuthSession(user, userProfile);
       
-      console.log('emailSignIn - Email signin successful for existing user:', { uid: user.uid, email });
+      logger.debug('emailSignIn - Email signin successful for existing user:', { uid: user.uid });
       return { user, userProfile, session, isExistingUser: true };
     } else {
       // User exists in Firebase Auth but not in Firestore (incomplete profile)
-      console.log('emailSignIn - User exists in auth but not in Firestore, needs profile completion');
+      logger.debug('emailSignIn - User exists in auth but not in Firestore, needs profile completion');
       
       // Create a minimal session without role
       const session = await createAuthSession(user, {
@@ -422,18 +421,18 @@ export const emailSignIn = async (
       return { user, userProfile: null, session, isExistingUser: false };
     }
   } catch (error: any) {
-    console.error('emailSignIn - Error:', error);
+    logger.error('emailSignIn - Error:', error);
     throw new Error(error.message || 'Failed to sign in with email');
   }
 };
 
 export const resetPassword = async (email: string): Promise<void> => {
   try {
-    console.log('resetPassword - Sending password reset email...', { email });
+    logger.debug('resetPassword - Sending password reset email...');
     await auth().sendPasswordResetEmail(email);
-    console.log('resetPassword - Password reset email sent successfully');
+    logger.debug('resetPassword - Password reset email sent successfully');
   } catch (error: any) {
-    console.error('resetPassword - Error:', error);
+    logger.error('resetPassword - Error:', error);
     throw new Error(error.message || 'Failed to send password reset email');
   }
 };
@@ -445,12 +444,12 @@ export const updateEmail = async (newEmail: string): Promise<void> => {
       throw new Error('No user is currently signed in');
     }
     
-    console.log('updateEmail - Updating email...', { newEmail });
+    logger.debug('updateEmail - Updating email...');
     await user.updateEmail(newEmail);
     await user.sendEmailVerification();
-    console.log('updateEmail - Email updated successfully');
+    logger.debug('updateEmail - Email updated successfully');
   } catch (error: any) {
-    console.error('updateEmail - Error:', error);
+    logger.error('updateEmail - Error:', error);
     throw new Error(error.message || 'Failed to update email');
   }
 };
@@ -462,11 +461,11 @@ export const updatePassword = async (newPassword: string): Promise<void> => {
       throw new Error('No user is currently signed in');
     }
     
-    console.log('updatePassword - Updating password...');
+    logger.debug('updatePassword - Updating password...');
     await user.updatePassword(newPassword);
-    console.log('updatePassword - Password updated successfully');
+    logger.debug('updatePassword - Password updated successfully');
   } catch (error: any) {
-    console.error('updatePassword - Error:', error);
+    logger.error('updatePassword - Error:', error);
     throw new Error(error.message || 'Failed to update password');
   }
 };
@@ -478,7 +477,7 @@ export const uploadImage = async (
   uid: string
 ): Promise<string> => {
   try {
-    console.log('uploadImage - Starting upload...', { path, uid });
+    logger.debug('uploadImage - Starting upload...', { path, uid });
     
     const reference = storage().ref(`users/${uid}/${path}`);
     const task = reference.putFile(imageUri);
@@ -489,10 +488,10 @@ export const uploadImage = async (
     // Get download URL
     const downloadURL = await reference.getDownloadURL();
     
-    console.log('uploadImage - Upload successful:', downloadURL);
+    logger.debug('uploadImage - Upload successful:', downloadURL);
     return downloadURL;
   } catch (error: any) {
-    console.error('uploadImage - Error:', error);
+    logger.error('uploadImage - Error:', error);
     throw new Error(error.message || 'Failed to upload image');
   }
 };
@@ -503,7 +502,7 @@ export const uploadMultipleImages = async (
   uid: string
 ): Promise<string[]> => {
   try {
-    console.log('uploadMultipleImages - Starting batch upload...', { path, uid, count: imageUris.length });
+    logger.debug('uploadMultipleImages - Starting batch upload...', { path, uid, count: imageUris.length });
     
     const uploadPromises = imageUris.map((uri, index) => 
       uploadImage(uri, `${path}_${index}`, uid)
@@ -511,10 +510,10 @@ export const uploadMultipleImages = async (
     
     const downloadURLs = await Promise.all(uploadPromises);
     
-    console.log('uploadMultipleImages - Batch upload successful:', downloadURLs);
+    logger.debug('uploadMultipleImages - Batch upload successful:', downloadURLs);
     return downloadURLs;
   } catch (error: any) {
-    console.error('uploadMultipleImages - Error:', error);
+    logger.error('uploadMultipleImages - Error:', error);
     throw new Error(error.message || 'Failed to upload images');
   }
 };
@@ -538,7 +537,7 @@ export const createUserProfileWithDetails = async (
   }
 ): Promise<UserProfile> => {
   try {
-    console.log('createUserProfileWithDetails - Starting...', { uid, role, profileData });
+    logger.debug('createUserProfileWithDetails - Starting...', { uid, role });
     
     const userProfile: UserProfile = {
       uid,
@@ -603,10 +602,9 @@ export const createUserProfileWithDetails = async (
     // Save to Firestore
     await firestore().collection('users').doc(uid).set(userProfile);
     
-    console.log('createUserProfileWithDetails - Profile created successfully:', userProfile);
     return userProfile;
   } catch (error: any) {
-    console.error('createUserProfileWithDetails - Error:', error);
+    logger.error('createUserProfileWithDetails - Error:', error);
     throw new Error(error.message || 'Failed to create user profile with details');
   }
 };
@@ -643,7 +641,7 @@ export const googleSignIn = async (): Promise<{ success: boolean; user?: any; er
       };
     }
   } catch (error: any) {
-    console.error('Google Sign-In Error:', error);
+    logger.error('Google Sign-In Error:', error);
     return {
       success: false,
       error: error.message || 'Google Sign-In failed',
@@ -667,7 +665,7 @@ export const createDriverProfileWithDetails = async (
   }
 ): Promise<UserProfile> => {
   try {
-    console.log('createDriverProfileWithDetails - Starting...', { uid, phoneNumber, profileData });
+    logger.debug('createDriverProfileWithDetails - Starting...', { uid });
     
     const userProfile: UserProfile = {
       uid,
@@ -730,10 +728,10 @@ export const createDriverProfileWithDetails = async (
     // Save to Firestore
     await firestore().collection('users').doc(uid).set(userProfile);
     
-    console.log('createDriverProfileWithDetails - Driver profile created successfully');
+    logger.debug('createDriverProfileWithDetails - Driver profile created successfully');
     return userProfile;
   } catch (error: any) {
-    console.error('createDriverProfileWithDetails - Error:', error);
+    logger.error('createDriverProfileWithDetails - Error:', error);
     throw new Error(error.message || 'Failed to create driver profile');
   }
 };
@@ -747,9 +745,9 @@ export const approveDriver = async (driverUid: string, adminUid: string): Promis
       approvedBy: adminUid,
       updatedAt: firestore.FieldValue.serverTimestamp(),
     });
-    console.log('Driver approved successfully:', driverUid);
+    logger.debug('Driver approved successfully:', driverUid);
   } catch (error: any) {
-    console.error('Error approving driver:', error);
+    logger.error('Error approving driver:', error);
     throw new Error('Failed to approve driver');
   }
 };
@@ -762,9 +760,9 @@ export const rejectDriver = async (driverUid: string, adminUid: string, reason: 
       approvedBy: adminUid,
       updatedAt: firestore.FieldValue.serverTimestamp(),
     });
-    console.log('Driver rejected successfully:', driverUid);
+    logger.debug('Driver rejected successfully:', driverUid);
   } catch (error: any) {
-    console.error('Error rejecting driver:', error);
+    logger.error('Error rejecting driver:', error);
     throw new Error('Failed to reject driver');
   }
 };
@@ -777,9 +775,9 @@ export const suspendDriver = async (driverUid: string, adminUid: string, reason:
       approvedBy: adminUid,
       updatedAt: firestore.FieldValue.serverTimestamp(),
     });
-    console.log('Driver suspended successfully:', driverUid);
+    logger.debug('Driver suspended successfully:', driverUid);
   } catch (error: any) {
-    console.error('Error suspending driver:', error);
+    logger.error('Error suspending driver:', error);
     throw new Error('Failed to suspend driver');
   }
 };

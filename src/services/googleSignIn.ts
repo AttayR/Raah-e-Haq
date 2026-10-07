@@ -1,6 +1,7 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithCredential } from '@react-native-firebase/auth';
+import { logger } from '../core/logging/logger';
 
 // Configure Google Sign-In
 export const configureGoogleSignIn = () => {
@@ -33,7 +34,7 @@ export const signInWithGoogle = async () => {
       user: result.user,
     };
   } catch (error: any) {
-    console.error('Google Sign-In Error:', error);
+    logger.error('Google Sign-In Error:', error);
     
     if (error.code === statusCodes.SIGN_IN_CANCELLED) {
       return {
@@ -65,7 +66,7 @@ export const signOutFromGoogle = async () => {
     await GoogleSignin.signOut();
     return { success: true };
   } catch (error: any) {
-    console.error('Google Sign-Out Error:', error);
+    logger.error('Google Sign-Out Error:', error);
     return {
       success: false,
       error: error.message || 'Failed to sign out from Google',
@@ -79,7 +80,7 @@ export const isSignedInWithGoogle = async () => {
     const userInfo = await GoogleSignin.getCurrentUser();
     return userInfo !== null;
   } catch (error) {
-    console.error('Error checking Google sign-in status:', error);
+    logger.error('Error checking Google sign-in status:', error);
     return false;
   }
 };
@@ -90,7 +91,7 @@ export const getCurrentGoogleUser = async () => {
     const userInfo = await GoogleSignin.getCurrentUser();
     return userInfo;
   } catch (error) {
-    console.error('Error getting current Google user:', error);
+    logger.error('Error getting current Google user:', error);
     return null;
   }
 };

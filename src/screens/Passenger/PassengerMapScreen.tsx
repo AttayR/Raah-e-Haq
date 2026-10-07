@@ -27,6 +27,7 @@ import { reverseGeocode } from '../../services/placesService';
 import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
 import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
+import { logger } from '../../core/logging/logger';
 
 const PassengerMapScreen = () => {
   const navigation = useNavigation();
@@ -98,7 +99,7 @@ const PassengerMapScreen = () => {
           // Safely clear the map reference
           mapRef.current = null;
         } catch (error) {
-          console.log('MapView cleanup error:', error);
+          logger.debug('MapView cleanup error:', error);
         }
       }
       
@@ -106,7 +107,7 @@ const PassengerMapScreen = () => {
       try {
         cancelAllRequests();
       } catch (error) {
-        console.log('Error cancelling requests:', error);
+        logger.debug('Error cancelling requests:', error);
       }
     };
   }, []);
@@ -119,9 +120,9 @@ const PassengerMapScreen = () => {
         if (mapRef.current) {
           try {
             // Don't call any MapView methods when app is backgrounded
-            console.log('App backgrounded, pausing MapView operations');
+            logger.debug('App backgrounded, pausing MapView operations');
           } catch (error) {
-            console.log('Error handling app state change:', error);
+            logger.debug('Error handling app state change:', error);
           }
         }
       }
@@ -135,15 +136,15 @@ const PassengerMapScreen = () => {
   useFocusEffect(
     useCallback(() => {
       // Screen is focused
-      console.log('PassengerMapScreen focused');
+      logger.debug('PassengerMapScreen focused');
       
       return () => {
         // Screen is unfocused - cleanup
-        console.log('PassengerMapScreen unfocused - cleaning up');
+        logger.debug('PassengerMapScreen unfocused - cleaning up');
         try {
           cancelAllRequests();
         } catch (error) {
-          console.log('Error cancelling requests on unfocus:', error);
+          logger.debug('Error cancelling requests on unfocus:', error);
         }
       };
     }, [])
@@ -157,7 +158,7 @@ const PassengerMapScreen = () => {
           // Pause MapView when app goes to background
           mapRef.current.setNativeProps({ onPause: true });
         } catch (error) {
-          console.log('MapView pause error:', error);
+          logger.debug('MapView pause error:', error);
         }
       }
     };
@@ -187,12 +188,12 @@ const PassengerMapScreen = () => {
     const calculateFare = async () => {
       if (pickup && destination) {
         try {
-          console.log('💰 Calculating fare in PassengerMapScreen:', { pickup, destination });
+          logger.debug('💰 Calculating fare in PassengerMapScreen:', { pickup, destination });
           const result = await getFare(pickup, destination);
-          console.log('✅ Fare calculated in PassengerMapScreen:', result);
+          logger.debug('✅ Fare calculated in PassengerMapScreen:', result);
           setFareInfo(result);
         } catch (error) {
-          console.error('❌ Error calculating fare in PassengerMapScreen:', error);
+          logger.error('❌ Error calculating fare in PassengerMapScreen:', error);
           // Set fallback fare info
           setFareInfo({
             fare: 150,
@@ -250,7 +251,7 @@ const PassengerMapScreen = () => {
           longitudeDelta: 0.01,
         });
       } catch (error) {
-        console.log('Error centering on user:', error);
+        logger.debug('Error centering on user:', error);
       }
     } else if (!currentLocation) {
       requestLocationPermission();
@@ -268,7 +269,7 @@ const PassengerMapScreen = () => {
           longitudeDelta: 0.01,
         });
       } catch (error) {
-        console.log('Error animating to current location:', error);
+        logger.debug('Error animating to current location:', error);
       }
     }
   }, [currentLocation, isMapReady]);
@@ -309,8 +310,8 @@ const PassengerMapScreen = () => {
 
       const mappedVehicleType = vehicleTypeMapping[rideData.vehicle_type] || rideData.vehicle_type;
       
-      console.log('Original vehicle type:', rideData.vehicle_type);
-      console.log('Mapped vehicle type:', mappedVehicleType);
+      logger.debug('Original vehicle type:', rideData.vehicle_type);
+      logger.debug('Mapped vehicle type:', mappedVehicleType);
 
       const processedRideData = {
         ...rideData,
@@ -321,7 +322,7 @@ const PassengerMapScreen = () => {
         })
       };
 
-      console.log('Requesting ride with processed data:', processedRideData);
+      logger.debug('Requesting ride with processed data:', processedRideData);
       
       const fullRideData = {
         passenger_id: 11, // TODO: Get actual passenger ID from auth
@@ -382,7 +383,7 @@ const PassengerMapScreen = () => {
                 Alert.alert('Ride Cancelled', 'Your ride has been cancelled.');
                 resetSelection();
               } catch (error) {
-                console.error('Error cancelling ride:', error);
+                logger.error('Error cancelling ride:', error);
                 Alert.alert('Error', 'Failed to cancel ride.');
               }
             } else {
@@ -469,7 +470,7 @@ const PassengerMapScreen = () => {
       setStage('requesting');
       Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare || 0}\n${fareInfo.distance || 0} km • ${fareInfo.duration || 0} min`);
     } catch (err) {
-      console.error('Ride request error:', err);
+      logger.error('Ride request error:', err);
       setError('Failed to request ride. Please try again.');
       setStage('fare'); // Go back to fare stage on error
     } finally {
@@ -488,7 +489,7 @@ const PassengerMapScreen = () => {
           animated: true,
         });
       } catch (error) {
-        console.log('Error fitting map to route:', error);
+        logger.debug('Error fitting map to route:', error);
       }
     }
   }, [routeCoordinates]);
@@ -532,7 +533,7 @@ const PassengerMapScreen = () => {
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
-        console.error('PassengerMapScreen Error:', error, errorInfo);
+        logger.error('PassengerMapScreen Error:', error, errorInfo);
         handleError(error, 'PASSENGER_MAP_ERROR');
       }}
     >
@@ -565,7 +566,7 @@ const PassengerMapScreen = () => {
                showsUserLocation={MAPS_CONFIG.CONTROLS.showUserLocation && canShowUserLocation}
                showsMyLocationButton={Platform.OS === 'ios' ? (MAPS_CONFIG.CONTROLS.showMyLocationButton && canShowUserLocation) : false}
                onMapReady={() => {
-                 console.log('SafeMapView onMapReady called');
+                 logger.debug('SafeMapView onMapReady called');
                  setIsMapReady(true);
                  // Delay the region animation to ensure map is fully ready
                  setTimeout(() => {
@@ -578,13 +579,13 @@ const PassengerMapScreen = () => {
                          longitudeDelta: 0.01,
                        }, 1000);
                      } catch (error) {
-                       console.log('Error in onMapReady animation:', error);
+                       logger.debug('Error in onMapReady animation:', error);
                      }
                    }
                  }, 500);
                }}
                onMapLoaded={() => {
-                 console.log('SafeMapView onMapLoaded called');
+                 logger.debug('SafeMapView onMapLoaded called');
                  setIsMapReady(true);
                }}
                fallbackComponent={

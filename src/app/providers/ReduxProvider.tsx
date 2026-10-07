@@ -8,8 +8,6 @@ import AuthProvider from './AuthProvider';
 import ToastProvider from '../../components/ToastProvider';
 
 export default function ReduxProvider({ children }: React.PropsWithChildren) {
-  console.log('ReduxProvider - Rendering with store:', store);
-  
   return (
     <Provider store={store}>
       <PersistGate loading={<Loading />} persistor={persistor}>

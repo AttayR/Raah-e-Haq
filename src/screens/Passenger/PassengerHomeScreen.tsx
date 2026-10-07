@@ -23,6 +23,7 @@ import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { SUPPORT_EMAIL } from '../../config/support';
+import { logger } from '../../core/logging/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -49,8 +50,6 @@ export default function PassengerHomeScreen() {
   // Use passenger notifications
   const {
     isInitialized: notificationsInitialized,
-    fcmToken,
-    hasPermission: hasNotificationPermission,
     subscribeToPassengerNotifications,
     unsubscribeFromPassengerNotifications,
   } = usePassengerNotifications(user?.id?.toString());
@@ -89,61 +88,42 @@ export default function PassengerHomeScreen() {
     }
   }, [notificationsInitialized, user?.id, subscribeToPassengerNotifications, unsubscribeFromPassengerNotifications]);
 
-  // Log FCM token for passenger
-  useEffect(() => {
-    if (fcmToken) {
-      console.log('👤 PassengerHomeScreen - FCM Token:', fcmToken);
-      console.log('👤 PassengerHomeScreen - Passenger ID:', user?.id);
-      console.log('👤 PassengerHomeScreen - Token Status:', {
-        token: fcmToken,
-        passengerId: user?.id,
-        isInitialized: notificationsInitialized,
-        hasPermission: hasNotificationPermission,
-      });
-    }
-  }, [fcmToken, user?.id, notificationsInitialized, hasNotificationPermission]);
-
   // Update address when location changes
   useEffect(() => {
     const updateAddress = async () => {
-      console.log('Location update effect:', { currentLocation, permissionStatus });
+      logger.debug('Location update effect:', { currentLocation, permissionStatus });
       
       if (currentLocation && permissionStatus.isGranted) {
-        console.log('Got location, reverse geocoding:', currentLocation);
+        logger.debug('Got location, reverse geocoding:', currentLocation);
         try {
           const address = await reverseGeocode(currentLocation.latitude, currentLocation.longitude);
-          console.log('Reverse geocode result:', address);
+          logger.debug('Reverse geocode result:', address);
           if (address && typeof address === 'string' && address.trim().length > 0) {
             setCurrentAddress(address.trim());
             return;
           } else {
-            console.log('Reverse geocoding failed, showing coordinates');
+            logger.debug('Reverse geocoding failed, showing coordinates');
             setCurrentAddress(`${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`);
             return;
           }
         } catch (error) {
-          console.warn('Reverse geocoding error:', error);
+          logger.warn('Reverse geocoding error:', error);
           setCurrentAddress(`${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`);
         }
       } else if (!permissionStatus.isGranted) {
-        console.log('Location permission not granted');
+        logger.debug('Location permission not granted');
         setCurrentAddress('Location permission required');
       } else if (!permissionStatus.isLocationEnabled) {
-        console.log('Location services disabled');
+        logger.debug('Location services disabled');
         setCurrentAddress('Location services disabled');
       } else if (!currentLocation) {
-        console.log('No current location available');
+        logger.debug('No current location available');
         setCurrentAddress('Getting location...');
       }
     };
 
     updateAddress();
   }, [currentLocation, permissionStatus]);
-
-  // Debug logging
-  console.log('PassengerHomeScreen - User data:', user);
-  console.log('PassengerHomeScreen - User name:', user?.name);
-  console.log('PassengerHomeScreen - User status:', user?.status);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -618,7 +598,7 @@ export default function PassengerHomeScreen() {
             >
               <TouchableOpacity
                 style={styles.accountItem}
-                onPress={() => console.log('Edit Profile')}
+                onPress={() => logger.debug('Edit Profile')}
               >
                 <Icon name="edit" size={24} color={theme.colors.primary} />
                 <Text
@@ -642,7 +622,7 @@ export default function PassengerHomeScreen() {
 
               <TouchableOpacity
                 style={styles.accountItem}
-                onPress={() => console.log('Settings')}
+                onPress={() => logger.debug('Settings')}
               >
                 <Icon name="settings" size={24} color={theme.colors.primary} />
                 <Text

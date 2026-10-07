@@ -4,6 +4,7 @@ import { auth, db } from '../services/firebase';
 import { collection, addDoc, getDocs } from '@react-native-firebase/firestore';
 import { signInAnonymously } from '@react-native-firebase/auth';
 import { createTestUser } from '../services/firebaseAuth';
+import { logger } from '../core/logging/logger';
 
 const FirebaseTest: React.FC = () => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -17,7 +18,7 @@ const FirebaseTest: React.FC = () => {
     try {
       // Test Authentication
       const userCredential = await signInAnonymously(auth);
-      console.log('Firebase Auth Test: Success', userCredential.user.uid);
+      logger.debug('Firebase Auth Test: Success', userCredential.user.uid);
 
       // Test Firestore
       const testCollection = collection(db, 'test');
@@ -26,11 +27,11 @@ const FirebaseTest: React.FC = () => {
         timestamp: new Date(),
         userId: userCredential.user.uid
       });
-      console.log('Firestore Write Test: Success', docRef.id);
+      logger.debug('Firestore Write Test: Success', docRef.id);
 
       // Test Firestore Read
       const querySnapshot = await getDocs(testCollection);
-      console.log('Firestore Read Test: Success', querySnapshot.size, 'documents');
+      logger.debug('Firestore Read Test: Success', querySnapshot.size, 'documents');
 
       setIsConnected(true);
       setTestResult('✅ All Firebase services are working correctly!');
@@ -42,7 +43,7 @@ const FirebaseTest: React.FC = () => {
       );
 
     } catch (error) {
-      console.error('Firebase Test Error:', error);
+      logger.error('Firebase Test Error:', error);
       setIsConnected(false);
       setTestResult(`❌ Firebase test failed: ${error.message}`);
       
@@ -57,7 +58,7 @@ const FirebaseTest: React.FC = () => {
   const createTestUserForDemo = async () => {
     try {
       const testPhoneNumber = '+923486716994'; // Replace with your test number
-      const testUser = await createTestUser(testPhoneNumber, 'passenger');
+      await createTestUser(testPhoneNumber, 'passenger');
       
       Alert.alert(
         'Test User Created',
@@ -65,9 +66,8 @@ const FirebaseTest: React.FC = () => {
         [{ text: 'OK' }]
       );
       
-      console.log('Test user created for demo:', testUser);
     } catch (error) {
-      console.error('Error creating test user:', error);
+      logger.error('Error creating test user:', error);
       Alert.alert(
         'Error',
         `Failed to create test user: ${error.message}`,

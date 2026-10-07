@@ -18,6 +18,7 @@ import { useRide } from '../../hooks/useRide';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { RideResource, RideStopResource } from '../../services/rideService';
+import { logger } from '../../core/logging/logger';
 
 const { width, height } = Dimensions.get('window');
 
@@ -143,7 +144,7 @@ const DriverRideScreen: React.FC<DriverRideScreenProps> = ({ ride, onRideUpdate 
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
-        console.error('DriverRideScreen Error:', error, errorInfo);
+        logger.error('DriverRideScreen Error:', error, errorInfo);
         handleError(error, 'DRIVER_RIDE_ERROR');
       }}
     >

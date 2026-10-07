@@ -1,3 +1,5 @@
+import { logger } from '../core/logging/logger';
+
 // Payment service for handling ride payments
 // This is a mock implementation - in production, you would integrate with actual payment gateways
 
@@ -95,7 +97,7 @@ export const getPaymentMethods = async (userId: string): Promise<PaymentMethod[]
     // In a real implementation, you would fetch from your backend
     return mockPaymentMethods.filter(method => method.isActive);
   } catch (error) {
-    console.error('Error getting payment methods:', error);
+    logger.error('Error getting payment methods:', error);
     throw new Error('Failed to get payment methods');
   }
 };
@@ -113,7 +115,7 @@ export const addPaymentMethod = async (userId: string, method: Omit<PaymentMetho
     
     return newMethod;
   } catch (error) {
-    console.error('Error adding payment method:', error);
+    logger.error('Error adding payment method:', error);
     throw new Error('Failed to add payment method');
   }
 };
@@ -128,7 +130,7 @@ export const updatePaymentMethod = async (methodId: string, updates: Partial<Pay
     
     mockPaymentMethods[index] = { ...mockPaymentMethods[index], ...updates };
   } catch (error) {
-    console.error('Error updating payment method:', error);
+    logger.error('Error updating payment method:', error);
     throw new Error('Failed to update payment method');
   }
 };
@@ -143,7 +145,7 @@ export const deletePaymentMethod = async (methodId: string): Promise<void> => {
     
     mockPaymentMethods.splice(index, 1);
   } catch (error) {
-    console.error('Error deleting payment method:', error);
+    logger.error('Error deleting payment method:', error);
     throw new Error('Failed to delete payment method');
   }
 };
@@ -188,7 +190,7 @@ export const processPayment = async (
     
     return payment;
   } catch (error) {
-    console.error('Error processing payment:', error);
+    logger.error('Error processing payment:', error);
     throw new Error('Failed to process payment');
   }
 };
@@ -199,7 +201,7 @@ export const getWalletBalance = async (userId: string): Promise<Wallet> => {
     // In a real implementation, you would fetch from your backend
     return mockWallet;
   } catch (error) {
-    console.error('Error getting wallet balance:', error);
+    logger.error('Error getting wallet balance:', error);
     throw new Error('Failed to get wallet balance');
   }
 };
@@ -220,7 +222,7 @@ export const addToWallet = async (userId: string, amount: number, method: string
     
     return transaction;
   } catch (error) {
-    console.error('Error adding to wallet:', error);
+    logger.error('Error adding to wallet:', error);
     throw new Error('Failed to add money to wallet');
   }
 };
@@ -246,7 +248,7 @@ export const deductFromWallet = async (amount: number, rideId: string): Promise<
     
     return transaction;
   } catch (error) {
-    console.error('Error deducting from wallet:', error);
+    logger.error('Error deducting from wallet:', error);
     throw new Error('Failed to deduct from wallet');
   }
 };
@@ -281,7 +283,7 @@ export const getPaymentHistory = async (userId: string, limit: number = 50): Pro
     
     return mockPayments.slice(0, limit);
   } catch (error) {
-    console.error('Error getting payment history:', error);
+    logger.error('Error getting payment history:', error);
     throw new Error('Failed to get payment history');
   }
 };
@@ -304,7 +306,7 @@ export const refundPayment = async (paymentId: string, reason: string): Promise<
     
     return refundedPayment;
   } catch (error) {
-    console.error('Error refunding payment:', error);
+    logger.error('Error refunding payment:', error);
     throw new Error('Failed to refund payment');
   }
 };

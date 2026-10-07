@@ -4,6 +4,7 @@ import DriverStack from './stacks/DriverStack';
 import PassengerStack from './stacks/PassengerStack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import { logger } from '../../core/logging/logger';
 
 export type RootStackParamList = {
   Driver: undefined;
@@ -16,11 +17,10 @@ export default function RootNavigator() {
   const { user } = useSelector((s: RootState) => s.apiAuth);
   const role = user?.role;
 
-  console.log('RootNavigation - Current user:', user);
-  console.log('RootNavigation - Current role:', role);
-  console.log('RootNavigation - Role type:', typeof role);
-  console.log('RootNavigation - Role === "passenger":', role === 'passenger');
-  console.log('RootNavigation - Role === "driver":', role === 'driver');
+  logger.debug('RootNavigation - Current role:', role);
+  logger.debug('RootNavigation - Role type:', typeof role);
+  logger.debug('RootNavigation - Role === "passenger":', role === 'passenger');
+  logger.debug('RootNavigation - Role === "driver":', role === 'driver');
 
   // Use key prop to force re-rendering when role changes
   return (

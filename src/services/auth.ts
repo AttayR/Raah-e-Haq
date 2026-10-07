@@ -20,6 +20,7 @@ import {
   serverTimestamp 
 } from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../core/logging/logger';
 
 // Types
 export interface PhoneAuthData {
@@ -61,7 +62,6 @@ export const sendPhoneVerification = async (phoneNumber: string): Promise<string
     // For React Native, we need to use a different approach
     // The verification will be handled by the native Firebase SDK
     // We'll simulate the verification process for now
-    console.log('Sending verification code to:', phoneNumber);
     
     // In a real implementation, this would trigger the native Firebase phone auth
     // For now, we'll return a mock verification ID
@@ -69,7 +69,7 @@ export const sendPhoneVerification = async (phoneNumber: string): Promise<string
     
     return mockVerificationId;
   } catch (error: any) {
-    console.error('Error sending verification code:', error);
+    logger.error('Error sending verification code:', error);
     throw new Error(error.message || 'Failed to send verification code');
   }
 };
@@ -116,7 +116,7 @@ export const verifyPhoneCode = async (
       throw new Error('Invalid verification code');
     }
   } catch (error: any) {
-    console.error('Error verifying code:', error);
+    logger.error('Error verifying code:', error);
     throw new Error(error.message || 'Invalid verification code');
   }
 };
@@ -145,7 +145,7 @@ export const createUserProfile = async (
     await setDoc(doc(db, 'users', uid), userProfile);
     return userProfile;
   } catch (error: any) {
-    console.error('Error creating user profile:', error);
+    logger.error('Error creating user profile:', error);
     throw new Error(error.message || 'Failed to create user profile');
   }
 };
@@ -158,7 +158,7 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting user profile:', error);
+    logger.error('Error getting user profile:', error);
     throw new Error(error.message || 'Failed to get user profile');
   }
 };
@@ -175,7 +175,7 @@ export const getUserByPhone = async (phoneNumber: string): Promise<UserProfile |
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting user by phone:', error);
+    logger.error('Error getting user by phone:', error);
     throw new Error(error.message || 'Failed to get user by phone');
   }
 };
@@ -191,7 +191,7 @@ export const updateUserProfile = async (
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error: any) {
-    console.error('Error updating user profile:', error);
+    logger.error('Error updating user profile:', error);
     throw new Error(error.message || 'Failed to update user profile');
   }
 };
@@ -211,7 +211,7 @@ export const createAuthSession = async (user: User, profile: UserProfile): Promi
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return session;
   } catch (error: any) {
-    console.error('Error creating auth session:', error);
+    logger.error('Error creating auth session:', error);
     throw new Error(error.message || 'Failed to create auth session');
   }
 };
@@ -232,7 +232,7 @@ export const getAuthSession = async (): Promise<AuthSession | null> => {
     }
     return null;
   } catch (error: any) {
-    console.error('Error getting auth session:', error);
+    logger.error('Error getting auth session:', error);
     return null;
   }
 };
@@ -241,7 +241,7 @@ export const clearAuthSession = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SESSION_KEY);
   } catch (error: any) {
-    console.error('Error clearing auth session:', error);
+    logger.error('Error clearing auth session:', error);
   }
 };
 
@@ -253,7 +253,7 @@ export const refreshAuthSession = async (user: User): Promise<AuthSession | null
     }
     return null;
   } catch (error: any) {
-    console.error('Error refreshing auth session:', error);
+    logger.error('Error refreshing auth session:', error);
     return null;
   }
 };
@@ -267,7 +267,7 @@ export const signOutUser = async () => {
     await clearAuthSession();
     await signOut(auth);
   } catch (error: any) {
-    console.error('Error signing out:', error);
+    logger.error('Error signing out:', error);
     throw new Error(error.message || 'Failed to sign out');
   }
 };
@@ -314,7 +314,7 @@ export const googleSignIn = async (): Promise<{ success: boolean; user?: User; e
       };
     }
   } catch (error: any) {
-    console.error('Google Sign-In Error:', error);
+    logger.error('Google Sign-In Error:', error);
     return {
       success: false,
       error: error.message || 'Google Sign-In failed',

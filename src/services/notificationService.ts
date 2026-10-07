@@ -4,6 +4,7 @@ import { Platform, Alert, PermissionsAndroid } from 'react-native';
 import { NotificationResource } from './rideService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { env } from '../config/env';
+import { logger } from '../core/logging/logger';
 
 export interface NotificationData {
   ride_id?: number;
@@ -32,7 +33,7 @@ class NotificationService {
     };
   }> {
     try {
-      console.log('🔔 Fetching notifications:', { page, perPage });
+      logger.debug('🔔 Fetching notifications:', { page, perPage });
       
       const response = await fetch(`${env.API_URL}${this.baseUrl}?page=${page}&per_page=${perPage}`, {
         headers: {
@@ -42,7 +43,7 @@ class NotificationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('⚠️ Notifications endpoint not implemented yet, returning empty list');
+          logger.debug('⚠️ Notifications endpoint not implemented yet, returning empty list');
           return {
             data: [],
             pagination: {
@@ -57,11 +58,11 @@ class NotificationService {
       }
 
       const result = await response.json();
-      console.log('✅ Notifications fetched successfully:', result);
+      logger.debug('✅ Notifications fetched successfully:', result);
       
       return result;
     } catch (error) {
-      console.error('❌ Failed to fetch notifications:', error);
+      logger.error('❌ Failed to fetch notifications:', error);
       // Return empty result as fallback when notifications are not implemented
       return {
         data: [],
@@ -78,7 +79,7 @@ class NotificationService {
   // Mark notification as read
   async markAsRead(notificationId: number): Promise<void> {
     try {
-      console.log('✅ Marking notification as read:', notificationId);
+      logger.debug('✅ Marking notification as read:', notificationId);
       
       const response = await fetch(`${env.API_URL}${this.baseUrl}/${notificationId}/read`, {
         method: 'POST',
@@ -89,19 +90,19 @@ class NotificationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('⚠️ Mark as read endpoint not implemented yet, skipping');
+          logger.debug('⚠️ Mark as read endpoint not implemented yet, skipping');
           return;
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('✅ Notification marked as read:', result);
+      logger.debug('✅ Notification marked as read:', result);
       
       // Update unread count
       await this.updateUnreadCount();
     } catch (error) {
-      console.error('❌ Failed to mark notification as read:', error);
+      logger.error('❌ Failed to mark notification as read:', error);
       // Don't throw error, just log it
     }
   }
@@ -109,7 +110,7 @@ class NotificationService {
   // Mark all notifications as read
   async markAllAsRead(): Promise<void> {
     try {
-      console.log('✅ Marking all notifications as read');
+      logger.debug('✅ Marking all notifications as read');
       
       const response = await fetch(`${env.API_URL}${this.baseUrl}/read-all`, {
         method: 'POST',
@@ -120,20 +121,20 @@ class NotificationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('⚠️ Mark all as read endpoint not implemented yet, skipping');
+          logger.debug('⚠️ Mark all as read endpoint not implemented yet, skipping');
           return;
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('✅ All notifications marked as read:', result);
+      logger.debug('✅ All notifications marked as read:', result);
       
       // Update unread count
       this.unreadCount = 0;
       this.notifyListeners();
     } catch (error) {
-      console.error('❌ Failed to mark all notifications as read:', error);
+      logger.error('❌ Failed to mark all notifications as read:', error);
       // Don't throw error, just log it
     }
   }
@@ -141,7 +142,7 @@ class NotificationService {
   // Get unread count
   async getUnreadCount(): Promise<number> {
     try {
-      console.log('🔢 Getting unread count');
+      logger.debug('🔢 Getting unread count');
       
       const response = await fetch(`${env.API_URL}${this.baseUrl}/unread-count`, {
         headers: {
@@ -151,7 +152,7 @@ class NotificationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('⚠️ Notifications endpoint not implemented yet, returning 0');
+          logger.debug('⚠️ Notifications endpoint not implemented yet, returning 0');
           this.unreadCount = 0;
           this.notifyListeners();
           return 0;
@@ -160,14 +161,14 @@ class NotificationService {
       }
 
       const result = await response.json();
-      console.log('✅ Unread count fetched:', result);
+      logger.debug('✅ Unread count fetched:', result);
       
       this.unreadCount = result.data.unread_count;
       this.notifyListeners();
       
       return this.unreadCount;
     } catch (error) {
-      console.error('❌ Failed to get unread count:', error);
+      logger.error('❌ Failed to get unread count:', error);
       // Return 0 as fallback when notifications are not implemented
       this.unreadCount = 0;
       this.notifyListeners();
@@ -182,7 +183,7 @@ class NotificationService {
       this.unreadCount = count;
       this.notifyListeners();
     } catch (error) {
-      console.error('❌ Failed to update unread count:', error);
+      logger.error('❌ Failed to update unread count:', error);
       // Set to 0 as fallback
       this.unreadCount = 0;
       this.notifyListeners();
@@ -205,7 +206,7 @@ class NotificationService {
       try {
         listener(this.unreadCount);
       } catch (error) {
-        console.error('❌ Error notifying listener:', error);
+        logger.error('❌ Error notifying listener:', error);
       }
     });
   }
@@ -217,7 +218,7 @@ class NotificationService {
 
   // Handle incoming notification
   handleIncomingNotification(notification: NotificationResource): void {
-    console.log('📨 Received new notification:', notification);
+    logger.debug('📨 Received new notification:', notification);
     
     // Increment unread count
     this.unreadCount++;
@@ -246,7 +247,7 @@ class NotificationService {
       
       await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
     } catch (error) {
-      console.error('❌ Failed to store notification locally:', error);
+      logger.error('❌ Failed to store notification locally:', error);
     }
   }
 
@@ -256,7 +257,7 @@ class NotificationService {
       const stored = await AsyncStorage.getItem('notifications');
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('❌ Failed to get stored notifications:', error);
+      logger.error('❌ Failed to get stored notifications:', error);
       return [];
     }
   }
@@ -265,7 +266,7 @@ class NotificationService {
   private showLocalNotification(notification: NotificationResource): void {
     // This would integrate with your push notification service
     // For now, just log it
-    console.log('📱 Showing local notification:', {
+    logger.debug('📱 Showing local notification:', {
       title: notification.title,
       message: notification.message,
       type: notification.type
@@ -276,9 +277,9 @@ class NotificationService {
   async clearStoredNotifications(): Promise<void> {
     try {
       await AsyncStorage.removeItem('notifications');
-      console.log('✅ Cleared stored notifications');
+      logger.debug('✅ Cleared stored notifications');
     } catch (error) {
-      console.error('❌ Failed to clear stored notifications:', error);
+      logger.error('❌ Failed to clear stored notifications:', error);
     }
   }
 
@@ -291,7 +292,7 @@ class NotificationService {
       }
       return token;
     } catch (error) {
-      console.error('❌ Failed to get auth token:', error);
+      logger.error('❌ Failed to get auth token:', error);
       throw error;
     }
   }

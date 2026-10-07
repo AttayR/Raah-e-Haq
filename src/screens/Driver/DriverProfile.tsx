@@ -25,13 +25,6 @@ const DriverProfile = () => {
   );
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  // Debug logging
-  console.log('DriverProfile - User data:', user);
-  console.log('DriverProfile - User name:', user?.name);
-  console.log('DriverProfile - User email:', user?.email);
-  console.log('DriverProfile - User phone:', user?.phone);
-  console.log('DriverProfile - User status:', user?.status);
-
   const imagePickerOptions = {
     mediaType: 'photo' as MediaType,
     maxHeight: 400,

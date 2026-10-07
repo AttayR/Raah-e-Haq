@@ -25,13 +25,6 @@ const PassengerProfile = () => {
   );
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  // Debug logging
-  console.log('PassengerProfile - User data:', user);
-  console.log('PassengerProfile - User name:', user?.name);
-  console.log('PassengerProfile - User email:', user?.email);
-  console.log('PassengerProfile - User phone:', user?.phone);
-  console.log('PassengerProfile - User status:', user?.status);
-
   const imagePickerOptions = {
     mediaType: 'photo' as MediaType,
     maxHeight: 400,

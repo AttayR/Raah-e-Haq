@@ -1,5 +1,6 @@
 import { LocationUpdate, DriverLocation } from './rideService';
 import { env } from '../config/env';
+import { logger } from '../core/logging/logger';
 
 export interface LocationData {
   latitude: number;
@@ -35,7 +36,7 @@ class LocationTrackingService {
   // Start location tracking
   async startTracking(config?: Partial<TrackingConfig>): Promise<void> {
     if (this.isTracking) {
-      console.log('📍 Location tracking already started');
+      logger.debug('📍 Location tracking already started');
       return;
     }
 
@@ -63,13 +64,13 @@ class LocationTrackingService {
       );
 
       this.isTracking = true;
-      console.log('📍 Location tracking started');
+      logger.debug('📍 Location tracking started');
 
       // Start periodic updates
       this.startPeriodicUpdates();
 
     } catch (error) {
-      console.error('❌ Failed to start location tracking:', error);
+      logger.error('❌ Failed to start location tracking:', error);
       throw error;
     }
   }
@@ -77,7 +78,7 @@ class LocationTrackingService {
   // Stop location tracking
   stopTracking(): void {
     if (!this.isTracking) {
-      console.log('📍 Location tracking not started');
+      logger.debug('📍 Location tracking not started');
       return;
     }
 
@@ -92,7 +93,7 @@ class LocationTrackingService {
     }
 
     this.isTracking = false;
-    console.log('📍 Location tracking stopped');
+    logger.debug('📍 Location tracking stopped');
   }
 
   // Handle location update
@@ -120,17 +121,17 @@ class LocationTrackingService {
 
   // Handle location error
   private handleLocationError(error: GeolocationPositionError): void {
-    console.error('❌ Location error:', error);
+    logger.error('❌ Location error:', error);
     
     switch (error.code) {
       case error.PERMISSION_DENIED:
-        console.error('❌ Location permission denied');
+        logger.error('❌ Location permission denied');
         break;
       case error.POSITION_UNAVAILABLE:
-        console.error('❌ Location unavailable');
+        logger.error('❌ Location unavailable');
         break;
       case error.TIMEOUT:
-        console.error('❌ Location request timeout');
+        logger.error('❌ Location request timeout');
         break;
     }
   }
@@ -193,9 +194,9 @@ class LocationTrackingService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log('📍 Location updated on server');
+      logger.debug('📍 Location updated on server');
     } catch (error) {
-      console.error('❌ Failed to update location on server:', error);
+      logger.error('❌ Failed to update location on server:', error);
     }
   }
 
@@ -240,7 +241,7 @@ class LocationTrackingService {
       const result = await response.json();
       return result.data;
     } catch (error) {
-      console.error('❌ Failed to get driver location:', error);
+      logger.error('❌ Failed to get driver location:', error);
       throw error;
     }
   }
@@ -261,7 +262,7 @@ class LocationTrackingService {
       try {
         listener(location);
       } catch (error) {
-        console.error('❌ Error notifying location listener:', error);
+        logger.error('❌ Error notifying location listener:', error);
       }
     });
   }
@@ -308,7 +309,7 @@ class LocationTrackingService {
       }
       return token;
     } catch (error) {
-      console.error('❌ Failed to get auth token:', error);
+      logger.error('❌ Failed to get auth token:', error);
       throw error;
     }
   }
@@ -332,7 +333,7 @@ class LocationTrackingService {
   // Update configuration
   updateConfig(config: Partial<TrackingConfig>): void {
     this.config = { ...this.config, ...config };
-    console.log('📍 Tracking config updated:', this.config);
+    logger.debug('📍 Tracking config updated:', this.config);
   }
 
   // Get current configuration
@@ -356,9 +357,9 @@ class LocationTrackingService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log('📍 Driver status updated:', status);
+      logger.debug('📍 Driver status updated:', status);
     } catch (error) {
-      console.error('❌ Failed to update driver status:', error);
+      logger.error('❌ Failed to update driver status:', error);
       throw error;
     }
   }

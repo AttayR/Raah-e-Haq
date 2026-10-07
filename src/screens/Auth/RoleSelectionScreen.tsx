@@ -21,6 +21,7 @@ import { RootState } from '../../store';
 import BrandButton from '../../components/BrandButton';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { logger } from '../../core/logging/logger';
 
 export default function RoleSelectionScreen() {
   const { theme } = useAppTheme();
@@ -35,9 +36,9 @@ export default function RoleSelectionScreen() {
   const handleRoleSelect = (role: 'driver' | 'passenger') => {
     try {
       setSelectedRole(role);
-      console.log('Role selected:', role);
+      logger.debug('Role selected:', role);
     } catch (error) {
-      console.error('Error selecting role:', error);
+      logger.error('Error selecting role:', error);
       showToast('error', 'Failed to select role. Please try again.');
     }
   };
@@ -55,14 +56,13 @@ export default function RoleSelectionScreen() {
     try {
       setIsLoading(true);
       
-      console.log('RoleSelectionScreen - Selected role:', selectedRole);
-      console.log('RoleSelectionScreen - Current auth state:', authState);
-      console.log('RoleSelectionScreen - Dispatching setUserRole...');
+      logger.debug('RoleSelectionScreen - Selected role:', selectedRole);
+      logger.debug('RoleSelectionScreen - Dispatching setUserRole...');
 
       // Set the user role in the auth state
       dispatch(setUserRole(selectedRole));
 
-      console.log('RoleSelectionScreen - Role set, navigating based on role...');
+      logger.debug('RoleSelectionScreen - Role set, navigating based on role...');
 
       // Navigate based on role
       if (selectedRole === 'driver') {
@@ -75,7 +75,7 @@ export default function RoleSelectionScreen() {
         navigation.navigate('BasicInfo', { role: selectedRole });
       }
     } catch (error) {
-      console.error('Error continuing with role selection:', error);
+      logger.error('Error continuing with role selection:', error);
       showToast('error', 'Failed to continue. Please try again.');
     } finally {
       setIsLoading(false);

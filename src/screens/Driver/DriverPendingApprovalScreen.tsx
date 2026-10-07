@@ -19,6 +19,7 @@ import { setSignedOut } from '../../store/slices/authSlice';
 import { showToast } from '../../components/ToastProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { logger } from '../../core/logging/logger';
 
 export default function DriverPendingApprovalScreen() {
   const navigation = useNavigation<any>();
@@ -49,7 +50,7 @@ export default function DriverPendingApprovalScreen() {
         ]
       );
     } catch (error) {
-      console.error('Error signing out:', error);
+      logger.error('Error signing out:', error);
       showToast('error', 'Failed to sign out');
     }
   };

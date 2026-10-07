@@ -9,6 +9,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../app/providers/ThemeProvider';
 import { RideStopRequest } from '../../services/rideService';
+import { logger } from '../../core/logging/logger';
 
 interface StopManagerProps {
   stops: RideStopRequest[];
@@ -37,7 +38,7 @@ const StopManager: React.FC<StopManagerProps> = ({
       }
     };
   } catch (error) {
-    console.log('Theme error, using fallback:', error);
+    logger.debug('Theme error, using fallback:', error);
     theme = {
       colors: {
         primary: '#3B82F6',

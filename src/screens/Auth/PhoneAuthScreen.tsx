@@ -21,6 +21,7 @@ import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import OtpService from '../../services/otpService';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { logger } from '../../core/logging/logger';
 
 type AuthStep = 'phone' | 'verification';
 
@@ -32,7 +33,7 @@ export default function PhoneAuthScreen() {
 
   // Debug logging for state changes
   useEffect(() => {
-    console.log('📱 PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
+    logger.debug('📱 PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
   }, [isLoading, error, isOtpSent, isOtpVerified]);
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
@@ -59,8 +60,7 @@ export default function PhoneAuthScreen() {
   }, [countdown]);
 
   const handleSendCode = async () => {
-    console.log('📱 PhoneAuthScreen - Starting send OTP process');
-    console.log('📞 Phone input:', phoneInput);
+    logger.debug('📱 PhoneAuthScreen - Starting send OTP process');
     
     // Clear previous errors
     setPhoneError('');
@@ -68,21 +68,20 @@ export default function PhoneAuthScreen() {
     // Validate phone number
     const validation = OtpService.validatePhoneNumber(phoneInput.trim());
     if (!validation.isValid) {
-      console.log('❌ PhoneAuthScreen - Phone validation failed:', validation.error);
+      logger.debug('❌ PhoneAuthScreen - Phone validation failed:', validation.error);
       setPhoneError(validation.error || 'Invalid phone number');
       showToast('error', validation.error || 'Invalid phone number');
       return;
     }
 
-    console.log('✅ PhoneAuthScreen - Phone validation passed');
+    logger.debug('✅ PhoneAuthScreen - Phone validation passed');
 
     try {
       const result = await sendOtpToPhone(phoneInput.trim());
-      console.log('📨 PhoneAuthScreen - Send OTP result:', result.type);
+      logger.debug('📨 PhoneAuthScreen - Send OTP result:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
-        console.log('✅ PhoneAuthScreen - OTP sent successfully');
-        console.log('🔢 PhoneAuthScreen - Received OTP code:', (result.payload as any)?.otp_code);
+        logger.debug('✅ PhoneAuthScreen - OTP sent successfully');
         
         setCurrentStep('verification');
         setCountdown(60); // 60 seconds countdown
@@ -93,12 +92,12 @@ export default function PhoneAuthScreen() {
         showToast('success', 'OTP sent successfully');
       } else {
         const errorMessage = (result.payload as string) || 'Failed to send OTP';
-        console.log('❌ PhoneAuthScreen - OTP send failed:', errorMessage);
+        logger.debug('❌ PhoneAuthScreen - OTP send failed:', errorMessage);
         setPhoneError(errorMessage);
         showToast('error', errorMessage);
       }
     } catch (err: any) {
-      console.error('💥 PhoneAuthScreen - Error sending verification code:', err);
+      logger.error('💥 PhoneAuthScreen - Error sending verification code:', err);
       const errorMessage = err.message || 'Failed to send OTP';
       setPhoneError(errorMessage);
       showToast('error', errorMessage);
@@ -106,8 +105,7 @@ export default function PhoneAuthScreen() {
   };
 
   const handleVerifyCode = async () => {
-    console.log('📱 PhoneAuthScreen - Starting verify OTP process');
-    console.log('🔢 OTP input:', verificationCode);
+    logger.debug('📱 PhoneAuthScreen - Starting verify OTP process');
     
     // Clear previous errors
     setOtpError('');
@@ -120,35 +118,35 @@ export default function PhoneAuthScreen() {
     
     const validation = OtpService.validateOtpData(otpData);
     if (!validation.isValid) {
-      console.log('❌ PhoneAuthScreen - OTP validation failed:', validation.error);
+      logger.debug('❌ PhoneAuthScreen - OTP validation failed:', validation.error);
       setOtpError(validation.error || 'Invalid OTP code');
       showToast('error', validation.error || 'Invalid OTP code');
       return;
     }
 
-    console.log('✅ PhoneAuthScreen - OTP validation passed');
+    logger.debug('✅ PhoneAuthScreen - OTP validation passed');
 
     try {
       const result = await verifyOtpCode(otpData);
-      console.log('📨 PhoneAuthScreen - Verify OTP result:', result.type);
+      logger.debug('📨 PhoneAuthScreen - Verify OTP result:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
-        console.log('✅ PhoneAuthScreen - Phone verified successfully');
+        logger.debug('✅ PhoneAuthScreen - Phone verified successfully');
         // Show success toast
         setShowSuccessToast(true);
         showToast('success', 'Phone number verified successfully!');
         
         // Navigation will be handled by AuthFlow component based on auth state
-        console.log('PhoneAuthScreen - Phone verified successfully');
+        logger.debug('PhoneAuthScreen - Phone verified successfully');
       } else {
         const errorMessage = (result.payload as string) || 'Invalid verification code';
-        console.log('❌ PhoneAuthScreen - OTP verification failed:', errorMessage);
+        logger.debug('❌ PhoneAuthScreen - OTP verification failed:', errorMessage);
         setOtpError(errorMessage);
         showToast('error', errorMessage);
       }
       
     } catch (err: any) {
-      console.error('💥 PhoneAuthScreen - Error verifying code:', err);
+      logger.error('💥 PhoneAuthScreen - Error verifying code:', err);
       const errorMessage = err.message || 'Failed to verify code';
       setOtpError(errorMessage);
       showToast('error', errorMessage);
@@ -156,16 +154,15 @@ export default function PhoneAuthScreen() {
   };
 
   const handleResendCode = async () => {
-    console.log('📱 PhoneAuthScreen - Starting resend OTP process');
+    logger.debug('📱 PhoneAuthScreen - Starting resend OTP process');
     setIsResending(true);
     
     try {
       const result = await sendOtpToPhone(phoneInput.trim());
-      console.log('📨 PhoneAuthScreen - Resend OTP result:', result.type);
+      logger.debug('📨 PhoneAuthScreen - Resend OTP result:', result.type);
       
       if (result.type.endsWith('/fulfilled')) {
-        console.log('✅ PhoneAuthScreen - OTP resent successfully');
-        console.log('🔢 PhoneAuthScreen - New OTP code:', (result.payload as any)?.otp_code);
+        logger.debug('✅ PhoneAuthScreen - OTP resent successfully');
         
         setCountdown(60);
         setVerificationCode('');
@@ -176,12 +173,12 @@ export default function PhoneAuthScreen() {
         showToast('success', 'Verification code sent again');
       } else {
         const errorMessage = (result.payload as string) || 'Failed to resend code';
-        console.log('❌ PhoneAuthScreen - Resend OTP failed:', errorMessage);
+        logger.debug('❌ PhoneAuthScreen - Resend OTP failed:', errorMessage);
         setOtpError(errorMessage);
         showToast('error', errorMessage);
       }
     } catch (err: any) {
-      console.error('💥 PhoneAuthScreen - Error resending code:', err);
+      logger.error('💥 PhoneAuthScreen - Error resending code:', err);
       const errorMessage = err.message || 'Failed to resend code';
       setOtpError(errorMessage);
       showToast('error', errorMessage);

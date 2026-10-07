@@ -23,6 +23,7 @@ import {
   showLoadingToast,
   hideToast
 } from '../components/NotificationManager';
+import { logger } from '../core/logging/logger';
 
 export interface RideState {
   currentRide: RideResource | null;
@@ -92,7 +93,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     showLoadingToast('Creating Ride Request', 'Please wait while we process your request...');
     
     try {
-      console.log('🚗 Requesting ride:', rideData);
+      logger.debug('🚗 Requesting ride:', rideData);
       const ride = await rideService.createRide(rideData);
       
       // Hide loading toast
@@ -136,13 +137,13 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       // Show success modal
       showRideRequestedModal();
 
-      console.log('✅ Ride requested successfully:', ride);
+      logger.debug('✅ Ride requested successfully:', ride);
       return ride;
     } catch (error) {
       // Hide loading toast
       hideToast();
       
-      console.error('❌ Failed to request ride:', error);
+      logger.error('❌ Failed to request ride:', error);
       
       // Handle different types of errors
       let errorMessage = 'Failed to request ride';
@@ -183,13 +184,13 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
           label: 'Try Again',
           onPress: () => {
             // Retry logic could be added here
-            console.log('Retry ride request');
+            logger.debug('Retry ride request');
           },
         },
         {
           label: 'Cancel',
           onPress: () => {
-            console.log('Cancel ride request');
+            logger.debug('Cancel ride request');
           },
         }
       );
@@ -203,7 +204,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('✅ Accepting ride:', rideId, driverId);
+      logger.debug('✅ Accepting ride:', rideId, driverId);
       const ride = await rideService.acceptRide(rideId, driverId);
       
       setState(prev => ({
@@ -227,15 +228,15 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         {
           label: 'View Details',
           onPress: () => {
-            console.log('Navigate to ride details');
+            logger.debug('Navigate to ride details');
           },
         }
       );
 
-      console.log('✅ Ride accepted successfully:', ride);
+      logger.debug('✅ Ride accepted successfully:', ride);
       return ride;
     } catch (error) {
-      console.error('❌ Failed to accept ride:', error);
+      logger.error('❌ Failed to accept ride:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -249,7 +250,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         {
           label: 'Try Again',
           onPress: () => {
-            console.log('Retry accept ride');
+            logger.debug('Retry accept ride');
           },
         }
       );
@@ -263,7 +264,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🚀 Starting ride:', rideId);
+      logger.debug('🚀 Starting ride:', rideId);
       const ride = await rideService.startRide(rideId);
       
       setState(prev => ({
@@ -283,10 +284,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       // Show success toast
       showRideStartedToast();
 
-      console.log('✅ Ride started successfully:', ride);
+      logger.debug('✅ Ride started successfully:', ride);
       return ride;
     } catch (error) {
-      console.error('❌ Failed to start ride:', error);
+      logger.error('❌ Failed to start ride:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -300,7 +301,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         {
           label: 'Try Again',
           onPress: () => {
-            console.log('Retry start ride');
+            logger.debug('Retry start ride');
           },
         }
       );
@@ -319,7 +320,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🏁 Completing ride:', rideId, { fare, distance, duration });
+      logger.debug('🏁 Completing ride:', rideId, { fare, distance, duration });
       const ride = await rideService.completeRide(rideId, fare, distance, duration);
       
       setState(prev => ({
@@ -341,10 +342,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       // Show success toast
       showRideCompletedToast(fare || 0);
 
-      console.log('✅ Ride completed successfully:', ride);
+      logger.debug('✅ Ride completed successfully:', ride);
       return ride;
     } catch (error) {
-      console.error('❌ Failed to complete ride:', error);
+      logger.error('❌ Failed to complete ride:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -358,7 +359,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         {
           label: 'Try Again',
           onPress: () => {
-            console.log('Retry complete ride');
+            logger.debug('Retry complete ride');
           },
         }
       );
@@ -372,7 +373,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('❌ Cancelling ride:', rideId);
+      logger.debug('❌ Cancelling ride:', rideId);
       const ride = await rideService.cancelRide(rideId);
       
       setState(prev => ({
@@ -382,10 +383,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
       }));
 
-      console.log('✅ Ride cancelled successfully:', ride);
+      logger.debug('✅ Ride cancelled successfully:', ride);
       return ride;
     } catch (error) {
-      console.error('❌ Failed to cancel ride:', error);
+      logger.error('❌ Failed to cancel ride:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -398,11 +399,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Update driver location
   const updateDriverLocation = useCallback(async (location: DriverLocation): Promise<void> => {
     try {
-      console.log('📍 Updating driver location:', location);
+      logger.debug('📍 Updating driver location:', location);
       await rideService.updateDriverLocation(location);
-      console.log('✅ Driver location updated successfully');
+      logger.debug('✅ Driver location updated successfully');
     } catch (error) {
-      console.error('❌ Failed to update driver location:', error);
+      logger.error('❌ Failed to update driver location:', error);
       throw error;
     }
   }, []);
@@ -414,7 +415,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     radius: number = 5
   ): Promise<DriverInRadius[]> => {
     try {
-      console.log('🔍 Finding nearby drivers:', { latitude, longitude, radius });
+      logger.debug('🔍 Finding nearby drivers:', { latitude, longitude, radius });
       const drivers = await rideService.getDriversInRadius(latitude, longitude, radius);
       
       // Ensure drivers is always an array
@@ -425,10 +426,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         availableDrivers: safeDrivers,
       }));
 
-      console.log('✅ Nearby drivers found:', safeDrivers);
+      logger.debug('✅ Nearby drivers found:', safeDrivers);
       return safeDrivers;
     } catch (error) {
-      console.error('❌ Failed to find nearby drivers:', error);
+      logger.error('❌ Failed to find nearby drivers:', error);
       // Return empty array on error instead of throwing
       const emptyDrivers: DriverInRadius[] = [];
       setState(prev => ({
@@ -442,7 +443,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Refresh current ride
   const refreshRide = useCallback(async (rideId: number): Promise<RideResource> => {
     try {
-      console.log('🔄 Refreshing ride:', rideId);
+      logger.debug('🔄 Refreshing ride:', rideId);
       const ride = await rideService.getRide(rideId);
       
       setState(prev => ({
@@ -450,10 +451,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         currentRide: ride,
       }));
 
-      console.log('✅ Ride refreshed successfully:', ride);
+      logger.debug('✅ Ride refreshed successfully:', ride);
       return ride;
     } catch (error) {
-      console.error('❌ Failed to refresh ride:', error);
+      logger.error('❌ Failed to refresh ride:', error);
       throw error;
     }
   }, []);
@@ -463,7 +464,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     if (!userId) return;
     
     try {
-      console.log('📋 Refreshing ride history:', userId, userType);
+      logger.debug('📋 Refreshing ride history:', userId, userType);
       let rides: RideResource[];
       
       if (userType === 'passenger') {
@@ -479,9 +480,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         rideHistory: rides,
       }));
 
-      console.log('✅ Ride history refreshed successfully:', rides);
+      logger.debug('✅ Ride history refreshed successfully:', rides);
     } catch (error) {
-      console.error('❌ Failed to refresh ride history:', error);
+      logger.error('❌ Failed to refresh ride history:', error);
     }
   }, [userId, userType]);
 
@@ -498,7 +499,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       try {
         await refreshRide(state.currentRide!.id);
       } catch (error) {
-        console.warn('Failed to auto-refresh ride:', error);
+        logger.warn('Failed to auto-refresh ride:', error);
       }
     }, 10000); // Refresh every 10 seconds
 
@@ -519,7 +520,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('📍 Adding stop to ride:', rideId, stopData);
+      logger.debug('📍 Adding stop to ride:', rideId, stopData);
       const updatedRide = await rideService.addStop(rideId, stopData);
       
       setState(prev => ({
@@ -528,10 +529,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
       }));
       
-      console.log('✅ Stop added successfully:', updatedRide);
+      logger.debug('✅ Stop added successfully:', updatedRide);
       return updatedRide;
     } catch (error) {
-      console.error('❌ Failed to add stop:', error);
+      logger.error('❌ Failed to add stop:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -546,7 +547,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🗑️ Removing stop from ride:', rideId, stopId);
+      logger.debug('🗑️ Removing stop from ride:', rideId, stopId);
       const updatedRide = await rideService.removeStop(rideId, stopId);
       
       setState(prev => ({
@@ -555,10 +556,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
       }));
       
-      console.log('✅ Stop removed successfully:', updatedRide);
+      logger.debug('✅ Stop removed successfully:', updatedRide);
       return updatedRide;
     } catch (error) {
-      console.error('❌ Failed to remove stop:', error);
+      logger.error('❌ Failed to remove stop:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -573,7 +574,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      console.log('🔄 Updating stop order:', rideId, stopOrders);
+      logger.debug('🔄 Updating stop order:', rideId, stopOrders);
       const updatedRide = await rideService.updateStopOrder(rideId, stopOrders);
       
       setState(prev => ({
@@ -582,10 +583,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
       }));
       
-      console.log('✅ Stop order updated successfully:', updatedRide);
+      logger.debug('✅ Stop order updated successfully:', updatedRide);
       return updatedRide;
     } catch (error) {
-      console.error('❌ Failed to update stop order:', error);
+      logger.error('❌ Failed to update stop order:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -600,12 +601,12 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Navigate to next stop
   const navigateToNextStop = useCallback(async (rideId: number): Promise<any> => {
     try {
-      console.log('🧭 Navigating to next stop:', rideId);
+      logger.debug('🧭 Navigating to next stop:', rideId);
       const result = await rideService.navigateToNextStop(rideId);
-      console.log('✅ Navigation started successfully:', result);
+      logger.debug('✅ Navigation started successfully:', result);
       return result;
     } catch (error) {
-      console.error('❌ Failed to start navigation:', error);
+      logger.error('❌ Failed to start navigation:', error);
       throw error;
     }
   }, []);
@@ -613,12 +614,12 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Mark stop as completed
   const markStopCompleted = useCallback(async (rideId: number, stopId: number): Promise<any> => {
     try {
-      console.log('✅ Marking stop as completed:', rideId, stopId);
+      logger.debug('✅ Marking stop as completed:', rideId, stopId);
       const result = await rideService.markStopCompleted(rideId, stopId);
-      console.log('✅ Stop marked as completed:', result);
+      logger.debug('✅ Stop marked as completed:', result);
       return result;
     } catch (error) {
-      console.error('❌ Failed to mark stop as completed:', error);
+      logger.error('❌ Failed to mark stop as completed:', error);
       throw error;
     }
   }, []);
@@ -626,12 +627,12 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Get navigation instructions
   const getNavigationInstructions = useCallback(async (rideId: number): Promise<any> => {
     try {
-      console.log('🧭 Getting navigation instructions:', rideId);
+      logger.debug('🧭 Getting navigation instructions:', rideId);
       const result = await rideService.getNavigationInstructions(rideId);
-      console.log('✅ Navigation instructions fetched:', result);
+      logger.debug('✅ Navigation instructions fetched:', result);
       return result;
     } catch (error) {
-      console.error('❌ Failed to get navigation instructions:', error);
+      logger.error('❌ Failed to get navigation instructions:', error);
       throw error;
     }
   }, []);
@@ -641,11 +642,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Start location tracking
   const startLocationTracking = useCallback(async (config?: any): Promise<void> => {
     try {
-      console.log('📍 Starting location tracking:', config);
+      logger.debug('📍 Starting location tracking:', config);
       await locationTrackingService.startTracking(config);
-      console.log('✅ Location tracking started');
+      logger.debug('✅ Location tracking started');
     } catch (error) {
-      console.error('❌ Failed to start location tracking:', error);
+      logger.error('❌ Failed to start location tracking:', error);
       throw error;
     }
   }, []);
@@ -653,23 +654,23 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Stop location tracking
   const stopLocationTracking = useCallback((): void => {
     try {
-      console.log('📍 Stopping location tracking');
+      logger.debug('📍 Stopping location tracking');
       locationTrackingService.stopTracking();
-      console.log('✅ Location tracking stopped');
+      logger.debug('✅ Location tracking stopped');
     } catch (error) {
-      console.error('❌ Failed to stop location tracking:', error);
+      logger.error('❌ Failed to stop location tracking:', error);
     }
   }, []);
 
   // Get driver location
   const getDriverLocation = useCallback(async (driverId: number): Promise<DriverLocation> => {
     try {
-      console.log('📍 Getting driver location:', driverId);
+      logger.debug('📍 Getting driver location:', driverId);
       const location = await locationTrackingService.getDriverLocation(driverId);
-      console.log('✅ Driver location fetched:', location);
+      logger.debug('✅ Driver location fetched:', location);
       return location;
     } catch (error) {
-      console.error('❌ Failed to get driver location:', error);
+      logger.error('❌ Failed to get driver location:', error);
       throw error;
     }
   }, []);
@@ -679,12 +680,12 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Get notifications
   const getNotifications = useCallback(async (page: number = 1, perPage: number = 20): Promise<{data: NotificationResource[], pagination: any}> => {
     try {
-      console.log('🔔 Getting notifications:', { page, perPage });
+      logger.debug('🔔 Getting notifications:', { page, perPage });
       const result = await notificationService.getNotifications(page, perPage);
-      console.log('✅ Notifications fetched:', result);
+      logger.debug('✅ Notifications fetched:', result);
       return result;
     } catch (error) {
-      console.error('❌ Failed to get notifications:', error);
+      logger.error('❌ Failed to get notifications:', error);
       throw error;
     }
   }, []);
@@ -692,11 +693,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Mark notification as read
   const markNotificationAsRead = useCallback(async (notificationId: number): Promise<void> => {
     try {
-      console.log('✅ Marking notification as read:', notificationId);
+      logger.debug('✅ Marking notification as read:', notificationId);
       await notificationService.markAsRead(notificationId);
-      console.log('✅ Notification marked as read');
+      logger.debug('✅ Notification marked as read');
     } catch (error) {
-      console.error('❌ Failed to mark notification as read:', error);
+      logger.error('❌ Failed to mark notification as read:', error);
       throw error;
     }
   }, []);
@@ -704,11 +705,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Mark all notifications as read
   const markAllNotificationsAsRead = useCallback(async (): Promise<void> => {
     try {
-      console.log('✅ Marking all notifications as read');
+      logger.debug('✅ Marking all notifications as read');
       await notificationService.markAllAsRead();
-      console.log('✅ All notifications marked as read');
+      logger.debug('✅ All notifications marked as read');
     } catch (error) {
-      console.error('❌ Failed to mark all notifications as read:', error);
+      logger.error('❌ Failed to mark all notifications as read:', error);
       throw error;
     }
   }, []);
@@ -716,12 +717,12 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Get unread count
   const getUnreadCount = useCallback(async (): Promise<number> => {
     try {
-      console.log('🔢 Getting unread count');
+      logger.debug('🔢 Getting unread count');
       const count = await notificationService.getUnreadCount();
-      console.log('✅ Unread count fetched:', count);
+      logger.debug('✅ Unread count fetched:', count);
       return count;
     } catch (error) {
-      console.error('❌ Failed to get unread count:', error);
+      logger.error('❌ Failed to get unread count:', error);
       throw error;
     }
   }, []);
@@ -731,9 +732,9 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Subscribe to ride updates
   const subscribeToRideUpdates = useCallback(async (rideId: number, userType: 'passenger' | 'driver'): Promise<string> => {
     try {
-      console.log('🔌 Subscribing to ride updates:', { rideId, userType });
+      logger.debug('🔌 Subscribing to ride updates:', { rideId, userType });
       const connectionId = await webSocketService.subscribeToRideUpdates(rideId, userType, (event) => {
-        console.log('📨 Received ride update:', event);
+        logger.debug('📨 Received ride update:', event);
         // Handle ride update event
         if (event.type === 'ride_status_update' && event.data.ride_id === rideId) {
           // Refresh current ride if it matches
@@ -742,10 +743,10 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
           }
         }
       });
-      console.log('✅ Subscribed to ride updates:', connectionId);
+      logger.debug('✅ Subscribed to ride updates:', connectionId);
       return connectionId;
     } catch (error) {
-      console.error('❌ Failed to subscribe to ride updates:', error);
+      logger.error('❌ Failed to subscribe to ride updates:', error);
       throw error;
     }
   }, [state.currentRide, refreshRide]);
@@ -753,19 +754,19 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Subscribe to driver requests
   const subscribeToDriverRequests = useCallback(async (driverId: number, latitude: number, longitude: number, radius: number = 10): Promise<string> => {
     try {
-      console.log('🔌 Subscribing to driver requests:', { driverId, latitude, longitude, radius });
+      logger.debug('🔌 Subscribing to driver requests:', { driverId, latitude, longitude, radius });
       const connectionId = await webSocketService.subscribeToDriverRequests(driverId, latitude, longitude, radius, (event) => {
-        console.log('📨 Received driver request:', event);
+        logger.debug('📨 Received driver request:', event);
         // Handle driver request event
         if (event.type === 'new_ride_request') {
           // Update available drivers or refresh ride requests
           findNearbyDrivers(latitude, longitude, radius);
         }
       });
-      console.log('✅ Subscribed to driver requests:', connectionId);
+      logger.debug('✅ Subscribed to driver requests:', connectionId);
       return connectionId;
     } catch (error) {
-      console.error('❌ Failed to subscribe to driver requests:', error);
+      logger.error('❌ Failed to subscribe to driver requests:', error);
       throw error;
     }
   }, [findNearbyDrivers]);
@@ -773,11 +774,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Unsubscribe from WebSocket
   const unsubscribe = useCallback((connectionId: string): void => {
     try {
-      console.log('🔌 Unsubscribing from:', connectionId);
+      logger.debug('🔌 Unsubscribing from:', connectionId);
       webSocketService.unsubscribe(connectionId);
-      console.log('✅ Unsubscribed successfully');
+      logger.debug('✅ Unsubscribed successfully');
     } catch (error) {
-      console.error('❌ Failed to unsubscribe:', error);
+      logger.error('❌ Failed to unsubscribe:', error);
     }
   }, []);
 

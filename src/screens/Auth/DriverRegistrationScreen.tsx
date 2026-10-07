@@ -19,6 +19,7 @@ import { showToast } from '../../components/ToastProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
+import { logger } from '../../core/logging/logger';
 
 type RegistrationStep = 'personal' | 'vehicle' | 'documents' | 'review';
 
@@ -168,7 +169,7 @@ export default function DriverRegistrationScreen() {
       // Navigation will be handled by AuthFlow based on driver status
       
     } catch (error: any) {
-      console.error('Driver registration error:', error);
+      logger.error('Driver registration error:', error);
       showToast('error', error.message || 'Driver registration failed');
     }
   };

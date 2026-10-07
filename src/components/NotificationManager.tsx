@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import ModernToast, { ToastConfig } from './ModernToast';
 import ModernModal, { ModernModalConfig } from './ModernModal';
+import { logger } from '../core/logging/logger';
 
 interface NotificationManagerProps {
   children: React.ReactNode;
@@ -143,7 +144,7 @@ export const showRideRequestedToast = () => {
       label: 'View Status',
       onPress: () => {
         // Navigate to ride status screen
-        console.log('Navigate to ride status');
+        logger.debug('Navigate to ride status');
       },
     }
   );
@@ -158,7 +159,7 @@ export const showRideRequestedModal = () => {
       onPress: () => {
         hideModal();
         // Navigate to ride status screen
-        console.log('Navigate to ride status');
+        logger.debug('Navigate to ride status');
       },
     },
     {
@@ -166,7 +167,7 @@ export const showRideRequestedModal = () => {
       onPress: () => {
         hideModal();
         // Show cancel confirmation
-        console.log('Show cancel confirmation');
+        logger.debug('Show cancel confirmation');
       },
     }
   );
@@ -179,7 +180,7 @@ export const showDriverFoundToast = (driverName: string) => {
     {
       label: 'Track Driver',
       onPress: () => {
-        console.log('Navigate to driver tracking');
+        logger.debug('Navigate to driver tracking');
       },
     }
   );
@@ -199,7 +200,7 @@ export const showRideCompletedToast = (fare: number) => {
     {
       label: 'Rate Driver',
       onPress: () => {
-        console.log('Open rating modal');
+        logger.debug('Open rating modal');
       },
     }
   );

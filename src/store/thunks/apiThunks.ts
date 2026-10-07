@@ -1,28 +1,25 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { apiService, LoginRequest, RegisterRequest, SendOtpRequest, VerifyOtpRequest, ForgotPasswordRequest, ResetPasswordRequest, User } from '../../services/api';
+import { logger } from '../../core/logging/logger';
 
 // Auth Thunks
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials: LoginRequest, { rejectWithValue }) => {
     try {
-      console.log('🔄 Redux Thunk - Starting user login...');
-      console.log('📋 Credentials received:', credentials);
+      logger.debug('🔄 Redux Thunk - Starting user login...');
       
       const response = await apiService.login(credentials);
       
-      console.log('📨 Redux Thunk - API response received:', response);
       
       if (response.success && response.data) {
-        console.log('✅ Redux Thunk - Login successful');
-        console.log('👤 User data:', response.data.user);
-        console.log('🔑 Token:', response.data.token);
+        logger.debug('✅ Redux Thunk - Login successful');
         
         // Store auth data
         await apiService.setAuthToken(response.data.token);
         await apiService.setUserData(response.data.user);
         
-        console.log('💾 Auth data stored successfully');
+        logger.debug('💾 Auth data stored successfully');
         
         return {
           user: response.data.user,
@@ -30,12 +27,12 @@ export const loginUser = createAsyncThunk(
           tokenType: response.data.token_type,
         };
       } else {
-        console.log('❌ Redux Thunk - Login failed:', response.message);
+        logger.debug('❌ Redux Thunk - Login failed:', response.message);
         return rejectWithValue(response.message || 'Login failed');
       }
     } catch (error: any) {
-      console.error('💥 Redux Thunk - Login error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 Redux Thunk - Login error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
@@ -53,24 +50,21 @@ export const registerUser = createAsyncThunk(
   'auth/registerUser',
   async (userData: RegisterRequest, { rejectWithValue }) => {
     try {
-      console.log('🔄 Redux Thunk - Starting user registration...');
-      console.log('📋 User data received:', userData);
+      logger.debug('🔄 Redux Thunk - Starting user registration...');
       
       const response = await apiService.register(userData);
       
-      console.log('📨 Redux Thunk - API response received:', response);
       
       if (response.success && response.data) {
-        console.log('✅ Redux Thunk - Registration successful');
-        console.log('👤 User created:', response.data.user);
+        logger.debug('✅ Redux Thunk - Registration successful');
         return response.data.user;
       } else {
-        console.log('❌ Redux Thunk - Registration failed:', response.message);
+        logger.debug('❌ Redux Thunk - Registration failed:', response.message);
         return rejectWithValue(response.message || 'Registration failed');
       }
     } catch (error: any) {
-      console.error('💥 Redux Thunk - Registration error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 Redux Thunk - Registration error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
@@ -91,25 +85,21 @@ export const registerUserWithImages = createAsyncThunk(
     passenger_cnic_back_image?: string; 
   }, { rejectWithValue }) => {
     try {
-      console.log('🔄 Redux Thunk - Starting user registration with images...');
-      console.log('📋 User data received:', userData);
+      logger.debug('🔄 Redux Thunk - Starting user registration with images...');
       
       const response = await apiService.registerWithImages(userData);
       
-      console.log('📨 Redux Thunk - Registration with images API response received');
-      console.log('📊 Response success:', response.success);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 Redux Thunk - Registration with images API response received');
+      logger.debug('📊 Response success:', response.success);
       
       if (response.success && response.data) {
-        console.log('✅ Redux Thunk - Registration with images successful');
-        console.log('👤 User data:', response.data.user);
-        console.log('🔑 Token:', response.data.token);
+        logger.debug('✅ Redux Thunk - Registration with images successful');
         
         // Store auth data
         await apiService.setAuthToken(response.data.token);
         await apiService.setUserData(response.data.user);
         
-        console.log('💾 Auth data stored successfully');
+        logger.debug('💾 Auth data stored successfully');
         
         return {
           user: response.data.user,
@@ -117,12 +107,12 @@ export const registerUserWithImages = createAsyncThunk(
           tokenType: response.data.token_type,
         };
       } else {
-        console.log('❌ Redux Thunk - Registration with images failed:', response.message);
+        logger.debug('❌ Redux Thunk - Registration with images failed:', response.message);
         return rejectWithValue(response.message || 'Registration with images failed');
       }
     } catch (error: any) {
-      console.error('💥 Redux Thunk - Registration with images error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 Redux Thunk - Registration with images error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
@@ -155,42 +145,37 @@ export const sendOtp = createAsyncThunk(
   'auth/sendOtp',
   async (phone: string, { rejectWithValue }) => {
     try {
-      console.log('🔄 Redux Thunk - Starting OTP send process...');
-      console.log('📱 Phone number:', phone);
-      console.log('⏰ Thunk timestamp:', new Date().toISOString());
+      logger.debug('🔄 Redux Thunk - Starting OTP send process...');
+      logger.debug('⏰ Thunk timestamp:', new Date().toISOString());
       
       const response = await apiService.sendOtp(phone);
       
-      console.log('📨 Redux Thunk - OTP send API response received');
-      console.log('📊 Response success:', response.success);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 Redux Thunk - OTP send API response received');
+      logger.debug('📊 Response success:', response.success);
       
       if (response.success && response.data) {
-        console.log('✅ Redux Thunk - OTP sent successfully');
-        console.log('📱 Phone verified:', response.data.phone);
-        console.log('⏰ OTP expires in:', response.data.expires_in, 'seconds');
-        console.log('🔢 OTP code (for testing):', response.data.otp_code);
+        logger.debug('✅ Redux Thunk - OTP sent successfully');
+        logger.debug('⏰ OTP expires in:', response.data.expires_in, 'seconds');
         
         return response.data;
       } else {
-        console.log('❌ Redux Thunk - OTP send failed:', response.message);
-        console.log('🔍 Error details:', response.errors);
+        logger.debug('❌ Redux Thunk - OTP send failed:', response.message);
+        logger.debug('🔍 Error details:', response.errors);
         return rejectWithValue(response.message || 'Failed to send OTP');
       }
     } catch (error: any) {
-      console.error('💥 Redux Thunk - OTP send error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 Redux Thunk - OTP send error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        phone: phone
       });
       
       const errorMessage = error.response?.data?.message || 
         error.message || 
         'Failed to send OTP';
       
-      console.log('📤 Redux Thunk - Rejecting with error:', errorMessage);
+      logger.debug('📤 Redux Thunk - Rejecting with error:', errorMessage);
       return rejectWithValue(errorMessage);
     }
   }
@@ -200,32 +185,25 @@ export const verifyOtp = createAsyncThunk(
   'auth/verifyOtp',
   async (otpData: VerifyOtpRequest, { rejectWithValue }) => {
     try {
-      console.log('🔄 Redux Thunk - Starting OTP verification process...');
-      console.log('📋 OTP data:', {
-        phone: otpData.phone,
-        otp_code: otpData.otp_code ? '***' + otpData.otp_code.slice(-2) : 'undefined'
-      });
-      console.log('⏰ Thunk timestamp:', new Date().toISOString());
+      logger.debug('🔄 Redux Thunk - Starting OTP verification process...');
+      logger.debug('⏰ Thunk timestamp:', new Date().toISOString());
       
       const response = await apiService.verifyOtp(otpData);
       
-      console.log('📨 Redux Thunk - OTP verification API response received');
-      console.log('📊 Response success:', response.success);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 Redux Thunk - OTP verification API response received');
+      logger.debug('📊 Response success:', response.success);
       
       if (response.success && response.data) {
-        console.log('✅ Redux Thunk - OTP verification successful');
-        console.log('👤 User authenticated:', response.data.user?.name || 'Unknown');
-        console.log('🔑 Token received:', response.data.token ? 'Yes' : 'No');
-        console.log('📱 Phone verified:', response.data.user?.phone);
-        console.log('👤 User role:', response.data.user?.role);
-        console.log('📊 User status:', response.data.user?.status);
+        logger.debug('✅ Redux Thunk - OTP verification successful');
+        logger.debug('🔑 Token received:', response.data.token ? 'Yes' : 'No');
+        logger.debug('👤 User role:', response.data.user?.role);
+        logger.debug('📊 User status:', response.data.user?.status);
         
         // Store auth data
-        console.log('💾 Storing authentication data...');
+        logger.debug('💾 Storing authentication data...');
         await apiService.setAuthToken(response.data.token);
         await apiService.setUserData(response.data.user);
-        console.log('✅ Authentication data stored successfully');
+        logger.debug('✅ Authentication data stored successfully');
         
         return {
           user: response.data.user,
@@ -233,25 +211,23 @@ export const verifyOtp = createAsyncThunk(
           tokenType: response.data.token_type,
         };
       } else {
-        console.log('❌ Redux Thunk - OTP verification failed:', response.message);
-        console.log('🔍 Error details:', response.errors);
+        logger.debug('❌ Redux Thunk - OTP verification failed:', response.message);
+        logger.debug('🔍 Error details:', response.errors);
         return rejectWithValue(response.message || 'OTP verification failed');
       }
     } catch (error: any) {
-      console.error('💥 Redux Thunk - OTP verification error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 Redux Thunk - OTP verification error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        phone: otpData.phone,
-        otp_length: otpData.otp_code?.length
       });
       
       const errorMessage = error.response?.data?.message || 
         error.message || 
         'OTP verification failed';
       
-      console.log('📤 Redux Thunk - Rejecting with error:', errorMessage);
+      logger.debug('📤 Redux Thunk - Rejecting with error:', errorMessage);
       return rejectWithValue(errorMessage);
     }
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import notificationService from '../services/notificationService';
 import { NotificationResource } from '../services/rideService';
+import { logger } from '../core/logging/logger';
 
 export interface NotificationState {
   isInitialized: boolean;
@@ -20,7 +21,7 @@ export const useNotifications = () => {
   // Initialize notifications
   const initializeNotifications = useCallback(async () => {
     try {
-      console.log('🔄 Initializing notifications...');
+      logger.debug('🔄 Initializing notifications...');
       
       // Load initial notifications and unread count
       const [notificationsResult, unreadCount] = await Promise.all([
@@ -35,9 +36,9 @@ export const useNotifications = () => {
         unreadCount: unreadCount,
       }));
       
-      console.log('✅ Notifications initialized successfully');
+      logger.debug('✅ Notifications initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to initialize notifications:', error);
+      logger.error('❌ Failed to initialize notifications:', error);
       setState(prev => ({
         ...prev,
         isInitialized: true, // Still mark as initialized even if failed
@@ -59,7 +60,7 @@ export const useNotifications = () => {
       
       return result;
     } catch (error) {
-      console.error('❌ Failed to get notifications:', error);
+      logger.error('❌ Failed to get notifications:', error);
       setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
@@ -82,7 +83,7 @@ export const useNotifications = () => {
       }));
       
     } catch (error) {
-      console.error('❌ Failed to mark notification as read:', error);
+      logger.error('❌ Failed to mark notification as read:', error);
       throw error;
     }
   }, []);
@@ -103,7 +104,7 @@ export const useNotifications = () => {
       }));
       
     } catch (error) {
-      console.error('❌ Failed to mark all notifications as read:', error);
+      logger.error('❌ Failed to mark all notifications as read:', error);
       throw error;
     }
   }, []);
@@ -115,7 +116,7 @@ export const useNotifications = () => {
       setState(prev => ({ ...prev, unreadCount: count }));
       return count;
     } catch (error) {
-      console.error('❌ Failed to get unread count:', error);
+      logger.error('❌ Failed to get unread count:', error);
       throw error;
     }
   }, []);
@@ -128,13 +129,13 @@ export const useNotifications = () => {
         getUnreadCount()
       ]);
     } catch (error) {
-      console.error('❌ Failed to refresh notifications:', error);
+      logger.error('❌ Failed to refresh notifications:', error);
     }
   }, [getNotifications, getUnreadCount]);
 
   // Handle incoming notification
   const handleIncomingNotification = useCallback((notification: NotificationResource) => {
-    console.log('📨 Received new notification:', notification);
+    logger.debug('📨 Received new notification:', notification);
     
     setState(prev => ({
       ...prev,
@@ -153,7 +154,7 @@ export const useNotifications = () => {
         unreadCount: 0,
       }));
     } catch (error) {
-      console.error('❌ Failed to clear notifications:', error);
+      logger.error('❌ Failed to clear notifications:', error);
     }
   }, []);
 

@@ -22,6 +22,7 @@ import { saveUserBasicInfo } from '../../services/userService';
 import { showToast } from '../../components/ToastProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { logger } from '../../core/logging/logger';
 
 interface BasicInfoParams {
   role: 'driver' | 'passenger';
@@ -179,13 +180,13 @@ export default function BasicInfoScreen() {
 
       if (!uid) {
         Alert.alert('Error', 'User ID not found. Please try signing in again.');
-        console.error('BasicInfoScreen - UID is undefined in auth state');
+        logger.error('BasicInfoScreen - UID is undefined in auth state');
         return;
       }
 
       setIsSubmitting(true);
       
-      console.log('BasicInfoScreen - Calling saveUserBasicInfo with uid:', uid);
+      logger.debug('BasicInfoScreen - Calling saveUserBasicInfo with uid:', uid);
       
       // Save user basic information
       const savedUserProfile = await saveUserBasicInfo({
@@ -194,7 +195,6 @@ export default function BasicInfoScreen() {
         phoneNumber,
       }, uid);
 
-      console.log('BasicInfoScreen - User profile saved successfully:', savedUserProfile);
 
       // Update auth state with the userProfile
       dispatch(setUserProfile(savedUserProfile));
@@ -206,11 +206,11 @@ export default function BasicInfoScreen() {
       );
 
       // Dispatch setProfileCompleted immediately after showing toast
-      console.log('BasicInfoScreen - Dispatching setProfileCompleted immediately...');
+      logger.debug('BasicInfoScreen - Dispatching setProfileCompleted immediately...');
       dispatch(setProfileCompleted());
-      console.log('BasicInfoScreen - setProfileCompleted dispatched');
+      logger.debug('BasicInfoScreen - setProfileCompleted dispatched');
     } catch (error: any) {
-      console.error('BasicInfoScreen - Error saving user info:', error);
+      logger.error('BasicInfoScreen - Error saving user info:', error);
       Alert.alert('Error', error.message || 'Failed to save information. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -221,7 +221,7 @@ export default function BasicInfoScreen() {
     try {
       navigation.goBack();
     } catch (err) {
-      console.error('Navigation error:', err);
+      logger.error('Navigation error:', err);
       Alert.alert('Error', 'Unable to go back. Please try again.');
     }
   };

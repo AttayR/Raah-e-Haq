@@ -1,4 +1,5 @@
 import { apiService, VerifyOtpRequest } from './api';
+import { logger } from '../core/logging/logger';
 
 // OTP Service for handling phone verification operations
 export class OtpService {
@@ -7,44 +8,38 @@ export class OtpService {
    */
   static async sendOtp(phone: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      console.log('🔐 OTP Service - Initiating OTP send process');
-      console.log('📱 Target phone:', phone);
-      console.log('⏰ Service timestamp:', new Date().toISOString());
+      logger.debug('🔐 OTP Service - Initiating OTP send process');
+      logger.debug('⏰ Service timestamp:', new Date().toISOString());
       
       // Normalize to Pakistani E.164 format +92XXXXXXXXXX
       const normalized = this.normalizePakistanPhone(phone);
       if (!normalized.success) {
-        console.log('❌ OTP Service - Phone normalization failed:', normalized.error);
+        logger.debug('❌ OTP Service - Phone normalization failed:', normalized.error);
         return { success: false, error: normalized.error };
       }
 
       // Validate phone number format
       const validation = this.validatePhoneNumber(normalized.phone!);
       if (!validation.isValid) {
-        console.log('❌ OTP Service - Phone validation failed:', validation.error);
+        logger.debug('❌ OTP Service - Phone validation failed:', validation.error);
         return { success: false, error: validation.error };
       }
       
-      console.log('✅ OTP Service - Phone validation passed');
+      logger.debug('✅ OTP Service - Phone validation passed');
       
       // Call API service
       const response = await apiService.sendOtp(normalized.phone!);
       
       if (response.success && response.data) {
-        console.log('✅ OTP Service - OTP sent successfully via API');
-        console.log('📊 OTP details:', {
-          phone: response.data.phone,
-          expires_in: response.data.expires_in,
-          has_otp_code: !!response.data.otp_code
-        });
+        logger.debug('✅ OTP Service - OTP sent successfully via API');
         
         return { success: true, data: response.data };
       } else {
-        console.log('❌ OTP Service - API returned failure:', response.message);
+        logger.debug('❌ OTP Service - API returned failure:', response.message);
         return { success: false, error: response.message || 'Failed to send OTP' };
       }
     } catch (error: any) {
-      console.error('💥 OTP Service - Send OTP error:', error);
+      logger.error('💥 OTP Service - Send OTP error:', error);
       return { 
         success: false, 
         error: error.message || 'Failed to send OTP' 
@@ -57,45 +52,31 @@ export class OtpService {
    */
   static async verifyOtp(otpData: VerifyOtpRequest): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      console.log('🔐 OTP Service - Initiating OTP verification process');
-      console.log('📋 OTP data:', {
-        phone: otpData.phone,
-        otp_code: otpData.otp_code ? '***' + otpData.otp_code.slice(-2) : 'undefined'
-      });
-      console.log('⏰ Service timestamp:', new Date().toISOString());
+      logger.debug('🔐 OTP Service - Initiating OTP verification process');
+      logger.debug('⏰ Service timestamp:', new Date().toISOString());
       
       // Validate OTP data
       const validation = this.validateOtpData(otpData);
       if (!validation.isValid) {
-        console.log('❌ OTP Service - OTP validation failed:', validation.error);
+        logger.debug('❌ OTP Service - OTP validation failed:', validation.error);
         return { success: false, error: validation.error };
       }
       
-      console.log('✅ OTP Service - OTP data validation passed');
+      logger.debug('✅ OTP Service - OTP data validation passed');
       
       // Call API service
       const response = await apiService.verifyOtp(otpData);
       
       if (response.success && response.data) {
-        console.log('✅ OTP Service - OTP verification successful via API');
-        console.log('👤 User details:', {
-          name: response.data.user?.name,
-          phone: response.data.user?.phone,
-          role: response.data.user?.role,
-          status: response.data.user?.status
-        });
-        console.log('🔑 Auth details:', {
-          has_token: !!response.data.token,
-          token_type: response.data.token_type
-        });
+        logger.debug('✅ OTP Service - OTP verification successful via API');
         
         return { success: true, data: response.data };
       } else {
-        console.log('❌ OTP Service - API returned verification failure:', response.message);
+        logger.debug('❌ OTP Service - API returned verification failure:', response.message);
         return { success: false, error: response.message || 'OTP verification failed' };
       }
     } catch (error: any) {
-      console.error('💥 OTP Service - Verify OTP error:', error);
+      logger.error('💥 OTP Service - Verify OTP error:', error);
       return { 
         success: false, 
         error: error.message || 'OTP verification failed' 

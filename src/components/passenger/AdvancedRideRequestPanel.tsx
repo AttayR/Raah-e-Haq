@@ -18,6 +18,7 @@ import LocationSearch from './LocationSearch';
 import VehicleSelector from './VehicleSelector';
 import PassengerCountSelector from './PassengerCountSelector';
 import StopManager from './StopManager';
+import { logger } from '../../core/logging/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -63,7 +64,7 @@ const AdvancedRideRequestPanel: React.FC<AdvancedRideRequestPanelProps> = ({
       }
     };
   } catch (error) {
-    console.log('Theme error, using fallback:', error);
+    logger.debug('Theme error, using fallback:', error);
     theme = {
       colors: {
         primary: '#3B82F6',

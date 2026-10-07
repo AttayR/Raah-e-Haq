@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Button } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { setSignedOut, setAuthenticated } from '../store/slices/authSlice';
+import { logger } from '../core/logging/logger';
 
 export default function AuthDebug() {
   const dispatch = useDispatch<any>();
@@ -10,12 +11,12 @@ export default function AuthDebug() {
   const userState = useSelector((state: RootState) => state.user);
 
   const testSignOut = () => {
-    console.log('AuthDebug - Testing sign out');
+    logger.debug('AuthDebug - Testing sign out');
     dispatch(setSignedOut());
   };
 
   const testSignIn = () => {
-    console.log('AuthDebug - Testing sign in');
+    logger.debug('AuthDebug - Testing sign in');
     const mockUser = {
       uid: 'test_user_' + Date.now(),
       phoneNumber: '+1234567890',

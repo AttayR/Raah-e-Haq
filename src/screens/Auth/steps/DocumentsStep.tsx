@@ -12,6 +12,7 @@ import {
 import { launchImageLibrary, ImagePickerResponse, MediaType, PhotoQuality } from 'react-native-image-picker';
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { logger } from '../../../core/logging/logger';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -62,7 +63,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
       setIsUploading(false);
       
       if (response.didCancel) {
-        console.log('Image picker cancelled');
+        logger.debug('Image picker cancelled');
         return;
       }
 
@@ -70,13 +71,12 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
       const asset = response.assets && response.assets[0];
       const imageUri = asset?.uri;
       if (!imageUri) {
-        console.log('Image picker cancelled or error:', response.errorMessage);
-        console.log('No image URI found in response:', response);
+        logger.debug('Image picker cancelled or error:', response.errorMessage);
         Alert.alert('Error', 'Failed to get image. Please try again.');
         return;
       }
       
-      console.log('Image picker response:', {
+      logger.debug('Image picker response:', {
         imageUri,
         fileName: asset?.fileName,
         fileSize: asset?.fileSize,

@@ -42,7 +42,7 @@ src/
     realtime/   socket.ts (one connection manager)
     location/   useLocationWatcher.ts, driverTracker.ts
     push/       fcm.ts
-    logging/    logger.ts (redacting; silent in release)
+    logging/    logger.ts (redacting; only `error` prints in release)
   features/
     auth/  onboarding/  ride-request/  ride-tracking/  driver-dispatch/  driver-ride/
     history/  notifications/  profile/  wallet/ (later)  chat/ (later)
@@ -72,7 +72,7 @@ Migration rule: **move code into this structure when a task touches it.** No big
 | UI | `ui/tokens.ts` (colour roles incl. error/warning/success, spacing, radius, type scale); `useColorScheme` with a persisted override; `react-native-safe-area-context` everywhere; lint rule `react-native/no-color-literals` | INF-24, PAX-21, DRV-21 |
 | Feedback | One toast host (NotificationManager/ModernToast) mounted once, plus `useToast()` | INF-15, INF-22, PAX-16 |
 | Crashes | A root ErrorBoundary, plus Crashlytics (RNFirebase) in release | INF-23 |
-| Logging | `logger` with key redaction (password, token, otp, cnic, phone, account); `transform-remove-console` in release | AUTH-03, INF-33 |
+| Logging | `src/core/logging/logger.ts` is the only console user (ESLint `no-console: error` in `src/`). Every argument is redacted by key (password, token, otp, cnic, phone, email, account, bank, address, licence, plate, uid, api key, fcm …) and `key=`/`token=` query values in strings are masked. `debug`/`info`/`warn` are silent in release; `error` always prints, with a stricter set that also redacts names and coordinates. No `transform-remove-console`: it would also strip `error`, which crash reporting (T-606) needs | AUTH-03, INF-33 |
 | Tests | Jest + React Native Testing Library + native mocks; `axios-mock-adapter` for API contracts; **Maestro** for E2E flows | INF-28 |
 | CI | GitHub Actions: `yarn verify` and a release bundle for both platforms on every PR | INF-29 |
 

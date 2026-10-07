@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse, CancelTokenSource } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { env } from '../config/env';
+import { logger } from '../core/logging/logger';
 
 // API Configuration: base URL comes from the env config (see src/config/env.ts)
 const API_BASE_URL = env.API_URL;
@@ -31,7 +32,7 @@ export const cancelAllRequests = () => {
     try {
       source.cancel('Component unmounted');
     } catch (error) {
-      console.log('Error cancelling request:', error);
+      logger.debug('Error cancelling request:', error);
     }
   });
   activeRequests.clear();
@@ -51,7 +52,7 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.log('Error getting token from storage:', error);
+      logger.debug('Error getting token from storage:', error);
     }
     return config;
   },
@@ -68,7 +69,7 @@ apiClient.interceptors.response.use(
   async (error) => {
     // Handle cancelled requests (don't process them)
     if (axios.isCancel(error)) {
-      console.log('Request cancelled:', error.message);
+      logger.debug('Request cancelled:', error.message);
       return Promise.reject(error);
     }
 
@@ -196,47 +197,42 @@ export interface ResetPasswordRequest {
 class ApiService {
   // Authentication Methods
   async login(credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> {
-    console.log('🌐 API Service - Logging in user...');
-    console.log('📡 Endpoint: POST /auth/login');
-    console.log('📋 Request data:', credentials);
+    logger.debug('🌐 API Service - Logging in user...');
+    logger.debug('📡 Endpoint: POST /auth/login');
     
     const response = await apiClient.post('/auth/login', credentials);
     
-    console.log('📨 API Service - Login response received');
-    console.log('📊 Response status:', response.status);
-    console.log('📋 Response data:', response.data);
+    logger.debug('📨 API Service - Login response received');
+    logger.debug('📊 Response status:', response.status);
     
     return response.data;
   }
 
   async register(userData: RegisterRequest): Promise<ApiResponse<{ user: User }>> {
-    console.log('🌐 API Service - Registering user...');
-    console.log('📡 Endpoint: POST /auth/register');
-    console.log('📋 Request data:', userData);
+    logger.debug('🌐 API Service - Registering user...');
+    logger.debug('📡 Endpoint: POST /auth/register');
     
     try {
       const response = await apiClient.post('/auth/register', userData);
       
-      console.log('📨 API Service - Registration response received');
-      console.log('📊 Response status:', response.status);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 API Service - Registration response received');
+      logger.debug('📊 Response status:', response.status);
       
       return response.data;
     } catch (error: any) {
-      console.error('💥 API Service - Registration error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 API Service - Registration error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        userData: userData
       });
       
       // Log validation errors if available
       if (error.response?.data?.errors) {
-        console.error('📋 Validation errors:', error.response.data.errors);
+        logger.error('📋 Validation errors:', error.response.data.errors);
         // Log each validation error in detail
         Object.entries(error.response.data.errors).forEach(([field, messages]) => {
-          console.error(`❌ ${field}:`, messages);
+          logger.error(`❌ ${field}:`, messages);
         });
       }
       
@@ -254,13 +250,8 @@ class ApiService {
     passenger_emergency_contact_name?: string;
     passenger_emergency_contact_relation?: string;
   }): Promise<ApiResponse<{ user: User }>> {
-    console.log('🌐 API Service - Registering user with images...');
-    console.log('📡 Endpoint: POST /auth/register (multipart/form-data)');
-    console.log('📋 Request data (redacted passwords):', {
-      ...userData,
-      password: userData.password ? '***' : undefined,
-      password_confirmation: userData.password_confirmation ? '***' : undefined,
-    });
+    logger.debug('🌐 API Service - Registering user with images...');
+    logger.debug('📡 Endpoint: POST /auth/register (multipart/form-data)');
 
     // Helper to build a RN-compatible file object from a URI
     const buildFile = (uri?: string, fallbackName?: string) => {
@@ -315,20 +306,6 @@ class ApiService {
         if (userData.bank_account_number) formData.append('bank_account_number', userData.bank_account_number);
       }
 
-      // Log form data for debugging
-      console.log('📋 FormData entries:');
-      // Note: FormData.entries() is not available in React Native
-      // We'll log the known fields instead
-      console.log('  name:', userData.name);
-      console.log('  email:', userData.email);
-      console.log('  password: ***');
-      console.log('  password_confirmation: ***');
-      console.log('  user_type:', userData.user_type);
-      console.log('  phone:', userData.phone);
-      console.log('  cnic:', userData.cnic);
-      console.log('  address:', userData.address);
-      console.log('  emergency_contact:', userData.emergency_contact);
-
       // Attach passenger CNIC images when applicable
       if (userData.user_type === 'passenger') {
         const front = buildFile(userData.passenger_cnic_front_image, 'cnic_front.jpg');
@@ -343,9 +320,9 @@ class ApiService {
         if (userData.passenger_preferred_payment) formData.append('passenger_preferred_payment', userData.passenger_preferred_payment);
       }
 
-      console.log('📤 Sending multipart/form-data registration request...');
-      console.log('🌐 API Base URL:', API_BASE_URL);
-      console.log('🔗 Full URL:', `${API_BASE_URL}/auth/register`);
+      logger.debug('📤 Sending multipart/form-data registration request...');
+      logger.debug('🌐 API Base URL:', API_BASE_URL);
+      logger.debug('🔗 Full URL:', `${API_BASE_URL}/auth/register`);
 
       const response = await apiClient.post('/auth/register', formData, {
         headers: {
@@ -355,22 +332,20 @@ class ApiService {
         },
       });
 
-      console.log('📨 API Service - Registration with images response received');
-      console.log('📊 Response status:', response.status);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 API Service - Registration with images response received');
+      logger.debug('📊 Response status:', response.status);
       return response.data;
     } catch (error: any) {
-      console.error('💥 API Service - Registration with images error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 API Service - Registration with images error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        userData: { ...userData, password: userData.password ? '***' : undefined, password_confirmation: userData.password_confirmation ? '***' : undefined },
       });
       if (error.response?.data?.errors) {
-        console.error('📋 Validation errors:', error.response.data.errors);
+        logger.error('📋 Validation errors:', error.response.data.errors);
         Object.entries(error.response.data.errors).forEach(([field, messages]) => {
-          console.error(`❌ ${field}:`, messages);
+          logger.error(`❌ ${field}:`, messages);
         });
       }
       throw error;
@@ -378,77 +353,63 @@ class ApiService {
   }
 
   async sendOtp(phone: string): Promise<ApiResponse<{ phone: string; otp_code: string; expires_in: number }>> {
-    console.log('🌐 API Service - Sending OTP to phone number...');
-    console.log('📡 Endpoint: POST /auth/send-otp');
-    console.log('📱 Phone number:', phone);
-    console.log('⏰ Request timestamp:', new Date().toISOString());
+    logger.debug('🌐 API Service - Sending OTP to phone number...');
+    logger.debug('📡 Endpoint: POST /auth/send-otp');
+    logger.debug('⏰ Request timestamp:', new Date().toISOString());
     
     try {
       const response = await apiClient.post('/auth/send-otp', { phone });
       
-      console.log('📨 API Service - OTP send response received');
-      console.log('📊 Response status:', response.status);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 API Service - OTP send response received');
+      logger.debug('📊 Response status:', response.status);
       
       if (response.data.success) {
-        console.log('✅ OTP sent successfully');
-        console.log('📱 Phone:', response.data.data?.phone);
-        console.log('⏰ Expires in:', response.data.data?.expires_in, 'seconds');
-        console.log('🔢 OTP Code (for testing):', response.data.data?.otp_code);
+        logger.debug('✅ OTP sent successfully');
+        logger.debug('⏰ Expires in:', response.data.data?.expires_in, 'seconds');
       } else {
-        console.log('❌ OTP send failed:', response.data.message);
+        logger.debug('❌ OTP send failed:', response.data.message);
       }
       
       return response.data;
     } catch (error: any) {
-      console.error('💥 API Service - OTP send error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 API Service - OTP send error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        phone: phone
       });
       throw error;
     }
   }
 
   async verifyOtp(otpData: VerifyOtpRequest): Promise<ApiResponse<AuthResponse>> {
-    console.log('🌐 API Service - Verifying OTP...');
-    console.log('📡 Endpoint: POST /auth/verify-otp');
-    console.log('📋 OTP data:', {
-      phone: otpData.phone,
-      otp_code: otpData.otp_code ? '***' + otpData.otp_code.slice(-2) : 'undefined'
-    });
-    console.log('⏰ Request timestamp:', new Date().toISOString());
+    logger.debug('🌐 API Service - Verifying OTP...');
+    logger.debug('📡 Endpoint: POST /auth/verify-otp');
+    logger.debug('⏰ Request timestamp:', new Date().toISOString());
     
     try {
       const response = await apiClient.post('/auth/verify-otp', otpData);
       
-      console.log('📨 API Service - OTP verification response received');
-      console.log('📊 Response status:', response.status);
-      console.log('📋 Response data:', response.data);
+      logger.debug('📨 API Service - OTP verification response received');
+      logger.debug('📊 Response status:', response.status);
       
       if (response.data.success && response.data.data) {
-        console.log('✅ OTP verification successful');
-        console.log('👤 User authenticated:', response.data.data.user?.name || 'Unknown');
-        console.log('🔑 Token received:', response.data.data.token ? 'Yes' : 'No');
-        console.log('📱 Phone verified:', response.data.data.user?.phone);
-        console.log('👤 User role:', response.data.data.user?.role);
-        console.log('📊 User status:', response.data.data.user?.status);
+        logger.debug('✅ OTP verification successful');
+        logger.debug('🔑 Token received:', response.data.data.token ? 'Yes' : 'No');
+        logger.debug('👤 User role:', response.data.data.user?.role);
+        logger.debug('📊 User status:', response.data.data.user?.status);
       } else {
-        console.log('❌ OTP verification failed:', response.data.message);
-        console.log('🔍 Error details:', response.data.errors);
+        logger.debug('❌ OTP verification failed:', response.data.message);
+        logger.debug('🔍 Error details:', response.data.errors);
       }
       
       return response.data;
     } catch (error: any) {
-      console.error('💥 API Service - OTP verification error:', error);
-      console.error('🔍 Error details:', {
+      logger.error('💥 API Service - OTP verification error:', error);
+      logger.error('🔍 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        phone: otpData.phone,
-        otp_length: otpData.otp_code?.length
       });
       throw error;
     }
@@ -501,25 +462,25 @@ class ApiService {
   // Only network failures (timeout, no connection, DNS) are treated as no connectivity.
   async testNetworkConnectivity(): Promise<boolean> {
     try {
-      console.log('🌐 Testing network connectivity...');
-      console.log('🔗 Testing URL:', API_BASE_URL);
+      logger.debug('🌐 Testing network connectivity...');
+      logger.debug('🔗 Testing URL:', API_BASE_URL);
 
       const response = await apiClient.get('/', {
         timeout: 10000,
         validateStatus: () => true, // Accept any status so we only fail on network error
       });
 
-      console.log('✅ Network connectivity test successful');
-      console.log('📊 Response status:', response.status);
+      logger.debug('✅ Network connectivity test successful');
+      logger.debug('📊 Response status:', response.status);
       return true;
     } catch (error: any) {
       // Server responded with an error (e.g. 404) = we have connectivity
       if (error.response != null) {
-        console.log('✅ Server reachable (response status:', error.response.status, ')');
+        logger.debug('✅ Server reachable (response status:', error.response.status, ')');
         return true;
       }
-      console.error('❌ Network connectivity test failed');
-      console.error('🔍 Error details:', {
+      logger.error('❌ Network connectivity test failed');
+      logger.error('🔍 Error details:', {
         message: error.message,
         code: error.code,
       });
@@ -559,25 +520,25 @@ class ApiService {
 
   // Generic HTTP methods for external services
   async get(url: string, config?: any): Promise<any> {
-    console.log('🌐 API Service - GET request:', url);
+    logger.debug('🌐 API Service - GET request:', url);
     const response = await apiClient.get(url, config);
     return response.data;
   }
 
   async post(url: string, data?: any, config?: any): Promise<any> {
-    console.log('🌐 API Service - POST request:', url);
+    logger.debug('🌐 API Service - POST request:', url);
     const response = await apiClient.post(url, data, config);
     return response.data;
   }
 
   async put(url: string, data?: any, config?: any): Promise<any> {
-    console.log('🌐 API Service - PUT request:', url);
+    logger.debug('🌐 API Service - PUT request:', url);
     const response = await apiClient.put(url, data, config);
     return response.data;
   }
 
   async delete(url: string, config?: any): Promise<any> {
-    console.log('🌐 API Service - DELETE request:', url);
+    logger.debug('🌐 API Service - DELETE request:', url);
     const response = await apiClient.delete(url, config);
     return response.data;
   }

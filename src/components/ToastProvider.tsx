@@ -1,3 +1,5 @@
+import { logger } from '../core/logging/logger';
+
 // Safe toast implementation that doesn't crash if react-native-toast-message is not available
 export const showToast = (type: 'success' | 'error' | 'info', message: string) => {
   try {
@@ -12,7 +14,7 @@ export const showToast = (type: 'success' | 'error' | 'info', message: string) =
     });
   } catch (error) {
     // Fallback to console log if toast library is not available
-    console.log(`[${type.toUpperCase()}] ${message}`);
+    logger.debug(`[${type.toUpperCase()}] ${message}`);
   }
 };
 

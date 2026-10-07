@@ -20,6 +20,7 @@ import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import LinearGradient from 'react-native-linear-gradient';
 import { showToast } from '../../components/ToastProvider';
+import { logger } from '../../core/logging/logger';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -58,7 +59,7 @@ export default function DriverHomeScreen() {
       subtitle: 'View your income',
       icon: 'attach-money',
       color: '#f59e0b',
-      onPress: () => console.log('View earnings'),
+      onPress: () => logger.debug('View earnings'),
     },
     {
       id: 'history',
@@ -66,7 +67,7 @@ export default function DriverHomeScreen() {
       subtitle: 'Past trips',
       icon: 'history',
       color: theme.colors.secondary,
-      onPress: () => console.log('View history'),
+      onPress: () => logger.debug('View history'),
     },
     {
       id: 'profile',

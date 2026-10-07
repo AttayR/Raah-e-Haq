@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../app/providers/ThemeProvider';
+import { logger } from '../../core/logging/logger';
 
 interface PassengerCountSelectorProps {
   count: number;
@@ -34,7 +35,7 @@ const PassengerCountSelector: React.FC<PassengerCountSelectorProps> = ({
       }
     };
   } catch (error) {
-    console.log('Theme error, using fallback:', error);
+    logger.debug('Theme error, using fallback:', error);
     theme = {
       colors: {
         primary: '#3B82F6',

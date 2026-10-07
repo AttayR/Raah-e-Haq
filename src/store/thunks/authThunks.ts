@@ -37,40 +37,41 @@ import {
   setProfileCompleted
 } from '../slices/authSlice';
 import authModule from '@react-native-firebase/auth';
+import { logger } from '../../core/logging/logger';
 
 // Start authentication listener
 export const startAuthListener = () => (dispatch: AppDispatch, _getState: () => any) => {
-  console.log('startAuthListener - Starting...');
+  logger.debug('startAuthListener - Starting...');
   
   // Set up Firebase auth state listener
   const unsubscribe = listenAuth(async (user) => {
-    console.log('startAuthListener - Firebase auth state changed:', user ? user.uid : 'signed out');
+    logger.debug('startAuthListener - Firebase auth state changed:', user ? user.uid : 'signed out');
     
     if (user) {
       // User is signed in, but we need to check if we have a valid session
       // The checkAuthStatusThunk will handle session validation
-      console.log('startAuthListener - User signed in, session will be validated by checkAuthStatusThunk');
+      logger.debug('startAuthListener - User signed in, session will be validated by checkAuthStatusThunk');
     } else {
       // User is signed out in Firebase, but check if we have a valid session in AsyncStorage
-      console.log('startAuthListener - Firebase user signed out, checking for valid session...');
+      logger.debug('startAuthListener - Firebase user signed out, checking for valid session...');
       
       const session = await getAuthSession();
       if (session) {
-        console.log('startAuthListener - Valid session found in AsyncStorage, keeping authenticated state');
+        logger.debug('startAuthListener - Valid session found in AsyncStorage, keeping authenticated state');
         // Don't sign out - we have a valid session
         return;
       } else {
-        console.log('startAuthListener - No valid session found, signing out');
+        logger.debug('startAuthListener - No valid session found, signing out');
         dispatch(setSignedOut());
       }
     }
   });
   
-  console.log('startAuthListener - Auth listener set up successfully');
+  logger.debug('startAuthListener - Auth listener set up successfully');
   
   // Return the unsubscribe function
   return () => {
-    console.log('startAuthListener - Unsubscribing from auth listener');
+    logger.debug('startAuthListener - Unsubscribing from auth listener');
     if (unsubscribe) {
       unsubscribe();
     }
@@ -117,28 +118,32 @@ export const verifyCodeThunk = (
   email?: string
 ) => async (dispatch: AppDispatch, getState: () => any) => {
   try {
-    console.log('verifyCodeThunk - Starting verification...');
+    logger.debug('verifyCodeThunk - Starting verification...');
     dispatch(setVerifying());
     dispatch(clearError());
     
     const { auth } = getState();
     const { verificationId, phoneNumber, isExistingUser, userProfile: existingUserProfile } = auth;
     
-    console.log('verifyCodeThunk - Current auth state:', auth);
+    logger.debug('verifyCodeThunk - Current auth state:', {
+      hasVerificationId: !!verificationId,
+      hasPhone: !!phoneNumber,
+      isExistingUser,
+    });
     
     if (!verificationId || !phoneNumber) {
       throw new Error('Verification ID or phone number not found');
     }
     
     // Verify the code using Firebase
-    console.log('verifyCodeThunk - Verifying code with Firebase...');
+    logger.debug('verifyCodeThunk - Verifying code with Firebase...');
     const userCredential = await verifyPhoneCode(verificationId, verificationCode);
     const user = userCredential.user;
-    console.log('verifyCodeThunk - Firebase verification successful, user:', user.uid);
+    logger.debug('verifyCodeThunk - Firebase verification successful, user:', user.uid);
     
     // Handle existing user flow
     if (isExistingUser && existingUserProfile) {
-      console.log('verifyCodeThunk - Existing user detected, signing in...');
+      logger.debug('verifyCodeThunk - Existing user detected, signing in...');
       
       // Update last login time
       await updateUserProfile(user.uid, { 
@@ -159,17 +164,17 @@ export const verifyCodeThunk = (
       }));
       
       dispatch(setSession(session));
-      console.log('verifyCodeThunk - Existing user signed in successfully');
+      logger.debug('verifyCodeThunk - Existing user signed in successfully');
       showToast('success', 'Signed in successfully');
       return { user, userProfile: existingUserProfile, session, isExistingUser: true };
     }
     
     // Handle new user flow
-    console.log('verifyCodeThunk - New user detected...');
+    logger.debug('verifyCodeThunk - New user detected...');
     
     // If no role provided, just authenticate the user without setting a role
     if (!role) {
-      console.log('verifyCodeThunk - No role provided, authenticating user without role...');
+      logger.debug('verifyCodeThunk - No role provided, authenticating user without role...');
       
       // Create a minimal session without role
       const session = await createAuthSession(user, {
@@ -191,24 +196,22 @@ export const verifyCodeThunk = (
       }));
       
       dispatch(setSession(session));
-      console.log('verifyCodeThunk - User authenticated without role, ready for role selection');
+      logger.debug('verifyCodeThunk - User authenticated without role, ready for role selection');
       showToast('success', 'Phone verified successfully');
       return { user, userProfile: null, session, isExistingUser: false };
     }
     
     // Create new user profile
-    console.log('verifyCodeThunk - Creating new user profile...');
+    logger.debug('verifyCodeThunk - Creating new user profile...');
     const userProfile = await createUserProfile(user.uid, phoneNumber, role, displayName, email);
     
-    console.log('verifyCodeThunk - User profile ready:', userProfile);
     
     // Create session
-    console.log('verifyCodeThunk - Creating auth session...');
+    logger.debug('verifyCodeThunk - Creating auth session...');
     const session = await createAuthSession(user, userProfile);
-    console.log('verifyCodeThunk - Session created:', session);
     
     // Set authenticated state
-    console.log('verifyCodeThunk - Dispatching setAuthenticated...');
+    logger.debug('verifyCodeThunk - Dispatching setAuthenticated...');
     dispatch(setAuthenticated({
       uid: user.uid,
       phoneNumber: userProfile.phoneNumber,
@@ -218,14 +221,14 @@ export const verifyCodeThunk = (
       profileCompleted: true
     }));
     
-    console.log('verifyCodeThunk - Dispatching setSession...');
+    logger.debug('verifyCodeThunk - Dispatching setSession...');
     dispatch(setSession(session));
     
-    console.log('verifyCodeThunk - Verification completed successfully');
+    logger.debug('verifyCodeThunk - Verification completed successfully');
     showToast('success', 'Account created successfully');
     return { user, userProfile, session, isExistingUser: false };
   } catch (error: any) {
-    console.error('verifyCodeThunk - Error:', error);
+    logger.error('verifyCodeThunk - Error:', error);
     const errorMessage = error.message || 'Failed to verify code';
     dispatch(setAuthError(errorMessage));
     showToast('error', errorMessage);
@@ -239,7 +242,7 @@ export const signOutThunk = () => async (dispatch: AppDispatch) => {
     await signOutUser();
     dispatch(setSignedOut());
   } catch (error: any) {
-    console.error('Sign out error:', error);
+    logger.error('Sign out error:', error);
     // Force sign out even if there's an error
     dispatch(setSignedOut());
   }
@@ -248,34 +251,33 @@ export const signOutThunk = () => async (dispatch: AppDispatch) => {
 // Check authentication status on app start
 export const checkAuthStatusThunk = () => async (dispatch: AppDispatch, getState: () => any) => {
   try {
-    console.log('checkAuthStatusThunk - Starting...');
+    logger.debug('checkAuthStatusThunk - Starting...');
     
     // Check if we have a persisted auth state first
     const { auth } = getState();
-    console.log('checkAuthStatusThunk - Current persisted state:', auth);
+    logger.debug('checkAuthStatusThunk - Current persisted state:', auth);
     
     // If we already have an authenticated user with valid session, don't override it
     if (auth.status === 'authenticated' && auth.uid && auth.session) {
-      console.log('checkAuthStatusThunk - User already authenticated, checking session validity...');
+      logger.debug('checkAuthStatusThunk - User already authenticated, checking session validity...');
       
       // Check if the session is still valid
       const session = await getAuthSession();
       if (session && session.uid === auth.uid) {
-        console.log('checkAuthStatusThunk - Valid session found, keeping authenticated state');
+        logger.debug('checkAuthStatusThunk - Valid session found, keeping authenticated state');
         return;
       } else {
-        console.log('checkAuthStatusThunk - Session expired or invalid, signing out');
+        logger.debug('checkAuthStatusThunk - Session expired or invalid, signing out');
         dispatch(setSignedOut());
         return;
       }
     }
     
     // Check for existing session in AsyncStorage
-    console.log('checkAuthStatusThunk - Checking AsyncStorage for existing session...');
+    logger.debug('checkAuthStatusThunk - Checking AsyncStorage for existing session...');
     const session = await getAuthSession();
     
     if (session) {
-      console.log('checkAuthStatusThunk - Found valid session:', session);
       
       // Restore authentication state from session
       dispatch(setAuthenticated({
@@ -287,15 +289,15 @@ export const checkAuthStatusThunk = () => async (dispatch: AppDispatch, getState
         profileCompleted: true // If there's a valid session, profile must be completed
       }));
       
-      console.log('checkAuthStatusThunk - Authentication state restored from session');
+      logger.debug('checkAuthStatusThunk - Authentication state restored from session');
     } else {
-      console.log('checkAuthStatusThunk - No valid session found, setting signed out state');
+      logger.debug('checkAuthStatusThunk - No valid session found, setting signed out state');
       dispatch(setSignedOut());
     }
     
-    console.log('checkAuthStatusThunk - Completed');
+    logger.debug('checkAuthStatusThunk - Completed');
   } catch (error: any) {
-    console.error('checkAuthStatusThunk - Error:', error);
+    logger.error('checkAuthStatusThunk - Error:', error);
     dispatch(setSignedOut());
   }
 };
@@ -311,7 +313,7 @@ export const refreshSessionThunk = () => async (dispatch: AppDispatch, getState:
       return session;
     }
   } catch (error: any) {
-    console.error('Session refresh error:', error);
+    logger.error('Session refresh error:', error);
     dispatch(setAuthError('Session refresh failed'));
   }
   return null;
@@ -328,7 +330,7 @@ export const updateProfileThunk = (updates: any) => async (dispatch: AppDispatch
       }
     }
   } catch (error: any) {
-    console.error('Profile update error:', error);
+    logger.error('Profile update error:', error);
     dispatch(setAuthError('Failed to update profile'));
   }
 };
@@ -342,7 +344,7 @@ export const emailSignUpThunk = (
   phoneNumber?: string
 ) => async (dispatch: AppDispatch) => {
   try {
-    console.log('emailSignUpThunk - Starting email signup...');
+    logger.debug('emailSignUpThunk - Starting email signup...');
     dispatch(setAuthLoading());
     dispatch(clearError());
     
@@ -387,10 +389,10 @@ export const emailSignUpThunk = (
     }));
     
     dispatch(setSession(session));
-    console.log('emailSignUpThunk - Email signup successful');
+    logger.debug('emailSignUpThunk - Email signup successful');
     return { user, userProfile, session };
   } catch (error: any) {
-    console.error('emailSignUpThunk - Error:', error);
+    logger.error('emailSignUpThunk - Error:', error);
     const errorMessage = error.message || 'Failed to create account';
     dispatch(setAuthError(errorMessage));
     throw error;
@@ -399,7 +401,7 @@ export const emailSignUpThunk = (
 
 export const emailSignInThunk = (email: string, password: string) => async (dispatch: AppDispatch) => {
   try {
-    console.log('emailSignInThunk - Starting email signin...');
+    logger.debug('emailSignInThunk - Starting email signin...');
     dispatch(setAuthLoading());
     dispatch(clearError());
     
@@ -436,11 +438,11 @@ export const emailSignInThunk = (email: string, password: string) => async (disp
     }
     
     dispatch(setSession(session));
-    console.log('emailSignInThunk - Email signin successful');
+    logger.debug('emailSignInThunk - Email signin successful');
     showToast('success', 'Signed in successfully');
     return { user, userProfile, session, isExistingUser };
   } catch (error: any) {
-    console.error('emailSignInThunk - Error:', error);
+    logger.error('emailSignInThunk - Error:', error);
     const errorMessage = error.message || 'Failed to sign in';
     dispatch(setAuthError(errorMessage));
     showToast('error', errorMessage);
@@ -450,7 +452,7 @@ export const emailSignInThunk = (email: string, password: string) => async (disp
 
 export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatch) => {
   try {
-    console.log('resetPasswordThunk - Starting password reset...');
+    logger.debug('resetPasswordThunk - Starting password reset...');
     dispatch(setAuthLoading());
     dispatch(clearError());
     
@@ -461,11 +463,11 @@ export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatc
     }
     
     await resetPassword(email.trim());
-    console.log('resetPasswordThunk - Password reset email sent');
+    logger.debug('resetPasswordThunk - Password reset email sent');
     showToast('success', 'Password reset email sent');
     return true;
   } catch (error: any) {
-    console.error('resetPasswordThunk - Error:', error);
+    logger.error('resetPasswordThunk - Error:', error);
     const errorMessage = error.message || 'Failed to send password reset email';
     dispatch(setAuthError(errorMessage));
     showToast('error', errorMessage);
@@ -497,7 +499,7 @@ export const detailedRegistrationThunk = (
   }
 ) => async (dispatch: AppDispatch) => {
   try {
-    console.log('detailedRegistrationThunk - Starting detailed registration...');
+    logger.debug('detailedRegistrationThunk - Starting detailed registration...');
     dispatch(setAuthLoading());
     dispatch(clearError());
     
@@ -547,11 +549,11 @@ export const detailedRegistrationThunk = (
     }));
     
     dispatch(setSession(session));
-    console.log('detailedRegistrationThunk - Detailed registration successful');
+    logger.debug('detailedRegistrationThunk - Detailed registration successful');
     showToast('success', 'Account created successfully');
     return { user, userProfile, session };
   } catch (error: any) {
-    console.error('detailedRegistrationThunk - Error:', error);
+    logger.error('detailedRegistrationThunk - Error:', error);
     const errorMessage = error.message || 'Failed to create account';
     dispatch(setAuthError(errorMessage));
     showToast('error', errorMessage);
@@ -562,7 +564,7 @@ export const detailedRegistrationThunk = (
 // Google Sign-In Thunk
 export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
   try {
-    console.log('googleSignInThunk - Starting Google sign-in...');
+    logger.debug('googleSignInThunk - Starting Google sign-in...');
     dispatch(setAuthLoading());
     dispatch(clearError());
     
@@ -587,7 +589,7 @@ export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
         }));
         
         dispatch(setSession(session));
-        console.log('googleSignInThunk - Google sign-in successful');
+        logger.debug('googleSignInThunk - Google sign-in successful');
         showToast('success', 'Signed in with Google successfully');
         return { user: result.user, userProfile, session };
       } else {
@@ -612,7 +614,7 @@ export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
         }));
         
         dispatch(setSession(session));
-        console.log('googleSignInThunk - Google sign-in successful with new profile');
+        logger.debug('googleSignInThunk - Google sign-in successful with new profile');
         showToast('success', 'Signed in with Google successfully');
         return { user: result.user, userProfile: newUserProfile, session };
       }
@@ -620,7 +622,7 @@ export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
       throw new Error(result.error || 'Google Sign-In failed');
     }
   } catch (error: any) {
-    console.error('googleSignInThunk - Error:', error);
+    logger.error('googleSignInThunk - Error:', error);
     const errorMessage = error.message || 'Failed to sign in with Google';
     dispatch(setAuthError(errorMessage));
     showToast('error', errorMessage);
@@ -660,7 +662,7 @@ export const driverRegistrationThunk = (
   }
 ) => async (dispatch: AppDispatch, getState: () => any) => {
   try {
-    console.log('driverRegistrationThunk - Starting driver registration...');
+    logger.debug('driverRegistrationThunk - Starting driver registration...');
     dispatch(setAuthLoading());
     
     const { auth } = getState();
@@ -688,12 +690,12 @@ export const driverRegistrationThunk = (
     
     dispatch(setSession(session));
     
-    console.log('driverRegistrationThunk - Driver registration completed successfully');
+    logger.debug('driverRegistrationThunk - Driver registration completed successfully');
     showToast('success', 'Driver registration submitted for approval');
     
     return { userProfile, session };
   } catch (error: any) {
-    console.error('driverRegistrationThunk - Error:', error);
+    logger.error('driverRegistrationThunk - Error:', error);
     dispatch(setAuthError(error.message || 'Driver registration failed'));
     showToast('error', error.message || 'Driver registration failed');
     throw error;

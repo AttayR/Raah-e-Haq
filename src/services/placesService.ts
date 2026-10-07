@@ -1,4 +1,5 @@
 import MAPS_CONFIG from '../config/mapsConfig';
+import { logger } from '../core/logging/logger';
 
 export type AutocompleteItem = {
   place_id: string;
@@ -31,7 +32,7 @@ export async function fetchPlaceDetails(placeId: string): Promise<{ latitude: nu
 async function fallbackReverseGeocode(lat: number, lng: number): Promise<string | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
-    console.log('Fallback reverse geocoding URL:', url);
+    logger.debug('Fallback reverse geocoding URL:', url);
     
     const res = await fetch(url, {
       headers: {
@@ -40,21 +41,21 @@ async function fallbackReverseGeocode(lat: number, lng: number): Promise<string 
     });
     
     if (!res.ok) {
-      console.error('Fallback reverse geocoding HTTP error:', res.status);
+      logger.error('Fallback reverse geocoding HTTP error:', res.status);
       return null;
     }
     
     const json = await res.json();
-    console.log('Fallback reverse geocoding response:', json);
+    logger.debug('Fallback reverse geocoding response:', json);
     
     if (json.display_name) {
-      console.log('Fallback reverse geocoding success:', json.display_name);
+      logger.debug('Fallback reverse geocoding success:', json.display_name);
       return json.display_name;
     }
     
     return null;
   } catch (error) {
-    console.error('Fallback reverse geocoding error:', error);
+    logger.error('Fallback reverse geocoding error:', error);
     return null;
   }
 }
@@ -62,36 +63,35 @@ async function fallbackReverseGeocode(lat: number, lng: number): Promise<string 
 export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${MAPS_CONFIG.API_KEY}`;
-    console.log('Reverse geocoding URL:', url);
     
     const res = await fetch(url);
-    console.log('Reverse geocoding response status:', res.status);
+    logger.debug('Reverse geocoding response status:', res.status);
     
     if (!res.ok) {
-      console.error('Reverse geocoding HTTP error:', res.status, res.statusText);
+      logger.error('Reverse geocoding HTTP error:', res.status, res.statusText);
       return await fallbackReverseGeocode(lat, lng);
     }
     
     const json = await res.json();
-    console.log('Reverse geocoding response:', json);
+    logger.debug('Reverse geocoding response:', json);
     
     if (json.status !== 'OK') {
-      console.error('Reverse geocoding API error:', json.status, json.error_message);
-      console.log('Trying fallback reverse geocoding...');
+      logger.error('Reverse geocoding API error:', json.status, json.error_message);
+      logger.debug('Trying fallback reverse geocoding...');
       return await fallbackReverseGeocode(lat, lng);
     }
     
     if (!json.results?.length) {
-      console.warn('No results from reverse geocoding, trying fallback...');
+      logger.warn('No results from reverse geocoding, trying fallback...');
       return await fallbackReverseGeocode(lat, lng);
     }
     
     const address = json.results[0].formatted_address;
-    console.log('Reverse geocoding success:', address);
+    logger.debug('Reverse geocoding success:', address);
     return address;
   } catch (error) {
-    console.error('Reverse geocoding fetch error:', error);
-    console.log('Trying fallback reverse geocoding...');
+    logger.error('Reverse geocoding fetch error:', error);
+    logger.debug('Trying fallback reverse geocoding...');
     return await fallbackReverseGeocode(lat, lng);
   }
 }

@@ -19,6 +19,7 @@ import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
+import { logger } from '../../core/logging/logger';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,7 +38,7 @@ const DriverMapScreen = () => {
   const uid = authState?.uid || null;
   
   // Debug logging
-  console.log('DriverMapScreen - Auth state:', { 
+  logger.debug('DriverMapScreen - Auth state:', { 
     hasAuthState: !!authState, 
     hasUserProfile: !!userProfile, 
     hasUid: !!uid 
@@ -46,8 +47,6 @@ const DriverMapScreen = () => {
   // Use driver notifications
   const {
     isInitialized: notificationsInitialized,
-    fcmToken,
-    hasPermission: hasNotificationPermission,
     subscribeToDriverNotifications,
     unsubscribeFromDriverNotifications,
     sendRideAcceptedNotification,
@@ -87,7 +86,7 @@ const DriverMapScreen = () => {
         try {
           mapRef.current = null;
         } catch (error) {
-          console.log('Map cleanup error:', error);
+          logger.debug('Map cleanup error:', error);
         }
       }
     };
@@ -126,7 +125,7 @@ const DriverMapScreen = () => {
           longitudeDelta: 0.01,
         });
       } catch (error) {
-        console.error('Error animating to region:', error);
+        logger.error('Error animating to region:', error);
       }
     }
   }, [currentLocation]);
@@ -164,20 +163,6 @@ const DriverMapScreen = () => {
     }
   }, [isOnline, uid, notificationsInitialized, subscribeToDriverNotifications, unsubscribeFromDriverNotifications]);
 
-  // Log FCM token for driver
-  useEffect(() => {
-    if (fcmToken) {
-      console.log('🚗 DriverMapScreen - FCM Token:', fcmToken);
-      console.log('🚗 DriverMapScreen - Driver ID:', uid);
-      console.log('🚗 DriverMapScreen - Token Status:', {
-        token: fcmToken,
-        driverId: uid,
-        isInitialized: notificationsInitialized,
-        hasPermission: hasNotificationPermission,
-      });
-    }
-  }, [fcmToken, uid, notificationsInitialized, hasNotificationPermission]);
-
   const toggleOnlineStatus = () => {
     if (!currentLocation) {
       Alert.alert(
@@ -199,12 +184,12 @@ const DriverMapScreen = () => {
 
   const handleAcceptRide = async (rideId: number) => {
     try {
-      console.log('Accepting ride:', rideId);
+      logger.debug('Accepting ride:', rideId);
       await acceptRide(rideId, uid ? parseInt(uid) : 0);
       
       Alert.alert('Ride Accepted', 'You have accepted the ride request');
     } catch (error) {
-      console.error('Error accepting ride:', error);
+      logger.error('Error accepting ride:', error);
       Alert.alert('Error', 'Failed to accept ride');
     }
   };
@@ -219,7 +204,7 @@ const DriverMapScreen = () => {
         await startRide(currentRide.id);
         Alert.alert('Ride Started', 'You can now navigate to the passenger');
       } catch (error) {
-        console.error('Error starting ride:', error);
+        logger.error('Error starting ride:', error);
         Alert.alert('Error', 'Failed to start ride');
       }
     }
@@ -236,7 +221,7 @@ const DriverMapScreen = () => {
         await completeRide(currentRide.id, fare, distance, duration);
         Alert.alert('Ride Completed', `Fare: PKR ${fare}`);
       } catch (error) {
-        console.error('Error completing ride:', error);
+        logger.error('Error completing ride:', error);
         Alert.alert('Error', 'Failed to complete ride');
       }
     }
@@ -254,10 +239,10 @@ const DriverMapScreen = () => {
           showsUserLocation={true}
           showsMyLocationButton={false}
           onMapReady={() => {
-            console.log('SafeMapView is ready');
+            logger.debug('SafeMapView is ready');
           }}
           onError={(error) => {
-            console.error('SafeMapView error:', error);
+            logger.error('SafeMapView error:', error);
           }}
           fallbackComponent={
             <View style={styles.map}>

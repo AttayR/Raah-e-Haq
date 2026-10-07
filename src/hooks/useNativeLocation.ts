@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Alert, Platform, Linking, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { isAndroidEmulator, getDefaultLocation } from '../utils/locationUtils';
+import { logger } from '../core/logging/logger';
 
 export interface Coordinates {
   latitude: number;
@@ -28,7 +29,7 @@ export const useNativeLocation = () => {
     return new Promise((resolve) => {
       // For Android emulator, always return true
       if (isAndroidEmulator()) {
-        console.log('Android emulator detected, skipping location services check');
+        logger.debug('Android emulator detected, skipping location services check');
         resolve(true);
         return;
       }
@@ -73,7 +74,7 @@ export const useNativeLocation = () => {
           isLocationEnabled,
         };
       } catch (error) {
-        console.warn('Error checking Android permissions:', error);
+        logger.warn('Error checking Android permissions:', error);
         return {
           isGranted: false,
           canAskAgain: true,
@@ -98,7 +99,7 @@ export const useNativeLocation = () => {
     try {
       // For Android emulator, skip permission request and use default location
       if (isAndroidEmulator()) {
-        console.log('Android emulator detected, using default location');
+        logger.debug('Android emulator detected, using default location');
         const defaultLocation = getDefaultLocation();
         setCurrentLocation(defaultLocation);
         setPermissionStatus({
@@ -197,7 +198,7 @@ export const useNativeLocation = () => {
         return true;
       }
     } catch (error) {
-      console.warn('Error requesting location permission:', error);
+      logger.warn('Error requesting location permission:', error);
       setIsLoading(false);
       return false;
     }
@@ -219,11 +220,11 @@ export const useNativeLocation = () => {
           resolve(location);
         },
         (error) => {
-          console.warn('Location error:', error);
+          logger.warn('Location error:', error);
           
           // For Android emulator, use default location
           if (isEmulator && error.code === 3) { // TIMEOUT
-            console.log('Using default location for Android emulator');
+            logger.debug('Using default location for Android emulator');
             const defaultLocation = getDefaultLocation();
             setCurrentLocation(defaultLocation);
             resolve(defaultLocation);
@@ -294,7 +295,7 @@ export const useNativeLocation = () => {
         await getCurrentLocation();
       }
     } catch (error) {
-      console.warn('Error initializing location:', error);
+      logger.warn('Error initializing location:', error);
     } finally {
       setIsLoading(false);
     }

@@ -18,6 +18,7 @@ import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { showToast } from '../../components/ToastProvider';
+import { logger } from '../../core/logging/logger';
 
 const PassengerSettingsScreen = () => {
   const navigation = useNavigation();
@@ -30,17 +31,11 @@ const PassengerSettingsScreen = () => {
   const [rideUpdatesEnabled, setRideUpdatesEnabled] = useState(true);
   const [promoEnabled, setPromoEnabled] = useState(false);
 
-  // Debug logging
-  console.log('PassengerSettingsScreen - User data:', user);
-  console.log('PassengerSettingsScreen - User name:', user?.name);
-  console.log('PassengerSettingsScreen - User email:', user?.email);
-  console.log('PassengerSettingsScreen - User phone:', user?.phone);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       // Refresh user data - this will be handled by the API auth system
-      console.log('PassengerSettingsScreen - Refreshing user data...');
+      logger.debug('PassengerSettingsScreen - Refreshing user data...');
     } finally {
       setRefreshing(false);
     }
@@ -48,11 +43,11 @@ const PassengerSettingsScreen = () => {
 
   const handleLogout = async () => {
     try {
-      console.log('PassengerSettingsScreen - Logging out...');
+      logger.debug('PassengerSettingsScreen - Logging out...');
       await logout();
       showToast('success', 'Logged out successfully');
     } catch (error) {
-      console.error('PassengerSettingsScreen - Logout error:', error);
+      logger.error('PassengerSettingsScreen - Logout error:', error);
       showToast('error', 'Failed to logout');
     }
   };

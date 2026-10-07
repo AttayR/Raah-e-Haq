@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import rideService from '../services/rideService';
+import { logger } from '../core/logging/logger';
 
 export interface Coordinates {
   latitude: number;
@@ -13,7 +14,7 @@ export const useFare = () => {
 
   const getFare = useCallback(async (pickup: Coordinates, destination: Coordinates) => {
     try {
-      console.log('💰 Calculating fare via useFare hook:', { pickup, destination, vehicleType });
+      logger.debug('💰 Calculating fare via useFare hook:', { pickup, destination, vehicleType });
       const result = await rideService.calculateFare(
         pickup.latitude,
         pickup.longitude,
@@ -21,10 +22,10 @@ export const useFare = () => {
         destination.longitude,
         vehicleType
       );
-      console.log('✅ Fare calculated via useFare hook:', result);
+      logger.debug('✅ Fare calculated via useFare hook:', result);
       return result;
     } catch (error) {
-      console.error('❌ Error calculating fare via useFare hook:', error);
+      logger.error('❌ Error calculating fare via useFare hook:', error);
       // Return a fallback fare calculation
       const distance = Math.sqrt(
         Math.pow(destination.latitude - pickup.latitude, 2) +

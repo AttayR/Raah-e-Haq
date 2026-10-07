@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useNotifications } from './useNotifications';
 import { NotificationData } from '../services/notificationService';
+import { logger } from '../core/logging/logger';
 
 export const usePassengerNotifications = (passengerId?: string) => {
   const {
@@ -20,8 +21,8 @@ export const usePassengerNotifications = (passengerId?: string) => {
   // Log passenger ID
   useEffect(() => {
     if (passengerId) {
-      console.log('👤 Passenger ID:', passengerId);
-      console.log('👤 Passenger Details:', {
+      logger.debug('👤 Passenger ID:', passengerId);
+      logger.debug('👤 Passenger Details:', {
         passengerId,
         timestamp: new Date().toISOString(),
       });
@@ -33,11 +34,11 @@ export const usePassengerNotifications = (passengerId?: string) => {
     if (!passengerId) return;
     
     try {
-      console.log(`✅ Passenger ${passengerId} subscribed to notifications`);
+      logger.debug(`✅ Passenger ${passengerId} subscribed to notifications`);
       // In our new system, notifications are automatically fetched from the API
       await refreshNotifications();
     } catch (error) {
-      console.error('❌ Failed to subscribe to passenger notifications:', error);
+      logger.error('❌ Failed to subscribe to passenger notifications:', error);
     }
   }, [passengerId, refreshNotifications]);
 
@@ -46,82 +47,82 @@ export const usePassengerNotifications = (passengerId?: string) => {
     if (!passengerId) return;
     
     try {
-      console.log(`✅ Passenger ${passengerId} unsubscribed from notifications`);
+      logger.debug(`✅ Passenger ${passengerId} unsubscribed from notifications`);
       // In our new system, we just clear local notifications
       await clearAllNotifications();
     } catch (error) {
-      console.error('❌ Failed to unsubscribe from passenger notifications:', error);
+      logger.error('❌ Failed to unsubscribe from passenger notifications:', error);
     }
   }, [passengerId, clearAllNotifications]);
 
   // Send ride request notification to driver
   const sendRideRequestNotification = useCallback(async (driverId: string, rideData: any) => {
     try {
-      console.log('📱 Sending ride request notification to driver:', driverId);
-      console.log('📱 Ride data:', rideData);
+      logger.debug('📱 Sending ride request notification to driver:', driverId);
+      logger.debug('📱 Ride data:', rideData);
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send ride request notification:', error);
+      logger.error('❌ Failed to send ride request notification:', error);
     }
   }, []);
 
   // Send ride accepted notification to passenger
   const sendRideAcceptedNotification = useCallback(async (driverId: string, rideData: any) => {
     try {
-      console.log('📱 Ride accepted notification:', driverId, rideData);
+      logger.debug('📱 Ride accepted notification:', driverId, rideData);
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send ride accepted notification:', error);
+      logger.error('❌ Failed to send ride accepted notification:', error);
     }
   }, []);
 
   // Send driver arrived notification
   const sendDriverArrivedNotification = useCallback(async (driverId: string, rideData: any) => {
     try {
-      console.log('📱 Driver arrived notification:', driverId, rideData);
+      logger.debug('📱 Driver arrived notification:', driverId, rideData);
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send driver arrived notification:', error);
+      logger.error('❌ Failed to send driver arrived notification:', error);
     }
   }, []);
 
   // Send ride started notification
   const sendRideStartedNotification = useCallback(async (driverId: string, rideData: any) => {
     try {
-      console.log('📱 Ride started notification:', driverId, rideData);
+      logger.debug('📱 Ride started notification:', driverId, rideData);
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send ride started notification:', error);
+      logger.error('❌ Failed to send ride started notification:', error);
     }
   }, []);
 
   // Send ride completed notification
   const sendRideCompletedNotification = useCallback(async (driverId: string, rideData: any) => {
     try {
-      console.log('📱 Ride completed notification:', driverId, rideData);
+      logger.debug('📱 Ride completed notification:', driverId, rideData);
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send ride completed notification:', error);
+      logger.error('❌ Failed to send ride completed notification:', error);
     }
   }, []);
 
   // Send payment received notification
   const sendPaymentReceivedNotification = useCallback(async (paymentData: any) => {
     try {
-      console.log('📱 Payment received notification:', paymentData);
+      logger.debug('📱 Payment received notification:', paymentData);
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send payment received notification:', error);
+      logger.error('❌ Failed to send payment received notification:', error);
     }
   }, []);
 
   // Send general notification to passenger
   const sendGeneralNotification = useCallback(async (title: string, body: string, data?: any) => {
     try {
-      console.log('📱 General notification:', { title, body, data });
+      logger.debug('📱 General notification:', { title, body, data });
       // In our new system, notifications are sent by the backend
     } catch (error) {
-      console.error('❌ Failed to send general notification:', error);
+      logger.error('❌ Failed to send general notification:', error);
     }
   }, []);
 
