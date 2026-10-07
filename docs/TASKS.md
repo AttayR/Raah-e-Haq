@@ -19,7 +19,7 @@
 | T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | todo | |
 | T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | todo | |
 | T-008 | 0 | One working toast system | T-002 | yes | agent | todo | |
-| T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = B-01 |
+| T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01) |
 | T-102 | 1 | Single logout thunk used everywhere | T-007 | yes | agent | todo | |
 | T-103 | 1 | Auth bootstrap: splash, offline-tolerant init | T-102 | yes | agent | todo | |
 | T-104 | 1 | Token in Keychain + single-flight 401 handling | T-103 | yes | agent | todo | |
@@ -33,26 +33,33 @@
 | T-203 | 2 | Driver documents + license number actually uploaded | T-202 | yes | agent | todo | Needs B-03 |
 | T-204 | 2 | Auth screens: keyboard, safe area, remove dead Google button | T-201 | yes | agent | todo | |
 | T-301 | 3 | Active ride in Redux; single booking route; restore on launch | T-107 | yes | agent | todo | |
-| T-302 | 3 | Correct ride payload builder (real user, addresses, vehicle, stops) | T-301 | yes | agent | todo | |
+| T-302 | 3 | Correct ride payload builder (real user, addresses, vehicle, stops) | T-301, BE-01 | yes | agent | todo | Server takes passenger from token (BE-01); drop `passenger_id` from payload |
 | T-303 | 3 | Location search: debounce, session token, PK bias, keep address | T-109 | yes | agent | todo | |
 | T-304 | 3 | Ride status state machine; polling lifecycle; map-tap mode | T-302 | yes | agent | todo | |
 | T-305 | 3 | Request safety: double-tap guard, cancel during create, per-request abort | T-304 | yes | agent | todo | |
-| T-306 | 3 | Fare from server | T-302 | yes | agent | todo | Needs B-04 |
+| T-306 | 3 | Fare from server | T-302, BE-05 | yes | agent | todo | Uses `POST /rides/estimate` (BE-05, was B-04) |
 | T-307 | 3 | Driver-assigned card + passenger tracking screen | T-304 | yes | agent | todo | |
 | T-308 | 3 | Location permission UX + shared location watcher | T-301 | yes | agent | todo | |
 | T-309 | 3 | Remove crashing Advanced panel + passenger dead duplicates | T-302 | yes | agent | todo | |
-| T-401 | 4 | Driver online/offline in Redux backed by API | T-107 | yes | agent | todo | Needs B-04 |
+| T-310 | 3 | Vehicle options + ETAs from server catalogue | T-306, BE-05, BE-02 | yes | agent | todo | FEAT-05 |
+| T-401 | 4 | Driver online/offline in Redux backed by API | T-107, BE-06 | yes | agent | todo | `POST/GET /driver/status` (BE-06, was B-04) |
 | T-402 | 4 | Driver location tracker rewrite | T-308, T-401 | yes | agent | todo | |
-| T-403 | 4 | Incoming ride requests (poll /rides/pending) | T-402 | yes | agent | todo | |
-| T-404 | 4 | Accept via assign-driver (409) + reject | T-403 | yes | agent | todo | Needs B-06 |
-| T-405 | 4 | Driver ride screen routed: pickup → start → stops → complete | T-404 | yes | agent | todo | |
-| T-406 | 4 | WebSocket manager rewrite | T-007 | no | agent | todo | Auth needs B-06 |
-| T-407 | 4 | Background driver location | T-402 | yes | agent | todo | Needs B-08 decision |
-| T-501 | 5 | Ride history (passenger + driver) from API | T-305, T-405 | yes | agent | todo | |
-| T-502 | 5 | Notifications from API + FCM token registration | T-107 | yes | agent | todo | |
-| T-503 | 5 | Remove fake data; hide unbuilt features | T-501 | yes | agent | todo | |
-| T-504 | 5 | Profile: real fields + photo upload | T-503 | yes | agent | todo | |
-| T-505 | 5 | Rating after ride | T-307 | yes | agent | todo | Needs B-04 |
+| T-403 | 4 | Incoming ride requests (poll /rides/pending) | T-402, BE-02 | yes | agent | todo | `/rides/pending` is unreachable until BE-02 (FEAT-01) |
+| T-404 | 4 | Accept via assign-driver (409) + reject | T-403, BE-03 | yes | agent | todo | Atomic accept = BE-03 (was B-06) |
+| T-405 | 4 | Driver ride screen routed: pickup → start → stops → complete | T-404, BE-04 | yes | agent | todo | Use BE-04 `arrived/start/complete` endpoints, not generic PUT |
+| T-406 | 4 | WebSocket manager rewrite | T-007, BE-12 | no | agent | todo | Retarget to Laravel Reverb (Pusher protocol: `laravel-echo` + `pusher-js`, Sanctum `/broadcasting/auth`), BE-12 (was B-06) |
+| T-407 | 4 | Background driver location | T-402 | yes | agent | todo | B-08 decided 2026-10-08: foreground only. Scope shrinks to: no background mode/permission shipped (with T-108) |
+| T-501 | 5 | Ride history (passenger + driver) from API | T-305, T-405, BE-01 | yes | agent | todo | Includes new driver history screen + ride details/receipt screen (FEATURES.md) |
+| T-502 | 5 | Notifications from API + FCM token registration | T-107, BE-11 | yes | agent | todo | Both roles (driver tab is a placeholder); device token via `POST /devices` (BE-11) |
+| T-503 | 5 | Remove fake data; hide unbuilt features | T-501 | yes | agent | todo | Final sweep after T-506..T-511 wire real data (owner: real data, not hiding) |
+| T-504 | 5 | Profile: real fields + photo upload | T-503, BE-15 | yes | agent | todo | App calls missing `PUT /auth/profile`; switch to `PUT /profile` + `POST /profile/avatar` |
+| T-505 | 5 | Rating after ride | T-307, BE-07 | yes | agent | todo | `POST /rides/{id}/rate` (BE-07, was B-04) |
+| T-506 | 5 | Passenger Home on real data (stats, offers, recent rides, badge) | BE-08, BE-10, BE-01, T-501, T-502 | yes | agent | todo | FEAT-08/10/18 |
+| T-507 | 5 | Driver Home, Profile and Earnings screen on real data | BE-08, BE-15, BE-01, T-401, T-501 | yes | agent | todo | FEAT-08/15 |
+| T-508 | 5 | Wallet: cash-only balance + history from API | BE-09 | yes | agent | todo | FEAT-09 |
+| T-509 | 5 | Favourite (saved) places from API | BE-14, T-303 | yes | agent | todo | FEAT-14 |
+| T-510 | 5 | In-ride chat passenger ↔ driver (replace demo chats) | BE-13, BE-12, T-406, T-307, T-405 | yes | agent | todo | FEAT-13 |
+| T-511 | 5 | Settings, support, invite, account deletion (both roles) | BE-11, BE-15, BE-17, T-102 | yes | agent | todo | FEAT-11/15/17 |
 | T-601 | 6 | Theme tokens complete; useColorScheme; persisted choice | T-008 | yes | agent | todo | |
 | T-602 | 6 | UI kit (Screen, Header, Button, Input, Card, states) | T-601 | yes | agent | todo | |
 | T-603 | 6 | Migrate auth screens to UI kit | T-602, T-204 | yes | agent | todo | |
@@ -65,15 +72,43 @@
 | T-704 | 7 | CI (GitHub Actions) | T-702 | no | agent | todo | |
 | T-705 | 7 | Android R8 + versioning; final iOS config | T-108 | yes | agent | todo | Needs B-05 |
 | T-706 | 7 | README + docs rewrite | T-704 | no | agent | todo | |
-| B-01 | – | Backend: stop returning otp_code; real SMS | | | owner | todo | |
+| B-01 | – | Backend: stop returning otp_code; real SMS | | | owner | todo | Superseded by BE-16 (code part, agent). SMS gateway account + credentials stay with owner (B-11) |
 | B-02 | – | Rotate + restrict Google Maps keys | | | owner | todo | |
 | B-03 | – | Confirm auth `role` field + registration/document contract | | | owner | todo | |
-| B-04 | – | Endpoints: fare estimate, driver status, pending rides, rating, history, earnings | | | owner | todo | |
+| B-04 | – | Endpoints: fare estimate, driver status, pending rides, rating, history, earnings | | | owner | todo | Superseded by BE-02, BE-05, BE-06, BE-07, BE-08 (+ BE-01 for history); we own the backend |
 | B-05 | – | Signing: Android upload keystore, Apple certs | | | owner | todo | |
-| B-06 | – | Backend: passenger from token, atomic assign-driver, WS auth | | | owner | todo | |
+| B-06 | – | Backend: passenger from token, atomic assign-driver, WS auth | | | owner | todo | Superseded by BE-01, BE-03, BE-12 |
 | B-07 | – | Test accounts + safe test location in QA_SCENARIOS.md | | | owner | todo | **Needed before any QA** |
 | B-08 | – | Product decisions: background location, chat, wallet | | | owner | todo | |
 | B-09 | – | **Production backend down: SSL missing for raahehaq.com + /api not served** (see docs/api/HEALTH_2026-10-03.md) | | | owner | todo | **Blocks all QA and real use** |
+| B-10 | – | Production hosting for Laravel Reverb + queue worker (process manager, TLS/wss proxy) | BE-12 | | owner | todo | Server/hPanel work; agents only prepare code + docs |
+| B-11 | – | Credentials: Firebase service-account JSON for FCM (BE-11), SMS gateway account (BE-16) | | | owner | todo | Never commit; set in production `.env` |
+| BE-00 | 0 | Backend test harness: SQLite-safe migrations, factories, helpers | | no | agent | todo | FEAT-19: `php artisan test` 33/35 failing today. Prerequisite for every BE task |
+| BE-01 | 3 | Rides scoped to caller; passenger from token; ownership checks | BE-00 | yes | agent | todo | FEAT-02 (supersedes B-06 part) |
+| BE-02 | 4 | Fix route shadowing of /rides/pending + nearby-drivers; driver from token | BE-00 | yes | agent | todo | FEAT-01 (supersedes B-04 part) |
+| BE-03 | 4 | Atomic assign-driver with 409; driver from token | BE-01 | yes | agent | todo | FEAT-03 (supersedes B-06 part) |
+| BE-04 | 4 | Ride lifecycle endpoints (arrived/start/complete/driver cancel); server fare + earnings | BE-03, BE-05 | yes | agent | todo | FEAT-04 |
+| BE-05 | 3 | Vehicle catalogue + fare estimate endpoint | BE-00 | yes | agent | todo | FEAT-05 (supersedes B-04 part) |
+| BE-06 | 4 | Driver status endpoint + location endpoints fixed | BE-00 | yes | agent | todo | FEAT-06 (supersedes B-04 part) |
+| BE-07 | 5 | Ride rating endpoint + user rating recompute | BE-04 | yes | agent | todo | FEAT-07 (supersedes B-04 part) |
+| BE-08 | 5 | Personal stats (`/me/stats`) + driver earnings | BE-04 | yes | agent | todo | FEAT-08 (supersedes B-04 part) |
+| BE-09 | 5 | My wallet (cash only): balance + transactions; lock admin payment routes | BE-04 | yes | agent | todo | FEAT-09 |
+| BE-10 | 5 | Fix banners 500 + filter by date/audience/position | BE-00 | yes | agent | todo | FEAT-10 |
+| BE-11 | 5 | Push: device tokens, FCM send, preferences, broadcasts in list | BE-00 | yes | agent | todo | FEAT-11; prod creds = B-11 |
+| BE-12 | 4 | Realtime with Laravel Reverb (channels, Sanctum broadcast auth, events) | BE-03 | yes | agent | todo | FEAT-12 (supersedes B-06 part); prod hosting = B-10 |
+| BE-13 | 5 | In-ride chat API (messages, chats list, broadcast) | BE-12 | yes | agent | todo | FEAT-13 |
+| BE-14 | 5 | Saved places CRUD | BE-00 | yes | agent | todo | FEAT-14 |
+| BE-15 | 5 | Profile completeness (driver vehicle/licence, stats) + account deletion | BE-00 | yes | agent | todo | FEAT-15 |
+| BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | todo | FEAT-16 (supersedes B-01 code part) |
+| BE-17 | 5 | Referral code column fix; support scoping tests; public settings URLs | BE-00 | yes | agent | todo | FEAT-17 |
+| BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | todo | SEC-01 (critical) |
+| BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | todo | SEC-02 (critical); live part = B-12 |
+| BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | todo | SEC-03 (high); complements BE-06 |
+| BE-21 | 1 | Remove registration request logging (API + web) | BE-00 | no | agent | todo | SEC-04 (high) |
+| BE-22 | 1 | CNIC/licence/vehicle documents on private disk + authorized temporary URLs; migrate existing files | BE-18 | no | agent | todo | SEC-05 (high) |
+| BE-23 | 1 | Production config guard (refuse debug in production) + production env values in DEPLOYMENT.md | BE-00 | no | agent | todo | SEC-06 (high); live check = B-12 |
+| B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md) |
+| B-13 | – | Firebase console: Firestore + Storage rules to deny-all | | | owner | todo | SEC-12 |
 
 ---
 
@@ -469,3 +504,397 @@
 - **Acceptance:**
   - [ ] The README covers real setup, env, scripts and architecture.
   - [ ] The stale root docs are moved to `docs/archive/` or rewritten; the API docs go in `docs/api/`.
+
+## Feature-completeness tasks (rh-auditor, 2026-10-08)
+
+Source: [audit/FEATURES.md](audit/FEATURES.md) (findings `FEAT-01`..`FEAT-19`).
+
+**Rules that apply to every task below:**
+- Owner product defaults: cash only, in-ride chat, foreground-only location, realtime on Laravel Reverb.
+- No screen may show a number, list or text that doesn't come from the API or a documented config/i18n file.
+- Every async view has loading, error (with Retry) and empty states.
+
+**BE tasks** run in `~/My-Projects/Raah-e-Haq-backend`, on branch `fix/production-hardening` cut from `main` (it doesn't exist yet).
+- Each one adds feature tests (`php artisan test` green).
+- Responses use the existing `{success, data, error:{code,message,details}}` envelope.
+- Each one updates `docs/api/CONTRACT_NOTES.md` in the app repo with the request and response shape.
+
+**App tasks** depend on their BE task.
+
+### BE-00 · Backend test harness works (SQLite-safe migrations, factories)
+- **Findings:** FEAT-19
+- **Acceptance:**
+  - [ ] `php artisan test` runs green on the in-memory SQLite DB from `phpunit.xml`. The MySQL-only `ALTER TABLE … MODIFY ENUM` migrations (`2025_09_17_115753_update_rides_status_enum.php`, `2025_09_27_093000_add_motorcycle_to_rides_vehicle_type_enum.php`) are guarded by driver, or rewritten so they work on both MySQL and SQLite.
+  - [ ] `migrate:fresh --seed` still works on local MySQL.
+  - [ ] Factories exist for User (with role passenger/driver/admin), Vehicle, Ride and DriverLocation, plus a `actingAsPassenger()/actingAsDriver()` test helper.
+  - [ ] The existing `RideModuleApiTest` runs (fix or mark the tests that encode wrong behaviour as `todo` with the BE task that fixes them).
+- **QA:** none (backend tests only)
+
+### BE-01 · Rides scoped to the caller; passenger from token
+- **Findings:** FEAT-02 · supersedes B-06 (passenger-from-token part)
+- **Acceptance:**
+  - [ ] `POST /rides` ignores or rejects `passenger_id`; the passenger is `auth()->user()`, who must have the `passenger` role and be `active`.
+  - [ ] `vehicle_type` is validated against the catalogue from BE-05 (until then: `car,bike,rickshaw,van`).
+  - [ ] `GET /rides` filters by role through the `roles` pivot (passenger → own rides; driver → rides assigned to them; admin → all).
+    - It supports `status` as a comma list (e.g. `requested,accepted,arrived,ongoing` for active-ride restore), plus `per_page` and `page`.
+    - Every status in the list is passed through `getStatusForApi`.
+  - [ ] `GET /rides/{id}`, `POST /rides/{id}/cancel` and `DELETE /rides/{id}`: only the ride's passenger, its assigned driver or an admin; otherwise 403.
+  - [ ] Cancel records `cancelled_by`, a `cancellation_reason` (passenger/driver) and an optional note.
+  - [ ] Feature tests: user A can't list, show or cancel user B's ride; a passenger can't create a ride as someone else.
+- **QA:** PAX-E2E-02
+
+### BE-02 · Pending-ride feed and nearby drivers reachable and token-based
+- **Findings:** FEAT-01 · supersedes B-04 (pending-rides contract)
+- **Acceptance:**
+  - [ ] `rides/pending` and `rides/nearby-drivers` are registered before `apiResource('rides')` (or `{ride}` is constrained to digits). A test proves `GET /api/rides/pending` hits `getPendingRides`.
+  - [ ] `GET /rides/pending?latitude&longitude[&radius]`:
+    - The driver comes from the token (driver role, `active`, approved vehicle); `driver_id` is no longer required.
+    - It filters by the driver's own vehicle type, returns only `requested` rides newer than a configurable age (default 10 min), sorted by distance, with `estimated_distance`.
+  - [ ] `GET /rides/nearby-drivers` returns only drivers whose latest location is `available` and seen within 5 min.
+    - It includes `estimated_arrival_min`.
+    - It never returns driver phone numbers to passengers.
+  - [ ] Feature tests for both, including the route-order regression.
+- **QA:** DRV-E2E-02
+
+### BE-03 · Atomic accept (assign-driver) with 409
+- **Findings:** FEAT-03 · supersedes B-06 (atomic assign-driver)
+- **Acceptance:**
+  - [ ] `POST /rides/{id}/assign-driver` takes the driver from the token (the body `driver_id` is ignored). The driver must have the driver role, be `active` and have an approved vehicle.
+  - [ ] Accept is a single conditional update (`where status='requested' and driver_id is null`) or runs inside a transaction with `lockForUpdate`. The loser gets **409** `RIDE_ALREADY_ACCEPTED`.
+  - [ ] It stores `vehicle_id`, sets `accepted_at`, sets the driver's location status to `busy`, and fires the `RideAccepted` event (broadcast once BE-12 exists).
+  - [ ] Feature test: two drivers accept the same ride → exactly one 200 and one 409.
+- **QA:** E2E-01
+
+### BE-04 · Ride lifecycle endpoints; server-computed fare and earnings
+- **Findings:** FEAT-04
+- **Acceptance:**
+  - [ ] New driver-only endpoints (assigned driver only; 403 otherwise; 409 on an invalid transition):
+    - `POST /rides/{id}/arrived` (accepted → arrived)
+    - `POST /rides/{id}/start` (arrived|accepted → ongoing)
+    - `POST /rides/{id}/complete` (ongoing → completed)
+  - [ ] `POST /rides/{id}/cancel` by the driver works before start, with a reason; the ride goes back to `requested`, or is cancelled per config.
+  - [ ] `arrived` is exposed in `RideResource.status` (no longer collapsed into `accepted`). The app status machine (T-304) gets the full list.
+  - [ ] Complete computes everything server-side and creates a cash `Transaction` for the ride (`payment_method=cash`, `payment_status=paid`):
+    - `distance_km` and `duration_minutes`, from tracking points (BE-06) or the route estimate
+    - `total_fare`, with the same formula as BE-05
+    - `driver_earnings` and `platform_commission` (commission % from `app_settings`)
+    - increments `total_rides` for both users
+    - sets the driver back to `available`
+  - [ ] `PUT /rides/{id}` no longer accepts `status`, `driver_id`, `fare`, `distance_km` or `duration_min` from clients (admin-only, or removed).
+  - [ ] Each transition fires a `RideStatusChanged` event and creates a DB notification for the other party.
+  - [ ] Feature tests for every transition, including the forbidden ones.
+- **QA:** E2E-01
+
+### BE-05 · Vehicle catalogue + fare estimate endpoint
+- **Findings:** FEAT-05 · supersedes B-04 (fare estimate)
+- **Acceptance:**
+  - [ ] `GET /vehicle-types` (public or authenticated) returns the active vehicle types: key, display name, capacity, icon key, `base_fare`, `per_km`, `per_min`, `min_fare`, `per_stop`.
+    - Seeded with car, bike, rickshaw (and van if the owner keeps it). Values come from `app_settings` category `fare`, or a `vehicle_types` table editable in the admin panel.
+  - [ ] `POST /rides/estimate` {pickup, dropoff, stops[], vehicle_type?} returns, per vehicle type, `{distance_km, duration_min, fare, breakdown:{base, distance, time, stops}}`. The distance is the server-side road distance (Google Directions with the server key, if configured) or haversine × a configurable road factor, with a `source` field.
+  - [ ] `POST /rides` stores the fare from the same calculator; the breakdown always adds up to `total_fare`.
+  - [ ] Unit tests of the calculator and feature tests of both endpoints.
+- **QA:** PAX-E2E-01
+
+### BE-06 · Driver availability status + location endpoints the app needs
+- **Findings:** FEAT-06 · supersedes B-04 (driver status)
+- **Acceptance:**
+  - [ ] `POST /driver/status` {status: online|offline} and `GET /driver/status` (driver role only).
+    - Going online requires `active` + an approved vehicle.
+    - Offline clears availability.
+    - It refuses `offline` while a ride is in progress (409).
+  - [ ] `POST /tracking/update-location` is driver-only, keeps the driver's current status (doesn't silently reset to `available`), and validates lat/lng ranges, speed, heading and accuracy.
+    - It upserts a `driver_current_locations` row (or prunes history), so the table doesn't grow unbounded.
+    - It fires `DriverLocationUpdated` on the active ride's channel (BE-12).
+  - [ ] `GET /rides/{id}/driver-location` (participants only) returns the assigned driver's latest position for passenger tracking. `GET /tracking/driver/{id}/latest` is restricted to admins and that ride's passenger.
+  - [ ] Feature tests. The app-side route names are recorded in CONTRACT_NOTES; the app calls to the missing `/tracking/update-status` and `/tracking/driver/{id}/location` are replaced in T-401/T-402.
+- **QA:** DRV-E2E-01
+
+### BE-07 · Ride rating
+- **Findings:** FEAT-07 · supersedes B-04 (rating)
+- **Acceptance:**
+  - [ ] Migration: `ride_ratings` (ride_id, rater_id, ratee_id, stars 1-5, comment ≤500, created_at; unique on ride_id + rater_id).
+  - [ ] `POST /rides/{id}/rate` {stars, comment?}: only a participant of a `completed` ride, once (409 on repeat).
+  - [ ] It recomputes the ratee's `users.rating` (average).
+  - [ ] `RideResource` exposes `my_rating` and `can_rate`.
+  - [ ] Feature tests.
+- **QA:** E2E-01 step 7
+
+### BE-08 · Personal stats and driver earnings
+- **Findings:** FEAT-08 · supersedes B-04 (history, earnings)
+- **Acceptance:**
+  - [ ] `GET /me/stats`, computed from completed rides (cached ≤5 min):
+    - **Passenger:** `total_rides`, `total_distance_km`, `total_spent`, `rating`, `member_since`.
+    - **Driver:** `total_rides`, `rating`, `earnings_today`, `earnings_week`, `earnings_month`, `online_minutes_today`, `acceptance_rate` (if derivable).
+  - [ ] `GET /driver/earnings?period=day|week|month` returns totals plus a per-day series and the list of completed rides with `driver_earnings`.
+  - [ ] Feature tests with seeded completed rides; zero-state returns zeros, not nulls.
+- **QA:** PAX-DATA-01, DRV-DATA-01
+
+### BE-09 · My wallet (cash only: balance + history)
+- **Findings:** FEAT-09
+- **Acceptance:**
+  - [ ] `GET /wallet` returns the caller's wallet: balance, currency, total_spent/total_earnings. It is auto-created (zero) on first access and on register.
+  - [ ] `GET /wallet/transactions?page` returns the caller's transactions only, newest first, with the ride reference.
+  - [ ] There is no top-up endpoint (cash only).
+  - [ ] The existing `payments/*` routes are restricted to admins (coordinate with rh-security).
+  - [ ] Completed cash rides from BE-04 show up as transactions.
+  - [ ] Feature tests: user A can't see user B's wallet or transactions.
+- **QA:** PAX-DATA-01
+
+### BE-10 · Banners/offers endpoint fixed and filtered
+- **Findings:** FEAT-10
+- **Acceptance:**
+  - [ ] `GET /public/banners` (or authenticated `GET /banners`) selects the real columns (`description`, `image_url`, `action_url`, `action_text`, `type`, `position`, `display_order`).
+    - It filters `is_active`, the `start_date`/`end_date` window, `target_audience` (from the token, if present) and an optional `position`.
+    - It orders by `display_order`.
+    - `image_url` is an absolute URL.
+  - [ ] Feature tests: expired banners are excluded; there is no 500 with an empty table.
+  - [ ] The seeder adds 2 local demo banners (local DB only), so QA can see the Home offers.
+- **QA:** PAX-DATA-01
+
+### BE-11 · Push notifications: device tokens, FCM send, preferences, broadcasts
+- **Findings:** FEAT-11
+- **Acceptance:**
+  - [ ] Migration `user_devices` (user_id, fcm_token unique, platform, last_seen_at). `POST /devices` registers or refreshes; `DELETE /devices/{token}` on logout.
+  - [ ] `sendPushNotification` sends through the FCM HTTP v1 API using a service-account path from env (`FIREBASE_CREDENTIALS`).
+    - With no credentials it logs a single warning and skips (no crash).
+    - It sends on a queue.
+    - Invalid tokens are pruned.
+  - [ ] Notification preferences (`push_enabled`, `ride_updates`, `promotions`, driver `sound_alerts`) are stored per user. `GET/PUT /profile/preferences`; sending respects them.
+  - [ ] Admin broadcasts (`target_audience` all/passengers/drivers) appear in `GET /notifications` and in the unread count for the matching users (fan-out rows or a union query).
+  - [ ] The list items expose a `category` (ride, promo, system, wallet) for the app filters.
+  - [ ] Feature tests (FCM mocked with `Http::fake`).
+  - [ ] Owner item: the Firebase service-account JSON for production is B-11.
+- **QA:** NOTIF-01
+
+### BE-12 · Realtime with Laravel Reverb
+- **Findings:** FEAT-12 · supersedes B-06 (WebSocket auth)
+- **Acceptance:**
+  - [ ] `laravel/reverb` is installed; `BROADCAST_CONNECTION=reverb` in `.env.example` with `REVERB_*` keys; `php artisan reverb:start` works locally (documented in the backend README).
+  - [ ] Broadcast auth is `POST /broadcasting/auth` with a Sanctum bearer token (`Broadcast::routes(['middleware' => ['auth:sanctum']])`).
+  - [ ] Private channels:
+    - `private-ride.{id}` (passenger + assigned driver)
+    - `private-driver.{id}` (that driver)
+    - `private-user.{id}` (that user)
+  - [ ] Events on `ShouldBroadcast` (queued):
+    - `RideRequested` (to nearby available drivers' channels)
+    - `RideAccepted`
+    - `RideStatusChanged`
+    - `DriverLocationUpdated` (throttled)
+    - `RideMessageSent` (BE-13)
+    - `NotificationCreated`
+  - [ ] `WebSocketController` stub endpoints are removed or return the real Reverb connection config (host, port, key, scheme), not a hardcoded URL.
+  - [ ] Feature tests use `Event::fake`/`Broadcast` assertions plus the channel-authorisation tests.
+  - [ ] Owner item: running Reverb plus a queue worker on the production host is B-10.
+- **QA:** E2E-01 (with realtime), CHAT-01
+
+### BE-13 · In-ride chat (passenger ↔ driver)
+- **Findings:** FEAT-13
+- **Acceptance:**
+  - [ ] Migration `ride_messages` (ride_id, sender_id, body ≤1000, read_at, created_at).
+  - [ ] `GET /rides/{id}/messages?after_id`, `POST /rides/{id}/messages` and `POST /rides/{id}/messages/read`:
+    - Participants only (403 otherwise).
+    - Posting is allowed only while the ride is accepted/arrived/ongoing (409 otherwise); reading stays allowed for 24 h after the end.
+    - Rate limited (e.g. 30/min).
+  - [ ] `GET /chats` lists the caller's rides that have messages or are active, with the other party's name and photo, the last message and the unread count.
+  - [ ] Each new message broadcasts `RideMessageSent` on `private-ride.{id}` (BE-12) and pushes to the other party (BE-11).
+  - [ ] Phone numbers are never exposed in chat payloads.
+  - [ ] Feature tests.
+- **QA:** CHAT-01
+
+### BE-14 · Saved places (favourites)
+- **Findings:** FEAT-14
+- **Acceptance:**
+  - [ ] Migration `saved_places` (user_id, label, type home|work|other, address, latitude, longitude). `GET/POST/PUT/DELETE /saved-places`, own rows only, with at most one home and one work.
+  - [ ] Feature tests.
+- **QA:** PAX-DATA-02
+
+### BE-15 · Profile completeness, driver vehicle/licence, account deletion
+- **Findings:** FEAT-15
+- **Acceptance:**
+  - [ ] `GET /auth/profile` and `GET /profile` return one normalised user:
+    - `role`, `status`, `rating`, `total_rides`, `created_at`, `profile_image` as an absolute URL
+    - for drivers: `license_number`, `license_expiry_date`, `vehicle` {make, model, year, color, license_plate, vehicle_type, verification_status} and the document statuses
+    - never `password`, bank or CNIC image paths
+  - [ ] `PUT /profile` validates as today. The app is switched to it (T-504); no `/auth/profile` PUT alias.
+  - [ ] `DELETE /profile` {password or OTP confirmation}:
+    - Anonymises the PII, revokes the tokens and deletes the avatar.
+    - Keeps rides for accounting, with names replaced.
+    - Refuses while a ride is active.
+  - [ ] Feature tests.
+- **QA:** PROFILE-01
+
+### BE-16 · OTP hardening (code part of B-01)
+- **Findings:** FEAT-16, AUTH-02 · supersedes B-01 (code part)
+- **Acceptance:**
+  - [ ] `otp_code` is returned only when `app()->environment('local','testing')`, never when the env is production, even with `APP_DEBUG=true`.
+  - [ ] `SmsService` never logs the OTP or the full phone number (mask it).
+  - [ ] `SmsService` gets a driver interface (`log` for local, one real gateway adapter configured from env). The gateway account and credentials remain an owner item (B-11).
+  - [ ] Remove the `sleep(1)` in `SmsService::send`.
+  - [ ] Feature tests for both environments.
+- **QA:** AUTH-OTP-01 (local)
+
+### BE-17 · Referral code fix + support/app-info contract
+- **Findings:** FEAT-17
+- **Acceptance:**
+  - [ ] Migration adds `users.referral_code` (unique, nullable) and makes it fillable. `GET /referrals/code/mine` returns a stable code and a share text/link.
+  - [ ] Confirm and test that `GET/POST /support/tickets` and `POST /support/tickets/{id}/reply` are scoped to the caller for non-admins, and that `assign`/`status` are admin-only.
+  - [ ] `GET /settings/public` includes `support_email`, `support_phone`, `privacy_url` and `terms_url` (seeded).
+  - [ ] Feature tests.
+- **QA:** SETTINGS-01
+
+### T-310 · Vehicle options and ETAs from the server
+- **Findings:** FEAT-05
+- **Depends:** BE-05, BE-02, T-306
+- **Acceptance:**
+  - [ ] The vehicle list on the booking sheet comes from `GET /vehicle-types`. The price per option comes from `POST /rides/estimate`, and the ETA from `GET /rides/nearby-drivers` (nearest driver per type).
+    - If no driver is near, the option shows "No drivers nearby" instead of an ETA.
+    - The hardcoded array at `PassengerMapScreen.tsx:753-756` and the multipliers are gone.
+  - [ ] The selected vehicle key is sent unchanged as `vehicle_type` (no client-side mapping, no `service_level`).
+  - [ ] Loading, error (Retry) and empty states on the vehicle sheet. Unit test of the options view-model.
+- **QA:** PAX-E2E-01
+
+### T-506 · Passenger Home on real data
+- **Findings:** FEAT-08, FEAT-10, FEAT-18
+- **Depends:** BE-08, BE-10, BE-01, T-501, T-502
+- **Acceptance:**
+  - [ ] Stats cards come from `GET /me/stats` (rides, rating, distance, spent). The fake "+12%" change chips are removed (no backend source).
+  - [ ] The Special Offers carousel comes from banners (BE-10). "View All" opens a list or is removed; tapping an offer opens `action_url` or shows its description. With no offers, the section is hidden.
+  - [ ] Recent rides = `GET /rides?per_page=3` (completed/cancelled); "View All" → RideHistory.
+    - The fake "Recent Activity" block is removed or derived from the same data.
+    - The weather widget is removed.
+    - The notification badge = `GET /notifications/unread-count`.
+  - [ ] "Schedule Ride" is hidden (no backend; owner hasn't asked for it).
+  - [ ] "Support" uses `support_email`/`support_phone` from `GET /settings/public` (shared with T-511).
+  - [ ] The Account rows navigate: Edit Profile → profile, Settings → Settings tab.
+  - [ ] Pull to refresh refetches the profile, stats, rides, banners and unread count (no Firebase `refreshSessionThunk`).
+  - [ ] The screen is split under ~400 lines (hooks `usePassengerStats`, `useBanners`, `useRecentRides`).
+  - [ ] Loading, error and empty states. RNTL test: the stats render from a mocked API, and there is no literal "24"/"4.8" in the file (grep).
+- **QA:** PAX-DATA-01
+
+### T-507 · Driver Home, Profile and Earnings on real data
+- **Findings:** FEAT-08, FEAT-15, DRV-19
+- **Depends:** BE-08, BE-15, BE-01, T-401, T-501
+- **Acceptance:**
+  - [ ] Driver Home stats (rides, rating, earnings this month, online time today) come from `GET /me/stats`. The recent rides come from `GET /rides?per_page=3`. Currency is PKR everywhere (no `$`).
+  - [ ] A new **Earnings** screen (stack route) uses `GET /driver/earnings` (day/week/month tabs, totals, list of rides). The Home "Earnings" action opens it; "Ride History" opens the driver history from T-501.
+  - [ ] Driver Profile: the stats, vehicle (make, model, year, plate, colour) and licence number/expiry come from the profile (BE-15). "Toyota Corolla 2020", "DL-123456789", "4.9/156/$2.4k" are gone (grep).
+  - [ ] The vehicle label on Home uses `profile.vehicle`.
+  - [ ] Loading, error and empty states. RNTL tests for Home stats and the Earnings screen.
+- **QA:** DRV-DATA-01
+
+### T-508 · Wallet: cash-only balance and history
+- **Findings:** FEAT-09
+- **Depends:** BE-09
+- **Acceptance:**
+  - [ ] The balance and transactions come from `GET /wallet` and `GET /wallet/transactions` (paginated, pull to refresh).
+  - [ ] "Add Funds" and "Payment Methods" are removed. A short note says "Rides are paid in cash to the driver" (copy in i18n/config).
+  - [ ] "View all" loads more, or is removed when everything is shown.
+  - [ ] `src/services/paymentService.ts` (mock, unused) is deleted after a grep proves it unused.
+  - [ ] The Settings/Profile rows still navigate here; the Home quick-action subtitle no longer says "Payment methods".
+  - [ ] Loading, error and empty states. RNTL test.
+- **QA:** PAX-DATA-01
+
+### T-509 · Favourite (saved) places from the API
+- **Findings:** FEAT-14
+- **Depends:** BE-14, T-303
+- **Acceptance:**
+  - [ ] The list, add, edit and delete use `/saved-places`. Adding uses the Places search from T-303 (address + coordinates), not free text. Home/Work have dedicated slots.
+  - [ ] "Set Pickup" opens the booking map with the pickup prefilled; the booking search shows saved places first.
+  - [ ] Loading, error and empty states; the delete has a confirmation. RNTL test.
+- **QA:** PAX-DATA-02
+
+### T-510 · In-ride chat (passenger ↔ driver), replacing the demo chats
+- **Findings:** FEAT-13
+- **Depends:** BE-13, BE-12, T-406, T-307, T-405
+- **Acceptance:**
+  - [ ] The Chat tab (both roles) lists conversations from `GET /chats`. `dummyChats` (`PassengerChatScreen.tsx`, `DriverChatScreen.tsx`), `dummyMessages` (`DriverMessagesScreen.tsx`) and the seeded GiftedChat bot (`MessagesScreen.tsx`) are deleted.
+  - [ ] One shared thread screen for both roles:
+    - Loads `GET /rides/{id}/messages`.
+    - Sends with `POST` (optimistic, with failure and retry).
+    - Receives live through the Reverb `private-ride.{id}` channel, with a polling fallback (≥5 s, only while focused).
+    - Marks messages read.
+  - [ ] The input is disabled with an explanation once the ride has ended.
+  - [ ] The header shows the other party's name and photo. The call button opens `tel:` with the number from the ride (masked in logs).
+  - [ ] "Message" on the driver-assigned card (T-307) and on the driver ride screen (T-405) opens the thread.
+  - [ ] Empty state "Chats appear here during a ride". Unit tests for the message reducer; RNTL test for the thread.
+- **QA:** CHAT-01
+
+### T-511 · Settings, support, invite and account deletion (both roles)
+- **Findings:** FEAT-11 (preferences), FEAT-15 (deletion), FEAT-17
+- **Depends:** BE-11, BE-15, BE-17, T-102
+- **Acceptance:**
+  - [ ] Notification toggles (passenger: push, ride updates, promotions; driver: ride notifications, sound alerts) read and write `/profile/preferences`; the static Views in `DriverProfile.tsx:339-373` become real switches. "Auto Accept Rides" is removed.
+  - [ ] Help & Support opens a Support screen: the contact email/phone from `GET /settings/public`, the user's tickets list (`GET /support/tickets`), a create-ticket form, and the ticket thread with reply. `src/config/support.ts` is removed or becomes a fallback only.
+  - [ ] Invite Friends / Share App opens the native share sheet with the code from `GET /referrals/code/mine`.
+  - [ ] Privacy and Terms rows open the URLs from public settings.
+  - [ ] Delete Account (passenger settings and driver profile) has a confirmation plus a password re-entry, calls `DELETE /profile`, then the unified logout.
+  - [ ] Every `console.log` row handler in `DriverSettingsScreen.tsx:106-148` and `PassengerHomeScreen.tsx:621,645` is wired or removed.
+  - [ ] Pull to refresh on Settings refetches the profile.
+  - [ ] RNTL tests for the toggles (optimistic + revert on error) and the delete-confirmation flow.
+- **QA:** SETTINGS-01
+
+## Backend security tasks (rh-security audit, 2026-10-08)
+
+Findings: [audit/SECURITY.md](audit/SECURITY.md). Repo: `~/My-Projects/Raah-e-Haq-backend`, done by rh-backend. Every task adds feature tests.
+
+### BE-18 · Role authorization (admin API + admin panel)
+- **Findings:** SEC-01
+- **Acceptance:**
+  - [ ] Admin-only API endpoints are in a `role:admin` group:
+    - `users` CRUD (a user may only read or update themselves through `/profile`)
+    - `payments/*` (except a future "my wallet")
+    - `settings` writes and `settings/banners*`
+    - `security/*`
+    - `analytics/dashboard|events|export`
+    - `referrals/settings` POST and `referrals/{id}/complete`
+  - [ ] `routes/web.php` `admin.*` is wrapped in `role:admin`. `RoleMiddleware` returns a JSON 403 for API requests.
+  - [ ] Public web `/register` can no longer lead to panel access (disabled, or admin-only).
+  - [ ] Feature tests: a passenger and a driver get 403 on every admin route; an admin gets 200; an unauthenticated caller gets 401.
+
+### BE-19 · Production-safe seeding
+- **Findings:** SEC-02
+- **Acceptance:**
+  - [ ] `DatabaseSeeder` runs only `RoleSeeder` and `AppSettingsSeeder` outside `local`/`testing`. Demo seeders return early in other environments.
+  - [ ] No hardcoded admin password. A `php artisan raahehaq:create-admin` command prompts for email and password.
+  - [ ] The `DEPLOYMENT.md` seeding step is updated.
+  - [ ] Local `migrate:fresh --seed` still produces the QA accounts listed in `docs/QA_SCENARIOS.md`.
+
+### BE-20 · Driver identity and location privacy
+- **Findings:** SEC-03 (BE-06 covers the update-location role check and `latest`)
+- **Acceptance:**
+  - [ ] `rides/nearby-drivers` returns no name or phone, a coarse or jittered position, and caps the radius at 10 km or less.
+  - [ ] `tracking/drivers-in-radius` is admin-only and validates `radius_km` with a max.
+  - [ ] A driver's phone and exact location are returned only to the passenger of that driver's active accepted ride.
+  - [ ] Feature tests for each rule.
+
+### BE-21 · No PII in logs
+- **Findings:** SEC-04
+- **Acceptance:**
+  - [ ] No `Log::` call receives `$request->all()` or any password, CNIC, bank, phone or OTP value (grep evidence in the report).
+  - [ ] The registration logs only the user id and the failed field names.
+
+### BE-22 · Private identity documents
+- **Findings:** SEC-05
+- **Acceptance:**
+  - [ ] CNIC, licence and vehicle document uploads go to the private `local` disk.
+  - [ ] An authorised route (owner or admin) returns a temporary signed URL; the admin panel views use it.
+  - [ ] A migration command moves the existing files out of `storage/app/public/uploads`.
+  - [ ] Feature test: an unauthenticated request can't fetch a document.
+
+### BE-23 · Production config guard
+- **Findings:** SEC-06
+- **Acceptance:**
+  - [ ] Add `.env.production.example` with `APP_ENV=production`, `APP_DEBUG=false`, `LOG_LEVEL=warning` and `SESSION_SECURE_COOKIE=true`. `DEPLOYMENT.md` uses it.
+  - [ ] `AppServiceProvider` logs critical and refuses to serve (503) when `APP_ENV=production` and `APP_DEBUG=true`. Unit test.
+
+**Medium and low findings with no task yet (fold into related BE work):**
+- SEC-07: token expiry, an active-status middleware, token revocation on password change
+- SEC-08: per-phone OTP limits, unique phone. Do it with BE-16.
+- SEC-09: atomic wallet. Do it with BE-09.
+- SEC-10: composer update
+- SEC-11: axios upgrade, remove the firebase JS SDK
+- SEC-13: account enumeration
+- SEC-14, SEC-15: remove the dump, `composer.phar`, `test_ride_api.php` and `reh`
+- SEC-16: input bounds
+- SEC-17: https/wss enforced in release (`env.ts`)
+- SEC-18: notification cache
