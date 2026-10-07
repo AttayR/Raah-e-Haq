@@ -60,12 +60,13 @@
 | T-509 | 5 | Favourite (saved) places from API | BE-14, T-303 | yes | agent | todo | FEAT-14 |
 | T-510 | 5 | In-ride chat passenger ↔ driver (replace demo chats) | BE-13, BE-12, T-406, T-307, T-405 | yes | agent | todo | FEAT-13 |
 | T-511 | 5 | Settings, support, invite, account deletion (both roles) | BE-11, BE-15, BE-17, T-102 | yes | agent | todo | FEAT-11/15/17 |
-| T-601 | 6 | Theme tokens complete; useColorScheme; persisted choice | T-008 | yes | agent | todo | |
-| T-602 | 6 | UI kit (Screen, Header, Button, Input, Card, states) | T-601 | yes | agent | todo | |
-| T-603 | 6 | Migrate auth screens to UI kit | T-602, T-204 | yes | agent | todo | |
-| T-604 | 6 | Passenger screens: split + migrate | T-602, T-309 | yes | agent | todo | |
-| T-605 | 6 | Driver screens: split + migrate | T-602, T-405 | yes | agent | todo | |
+| T-601 | 6 | Theme tokens complete; useColorScheme; persisted choice | T-008 | yes | agent | todo | Builder: rh-designer |
+| T-602 | 6 | UI kit (Screen, Header, Button, Input, Card, states) | T-601 | yes | agent | todo | Builder: rh-designer |
+| T-603 | 6 | Migrate auth screens to UI kit | T-602, T-204 | yes | agent | todo | Builder: rh-designer |
+| T-604 | 6 | Passenger screens: split + migrate | T-602, T-309 | yes | agent | todo | Builder: rh-designer |
+| T-605 | 6 | Driver screens: split + migrate | T-602, T-405 | yes | agent | todo | Builder: rh-designer |
 | T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | |
+| T-607 | 6 | Shared screens to UI kit: notifications, chat, wallet/history, settings/profile | T-602, T-508, T-510, T-511 | yes | agent | todo | Builder: rh-designer |
 | T-701 | 7 | Delete dead code + unused dependencies | T-605 | yes | agent | todo | |
 | T-702 | 7 | TypeScript + ESLint to zero; gate requires zero | T-701 | no | agent | todo | |
 | T-703 | 7 | Maestro E2E flows for QA scenarios | T-405 | no | agent | todo | |
@@ -85,14 +86,14 @@
 | B-11 | – | Credentials: Firebase service-account JSON for FCM (BE-11), SMS gateway account (BE-16) | | | owner | todo | Never commit; set in production `.env` |
 | BE-00 | 0 | Backend test harness: SQLite-safe migrations, factories, helpers | | no | agent | todo | FEAT-19: `php artisan test` 33/35 failing today. Prerequisite for every BE task |
 | BE-01 | 3 | Rides scoped to caller; passenger from token; ownership checks | BE-00 | yes | agent | todo | FEAT-02 (supersedes B-06 part) |
-| BE-02 | 4 | Fix route shadowing of /rides/pending + nearby-drivers; driver from token | BE-00 | yes | agent | todo | FEAT-01 (supersedes B-04 part) |
+| BE-02 | 4 | Fix route shadowing of /rides/pending + nearby-drivers; driver from token | BE-00 | yes | agent | todo | FEAT-01 (supersedes B-04 part); Driver privacy (no phone/name, coarse position, radius cap) is owned by BE-20 |
 | BE-03 | 4 | Atomic assign-driver with 409; driver from token | BE-01 | yes | agent | todo | FEAT-03 (supersedes B-06 part) |
 | BE-04 | 4 | Ride lifecycle endpoints (arrived/start/complete/driver cancel); server fare + earnings | BE-03, BE-05 | yes | agent | todo | FEAT-04 |
 | BE-05 | 3 | Vehicle catalogue + fare estimate endpoint | BE-00 | yes | agent | todo | FEAT-05 (supersedes B-04 part) |
 | BE-06 | 4 | Driver status endpoint + location endpoints fixed | BE-00 | yes | agent | todo | FEAT-06 (supersedes B-04 part) |
 | BE-07 | 5 | Ride rating endpoint + user rating recompute | BE-04 | yes | agent | todo | FEAT-07 (supersedes B-04 part) |
 | BE-08 | 5 | Personal stats (`/me/stats`) + driver earnings | BE-04 | yes | agent | todo | FEAT-08 (supersedes B-04 part) |
-| BE-09 | 5 | My wallet (cash only): balance + transactions; lock admin payment routes | BE-04 | yes | agent | todo | FEAT-09 |
+| BE-09 | 5 | My wallet (cash only): balance + transactions; lock admin payment routes | BE-04 | yes | agent | todo | FEAT-09; Admin-only locking of payments/* is owned by BE-18; BE-09 does only the user wallet endpoints |
 | BE-10 | 5 | Fix banners 500 + filter by date/audience/position | BE-00 | yes | agent | todo | FEAT-10 |
 | BE-11 | 5 | Push: device tokens, FCM send, preferences, broadcasts in list | BE-00 | yes | agent | todo | FEAT-11; prod creds = B-11 |
 | BE-12 | 4 | Realtime with Laravel Reverb (channels, Sanctum broadcast auth, events) | BE-03 | yes | agent | todo | FEAT-12 (supersedes B-06 part); prod hosting = B-10 |
@@ -467,6 +468,13 @@
 - **Acceptance:**
   - [ ] A root boundary with a friendly fallback and restart.
   - [ ] Crashlytics in release (RNFirebase), with no PII.
+
+### T-607 · Shared screens to UI kit
+- **Builder:** rh-designer
+- **Acceptance:**
+  - [ ] Notifications, chat (list + thread), wallet/transactions, settings and profile screens use only `src/components/ui` + theme tokens (no hex literals, no raw font sizes).
+  - [ ] Each has skeleton loading, `ErrorState` with retry and `EmptyState`; light and dark screenshots on iPhone 17 and a small device.
+  - [ ] No behaviour or data-flow change; existing tests pass; new RNTL tests for any new components.
 
 ## Phase 7: Release readiness
 
