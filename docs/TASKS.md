@@ -16,7 +16,7 @@
 | T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | todo | |
 | T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | Podfile NODE_BINARY removed early (iOS build fix commit) |
 | T-005 | 0 | Env config: single source for API/WS URLs and keys | T-002 | yes | agent | done | 2026-10-08 (6963f4b). QA on local backend (prod down). Debug→.env.development, Release→.env.production |
-| T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | todo | |
+| T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | in-progress | |
 | T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | todo | |
 | T-008 | 0 | One working toast system | T-002 | yes | agent | todo | |
 | T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01) |
@@ -102,12 +102,14 @@
 | BE-15 | 5 | Profile completeness (driver vehicle/licence, stats) + account deletion | BE-00 | yes | agent | todo | FEAT-15 |
 | BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | todo | FEAT-16 (supersedes B-01 code part) |
 | BE-17 | 5 | Referral code column fix; support scoping tests; public settings URLs | BE-00 | yes | agent | todo | FEAT-17 |
-| BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | in-progress | SEC-01 (critical) |
+| BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | done | 2026-10-08 (backend 1093b35). SEC-01 (critical) |
 | BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | todo | SEC-02 (critical); live part = B-12 |
 | BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | todo | SEC-03 (high); complements BE-06 |
 | BE-21 | 1 | Remove registration request logging (API + web) | BE-00 | no | agent | todo | SEC-04 (high) |
 | BE-22 | 1 | CNIC/licence/vehicle documents on private disk + authorized temporary URLs; migrate existing files | BE-18 | no | agent | todo | SEC-05 (high) |
 | BE-23 | 1 | Production config guard (refuse debug in production) + production env values in DEPLOYMENT.md | BE-00 | no | agent | todo | SEC-06 (high); live check = B-12 |
+| BE-24 | 1 | Ownership checks: ride GPS path, ride stops, referral show; remove admin debug route; fix referrals route shadowing | BE-18 | no | agent | todo | BE-18 security review findings 1,2,3,9,10 |
+| BE-25 | 1 | Active-user enforcement (suspended/inactive blocked on login and every request) + Sanctum token expiry and revoke on password change | BE-18 | no | agent | todo | SEC-07 |
 | B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md) |
 | B-13 | – | Firebase console: Firestore + Storage rules to deny-all | | | owner | todo | SEC-12 |
 
@@ -906,3 +908,22 @@ Findings: [audit/SECURITY.md](audit/SECURITY.md). Repo: `~/My-Projects/Raah-e-Ha
 - SEC-16: input bounds
 - SEC-17: https/wss enforced in release (`env.ts`)
 - SEC-18: notification cache
+
+### BE-24 · Ownership checks on remaining cross-user routes
+- **Findings:** BE-18 security review (2026-10-08) findings 1, 2, 3, 9, 10
+- **Acceptance:**
+  - [ ] `GET /api/tracking/ride/{ride}/path` only for the ride's passenger, its assigned driver or an admin; others 403.
+  - [ ] `POST/DELETE/PUT /api/rides/{ride}/stops*` only for the ride's passenger (or admin).
+  - [ ] `GET /api/referrals/{referral}` only for the referrer, the referred user or an admin; response doesn't expose DOB/gender of the other party.
+  - [ ] Static `referrals/tree|stats|rewards|settings` routes reachable (registered before `{referral}` or `{referral}` constrained to digits).
+  - [ ] `admin/debug-referrals` removed.
+  - [ ] Feature tests: owner 200, other user 403, admin 200 for each.
+
+### BE-25 · Active-user enforcement and token lifetime
+- **Findings:** SEC-07
+- **Acceptance:**
+  - [ ] Middleware `EnsureUserIsActive` on all `auth:sanctum` and web `auth` routes: suspended/inactive users get 403 `{success:false,message}` (pending drivers keep access to the routes they need for onboarding/status).
+  - [ ] API login and OTP login refuse suspended/inactive accounts with a clear message.
+  - [ ] Sanctum `expiration` configured (e.g. 30 days) with refresh via `/auth/refresh`; password change/reset revokes all other tokens.
+  - [ ] Feature tests for each case; the app's 401/403 handling (T-104) documented in API CONTRACT CHANGES.
+
