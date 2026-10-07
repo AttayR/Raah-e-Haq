@@ -55,6 +55,14 @@ yarn-error.log
 
 # Bundle artifact
 *.jsbundle
+# Output of a manual `react-native bundle` into the Android source tree.
+# Gradle generates these itself in build/; committed copies go stale and
+# clash with the generated resources.
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.bundle.map
+android/app/src/main/res/drawable-*/src_assets_*
+android/app/src/main/res/drawable-*/node_modules_*
+android/app/src/main/res/raw/keep.xml
 
 # Ruby / CocoaPods
 **/Pods/
@@ -66,7 +74,8 @@ yarn-error.log
 # testing
 /coverage
 
-# Yarn
+# Yarn (yarn only: never commit an npm lockfile)
+package-lock.json
 .yarn/*
 !.yarn/patches
 !.yarn/plugins

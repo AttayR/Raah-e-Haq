@@ -32,7 +32,7 @@ Safe test location (local): Gulberg III, Lahore (31.5204, 74.3587). After `migra
 ## Rules
 - **Data creation.** On the local backend, scenarios marked **Creates data** run without asking (owner approved 2026-10-08) and must finish with their cleanup step. On production they need the owner's go-ahead per run.
 - **Two simulators.** Two-device scenarios run the passenger and driver apps on two different simulators, each with its own signed-in test account.
-- **Credentials.** On the local backend, agents sign in with the local test accounts above. Agents never type production passwords or OTPs; a production login screen means `BLOCKED` until the owner signs in. OTP on local: read it from the local database or Laravel log, never from production.
+- **Credentials.** On the local backend, agents sign in with the local test accounts above. Agents never type production passwords or OTPs; a production login screen means `BLOCKED` until the owner signs in. OTP on local: the code is stored hashed and never logged (BE-16); read it from the `send-otp` response, which echoes `otp_code` only when the local backend runs with APP_ENV=local and APP_DEBUG=true. A resend within 60 s returns 429 (set `OTP_RESEND_COOLDOWN_SECONDS=0` in the local backend .env if a scenario needs rapid resends). Never from production.
 
 ## Smoke (read-only)
 

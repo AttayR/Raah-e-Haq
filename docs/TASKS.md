@@ -14,20 +14,21 @@
 | T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | done | logo rename + useErrorHandler import done early (iOS build fix commit); NotificationScreen + gate bundle check remain; 2026-10-08. Bundle check in gate (bundleOk); NotificationScreen imports fixed (delete denied by permissions, owner may delete; INF-34) |
 | T-002 | 0 | Make Jest work (setup, native mocks, App smoke test) | | no | agent | done | 2026-10-07 (904b918). Also fixed no-undef in scripts/api-health.js (added after baseline). Follow-up: stub WebSocket in jest.setup (do in T-005) |
 | T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | done | 2026-10-08. worklets plugin last; remove-console in production keeps error; logger.error calls console.error statically; App.test cold-cache timeout 30s |
-| T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | Podfile NODE_BINARY removed early (iOS build fix commit) |
+| T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | verified-no-qa | Podfile NODE_BINARY removed early (iOS build fix commit); 2026-10-08. Android runtime QA blocked by emulator instability (API 37, host load); APK verified clean; iOS smoke PASS. Re-run Android smoke later |
 | T-005 | 0 | Env config: single source for API/WS URLs and keys | T-002 | yes | agent | done | 2026-10-08 (6963f4b). QA on local backend (prod down). Debug→.env.development, Release→.env.production |
 | T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | done | 2026-10-08. src/core/logging/logger.ts (strict set on error path); 790 console calls migrated; ESLint no-console in src/ |
 | T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | todo | |
 | T-008 | 0 | One working toast system | T-002 | yes | agent | todo | |
-| T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01) |
+| T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01); BE-16 contract: send-otp/verify-otp may return 429 with retry_after; show message, resend countdown from retry_after (60 s after each send); otp_code optional/null; use server expires_in (60 s) not hardcoded 300 |
 | T-102 | 1 | Single logout thunk used everywhere | T-007 | yes | agent | todo | QA 2026-10-08: add a confirmation dialog before logout |
 | T-103 | 1 | Auth bootstrap: splash, offline-tolerant init | T-102 | yes | agent | todo | |
-| T-104 | 1 | Token in Keychain + single-flight 401 handling | T-103 | yes | agent | todo | |
+| T-104 | 1 | Token in Keychain + single-flight 401 handling | T-103 | yes | agent | todo |; 401 from verify-otp/login must not trigger the refresh-token branch (api.ts:79-101) |
 | T-105 | 1 | normalizeUser + role/status routing | T-103 | yes | agent | todo | Confirm with B-03 |
 | T-106 | 1 | Account-status screen (pending/suspended) rebuilt | T-105 | yes | agent | todo | |
 | T-107 | 1 | Remove Firebase auth path; fix slices & persist config | T-106 | yes | agent | todo | |
-| T-108 | 1 | Android release hardening in code (signing from env, no cleartext) + iOS plist cleanup | T-004 | no | agent | todo | Keystore = B-05 |
+| T-108 | 1 | Android release hardening in code (signing from env, no cleartext) + iOS plist cleanup | T-004 | no | agent | todo | Keystore = B-05; README: Android emulator dev host defaults to 10.0.2.2:8081 (set bundle location when Metro is on another port); run `./gradlew clean` and `installDebug` as separate commands (reanimated prefab) |
 | T-109 | 1 | Maps keys from build config; never logged | T-005 | yes | agent | todo | Rotation = B-02 |
+| T-110 | 1 | Nearby drivers via /rides/nearby-drivers (BE-20 contract): opaque string ids, no name/phone, radius <= 10; driver latest location only during active ride (403 = not available); driverPhone from ride.driver.phone while active | T-007 | yes | agent | todo | BE-20 app follow-up; passengers get 403 on /tracking/drivers-in-radius once BE-20 is deployed |
 | T-201 | 2 | Registration: per-step schema validation | T-107 | yes | agent | todo | |
 | T-202 | 2 | Registration: server field errors on every input | T-201 | yes | agent | todo | |
 | T-203 | 2 | Driver documents + license number actually uploaded | T-202 | yes | agent | todo | Needs B-03 |
@@ -95,7 +96,7 @@
 | B-08 | – | Product decisions: background location, chat, wallet | | | owner | todo | |
 | B-09 | – | **Production backend down: SSL missing for raahehaq.com + /api not served** (see docs/api/HEALTH_2026-10-03.md) | | | owner | todo | **Blocks all QA and real use** |
 | B-10 | – | Production hosting for Laravel Reverb + queue worker (process manager, TLS/wss proxy) | BE-12 | | owner | todo | Server/hPanel work; agents only prepare code + docs |
-| B-11 | – | Credentials: Firebase service-account JSON for FCM (BE-11), SMS gateway account (BE-16) | | | owner | todo | Never commit; set in production `.env` |
+| B-11 | – | Credentials: Firebase service-account JSON for FCM (BE-11), SMS gateway account (BE-16) | | | owner | todo | Never commit; set in production `.env`; enable Twilio Geo Permissions for Pakistan only; set an SMS spend alert |
 | BE-00 | 0 | Backend test harness: SQLite-safe migrations, factories, helpers | | no | agent | done | 2026-10-08 (backend 363d127). tests 2/35 → 39 pass, 3 incomplete (BE-02/18/20/21). FEAT-19: `php artisan test` 33/35 failing today. Prerequisite for every BE task |
 | BE-01 | 3 | Rides scoped to caller; passenger from token; ownership checks | BE-00 | yes | agent | todo | FEAT-02 (supersedes B-06 part) |
 | BE-02 | 4 | Fix route shadowing of /rides/pending + nearby-drivers; driver from token | BE-00 | yes | agent | todo | FEAT-01 (supersedes B-04 part); Driver privacy (no phone/name, coarse position, radius cap) is owned by BE-20 |
@@ -112,18 +113,21 @@
 | BE-13 | 5 | In-ride chat API (messages, chats list, broadcast) | BE-12 | yes | agent | todo | FEAT-13 |
 | BE-14 | 5 | Saved places CRUD | BE-00 | yes | agent | todo | FEAT-14 |
 | BE-15 | 5 | Profile completeness (driver vehicle/licence, stats) + account deletion | BE-00 | yes | agent | todo | FEAT-15 |
-| BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | in-progress | FEAT-16 (supersedes B-01 code part) |
+| BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | done | 2026-10-08 (backend 6c89b36). Echo only local+debug; SMS_DRIVER=log outside local → send-otp 500 + critical log (not 503). FEAT-16 (supersedes B-01 code part) |
 | BE-17 | 5 | Referral code column fix; support scoping tests; public settings URLs | BE-00 | yes | agent | todo | FEAT-17 |
 | BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | done | 2026-10-08 (backend 1093b35). SEC-01 (critical) |
 | BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | done | 2026-10-08 (backend 2348cfc). SEC-02 (critical); live part = B-12 |
-| BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | todo | SEC-03 (high); complements BE-06 |
+| BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | in-progress | SEC-03 (high); complements BE-06 |
 | BE-21 | 1 | Remove registration request logging (API + web) | BE-00 | no | agent | done | 2026-10-08 (backend b0be953); dontFlash now excludes CNIC/phone/bank/emergency fields (forms must be retyped after a validation error — owner to confirm). SEC-04 (high) |
-| BE-22 | 1 | CNIC/licence/vehicle documents on private disk + authorized temporary URLs; migrate existing files | BE-18 | no | agent | todo | SEC-05 (high) |
+| BE-22 | 1 | CNIC/licence/vehicle documents on private disk + authorized temporary URLs; migrate existing files | BE-18 | no | agent | done | 2026-10-08 (backend c27989c). SEC-05 (high) |
 | BE-23 | 1 | Production config guard (refuse debug in production) + production env values in DEPLOYMENT.md | BE-00 | no | agent | done | 2026-10-08 (backend 79bce43). SEC-06 (high); live check = B-12 |
 | BE-24 | 1 | Ownership checks: ride GPS path, ride stops, referral show; remove admin debug route; fix referrals route shadowing | BE-18 | no | agent | todo | BE-18 security review findings 1,2,3,9,10 |
 | BE-25 | 1 | Active-user enforcement (suspended/inactive blocked on login and every request) + Sanctum token expiry and revoke on password change | BE-18 | no | agent | todo | SEC-07 |
-| BE-26 | 1 | No exception details in API/admin responses; no withInput() of sensitive fields | BE-21 | no | agent | todo | BE-21 security re-check findings 1-2 (RidesController:162 details, Admin Ride/Payment/Referral, Api PaymentsController:58); also: phpunit.xml LOG_CHANNEL=null (tests write to real laravel.log), guard throttle file fallback when cache store down, SESSION_ENCRYPT default true; DEPLOYMENT.md: check old seeded accounts for use before deleting (+ delete their tokens), "never pass --env on a server"; CreateAdminCommand secret(..., false) |
-| B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md); before deleting old seeded accounts (admin@test.com, *@raah-e-haq.com) check login_attempts/audit_logs/personal_access_tokens for outside use; create real admin with `php artisan raahehaq:create-admin` |
+| BE-26 | 1 | No exception details in API/admin responses; no withInput() of sensitive fields | BE-21 | no | agent | todo | BE-21 security re-check findings 1-2 (RidesController:162 details, Admin Ride/Payment/Referral, Api PaymentsController:58); also: phpunit.xml LOG_CHANNEL=null (tests write to real laravel.log), guard throttle file fallback when cache store down, SESSION_ENCRYPT default true; DEPLOYMENT.md: check old seeded accounts for use before deleting (+ delete their tokens), "never pass --env on a server"; CreateAdminCommand secret(..., false); ProductionConfigGuard: critical warning when APP_URL is not https or is localhost in production |
+| BE-27 | 1 | Normalize users.phone to E.164 + unique index (dedupe plan); OTP lookups and limits by normalized phone; send-otp/forgot-password no account enumeration | BE-16 | no | agent | todo | SEC-08 part 3, SEC-13 |
+| BE-28 | 1 | OTP abuse hardening: Pakistan-only SMS, per-IP and global daily caps, counter clamp, admin limit reset, retry_after on every 429 | BE-16, BE-27 | no | agent | todo | BE-16 security re-check findings 1-4 |
+| BE-29 | 1 | Validation/contract fixes: vehicle_year max dynamic (now+1, 2026 drivers rejected today); profile endpoints return a resource not the raw user model; admin user store/update use validated(); remove dead legacy vehicle-image view block | BE-22 | no | agent | todo | BE-22 out-of-scope findings |
+| B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md); before deleting old seeded accounts (admin@test.com, *@raah-e-haq.com) check login_attempts/audit_logs/personal_access_tokens for outside use; create real admin with `php artisan raahehaq:create-admin`; after deploying BE-22 run `php artisan raahehaq:privatize-documents` (dry-run first, backup first) and review web access logs for past /storage/uploads/ requests (CNIC images were public; decide on breach notification) |
 | B-13 | – | Firebase console: Firestore + Storage rules to deny-all | | | owner | todo | SEC-12 |
 
 ---
@@ -1047,4 +1051,40 @@ Findings: [audit/SECURITY.md](audit/SECURITY.md). Repo: `~/My-Projects/Raah-e-Ha
   - [ ] No response returns `$e->getMessage()` or exception details outside `config('app.debug')` local mode: RidesController (`details`), Admin Ride/Payment/Referral controllers, Api PaymentsController. Use a generic message plus an error code; log through `SafeExceptionContext`.
   - [ ] `back()->withInput()` in admin controllers excludes password, CNIC, phone, bank and emergency fields.
   - [ ] Tests: a forced exception returns a generic body with no SQL or values.
+
+### BE-27 · Phone normalization and enumeration
+- **Findings:** SEC-08 (part 3), SEC-13
+- **Acceptance:**
+  - [ ] A migration normalizes existing `users.phone` to E.164 (+92…) with a documented dedupe report for collisions (no silent merges; collisions listed for the owner), then adds a unique index.
+  - [ ] Registration, profile update, send-otp and verify-otp normalize input before lookups and rate-limit keys.
+  - [ ] send-otp and forgot-password return the same generic 200 response whether or not the account exists (no 404 enumeration); no SMS/email is sent for unknown accounts.
+  - [ ] Feature tests for formats `0300…`, `+92300…`, `92300…`, with spaces/dashes.
+
+### BE-28 · OTP abuse hardening
+- **Findings:** BE-16 security re-check (2026-10-08) findings 1–4; reviewer suggestions 1, 2, 5
+- **Acceptance:**
+  - [ ] SmsService refuses any number that doesn't normalise to +92 (no SMS to foreign/premium numbers); registration validates Pakistani mobile numbers.
+  - [ ] Per-IP daily caps on send-otp and failed verifies, plus a global daily SMS budget (config), with a critical log when the budget is hit.
+  - [ ] OtpLimiter give-back clamps counters at zero (never negative).
+  - [ ] Admin action (panel or artisan `raahehaq:otp-reset {phone}`) clears a phone's OTP limits; documented support flow for victims of targeted lockout.
+  - [ ] Every 429 from send-otp/verify-otp carries `retry_after` (or a documented `code: "code_exhausted"` for the per-code limit); API docs updated.
+  - [ ] Issue-lock timeout returns 429/503, not a generic 500.
+  - [ ] Feature tests for each.
+
+### BE-29 · Validation and response contract fixes
+- **Findings:** BE-22 implementer out-of-scope list (2026-10-08)
+- **Acceptance:**
+  - [ ] `vehicle_year` rule is `integer|min:1980|max:{current year + 1}` (computed) in every register/user controller; test with the current and next year.
+  - [ ] `ProfileController::show` and `updateAvatar` return `UserResource` (no raw document paths, no password/remember token/PII columns beyond what the owner needs).
+  - [ ] Admin `UserController` store/update map only `validated()` data for all fields.
+  - [ ] Dead "Vehicle Images (Legacy Data)" block removed from admin show view.
+  - [ ] Feature tests.
+
+### T-110 · Nearby drivers on the BE-20 contract
+- **Findings:** BE-20 API contract change (2026-10-08)
+- **Acceptance:**
+  - [ ] `rideService.getDriversInRadius` (or its replacement) calls `GET /rides/nearby-drivers` with `{latitude, longitude, radius<=10, vehicle_type?}`; `DriverInRadius.id` is `string`; `name`/`phone` removed from the type and UI; map marker keys use the opaque id.
+  - [ ] `getDriverLocation(driverId)` is only called during an active ride; 403 is handled as "not available" without an error toast.
+  - [ ] `driverPhone` comes from `ride.driver.phone` when present (active ride), otherwise the call button is hidden.
+  - [ ] Unit tests with axios-mock-adapter for the new shapes; QA on the local backend shows nearby drivers on the passenger map.
 
