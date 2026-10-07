@@ -58,7 +58,8 @@ The app is being taken from prototype to production through a tracked fix progra
 | **rh-auditor** | Maps every screen/action to real data and backend routes; turns MOCK/BROKEN/MISSING items into tasks | No (docs only) |
 | **rh-implementer** | Implements one app task (`T-…`) with tests | Yes (app) |
 | **rh-backend** | Implements one backend task (`BE-…`) with feature tests | Yes (backend) |
-| **rh-designer** | Design system and screen redesign tasks (`UI-…` / design tasks) | Yes (app UI) |
+| **rh-design-director** | Pixel-by-pixel revamp of passenger + driver UI: audits every screen, writes the design system and per-screen specs in `docs/design/`, creates UI tasks, and is the design QA gate for each one | No (docs/specs only) |
+| **rh-designer** | Implements design tasks (tokens, UI kit, screen redesigns) to the director's spec | Yes (app UI) |
 | **rh-debugger** | Root-causes failures, fixes with a regression test | Yes |
 | **rh-reviewer** | Independent PASS/FAIL on the diff, criteria and gate | No |
 | **rh-security** | Security PASS/FAIL on every diff; phase/area audits | No (docs only) |

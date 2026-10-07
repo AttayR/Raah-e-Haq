@@ -38,7 +38,8 @@ If the builder reports `BLOCKED`:
 ## 3. Verify (independent, in this order)
 1. **rh-reviewer** with the task ID and the builder's full report. For BE tasks, tell it the repo is `~/My-Projects/Raah-e-Haq-backend` and to run `php artisan test` there.
 2. **rh-security** in `diff <ID>` mode with the builder's report.
-3. Run the gate yourself: `yarn verify` (app) and/or `php artisan test` (backend). Don't trust any report blindly.
+3. **Design tasks only** (Notes say `Builder: rh-designer`): **rh-design-director** in `review <ID>` mode. Its DEVIATIONS count as FAIL issues.
+4. Run the gate yourself: `yarn verify` (app) and/or `php artisan test` (backend). Don't trust any report blindly.
 
 On any FAIL: send the combined ISSUES back to the builder (retry 1). If it fails again, give the failure evidence to **rh-debugger** (retry 2). If it still fails, set `blocked` with the top issue, stash the change (`<ID>-failed`), and move on.
 
