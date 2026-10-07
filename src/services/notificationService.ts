@@ -1,9 +1,8 @@
 import { messaging } from './firebase';
 import { getToken, onMessage } from '@react-native-firebase/messaging';
 import { Platform, Alert, PermissionsAndroid } from 'react-native';
-import { NotificationResource } from './rideService';
+import rideService, { NotificationResource } from './rideService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { env } from '../config/env';
 import { logger } from '../core/logging/logger';
 
 export interface NotificationData {
@@ -18,7 +17,6 @@ export interface NotificationData {
 }
 
 class NotificationService {
-  private baseUrl = '/notifications';
   private unreadCount: number = 0;
   private listeners: Set<(count: number) => void> = new Set();
 
@@ -35,31 +33,10 @@ class NotificationService {
     try {
       logger.debug('🔔 Fetching notifications:', { page, perPage });
       
-      const response = await fetch(`${env.API_URL}${this.baseUrl}?page=${page}&per_page=${perPage}`, {
-        headers: {
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        }
-      });
+      // GET /notifications through the shared axios client: { success, data, pagination }
+      const result = await rideService.getNotifications(page, perPage);
+      logger.debug('✅ Notifications fetched successfully:', result.data.length);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          logger.debug('⚠️ Notifications endpoint not implemented yet, returning empty list');
-          return {
-            data: [],
-            pagination: {
-              current_page: 1,
-              last_page: 1,
-              per_page: perPage,
-              total: 0
-            }
-          };
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      logger.debug('✅ Notifications fetched successfully:', result);
-      
       return result;
     } catch (error) {
       logger.error('❌ Failed to fetch notifications:', error);
@@ -81,23 +58,8 @@ class NotificationService {
     try {
       logger.debug('✅ Marking notification as read:', notificationId);
       
-      const response = await fetch(`${env.API_URL}${this.baseUrl}/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          logger.debug('⚠️ Mark as read endpoint not implemented yet, skipping');
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      logger.debug('✅ Notification marked as read:', result);
+      await rideService.markNotificationAsRead(notificationId);
+      logger.debug('✅ Notification marked as read');
       
       // Update unread count
       await this.updateUnreadCount();
@@ -112,23 +74,8 @@ class NotificationService {
     try {
       logger.debug('✅ Marking all notifications as read');
       
-      const response = await fetch(`${env.API_URL}${this.baseUrl}/read-all`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          logger.debug('⚠️ Mark all as read endpoint not implemented yet, skipping');
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      logger.debug('✅ All notifications marked as read:', result);
+      await rideService.markAllNotificationsAsRead();
+      logger.debug('✅ All notifications marked as read');
       
       // Update unread count
       this.unreadCount = 0;
@@ -144,26 +91,9 @@ class NotificationService {
     try {
       logger.debug('🔢 Getting unread count');
       
-      const response = await fetch(`${env.API_URL}${this.baseUrl}/unread-count`, {
-        headers: {
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        }
-      });
+      this.unreadCount = await rideService.getUnreadCount();
+      logger.debug('✅ Unread count fetched:', this.unreadCount);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          logger.debug('⚠️ Notifications endpoint not implemented yet, returning 0');
-          this.unreadCount = 0;
-          this.notifyListeners();
-          return 0;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      logger.debug('✅ Unread count fetched:', result);
-      
-      this.unreadCount = result.data.unread_count;
       this.notifyListeners();
       
       return this.unreadCount;
@@ -280,20 +210,6 @@ class NotificationService {
       logger.debug('✅ Cleared stored notifications');
     } catch (error) {
       logger.error('❌ Failed to clear stored notifications:', error);
-    }
-  }
-
-  // Get authentication token
-  private async getAuthToken(): Promise<string> {
-    try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('No auth token found');
-      }
-      return token;
-    } catch (error) {
-      logger.error('❌ Failed to get auth token:', error);
-      throw error;
     }
   }
 

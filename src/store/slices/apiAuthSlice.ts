@@ -14,6 +14,7 @@ import {
   updateUserProfile,
   initializeAuth,
 } from '../thunks/apiThunks';
+import { rejectionMessage } from '../../core/api/errors';
 
 export type AuthState = {
   user: User | null;
@@ -23,7 +24,7 @@ export type AuthState = {
   error: string | null;
   otpData: {
     phone: string;
-    otp_code: string;
+    otp_code?: string | null;
     expires_in: number;
   } | null;
   isOtpSent: boolean;
@@ -85,7 +86,7 @@ const authSlice = createSlice({
       .addCase(initializeAuth.rejected, (state, action) => {
         state.status = 'failed';
         state.isInitialized = true;
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
     // Login User
@@ -103,7 +104,7 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         state.isAuthenticated = false;
       });
 
@@ -121,7 +122,7 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
     // Send OTP
@@ -138,7 +139,7 @@ const authSlice = createSlice({
       })
       .addCase(sendOtp.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         state.isOtpSent = false;
       });
 
@@ -160,7 +161,7 @@ const authSlice = createSlice({
       })
       .addCase(verifyOtp.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         state.isOtpVerified = false;
       });
 
@@ -176,7 +177,7 @@ const authSlice = createSlice({
       })
       .addCase(forgotPassword.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
     // Reset Password
@@ -191,7 +192,7 @@ const authSlice = createSlice({
       })
       .addCase(resetPassword.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
     // Logout User
@@ -212,7 +213,7 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         // Still clear auth data even if API call fails
         state.user = null;
         state.token = null;
@@ -241,7 +242,7 @@ const authSlice = createSlice({
       })
       .addCase(logoutAllDevices.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         // Still clear auth data even if API call fails
         state.user = null;
         state.token = null;
@@ -264,7 +265,7 @@ const authSlice = createSlice({
       })
       .addCase(refreshToken.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         // If refresh fails, logout user
         state.user = null;
         state.token = null;
@@ -284,7 +285,7 @@ const authSlice = createSlice({
       })
       .addCase(getUserProfile.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
     // Update User Profile
@@ -300,7 +301,7 @@ const authSlice = createSlice({
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload as string;
+        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
   },
 });

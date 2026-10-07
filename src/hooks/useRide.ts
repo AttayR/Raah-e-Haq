@@ -3,6 +3,7 @@ import rideService, {
   RideResource, 
   RideRequest, 
   RideStopRequest,
+  RideStopsUpdate,
   DriverInRadius, 
   DriverLocation,
   LocationUpdate,
@@ -46,9 +47,9 @@ export interface RideActions {
   clearError: () => void;
   
   // Stop management
-  addStop: (rideId: number, stopData: RideStopRequest) => Promise<RideResource>;
-  removeStop: (rideId: number, stopId: number) => Promise<RideResource>;
-  updateStopOrder: (rideId: number, stopOrders: Array<{stop_id: number, new_order: number}>) => Promise<RideResource>;
+  addStop: (rideId: number, stopData: RideStopRequest) => Promise<RideStopsUpdate>;
+  removeStop: (rideId: number, stopId: number) => Promise<RideStopsUpdate>;
+  updateStopOrder: (rideId: number, stopOrders: Array<{stop_id: number, new_order: number}>) => Promise<RideStopsUpdate>;
   
   // Driver navigation
   navigateToNextStop: (rideId: number) => Promise<any>;
@@ -58,7 +59,7 @@ export interface RideActions {
   // Location tracking
   startLocationTracking: (config?: any) => Promise<void>;
   stopLocationTracking: () => void;
-  getDriverLocation: (driverId: number) => Promise<DriverLocation>;
+  getDriverLocation: (driverId: number) => Promise<DriverLocation | null>;
   
   // Notifications
   getNotifications: (page?: number, perPage?: number) => Promise<{data: NotificationResource[], pagination: any}>;
@@ -71,6 +72,12 @@ export interface RideActions {
   subscribeToDriverRequests: (driverId: number, latitude: number, longitude: number, radius?: number) => Promise<string>;
   unsubscribe: (connectionId: string) => void;
 }
+
+// Stop endpoints return only the stops and new fare; merge them into the current ride.
+const applyStopsUpdate = (ride: RideResource | null, update: RideStopsUpdate): RideResource | null =>
+  ride && ride.id === update.id
+    ? { ...ride, stops: update.stops, total_fare: update.updated_fare }
+    : ride;
 
 export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   const [state, setState] = useState<RideState>({
@@ -397,7 +404,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   }, []);
 
   // Update driver location
-  const updateDriverLocation = useCallback(async (location: DriverLocation): Promise<void> => {
+  const updateDriverLocation = useCallback(async (location: LocationUpdate): Promise<void> => {
     try {
       logger.debug('📍 Updating driver location:', location);
       await rideService.updateDriverLocation(location);
@@ -516,7 +523,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // ==================== STOP MANAGEMENT METHODS ====================
 
   // Add stop to ride
-  const addStop = useCallback(async (rideId: number, stopData: RideStopRequest): Promise<RideResource> => {
+  const addStop = useCallback(async (rideId: number, stopData: RideStopRequest): Promise<RideStopsUpdate> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
@@ -525,7 +532,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       setState(prev => ({
         ...prev,
-        currentRide: updatedRide,
+        currentRide: applyStopsUpdate(prev.currentRide, updatedRide),
         isLoading: false,
       }));
       
@@ -543,7 +550,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   }, []);
 
   // Remove stop from ride
-  const removeStop = useCallback(async (rideId: number, stopId: number): Promise<RideResource> => {
+  const removeStop = useCallback(async (rideId: number, stopId: number): Promise<RideStopsUpdate> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
@@ -552,7 +559,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       setState(prev => ({
         ...prev,
-        currentRide: updatedRide,
+        currentRide: applyStopsUpdate(prev.currentRide, updatedRide),
         isLoading: false,
       }));
       
@@ -570,7 +577,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   }, []);
 
   // Update stop order
-  const updateStopOrder = useCallback(async (rideId: number, stopOrders: Array<{stop_id: number, new_order: number}>): Promise<RideResource> => {
+  const updateStopOrder = useCallback(async (rideId: number, stopOrders: Array<{stop_id: number, new_order: number}>): Promise<RideStopsUpdate> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
@@ -579,7 +586,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       setState(prev => ({
         ...prev,
-        currentRide: updatedRide,
+        currentRide: applyStopsUpdate(prev.currentRide, updatedRide),
         isLoading: false,
       }));
       
@@ -663,7 +670,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   }, []);
 
   // Get driver location
-  const getDriverLocation = useCallback(async (driverId: number): Promise<DriverLocation> => {
+  const getDriverLocation = useCallback(async (driverId: number): Promise<DriverLocation | null> => {
     try {
       logger.debug('📍 Getting driver location:', driverId);
       const location = await locationTrackingService.getDriverLocation(driverId);

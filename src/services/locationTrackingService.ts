@@ -1,5 +1,5 @@
-import { LocationUpdate, DriverLocation } from './rideService';
-import { env } from '../config/env';
+import rideService, { LocationUpdate, DriverLocation } from './rideService';
+import apiService from './api';
 import { logger } from '../core/logging/logger';
 
 export interface LocationData {
@@ -181,18 +181,7 @@ class LocationTrackingService {
         accuracy: location.accuracy
       };
 
-      const response = await fetch(`${env.API_URL}/tracking/update-location`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        },
-        body: JSON.stringify(locationUpdate)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      await rideService.updateDriverLocation(locationUpdate);
 
       logger.debug('📍 Location updated on server');
     } catch (error) {
@@ -225,21 +214,11 @@ class LocationTrackingService {
     });
   }
 
-  // Get driver location
-  async getDriverLocation(driverId: number): Promise<DriverLocation> {
+  // Get driver location. The backend route is GET /tracking/driver/{id}/latest
+  // (there is no /tracking/driver/{id}/location); 403 unless there is an active ride (BE-20).
+  async getDriverLocation(driverId: number): Promise<DriverLocation | null> {
     try {
-      const response = await fetch(`${env.API_URL}/tracking/driver/${driverId}/location`, {
-        headers: {
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result.data;
+      return await rideService.getDriverLocation(driverId);
     } catch (error) {
       logger.error('❌ Failed to get driver location:', error);
       throw error;
@@ -299,27 +278,6 @@ class LocationTrackingService {
     return R * c; // Distance in meters
   }
 
-  // Get authentication token
-  private async getAuthToken(): Promise<string> {
-    try {
-      // This should be implemented based on your auth system
-      const token = await this.getStoredToken();
-      if (!token) {
-        throw new Error('No auth token found');
-      }
-      return token;
-    } catch (error) {
-      logger.error('❌ Failed to get auth token:', error);
-      throw error;
-    }
-  }
-
-  // Get stored token (placeholder)
-  private async getStoredToken(): Promise<string | null> {
-    // This should be implemented based on your storage system
-    return 'your_auth_token_here';
-  }
-
   // Get tracking status
   getTrackingStatus(): boolean {
     return this.isTracking;
@@ -342,20 +300,11 @@ class LocationTrackingService {
   }
 
   // Set driver status
+  // TODO(BE-06/T-401): POST /tracking/update-status does not exist on the backend (404).
+  // Driver online/offline moves to POST /driver/status (BE-06). No caller uses this today.
   async setDriverStatus(status: 'online' | 'offline' | 'busy'): Promise<void> {
     try {
-      const response = await fetch(`${env.API_URL}/tracking/update-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        },
-        body: JSON.stringify({ status })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      await apiService.post('/tracking/update-status', { status });
 
       logger.debug('📍 Driver status updated:', status);
     } catch (error) {

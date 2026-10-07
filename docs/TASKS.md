@@ -17,7 +17,7 @@
 | T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | verified-no-qa | Podfile NODE_BINARY removed early (iOS build fix commit); 2026-10-08. Android runtime QA blocked by emulator instability (API 37, host load); APK verified clean; iOS smoke PASS. Re-run Android smoke later |
 | T-005 | 0 | Env config: single source for API/WS URLs and keys | T-002 | yes | agent | done | 2026-10-08 (6963f4b). QA on local backend (prod down). Debug→.env.development, Release→.env.production |
 | T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | done | 2026-10-08. src/core/logging/logger.ts (strict set on error path); 790 console calls migrated; ESLint no-console in src/ |
-| T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | todo | |
+| T-007 | 0 | Typed API layer: ApiResponse/ApiError, fix double unwrap, route all calls through axios | T-005 | no | agent | done | 2026-10-08. src/core/api (ApiResponse, ApiError kinds, unwrap); token only to API origin; 5xx text never shown; docs/api/CONTRACT_NOTES.md from real routes |
 | T-008 | 0 | One working toast system | T-002 | yes | agent | todo | |
 | T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01); BE-16 contract: send-otp/verify-otp may return 429 with retry_after; show message, resend countdown from retry_after (60 s after each send); otp_code optional/null; use server expires_in (60 s) not hardcoded 300 |
 | T-102 | 1 | Single logout thunk used everywhere | T-007 | yes | agent | todo | QA 2026-10-08: add a confirmation dialog before logout |
@@ -28,7 +28,7 @@
 | T-107 | 1 | Remove Firebase auth path; fix slices & persist config | T-106 | yes | agent | todo | |
 | T-108 | 1 | Android release hardening in code (signing from env, no cleartext) + iOS plist cleanup | T-004 | no | agent | todo | Keystore = B-05; README: Android emulator dev host defaults to 10.0.2.2:8081 (set bundle location when Metro is on another port); run `./gradlew clean` and `installDebug` as separate commands (reanimated prefab) |
 | T-109 | 1 | Maps keys from build config; never logged | T-005 | yes | agent | todo | Rotation = B-02 |
-| T-110 | 1 | Nearby drivers via /rides/nearby-drivers (BE-20 contract): opaque string ids, no name/phone, radius <= 10; driver latest location only during active ride (403 = not available); driverPhone from ride.driver.phone while active | T-007 | yes | agent | todo | BE-20 app follow-up; passengers get 403 on /tracking/drivers-in-radius once BE-20 is deployed |
+| T-110 | 1 | Nearby drivers via /rides/nearby-drivers (BE-20 contract): opaque string ids, no name/phone, radius <= 10; driver latest location only during active ride (403 = not available); driverPhone from ride.driver.phone while active | T-007 | yes | agent | todo | BE-20 app follow-up; passengers get 403 on /tracking/drivers-in-radius once BE-20 is deployed; nearby id differs per viewer, rating 0.5 steps, positions refresh every 2 min, 429 with retry_after (poll ≥10 s); latest returns 6 fields only |
 | T-201 | 2 | Registration: per-step schema validation | T-107 | yes | agent | todo | |
 | T-202 | 2 | Registration: server field errors on every input | T-201 | yes | agent | todo | |
 | T-203 | 2 | Driver documents + license number actually uploaded | T-202 | yes | agent | todo | Needs B-03 |
@@ -43,7 +43,7 @@
 | T-308 | 3 | Location permission UX + shared location watcher | T-301 | yes | agent | todo | |
 | T-309 | 3 | Remove crashing Advanced panel + passenger dead duplicates | T-302 | yes | agent | todo | |
 | T-310 | 3 | Vehicle options + ETAs from server catalogue | T-306, BE-05, BE-02 | yes | agent | todo | FEAT-05 |
-| T-401 | 4 | Driver online/offline in Redux backed by API | T-107, BE-06 | yes | agent | todo | `POST/GET /driver/status` (BE-06, was B-04) |
+| T-401 | 4 | Driver online/offline in Redux backed by API | T-107, BE-06 | yes | agent | todo | `POST/GET /driver/status` (BE-06, was B-04); BE-30: accept via POST /rides/{id}/assign-driver with no body (token driver); fix DriverMapScreen updateDriverLocation(uid, loc) signature mismatch (posts a string); show 403/409/400 message |
 | T-402 | 4 | Driver location tracker rewrite | T-308, T-401 | yes | agent | todo | |
 | T-403 | 4 | Incoming ride requests (poll /rides/pending) | T-402, BE-02 | yes | agent | todo | `/rides/pending` is unreachable until BE-02 (FEAT-01) |
 | T-404 | 4 | Accept via assign-driver (409) + reject | T-403, BE-03 | yes | agent | todo | Atomic accept = BE-03 (was B-06) |
@@ -98,12 +98,12 @@
 | B-10 | – | Production hosting for Laravel Reverb + queue worker (process manager, TLS/wss proxy) | BE-12 | | owner | todo | Server/hPanel work; agents only prepare code + docs |
 | B-11 | – | Credentials: Firebase service-account JSON for FCM (BE-11), SMS gateway account (BE-16) | | | owner | todo | Never commit; set in production `.env`; enable Twilio Geo Permissions for Pakistan only; set an SMS spend alert |
 | BE-00 | 0 | Backend test harness: SQLite-safe migrations, factories, helpers | | no | agent | done | 2026-10-08 (backend 363d127). tests 2/35 → 39 pass, 3 incomplete (BE-02/18/20/21). FEAT-19: `php artisan test` 33/35 failing today. Prerequisite for every BE task |
-| BE-01 | 3 | Rides scoped to caller; passenger from token; ownership checks | BE-00 | yes | agent | todo | FEAT-02 (supersedes B-06 part) |
+| BE-01 | 3 | Rides scoped to caller; passenger from token; ownership checks | BE-00 | yes | agent | todo | FEAT-02 (supersedes B-06 part); also: RideResource.passenger minimal card (first name, photo, rating; phone only to assigned driver while active), full UserResource admin-only (BE-20 security finding 4) |
 | BE-02 | 4 | Fix route shadowing of /rides/pending + nearby-drivers; driver from token | BE-00 | yes | agent | todo | FEAT-01 (supersedes B-04 part); Driver privacy (no phone/name, coarse position, radius cap) is owned by BE-20 |
-| BE-03 | 4 | Atomic assign-driver with 409; driver from token | BE-01 | yes | agent | todo | FEAT-03 (supersedes B-06 part) |
+| BE-03 | 4 | Atomic assign-driver with 409; driver from token | BE-01 | yes | agent | todo | FEAT-03 (supersedes B-06 part); driver with an active ride cannot accept another; mark driver busy atomically; admin assigning driver_id must target an active driver who is not the passenger (BE-30 security findings 3, 6) |
 | BE-04 | 4 | Ride lifecycle endpoints (arrived/start/complete/driver cancel); server fare + earnings | BE-03, BE-05 | yes | agent | todo | FEAT-04 |
 | BE-05 | 3 | Vehicle catalogue + fare estimate endpoint | BE-00 | yes | agent | todo | FEAT-05 (supersedes B-04 part) |
-| BE-06 | 4 | Driver status endpoint + location endpoints fixed | BE-00 | yes | agent | todo | FEAT-06 (supersedes B-04 part) |
+| BE-06 | 4 | Driver status endpoint + location endpoints fixed | BE-00 | yes | agent | todo | FEAT-06 (supersedes B-04 part); normalise driver status: app sends `online`, accept requires `available` (BE-30 review) — treat online as available or migrate the app; until then driver accept returns 400 DRIVER_NOT_AVAILABLE |
 | BE-07 | 5 | Ride rating endpoint + user rating recompute | BE-04 | yes | agent | todo | FEAT-07 (supersedes B-04 part) |
 | BE-08 | 5 | Personal stats (`/me/stats`) + driver earnings | BE-04 | yes | agent | todo | FEAT-08 (supersedes B-04 part) |
 | BE-09 | 5 | My wallet (cash only): balance + transactions; lock admin payment routes | BE-04 | yes | agent | todo | FEAT-09; Admin-only locking of payments/* is owned by BE-18; BE-09 does only the user wallet endpoints |
@@ -117,16 +117,17 @@
 | BE-17 | 5 | Referral code column fix; support scoping tests; public settings URLs | BE-00 | yes | agent | todo | FEAT-17 |
 | BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | done | 2026-10-08 (backend 1093b35). SEC-01 (critical) |
 | BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | done | 2026-10-08 (backend 2348cfc). SEC-02 (critical); live part = B-12 |
-| BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | in-progress | SEC-03 (high); complements BE-06 |
+| BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | done | 2026-10-08 (backend 4eceaaf). nearby-drivers route unshadowed; viewer-bound ids; 2-min position buckets; 12/min/user limiter. SEC-03 (high); complements BE-06 |
 | BE-21 | 1 | Remove registration request logging (API + web) | BE-00 | no | agent | done | 2026-10-08 (backend b0be953); dontFlash now excludes CNIC/phone/bank/emergency fields (forms must be retyped after a validation error — owner to confirm). SEC-04 (high) |
 | BE-22 | 1 | CNIC/licence/vehicle documents on private disk + authorized temporary URLs; migrate existing files | BE-18 | no | agent | done | 2026-10-08 (backend c27989c). SEC-05 (high) |
 | BE-23 | 1 | Production config guard (refuse debug in production) + production env values in DEPLOYMENT.md | BE-00 | no | agent | done | 2026-10-08 (backend 79bce43). SEC-06 (high); live check = B-12 |
-| BE-24 | 1 | Ownership checks: ride GPS path, ride stops, referral show; remove admin debug route; fix referrals route shadowing | BE-18 | no | agent | todo | BE-18 security review findings 1,2,3,9,10 |
+| BE-24 | 1 | Ownership checks: ride GPS path, ride stops, referral show; remove admin debug route; fix referrals route shadowing | BE-18 | no | agent | in-progress | BE-18 security review findings 1,2,3,9,10; also cancel()/destroy()/show() ownership if BE-01 has not landed (BE-30 review); stops: 409 if stop already cancelled/completed, recompute fare server-side from active stops (no repeated -25 / no negative fare), passenger-or-admin only (BE-30 security finding 2, high) |
 | BE-25 | 1 | Active-user enforcement (suspended/inactive blocked on login and every request) + Sanctum token expiry and revoke on password change | BE-18 | no | agent | todo | SEC-07 |
-| BE-26 | 1 | No exception details in API/admin responses; no withInput() of sensitive fields | BE-21 | no | agent | todo | BE-21 security re-check findings 1-2 (RidesController:162 details, Admin Ride/Payment/Referral, Api PaymentsController:58); also: phpunit.xml LOG_CHANNEL=null (tests write to real laravel.log), guard throttle file fallback when cache store down, SESSION_ENCRYPT default true; DEPLOYMENT.md: check old seeded accounts for use before deleting (+ delete their tokens), "never pass --env on a server"; CreateAdminCommand secret(..., false); ProductionConfigGuard: critical warning when APP_URL is not https or is localhost in production |
+| BE-26 | 1 | No exception details in API/admin responses; no withInput() of sensitive fields | BE-21 | no | agent | todo | BE-21 security re-check findings 1-2 (RidesController:162 details, Admin Ride/Payment/Referral, Api PaymentsController:58); also: phpunit.xml LOG_CHANNEL=null (tests write to real laravel.log), guard throttle file fallback when cache store down, SESSION_ENCRYPT default true; DEPLOYMENT.md: check old seeded accounts for use before deleting (+ delete their tokens), "never pass --env on a server"; CreateAdminCommand secret(..., false); ProductionConfigGuard: critical warning when APP_URL is not https or is localhost in production; one-off command to remove data.driver_phone from existing notifications |
 | BE-27 | 1 | Normalize users.phone to E.164 + unique index (dedupe plan); OTP lookups and limits by normalized phone; send-otp/forgot-password no account enumeration | BE-16 | no | agent | todo | SEC-08 part 3, SEC-13 |
 | BE-28 | 1 | OTP abuse hardening: Pakistan-only SMS, per-IP and global daily caps, counter clamp, admin limit reset, retry_after on every 429 | BE-16, BE-27 | no | agent | todo | BE-16 security re-check findings 1-4 |
 | BE-29 | 1 | Validation/contract fixes: vehicle_year max dynamic (now+1, 2026 drivers rejected today); profile endpoints return a resource not the raw user model; admin user store/update use validated(); remove dead legacy vehicle-image view block | BE-22 | no | agent | todo | BE-22 out-of-scope findings |
+| BE-30 | 1 | Ride write lockdown (phase-1 stopgap for SEC-03): PUT /rides/{id} cannot set driver_id/status/fare except admin; assign-driver uses the token user and requires driver role; stop persisting driver_phone in notification data | BE-18 | no | agent | done | 2026-10-08 (backend bd76db1). Assigned driver may move status forward via PUT until BE-04. BE-20 security finding 1 (high): passenger can self-assign any driver and unlock phone/exact location; full fix in BE-03/BE-04 |
 | B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md); before deleting old seeded accounts (admin@test.com, *@raah-e-haq.com) check login_attempts/audit_logs/personal_access_tokens for outside use; create real admin with `php artisan raahehaq:create-admin`; after deploying BE-22 run `php artisan raahehaq:privatize-documents` (dry-run first, backup first) and review web access logs for past /storage/uploads/ requests (CNIC images were public; decide on breach notification) |
 | B-13 | – | Firebase console: Firestore + Storage rules to deny-all | | | owner | todo | SEC-12 |
 
@@ -1087,4 +1088,12 @@ Findings: [audit/SECURITY.md](audit/SECURITY.md). Repo: `~/My-Projects/Raah-e-Ha
   - [ ] `getDriverLocation(driverId)` is only called during an active ride; 403 is handled as "not available" without an error toast.
   - [ ] `driverPhone` comes from `ride.driver.phone` when present (active ride), otherwise the call button is hidden.
   - [ ] Unit tests with axios-mock-adapter for the new shapes; QA on the local backend shows nearby drivers on the passenger map.
+
+### BE-30 · Ride write lockdown (stopgap)
+- **Findings:** BE-20 security review finding 1 (high), SEC-03
+- **Acceptance:**
+  - [ ] `PUT /rides/{id}`: non-admins can't change `driver_id`, `status`, `fare`, `passenger_id`; only the ride's passenger may edit allowed fields (pickup/dropoff notes etc.) while `requested`.
+  - [ ] `POST /rides/{ride}/assign-driver`: driver is the authenticated user (body `driver_id` ignored), must have the driver role and be active; passengers get 403.
+  - [ ] `driver_phone` no longer stored in notification `data`.
+  - [ ] Feature tests: passenger self-assign attempt → 403/ignored and no phone/location unlocked; driver assign works.
 

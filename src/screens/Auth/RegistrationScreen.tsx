@@ -22,6 +22,7 @@ import DocumentsStep from './steps/DocumentsStep';
 import ReviewStep from './steps/ReviewStep';
 import { showToast } from '../../components/ToastProvider';
 import { logger } from '../../core/logging/logger';
+import { rejectionMessage, ThunkRejection } from '../../core/api/errors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -344,22 +345,20 @@ export default function RegistrationScreen() {
         navigation.navigate('Login');
       } else {
         logger.debug('❌ Registration failed');
-        const payload = result.payload as any;
-        const isValidationError = payload && typeof payload === 'object' && payload.errors;
-        if (isValidationError) {
+        const payload = result.payload as ThunkRejection | undefined;
+        const serverFieldErrors = payload?.fieldErrors ?? {};
+        if (Object.keys(serverFieldErrors).length > 0) {
           const fieldErrors: Record<string, string> = {};
-          Object.entries(payload.errors || {}).forEach(([field, messages]) => {
-            const msg = Array.isArray(messages) ? messages[0] : String(messages);
-            fieldErrors[field] = msg;
+          Object.entries(serverFieldErrors).forEach(([field, messages]) => {
+            fieldErrors[field] = messages[0] ?? '';
           });
           setApiValidationErrors(fieldErrors);
           const driverFields = ['license_type', 'license_expiry_date', 'license_plate', 'registration_number', 'driving_experience', 'vehicle_make', 'vehicle_model', 'vehicle_year', 'vehicle_color', 'bank_name', 'bank_branch', 'bank_account_number'];
           const hasDriverError = Object.keys(fieldErrors).some((k) => driverFields.includes(k));
           setCurrentStep(hasDriverError && formData.role === 'driver' ? 'vehicle' : 'personal');
-          showToast('error', payload.message || 'Please fix the errors below.');
+          showToast('error', payload?.message || 'Please fix the errors below.');
         } else {
-          const message = typeof payload === 'string' ? payload : payload?.message || 'Registration failed';
-          showToast('error', message);
+          showToast('error', rejectionMessage(payload, 'Registration failed'));
         }
       }
       

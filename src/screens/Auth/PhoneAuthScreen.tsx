@@ -22,6 +22,7 @@ import { Typography } from '../../theme/typography';
 import OtpService from '../../services/otpService';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
+import { rejectionMessage } from '../../core/api/errors';
 
 type AuthStep = 'phone' | 'verification';
 
@@ -91,7 +92,7 @@ export default function PhoneAuthScreen() {
         setReceivedOtpCode((result.payload as any)?.otp_code || '');
         showToast('success', 'OTP sent successfully');
       } else {
-        const errorMessage = (result.payload as string) || 'Failed to send OTP';
+        const errorMessage = rejectionMessage(result.payload, 'Failed to send OTP');
         logger.debug('❌ PhoneAuthScreen - OTP send failed:', errorMessage);
         setPhoneError(errorMessage);
         showToast('error', errorMessage);
@@ -139,7 +140,7 @@ export default function PhoneAuthScreen() {
         // Navigation will be handled by AuthFlow component based on auth state
         logger.debug('PhoneAuthScreen - Phone verified successfully');
       } else {
-        const errorMessage = (result.payload as string) || 'Invalid verification code';
+        const errorMessage = rejectionMessage(result.payload, 'Invalid verification code');
         logger.debug('❌ PhoneAuthScreen - OTP verification failed:', errorMessage);
         setOtpError(errorMessage);
         showToast('error', errorMessage);
@@ -172,7 +173,7 @@ export default function PhoneAuthScreen() {
         setReceivedOtpCode((result.payload as any)?.otp_code || '');
         showToast('success', 'Verification code sent again');
       } else {
-        const errorMessage = (result.payload as string) || 'Failed to resend code';
+        const errorMessage = rejectionMessage(result.payload, 'Failed to resend code');
         logger.debug('❌ PhoneAuthScreen - Resend OTP failed:', errorMessage);
         setOtpError(errorMessage);
         showToast('error', errorMessage);

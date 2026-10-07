@@ -20,6 +20,7 @@ import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { showToast } from '../../components/ToastProvider';
 import { logger } from '../../core/logging/logger';
+import { rejectionMessage } from '../../core/api/errors';
 
 type LoginMethod = 'phone' | 'email';
 
@@ -112,7 +113,7 @@ export default function LoginScreen() {
       } else {
         logger.debug('❌ Login failed');
         logger.debug('🚨 Error details:', result.payload);
-        showToast('error', (result.payload as string) || 'Login failed. Please try again.');
+        showToast('error', rejectionMessage(result.payload, 'Login failed. Please try again.'));
       }
     } catch (err: any) {
       logger.error('Email sign in error:', err);
@@ -140,7 +141,7 @@ export default function LoginScreen() {
       if (result.type.endsWith('/fulfilled')) {
         showToast('success', 'Password reset email sent! Please check your inbox.');
       } else {
-        showToast('error', (result.payload as string) || 'Failed to send password reset email. Please try again.');
+        showToast('error', rejectionMessage(result.payload, 'Failed to send password reset email. Please try again.'));
       }
     } catch (err: any) {
       logger.error('Password reset error:', err);

@@ -1,13 +1,18 @@
-import axios, { AxiosInstance, AxiosResponse, CancelTokenSource } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, CancelTokenSource } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { env } from '../config/env';
 import { logger } from '../core/logging/logger';
+import { toApiError } from '../core/api/errors';
+import type { ApiResponse } from '../core/api/types';
+
+export type { ApiResponse } from '../core/api/types';
+export { ApiError, isApiError, unwrap } from '../core/api/errors';
 
 // API Configuration: base URL comes from the env config (see src/config/env.ts)
 const API_BASE_URL = env.API_URL;
 
-// Create axios instance
-const apiClient: AxiosInstance = axios.create({
+// Create axios instance (the only HTTP client for the backend)
+export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -43,9 +48,29 @@ export const removeRequest = (source: CancelTokenSource) => {
   activeRequests.delete(source);
 };
 
+// "scheme://host[:port]" of an absolute URL, lower-cased; null for relative URLs.
+// (Regex instead of URL: React Native's URL polyfill does not implement `origin`.)
+const originOf = (url: string): string | null => {
+  const match = /^([a-z][a-z\d+\-.]*:)?\/\/([^/?#]*)/i.exec(url);
+  if (!match) return null;
+  return `${(match[1] ?? '').toLowerCase()}//${match[2].toLowerCase()}`;
+};
+
+const API_ORIGIN = originOf(API_BASE_URL);
+
+/** The bearer token is sent only to our API: relative URLs, or absolute ones on env.API_URL's origin. */
+export const isApiUrl = (url?: string): boolean => {
+  if (!url) return true;
+  const origin = originOf(url);
+  return origin === null || (API_ORIGIN !== null && origin === API_ORIGIN);
+};
+
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   async (config) => {
+    if (!isApiUrl(config.url)) {
+      return config;
+    }
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (token) {
@@ -61,7 +86,8 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
+// Response interceptor: 401 refresh, then every failure is normalised to ApiError
+// (src/core/api/errors.ts) so callers never parse axios errors themselves.
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
@@ -69,14 +95,14 @@ apiClient.interceptors.response.use(
   async (error) => {
     // Handle cancelled requests (don't process them)
     if (axios.isCancel(error)) {
-      logger.debug('Request cancelled:', error.message);
-      return Promise.reject(error);
+      logger.debug('Request cancelled');
+      return Promise.reject(toApiError(error));
     }
 
-    const originalRequest = error.config;
+    const originalRequest = error?.config;
 
     // Handle 401 errors (unauthorized)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error?.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
@@ -101,17 +127,9 @@ apiClient.interceptors.response.use(
       }
     }
 
-    return Promise.reject(error);
+    return Promise.reject(toApiError(error));
   }
 );
-
-// API Response Types
-export interface ApiResponse<T = any> {
-  success: boolean;
-  message: string;
-  data?: T;
-  errors?: Record<string, string[]>;
-}
 
 export interface User {
   id: number;
@@ -136,6 +154,20 @@ export interface AuthResponse {
   user: User;
   token: string;
   token_type: string;
+}
+
+/** POST /auth/register: drivers get no token until approved (token and token_type are null). */
+export interface RegisterResponse {
+  user: User;
+  token: string | null;
+  token_type: string | null;
+}
+
+/** POST /auth/send-otp (BE-16): otp_code is null outside APP_ENV=local; expires_in is seconds. */
+export interface SendOtpResponse {
+  phone: string;
+  otp_code?: string | null;
+  expires_in: number;
 }
 
 export interface LoginRequest {
@@ -208,7 +240,7 @@ class ApiService {
     return response.data;
   }
 
-  async register(userData: RegisterRequest): Promise<ApiResponse<{ user: User }>> {
+  async register(userData: RegisterRequest): Promise<ApiResponse<RegisterResponse>> {
     logger.debug('🌐 API Service - Registering user...');
     logger.debug('📡 Endpoint: POST /auth/register');
     
@@ -219,23 +251,14 @@ class ApiService {
       logger.debug('📊 Response status:', response.status);
       
       return response.data;
-    } catch (error: any) {
-      logger.error('💥 API Service - Registration error:', error);
+    } catch (err: unknown) {
+      const error = toApiError(err);
+      logger.error('💥 API Service - Registration error:', error.message);
       logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
+        kind: error.kind,
+        status: error.status,
+        fields: Object.keys(error.fieldErrors),
       });
-      
-      // Log validation errors if available
-      if (error.response?.data?.errors) {
-        logger.error('📋 Validation errors:', error.response.data.errors);
-        // Log each validation error in detail
-        Object.entries(error.response.data.errors).forEach(([field, messages]) => {
-          logger.error(`❌ ${field}:`, messages);
-        });
-      }
-      
       throw error;
     }
   }
@@ -249,7 +272,7 @@ class ApiService {
     passenger_emergency_contact?: string;
     passenger_emergency_contact_name?: string;
     passenger_emergency_contact_relation?: string;
-  }): Promise<ApiResponse<{ user: User }>> {
+  }): Promise<ApiResponse<RegisterResponse>> {
     logger.debug('🌐 API Service - Registering user with images...');
     logger.debug('📡 Endpoint: POST /auth/register (multipart/form-data)');
 
@@ -335,24 +358,19 @@ class ApiService {
       logger.debug('📨 API Service - Registration with images response received');
       logger.debug('📊 Response status:', response.status);
       return response.data;
-    } catch (error: any) {
-      logger.error('💥 API Service - Registration with images error:', error);
+    } catch (err: unknown) {
+      const error = toApiError(err);
+      logger.error('💥 API Service - Registration with images error:', error.message);
       logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
+        kind: error.kind,
+        status: error.status,
+        fields: Object.keys(error.fieldErrors),
       });
-      if (error.response?.data?.errors) {
-        logger.error('📋 Validation errors:', error.response.data.errors);
-        Object.entries(error.response.data.errors).forEach(([field, messages]) => {
-          logger.error(`❌ ${field}:`, messages);
-        });
-      }
       throw error;
     }
   }
 
-  async sendOtp(phone: string): Promise<ApiResponse<{ phone: string; otp_code: string; expires_in: number }>> {
+  async sendOtp(phone: string): Promise<ApiResponse<SendOtpResponse>> {
     logger.debug('🌐 API Service - Sending OTP to phone number...');
     logger.debug('📡 Endpoint: POST /auth/send-otp');
     logger.debug('⏰ Request timestamp:', new Date().toISOString());
@@ -371,12 +389,13 @@ class ApiService {
       }
       
       return response.data;
-    } catch (error: any) {
-      logger.error('💥 API Service - OTP send error:', error);
+    } catch (err: unknown) {
+      const error = toApiError(err);
+      logger.error('💥 API Service - OTP send error:', error.message);
       logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
+        kind: error.kind,
+        status: error.status,
+        fields: Object.keys(error.fieldErrors),
       });
       throw error;
     }
@@ -404,12 +423,13 @@ class ApiService {
       }
       
       return response.data;
-    } catch (error: any) {
-      logger.error('💥 API Service - OTP verification error:', error);
+    } catch (err: unknown) {
+      const error = toApiError(err);
+      logger.error('💥 API Service - OTP verification error:', error.message);
       logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
+        kind: error.kind,
+        status: error.status,
+        fields: Object.keys(error.fieldErrors),
       });
       throw error;
     }
@@ -446,8 +466,10 @@ class ApiService {
     return response.data;
   }
 
-  async updateProfile(userData: Partial<User>): Promise<ApiResponse<{ user: User }>> {
-    const response = await apiClient.put('/auth/profile', userData);
+  // PUT /profile (there is no PUT /auth/profile). data is the raw user model with a `roles`
+  // relation, not the normalised auth user; normalizeUser lands in T-105, the profile screen in T-504.
+  async updateProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
+    const response = await apiClient.put('/profile', userData);
     return response.data;
   }
 
@@ -473,17 +495,15 @@ class ApiService {
       logger.debug('✅ Network connectivity test successful');
       logger.debug('📊 Response status:', response.status);
       return true;
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = toApiError(err);
       // Server responded with an error (e.g. 404) = we have connectivity
-      if (error.response != null) {
-        logger.debug('✅ Server reachable (response status:', error.response.status, ')');
+      if (error.status != null) {
+        logger.debug('✅ Server reachable (response status:', error.status, ')');
         return true;
       }
       logger.error('❌ Network connectivity test failed');
-      logger.error('🔍 Error details:', {
-        message: error.message,
-        code: error.code,
-      });
+      logger.error('🔍 Error details:', { kind: error.kind, message: error.message });
       return false;
     }
   }
@@ -518,28 +538,28 @@ class ApiService {
     }
   }
 
-  // Generic HTTP methods for external services
-  async get(url: string, config?: any): Promise<any> {
+  // Generic HTTP methods: return the response body (the API envelope). Use unwrap() for `data`.
+  async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     logger.debug('🌐 API Service - GET request:', url);
-    const response = await apiClient.get(url, config);
+    const response = await apiClient.get<ApiResponse<T>>(url, config);
     return response.data;
   }
 
-  async post(url: string, data?: any, config?: any): Promise<any> {
+  async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     logger.debug('🌐 API Service - POST request:', url);
-    const response = await apiClient.post(url, data, config);
+    const response = await apiClient.post<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
-  async put(url: string, data?: any, config?: any): Promise<any> {
+  async put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     logger.debug('🌐 API Service - PUT request:', url);
-    const response = await apiClient.put(url, data, config);
+    const response = await apiClient.put<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
-  async delete(url: string, config?: any): Promise<any> {
+  async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     logger.debug('🌐 API Service - DELETE request:', url);
-    const response = await apiClient.delete(url, config);
+    const response = await apiClient.delete<ApiResponse<T>>(url, config);
     return response.data;
   }
 }

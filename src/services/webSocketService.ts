@@ -1,4 +1,4 @@
-import { RideResource, DriverLocation, NotificationResource } from './rideService';
+import rideService, { RideResource, DriverLocation, NotificationResource } from './rideService';
 import { env } from '../config/env';
 import { logger } from '../core/logging/logger';
 
@@ -48,21 +48,8 @@ class WebSocketService {
     const connectionId = `ride_${rideId}_${userType}`;
     
     try {
-      // Get WebSocket URL from API
-      const response = await fetch(`${env.API_URL}/websocket/subscribe-ride`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        },
-        body: JSON.stringify({
-          ride_id: rideId,
-          user_type: userType
-        })
-      });
-
-      const result = await response.json();
-      const wsUrl = result.data.websocket_url;
+      // Get WebSocket URL from API (shared axios client: auth header, env base URL, ApiError)
+      const { websocket_url: wsUrl } = await rideService.subscribeToRideUpdates(rideId, userType);
 
       // Create WebSocket connection
       const ws = new WebSocket(wsUrl);
@@ -114,23 +101,8 @@ class WebSocketService {
     const connectionId = `driver_${driverId}`;
     
     try {
-      // Get WebSocket URL from API
-      const response = await fetch(`${env.API_URL}/websocket/subscribe-driver`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        },
-        body: JSON.stringify({
-          driver_id: driverId,
-          latitude,
-          longitude,
-          radius
-        })
-      });
-
-      const result = await response.json();
-      const wsUrl = result.data.websocket_url;
+      // Get WebSocket URL from API (shared axios client: auth header, env base URL, ApiError)
+      const { websocket_url: wsUrl } = await rideService.subscribeToDriverRequests(driverId, latitude, longitude, radius);
 
       // Create WebSocket connection
       const ws = new WebSocket(wsUrl);
@@ -180,6 +152,7 @@ class WebSocketService {
     
     try {
       // Create WebSocket connection for notifications
+      // TODO(T-406/BE-12): this socket carries no auth (INF-13); Reverb + /broadcasting/auth replaces it.
       const wsUrl = `${env.WS_URL}/notifications/${userId}`;
       const ws = new WebSocket(wsUrl);
       
@@ -277,13 +250,6 @@ class WebSocketService {
     if (listeners) {
       listeners.delete(listener);
     }
-  }
-
-  // Get authentication token
-  private async getAuthToken(): Promise<string> {
-    // This should be implemented based on your auth system
-    // For now, returning a placeholder
-    return 'your_auth_token_here';
   }
 
   // Send message through WebSocket

@@ -1,6 +1,7 @@
 import reducer, { clearError, resetAuthState, AuthState } from '../../src/store/slices/apiAuthSlice';
 import { loginUser, logoutUser } from '../../src/store/thunks/apiThunks';
 import type { User } from '../../src/services/api';
+import type { ThunkRejection } from '../../src/core/api/errors';
 
 const user: User = {
   id: 1,
@@ -15,6 +16,13 @@ const user: User = {
 };
 
 const credentials = { email: user.email, password: 'not-a-real-password' };
+
+const rejection = (message: string, extra: Partial<ThunkRejection> = {}): ThunkRejection => ({
+  message,
+  kind: 'unknown',
+  fieldErrors: {},
+  ...extra,
+});
 
 const initial = (): AuthState => reducer(undefined, { type: '@@INIT' });
 
@@ -43,7 +51,12 @@ describe('apiAuthSlice', () => {
   });
 
   it('records the error and stays signed out when login fails', () => {
-    const action = loginUser.rejected(null, 'req-2', credentials, 'Invalid credentials');
+    const action = loginUser.rejected(
+      null,
+      'req-2',
+      credentials,
+      rejection('Invalid credentials', { kind: 'auth', status: 401 }),
+    );
     const state = reducer(initial(), action);
     expect(state.status).toBe('failed');
     expect(state.isAuthenticated).toBe(false);
@@ -57,7 +70,7 @@ describe('apiAuthSlice', () => {
       initial(),
       loginUser.fulfilled({ user, token: 'token-123', tokenType: 'Bearer' }, 'req-3', credentials),
     );
-    const state = reducer(signedIn, logoutUser.rejected(null, 'req-4', undefined, 'Network error'));
+    const state = reducer(signedIn, logoutUser.rejected(null, 'req-4', undefined, rejection('Network error', { kind: 'network' })));
     expect(state.isAuthenticated).toBe(false);
     expect(state.user).toBeNull();
     expect(state.token).toBeNull();

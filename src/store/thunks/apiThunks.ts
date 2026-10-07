@@ -1,407 +1,235 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { apiService, LoginRequest, RegisterRequest, SendOtpRequest, VerifyOtpRequest, ForgotPasswordRequest, ResetPasswordRequest, User } from '../../services/api';
+import {
+  apiService,
+  LoginRequest,
+  RegisterRequest,
+  VerifyOtpRequest,
+  ResetPasswordRequest,
+  SendOtpResponse,
+  User,
+} from '../../services/api';
+import { unwrap, toThunkRejection, ThunkRejection } from '../../core/api/errors';
 import { logger } from '../../core/logging/logger';
 
+/**
+ * Every thunk rejects with a ThunkRejection: a display-safe `message` plus `fieldErrors`
+ * (and kind/status/retryAfter). Use rejectionMessage() to show it.
+ */
+type ThunkConfig = { rejectValue: ThunkRejection };
+
+export interface AuthSession {
+  user: User;
+  token: string;
+  tokenType: string;
+}
+
+/** For endpoints whose success body has only a message (no data). */
+const messageOf = (body: { success: boolean; message?: string }, fallback: string): string => {
+  if (body.success === false) {
+    throw new Error(body.message || fallback);
+  }
+  return body.message || fallback;
+};
+
 // Auth Thunks
-export const loginUser = createAsyncThunk(
+export const loginUser = createAsyncThunk<AuthSession, LoginRequest, ThunkConfig>(
   'auth/loginUser',
-  async (credentials: LoginRequest, { rejectWithValue }) => {
+  async (credentials, { rejectWithValue }) => {
     try {
       logger.debug('🔄 Redux Thunk - Starting user login...');
-      
-      const response = await apiService.login(credentials);
-      
-      
-      if (response.success && response.data) {
-        logger.debug('✅ Redux Thunk - Login successful');
-        
-        // Store auth data
-        await apiService.setAuthToken(response.data.token);
-        await apiService.setUserData(response.data.user);
-        
-        logger.debug('💾 Auth data stored successfully');
-        
-        return {
-          user: response.data.user,
-          token: response.data.token,
-          tokenType: response.data.token_type,
-        };
-      } else {
-        logger.debug('❌ Redux Thunk - Login failed:', response.message);
-        return rejectWithValue(response.message || 'Login failed');
-      }
-    } catch (error: any) {
-      logger.error('💥 Redux Thunk - Login error:', error);
-      logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Login failed'
-      );
+      const data = unwrap(await apiService.login(credentials));
+
+      await apiService.setAuthToken(data.token);
+      await apiService.setUserData(data.user);
+      logger.debug('✅ Redux Thunk - Login successful');
+
+      return { user: data.user, token: data.token, tokenType: data.token_type };
+    } catch (error) {
+      logger.error('💥 Redux Thunk - Login error');
+      return rejectWithValue(toThunkRejection(error, 'Login failed'));
     }
   }
 );
 
-export const registerUser = createAsyncThunk(
+export const registerUser = createAsyncThunk<User, RegisterRequest, ThunkConfig>(
   'auth/registerUser',
-  async (userData: RegisterRequest, { rejectWithValue }) => {
+  async (userData, { rejectWithValue }) => {
     try {
       logger.debug('🔄 Redux Thunk - Starting user registration...');
-      
-      const response = await apiService.register(userData);
-      
-      
-      if (response.success && response.data) {
-        logger.debug('✅ Redux Thunk - Registration successful');
-        return response.data.user;
-      } else {
-        logger.debug('❌ Redux Thunk - Registration failed:', response.message);
-        return rejectWithValue(response.message || 'Registration failed');
-      }
-    } catch (error: any) {
-      logger.error('💥 Redux Thunk - Registration error:', error);
-      logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Registration failed'
-      );
+      const data = unwrap(await apiService.register(userData));
+      logger.debug('✅ Redux Thunk - Registration successful');
+      return data.user;
+    } catch (error) {
+      logger.error('💥 Redux Thunk - Registration error');
+      return rejectWithValue(toThunkRejection(error, 'Registration failed'));
     }
   }
 );
 
-export const registerUserWithImages = createAsyncThunk(
+export const registerUserWithImages = createAsyncThunk<
+  { user: User; token: string | null; tokenType: string | null },
+  RegisterRequest & {
+    passenger_cnic_front_image?: string;
+    passenger_cnic_back_image?: string;
+  },
+  ThunkConfig
+>(
   'auth/registerUserWithImages',
-  async (userData: RegisterRequest & { 
-    passenger_cnic_front_image?: string; 
-    passenger_cnic_back_image?: string; 
-  }, { rejectWithValue }) => {
+  async (userData, { rejectWithValue }) => {
     try {
       logger.debug('🔄 Redux Thunk - Starting user registration with images...');
-      
-      const response = await apiService.registerWithImages(userData);
-      
-      logger.debug('📨 Redux Thunk - Registration with images API response received');
-      logger.debug('📊 Response success:', response.success);
-      
-      if (response.success && response.data) {
-        logger.debug('✅ Redux Thunk - Registration with images successful');
-        
-        // Store auth data
-        await apiService.setAuthToken(response.data.token);
-        await apiService.setUserData(response.data.user);
-        
-        logger.debug('💾 Auth data stored successfully');
-        
-        return {
-          user: response.data.user,
-          token: response.data.token,
-          tokenType: response.data.token_type,
-        };
-      } else {
-        logger.debug('❌ Redux Thunk - Registration with images failed:', response.message);
-        return rejectWithValue(response.message || 'Registration with images failed');
-      }
-    } catch (error: any) {
-      logger.error('💥 Redux Thunk - Registration with images error:', error);
-      logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      const data = unwrap(await apiService.registerWithImages(userData));
 
-      const status = error.response?.status;
-      const data = error.response?.data;
-      if (status === 422 && data?.errors && typeof data.errors === 'object') {
-        const firstMessages = Object.entries(data.errors).map(([field, messages]) => {
-          const msg = Array.isArray(messages) ? messages[0] : String(messages);
-          return `${field}: ${msg}`;
-        });
-        return rejectWithValue({
-          message: data.message || 'Validation failed. Please check the fields below.',
-          errors: data.errors as Record<string, string[]>,
-          summary: firstMessages.join(' '),
-        });
-      }
+      // Drivers get no token until an admin approves them (token is null).
+      await apiService.setAuthToken(data.token);
+      await apiService.setUserData(data.user);
+      logger.debug('✅ Redux Thunk - Registration with images successful');
 
-      return rejectWithValue(
-        data?.message ||
-        error.message ||
-        'Registration failed'
-      );
+      return { user: data.user, token: data.token, tokenType: data.token_type };
+    } catch (error) {
+      logger.error('💥 Redux Thunk - Registration with images error');
+      return rejectWithValue(toThunkRejection(error, 'Registration failed'));
     }
   }
 );
 
-export const sendOtp = createAsyncThunk(
+export const sendOtp = createAsyncThunk<SendOtpResponse, string, ThunkConfig>(
   'auth/sendOtp',
-  async (phone: string, { rejectWithValue }) => {
+  async (phone, { rejectWithValue }) => {
     try {
       logger.debug('🔄 Redux Thunk - Starting OTP send process...');
-      logger.debug('⏰ Thunk timestamp:', new Date().toISOString());
-      
-      const response = await apiService.sendOtp(phone);
-      
-      logger.debug('📨 Redux Thunk - OTP send API response received');
-      logger.debug('📊 Response success:', response.success);
-      
-      if (response.success && response.data) {
-        logger.debug('✅ Redux Thunk - OTP sent successfully');
-        logger.debug('⏰ OTP expires in:', response.data.expires_in, 'seconds');
-        
-        return response.data;
-      } else {
-        logger.debug('❌ Redux Thunk - OTP send failed:', response.message);
-        logger.debug('🔍 Error details:', response.errors);
-        return rejectWithValue(response.message || 'Failed to send OTP');
-      }
-    } catch (error: any) {
-      logger.error('💥 Redux Thunk - OTP send error:', error);
-      logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-        error.message || 
-        'Failed to send OTP';
-      
-      logger.debug('📤 Redux Thunk - Rejecting with error:', errorMessage);
-      return rejectWithValue(errorMessage);
+      const data = unwrap(await apiService.sendOtp(phone));
+      logger.debug('✅ Redux Thunk - OTP sent; expires in', data.expires_in, 'seconds');
+      return data;
+    } catch (error) {
+      logger.error('💥 Redux Thunk - OTP send error');
+      // 429 carries retryAfter (seconds) from the body or the Retry-After header (BE-16).
+      return rejectWithValue(toThunkRejection(error, 'Failed to send OTP'));
     }
   }
 );
 
-export const verifyOtp = createAsyncThunk(
+export const verifyOtp = createAsyncThunk<AuthSession, VerifyOtpRequest, ThunkConfig>(
   'auth/verifyOtp',
-  async (otpData: VerifyOtpRequest, { rejectWithValue }) => {
+  async (otpData, { rejectWithValue }) => {
     try {
       logger.debug('🔄 Redux Thunk - Starting OTP verification process...');
-      logger.debug('⏰ Thunk timestamp:', new Date().toISOString());
-      
-      const response = await apiService.verifyOtp(otpData);
-      
-      logger.debug('📨 Redux Thunk - OTP verification API response received');
-      logger.debug('📊 Response success:', response.success);
-      
-      if (response.success && response.data) {
-        logger.debug('✅ Redux Thunk - OTP verification successful');
-        logger.debug('🔑 Token received:', response.data.token ? 'Yes' : 'No');
-        logger.debug('👤 User role:', response.data.user?.role);
-        logger.debug('📊 User status:', response.data.user?.status);
-        
-        // Store auth data
-        logger.debug('💾 Storing authentication data...');
-        await apiService.setAuthToken(response.data.token);
-        await apiService.setUserData(response.data.user);
-        logger.debug('✅ Authentication data stored successfully');
-        
-        return {
-          user: response.data.user,
-          token: response.data.token,
-          tokenType: response.data.token_type,
-        };
-      } else {
-        logger.debug('❌ Redux Thunk - OTP verification failed:', response.message);
-        logger.debug('🔍 Error details:', response.errors);
-        return rejectWithValue(response.message || 'OTP verification failed');
-      }
-    } catch (error: any) {
-      logger.error('💥 Redux Thunk - OTP verification error:', error);
-      logger.error('🔍 Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-        error.message || 
-        'OTP verification failed';
-      
-      logger.debug('📤 Redux Thunk - Rejecting with error:', errorMessage);
-      return rejectWithValue(errorMessage);
+      const data = unwrap(await apiService.verifyOtp(otpData));
+
+      await apiService.setAuthToken(data.token);
+      await apiService.setUserData(data.user);
+      logger.debug('✅ Redux Thunk - OTP verification successful');
+
+      return { user: data.user, token: data.token, tokenType: data.token_type };
+    } catch (error) {
+      logger.error('💥 Redux Thunk - OTP verification error');
+      return rejectWithValue(toThunkRejection(error, 'OTP verification failed'));
     }
   }
 );
 
-export const forgotPassword = createAsyncThunk(
+export const forgotPassword = createAsyncThunk<string, string, ThunkConfig>(
   'auth/forgotPassword',
-  async (email: string, { rejectWithValue }) => {
+  async (email, { rejectWithValue }) => {
     try {
-      const response = await apiService.forgotPassword(email);
-      
-      if (response.success) {
-        return response.message;
-      } else {
-        return rejectWithValue(response.message || 'Failed to send reset email');
-      }
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Failed to send reset email'
-      );
+      return messageOf(await apiService.forgotPassword(email), 'Password reset email sent');
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Failed to send reset email'));
     }
   }
 );
 
-export const resetPassword = createAsyncThunk(
+export const resetPassword = createAsyncThunk<string, ResetPasswordRequest, ThunkConfig>(
   'auth/resetPassword',
-  async (resetData: ResetPasswordRequest, { rejectWithValue }) => {
+  async (resetData, { rejectWithValue }) => {
     try {
-      const response = await apiService.resetPassword(resetData);
-      
-      if (response.success) {
-        return response.message;
-      } else {
-        return rejectWithValue(response.message || 'Password reset failed');
-      }
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Password reset failed'
-      );
+      return messageOf(await apiService.resetPassword(resetData), 'Password reset successful');
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Password reset failed'));
     }
   }
 );
 
-export const logoutUser = createAsyncThunk(
+export const logoutUser = createAsyncThunk<string, void, ThunkConfig>(
   'auth/logoutUser',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiService.logout();
-      
+      const body = await apiService.logout();
       // Clear local storage regardless of API response
       await apiService.clearAuthData();
-      
-      if (response.success) {
-        return response.message;
-      } else {
-        return rejectWithValue(response.message || 'Logout failed');
-      }
-    } catch (error: any) {
+      return messageOf(body, 'Logged out');
+    } catch (error) {
       // Clear local storage even if API call fails
       await apiService.clearAuthData();
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Logout failed'
-      );
+      return rejectWithValue(toThunkRejection(error, 'Logout failed'));
     }
   }
 );
 
-export const logoutAllDevices = createAsyncThunk(
+export const logoutAllDevices = createAsyncThunk<string, void, ThunkConfig>(
   'auth/logoutAllDevices',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiService.logoutAll();
-      
+      const body = await apiService.logoutAll();
       // Clear local storage regardless of API response
       await apiService.clearAuthData();
-      
-      if (response.success) {
-        return response.message;
-      } else {
-        return rejectWithValue(response.message || 'Logout from all devices failed');
-      }
-    } catch (error: any) {
+      return messageOf(body, 'Logged out from all devices');
+    } catch (error) {
       // Clear local storage even if API call fails
       await apiService.clearAuthData();
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Logout from all devices failed'
-      );
+      return rejectWithValue(toThunkRejection(error, 'Logout from all devices failed'));
     }
   }
 );
 
-export const refreshToken = createAsyncThunk(
+export const refreshToken = createAsyncThunk<string, void, ThunkConfig>(
   'auth/refreshToken',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiService.refreshToken();
-      
-      if (response.success && response.data) {
-        await apiService.setAuthToken(response.data.token);
-        return response.data.token;
-      } else {
-        return rejectWithValue(response.message || 'Token refresh failed');
-      }
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Token refresh failed'
-      );
+      const data = unwrap(await apiService.refreshToken());
+      await apiService.setAuthToken(data.token);
+      return data.token;
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Token refresh failed'));
     }
   }
 );
 
 // User Profile Thunks
-export const getUserProfile = createAsyncThunk(
+export const getUserProfile = createAsyncThunk<User, void, ThunkConfig>(
   'auth/getUserProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiService.getProfile();
-      
-      if (response.success && response.data) {
-        await apiService.setUserData(response.data.user);
-        return response.data.user;
-      } else {
-        return rejectWithValue(response.message || 'Failed to get profile');
-      }
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Failed to get profile'
-      );
+      const data = unwrap(await apiService.getProfile());
+      await apiService.setUserData(data.user);
+      return data.user;
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Failed to get profile'));
     }
   }
 );
 
-export const updateUserProfile = createAsyncThunk(
+export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConfig>(
   'auth/updateUserProfile',
-  async (userData: Partial<User>, { rejectWithValue }) => {
+  async (userData, { rejectWithValue }) => {
     try {
-      const response = await apiService.updateProfile(userData);
-      
-      if (response.success && response.data) {
-        await apiService.setUserData(response.data.user);
-        return response.data.user;
-      } else {
-        return rejectWithValue(response.message || 'Profile update failed');
-      }
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 
-        error.message || 
-        'Profile update failed'
-      );
+      const user = unwrap(await apiService.updateProfile(userData));
+      await apiService.setUserData(user);
+      return user;
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Profile update failed'));
     }
   }
 );
 
 // Initialize Auth State
-export const initializeAuth = createAsyncThunk(
+export const initializeAuth = createAsyncThunk<{ user: User; token: string } | null, void, ThunkConfig>(
   'auth/initializeAuth',
   async (_, { rejectWithValue }) => {
     try {
       const token = await apiService.getAuthToken();
       const userData = await apiService.getUserData();
-      
+
       if (token && userData) {
         // Verify token is still valid by making a test request
         try {
@@ -413,12 +241,10 @@ export const initializeAuth = createAsyncThunk(
           return null;
         }
       }
-      
+
       return null;
-    } catch (error: any) {
-      return rejectWithValue(
-        error.message || 'Failed to initialize auth'
-      );
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Failed to initialize auth'));
     }
   }
 );
