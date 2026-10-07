@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|---|
 | T-001 | 0 | Fix release-bundle blockers + add bundle check to gate | | yes | agent | done | logo rename + useErrorHandler import done early (iOS build fix commit); NotificationScreen + gate bundle check remain; 2026-10-08. Bundle check in gate (bundleOk); NotificationScreen imports fixed (delete denied by permissions, owner may delete; INF-34) |
 | T-002 | 0 | Make Jest work (setup, native mocks, App smoke test) | | no | agent | done | 2026-10-07 (904b918). Also fixed no-undef in scripts/api-health.js (added after baseline). Follow-up: stub WebSocket in jest.setup (do in T-005) |
-| T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | todo | |
+| T-003 | 0 | Babel: worklets plugin + strip console in release | T-002 | yes | agent | in-progress | |
 | T-004 | 0 | Repo hygiene: stale bundle, lockfile, Podfile node path | | yes | agent | todo | Podfile NODE_BINARY removed early (iOS build fix commit) |
 | T-005 | 0 | Env config: single source for API/WS URLs and keys | T-002 | yes | agent | done | 2026-10-08 (6963f4b). QA on local backend (prod down). Debug→.env.development, Release→.env.production |
 | T-006 | 0 | Redacting logger; remove credential/PII logs | T-002 | no | agent | done | 2026-10-08. src/core/logging/logger.ts (strict set on error path); 790 console calls migrated; ESLint no-console in src/ |
@@ -60,14 +60,26 @@
 | T-509 | 5 | Favourite (saved) places from API | BE-14, T-303 | yes | agent | todo | FEAT-14 |
 | T-510 | 5 | In-ride chat passenger ↔ driver (replace demo chats) | BE-13, BE-12, T-406, T-307, T-405 | yes | agent | todo | FEAT-13 |
 | T-511 | 5 | Settings, support, invite, account deletion (both roles) | BE-11, BE-15, BE-17, T-102 | yes | agent | todo | FEAT-11/15/17 |
-| T-601 | 6 | Theme tokens complete; useColorScheme; persisted choice | T-008 | yes | agent | todo | Builder: rh-designer |
-| T-602 | 6 | UI kit (Screen, Header, Button, Input, Card, states) | T-601 | yes | agent | todo | Builder: rh-designer |
-| T-603 | 6 | Migrate auth screens to UI kit | T-602, T-204 | yes | agent | todo | Builder: rh-designer; QA 2026-10-08: Login bottom navy band clips "Create New Account" on first view |
-| T-604 | 6 | Passenger screens: split + migrate | T-602, T-309 | yes | agent | todo | Builder: rh-designer; QA 2026-10-08: Settings status bar low contrast; Home address overflows without ellipsis |
-| T-605 | 6 | Driver screens: split + migrate | T-602, T-405 | yes | agent | todo | Builder: rh-designer |
-| T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | |
-| T-607 | 6 | Shared screens to UI kit: notifications, chat, wallet/history, settings/profile | T-602, T-508, T-510, T-511 | yes | agent | todo | Builder: rh-designer |
-| T-701 | 7 | Delete dead code + unused dependencies | T-605 | yes | agent | todo | |
+| T-601 | 6 | Theme tokens + ThemeProvider per DESIGN_SYSTEM (palette, light/dark semantic tokens, type scale, spacing, radii, elevation, motion; live appearance; persisted override) | T-008 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-602 | 6 | UI kit core: Text, Icon (one family), Screen, Header, Button, IconButton, TextField, Card, ListItem, Switch, SegmentedControl, Chip, Badge, Avatar | T-601 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-608 | 6 | UI kit feedback + overlays: BottomSheet, Dialog, Toast, Banner/offline, Skeleton, EmptyState, ErrorState | T-602, T-008 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-609 | 6 | UI kit ride components: map style, pins, route line, address pair, vehicle card, fare breakdown, driver/passenger card, status timeline, rating, stat tile, promo card, slide-to-confirm | T-602, T-608 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-610 | 6 | Navigation shell: 4-tab IA per role, headers, tab bar, remove duplicate mounts | T-602, T-309 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director. IA change in DESIGN_SYSTEM §8 |
+| T-603 | 6 | Auth screens: login, phone code, forgot-password sheet | T-602, T-608, T-204, T-101 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director; QA 2026-10-08: Login bottom navy band clips "Create New Account" on first view |
+| T-611 | 6 | Auth: registration wizard (role choice, steps, review) | T-602, T-608, T-202, T-203 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-612 | 6 | Splash, account status (pending/rejected/suspended), permission prompts | T-602, T-608, T-103, T-106, T-308 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-604 | 6 | Passenger home + destination search | T-609, T-610, T-506, T-303 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director; QA 2026-10-08: Settings status bar low contrast; Home address overflows without ellipsis |
+| T-613 | 6 | Passenger choose ride (vehicle + fare) + finding driver | T-604, T-306, T-310, T-305 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-614 | 6 | Passenger driver assigned/arrived, on trip, trip complete + rating | T-613, T-307, T-505 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-605 | 6 | Driver Drive home (offline/online) + incoming request | T-609, T-610, T-401, T-403, T-404, T-507 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-615 | 6 | Driver to pickup/arrived, on trip, trip complete | T-605, T-405 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-616 | 6 | Driver earnings + vehicle & documents | T-609, T-610, T-507, T-501 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-607 | 6 | Inbox: notifications, messages list, chat thread (both roles) | T-608, T-610, T-502, T-510 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-617 | 6 | Activity: ride history, ride details/receipt, wallet | T-608, T-609, T-610, T-501, T-508 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-618 | 6 | Account: settings, profile view/edit, saved places (both roles) | T-608, T-610, T-504, T-509, T-511 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-619 | 6 | Help & support, invite friends, delete account | T-618, T-511 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
+| T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | Fallback UI follows ErrorState (DESIGN_SYSTEM §5.20) once T-608 lands |
+| T-701 | 7 | Delete dead code + unused dependencies | T-605, T-615, T-616 | yes | agent | todo | |
 | T-702 | 7 | TypeScript + ESLint to zero; gate requires zero | T-701 | no | agent | todo | |
 | T-703 | 7 | Maestro E2E flows for QA scenarios | T-405 | no | agent | todo | |
 | T-704 | 7 | CI (GitHub Actions) | T-702 | no | agent | todo | |
@@ -100,18 +112,18 @@
 | BE-13 | 5 | In-ride chat API (messages, chats list, broadcast) | BE-12 | yes | agent | todo | FEAT-13 |
 | BE-14 | 5 | Saved places CRUD | BE-00 | yes | agent | todo | FEAT-14 |
 | BE-15 | 5 | Profile completeness (driver vehicle/licence, stats) + account deletion | BE-00 | yes | agent | todo | FEAT-15 |
-| BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | todo | FEAT-16 (supersedes B-01 code part) |
+| BE-16 | 1 | OTP hardening: never return/log code outside local; SMS driver interface | BE-00 | yes | agent | in-progress | FEAT-16 (supersedes B-01 code part) |
 | BE-17 | 5 | Referral code column fix; support scoping tests; public settings URLs | BE-00 | yes | agent | todo | FEAT-17 |
 | BE-18 | 1 | Role authorization: `role:admin` on admin API routes and the admin panel; close panel access via public web registration | BE-00 | no | agent | done | 2026-10-08 (backend 1093b35). SEC-01 (critical) |
-| BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | todo | SEC-02 (critical); live part = B-12 |
+| BE-19 | 1 | Production-safe seeders + prompted admin-create command; fix DEPLOYMENT.md seeding step | BE-00 | no | agent | done | 2026-10-08 (backend 2348cfc). SEC-02 (critical); live part = B-12 |
 | BE-20 | 1 | Driver privacy: nearby-drivers without name/phone, coarse position, capped radius; drivers-in-radius admin-only | BE-18 | no | agent | todo | SEC-03 (high); complements BE-06 |
 | BE-21 | 1 | Remove registration request logging (API + web) | BE-00 | no | agent | done | 2026-10-08 (backend b0be953); dontFlash now excludes CNIC/phone/bank/emergency fields (forms must be retyped after a validation error — owner to confirm). SEC-04 (high) |
 | BE-22 | 1 | CNIC/licence/vehicle documents on private disk + authorized temporary URLs; migrate existing files | BE-18 | no | agent | todo | SEC-05 (high) |
-| BE-23 | 1 | Production config guard (refuse debug in production) + production env values in DEPLOYMENT.md | BE-00 | no | agent | in-progress | SEC-06 (high); live check = B-12 |
+| BE-23 | 1 | Production config guard (refuse debug in production) + production env values in DEPLOYMENT.md | BE-00 | no | agent | done | 2026-10-08 (backend 79bce43). SEC-06 (high); live check = B-12 |
 | BE-24 | 1 | Ownership checks: ride GPS path, ride stops, referral show; remove admin debug route; fix referrals route shadowing | BE-18 | no | agent | todo | BE-18 security review findings 1,2,3,9,10 |
 | BE-25 | 1 | Active-user enforcement (suspended/inactive blocked on login and every request) + Sanctum token expiry and revoke on password change | BE-18 | no | agent | todo | SEC-07 |
-| BE-26 | 1 | No exception details in API/admin responses; no withInput() of sensitive fields | BE-21 | no | agent | todo | BE-21 security re-check findings 1-2 (RidesController:162 details, Admin Ride/Payment/Referral, Api PaymentsController:58) |
-| B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md) |
+| BE-26 | 1 | No exception details in API/admin responses; no withInput() of sensitive fields | BE-21 | no | agent | todo | BE-21 security re-check findings 1-2 (RidesController:162 details, Admin Ride/Payment/Referral, Api PaymentsController:58); also: phpunit.xml LOG_CHANNEL=null (tests write to real laravel.log), guard throttle file fallback when cache store down, SESSION_ENCRYPT default true; DEPLOYMENT.md: check old seeded accounts for use before deleting (+ delete their tokens), "never pass --env on a server"; CreateAdminCommand secret(..., false) |
+| B-12 | – | Production: change admin password, delete seeded test users/fake data, confirm APP_ENV=production + APP_DEBUG=false, purge laravel.log | | | owner | todo | SEC-02, SEC-04, SEC-06 (see docs/audit/SECURITY.md); before deleting old seeded accounts (admin@test.com, *@raah-e-haq.com) check login_attempts/audit_logs/personal_access_tokens for outside use; create real admin with `php artisan raahehaq:create-admin` |
 | B-13 | – | Firebase console: Firestore + Storage rules to deny-all | | | owner | todo | SEC-12 |
 
 ---
@@ -442,42 +454,143 @@
 
 ## Phase 6: UI / design system
 
-### T-601 · Theme tokens
-- **Findings:** INF-24
+Source of truth: [design/DESIGN_SYSTEM.md](design/DESIGN_SYSTEM.md) and the per-screen specs in [design/screens/](design/screens/README.md). Current-state audit with screenshots: [design/audit/README.md](design/audit/README.md) (rh-design-director, 2026-10-08).
+
+**Rules for every Phase 6 task (Builder: rh-designer; Design review: rh-design-director, `review <task ID>`):**
+- Build order: T-601 → T-602 → T-608 → T-609 → T-610, then the screen groups. Screen groups come after the Phase 3-5 task that wires their real data (listed in Depends), so the redesign is done once, on real data.
+- No behaviour or data-flow change beyond what the spec states; existing tests pass; RNTL tests for every new `src/components/ui` component.
+- UI primitives come only from `src/components/ui`; colours, type, spacing, radii, elevation and motion only from `src/theme` tokens. No hex/rgba literals, raw `fontSize`/`fontWeight`/`fontFamily`, magic spacing numbers, `ImageBackground`, emoji, or `react-native-vector-icons/*` imports outside `src/components/ui/Icon.tsx` in touched files (DESIGN_SYSTEM §11 greps).
+- **Every screen task: matches its spec in light and dark on iPhone 17 and iPhone SE**, in every state the spec lists that can be triggered on the local backend (loading, empty, error, offline, permission denied, long text at 1.3× font scale). Screenshots in `docs/qa-reports/<date>-<task>/design-*.png`. If no iPhone SE simulator exists, create "iPhone SE (3rd generation)" with `xcrun simctl create`.
+- Strings go through `src/i18n/en.ts`; layouts use start/end for RTL readiness (DESIGN_SYSTEM §7).
+
+### T-601 · Theme tokens + ThemeProvider
+- **Findings:** INF-24, audit G-01, G-03, G-04
+- **Spec:** DESIGN_SYSTEM §1 (palette, semantic tokens light/dark, contrast table), §2 (type scale), §3 (spacing, radii, borders, elevation), §6 (motion tokens), §9 (map style JSON), §1.6 (dark rules)
 - **Acceptance:**
-  - [ ] The token set covers every colour role used (error, warning, success, info, …); `useColorScheme` listener; the user override is persisted.
-  - [ ] The TS2339 errors for missing theme keys are gone.
+  - [ ] `src/theme/palette.ts`, `tokens.ts` (semantic light/dark), `typography.ts`, `spacing.ts`, `radii.ts`, `elevation.ts` (iOS + Android, zero shadow in dark), `motion.ts`, `mapStyles.ts` hold exactly the values in the spec; `BrandColors` and the old `AppTheme` shape are replaced (TS2339 errors for missing keys gone).
+  - [ ] ThemeProvider follows `useColorScheme` live (switching the simulator appearance while the app runs re-renders every mounted screen), with a persisted Light/Dark/System override.
+  - [ ] Status bar style comes from the theme only.
+  - [ ] A token preview screen (Debug only) shows every colour token with its contrast pair and every text style; screenshots light + dark on iPhone 17 and iPhone SE match the spec values.
 
-### T-602 · UI kit
+### T-602 · UI kit core
+- **Findings:** audit G-06, G-09, G-14
+- **Spec:** DESIGN_SYSTEM §4 (icons), §5.1-5.13
 - **Acceptance:**
-  - [ ] `src/ui` holds Screen (safe area + status bar), Header, Text, Button (loading/disabled), Input (error), Card, EmptyState, ErrorState, LoadingState, with RNTL tests.
-  - [ ] `react-native/no-color-literals` runs as a warning in ESLint.
+  - [ ] `src/components/ui` exports Text (variants = type styles, `maxFontSizeMultiplier` 1.3), Icon (MaterialCommunityIcons only, typed semantic name map), Screen, Header (incl. large-title variant), Button (sizes lg/md/sm × variants primary/secondary/outline/ghost/destructive/destructiveSoft, pressed/disabled/loading), IconButton, TextField (default/phone/password/search/otp; focus, error, disabled), Card, ListItem, Switch, SegmentedControl, Chip, Badge (count/dot/status pill), Avatar (initials fallback).
+  - [ ] Each matches its spec measurements in light and dark on iPhone 17 and iPhone SE (Debug kit gallery screen; screenshots of every variant and state).
+  - [ ] RNTL tests: rendering, disabled/loading blocks presses, accessibility labels/roles.
+  - [ ] `react-native/no-color-literals` and a custom no-raw-fontSize rule run as warnings in ESLint.
 
-### T-603 · Auth screens migrated
-### T-604 · Passenger screens split + migrated
-- **Findings:** PAX-21, PAX-22
-- **Acceptance:** no file over ~400 lines in the passenger flow; theme only.
+### T-608 · UI kit feedback + overlays
+- **Spec:** DESIGN_SYSTEM §5.14-5.20, §6 (sheet spring, toast, skeleton shimmer, reduced motion)
+- **Acceptance:**
+  - [ ] BottomSheet (snap points peek/half/full, map and modal modes, keyboard handling), Dialog, Toast (single system; replaces the three toast systems with T-008), Banner (incl. offline banner wired to NetInfo), Skeleton, EmptyState, ErrorState.
+  - [ ] Dependency decision recorded in the report (Reanimated-based sheet vs `@gorhom/bottom-sheet` v5).
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including reduced-motion behaviour (Settings → Accessibility → Reduce Motion).
 
-### T-605 · Driver screens split + migrated
-- **Findings:** DRV-20, DRV-21
+### T-609 · UI kit ride components
+- **Spec:** DESIGN_SYSTEM §5.21-5.31, §9
+- **Acceptance:**
+  - [ ] Map pins (pickup/dropoff/stop/driver/center pin), route line with casing and draw-on, light/dark map styles, address pair (Raah line), vehicle option card, fare breakdown, driver card, passenger card, ride status timeline + status pill mapping, rating stars (input + display), stat tile, promo card pager, slide-to-confirm (with accessibility action).
+  - [ ] Searching pulse and marker interpolation per §6, with reduced-motion fallbacks.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (gallery screenshots with real-shaped fixture data from API resources, no invented copy in production code).
 
-**T-603 to T-605 acceptance (shared):**
-- [ ] No hex literals in the migrated files.
-- [ ] Safe area via insets.
-- [ ] QA visual pass in light and dark mode on a small and a large simulator.
+### T-610 · Navigation shell
+- **Findings:** PAX-10, audit G-07, G-09
+- **Spec:** [design/screens/shared-navigation-shell.md](design/screens/shared-navigation-shell.md), DESIGN_SYSTEM §8
+- **Acceptance:**
+  - [ ] Passenger tabs Home · Activity · Inbox · Account; driver tabs Drive · Earnings · Inbox · Account; booking and trip stacks hide the tab bar; removed routes listed in the spec are gone and every `navigate()` call site is updated.
+  - [ ] Inbox badge = unread notifications + unread chats.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE.
+
+### T-603 · Auth screens: login, phone code, forgot password
+- **Findings:** audit Login 1-10, Phone 1-4, G-10
+- **Spec:** [auth-login](design/screens/auth-login.md), [auth-phone-otp](design/screens/auth-phone-otp.md), [auth-forgot-password](design/screens/auth-forgot-password.md)
+- **Acceptance:**
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including validation errors, submitting, wrong code, resend countdown and keyboard-up states (focused field and primary button visible above the keyboard).
+  - [ ] No OTP value on screen (AUTH-OTP-01).
+
+### T-611 · Auth: registration wizard
+- **Findings:** audit Registration 1-9
+- **Spec:** [auth-registration](design/screens/auth-registration.md)
+- **Acceptance:**
+  - [ ] Role-specific step sets (passenger 3, driver 5); date pickers; upload tiles; review with edit links; payment preference hidden (always `cash`).
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including field errors, server errors mapped to the right step, upload progress and upload failure.
+
+### T-612 · Splash, account status, permission prompts
+- **Spec:** [auth-splash](design/screens/auth-splash.md), [auth-account-status](design/screens/auth-account-status.md), [shared-permissions](design/screens/shared-permissions.md)
+- **Acceptance:**
+  - [ ] Native launch screen and JS splash are identical (no jump); account status for pending/rejected/suspended; location and notification pre-prompts and denied states.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (pending state with the local `pending@` account; denied state via `xcrun simctl privacy … revoke location`).
+
+### T-604 · Passenger home + destination search
+- **Findings:** PAX-21, PAX-22, audit Home 1-12, Map 1-4
+- **Spec:** [passenger-home](design/screens/passenger-home.md), [passenger-destination-search](design/screens/passenger-destination-search.md)
+- **Acceptance:**
+  - [ ] Map-backed Home with "Where to?" sheet (peek/full), shortcuts, offers, stats and recent rides from the API; search with saved/recent, autocomplete, choose-on-map; no file over ~400 lines.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including loading, empty (fresh account), error, offline and location-denied states.
+
+### T-613 · Passenger choose ride + finding driver
+- **Findings:** audit Map 5-8
+- **Spec:** [passenger-vehicle-fare](design/screens/passenger-vehicle-fare.md), [passenger-finding-driver](design/screens/passenger-finding-driver.md)
+- **Acceptance:**
+  - [ ] Route visible above the half sheet; vehicle cards and fare from BE-05; discard dialog copy; searching pulse; no-driver and cancel states.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (finding-driver captured during PAX-E2E-02 request + cancel on the local backend).
+
+### T-614 · Passenger trip: assigned, on trip, complete + rating
+- **Spec:** [passenger-driver-assigned](design/screens/passenger-driver-assigned.md), [passenger-trip-in-progress](design/screens/passenger-trip-in-progress.md), [passenger-trip-complete](design/screens/passenger-trip-complete.md)
+- **Acceptance:**
+  - [ ] Driver card, timeline, safety sheet, arrived state, on-trip stops, receipt and rating.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (captured during E2E-01 on two local simulators).
+
+### T-605 · Driver Drive home + incoming request
+- **Findings:** DRV-20, DRV-21, audit Driver Home 1-6, Drive map 1-4
+- **Spec:** [driver-drive-home](design/screens/driver-drive-home.md), [driver-incoming-request](design/screens/driver-incoming-request.md)
+- **Acceptance:**
+  - [ ] Map-first Drive tab with offline/online sheet, earnings pill, request sheet with countdown ring, 409 "taken" state; no file over ~400 lines.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (online/offline per DRV-E2E-01; request per DRV-E2E-02).
+
+### T-615 · Driver trip: to pickup, on trip, complete
+- **Spec:** [driver-to-pickup](design/screens/driver-to-pickup.md), [driver-trip-in-progress](design/screens/driver-trip-in-progress.md), [driver-trip-complete](design/screens/driver-trip-complete.md)
+- **Acceptance:**
+  - [ ] Navigation card with external Navigate, arrived/waiting timer, slide to start/complete, stops, cancel reasons, collect-cash summary and rider rating.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (captured during E2E-01).
+
+### T-616 · Driver earnings + vehicle & documents
+- **Spec:** [driver-earnings](design/screens/driver-earnings.md), [driver-vehicle-documents](design/screens/driver-vehicle-documents.md)
+- **Acceptance:**
+  - [ ] Period switch, hero total, bar chart, trips list; vehicle, licence expiry banners and document statuses from BE-15 (no invented vehicle/licence).
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including empty period and missing-data states.
+
+### T-607 · Inbox: notifications, messages, chat thread
+- **Spec:** [shared-notifications](design/screens/shared-notifications.md), [shared-chat-list](design/screens/shared-chat-list.md), [shared-chat-thread](design/screens/shared-chat-thread.md)
+- **Acceptance:**
+  - [ ] One Inbox for both roles; one chat thread component for both roles; closed-chat state; quick replies.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including loading, empty, error, offline and send-failure states (NOTIF-01, CHAT-01).
+
+### T-617 · Activity: ride history, ride details, wallet
+- **Spec:** [shared-ride-history](design/screens/shared-ride-history.md), [shared-ride-details](design/screens/shared-ride-details.md), [passenger-wallet](design/screens/passenger-wallet.md)
+- **Acceptance:**
+  - [ ] Ride cards open details (no dead "Details" button); cancelled rides show "No charge"; wallet without top-up or payment methods.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE, including empty (fresh account), error and pagination states (PAX-DATA-01).
+
+### T-618 · Account: settings, profile, saved places
+- **Spec:** [shared-settings](design/screens/shared-settings.md), [shared-profile](design/screens/shared-profile.md), [passenger-saved-places](design/screens/passenger-saved-places.md)
+- **Acceptance:**
+  - [ ] Account list per role, persisted preferences (or the OS-settings row before BE-11), appearance picker (T-601 override), logout dialog; profile view/edit with photo upload; saved places with Home/Work slots.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (PROFILE-01, SETTINGS-01 steps 1-4, PAX-DATA-02).
+
+### T-619 · Help & support, invite, delete account
+- **Spec:** [shared-support-invite](design/screens/shared-support-invite.md)
+- **Acceptance:**
+  - [ ] Support contact from `/settings/public`, tickets list/new/thread, invite code share, delete-account flow with password confirmation and active-ride block.
+  - [ ] Matches spec in light and dark on iPhone 17 and iPhone SE (SETTINGS-01 steps 2, 3, 5 on a throwaway local account).
 
 ### T-606 · Root ErrorBoundary + crash reporting
 - **Findings:** INF-23
 - **Acceptance:**
-  - [ ] A root boundary with a friendly fallback and restart.
+  - [ ] A root boundary with a friendly fallback and restart (fallback layout = ErrorState, DESIGN_SYSTEM §5.20, once T-608 lands).
   - [ ] Crashlytics in release (RNFirebase), with no PII.
-
-### T-607 · Shared screens to UI kit
-- **Builder:** rh-designer
-- **Acceptance:**
-  - [ ] Notifications, chat (list + thread), wallet/transactions, settings and profile screens use only `src/components/ui` + theme tokens (no hex literals, no raw font sizes).
-  - [ ] Each has skeleton loading, `ErrorState` with retry and `EmptyState`; light and dark screenshots on iPhone 17 and a small device.
-  - [ ] No behaviour or data-flow change; existing tests pass; new RNTL tests for any new components.
 
 ## Phase 7: Release readiness
 
