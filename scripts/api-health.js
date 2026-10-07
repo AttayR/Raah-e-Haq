@@ -8,6 +8,7 @@
  * Prints status, latency and response *shape* (keys, array lengths), never values,
  * so no user data ends up in the terminal.
  */
+/* global AbortSignal */ // Node 18+ global; not in ESLint's node env list
 const BASE = (process.argv[2] || 'https://raahehaq.com/api').replace(/\/$/, '');
 
 // expect: 'public' = should be 200 without a token; 'auth' = should be 401 without a token
