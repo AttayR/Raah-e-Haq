@@ -280,6 +280,16 @@ jest.mock('react-native-toast-message', () => {
 
 // Gesture handler: its official jestSetup is loaded via `setupFiles` in jest.config.js.
 
+// react-native-config: fixed test values. Hosts use the reserved .test TLD so nothing can resolve.
+jest.mock('react-native-config', () => {
+  const config = {
+    API_URL: 'https://api.raah.test/api',
+    WS_URL: 'wss://api.raah.test/ws',
+    MAPS_KEY: 'test-maps-key',
+  };
+  return {__esModule: true, default: config, Config: config};
+});
+
 // Never let a test reach a real server (the backend is production).
 const axios = require('axios');
 axios.defaults.adapter = config =>
@@ -289,3 +299,16 @@ axios.defaults.adapter = config =>
 global.fetch = jest.fn(url =>
   Promise.reject(new Error(`Network access is disabled in tests: fetch ${url}`)),
 );
+
+// WebSocket: constructing one throws, so no test can open a socket to a real server.
+// A plain class (not jest.fn) so resetting mocks cannot turn the guard off.
+// Tests that need a socket can jest.spyOn(global, 'WebSocket') with a fake.
+global.WebSocket = class DisabledWebSocket {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  constructor(url) {
+    throw new Error(`Network access is disabled in tests: WebSocket ${url}`);
+  }
+};

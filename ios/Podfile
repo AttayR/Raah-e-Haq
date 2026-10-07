@@ -62,6 +62,14 @@ pod 'react-native-maps/Google', :path => rn_maps_path
         if target.name == 'fmt'
           build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
         end
+
+        # react-native-config: Debug builds read .env.development, Release builds read
+        # .env.production. Override one build with:
+        #   yarn ios --extra-params "ENVFILE=.env.production"
+        if target.name == 'react-native-config'
+          build_config.build_settings['ENVFILE'] =
+            build_config.name == 'Release' ? '.env.production' : '.env.development'
+        end
       end
     end
   end

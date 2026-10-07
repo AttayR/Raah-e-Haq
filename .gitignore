@@ -73,3 +73,8 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Environment config (react-native-config). Only the example is committed.
+.env
+.env.*
+!.env.example

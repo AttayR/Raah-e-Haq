@@ -22,6 +22,7 @@ import { reverseGeocode } from '../../services/placesService';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
+import { SUPPORT_EMAIL } from '../../config/support';
 
 const { width } = Dimensions.get('window');
 
@@ -223,7 +224,7 @@ export default function PassengerHomeScreen() {
       icon: 'support-agent',
       color: '#6366F1',
       gradient: ['#6366F1', '#4F46E5'],
-      onPress: () => Alert.alert('Support', 'Contact support at help@raahehaq.com'),
+      onPress: () => Alert.alert('Support', `Contact support at ${SUPPORT_EMAIL}`),
     },
   ];
 

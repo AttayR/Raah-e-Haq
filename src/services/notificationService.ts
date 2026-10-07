@@ -3,6 +3,7 @@ import { getToken, onMessage } from '@react-native-firebase/messaging';
 import { Platform, Alert, PermissionsAndroid } from 'react-native';
 import { NotificationResource } from './rideService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { env } from '../config/env';
 
 export interface NotificationData {
   ride_id?: number;
@@ -33,7 +34,7 @@ class NotificationService {
     try {
       console.log('🔔 Fetching notifications:', { page, perPage });
       
-      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}?page=${page}&per_page=${perPage}`, {
+      const response = await fetch(`${env.API_URL}${this.baseUrl}?page=${page}&per_page=${perPage}`, {
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`
         }
@@ -79,7 +80,7 @@ class NotificationService {
     try {
       console.log('✅ Marking notification as read:', notificationId);
       
-      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}/${notificationId}/read`, {
+      const response = await fetch(`${env.API_URL}${this.baseUrl}/${notificationId}/read`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`
@@ -110,7 +111,7 @@ class NotificationService {
     try {
       console.log('✅ Marking all notifications as read');
       
-      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}/read-all`, {
+      const response = await fetch(`${env.API_URL}${this.baseUrl}/read-all`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`
@@ -142,7 +143,7 @@ class NotificationService {
     try {
       console.log('🔢 Getting unread count');
       
-      const response = await fetch(`https://raahehaq.com/api${this.baseUrl}/unread-count`, {
+      const response = await fetch(`${env.API_URL}${this.baseUrl}/unread-count`, {
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`
         }

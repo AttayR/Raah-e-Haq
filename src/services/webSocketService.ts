@@ -1,4 +1,5 @@
 import { RideResource, DriverLocation, NotificationResource } from './rideService';
+import { env } from '../config/env';
 
 export interface WebSocketEvent {
   type: string;
@@ -47,7 +48,7 @@ class WebSocketService {
     
     try {
       // Get WebSocket URL from API
-      const response = await fetch('https://raahehaq.com/api/websocket/subscribe-ride', {
+      const response = await fetch(`${env.API_URL}/websocket/subscribe-ride`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ class WebSocketService {
     
     try {
       // Get WebSocket URL from API
-      const response = await fetch('https://raahehaq.com/api/websocket/subscribe-driver', {
+      const response = await fetch(`${env.API_URL}/websocket/subscribe-driver`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +179,7 @@ class WebSocketService {
     
     try {
       // Create WebSocket connection for notifications
-      const wsUrl = `wss://raahehaq.com/ws/notifications/${userId}`;
+      const wsUrl = `${env.WS_URL}/notifications/${userId}`;
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {

@@ -1,7 +1,9 @@
+import { env } from './env';
+
 // Google Maps Configuration
 export const MAPS_CONFIG = {
-  // Google Maps API Key
-  API_KEY: 'AIzaSyBx-73GJ6HchOWC_zCTsg8uRUBuxKnOHUc',
+  // Google Maps API Key (from the env config; never hardcode or log it)
+  API_KEY: env.MAPS_KEY,
   
   // Default map settings
   DEFAULT_REGION: {

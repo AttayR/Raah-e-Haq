@@ -1,9 +1,9 @@
 import axios, { AxiosInstance, AxiosResponse, CancelTokenSource } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { env } from '../config/env';
 
-// API Configuration
-// Use production API for both development and production
-const API_BASE_URL = 'https://raahehaq.com/api';
+// API Configuration: base URL comes from the env config (see src/config/env.ts)
+const API_BASE_URL = env.API_URL;
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({

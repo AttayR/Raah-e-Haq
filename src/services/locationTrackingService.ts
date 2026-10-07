@@ -1,4 +1,5 @@
 import { LocationUpdate, DriverLocation } from './rideService';
+import { env } from '../config/env';
 
 export interface LocationData {
   latitude: number;
@@ -179,7 +180,7 @@ class LocationTrackingService {
         accuracy: location.accuracy
       };
 
-      const response = await fetch('https://raahehaq.com/api/tracking/update-location', {
+      const response = await fetch(`${env.API_URL}/tracking/update-location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -226,7 +227,7 @@ class LocationTrackingService {
   // Get driver location
   async getDriverLocation(driverId: number): Promise<DriverLocation> {
     try {
-      const response = await fetch(`https://raahehaq.com/api/tracking/driver/${driverId}/location`, {
+      const response = await fetch(`${env.API_URL}/tracking/driver/${driverId}/location`, {
         headers: {
           'Authorization': `Bearer ${await this.getAuthToken()}`
         }
@@ -342,7 +343,7 @@ class LocationTrackingService {
   // Set driver status
   async setDriverStatus(status: 'online' | 'offline' | 'busy'): Promise<void> {
     try {
-      const response = await fetch('https://raahehaq.com/api/tracking/update-status', {
+      const response = await fetch(`${env.API_URL}/tracking/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

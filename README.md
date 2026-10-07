@@ -4,6 +4,20 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 
+## Environments (API / WebSocket URLs, Maps key)
+
+Config comes from `.env.*` files read at build time by `react-native-config` and exposed to JS via `src/config/env.ts` (the app stops at startup with a clear error if a key is missing). Only `.env.example` is committed; copy it to create:
+
+| Build | Env file | Typical target |
+|---|---|---|
+| Debug (`yarn ios`, `yarn android`) | `.env.development` | local backend, `http://localhost:8000/api` |
+| Release (`yarn ios --mode Release`, `assembleRelease`) | `.env.production` | `https://raahehaq.com/api` |
+
+- Override one build: iOS `yarn ios --extra-params "ENVFILE=.env.production"`, Android `ENVFILE=.env.production yarn android`.
+- The mapping lives in `ios/Podfile` (post_install, `ENVFILE` per configuration) and `android/app/build.gradle` (`envConfigFiles`). Run `pod install` after changing the Podfile.
+- Values are compiled into the native app: after editing an env file, rebuild (restarting Metro is not enough).
+- Debug networking: iOS ATS allows local networking (`NSAllowsLocalNetworking`); Android debug allows cleartext only to `localhost`, `127.0.0.1` and `10.0.2.2`. On the Android emulator run `adb reverse tcp:8000 tcp:8000` so `localhost:8000` reaches your machine.
+
 ## Step 1: Start Metro
 
 First, you will need to run **Metro**, the JavaScript build tool for React Native.
