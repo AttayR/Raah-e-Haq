@@ -207,6 +207,8 @@ class WebSocketService {
   // Close all connections
   closeAll(): void {
     this.connections.forEach((ws, connectionId) => {
+      // Intentional close (logout): detach onclose so it does not schedule a reconnect.
+      ws.onclose = null;
       ws.close();
       logger.debug(`🔌 Closed connection ${connectionId}`);
     });

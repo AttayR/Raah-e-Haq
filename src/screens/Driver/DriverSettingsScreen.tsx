@@ -13,28 +13,16 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useApiAuth } from '../../hooks/useApiAuth';
-import { toast } from '../../core/toast';
+import { useLogout } from '../../hooks/useLogout';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
 
 const DriverSettingsScreen = () => {
   const { theme } = useAppTheme();
-  const { user, isLoading } = useSelector(
+  const { user } = useSelector(
     (state: RootState) => state.apiAuth,
   );
-  const { logout } = useApiAuth();
-
-  const handleLogout = async () => {
-    try {
-      logger.debug('DriverSettingsScreen - Logging out...');
-      await logout();
-      toast.success('Logged out successfully');
-    } catch (error) {
-      logger.error('DriverSettingsScreen - Logout error:', error);
-      toast.error('Failed to logout');
-    }
-  };
+  const { confirmLogout, isLoggingOut } = useLogout();
   
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -154,15 +142,15 @@ const DriverSettingsScreen = () => {
 
                 <TouchableOpacity
                   style={[styles.settingItem, styles.logoutItem]}
-                  onPress={handleLogout}
-                  disabled={isLoading}
+                  onPress={confirmLogout}
+                  disabled={isLoggingOut}
                 >
                   <View style={[styles.settingIcon, styles.logoutIcon]}>
                     <Icon name="logout" size={24} color="#ef4444" />
                   </View>
                   <View style={styles.settingContent}>
                     <Text style={[styles.settingTitle, styles.logoutText]}>
-                      {isLoading ? 'Signing Out...' : 'Sign Out'}
+                      {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                     </Text>
                     <Text style={styles.settingSubtitle}>Logout from your account</Text>
                   </View>

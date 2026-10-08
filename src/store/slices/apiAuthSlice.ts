@@ -7,13 +7,13 @@ import {
   verifyOtp,
   forgotPassword,
   resetPassword,
-  logoutUser,
-  logoutAllDevices,
   refreshToken,
   getUserProfile,
   updateUserProfile,
   initializeAuth,
 } from '../thunks/apiThunks';
+import { logout } from '../thunks/sessionThunks';
+import { resetApp } from '../actions';
 import { rejectionMessage } from '../../core/api/errors';
 
 export type AuthState = {
@@ -192,63 +192,13 @@ const authSlice = createSlice({
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
-    // Logout User
+    // Logout (store/thunks/sessionThunks.ts). The root reducer has already reset this slice
+    // when resetApp arrives; the app stays initialised so no splash/bootstrap runs again.
     builder
-      .addCase(logoutUser.pending, (state) => {
+      .addCase(logout.pending, (state) => {
         state.status = 'loading';
       })
-      .addCase(logoutUser.fulfilled, (state) => {
-        state.status = 'succeeded';
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.otpData = null;
-        state.isOtpSent = false;
-        state.isOtpVerified = false;
-        state.profileCompleted = false;
-        state.error = null;
-      })
-      .addCase(logoutUser.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
-        // Still clear auth data even if API call fails
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.otpData = null;
-        state.isOtpSent = false;
-        state.isOtpVerified = false;
-        state.profileCompleted = false;
-      });
-
-    // Logout All Devices
-    builder
-      .addCase(logoutAllDevices.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(logoutAllDevices.fulfilled, (state) => {
-        state.status = 'succeeded';
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.otpData = null;
-        state.isOtpSent = false;
-        state.isOtpVerified = false;
-        state.profileCompleted = false;
-        state.error = null;
-      })
-      .addCase(logoutAllDevices.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
-        // Still clear auth data even if API call fails
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.otpData = null;
-        state.isOtpSent = false;
-        state.isOtpVerified = false;
-        state.profileCompleted = false;
-      });
+      .addCase(resetApp, () => ({ ...initialState, isInitialized: true }));
 
     // Refresh Token
     builder

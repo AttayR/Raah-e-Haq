@@ -15,7 +15,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { refreshSessionThunk } from '../../store/thunks/authThunks';
-import { useApiAuth } from '../../hooks/useApiAuth';
+import { useLogout } from '../../hooks/useLogout';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { reverseGeocode } from '../../services/placesService';
@@ -32,7 +32,7 @@ export default function PassengerHomeScreen() {
   const dispatch = useDispatch<any>();
   const navigation = useNavigation<any>();
   const { user } = useSelector((state: RootState) => state.apiAuth);
-  const { logout } = useApiAuth();
+  const { confirmLogout, isLoggingOut } = useLogout();
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [weatherInfo] = useState({ temp: '28°C', condition: 'Sunny' });
@@ -646,7 +646,8 @@ export default function PassengerHomeScreen() {
 
               <TouchableOpacity
                 style={styles.accountItem}
-                onPress={() => logout()}
+                onPress={confirmLogout}
+                disabled={isLoggingOut}
               >
                 <Icon name="logout" size={24} color={theme.colors.warning} />
                 <Text

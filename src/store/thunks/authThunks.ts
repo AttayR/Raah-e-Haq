@@ -5,7 +5,6 @@ import {
   createUserProfile,
   getUserByPhone,
   createAuthSession,
-  signOutUser,
   listenAuth,
   getAuthSession,
   refreshAuthSession,
@@ -233,18 +232,6 @@ export const verifyCodeThunk = (
     dispatch(setAuthError(errorMessage));
     toast.fromError(error, 'Failed to verify code');
     throw error;
-  }
-};
-
-// Sign out
-export const signOutThunk = () => async (dispatch: AppDispatch) => {
-  try {
-    await signOutUser();
-    dispatch(setSignedOut());
-  } catch (error: any) {
-    logger.error('Sign out error:', error);
-    // Force sign out even if there's an error
-    dispatch(setSignedOut());
   }
 };
 

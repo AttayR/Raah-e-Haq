@@ -448,13 +448,13 @@ class ApiService {
     return response.data;
   }
 
-  async logout(): Promise<ApiResponse> {
-    const response = await apiClient.post('/auth/logout');
+  async logout(config?: AxiosRequestConfig): Promise<ApiResponse> {
+    const response = await apiClient.post('/auth/logout', undefined, config);
     return response.data;
   }
 
-  async logoutAll(): Promise<ApiResponse> {
-    const response = await apiClient.post('/auth/logout-all');
+  async logoutAll(config?: AxiosRequestConfig): Promise<ApiResponse> {
+    const response = await apiClient.post('/auth/logout-all', undefined, config);
     return response.data;
   }
 

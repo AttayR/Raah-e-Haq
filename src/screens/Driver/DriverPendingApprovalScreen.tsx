@@ -9,51 +9,24 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { signOutUser } from '../../services/firebaseAuth';
-import { setSignedOut } from '../../store/slices/authSlice';
+import { useLogout } from '../../hooks/useLogout';
 import { toast } from '../../core/toast';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { logger } from '../../core/logging/logger';
 
 export default function DriverPendingApprovalScreen() {
   const navigation = useNavigation<any>();
-  const dispatch = useDispatch<any>();
+  const { confirmLogout, isLoggingOut } = useLogout();
   const { userProfile } = useSelector((state: RootState) => state.auth);
   
   const [refreshCount, setRefreshCount] = useState(0);
 
   const driverStatus = userProfile?.driverStatus || 'pending';
   const rejectionReason = userProfile?.rejectionReason;
-
-  const handleSignOut = async () => {
-    try {
-      Alert.alert(
-        'Sign Out',
-        'Are you sure you want to sign out?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign Out',
-            style: 'destructive',
-            onPress: async () => {
-              await signOutUser();
-              dispatch(setSignedOut());
-              toast.success('Signed out successfully');
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      logger.error('Error signing out:', error);
-      toast.error('Failed to sign out');
-    }
-  };
 
   const handleRefresh = () => {
     setRefreshCount(prev => prev + 1);
@@ -185,7 +158,8 @@ export default function DriverPendingApprovalScreen() {
 
               <TouchableOpacity
                 style={styles.signOutButton}
-                onPress={handleSignOut}
+                onPress={confirmLogout}
+                disabled={isLoggingOut}
                 activeOpacity={0.8}
               >
                 <Icon name="logout" size={20} color={BrandColors.primary} />

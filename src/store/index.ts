@@ -1,22 +1,13 @@
 // src/store/index.ts
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, createTransform } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import authReducer from './slices/authSlice';
-import apiAuthReducer from './slices/apiAuthSlice';
-import userReducer from './slices/userSlice';
-import tripReducer from './slices/tripSlice';
-import rideReducer from './slices/rideSlice';
 import { stripOtpTransform } from './persistTransforms';
+import { rootReducer } from './rootReducer';
+import type { SessionThunkExtra } from './thunks/sessionThunks';
 
-const rootReducer = combineReducers({
-  auth: authReducer,
-  apiAuth: apiAuthReducer,
-  user: userReducer,
-  trip: tripReducer,
-  ride: rideReducer,
-});
+export { rootReducer } from './rootReducer';
 
 // When rehydrating, never restore auth/apiAuth error (or failed/loading status).
 // This prevents "stale" login errors from persisting after the user kills the app mid-login.
@@ -58,9 +49,15 @@ const persistConfig = {
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
+// The logout thunk purges redux-persist through this, so thunks never import the store.
+const thunkExtra: SessionThunkExtra = {
+  purgePersistedState: () => persistor.purge(),
+};
+
 export const store = configureStore({
   reducer: persistedReducer,
-  middleware: (getDefault) => getDefault({ serializableCheck: false }), // no manual thunk
+  middleware: (getDefault) =>
+    getDefault({ serializableCheck: false, thunk: { extraArgument: thunkExtra } }),
 });
 
 export const persistor = persistStore(store);

@@ -10,9 +10,9 @@ import {
   ImageBackground,
   SafeAreaView,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { signOutThunk } from '../../store/thunks/authThunks';
+import { useLogout } from '../../hooks/useLogout';
 import { RootState } from '../../store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -28,9 +28,9 @@ const isLargeScreen = width >= 1024;
 
 export default function DriverHomeScreen() {
   const { theme } = useAppTheme();
-  const dispatch = useDispatch<any>();
   const navigation = useNavigation();
   const [isOnline, setIsOnline] = useState(false);
+  const { confirmLogout, isLoggingOut } = useLogout();
   
   // Get user data from Redux store
   const { user } = useSelector((state: RootState) => state.apiAuth);
@@ -385,7 +385,8 @@ export default function DriverHomeScreen() {
             <View style={styles.actionsGrid}>
               <TouchableOpacity
                 style={[styles.actionCard, { borderLeftColor: '#ef4444' }]}
-                onPress={() => dispatch(signOutThunk())}
+                onPress={confirmLogout}
+                disabled={isLoggingOut}
                 activeOpacity={0.7}
               >
                 <View style={styles.actionContent}>

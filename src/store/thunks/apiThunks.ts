@@ -152,38 +152,6 @@ export const resetPassword = createAsyncThunk<string, ResetPasswordRequest, Thun
   }
 );
 
-export const logoutUser = createAsyncThunk<string, void, ThunkConfig>(
-  'auth/logoutUser',
-  async (_, { rejectWithValue }) => {
-    try {
-      const body = await apiService.logout();
-      // Clear local storage regardless of API response
-      await apiService.clearAuthData();
-      return messageOf(body, 'Logged out');
-    } catch (error) {
-      // Clear local storage even if API call fails
-      await apiService.clearAuthData();
-      return rejectWithValue(toThunkRejection(error, 'Logout failed'));
-    }
-  }
-);
-
-export const logoutAllDevices = createAsyncThunk<string, void, ThunkConfig>(
-  'auth/logoutAllDevices',
-  async (_, { rejectWithValue }) => {
-    try {
-      const body = await apiService.logoutAll();
-      // Clear local storage regardless of API response
-      await apiService.clearAuthData();
-      return messageOf(body, 'Logged out from all devices');
-    } catch (error) {
-      // Clear local storage even if API call fails
-      await apiService.clearAuthData();
-      return rejectWithValue(toThunkRejection(error, 'Logout from all devices failed'));
-    }
-  }
-);
-
 export const refreshToken = createAsyncThunk<string, void, ThunkConfig>(
   'auth/refreshToken',
   async (_, { rejectWithValue }) => {

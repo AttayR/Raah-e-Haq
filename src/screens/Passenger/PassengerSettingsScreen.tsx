@@ -16,16 +16,15 @@ import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
-import { useApiAuth } from '../../hooks/useApiAuth';
-import { toast } from '../../core/toast';
+import { useLogout } from '../../hooks/useLogout';
 import { logger } from '../../core/logging/logger';
 
 const PassengerSettingsScreen = () => {
   const navigation = useNavigation();
-  const { user, isLoading } = useSelector(
+  const { user } = useSelector(
     (state: RootState) => state.apiAuth,
   );
-  const { logout } = useApiAuth();
+  const { confirmLogout, isLoggingOut } = useLogout();
   const [refreshing, setRefreshing] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [rideUpdatesEnabled, setRideUpdatesEnabled] = useState(true);
@@ -40,17 +39,6 @@ const PassengerSettingsScreen = () => {
       setRefreshing(false);
     }
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      logger.debug('PassengerSettingsScreen - Logging out...');
-      await logout();
-      toast.success('Logged out successfully');
-    } catch (error) {
-      logger.error('PassengerSettingsScreen - Logout error:', error);
-      toast.error('Failed to logout');
-    }
-  };
 
   return (
     <ImageBackground
@@ -211,13 +199,13 @@ const PassengerSettingsScreen = () => {
           <Text style={styles.sectionTitle}>Danger Zone</Text>
           <TouchableOpacity 
             style={styles.optionItem}
-            onPress={handleLogout}
-            disabled={isLoading}
+            onPress={confirmLogout}
+            disabled={isLoggingOut}
           >
             <View style={styles.optionInfo}>
               <Icon name="logout" size={20} color="#ef4444" type="antDesignIcon" />
               <Text style={[styles.optionText, styles.logoutText]}>
-                {isLoading ? 'Logging out...' : 'Logout'}
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
               </Text>
             </View>
             <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />

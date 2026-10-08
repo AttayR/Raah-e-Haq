@@ -8,13 +8,12 @@ import {
   verifyOtp,
   forgotPassword,
   resetPassword,
-  logoutUser,
-  logoutAllDevices,
   refreshToken,
   getUserProfile,
   updateUserProfile,
   initializeAuth,
 } from '../store/thunks/apiThunks';
+import { logout as logoutThunk } from '../store/thunks/sessionThunks';
 import {
   clearError,
   clearOtpData,
@@ -71,14 +70,14 @@ export const useApiAuth = () => {
     return dispatch(resetPassword(resetData));
   }, [dispatch]);
 
-  // Logout
+  // Logout: the one session-ending thunk (T-102). Screens should use useLogout() (confirm dialog).
   const logout = useCallback(async () => {
-    return dispatch(logoutUser());
+    return dispatch(logoutThunk());
   }, [dispatch]);
 
-  // Logout from all devices
+  // Logout from all devices (same cleanup, revokes every token)
   const logoutAll = useCallback(async () => {
-    return dispatch(logoutAllDevices());
+    return dispatch(logoutThunk({ allDevices: true }));
   }, [dispatch]);
 
   // Refresh token

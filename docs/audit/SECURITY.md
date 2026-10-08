@@ -358,3 +358,8 @@ Scope: T-001 to T-008 end to end (env, logger, babel console stripping, API clie
 | BE 7 Races | assign-driver known (BE-03); wallet (SEC-09); OTP consume (SEC-08) |
 | BE 8 WebSockets | No server exists (FEAT-12 / BE-12) |
 | BE 9 Headers/CORS | No `config/cors.php`, so the framework default applies (`*` without credentials): acceptable for token auth. Error leakage depends on debug (SEC-06) |
+
+### SEC-22 · low · backend OTP: global SMS budget can be drained by throwaway accounts (and is a weak existence oracle)
+- **Where:** backend `app/Services/SmsService.php` (budget), `app/Jobs/SendLoginOtp.php`, `POST /api/auth/register` (unverified pending accounts can receive OTP).
+- **Issue:** ~50 self-registered +923 accounts × 10 sends from a few IPs can spend the 500/day budget, turning off phone login for everyone for up to 24 h. An attacker who holds the counter at budget-1 can test one number per window by watching for 503 `sms_unavailable`.
+- **Fix:** BE-32 (OTP-verified registration) and BE-33 (sub-budget for never-verified accounts); owner alerting and budget sizing before launch.

@@ -1,5 +1,7 @@
 import reducer, { clearError, resetAuthState, AuthState } from '../../src/store/slices/apiAuthSlice';
-import { loginUser, logoutUser } from '../../src/store/thunks/apiThunks';
+import { loginUser } from '../../src/store/thunks/apiThunks';
+import { logout } from '../../src/store/thunks/sessionThunks';
+import { resetApp } from '../../src/store/actions';
 import type { User } from '../../src/services/api';
 import type { ThunkRejection } from '../../src/core/api/errors';
 
@@ -65,15 +67,17 @@ describe('apiAuthSlice', () => {
     expect(reducer(state, clearError()).error).toBeNull();
   });
 
-  it('clears the session even when the logout request fails', () => {
+  it('shows loading while logging out, then resetApp signs out and keeps the app initialised', () => {
     const signedIn = reducer(
       initial(),
       loginUser.fulfilled({ user, token: 'token-123', tokenType: 'Bearer' }, 'req-3', credentials),
     );
-    const state = reducer(signedIn, logoutUser.rejected(null, 'req-4', undefined, rejection('Network error', { kind: 'network' })));
-    expect(state.isAuthenticated).toBe(false);
-    expect(state.user).toBeNull();
-    expect(state.token).toBeNull();
+    const loggingOut = reducer(signedIn, logout.pending('req-4', undefined));
+    expect(loggingOut.status).toBe('loading');
+
+    // The root reducer hands the slice `undefined` on resetApp (see store/index.ts).
+    const state = reducer(undefined, resetApp());
+    expect(state).toEqual({ ...initial(), isInitialized: true });
   });
 
   it('resetAuthState returns to signed out but keeps the app initialised', () => {
