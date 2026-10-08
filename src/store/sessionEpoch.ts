@@ -1,8 +1,9 @@
 /**
  * Session generation counter (T-103). `logout` bumps it before it clears anything, so a
  * request that started in an earlier session can tell, when it settles, that its result
- * belongs to a user who has since signed out and must not reach Redux or AsyncStorage.
- * T-104 replaces this with a full session epoch + AbortController.
+ * belongs to a user who has since signed out and must not reach Redux or device storage.
+ * T-104: authStorage skips token/user writes of an ended session, every thunk that stores
+ * a user or token checks it, and the 401 handler ignores 401s of earlier sessions.
  */
 let epoch = 0;
 

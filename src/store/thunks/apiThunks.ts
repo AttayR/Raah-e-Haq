@@ -8,8 +8,15 @@ import {
   OtpSentInfo,
   User,
 } from '../../services/api';
+import { authStorage } from '../../services/authStorage';
 import { unwrap, toApiError, toThunkRejection, ThunkRejection } from '../../core/api/errors';
-import { currentSessionEpoch, isStaleSession, STALE_SESSION_MESSAGE } from '../sessionEpoch';
+import { logApiFailure } from '../../core/api/logApiFailure';
+import {
+  bumpSessionEpoch,
+  currentSessionEpoch,
+  isStaleSession,
+  STALE_SESSION_MESSAGE,
+} from '../sessionEpoch';
 import { logger } from '../../core/logging/logger';
 
 /**
@@ -42,21 +49,45 @@ const messageOf = (body: { success: boolean; message?: string }, fallback: strin
   return body.message || fallback;
 };
 
+/**
+ * Stores the token (Keychain) and the cached user from a login/verify-otp/register response,
+ * unless the session ended while the request ran. Returns false when nothing was stored.
+ * A stored token starts a new session epoch, so nothing tied to an earlier token (its late
+ * results, the 401 single-flight latch in services/api.ts) can apply to this one.
+ */
+const storeNewSession = async (
+  data: { user: User; token: string; expires_at?: string | null },
+  startedIn: number,
+): Promise<boolean> => {
+  const stored = await authStorage.saveSession(
+    { token: data.token, expiresAt: data.expires_at, user: data.user },
+    startedIn,
+  );
+  if (!stored || isStaleSession(startedIn)) {
+    return false;
+  }
+  bumpSessionEpoch();
+  return true;
+};
+
 // Auth Thunks
 export const loginUser = createAsyncThunk<AuthSession, LoginRequest, ThunkConfig>(
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
     try {
       logger.debug('🔄 Redux Thunk - Starting user login...');
       const data = unwrap(await apiService.login(credentials));
 
-      await apiService.setAuthToken(data.token);
-      await apiService.setUserData(data.user);
+      // A logout while this ran wins: nothing is stored and the state stays signed out.
+      if (!(await storeNewSession(data, startedIn))) {
+        return rejectWithValue(staleSessionRejection());
+      }
       logger.debug('✅ Redux Thunk - Login successful');
 
       return { user: data.user, token: data.token, tokenType: data.token_type };
     } catch (error) {
-      logger.error('💥 Redux Thunk - Login error');
+      logApiFailure('loginUser failed', error);
       return rejectWithValue(toThunkRejection(error, 'Login failed'));
     }
   }
@@ -71,7 +102,7 @@ export const registerUser = createAsyncThunk<User, RegisterRequest, ThunkConfig>
       logger.debug('✅ Redux Thunk - Registration successful');
       return data.user;
     } catch (error) {
-      logger.error('💥 Redux Thunk - Registration error');
+      logApiFailure('registerUser failed', error);
       return rejectWithValue(toThunkRejection(error, 'Registration failed'));
     }
   }
@@ -87,18 +118,24 @@ export const registerUserWithImages = createAsyncThunk<
 >(
   'auth/registerUserWithImages',
   async (userData, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
     try {
       logger.debug('🔄 Redux Thunk - Starting user registration with images...');
       const data = unwrap(await apiService.registerWithImages(userData));
 
-      // Drivers get no token until an admin approves them (token is null).
-      await apiService.setAuthToken(data.token);
-      await apiService.setUserData(data.user);
+      // Drivers get no token until an admin approves them (token is null). Whether a token
+      // should be kept at all after registration is AUTH-17 (T-202).
+      const stored = data.token
+        ? await storeNewSession({ ...data, token: data.token }, startedIn)
+        : await authStorage.saveUser(data.user, startedIn);
+      if (!stored) {
+        return rejectWithValue(staleSessionRejection());
+      }
       logger.debug('✅ Redux Thunk - Registration with images successful');
 
       return { user: data.user, token: data.token, tokenType: data.token_type };
     } catch (error) {
-      logger.error('💥 Redux Thunk - Registration with images error');
+      logApiFailure('registerUserWithImages failed', error);
       return rejectWithValue(toThunkRejection(error, 'Registration failed'));
     }
   }
@@ -115,7 +152,7 @@ export const sendOtp = createAsyncThunk<OtpSentInfo, string, ThunkConfig>(
       // it never reaches Redux, redux-persist, the UI or the logs (AUTH-02, INF-05).
       return { phone: data.phone, expires_in: data.expires_in };
     } catch (error) {
-      logger.error('💥 Redux Thunk - OTP send error');
+      logApiFailure('sendOtp failed', error);
       // 429 carries retryAfter (seconds) from the body or the Retry-After header (BE-16).
       return rejectWithValue(toThunkRejection(error, 'Failed to send OTP'));
     }
@@ -125,17 +162,19 @@ export const sendOtp = createAsyncThunk<OtpSentInfo, string, ThunkConfig>(
 export const verifyOtp = createAsyncThunk<AuthSession, VerifyOtpRequest, ThunkConfig>(
   'auth/verifyOtp',
   async (otpData, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
     try {
       logger.debug('🔄 Redux Thunk - Starting OTP verification process...');
       const data = unwrap(await apiService.verifyOtp(otpData));
 
-      await apiService.setAuthToken(data.token);
-      await apiService.setUserData(data.user);
+      if (!(await storeNewSession(data, startedIn))) {
+        return rejectWithValue(staleSessionRejection());
+      }
       logger.debug('✅ Redux Thunk - OTP verification successful');
 
       return { user: data.user, token: data.token, tokenType: data.token_type };
     } catch (error) {
-      logger.error('💥 Redux Thunk - OTP verification error');
+      logApiFailure('verifyOtp failed', error);
       return rejectWithValue(toThunkRejection(error, 'OTP verification failed'));
     }
   }
@@ -163,19 +202,6 @@ export const resetPassword = createAsyncThunk<string, ResetPasswordRequest, Thun
   }
 );
 
-export const refreshToken = createAsyncThunk<string, void, ThunkConfig>(
-  'auth/refreshToken',
-  async (_, { rejectWithValue }) => {
-    try {
-      const data = unwrap(await apiService.refreshToken());
-      await apiService.setAuthToken(data.token);
-      return data.token;
-    } catch (error) {
-      return rejectWithValue(toThunkRejection(error, 'Token refresh failed'));
-    }
-  }
-);
-
 // User Profile Thunks
 export const getUserProfile = createAsyncThunk<User, void, ThunkConfig>(
   'auth/getUserProfile',
@@ -183,11 +209,11 @@ export const getUserProfile = createAsyncThunk<User, void, ThunkConfig>(
     const startedIn = currentSessionEpoch();
     try {
       const data = unwrap(await apiService.getProfile());
-      // Signed out (or in again as someone else) while this was in flight: drop it (T-103).
-      if (isStaleSession(startedIn)) {
+      // Signed out (or in again as someone else) while this was in flight: drop it. The
+      // storage write re-checks the epoch, so a logout during the write also wins (T-104).
+      if (!(await authStorage.saveUser(data.user, startedIn)) || isStaleSession(startedIn)) {
         return rejectWithValue(staleSessionRejection());
       }
-      await apiService.setUserData(data.user);
       return data.user;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Failed to get profile'));
@@ -198,9 +224,12 @@ export const getUserProfile = createAsyncThunk<User, void, ThunkConfig>(
 export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConfig>(
   'auth/updateUserProfile',
   async (userData, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
     try {
       const user = unwrap(await apiService.updateProfile(userData));
-      await apiService.setUserData(user);
+      if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
+        return rejectWithValue(staleSessionRejection());
+      }
       return user;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Profile update failed'));
@@ -219,24 +248,28 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
  * If a logout happens while it runs, it rejects with staleSessionRejection() and the
  * reducer leaves the signed-out state alone.
  */
-export const initializeAuth = createAsyncThunk<{ user: User; token: string } | null, void, ThunkConfig>(
+export const initializeAuth = createAsyncThunk<
+  { user: User; token: string } | null,
+  void,
+  ThunkConfig & { state: { apiAuth: { user: User | null } } }
+>(
   'auth/initializeAuth',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     const startedIn = currentSessionEpoch();
     try {
       const token = await apiService.getAuthToken();
       if (!token) {
         return null;
       }
-      const storedUser = await apiService.getUserData();
+      // The cached user, or the one redux-persist rehydrated (both without sensitive fields).
+      const storedUser = (await apiService.getUserData()) ?? getState().apiAuth.user ?? null;
 
       let session: { user: User; token: string } | null;
       try {
         const data = unwrap(await apiService.getProfile());
-        if (isStaleSession(startedIn)) {
+        if (!(await authStorage.saveUser(data.user, startedIn)) || isStaleSession(startedIn)) {
           return rejectWithValue(staleSessionRejection());
         }
-        await apiService.setUserData(data.user);
         session = { user: data.user, token };
       } catch (error) {
         if (isStaleSession(startedIn)) {
@@ -244,6 +277,8 @@ export const initializeAuth = createAsyncThunk<{ user: User; token: string } | n
         }
         const apiError = toApiError(error);
         if (apiError.status === 401) {
+          // The stored session is dead: end its epoch so nothing of it applies later.
+          bumpSessionEpoch();
           await apiService.clearAuthData();
           return null;
         }

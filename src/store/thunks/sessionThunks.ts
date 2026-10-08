@@ -1,4 +1,4 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAsyncThunk, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
 import auth from '@react-native-firebase/auth';
 import { apiService, cancelAllRequests } from '../../services/api';
 import { clearAuthSession } from '../../services/firebaseAuth';
@@ -54,7 +54,10 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
           : apiService.logout({ timeout: LOGOUT_REQUEST_TIMEOUT_MS }),
       );
       await step('close sockets', () => webSocketService.closeAll());
-      await step('stop location tracking', () => locationTrackingService.stopTracking());
+      // Stop and forget the last position and listeners, so user A's location is never
+      // posted under user B (T-104).
+      await step('reset location tracking', () => locationTrackingService.reset());
+      await step('reset notifications', () => notificationService.reset());
       await step('cancel requests', () => cancelAllRequests());
       await step('firebase sign out', async () => {
         await clearAuthSession();
@@ -71,3 +74,21 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
     }
   },
 );
+
+/**
+ * The server rejected the current session's token (401, see setUnauthorizedHandler in
+ * services/api.ts). Once the app is bootstrapped this always logs out, signed in or not: a
+ * token the server refuses is dead, and logout clears it and everything tied to it. During
+ * the cold-start check initializeAuth handles its own 401. Returns true when it started a
+ * logout, so the API layer latches its single-flight guard only then.
+ */
+export const sessionExpired =
+  (): ThunkAction<boolean, { apiAuth: { isInitialized: boolean } }, SessionThunkExtra, UnknownAction> =>
+  (dispatch, getState) => {
+    if (!getState().apiAuth.isInitialized) {
+      return false;
+    }
+    logger.warn('Session expired (401); signing out');
+    dispatch(logout());
+    return true;
+  };

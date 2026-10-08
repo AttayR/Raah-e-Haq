@@ -8,7 +8,6 @@ import {
   verifyOtp,
   forgotPassword,
   resetPassword,
-  refreshToken,
   getUserProfile,
   updateUserProfile,
   initializeAuth,
@@ -80,11 +79,6 @@ export const useApiAuth = () => {
     return dispatch(logoutThunk({ allDevices: true }));
   }, [dispatch]);
 
-  // Refresh token
-  const refreshAuthToken = useCallback(async () => {
-    return dispatch(refreshToken());
-  }, [dispatch]);
-
   // Get user profile
   const getProfile = useCallback(async () => {
     return dispatch(getUserProfile());
@@ -145,7 +139,6 @@ export const useApiAuth = () => {
     resetPasswordRequest,
     logout,
     logoutAll,
-    refreshAuthToken,
     getProfile,
     updateProfile,
     clearAuthError,

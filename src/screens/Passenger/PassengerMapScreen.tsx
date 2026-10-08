@@ -3,7 +3,6 @@ import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet, A
 import { Marker, MapPressEvent } from 'react-native-maps';
 import SafeMapView from '../../components/SafeMapView';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -15,7 +14,7 @@ import { useRide } from '../../hooks/useRide';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { cancelAllRequests } from '../../services/api';
+import { apiService, cancelAllRequests } from '../../services/api';
 import LocationSearch from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
 import VehicleOptions, { VehicleOption } from '../../components/passenger/VehicleOptions';
@@ -293,7 +292,7 @@ const PassengerMapScreen = () => {
       }
 
       // Check authentication
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await apiService.getAuthToken();
       if (!token) {
         handleError('Please log in to request a ride', 'AUTHENTICATION_ERROR');
         return;

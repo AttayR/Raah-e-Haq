@@ -1,6 +1,7 @@
 import { createTransform } from 'redux-persist';
 import type { AuthState } from './slices/apiAuthSlice';
 import type { AuthState as FirebaseAuthState } from './slices/authSlice';
+import { toStoredUser } from '../core/auth/storedUser';
 
 /**
  * OTP state is per-session and must never reach AsyncStorage (AUTH-02, INF-05).
@@ -13,6 +14,21 @@ const withoutOtp = (state: AuthState): AuthState =>
 export const stripOtpTransform = createTransform<AuthState, AuthState>(withoutOtp, withoutOtp, {
   whitelist: ['apiAuth'],
 });
+
+/**
+ * The bearer token lives only in the Keychain/Keystore (services/authStorage, INF-20, T-104),
+ * and the persisted user carries no CNIC, contacts, licence or bank fields. Inbound: never
+ * written. Outbound: a token or those fields an older build stored are dropped on rehydrate
+ * (the token itself is migrated by authStorage from its own legacy key).
+ */
+const withoutSecrets = (state: AuthState): AuthState =>
+  state ? { ...state, token: null, user: toStoredUser(state.user) } : state;
+
+export const stripApiAuthSecretsTransform = createTransform<AuthState, AuthState>(
+  withoutSecrets,
+  withoutSecrets,
+  { whitelist: ['apiAuth'] },
+);
 
 /**
  * Transient auth state must not survive a restart (AUTH-16, T-103): a stale error or a

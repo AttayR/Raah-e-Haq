@@ -7,9 +7,12 @@ import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import auth from '@react-native-firebase/auth';
+import * as Keychain from 'react-native-keychain';
 import { apiClient } from '../../src/services/api';
+import { authStorage } from '../../src/services/authStorage';
 import webSocketService from '../../src/services/webSocketService';
 import locationTrackingService from '../../src/services/locationTrackingService';
+import notificationService from '../../src/services/notificationService';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { loginUser } from '../../src/store/thunks/apiThunks';
@@ -18,6 +21,7 @@ import { setRole, setDisplayName } from '../../src/store/slices/userSlice';
 import { setCurrentTrip } from '../../src/store/slices/tripSlice';
 import { setMode, setIsRequesting } from '../../src/store/slices/rideSlice';
 import type { User } from '../../src/services/api';
+import type { NotificationResource } from '../../src/services/rideService';
 
 const user: User = {
   id: 7,
@@ -32,6 +36,16 @@ const user: User = {
 };
 
 const TOKEN = 'test-token-not-real';
+
+const incomingNotification: NotificationResource = {
+  id: 2,
+  user_id: 7,
+  type: 'ride_accepted',
+  title: 'Driver found',
+  message: 'On the way',
+  created_at: '2026-10-08T10:00:00Z',
+  updated_at: '2026-10-08T10:00:00Z',
+};
 
 const makeStore = () => {
   const extra: SessionThunkExtra = { purgePersistedState: jest.fn(() => Promise.resolve()) };
@@ -60,9 +74,8 @@ const signIn = async (store: ReturnType<typeof makeStore>['store']) => {
   store.dispatch(setCurrentTrip({ id: 'trip-1', status: 'ongoing' }));
   store.dispatch(setMode('bidding'));
   store.dispatch(setIsRequesting(true));
+  await authStorage.saveSession({ token: TOKEN, user });
   await AsyncStorage.multiSet([
-    ['auth_token', TOKEN],
-    ['user_data', JSON.stringify(user)],
     ['@auth_session', JSON.stringify({ uid: 'firebase-uid' })],
     ['notifications', JSON.stringify([{ id: 1, title: 'Old user notification' }])],
   ]);
@@ -92,6 +105,8 @@ const expectFullySignedOut = async (
     'notifications',
   ]);
   stored.forEach(([, value]) => expect(value).toBeNull());
+  expect(await authStorage.getToken()).toBeNull();
+  expect(await Keychain.getGenericPassword({ service: 'com.raahehaq.auth.session' })).toBe(false);
   expect(extra.purgePersistedState).toHaveBeenCalledTimes(1);
 };
 
@@ -99,6 +114,7 @@ let mock: MockAdapter;
 
 beforeEach(async () => {
   mock = new MockAdapter(apiClient);
+  await authStorage.clear();
   await AsyncStorage.clear();
 });
 
@@ -189,5 +205,56 @@ describe('logout thunk (T-102)', () => {
 
     expect(mock.history.post.map((r) => r.url)).toEqual(['/auth/logout-all']);
     await expectFullySignedOut(store, extra);
+  });
+
+  it('resets the location and notification singletons (no data carries over to the next user)', async () => {
+    const { store } = makeStore();
+    await signIn(store);
+    mock.onPost('/auth/logout').reply(200, { success: true });
+    // User A's last position (private state, set directly: geolocation is not available in Jest).
+    Object.assign(locationTrackingService, {
+      lastLocation: { latitude: 31.5, longitude: 74.3, timestamp: 1 },
+    });
+    expect(locationTrackingService.getLastLocation()).not.toBeNull();
+    const locationListener = jest.fn();
+    locationTrackingService.addLocationListener(locationListener);
+    const countListener = jest.fn();
+    notificationService.addUnreadCountListener(countListener);
+    mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 4 } });
+    await notificationService.getUnreadCount();
+    expect(notificationService.getCurrentUnreadCount()).toBe(4);
+
+    await store.dispatch(logout());
+
+    expect(locationTrackingService.getLastLocation()).toBeNull();
+    expect(notificationService.getCurrentUnreadCount()).toBe(0);
+    // Listeners of the old session are gone: a new event reaches none of them.
+    countListener.mockClear();
+    notificationService.handleIncomingNotification(incomingNotification);
+    expect(countListener).not.toHaveBeenCalled();
+    notificationService.reset();
+  });
+
+  it('a login that finishes after logout stores nothing and stays signed out', async () => {
+    const { store, extra } = makeStore();
+    let release!: (value: [number, unknown]) => void;
+    mock.onPost('/auth/login').reply(
+      () => new Promise<[number, unknown]>((resolve) => {
+        release = resolve;
+      }),
+    );
+    mock.onPost('/auth/logout').reply(200, { success: true });
+
+    const login = store.dispatch(loginUser({ email: user.email, password: 'not-a-real-password' }));
+    await new Promise<void>((r) => setTimeout(() => r(), 0));
+    await store.dispatch(logout());
+    release([200, { success: true, data: { user, token: 'late-token', token_type: 'Bearer' } }]);
+    await login;
+
+    expect(store.getState().apiAuth.isAuthenticated).toBe(false);
+    expect(store.getState().apiAuth.error).toBeNull();
+    expect(await authStorage.getToken()).toBeNull();
+    expect(await AsyncStorage.getItem('user_data')).toBeNull();
+    expect(extra.purgePersistedState).toHaveBeenCalledTimes(1);
   });
 });

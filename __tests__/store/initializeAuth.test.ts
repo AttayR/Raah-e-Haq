@@ -7,6 +7,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../../src/services/api';
+import { authStorage } from '../../src/services/authStorage';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { getUserProfile, initializeAuth, loginUser } from '../../src/store/thunks/apiThunks';
@@ -52,11 +53,7 @@ const rehydrateSignedIn = (store: Store) => {
   expect(store.getState().apiAuth.isInitialized).toBe(false);
 };
 
-const storeSession = () =>
-  AsyncStorage.multiSet([
-    ['auth_token', TOKEN],
-    ['user_data', JSON.stringify(storedUser)],
-  ]);
+const storeSession = () => authStorage.saveSession({ token: TOKEN, user: storedUser });
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -73,6 +70,7 @@ let mock: MockAdapter;
 
 beforeEach(async () => {
   mock = new MockAdapter(apiClient);
+  await authStorage.clear();
   await AsyncStorage.clear();
 });
 
@@ -107,7 +105,7 @@ describe('initializeAuth (T-103)', () => {
 
     expect(result.payload).toBeNull();
     expect(store.getState().apiAuth).toEqual({ ...initialApiAuth(), isInitialized: true });
-    expect(await AsyncStorage.getItem('auth_token')).toBeNull();
+    expect(await authStorage.getToken()).toBeNull();
     expect(await AsyncStorage.getItem('user_data')).toBeNull();
   });
 
@@ -123,7 +121,7 @@ describe('initializeAuth (T-103)', () => {
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).toEqual(storedUser);
     expect(state.token).toBe(TOKEN);
-    expect(await AsyncStorage.getItem('auth_token')).toBe(TOKEN);
+    expect(await authStorage.getToken()).toBe(TOKEN);
   });
 
   it('timeout: keeps the stored session and token', async () => {
@@ -134,7 +132,7 @@ describe('initializeAuth (T-103)', () => {
     await store.dispatch(initializeAuth());
 
     expect(store.getState().apiAuth.isAuthenticated).toBe(true);
-    expect(await AsyncStorage.getItem('auth_token')).toBe(TOKEN);
+    expect(await authStorage.getToken()).toBe(TOKEN);
   });
 
   it('500: keeps the stored session and token', async () => {
@@ -145,7 +143,7 @@ describe('initializeAuth (T-103)', () => {
     await store.dispatch(initializeAuth());
 
     expect(store.getState().apiAuth.isAuthenticated).toBe(true);
-    expect(await AsyncStorage.getItem('auth_token')).toBe(TOKEN);
+    expect(await authStorage.getToken()).toBe(TOKEN);
   });
 
   it('403 ACCOUNT_*: does not wipe the session (account-status routing is T-106)', async () => {
@@ -161,7 +159,7 @@ describe('initializeAuth (T-103)', () => {
     await store.dispatch(initializeAuth());
 
     expect(store.getState().apiAuth.isAuthenticated).toBe(true);
-    expect(await AsyncStorage.getItem('auth_token')).toBe(TOKEN);
+    expect(await authStorage.getToken()).toBe(TOKEN);
   });
 
   it('no stored token: resets a rehydrated session to the initial state, initialised', async () => {
@@ -224,5 +222,34 @@ describe('getUserProfile after logout (T-103)', () => {
     await store.dispatch(getUserProfile());
 
     expect(store.getState().apiAuth.user).toEqual(serverUser);
+  });
+});
+
+describe('T-104 follow-ups', () => {
+  it('offline with a token but no user_data falls back to the rehydrated user', async () => {
+    await authStorage.saveSession({ token: TOKEN });
+    mock.onGet('/auth/profile').networkError();
+    const store = makeStore();
+    rehydrateSignedIn(store);
+
+    await store.dispatch(initializeAuth());
+
+    const state = store.getState().apiAuth;
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.user).toEqual(storedUser);
+    expect(state.token).toBe(TOKEN);
+  });
+
+  it('getUserProfile while signed out never shows a loading state', async () => {
+    mock.onGet('/auth/profile').reply(200, { success: true, data: { user: serverUser } });
+    const store = makeStore();
+    const seen: string[] = [];
+    const unsubscribe = store.subscribe(() => seen.push(store.getState().apiAuth.status));
+
+    await store.dispatch(getUserProfile());
+    unsubscribe();
+
+    expect(seen).not.toContain('loading');
+    expect(store.getState().apiAuth.user).toBeNull();
   });
 });

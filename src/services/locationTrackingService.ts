@@ -19,17 +19,19 @@ export interface TrackingConfig {
   backgroundTracking: boolean;
 }
 
+const DEFAULT_TRACKING_CONFIG: TrackingConfig = {
+  enableTracking: true,
+  updateInterval: 10000, // 10 seconds
+  minAccuracy: 100, // 100 meters
+  minDistance: 50, // 50 meters
+  backgroundTracking: true
+};
+
 class LocationTrackingService {
   private isTracking: boolean = false;
   private watchId: number | null = null;
   private lastLocation: LocationData | null = null;
-  private config: TrackingConfig = {
-    enableTracking: true,
-    updateInterval: 10000, // 10 seconds
-    minAccuracy: 100, // 100 meters
-    minDistance: 50, // 50 meters
-    backgroundTracking: true
-  };
+  private config: TrackingConfig = { ...DEFAULT_TRACKING_CONFIG };
   private listeners: Set<(location: LocationData) => void> = new Set();
   private updateTimer: NodeJS.Timeout | null = null;
 
@@ -94,6 +96,18 @@ class LocationTrackingService {
 
     this.isTracking = false;
     logger.debug('📍 Location tracking stopped');
+  }
+
+  /**
+   * Back to the signed-out state (called by logout, T-104): stops tracking and forgets the
+   * last position, the listeners and any per-session config, so nothing of one user's
+   * session is uploaded or delivered in the next one.
+   */
+  reset(): void {
+    this.stopTracking();
+    this.lastLocation = null;
+    this.listeners.clear();
+    this.config = { ...DEFAULT_TRACKING_CONFIG };
   }
 
   // Handle location update

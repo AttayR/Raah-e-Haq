@@ -2,6 +2,7 @@ import apiService, { createCancellableRequest, removeRequest } from './api';
 import { isApiError, unwrap } from '../core/api/errors';
 import type { Pagination } from '../core/api/types';
 import { logger } from '../core/logging/logger';
+import { logApiFailure } from '../core/api/logApiFailure';
 
 export interface RideLocation {
   latitude: number;
@@ -640,7 +641,8 @@ class RideService {
         pagination: body.pagination ?? { current_page: page, last_page: page, per_page: perPage, total: data.length },
       };
     } catch (error) {
-      logger.error('❌ Failed to fetch notifications:', error);
+      // Keyed summary (never an empty line); offline/401 are warnings, not errors (T-104).
+      logApiFailure('RideService#getNotifications failed', error);
       throw error;
     }
   }

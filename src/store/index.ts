@@ -4,12 +4,14 @@ import { persistStore, persistReducer } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
+  stripApiAuthSecretsTransform,
   stripOtpTransform,
   clearApiAuthTransientTransform,
   clearFirebaseAuthTransientTransform,
 } from './persistTransforms';
 import { rootReducer } from './rootReducer';
-import type { SessionThunkExtra } from './thunks/sessionThunks';
+import { sessionExpired, type SessionThunkExtra } from './thunks/sessionThunks';
+import { setUnauthorizedHandler } from '../services/api';
 
 export { rootReducer } from './rootReducer';
 
@@ -18,7 +20,12 @@ const persistConfig = {
   storage: AsyncStorage,
   whitelist: ['auth', 'apiAuth', 'user'],
   // Per-key transforms (redux-persist v6 calls them once per whitelisted slice key).
-  transforms: [clearApiAuthTransientTransform, clearFirebaseAuthTransientTransform, stripOtpTransform],
+  transforms: [
+    clearApiAuthTransientTransform,
+    clearFirebaseAuthTransientTransform,
+    stripOtpTransform,
+    stripApiAuthSecretsTransform,
+  ],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -35,6 +42,10 @@ export const store = configureStore({
 });
 
 export const persistor = persistStore(store);
+
+// A 401 on a request that carried the current session's token ends the session (T-104,
+// BE-25: no refresh after a 401).
+setUnauthorizedHandler(() => store.dispatch(sessionExpired()));
 export type RootState = ReturnType<typeof rootReducer>;
 export type AppDispatch = typeof store.dispatch;
 

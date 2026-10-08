@@ -118,6 +118,67 @@ describe('toApiError', () => {
   });
 });
 
+describe('toApiError: top-level code and retry_after (BE-25, BE-28, T-104)', () => {
+  it('reads the throttle envelope { success:false, code:rate_limited, retry_after }', () => {
+    const error = toApiError(
+      axiosErrorWith(
+        429,
+        { success: false, message: 'Too many requests. Please try again later.', code: 'rate_limited', retry_after: 37 },
+        { 'retry-after': '37' },
+      ),
+    );
+    expect(error).toMatchObject({ kind: 'rate_limited', status: 429, code: 'rate_limited', retryAfter: 37 });
+  });
+
+  it('reads the OTP refusal code (code_exhausted) next to errors and retry_after', () => {
+    const error = toApiError(
+      axiosErrorWith(429, {
+        success: false,
+        message: 'Too many incorrect attempts. Please request a new code.',
+        code: 'code_exhausted',
+        errors: { otp_code: ['Too many incorrect attempts. Please request a new code.'] },
+        retry_after: 45,
+      }),
+    );
+    expect(error).toMatchObject({ code: 'code_exhausted', retryAfter: 45, fieldErrors: { otp_code: [expect.any(String)] } });
+    expect(toThunkRejection(error, 'x')).toMatchObject({ code: 'code_exhausted', retryAfter: 45 });
+  });
+
+  it('reads the 403 ACCOUNT_* code', () => {
+    const error = toApiError(
+      axiosErrorWith(403, { success: false, message: 'Your account is suspended.', code: 'ACCOUNT_SUSPENDED', data: { status: 'suspended' } }),
+    );
+    expect(error).toMatchObject({ kind: 'forbidden', code: 'ACCOUNT_SUSPENDED' });
+  });
+
+  it('shows the server message for 503 sms_unavailable and busy', () => {
+    const sms = toApiError(
+      axiosErrorWith(503, {
+        success: false,
+        message: 'Phone verification is temporarily unavailable. Please try again later.',
+        code: 'sms_unavailable',
+        errors: { phone: ['Phone verification is temporarily unavailable. Please try again later.'] },
+        retry_after: 3600,
+      }),
+    );
+    expect(sms).toMatchObject({
+      kind: 'server',
+      code: 'sms_unavailable',
+      retryAfter: 3600,
+      message: 'Phone verification is temporarily unavailable. Please try again later.',
+    });
+    const busy = toApiError(
+      axiosErrorWith(503, { success: false, message: 'The server is busy. Please try again in a few seconds.', code: 'busy', retry_after: 5 }),
+    );
+    expect(busy.message).toBe('The server is busy. Please try again in a few seconds.');
+  });
+
+  it('still hides the text of any other 5xx, whatever its code', () => {
+    const error = toApiError(axiosErrorWith(503, { message: 'SQLSTATE[HY000] connection refused', code: 'db_down' }));
+    expect(error.message).toBe('Something went wrong on our side. Please try again.');
+  });
+});
+
 describe('unwrap', () => {
   it('returns data', () => {
     expect(unwrap({ success: true, data: { id: 1 } })).toEqual({ id: 1 });

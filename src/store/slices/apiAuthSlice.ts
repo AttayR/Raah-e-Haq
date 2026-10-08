@@ -7,7 +7,6 @@ import {
   verifyOtp,
   forgotPassword,
   resetPassword,
-  refreshToken,
   getUserProfile,
   updateUserProfile,
   initializeAuth,
@@ -110,6 +109,10 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
+        // Logged out while it ran (T-104): logout already reset this slice.
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         state.isAuthenticated = false;
@@ -167,6 +170,9 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(verifyOtp.rejected, (state, action) => {
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
         state.isOtpVerified = false;
@@ -210,33 +216,18 @@ const authSlice = createSlice({
       })
       .addCase(resetApp, () => ({ ...initialState, isInitialized: true }));
 
-    // Refresh Token
-    builder
-      .addCase(refreshToken.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(refreshToken.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.token = action.payload;
-        state.error = null;
-      })
-      .addCase(refreshToken.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
-        // If refresh fails, logout user
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-      });
-
     // Get User Profile
     builder
       .addCase(getUserProfile.pending, (state) => {
+        // Signed out: the result will be dropped, so the signed-out screens never show a spinner.
+        if (!state.isAuthenticated) {
+          return;
+        }
         state.status = 'loading';
         state.error = null;
       })
       .addCase(getUserProfile.fulfilled, (state, action) => {
-        // Never re-write the user after logout (T-103; T-104 adds the full session epoch).
+        // Never re-write the user after logout (the thunk also checks the session epoch).
         if (!state.isAuthenticated) {
           return;
         }
@@ -260,11 +251,17 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
+        if (!state.isAuthenticated) {
+          return;
+        }
         state.status = 'succeeded';
         state.user = action.payload;
         state.error = null;
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });

@@ -61,11 +61,23 @@ const DEFAULT_MESSAGES: Record<ApiErrorKind, string> = {
 };
 
 /**
- * Server text is shown only for kinds where the backend writes user-facing messages.
- * 5xx and unclassified bodies can carry exception text (SQL, PII), so they always get our copy.
+ * 5xx refusals whose message the backend writes for users (BE-28): the SMS budget is spent
+ * (`sms_unavailable`) or a lock timed out (`busy`). Both carry `retry_after`.
  */
-const displayMessage = (kind: ApiErrorKind, serverMessage?: string): string =>
-  kind === 'server' || kind === 'unknown' || !serverMessage ? DEFAULT_MESSAGES[kind] : serverMessage;
+const USER_FACING_SERVER_CODES: ReadonlySet<string> = new Set(['sms_unavailable', 'busy']);
+
+/**
+ * Server text is shown only for kinds where the backend writes user-facing messages.
+ * 5xx and unclassified bodies can carry exception text (SQL, PII), so they always get our
+ * copy, except the known user-facing 503 codes above.
+ */
+const displayMessage = (kind: ApiErrorKind, serverMessage?: string, code?: string): string => {
+  if (!serverMessage) return DEFAULT_MESSAGES[kind];
+  if (kind === 'server') {
+    return code && USER_FACING_SERVER_CODES.has(code) ? serverMessage : DEFAULT_MESSAGES[kind];
+  }
+  return kind === 'unknown' ? DEFAULT_MESSAGES[kind] : serverMessage;
+};
 
 const kindForStatus = (status: number): ApiErrorKind => {
   if (status === 400) return 'bad_request';
@@ -113,9 +125,15 @@ const fromBody = (body: unknown) => {
     ...toFieldErrors(nested?.details),
     ...toFieldErrors(body.errors),
   };
+  // Top-level `code` (BE-25 403 ACCOUNT_*, BE-28 OTP refusals and the throttle envelope
+  // {success:false, code:'rate_limited', retry_after}) or the nested `error.code`.
+  const code =
+    (typeof body.code === 'string' && body.code) ||
+    (nested && typeof nested.code === 'string' && nested.code) ||
+    undefined;
   return {
     message,
-    code: nested && typeof nested.code === 'string' ? nested.code : undefined,
+    code,
     fieldErrors,
     retryAfter: toPositiveNumber(body.retry_after),
   };
@@ -139,7 +157,7 @@ export const toApiError = (error: unknown): ApiError => {
       return new ApiError({
         kind,
         status,
-        message: displayMessage(kind, parsed.message),
+        message: displayMessage(kind, parsed.message, parsed.code),
         code: parsed.code,
         fieldErrors,
         retryAfter: parsed.retryAfter ?? headerRetry,
@@ -181,6 +199,8 @@ export interface ThunkRejection {
   message: string;
   kind: ApiErrorKind;
   status?: number;
+  /** Machine-readable server code (e.g. `otp_cooldown`, `code_exhausted`, `ACCOUNT_SUSPENDED`). */
+  code?: string;
   fieldErrors: FieldErrors;
   retryAfter?: number;
 }
@@ -193,6 +213,7 @@ export const toThunkRejection = (error: unknown, fallbackMessage: string): Thunk
     message: fromApi ? apiError.message || fallbackMessage : fallbackMessage,
     kind: apiError.kind,
     status: apiError.status,
+    code: apiError.code,
     fieldErrors: apiError.fieldErrors,
     retryAfter: apiError.retryAfter,
   };

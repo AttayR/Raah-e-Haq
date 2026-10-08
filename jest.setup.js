@@ -14,6 +14,40 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
+// Keychain/Keystore (react-native-keychain ships no Jest mock): an in-memory store per service.
+jest.mock('react-native-keychain', () => {
+  const items = new Map();
+  const serviceOf = options => (options && options.service) || 'default';
+  return {
+    __esModule: true,
+    ACCESSIBLE: {
+      WHEN_UNLOCKED: 'AccessibleWhenUnlocked',
+      AFTER_FIRST_UNLOCK: 'AccessibleAfterFirstUnlock',
+      WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'AccessibleWhenUnlockedThisDeviceOnly',
+      AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AccessibleAfterFirstUnlockThisDeviceOnly',
+    },
+    setGenericPassword: jest.fn((username, password, options) => {
+      items.set(serviceOf(options), {username, password, service: serviceOf(options), storage: 'mock'});
+      return Promise.resolve({service: serviceOf(options), storage: 'mock'});
+    }),
+    getGenericPassword: jest.fn(options => Promise.resolve(items.get(serviceOf(options)) || false)),
+    hasGenericPassword: jest.fn(options => Promise.resolve(items.has(serviceOf(options)))),
+    resetGenericPassword: jest.fn(options => Promise.resolve(items.delete(serviceOf(options)))),
+  };
+});
+
+// redux-persist: its rehydrate timeout (5 s by default) is a bare setTimeout that is never
+// cleared, so any test that imports src/store kept the worker alive ("A worker process has
+// failed to exit gracefully"). Tests rehydrate from the in-memory AsyncStorage mock, so the
+// timeout is turned off here only; the app keeps the default.
+jest.mock('redux-persist', () => {
+  const actual = jest.requireActual('redux-persist');
+  return {
+    ...actual,
+    persistReducer: (config, reducer) => actual.persistReducer({...config, timeout: 0}, reducer),
+  };
+});
+
 // Safe area (official mock)
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,

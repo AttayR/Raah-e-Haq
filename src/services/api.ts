@@ -1,8 +1,16 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, CancelTokenSource } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  CancelTokenSource,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import { env } from '../config/env';
+import { authStorage } from './authStorage';
+import { currentSessionEpoch, isStaleSession } from '../store/sessionEpoch';
 import { logger } from '../core/logging/logger';
 import { toApiError } from '../core/api/errors';
+import { logApiFailure } from '../core/api/logApiFailure';
 import type { ApiResponse } from '../core/api/types';
 
 export type { ApiResponse } from '../core/api/types';
@@ -58,26 +66,116 @@ const originOf = (url: string): string | null => {
 
 const API_ORIGIN = originOf(API_BASE_URL);
 
-/** The bearer token is sent only to our API: relative URLs, or absolute ones on env.API_URL's origin. */
-export const isApiUrl = (url?: string): boolean => {
-  if (!url) return true;
-  const origin = originOf(url);
-  return origin === null || (API_ORIGIN !== null && origin === API_ORIGIN);
+const HAS_SCHEME = /^[a-z][a-z\d+\-.]*:/i;
+
+/** A URL we cannot parse reliably (backslashes, a scheme without "//"): never gets the token. */
+const isUnparseableUrl = (url?: string): boolean =>
+  !!url && (url.includes('\\') || (HAS_SCHEME.test(url) && originOf(url) === null));
+
+/**
+ * The bearer token is sent only when the request's resolved URL (baseURL applied, so a
+ * per-request baseURL override counts, SEC-21) is exactly on env.API_URL's origin. Anything
+ * unparseable fails closed.
+ */
+export const isTokenTarget = (config: InternalAxiosRequestConfig): boolean => {
+  if (API_ORIGIN === null || isUnparseableUrl(config.url) || isUnparseableUrl(config.baseURL)) {
+    return false;
+  }
+  const resolved = apiClient.getUri(config);
+  if (isUnparseableUrl(resolved)) {
+    return false;
+  }
+  const origin = originOf(resolved);
+  return origin !== null && origin === API_ORIGIN;
 };
 
-// Request interceptor to add auth token
+declare module 'axios' {
+  interface InternalAxiosRequestConfig {
+    /** Session epoch in which the bearer token was attached (T-104); unset when none was sent. */
+    authSessionEpoch?: number;
+  }
+}
+
+/**
+ * A 401 from these means "wrong password/code" or "already signed out", never "this session
+ * expired", so it must not trigger the session-expired logout (and logout's own 401 must not
+ * loop back into it).
+ */
+const NO_SESSION_EXPIRY_PATHS = [
+  '/auth/login',
+  '/auth/verify-otp',
+  '/auth/send-otp',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/logout',
+  '/auth/logout-all',
+];
+
+const isNoSessionExpiryPath = (url?: string): boolean => {
+  const path = (url ?? '').split(/[?#]/)[0].replace(/\/+$/, '');
+  return NO_SESSION_EXPIRY_PATHS.some(p => path.endsWith(p));
+};
+
+/** Returns true when it actually started ending the session (a logout). */
+type UnauthorizedHandler = () => boolean;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+/**
+ * Epoch whose expiry already started a logout: parallel 401s of one session trigger one
+ * logout. Set only when the handler started one, and every session start/end bumps the
+ * epoch, so a stale value can never swallow a later session's 401.
+ */
+let reportedExpiredEpoch: number | null = null;
+
+/**
+ * Registered by the store: what to do when the server rejects the current session's token
+ * (it dispatches the unified logout). Injected so this module never imports the store.
+ */
+export const setUnauthorizedHandler = (handler: UnauthorizedHandler | null): void => {
+  unauthorizedHandler = handler;
+};
+
+/** Test-only: forget the handler and the single-flight latch between test cases. */
+export const __resetUnauthorizedStateForTests = (): void => {
+  unauthorizedHandler = null;
+  reportedExpiredEpoch = null;
+};
+
+/**
+ * BE-25 contract: Sanctum tokens have no refresh token and an expired or revoked token gets
+ * 401. So a 401 on a request that carried the current session's token ends the session
+ * (single flight); there is no refresh-and-retry after a 401.
+ */
+const reportUnauthorized = (config?: InternalAxiosRequestConfig): void => {
+  const epoch = config?.authSessionEpoch;
+  if (epoch === undefined || isStaleSession(epoch) || isNoSessionExpiryPath(config?.url)) {
+    return;
+  }
+  if (reportedExpiredEpoch === epoch) {
+    return;
+  }
+  if (unauthorizedHandler?.() === true) {
+    reportedExpiredEpoch = epoch;
+  }
+};
+
+// Request interceptor: adds the bearer token (from the in-memory copy of the Keychain entry)
+// only to requests whose resolved URL is on our API origin (isTokenTarget, SEC-21).
 apiClient.interceptors.request.use(
   async (config) => {
-    if (!isApiUrl(config.url)) {
+    if (!isTokenTarget(config)) {
       return config;
     }
+    const epoch = currentSessionEpoch();
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await authStorage.getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        config.authSessionEpoch = epoch;
       }
     } catch (error) {
-      logger.debug('Error getting token from storage:', error);
+      logger.warn('Could not read the session token', { name: error instanceof Error ? error.name : typeof error });
     }
     return config;
   },
@@ -86,48 +184,21 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor: 401 refresh, then every failure is normalised to ApiError
-// (src/core/api/errors.ts) so callers never parse axios errors themselves.
+// Response interceptor: every failure is normalised to ApiError (src/core/api/errors.ts) so
+// callers never parse axios errors themselves; a 401 of the current session ends it.
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
   },
   async (error) => {
-    // Handle cancelled requests (don't process them)
     if (axios.isCancel(error)) {
-      logger.debug('Request cancelled');
       return Promise.reject(toApiError(error));
     }
-
-    const originalRequest = error?.config;
-
-    // Handle 401 errors (unauthorized)
-    if (error?.response?.status === 401 && originalRequest && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        // Try to refresh token
-        const refreshToken = await AsyncStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-
-          const { token } = response.data.data;
-          await AsyncStorage.setItem('auth_token', token);
-          
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return apiClient(originalRequest);
-        }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        await AsyncStorage.multiRemove(['auth_token', 'refresh_token', 'user_data']);
-        // You can dispatch a logout action here if using Redux
-      }
+    const apiError = toApiError(error);
+    if (apiError.status === 401 && axios.isAxiosError(error)) {
+      reportUnauthorized(error.config);
     }
-
-    return Promise.reject(toApiError(error));
+    return Promise.reject(apiError);
   }
 );
 
@@ -154,6 +225,8 @@ export interface AuthResponse {
   user: User;
   token: string;
   token_type: string;
+  /** BE-25: ISO 8601 idle expiry of the token (slides forward on use); null if none. */
+  expires_at?: string | null;
 }
 
 /** POST /auth/register: drivers get no token until approved (token and token_type are null). */
@@ -161,6 +234,7 @@ export interface RegisterResponse {
   user: User;
   token: string | null;
   token_type: string | null;
+  expires_at?: string | null;
 }
 
 /** POST /auth/send-otp (BE-16): otp_code is null outside APP_ENV=local; expires_in is seconds. */
@@ -256,12 +330,7 @@ class ApiService {
       return response.data;
     } catch (err: unknown) {
       const error = toApiError(err);
-      logger.error('💥 API Service - Registration error:', error.message);
-      logger.error('🔍 Error details:', {
-        kind: error.kind,
-        status: error.status,
-        fields: Object.keys(error.fieldErrors),
-      });
+      logApiFailure('ApiService#register failed', error);
       throw error;
     }
   }
@@ -363,12 +432,7 @@ class ApiService {
       return response.data;
     } catch (err: unknown) {
       const error = toApiError(err);
-      logger.error('💥 API Service - Registration with images error:', error.message);
-      logger.error('🔍 Error details:', {
-        kind: error.kind,
-        status: error.status,
-        fields: Object.keys(error.fieldErrors),
-      });
+      logApiFailure('ApiService#registerWithImages failed', error);
       throw error;
     }
   }
@@ -394,12 +458,7 @@ class ApiService {
       return response.data;
     } catch (err: unknown) {
       const error = toApiError(err);
-      logger.error('💥 API Service - OTP send error:', error.message);
-      logger.error('🔍 Error details:', {
-        kind: error.kind,
-        status: error.status,
-        fields: Object.keys(error.fieldErrors),
-      });
+      logApiFailure('ApiService#sendOtp failed', error);
       throw error;
     }
   }
@@ -428,12 +487,7 @@ class ApiService {
       return response.data;
     } catch (err: unknown) {
       const error = toApiError(err);
-      logger.error('💥 API Service - OTP verification error:', error.message);
-      logger.error('🔍 Error details:', {
-        kind: error.kind,
-        status: error.status,
-        fields: Object.keys(error.fieldErrors),
-      });
+      logApiFailure('ApiService#verifyOtp failed', error);
       throw error;
     }
   }
@@ -455,11 +509,6 @@ class ApiService {
 
   async logoutAll(config?: AxiosRequestConfig): Promise<ApiResponse> {
     const response = await apiClient.post('/auth/logout-all', undefined, config);
-    return response.data;
-  }
-
-  async refreshToken(): Promise<ApiResponse<{ token: string; token_type: string }>> {
-    const response = await apiClient.post('/auth/refresh');
     return response.data;
   }
 
@@ -511,34 +560,18 @@ class ApiService {
     }
   }
 
-  // Utility Methods
-  async setAuthToken(token: string | null | undefined): Promise<void> {
-    if (token != null && token !== '') {
-      await AsyncStorage.setItem('auth_token', token);
-    } else {
-      await AsyncStorage.removeItem('auth_token');
-    }
-  }
-
+  // Session storage (src/services/authStorage.ts): the token is in the Keychain/Keystore,
+  // the cached user in AsyncStorage without sensitive fields (T-104).
   async getAuthToken(): Promise<string | null> {
-    return await AsyncStorage.getItem('auth_token');
+    return authStorage.getToken();
   }
 
   async clearAuthData(): Promise<void> {
-    await AsyncStorage.multiRemove(['auth_token', 'refresh_token', 'user_data']);
-  }
-
-  async setUserData(user: User): Promise<void> {
-    await AsyncStorage.setItem('user_data', JSON.stringify(user));
+    await authStorage.clear();
   }
 
   async getUserData(): Promise<User | null> {
-    try {
-      const userData = await AsyncStorage.getItem('user_data');
-      return userData ? JSON.parse(userData) : null;
-    } catch (error) {
-      return null;
-    }
+    return authStorage.getUser();
   }
 
   // Generic HTTP methods: return the response body (the API envelope). Use unwrap() for `data`.

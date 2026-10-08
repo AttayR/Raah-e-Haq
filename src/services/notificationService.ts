@@ -20,6 +20,12 @@ class NotificationService {
   private unreadCount: number = 0;
   private listeners: Set<(count: number) => void> = new Set();
 
+  /** Back to the signed-out state (called by logout, T-104): no count or listeners carry over. */
+  reset(): void {
+    this.unreadCount = 0;
+    this.listeners.clear();
+  }
+
   // Get user notifications with pagination
   async getNotifications(page: number = 1, perPage: number = 20): Promise<{
     data: NotificationResource[];
