@@ -6,7 +6,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import auth from '@react-native-firebase/auth';
 import * as Keychain from 'react-native-keychain';
 import { apiClient } from '../../src/services/api';
 import { authStorage } from '../../src/services/authStorage';
@@ -16,8 +15,6 @@ import notificationService from '../../src/services/notificationService';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { loginUser } from '../../src/store/thunks/apiThunks';
-import { setPhoneNumber, setVerificationId } from '../../src/store/slices/authSlice';
-import { setRole, setDisplayName } from '../../src/store/slices/userSlice';
 import { setCurrentTrip } from '../../src/store/slices/tripSlice';
 import { setMode, setIsRequesting } from '../../src/store/slices/rideSlice';
 import type { User } from '../../src/services/api';
@@ -62,15 +59,11 @@ const initialRoot = () => rootReducer(undefined, { type: '@@INIT' });
 /** Puts something non-initial in every slice and in AsyncStorage. */
 const signIn = async (store: ReturnType<typeof makeStore>['store']) => {
   store.dispatch(
-    loginUser.fulfilled({ user, token: TOKEN, tokenType: 'Bearer' }, 'req-1', {
+    loginUser.fulfilled({ user }, 'req-1', {
       email: user.email,
       password: 'not-a-real-password',
     }),
   );
-  store.dispatch(setPhoneNumber('+920000000001'));
-  store.dispatch(setVerificationId('verification-1'));
-  store.dispatch(setRole('driver'));
-  store.dispatch(setDisplayName('Test Driver'));
   store.dispatch(setCurrentTrip({ id: 'trip-1', status: 'ongoing' }));
   store.dispatch(setMode('bidding'));
   store.dispatch(setIsRequesting(true));
@@ -88,14 +81,12 @@ const expectFullySignedOut = async (
 ) => {
   const initial = initialRoot();
   const state = store.getState();
-  expect(state.auth).toEqual(initial.auth);
-  expect(state.user).toEqual(initial.user);
   expect(state.trip).toEqual(initial.trip);
   expect(state.ride).toEqual(initial.ride);
   // apiAuth is the initial state too, except the app stays initialised (no bootstrap rerun).
   expect(state.apiAuth).toEqual({ ...initial.apiAuth, isInitialized: true });
   expect(state.apiAuth.isAuthenticated).toBe(false);
-  expect(state.apiAuth.token).toBeNull();
+  expect(state.apiAuth).not.toHaveProperty('token');
 
   const stored = await AsyncStorage.multiGet([
     'auth_token',
@@ -177,21 +168,19 @@ describe('logout thunk (T-102)', () => {
     await expectFullySignedOut(store, extra);
   });
 
-  it('signs out of Firebase when a Firebase user is still present', async () => {
+  it('never touches Firebase Auth and logs no failed cleanup step on a normal sign-out (T-107)', async () => {
     const { store, extra } = makeStore();
     await signIn(store);
     mock.onPost('/auth/logout').reply(200, { success: true });
-    const firebaseAuth = auth();
-    Object.defineProperty(firebaseAuth, 'currentUser', {
-      value: { uid: 'firebase-uid' },
-      configurable: true,
-    });
-
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       await store.dispatch(logout());
-      expect(firebaseAuth.signOut).toHaveBeenCalled();
+      const warnings = warn.mock.calls.map((call) => String(call[0]));
+      expect(warnings.filter((w) => w.includes('failed; continuing'))).toEqual([]);
+      // The namespaced RNFirebase API printed a deprecation console.warn on every logout.
+      expect(warnings.filter((w) => w.includes('namespaced API'))).toEqual([]);
     } finally {
-      Object.defineProperty(firebaseAuth, 'currentUser', { value: null, configurable: true });
+      warn.mockRestore();
     }
     await expectFullySignedOut(store, extra);
   });

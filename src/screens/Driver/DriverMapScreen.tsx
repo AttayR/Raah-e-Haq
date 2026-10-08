@@ -32,17 +32,9 @@ const DriverMapScreen = () => {
   const { theme } = useAppTheme();
   const mapRef = useRef<any>(null);
   
-  // Safe Redux state access with fallbacks
-  const authState = useAppSelector(state => state?.auth);
-  const userProfile = authState?.userProfile || null;
-  const uid = authState?.uid || null;
-  
-  // Debug logging
-  logger.debug('DriverMapScreen - Auth state:', { 
-    hasAuthState: !!authState, 
-    hasUserProfile: !!userProfile, 
-    hasUid: !!uid 
-  });
+  // The signed-in driver comes from the API session (apiAuth); the Firebase uid is gone (INF-10).
+  const userId = useAppSelector(state => state.apiAuth.user?.id ?? null);
+  const uid = userId != null ? String(userId) : null;
   
   // Use driver notifications
   const {
@@ -64,7 +56,6 @@ const DriverMapScreen = () => {
     acceptRide,
     startRide,
     completeRide,
-    updateDriverLocation,
     refreshRideHistory,
   } = useRide(uid ? parseInt(uid) : undefined, 'driver');
   
@@ -130,27 +121,10 @@ const DriverMapScreen = () => {
     }
   }, [currentLocation]);
 
-  // Update driver location when online
-  useEffect(() => {
-    if (isOnline && currentLocation && uid) {
-      const interval = setInterval(() => {
-        updateDriverLocation(uid, currentLocation);
-      }, 5000); // Update every 5 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [isOnline, currentLocation, uid]);
-
-  // Listen to ride requests when online
-  useEffect(() => {
-    if (isOnline && uid) {
-      const unsubscribe = listenToRideRequests(uid, (ride) => {
-        setIncomingRide(ride);
-      });
-
-      return () => unsubscribe();
-    }
-  }, [isOnline, uid]);
+  // Location posting, ride-request listening and the online/offline call were Firebase-era
+  // code (undefined helpers, wrong signatures) that never ran while `uid` came from the
+  // Firebase slice (always null). They are not wired to the API driver id here; T-401 builds
+  // them on POST/GET /driver/status (BE-06).
 
   // Subscribe to driver notifications when online
   useEffect(() => {
@@ -177,9 +151,6 @@ const DriverMapScreen = () => {
     }
 
     setIsOnline(!isOnline);
-    if (uid) {
-      setDriverStatus(uid, !isOnline);
-    }
   };
 
   const handleAcceptRide = async (rideId: number) => {

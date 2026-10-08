@@ -1,13 +1,14 @@
 // src/store/index.ts
 import { configureStore } from '@reduxjs/toolkit';
-import { persistStore, persistReducer } from 'redux-persist';
+import { createMigrate, persistStore, persistReducer } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   stripApiAuthSecretsTransform,
   stripOtpTransform,
   clearApiAuthTransientTransform,
-  clearFirebaseAuthTransientTransform,
+  persistMigrations,
+  PERSIST_VERSION,
 } from './persistTransforms';
 import { rootReducer } from './rootReducer';
 import { accountRefused, sessionExpired, type SessionThunkExtra } from './thunks/sessionThunks';
@@ -18,11 +19,15 @@ export { rootReducer } from './rootReducer';
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['auth', 'apiAuth', 'user'],
+  // Only the API session (user and flags, no token, no OTP, no transient status/error).
+  // trip and ride are per-session UI state and start empty on every launch.
+  whitelist: ['apiAuth'],
+  version: PERSIST_VERSION,
+  // Drops the removed Firebase `auth` and `user` slices an older build persisted (T-107).
+  migrate: createMigrate(persistMigrations, { debug: false }),
   // Per-key transforms (redux-persist v6 calls them once per whitelisted slice key).
   transforms: [
     clearApiAuthTransientTransform,
-    clearFirebaseAuthTransientTransform,
     stripOtpTransform,
     stripApiAuthSecretsTransform,
   ],

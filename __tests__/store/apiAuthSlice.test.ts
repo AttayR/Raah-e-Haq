@@ -33,14 +33,14 @@ describe('apiAuthSlice', () => {
     const state = initial();
     expect(state.isAuthenticated).toBe(false);
     expect(state.user).toBeNull();
-    expect(state.token).toBeNull();
+    expect(state).not.toHaveProperty('token');
     expect(state.status).toBe('idle');
     expect(state.isInitialized).toBe(false);
   });
 
-  it('stores user and token when login succeeds', () => {
+  it('stores the user, never the token, when login succeeds (T-107)', () => {
     const action = loginUser.fulfilled(
-      { user, token: 'token-123', tokenType: 'Bearer' },
+      { user },
       'req-1',
       credentials,
     );
@@ -48,7 +48,9 @@ describe('apiAuthSlice', () => {
     expect(state.status).toBe('succeeded');
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).toEqual(user);
-    expect(state.token).toBe('token-123');
+    // The token lives only in the Keychain (services/authStorage).
+    expect(state).not.toHaveProperty('token');
+    expect(JSON.stringify(state)).not.toContain('token-123');
     expect(state.error).toBeNull();
   });
 
@@ -70,7 +72,7 @@ describe('apiAuthSlice', () => {
   it('shows loading while logging out, then resetApp signs out and keeps the app initialised', () => {
     const signedIn = reducer(
       initial(),
-      loginUser.fulfilled({ user, token: 'token-123', tokenType: 'Bearer' }, 'req-3', credentials),
+      loginUser.fulfilled({ user }, 'req-3', credentials),
     );
     const loggingOut = reducer(signedIn, logout.pending('req-4', undefined));
     expect(loggingOut.status).toBe('loading');
@@ -83,7 +85,7 @@ describe('apiAuthSlice', () => {
   it('resetAuthState returns to signed out but keeps the app initialised', () => {
     const signedIn = reducer(
       initial(),
-      loginUser.fulfilled({ user, token: 'token-123', tokenType: 'Bearer' }, 'req-5', credentials),
+      loginUser.fulfilled({ user }, 'req-5', credentials),
     );
     const state = reducer(signedIn, resetAuthState());
     expect(state.isAuthenticated).toBe(false);

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { refreshSessionThunk } from '../../store/thunks/authThunks';
+import { getUserProfile } from '../../store/thunks/apiThunks';
 import { useLogout } from '../../hooks/useLogout';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
@@ -128,9 +128,8 @@ export default function PassengerHomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Refresh session/token
-      await dispatch(refreshSessionThunk());
-      // User data will be automatically updated from the API
+      // Re-read the signed-in user from GET /auth/profile (the old Firebase session refresh is gone).
+      await dispatch(getUserProfile());
     } finally {
       setRefreshing(false);
     }

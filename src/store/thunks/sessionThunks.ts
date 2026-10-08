@@ -1,7 +1,5 @@
 import { createAsyncThunk, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
-import auth from '@react-native-firebase/auth';
 import { apiService, cancelAllRequests } from '../../services/api';
-import { clearAuthSession } from '../../services/firebaseAuth';
 import webSocketService from '../../services/webSocketService';
 import locationTrackingService from '../../services/locationTrackingService';
 import notificationService from '../../services/notificationService';
@@ -38,9 +36,12 @@ const step = async (name: string, fn: () => unknown): Promise<void> => {
  * The one logout (AUTH-09). Always ends signed out, even offline or on a 401:
  * 1. ask the server to revoke the token (best effort, needs the token, so it goes first)
  * 2. stop sockets, location tracking and in-flight requests of this user
- * 3. sign out of Firebase if a Firebase user is still present
- * 4. clear the token, user and cached per-user data in AsyncStorage
- * 5. reset every slice (root RESET) and purge redux-persist
+ * 3. clear the token (Keychain), the cached user, any legacy session keys and cached per-user
+ *    data in AsyncStorage
+ * 4. reset every slice (root RESET) and purge redux-persist
+ * There is no Firebase sign-out step: Firebase Auth is not used (T-107). The old step called
+ * the namespaced `auth()` API, whose deprecation console.warn raised the yellow dev LogBox
+ * after every sign-out.
  * AuthFlow then renders the auth stack because apiAuth.isAuthenticated is false.
  * It never rejects.
  */
@@ -62,13 +63,6 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
       await step('reset location tracking', () => locationTrackingService.reset());
       await step('reset notifications', () => notificationService.reset());
       await step('cancel requests', () => cancelAllRequests());
-      await step('firebase sign out', async () => {
-        await clearAuthSession();
-        const firebaseAuth = auth();
-        if (firebaseAuth.currentUser) {
-          await firebaseAuth.signOut();
-        }
-      });
       await step('clear auth storage', () => apiService.clearAuthData());
       await step('clear cached notifications', () => notificationService.clearStoredNotifications());
     } finally {

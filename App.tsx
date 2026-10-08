@@ -1,5 +1,5 @@
 import 'react-native-reanimated';
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   NavigationContainer,
   DefaultTheme as NavLight,
@@ -12,7 +12,6 @@ import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
 import NotificationManager from './src/components/NotificationManager';
-import { configureGoogleSignIn } from './src/services/googleSignIn';
 
 function ThemedNav() {
   const { theme } = useAppTheme();
@@ -54,11 +53,6 @@ function ThemedNav() {
 }
 
 export default function App() {
-  useEffect(() => {
-    // Configure Google Sign-In when app starts
-    configureGoogleSignIn();
-  }, []);
-
   return (
     <SafeAreaProvider>
       <ReduxProvider>

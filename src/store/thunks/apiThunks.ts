@@ -36,10 +36,12 @@ export const staleSessionRejection = (): ThunkRejection => ({
 export const isStaleSessionRejection = (payload: ThunkRejection | undefined): boolean =>
   payload?.kind === 'cancelled' && payload.message === STALE_SESSION_MESSAGE;
 
+/**
+ * A signed-in result. The bearer token is not part of it: it lives only in the Keychain
+ * (services/authStorage), never in Redux or an action payload (T-104, T-107).
+ */
 export interface AuthSession {
   user: User;
-  token: string;
-  tokenType: string;
 }
 
 /**
@@ -99,7 +101,7 @@ export const loginUser = createAsyncThunk<AuthSession, LoginRequest, ThunkConfig
       }
       logger.debug('✅ Redux Thunk - Login successful');
 
-      return { user, token: data.token, tokenType: data.token_type };
+      return { user };
     } catch (error) {
       logApiFailure('loginUser failed', error);
       return rejectWithValue(toThunkRejection(error, 'Login failed'));
@@ -123,7 +125,7 @@ export const registerUser = createAsyncThunk<User, RegisterRequest, ThunkConfig>
 );
 
 export const registerUserWithImages = createAsyncThunk<
-  { user: User; token: string | null; tokenType: string | null },
+  AuthSession,
   RegisterRequest & {
     passenger_cnic_front_image?: string;
     passenger_cnic_back_image?: string;
@@ -148,7 +150,7 @@ export const registerUserWithImages = createAsyncThunk<
       }
       logger.debug('✅ Redux Thunk - Registration with images successful');
 
-      return { user, token: data.token, tokenType: data.token_type };
+      return { user };
     } catch (error) {
       logApiFailure('registerUserWithImages failed', error);
       return rejectWithValue(toThunkRejection(error, 'Registration failed'));
@@ -188,7 +190,7 @@ export const verifyOtp = createAsyncThunk<AuthSession, VerifyOtpRequest, ThunkCo
       }
       logger.debug('✅ Redux Thunk - OTP verification successful');
 
-      return { user, token: data.token, tokenType: data.token_type };
+      return { user };
     } catch (error) {
       logApiFailure('verifyOtp failed', error);
       return rejectWithValue(toThunkRejection(error, 'OTP verification failed'));
@@ -286,7 +288,7 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
  * reducer leaves the signed-out state alone.
  */
 export const initializeAuth = createAsyncThunk<
-  { user: User; token: string; statusUnverified?: boolean } | null,
+  { user: User; statusUnverified?: boolean } | null,
   void,
   ThunkConfig & { state: { apiAuth: { user: User | null } } }
 >(
@@ -303,7 +305,7 @@ export const initializeAuth = createAsyncThunk<
       const storedUser =
         (await apiService.getUserData()) ?? normalizeUser(getState().apiAuth.user) ?? null;
 
-      let session: { user: User; token: string } | null;
+      let session: AuthSession | null;
       let serverAnswered = false;
       try {
         const body = await apiService.getProfile();
@@ -312,7 +314,7 @@ export const initializeAuth = createAsyncThunk<
         if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
           return rejectWithValue(staleSessionRejection());
         }
-        session = { user, token };
+        session = { user };
       } catch (error) {
         if (isStaleSession(startedIn)) {
           return rejectWithValue(staleSessionRejection());
@@ -331,7 +333,7 @@ export const initializeAuth = createAsyncThunk<
           if (!(await authStorage.saveUser(refused, startedIn)) || isStaleSession(startedIn)) {
             return rejectWithValue(staleSessionRejection());
           }
-          return { user: refused, token };
+          return { user: refused };
         }
         if (serverAnswered) {
           // The server answered 2xx but not with a profile (bad deploy, proxy or captive
@@ -345,7 +347,7 @@ export const initializeAuth = createAsyncThunk<
           // status never wins over an unconfirmed one in this launch.
           logger.warn('initializeAuth - invalid profile response; routing to account status');
           return storedUser
-            ? { user: { ...storedUser, status: UNKNOWN_STATUS }, token, statusUnverified: true }
+            ? { user: { ...storedUser, status: UNKNOWN_STATUS }, statusUnverified: true }
             : null;
         }
         logger.warn('initializeAuth - profile check failed; keeping the stored session', {
@@ -354,7 +356,7 @@ export const initializeAuth = createAsyncThunk<
         });
         // Without a cached user there is nothing to route on; stay signed out but keep the
         // token so the next launch can try again.
-        session = storedUser ? { user: storedUser, token } : null;
+        session = storedUser ? { user: storedUser } : null;
       }
       return session;
     } catch (error) {

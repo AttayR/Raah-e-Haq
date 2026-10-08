@@ -42,7 +42,7 @@ const user: User = {
 test('a rehydrated, not yet initialised session renders only the splash', () => {
   const store = configureStore({ reducer: rootReducer });
   store.dispatch(
-    loginUser.fulfilled({ user, token: 't', tokenType: 'Bearer' }, 'req', {
+    loginUser.fulfilled({ user }, 'req', {
       email: user.email,
       password: 'not-a-real-password',
     }),
@@ -68,7 +68,7 @@ const renderSignedInAs = (raw: Record<string, unknown>) => {
   if (!normalised) {
     throw new Error('test payload is not a user');
   }
-  store.dispatch(initializeAuth.fulfilled({ user: normalised, token: 't' }, 'req'));
+  store.dispatch(initializeAuth.fulfilled({ user: normalised }, 'req'));
   return render(
     <Provider store={store}>
       <AuthFlow />

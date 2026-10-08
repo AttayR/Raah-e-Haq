@@ -653,7 +653,7 @@ class RideService {
       logger.debug('✅ Marking notification as read:', notificationId);
       return unwrap(await apiService.post<NotificationResource>(`${this.notificationsUrl}/${notificationId}/read`));
     } catch (error) {
-      logger.error('❌ Failed to mark notification as read:', error);
+      logApiFailure('RideService#markNotificationAsRead failed', error);
       throw error;
     }
   }
@@ -664,7 +664,7 @@ class RideService {
       logger.debug('✅ Marking all notifications as read');
       await apiService.post(`${this.notificationsUrl}/read-all`);
     } catch (error) {
-      logger.error('❌ Failed to mark all notifications as read:', error);
+      logApiFailure('RideService#markAllNotificationsAsRead failed', error);
       throw error;
     }
   }
@@ -675,7 +675,7 @@ class RideService {
       logger.debug('🔢 Getting unread count');
       return unwrap(await apiService.get<{ unread_count: number }>(`${this.notificationsUrl}/unread-count`)).unread_count;
     } catch (error) {
-      logger.error('❌ Failed to get unread count:', error);
+      logApiFailure('RideService#getUnreadCount failed', error);
       throw error;
     }
   }

@@ -1,4 +1,4 @@
- import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -39,10 +39,15 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
-  // Clear any persisted auth error when this screen is shown (e.g. after killing app mid-login).
+  // One sign-in at a time: a second tap lands before isLoading re-renders the button (T-107).
+  const signInInFlight = useRef(false);
+
+  // The auth error is shared with PhoneAuth and Signup: clear it whenever Login is shown
+  // again (mount and every focus, e.g. back from PhoneAuth), so an old banner never shows.
   useEffect(() => {
     clearAuthError();
-  }, [clearAuthError]);
+    return navigation.addListener('focus', () => clearAuthError());
+  }, [navigation, clearAuthError]);
 
   // Validation functions
   const validateEmail = (emailValue: string): boolean => {
@@ -79,6 +84,10 @@ export default function LoginScreen() {
   };
 
   const handleEmailSignIn = async () => {
+    if (signInInFlight.current) {
+      return;
+    }
+    signInInFlight.current = true;
     try {
       clearValidationErrors();
       clearAuthError();
@@ -127,6 +136,8 @@ export default function LoginScreen() {
     } catch (err: any) {
       logger.error('Email sign in error:', err);
       toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      signInInFlight.current = false;
     }
   };
 
@@ -161,6 +172,8 @@ export default function LoginScreen() {
   const handleLoginMethodChange = (method: LoginMethod) => {
     try {
       clearValidationErrors();
+      // An error from the other method must not show under this one.
+      clearAuthError();
       setLoginMethod(method);
     } catch (err) {
       logger.error('Login method change error:', err);

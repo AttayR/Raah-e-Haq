@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -33,7 +33,7 @@ const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
 export default function PhoneAuthScreen() {
-  const { sendOtpToPhone, verifyOtpCode, error, isLoading, isOtpSent, isOtpVerified } = useApiAuth();
+  const { sendOtpToPhone, verifyOtpCode, error, isLoading, isOtpSent, isOtpVerified, clearAuthError } = useApiAuth();
   const { resendIn, expiresIn, isExpired, codeSent, blockResend, expireCode, clearCode } = useOtpTimers();
 
   // Debug logging for state changes
@@ -50,6 +50,11 @@ export default function PhoneAuthScreen() {
   // The server's resend cooldown is per phone, so only that number is held back.
   const [cooldownPhone, setCooldownPhone] = useState('');
   const sendBlocked = resendIn > 0 && phoneInput.trim() === cooldownPhone;
+  // One send/verify at a time: a second tap lands before isLoading re-renders the button.
+  const inFlight = useRef(false);
+
+  // The auth error is shared with Login: leaving this screen must not carry it over (T-107).
+  useEffect(() => () => clearAuthError(), [clearAuthError]);
 
   /**
    * Sends (or resends) a code. Expiry comes from the server's expires_in; a 429 shows the
@@ -60,6 +65,10 @@ export default function PhoneAuthScreen() {
     const fallback = isResend ? 'Failed to resend code' : 'Failed to send OTP';
     const showError = isResend ? setOtpError : setPhoneError;
     const phone = phoneInput.trim();
+    if (inFlight.current) {
+      return;
+    }
+    inFlight.current = true;
     try {
       const result = await sendOtpToPhone(phone);
       logger.debug('📨 PhoneAuthScreen - Send OTP result:', result.type);
@@ -88,6 +97,8 @@ export default function PhoneAuthScreen() {
       logger.error('💥 PhoneAuthScreen - Error sending verification code:', err);
       showError(errorToastMessage(err, fallback) ?? fallback);
       toast.fromError(err, fallback);
+    } finally {
+      inFlight.current = false;
     }
   };
 
@@ -128,6 +139,10 @@ export default function PhoneAuthScreen() {
       return;
     }
 
+    if (inFlight.current) {
+      return;
+    }
+    inFlight.current = true;
     try {
       const result = await verifyOtpCode(otpData);
       logger.debug('📨 PhoneAuthScreen - Verify OTP result:', result.type);
@@ -157,6 +172,8 @@ export default function PhoneAuthScreen() {
       logger.error('💥 PhoneAuthScreen - Error verifying code:', err);
       setOtpError(errorToastMessage(err, 'Failed to verify code') ?? 'Failed to verify code');
       toast.fromError(err, 'Failed to verify code');
+    } finally {
+      inFlight.current = false;
     }
   };
 

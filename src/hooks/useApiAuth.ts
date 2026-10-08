@@ -117,7 +117,6 @@ export const useApiAuth = () => {
   return {
     // State
     user: authState.user,
-    token: authState.token,
     isAuthenticated: authState.isAuthenticated,
     status: authState.status,
     error: authState.error,

@@ -26,6 +26,10 @@ const KEYCHAIN_ACCOUNT = 'session';
 /** Pre-T-104 builds kept the token here in plain text. Migrated once, then deleted. */
 const LEGACY_TOKEN_KEY = 'auth_token';
 const LEGACY_REFRESH_KEY = 'refresh_token';
+/** The removed Firebase Auth path kept its session (ID token, phone, uid) here. Deleted on sight. */
+const LEGACY_FIREBASE_SESSION_KEY = '@auth_session';
+/** Every legacy key that may hold a token, removed on every read and clear. */
+const LEGACY_KEYS = [LEGACY_TOKEN_KEY, LEGACY_REFRESH_KEY, LEGACY_FIREBASE_SESSION_KEY];
 const USER_KEY = 'user_data';
 /**
  * AsyncStorage is wiped on uninstall but the iOS Keychain is not. A Keychain session found
@@ -49,6 +53,18 @@ export interface StoredSession {
 let cache: StoredSession | null | undefined;
 /** The Keychain could not be read this launch: warned once, then treated as no session. */
 let readFailureLogged = false;
+/**
+ * The last Keychain read failed (for example iOS errSecInteractionNotAllowed when the app
+ * was started in the background before the first unlock after a reboot). Requests do not
+ * retry it; recheckAfterReadFailure() does when the app becomes active.
+ */
+let readFailed = false;
+/**
+ * Bumped by every clear() at call time (before it waits in the queue). A Keychain read that
+ * started before a clear and returns after it must not put the signed-out session back in
+ * memory: load() and recheckAfterReadFailure() compare it before writing or answering.
+ */
+let clearGeneration = 0;
 let queue: Promise<unknown> = Promise.resolve();
 
 const enqueue = <T>(op: () => Promise<T>): Promise<T> => {
@@ -89,6 +105,9 @@ const load = async (): Promise<StoredSession | null> => {
   if (cache !== undefined) {
     return cache;
   }
+  const generation = clearGeneration;
+  // A clear() was called while this read was running: the session is signed out.
+  const clearedMeanwhile = (): boolean => generation !== clearGeneration;
   const [[, legacyToken], [, installed], [, wipePending]] = await AsyncStorage.multiGet([
     LEGACY_TOKEN_KEY,
     INSTALL_MARKER_KEY,
@@ -102,7 +121,7 @@ const load = async (): Promise<StoredSession | null> => {
     } catch (error) {
       logger.warn('authStorage - Keychain wipe retry failed', { name: errorName(error) });
     }
-    await AsyncStorage.multiRemove([LEGACY_TOKEN_KEY, LEGACY_REFRESH_KEY]);
+    await AsyncStorage.multiRemove(LEGACY_KEYS);
     cache = null;
     return null;
   }
@@ -111,14 +130,24 @@ const load = async (): Promise<StoredSession | null> => {
   try {
     credentials = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE });
   } catch (error) {
-    // Not retried on every request: this launch runs without a stored session.
+    if (clearedMeanwhile()) {
+      return null;
+    }
+    // Not retried on every request (signed out for now), but re-read once the app is active
+    // (recheckAfterReadFailure), so a locked-device background launch is not signed out for
+    // the whole launch.
     if (!readFailureLogged) {
       readFailureLogged = true;
-      logger.warn('authStorage - Keychain read failed; continuing signed out', { name: errorName(error) });
+      logger.warn('authStorage - Keychain read failed; signed out until the app is active', { name: errorName(error) });
     }
+    readFailed = true;
     cache = null;
     return null;
   }
+  if (clearedMeanwhile()) {
+    return null;
+  }
+  readFailed = false;
   let session = credentials ? parseSession(credentials.password) : null;
 
   if (legacyToken) {
@@ -130,9 +159,12 @@ const load = async (): Promise<StoredSession | null> => {
     await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE });
     session = null;
   }
-  await AsyncStorage.multiRemove([LEGACY_TOKEN_KEY, LEGACY_REFRESH_KEY]);
+  await AsyncStorage.multiRemove(LEGACY_KEYS);
   if (!installed) {
     await AsyncStorage.setItem(INSTALL_MARKER_KEY, '1');
+  }
+  if (clearedMeanwhile()) {
+    return null;
   }
   cache = session;
   return session;
@@ -167,8 +199,9 @@ export const authStorage = {
       const next: StoredSession = { token: session.token, expiresAt: session.expiresAt ?? null };
       await writeKeychain(next);
       cache = next;
+      readFailed = false;
       // The Keychain now holds this session, so a pending wipe of an older one is done.
-      await AsyncStorage.multiRemove([LEGACY_TOKEN_KEY, LEGACY_REFRESH_KEY, WIPE_PENDING_KEY]);
+      await AsyncStorage.multiRemove([...LEGACY_KEYS, WIPE_PENDING_KEY]);
       // This install wrote the entry, so it is not a leftover of an earlier install.
       await AsyncStorage.setItem(INSTALL_MARKER_KEY, '1');
       if (session.user) {
@@ -200,28 +233,68 @@ export const authStorage = {
   },
 
   /**
+   * Re-reads the Keychain if the last read failed (see `readFailed`). Called when the app
+   * becomes active. Resolves true when a stored session is readable now, so the caller can
+   * run the startup session check again; false when there was nothing to retry or still no
+   * session.
+   */
+  recheckAfterReadFailure(): Promise<boolean> {
+    if (!readFailed) {
+      return Promise.resolve(false);
+    }
+    const generation = clearGeneration;
+    return enqueue(async () => {
+      if (!readFailed || generation !== clearGeneration) {
+        return false;
+      }
+      cache = undefined;
+      const session = await load();
+      // A logout during the read wins: no session, so the caller never re-initialises.
+      return session !== null && generation === clearGeneration;
+    });
+  },
+
+  /**
    * Removes the token (Keychain and any legacy copy) and the cached user. Queued behind any
-   * write already in progress, so nothing written before it survives.
+   * write already in progress, so nothing written before it survives. Rejects when the
+   * Keychain entry could not be removed (the session stays signed out in memory and the
+   * pending flag, if it could be written, makes the next read discard and re-wipe it).
    */
   clear(): Promise<void> {
-    // Stop sending the token right away.
+    // Stop sending the token right away; a signed-out session is never re-read, and a read
+    // already in flight is discarded when it returns.
     cache = null;
+    readFailed = false;
+    clearGeneration += 1;
     return enqueue(async () => {
       cache = null;
-      let wiped = false;
+      readFailed = false;
+      // The flag is written first so a failed wipe is retried later; failing to write it must
+      // not skip the wipe itself (the two are separate steps).
       try {
         await AsyncStorage.setItem(WIPE_PENDING_KEY, '1');
+      } catch (error) {
+        logger.warn('authStorage - could not mark the Keychain wipe as pending', { name: errorName(error) });
+      }
+      let wiped = false;
+      let wipeError: unknown;
+      try {
         await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE });
         wiped = true;
-      } finally {
+      } catch (error) {
+        wipeError = error;
+      }
+      try {
         await AsyncStorage.multiRemove(
-          wiped
-            ? [LEGACY_TOKEN_KEY, LEGACY_REFRESH_KEY, USER_KEY, WIPE_PENDING_KEY]
-            : [LEGACY_TOKEN_KEY, LEGACY_REFRESH_KEY, USER_KEY],
+          wiped ? [...LEGACY_KEYS, USER_KEY, WIPE_PENDING_KEY] : [...LEGACY_KEYS, USER_KEY],
         );
+      } finally {
         // Wiped: the next read goes back to the (empty) Keychain. Not wiped: stay signed out
         // in memory; the pending flag makes the next launch ignore and re-wipe the entry.
         cache = wiped ? undefined : null;
+      }
+      if (!wiped) {
+        throw wipeError;
       }
     });
   },
@@ -231,6 +304,7 @@ export const authStorage = {
 export const __forgetAuthCacheForTests = (): void => {
   cache = undefined;
   readFailureLogged = false;
+  readFailed = false;
 };
 
 export default authStorage;

@@ -1,15 +1,11 @@
 import { combineReducers, type Reducer, type UnknownAction } from '@reduxjs/toolkit';
-import authReducer from './slices/authSlice';
 import apiAuthReducer from './slices/apiAuthSlice';
-import userReducer from './slices/userSlice';
 import tripReducer from './slices/tripSlice';
 import rideReducer from './slices/rideSlice';
 import { resetApp } from './actions';
 
 const appReducer = combineReducers({
-  auth: authReducer,
   apiAuth: apiAuthReducer,
-  user: userReducer,
   trip: tripReducer,
   ride: rideReducer,
 });

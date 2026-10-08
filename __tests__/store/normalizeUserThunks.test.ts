@@ -127,7 +127,7 @@ describe('thunks store the normalised user (T-105)', () => {
 
     const result = await store.dispatch(registerUserWithImages({ ...registration, user_type: 'driver' }));
 
-    expect(result.payload).toMatchObject({ user: { id: 10, role: 'driver', status: 'pending' }, token: null });
+    expect(result.payload).toEqual({ user: expect.objectContaining({ id: 10, role: 'driver', status: 'pending' }) });
     expect(await storedUserData()).toMatchObject({ id: 10, role: 'driver', status: 'pending' });
   });
 
@@ -193,7 +193,7 @@ describe('thunks store the normalised user (T-105)', () => {
 
       const state = store.getState().apiAuth;
       expect(state.isAuthenticated).toBe(true);
-      expect(state.token).toBe(TOKEN);
+      expect(state).not.toHaveProperty('token');
       expect(state.user).toMatchObject({ id: 3, role: 'passenger', status: expected });
       expect(resolveAuthRoute(state)).toBe('account-status');
       expect(await authStorage.getToken()).toBe(TOKEN);

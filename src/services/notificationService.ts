@@ -4,6 +4,7 @@ import { Platform, Alert, PermissionsAndroid } from 'react-native';
 import rideService, { NotificationResource } from './rideService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../core/logging/logger';
+import { logApiFailure } from '../core/api/logApiFailure';
 
 export interface NotificationData {
   ride_id?: number;
@@ -45,7 +46,8 @@ class NotificationService {
 
       return result;
     } catch (error) {
-      logger.error('❌ Failed to fetch notifications:', error);
+      // Expected failures (offline, 401 on a dead session, 429) log at warn, not error (T-107).
+      logApiFailure('notificationService - fetch notifications failed', error);
       // Return empty result as fallback when notifications are not implemented
       return {
         data: [],
@@ -70,7 +72,7 @@ class NotificationService {
       // Update unread count
       await this.updateUnreadCount();
     } catch (error) {
-      logger.error('❌ Failed to mark notification as read:', error);
+      logApiFailure('notificationService - mark as read failed', error);
       // Don't throw error, just log it
     }
   }
@@ -87,7 +89,7 @@ class NotificationService {
       this.unreadCount = 0;
       this.notifyListeners();
     } catch (error) {
-      logger.error('❌ Failed to mark all notifications as read:', error);
+      logApiFailure('notificationService - mark all as read failed', error);
       // Don't throw error, just log it
     }
   }
@@ -104,7 +106,7 @@ class NotificationService {
       
       return this.unreadCount;
     } catch (error) {
-      logger.error('❌ Failed to get unread count:', error);
+      logApiFailure('notificationService - unread count failed', error);
       // Return 0 as fallback when notifications are not implemented
       this.unreadCount = 0;
       this.notifyListeners();

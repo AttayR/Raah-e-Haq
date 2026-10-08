@@ -46,7 +46,7 @@ const initialApiAuth = () => rootReducer(undefined, { type: '@@INIT' }).apiAuth;
 /** What redux-persist hands back after a restart: signed in, not yet initialised. */
 const rehydrateSignedIn = (store: Store) => {
   store.dispatch(
-    loginUser.fulfilled({ user: storedUser, token: TOKEN, tokenType: 'Bearer' }, 'req', {
+    loginUser.fulfilled({ user: storedUser }, 'req', {
       email: storedUser.email,
       password: 'not-a-real-password',
     }),
@@ -91,7 +91,7 @@ describe('initializeAuth (T-103)', () => {
     const state = store.getState().apiAuth;
     expect(state.isInitialized).toBe(true);
     expect(state.isAuthenticated).toBe(true);
-    expect(state.token).toBe(TOKEN);
+    expect(state).not.toHaveProperty('token');
     expect(state.user).toEqual(serverUser);
     expect(JSON.parse((await AsyncStorage.getItem('user_data')) ?? 'null')).toEqual(serverUser);
   });
@@ -121,7 +121,7 @@ describe('initializeAuth (T-103)', () => {
     expect(state.isInitialized).toBe(true);
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).toEqual(storedUser);
-    expect(state.token).toBe(TOKEN);
+    expect(state).not.toHaveProperty('token');
     expect(await authStorage.getToken()).toBe(TOKEN);
   });
 
@@ -239,7 +239,7 @@ describe('T-104 follow-ups', () => {
     const state = store.getState().apiAuth;
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).toEqual(storedUser);
-    expect(state.token).toBe(TOKEN);
+    expect(state).not.toHaveProperty('token');
   });
 
   it('getUserProfile while signed out never shows a loading state', async () => {

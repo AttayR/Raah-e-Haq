@@ -18,9 +18,12 @@ import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalMessage } from '../../core/auth/accountRefusal';
 import { withRefusedStatus } from '../../core/auth/normalizeUser';
 
+/**
+ * The API session in Redux. There is no token here: the bearer token lives only in the
+ * Keychain/Keystore (services/authStorage), read by the axios interceptor (T-104, T-107).
+ */
 export type AuthState = {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
@@ -41,7 +44,6 @@ export type AuthState = {
 
 const initialState: AuthState = {
   user: null,
-  token: null,
   isAuthenticated: false,
   status: 'idle',
   error: null,
@@ -54,7 +56,8 @@ const initialState: AuthState = {
 };
 
 const authSlice = createSlice({
-  name: 'auth',
+  // Matches its store key (AUTH-16): actions are apiAuth/*, never shared with another slice.
+  name: 'apiAuth',
   initialState,
   reducers: {
     clearError: (state) => {
@@ -88,7 +91,6 @@ const authSlice = createSlice({
         state.status = 'succeeded';
         state.isInitialized = true;
         state.user = action.payload.user;
-        state.token = action.payload.token;
         state.isAuthenticated = true;
         state.statusUnverified = action.payload.statusUnverified === true;
       })
@@ -115,7 +117,6 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.user = action.payload.user;
-        state.token = action.payload.token;
         state.isAuthenticated = true;
         state.statusUnverified = false;
         state.error = null;
@@ -175,7 +176,6 @@ const authSlice = createSlice({
       .addCase(verifyOtp.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.user = action.payload.user;
-        state.token = action.payload.token;
         state.isAuthenticated = true;
         state.statusUnverified = false;
         state.isOtpVerified = true;

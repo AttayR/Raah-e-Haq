@@ -1,6 +1,5 @@
-import { createTransform } from 'redux-persist';
+import { createTransform, type MigrationManifest, type PersistedState } from 'redux-persist';
 import type { AuthState } from './slices/apiAuthSlice';
-import type { AuthState as FirebaseAuthState } from './slices/authSlice';
 import { toStoredUser } from '../core/auth/storedUser';
 
 /**
@@ -21,8 +20,15 @@ export const stripOtpTransform = createTransform<AuthState, AuthState>(withoutOt
  * written. Outbound: a token or those fields an older build stored are dropped on rehydrate
  * (the token itself is migrated by authStorage from its own legacy key).
  */
-const withoutSecrets = (state: AuthState): AuthState =>
-  state ? { ...state, token: null, user: toStoredUser(state.user) } : state;
+const withoutSecrets = (state: AuthState): AuthState => {
+  if (!state) {
+    return state;
+  }
+  // apiAuth has no token field any more (T-107); an older build's persisted copy may.
+  const next: AuthState & { token?: unknown } = { ...state, user: toStoredUser(state.user) };
+  delete next.token;
+  return next;
+};
 
 export const stripApiAuthSecretsTransform = createTransform<AuthState, AuthState>(
   withoutSecrets,
@@ -54,13 +60,28 @@ export const clearApiAuthTransientTransform = createTransform<AuthState, AuthSta
   { whitelist: ['apiAuth'] },
 );
 
-const withoutTransientFirebaseAuth = (state: FirebaseAuthState): FirebaseAuthState =>
-  state
-    ? { ...state, error: null, status: state.status === 'loading' ? 'idle' : state.status }
-    : state;
+/**
+ * Persisted-state version. Bumped when a persisted slice is removed or reshaped, so the
+ * matching migration below runs once on the first launch of the new build.
+ */
+export const PERSIST_VERSION = 1;
 
-export const clearFirebaseAuthTransientTransform = createTransform<FirebaseAuthState, FirebaseAuthState>(
-  withoutTransientFirebaseAuth,
-  withoutTransientFirebaseAuth,
-  { whitelist: ['auth'] },
-);
+type LegacyRoot = Exclude<PersistedState, undefined> & Record<string, unknown>;
+
+/**
+ * v1 (T-107): the Firebase `auth` slice (session with an ID token, phone, uid, a profile with
+ * CNIC) and the `user` slice are gone. An older build's copy is dropped before rehydrate, so
+ * it never reaches Redux (and combineReducers never sees keys it has no reducer for); the
+ * next persist write no longer contains it.
+ */
+export const persistMigrations: MigrationManifest = {
+  1: (state: PersistedState): PersistedState => {
+    if (!state) {
+      return state;
+    }
+    const next: LegacyRoot = { ...state };
+    delete next.auth;
+    delete next.user;
+    return next;
+  },
+};

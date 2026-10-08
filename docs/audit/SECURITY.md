@@ -364,3 +364,8 @@ Scope: T-001 to T-008 end to end (env, logger, babel console stripping, API clie
 - **Issue:** ~50 self-registered +923 accounts × 10 sends from a few IPs can spend the 500/day budget, turning off phone login for everyone for up to 24 h. An attacker who holds the counter at budget-1 can test one number per window by watching for 503 `sms_unavailable`.
 - **Fix:** BE-32 (OTP-verified registration) and BE-33 (sub-budget for never-verified accounts); owner alerting and budget sizing before launch.
 - **BE-33 update (2026-10-08):** the unverified sub-budget (25%) now limits throwaway-account drain to that pool, so established users keep logging in. Residual: a narrower variant of the budget oracle (a login probe to a never-verified post-cutoff account spends an unverified slot; ~125 SMS per probe, once per 24 h). Owner items unchanged: alert on "SMS daily budget reached" / "SMS unverified sub-budget reached" and size both budgets before launch.
+
+### SEC-23 · low · backend registration: SIM-holder residual oracle (accepted)
+- **Where:** `POST /auth/register` (BE-38).
+- **Issue:** a taken email gets a decoy answer that sends no SMS; a free email sends a phone code. Someone holding the SIM given as `phone` can tell the cases apart by whether an SMS arrives. Capped by per-phone (3/15 min, 10/day) and per-IP limits; each free probe creates a `signup_pending` user and mails the address. Real registrations also do a few more DB writes than the decoy (milliseconds).
+- **Decision:** accepted — any flow that lets a SIM holder finish signing up reveals this at verify time. Full closure needs email-first verification (BE-40).

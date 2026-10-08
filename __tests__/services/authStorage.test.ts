@@ -166,3 +166,94 @@ describe('authStorage (T-104)', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('authStorage (T-107)', () => {
+  it('still wipes the Keychain when the wipe-pending flag cannot be written', async () => {
+    await authStorage.saveSession({ token: 'signed-out-token', user });
+    jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await authStorage.clear();
+
+    expect(Keychain.resetGenericPassword).toHaveBeenCalledWith(SERVICE);
+    expect(await Keychain.getGenericPassword(SERVICE)).toBe(false);
+    expect(await authStorage.getToken()).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    __forgetAuthCacheForTests();
+    expect(await authStorage.getToken()).toBeNull();
+  });
+
+  it('removes the legacy Firebase @auth_session key on read and on clear', async () => {
+    await AsyncStorage.setItem('@auth_session', JSON.stringify({ idToken: 'firebase-id-token' }));
+    await authStorage.getToken();
+    expect(await AsyncStorage.getItem('@auth_session')).toBeNull();
+
+    await AsyncStorage.setItem('@auth_session', JSON.stringify({ idToken: 'firebase-id-token' }));
+    await authStorage.clear();
+    expect(await AsyncStorage.getItem('@auth_session')).toBeNull();
+  });
+
+  it('re-reads the Keychain once the app is active after a failed read (locked-device launch)', async () => {
+    await authStorage.saveSession({ token: 'kept-token', user });
+    __forgetAuthCacheForTests();
+    const locked = Object.assign(new Error('User interaction is not allowed.'), { code: '-25308' });
+    getGenericPassword.mockRejectedValueOnce(locked);
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    // Background launch before the first unlock: signed out, not retried per request.
+    expect(await authStorage.getToken()).toBeNull();
+    expect(await authStorage.getToken()).toBeNull();
+
+    // App becomes active (unlocked): the session is found.
+    expect(await authStorage.recheckAfterReadFailure()).toBe(true);
+    expect(await authStorage.getToken()).toBe('kept-token');
+    // Nothing left to retry.
+    expect(await authStorage.recheckAfterReadFailure()).toBe(false);
+  });
+
+  it('a logout during the re-check read wins: no session comes back (security follow-up)', async () => {
+    await authStorage.saveSession({ token: 'kept-token', user });
+    __forgetAuthCacheForTests();
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    getGenericPassword.mockRejectedValueOnce(new Error('keystore unavailable'));
+    expect(await authStorage.getToken()).toBeNull();
+
+    // The re-check's Keychain read is held open until clear() has been called.
+    let finishRead: (value: unknown) => void = () => undefined;
+    getGenericPassword.mockImplementationOnce(
+      () => new Promise((resolve) => { finishRead = resolve; }),
+    );
+    const calls = getGenericPassword.mock.calls.length;
+    const recheck = authStorage.recheckAfterReadFailure();
+    for (let i = 0; i < 20 && getGenericPassword.mock.calls.length === calls; i += 1) {
+      await new Promise<void>((r) => setImmediate(r));
+    }
+    expect(getGenericPassword.mock.calls.length).toBe(calls + 1);
+
+    const clear = authStorage.clear();
+    finishRead({
+      username: 'session',
+      password: JSON.stringify({ token: 'kept-token', expiresAt: null }),
+      service: SERVICE.service,
+    });
+
+    expect(await recheck).toBe(false);
+    await clear;
+    expect(await authStorage.getToken()).toBeNull();
+    expect(await Keychain.getGenericPassword(SERVICE)).toBe(false);
+  });
+
+  it('has nothing to re-read when the Keychain read worked, or after a logout', async () => {
+    expect(await authStorage.recheckAfterReadFailure()).toBe(false);
+
+    await authStorage.saveSession({ token: 'tok', user });
+    __forgetAuthCacheForTests();
+    getGenericPassword.mockRejectedValueOnce(new Error('keystore unavailable'));
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(await authStorage.getToken()).toBeNull();
+
+    await authStorage.clear();
+    expect(await authStorage.recheckAfterReadFailure()).toBe(false);
+    expect(await authStorage.getToken()).toBeNull();
+  });
+});
