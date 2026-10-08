@@ -21,6 +21,7 @@ import {
   STALE_SESSION_MESSAGE,
 } from '../sessionEpoch';
 import { logger } from '../../core/logging/logger';
+import { LOGOUT_REQUEST_TIMEOUT_MS } from './sessionThunks';
 
 /**
  * Every thunk rejects with a ThunkRejection: a display-safe `message` plus `fieldErrors`
@@ -67,6 +68,21 @@ const messageOf = (body: { success: boolean; message?: string }, fallback: strin
 };
 
 /**
+ * A token the server issued for a session that ended before it was kept (a logout while the
+ * login ran): the logout could not revoke it (it read no token, or an older one), so it would
+ * stay valid in personal_access_tokens. Revoked here, best effort and in the background, with
+ * the logout timeout (T-114).
+ */
+const revokeDiscardedToken = (token: unknown): void => {
+  if (typeof token !== 'string' || token === '') {
+    return;
+  }
+  apiService.revokeToken(token, { timeout: LOGOUT_REQUEST_TIMEOUT_MS }).catch((error: unknown) => {
+    logger.warn('could not revoke a discarded login token', { status: toApiError(error).status });
+  });
+};
+
+/**
  * Stores the token (Keychain) and the cached user from a login/verify-otp/register response,
  * unless the session ended while the request ran. Returns false when nothing was stored.
  * A stored token starts a new session epoch, so nothing tied to an earlier token (its late
@@ -81,6 +97,7 @@ const storeNewSession = async (
     startedIn,
   );
   if (!stored || isStaleSession(startedIn)) {
+    revokeDiscardedToken(data.token);
     return false;
   }
   bumpSessionEpoch();

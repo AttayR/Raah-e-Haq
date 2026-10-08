@@ -8,6 +8,7 @@ import {
   persistMigrations,
   PERSIST_VERSION,
 } from '../../src/store/persistTransforms';
+import { toStoredUser } from '../../src/core/auth/storedUser';
 
 const withOtp = (): AuthState =>
   reducer(undefined, sendOtp.fulfilled({ phone: '+923001234567', expires_in: 60 }, 'req', '+923001234567'));
@@ -109,6 +110,22 @@ describe('stripApiAuthSecretsTransform (T-104, INF-20)', () => {
     const state = reducer(undefined, { type: '@@INIT' });
     expect(stripApiAuthSecretsTransform.in(state, 'apiAuth', {}).user).toBeNull();
   });
+
+  it('writes only the routing fields: no phone, email, address, gender or bio (SEC-29, T-114)', () => {
+    const base = signedIn();
+    const state = {
+      ...base,
+      user: base.user && { ...base.user, address: '1 Test Street', gender: 'female', bio: 'Hi', pending_phone: '+920000000003' },
+    };
+    const stored = stripApiAuthSecretsTransform.in(state, 'apiAuth', {});
+    expect(toStoredUser(stored.user)).toEqual({ id: 1, name: 'Test', status: 'active', role: 'driver', roles: ['driver'] });
+    const json = JSON.stringify(stored);
+    ['+920000000001', 'test@example.test', '1 Test Street', 'female', '+920000000003'].forEach((value) =>
+      expect(json).not.toContain(value),
+    );
+    // Normalised back into a User, so Redux never holds a half-shaped one.
+    expect(stored.user).toMatchObject({ email: '', phone: null });
+  });
 });
 
 describe('persist migration v1 (T-107, AUTH-15/16)', () => {
@@ -127,7 +144,6 @@ describe('persist migration v1 (T-107, AUTH-15/16)', () => {
   });
 
   it('drops the removed Firebase auth and user slices before rehydrate', async () => {
-    expect(PERSIST_VERSION).toBe(1);
     const migrated = await persistMigrations[1](legacyRoot());
     expect(migrated).not.toHaveProperty('auth');
     expect(migrated).not.toHaveProperty('user');
@@ -144,5 +160,72 @@ describe('persist migration v1 (T-107, AUTH-15/16)', () => {
 
   it('handles nothing stored', async () => {
     expect(await persistMigrations[1](undefined)).toBeUndefined();
+  });
+});
+
+describe('persist migration v2 (SEC-29, T-114)', () => {
+  // What a v1 build wrote: apiAuth.user with the contact fields the old blocklist kept.
+  const v1Root = () => ({
+    apiAuth: {
+      ...reducer(undefined, { type: '@@INIT' }),
+      isAuthenticated: true,
+      user: {
+        id: 5,
+        name: 'V1 Passenger',
+        email: 'v1@example.test',
+        phone: '+920000000005',
+        pending_phone: '+920000000006',
+        address: '5 Test Road',
+        gender: 'male',
+        bio: 'About me',
+        profile_image_url: 'https://example.test/p.jpg',
+        status: 'active',
+        role: 'passenger',
+        roles: ['passenger'],
+        phone_verified_at: '2026-01-01T00:00:00Z',
+      },
+    },
+    _persist: { version: 1, rehydrated: false },
+  });
+
+  it('is the current version', () => {
+    expect(PERSIST_VERSION).toBe(2);
+  });
+
+  it('strips an old apiAuth.user down to the allowlist before rehydrate', async () => {
+    const migrate = createMigrate(persistMigrations, { debug: false });
+    const migrated = (await migrate(v1Root(), PERSIST_VERSION)) as unknown as { apiAuth: AuthState };
+    expect(migrated.apiAuth.isAuthenticated).toBe(true);
+    expect(toStoredUser(migrated.apiAuth.user)).toEqual({
+      id: 5,
+      name: 'V1 Passenger',
+      status: 'active',
+      role: 'passenger',
+      roles: ['passenger'],
+      phone_verified_at: '2026-01-01T00:00:00Z',
+    });
+    const json = JSON.stringify(migrated);
+    ['v1@example.test', '+920000000005', '+920000000006', '5 Test Road', 'male', 'About me', 'p.jpg'].forEach((value) =>
+      expect(json).not.toContain(value),
+    );
+  });
+
+  it('keeps the role of a v1 user that had only user_type', async () => {
+    const root = v1Root();
+    const legacyUser: Record<string, unknown> = { ...root.apiAuth.user, user_type: 'driver' };
+    delete legacyUser.role;
+    delete legacyUser.roles;
+    const legacyRoot = { ...root, apiAuth: { ...root.apiAuth, user: legacyUser } };
+    const migrated = (await persistMigrations[2](legacyRoot)) as unknown as {
+      apiAuth: AuthState;
+    };
+    expect(migrated.apiAuth.user).toMatchObject({ id: 5, role: 'driver', roles: ['driver'], email: '', phone: null });
+  });
+
+  it('handles a signed-out apiAuth and nothing stored', async () => {
+    const root = { apiAuth: reducer(undefined, { type: '@@INIT' }), _persist: { version: 1, rehydrated: false } };
+    const migrated = (await persistMigrations[2](root)) as unknown as { apiAuth: AuthState };
+    expect(migrated.apiAuth.user).toBeNull();
+    expect(await persistMigrations[2](undefined)).toBeUndefined();
   });
 });

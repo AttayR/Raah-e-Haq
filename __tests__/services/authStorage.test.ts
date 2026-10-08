@@ -71,6 +71,64 @@ describe('authStorage (T-104)', () => {
     );
   });
 
+  it('keeps phone, email and any other non-routing field out of user_data (SEC-29, T-114)', async () => {
+    await authStorage.saveSession({ token: 'tok-1', user: { ...user, address: '9 Test Street', gender: 'male', bio: 'Hi' } });
+
+    const stored = JSON.parse((await AsyncStorage.getItem('user_data')) ?? '{}');
+    expect(stored).toEqual({ id: 9, name: 'Test Passenger', status: 'active', role: 'passenger', roles: ['passenger'] });
+  });
+
+  it('scrubs a user_data an older build cached with contact fields, on the first read of a launch', async () => {
+    await AsyncStorage.multiSet([
+      ['auth_storage_installed', '1'],
+      ['user_data', JSON.stringify({ ...user, address: '9 Test Street', pending_phone: '+920000000011' })],
+    ]);
+    await Keychain.setGenericPassword('session', JSON.stringify({ token: 'tok-3', expiresAt: null }), SERVICE);
+
+    expect(await authStorage.getToken()).toBe('tok-3');
+
+    const raw = (await AsyncStorage.getItem('user_data')) ?? '';
+    expect(JSON.parse(raw)).toEqual({ id: 9, name: 'Test Passenger', status: 'active', role: 'passenger', roles: ['passenger'] });
+    ['passenger@example.test', '+920000000009', '+920000000011', '9 Test Street', '00000-0000000-0'].forEach((value) =>
+      expect(raw).not.toContain(value),
+    );
+    expect(await authStorage.getUser()).toEqual({
+      id: 9,
+      name: 'Test Passenger',
+      email: '',
+      phone: null,
+      status: 'active',
+      role: 'passenger',
+      roles: ['passenger'],
+    });
+  });
+
+  it('a legacy user_data with only user_type keeps its role when scrubbed', async () => {
+    await AsyncStorage.setItem(
+      'user_data',
+      JSON.stringify({ id: 4, name: 'Old Driver', user_type: 'driver', status: 'active', email: 'old@example.test' }),
+    );
+
+    await authStorage.getToken();
+
+    expect(JSON.parse((await AsyncStorage.getItem('user_data')) ?? '{}')).toEqual({
+      id: 4,
+      name: 'Old Driver',
+      status: 'active',
+      role: 'driver',
+      roles: ['driver'],
+    });
+    expect(await authStorage.getUser()).toMatchObject({ role: 'driver', email: '' });
+  });
+
+  it('removes a legacy user_data that is not a user at all', async () => {
+    await AsyncStorage.setItem('user_data', JSON.stringify({ phone: '+920000000009' }));
+
+    await authStorage.getToken();
+
+    expect(await AsyncStorage.getItem('user_data')).toBeNull();
+  });
+
   it('serves the token from memory after the first Keychain read', async () => {
     await AsyncStorage.setItem('auth_storage_installed', '1');
     await Keychain.setGenericPassword('session', JSON.stringify({ token: 'tok-2', expiresAt: null }), SERVICE);

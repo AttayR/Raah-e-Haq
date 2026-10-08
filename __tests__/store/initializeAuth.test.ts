@@ -28,6 +28,12 @@ const storedUser: User = {
 
 const serverUser: User = { ...storedUser, name: 'Fresh From Server' };
 
+/** What user_data keeps of a user (SEC-29 allowlist): no phone, email or timestamps. */
+const cachedFields = (u: User) => ({ id: u.id, name: u.name, status: u.status, role: u.role, roles: u.roles });
+
+/** The user an offline cold start routes on: the cached fields, normalised (T-114). */
+const offlineUser: User = { ...cachedFields(storedUser), email: '', phone: null };
+
 const TOKEN = 'test-token-not-real';
 
 const makeStore = () => {
@@ -93,7 +99,7 @@ describe('initializeAuth (T-103)', () => {
     expect(state.isAuthenticated).toBe(true);
     expect(state).not.toHaveProperty('token');
     expect(state.user).toEqual(serverUser);
-    expect(JSON.parse((await AsyncStorage.getItem('user_data')) ?? 'null')).toEqual(serverUser);
+    expect(JSON.parse((await AsyncStorage.getItem('user_data')) ?? 'null')).toEqual(cachedFields(serverUser));
   });
 
   it('401: clears the stored token and resets a rehydrated session to signed out', async () => {
@@ -120,7 +126,8 @@ describe('initializeAuth (T-103)', () => {
     const state = store.getState().apiAuth;
     expect(state.isInitialized).toBe(true);
     expect(state.isAuthenticated).toBe(true);
-    expect(state.user).toEqual(storedUser);
+    // Routed from the cache, which never held the phone or email (SEC-29, T-114).
+    expect(state.user).toEqual(offlineUser);
     expect(state).not.toHaveProperty('token');
     expect(await authStorage.getToken()).toBe(TOKEN);
   });

@@ -13,7 +13,7 @@ import webSocketService from '../../src/services/webSocketService';
 import locationTrackingService from '../../src/services/locationTrackingService';
 import notificationService from '../../src/services/notificationService';
 import { rootReducer } from '../../src/store/rootReducer';
-import { logout, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
+import { logout, LOGOUT_REQUEST_TIMEOUT_MS, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { loginUser } from '../../src/store/thunks/apiThunks';
 import { setCurrentTrip } from '../../src/store/slices/tripSlice';
 import { setMode, setIsRequesting } from '../../src/store/slices/rideSlice';
@@ -133,6 +133,41 @@ describe('logout thunk (T-102)', () => {
     await expectFullySignedOut(store, extra);
   });
 
+  it('sends the current token to /auth/logout and waits for it (with a timeout) before clearing the token (T-114)', async () => {
+    const { store, extra } = makeStore();
+    await signIn(store);
+    let release!: (value: [number, unknown]) => void;
+    mock.onPost('/auth/logout').reply(
+      () => new Promise<[number, unknown]>((resolve) => {
+        release = resolve;
+      }),
+    );
+    let settled = false;
+
+    const pending = store.dispatch(logout()).then((result) => {
+      settled = true;
+      return result;
+    });
+    // Let the request get past the async interceptor and reach the mock.
+    for (let i = 0; i < 5 && mock.history.post.length === 0; i += 1) {
+      await new Promise<void>((r) => setTimeout(() => r(), 0));
+    }
+
+    expect(mock.history.post).toHaveLength(1);
+    expect(mock.history.post[0].headers?.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(mock.history.post[0].timeout).toBe(LOGOUT_REQUEST_TIMEOUT_MS);
+    // The revoke is still in flight: nothing is cleared yet.
+    expect(settled).toBe(false);
+    expect(await Keychain.getGenericPassword({ service: 'com.raahehaq.auth.session' })).not.toBe(false);
+    expect(extra.purgePersistedState).not.toHaveBeenCalled();
+
+    release([200, { success: true }]);
+    const result = await pending;
+
+    expect(logout.fulfilled.match(result)).toBe(true);
+    await expectFullySignedOut(store, extra);
+  });
+
   it('still signs out locally when the request fails offline', async () => {
     const { store, extra } = makeStore();
     await signIn(store);
@@ -245,5 +280,41 @@ describe('logout thunk (T-102)', () => {
     expect(await authStorage.getToken()).toBeNull();
     expect(await AsyncStorage.getItem('user_data')).toBeNull();
     expect(extra.purgePersistedState).toHaveBeenCalledTimes(1);
+    // The token the server issued for the discarded login is revoked, so it does not stay
+    // valid in personal_access_tokens (T-114).
+    for (let i = 0; i < 5 && mock.history.post.length < 3; i += 1) {
+      await new Promise<void>((r) => setTimeout(() => r(), 0));
+    }
+    const revokes = mock.history.post.filter((r) => r.url === '/auth/logout');
+    expect(revokes.map((r) => r.headers?.Authorization)).toContain('Bearer late-token');
+    const lateRevoke = revokes.find((r) => r.headers?.Authorization === 'Bearer late-token');
+    expect(lateRevoke?.timeout).toBe(LOGOUT_REQUEST_TIMEOUT_MS);
+  });
+
+  it('a discarded login token is revoked with that token only, never the next session\'s', async () => {
+    const { store } = makeStore();
+    let release!: (value: [number, unknown]) => void;
+    mock.onPost('/auth/login').replyOnce(
+      () => new Promise<[number, unknown]>((resolve) => {
+        release = resolve;
+      }),
+    );
+    mock.onPost('/auth/logout').reply(200, { success: true });
+
+    const login = store.dispatch(loginUser({ email: user.email, password: 'not-a-real-password' }));
+    await new Promise<void>((r) => setTimeout(() => r(), 0));
+    await store.dispatch(logout());
+    // The user signs in again (session B) before the first login answers.
+    await authStorage.saveSession({ token: 'session-b-token', user });
+    release([200, { success: true, data: { user, token: 'late-token', token_type: 'Bearer' } }]);
+    await login;
+    for (let i = 0; i < 5 && !mock.history.post.some((r) => r.headers?.Authorization === 'Bearer late-token'); i += 1) {
+      await new Promise<void>((r) => setTimeout(() => r(), 0));
+    }
+
+    const authHeaders = mock.history.post.filter((r) => r.url === '/auth/logout').map((r) => r.headers?.Authorization);
+    expect(authHeaders).toContain('Bearer late-token');
+    expect(authHeaders).not.toContain('Bearer session-b-token');
+    expect(await authStorage.getToken()).toBe('session-b-token');
   });
 });

@@ -1,8 +1,7 @@
 import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isStaleSession } from '../store/sessionEpoch';
-import { toStoredUser } from '../core/auth/storedUser';
-import { normalizeUser } from '../core/auth/normalizeUser';
+import { toCachedUser, toStoredUser } from '../core/auth/storedUser';
 import { logger } from '../core/logging/logger';
 import type { User } from './api';
 
@@ -13,8 +12,9 @@ import type { User } from './api';
  *   react-native-keychain, never in AsyncStorage or redux-persist.
  * - One in-memory copy of it is what the axios interceptor reads, so a request does not hit
  *   the Keychain every time.
- * - The cached user (`user_data`) stays in AsyncStorage, without CNIC, contacts, licence or
- *   bank fields (see core/auth/storedUser).
+ * - The cached user (`user_data`) stays in AsyncStorage with only the allowlisted routing
+ *   fields: id, name, role(s), status, verified flags (core/auth/storedUser, SEC-29). A copy
+ *   an older build wrote with more fields is rewritten on the first read of a launch.
  * - Every write goes through one serial queue and can carry the session epoch it belongs
  *   to. A write whose session ended (logout bumped the epoch) is skipped, and logout's clear
  *   is queued behind any write that already started, so a late login/profile result can
@@ -100,7 +100,36 @@ const writeKeychain = async (session: StoredSession): Promise<void> => {
   }
 };
 
-/** Reads the Keychain, migrating a legacy AsyncStorage token once. Runs inside the queue. */
+/**
+ * SEC-29 / T-114: a `user_data` written before the allowlist (phone, email, address, gender,
+ * bio...) is cut down to the stored fields; one that is not a user at all is removed.
+ */
+const scrubLegacyUser = async (raw: string | null): Promise<void> => {
+  if (!raw) {
+    return;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  const user = toCachedUser(parsed);
+  if (!user) {
+    await AsyncStorage.removeItem(USER_KEY);
+    return;
+  }
+  // Normalised before the cut, so a `user_type`-only blob keeps its role.
+  const scrubbed = JSON.stringify(toStoredUser(user));
+  if (scrubbed !== raw) {
+    await AsyncStorage.setItem(USER_KEY, scrubbed);
+  }
+};
+
+/**
+ * Reads the Keychain, migrating a legacy AsyncStorage token once and scrubbing a legacy
+ * cached user. Runs inside the queue.
+ */
 const load = async (): Promise<StoredSession | null> => {
   if (cache !== undefined) {
     return cache;
@@ -108,11 +137,17 @@ const load = async (): Promise<StoredSession | null> => {
   const generation = clearGeneration;
   // A clear() was called while this read was running: the session is signed out.
   const clearedMeanwhile = (): boolean => generation !== clearGeneration;
-  const [[, legacyToken], [, installed], [, wipePending]] = await AsyncStorage.multiGet([
+  const [[, legacyToken], [, installed], [, wipePending], [, cachedUser]] = await AsyncStorage.multiGet([
     LEGACY_TOKEN_KEY,
     INSTALL_MARKER_KEY,
     WIPE_PENDING_KEY,
+    USER_KEY,
   ]);
+  try {
+    await scrubLegacyUser(cachedUser);
+  } catch (error) {
+    logger.warn('authStorage - could not scrub the cached user', { name: errorName(error) });
+  }
   if (wipePending) {
     // An earlier clear() could not wipe the Keychain: whatever is there is signed out.
     try {
@@ -226,7 +261,8 @@ export const authStorage = {
     try {
       const raw = await AsyncStorage.getItem(USER_KEY);
       // user_data may have been written by an older build (no `role`, other shapes).
-      return raw ? normalizeUser(JSON.parse(raw)) : null;
+      // Only the allowlisted fields, even if the startup scrub could not rewrite the blob.
+      return raw ? toCachedUser(JSON.parse(raw)) : null;
     } catch {
       return null;
     }

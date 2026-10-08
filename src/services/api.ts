@@ -94,6 +94,16 @@ declare module 'axios' {
     /** Session epoch in which the bearer token was attached (T-104); unset when none was sent. */
     authSessionEpoch?: number;
   }
+  interface AxiosRequestConfig {
+    /**
+     * Sends this token instead of the stored one (T-114): only for revoking a token the app
+     * received but never kept (a login that finished after a logout). Such a request belongs
+     * to no session, so its 401/403 never ends or routes the current one. Checked by
+     * presence: when the key is set, the stored token is never sent, and anything but a
+     * non-empty string sends no Authorization header at all.
+     */
+    bearerToken?: string | null;
+  }
 }
 
 /**
@@ -204,6 +214,16 @@ const reportAccountRefused = (error: ApiError, config?: InternalAxiosRequestConf
 // only to requests whose resolved URL is on our API origin (isTokenTarget, SEC-21).
 apiClient.interceptors.request.use(
   async (config) => {
+    if ('bearerToken' in config) {
+      // An explicit token (T-114): that one or none, never a fallback to the stored session.
+      const bearer = config.bearerToken;
+      if (typeof bearer === 'string' && bearer !== '' && isTokenTarget(config)) {
+        config.headers.Authorization = `Bearer ${bearer}`;
+      } else {
+        config.headers.delete('Authorization');
+      }
+      return config;
+    }
     if (!isTokenTarget(config)) {
       return config;
     }
@@ -654,6 +674,11 @@ class ApiService {
   async logout(config?: AxiosRequestConfig): Promise<ApiResponse> {
     const response = await apiClient.post('/auth/logout', undefined, config);
     return response.data;
+  }
+
+  /** Revokes `token` (POST /auth/logout with exactly that token), not the stored session's. */
+  async revokeToken(token: string, config?: AxiosRequestConfig): Promise<ApiResponse> {
+    return this.logout({ ...config, bearerToken: token });
   }
 
   async logoutAll(config?: AxiosRequestConfig): Promise<ApiResponse> {

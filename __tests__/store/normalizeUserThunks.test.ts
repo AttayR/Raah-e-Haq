@@ -143,7 +143,7 @@ describe('thunks store the normalised user (T-105)', () => {
 
     await store.dispatch(updateUserProfile({ bio: 'Hi' }));
     expect(store.getState().apiAuth.user).toMatchObject({ role: 'driver', languages: ['Urdu', 'English'], bio: 'Hi' });
-    expect(await storedUserData()).toMatchObject({ role: 'driver', bio: 'Hi' });
+    expect(await storedUserData()).toEqual({ id: 7, name: '', role: 'driver', roles: ['driver'], status: 'active' });
   });
 
   it('initializeAuth offline: a user_data cached by an older build (no role) is normalised', async () => {
