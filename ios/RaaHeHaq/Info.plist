@@ -34,15 +34,11 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to camera to take profile pictures and document photos.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs access to location to show nearby drivers and provide navigation services.</string>
+	<string>Raah-e-Haq uses the camera to take your profile photo.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs access to location to show nearby drivers and provide navigation services.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs access to microphone for voice messages and calls.</string>
+	<string>Raah-e-Haq uses your location while the app is open to set your pickup point, show nearby drivers and track your active ride.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to photo library to select profile pictures and documents.</string>
+	<string>Raah-e-Haq uses your photo library to choose a profile photo and upload driver documents.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>
@@ -58,8 +54,6 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
-		<string>location</string>
-		<string>background-processing</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -70,8 +64,6 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>

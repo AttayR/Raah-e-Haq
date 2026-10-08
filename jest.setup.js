@@ -179,27 +179,6 @@ jest.mock('@react-native-firebase/storage', () => {
   };
 });
 
-// Google sign-in
-jest.mock('@react-native-google-signin/google-signin', () => ({
-  GoogleSignin: {
-    configure: jest.fn(),
-    hasPlayServices: jest.fn(() => Promise.resolve(true)),
-    signIn: jest.fn(() => Promise.resolve({data: null})),
-    signOut: jest.fn(() => Promise.resolve()),
-    revokeAccess: jest.fn(() => Promise.resolve()),
-    getCurrentUser: jest.fn(() => null),
-    getTokens: jest.fn(() => Promise.resolve({idToken: '', accessToken: ''})),
-  },
-  GoogleSigninButton: 'GoogleSigninButton',
-  statusCodes: {
-    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
-    IN_PROGRESS: 'IN_PROGRESS',
-    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
-  },
-  isSuccessResponse: jest.fn(() => false),
-  isErrorWithCode: jest.fn(() => false),
-}));
-
 // Maps
 jest.mock('react-native-maps', () => {
   const React = require('react');

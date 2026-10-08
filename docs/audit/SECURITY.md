@@ -369,3 +369,11 @@ Scope: T-001 to T-008 end to end (env, logger, babel console stripping, API clie
 - **Where:** `POST /auth/register` (BE-38).
 - **Issue:** a taken email gets a decoy answer that sends no SMS; a free email sends a phone code. Someone holding the SIM given as `phone` can tell the cases apart by whether an SMS arrives. Capped by per-phone (3/15 min, 10/day) and per-IP limits; each free probe creates a `signup_pending` user and mails the address. Real registrations also do a few more DB writes than the decoy (milliseconds).
 - **Decision:** accepted — any flow that lets a SIM holder finish signing up reveals this at verify time. Full closure needs email-first verification (BE-40).
+
+### SEC-24 · medium · backend privacy: precise driver location history kept forever
+- **Where:** `app/Models/DriverLocation.php` (`updateLocation` inserts a row per update), `ride_tracking`.
+- **Fix:** BE-46 — retention/pruning with a documented period.
+
+### SEC-25 · low · backend privacy: other tables with phones/IPs lack retention
+- **Where:** `otps` (expired rows never deleted), `analytics_events`, `login_attempts`, `security_events`; audit rows deleted whole after 180 days (loses BE-36/44 evidence).
+- **Fix:** BE-46.

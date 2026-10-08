@@ -40,6 +40,13 @@ With Metro running, open a new terminal window/pane from the root of your React 
 yarn android
 ```
 
+- **Dev host on the emulator.** A Debug build loads JS from `10.0.2.2:8081` (the emulator's alias for your machine). If Metro runs on another port (`yarn start --port 8082`), set it in the app's Dev Menu → *Settings* → *Debug server host & port for device* (`10.0.2.2:8082`), or run `adb reverse tcp:8082 tcp:8082` and use `localhost:8082`.
+- **Clean builds.** Run `./gradlew clean` and `./gradlew installDebug` (from `android/`) as two separate commands. Chaining them in one Gradle call (`./gradlew clean installDebug`) fails because clean deletes Reanimated's prefab output while the same build still needs it.
+- **Release builds** need the upload key values (`RH_UPLOAD_*`) and fail without them; they are never signed with the debug key. See `android/release-signing.example.properties` and `docs/RELEASE_NOTES_OWNER.md`.
+- Release networking is HTTPS only (no cleartext to any host). Debug allows cleartext only to `localhost`, `127.0.0.1` and `10.0.2.2`.
+
+Metro ignores `docs/` (QA screenshots, reports), so saving files there doesn't reload the app.
+
 ### iOS
 
 For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).

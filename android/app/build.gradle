@@ -81,6 +81,47 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Release signing (INF-03). The upload keystore is never committed. Its values come from
+ * Gradle properties (~/.gradle/gradle.properties, or -P on the command line) or from
+ * environment variables with the same names. See android/release-signing.example.properties and
+ * docs/RELEASE_NOTES_OWNER.md. A release build without them fails with a clear message;
+ * it is never signed with the debug key. Debug builds don't need them.
+ */
+def releaseSigningKeys = [
+    'RH_UPLOAD_STORE_FILE',
+    'RH_UPLOAD_STORE_PASSWORD',
+    'RH_UPLOAD_KEY_ALIAS',
+    'RH_UPLOAD_KEY_PASSWORD',
+]
+def releaseSigning = releaseSigningKeys.collectEntries { key ->
+    def value = project.findProperty(key) ?: System.getenv(key)
+    [(key): value ? value.toString().trim() : null]
+}
+def releaseSigningProblems = releaseSigningKeys.findAll { !releaseSigning[it] }.collect { "${it} is not set" }
+def releaseSigningStoreFile = releaseSigning.RH_UPLOAD_STORE_FILE ? file(releaseSigning.RH_UPLOAD_STORE_FILE) : null
+if (releaseSigningStoreFile != null && !releaseSigningStoreFile.isFile()) {
+    releaseSigningProblems << "RH_UPLOAD_STORE_FILE does not point to a file (relative paths resolve against android/app)"
+}
+
+// Fail before any work when a task that signs or installs a release build is requested.
+def releaseSigningTasks = [
+    'assembleRelease', 'bundleRelease', 'packageRelease', 'packageReleaseBundle',
+    'signReleaseBundle', 'installRelease', 'validateSigningRelease',
+] as Set
+gradle.taskGraph.whenReady { graph ->
+    def wantsRelease = graph.allTasks.any { it.project == project && releaseSigningTasks.contains(it.name) }
+    if (wantsRelease && !releaseSigningProblems.isEmpty()) {
+        throw new GradleException(
+            "Release signing is not configured, so this release build stops here " +
+            "(it is never signed with the debug key):\n  - " + releaseSigningProblems.join("\n  - ") +
+            "\nSet RH_UPLOAD_STORE_FILE, RH_UPLOAD_STORE_PASSWORD, RH_UPLOAD_KEY_ALIAS and " +
+            "RH_UPLOAD_KEY_PASSWORD in ~/.gradle/gradle.properties or the environment. " +
+            "See android/release-signing.example.properties and docs/RELEASE_NOTES_OWNER.md."
+        )
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -108,16 +149,24 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (releaseSigningProblems.isEmpty()) {
+            release {
+                storeFile releaseSigningStoreFile
+                storePassword releaseSigning.RH_UPLOAD_STORE_PASSWORD
+                keyAlias releaseSigning.RH_UPLOAD_KEY_ALIAS
+                keyPassword releaseSigning.RH_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
+            // Signed only with the upload key from RH_UPLOAD_* (see releaseSigning above).
+            // Never falls back to the debug key: without the values a release build fails.
             crunchPngs false
-            signingConfig signingConfigs.debug
+            signingConfig releaseSigningProblems.isEmpty() ? signingConfigs.release : null
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

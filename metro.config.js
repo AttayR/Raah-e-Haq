@@ -1,6 +1,20 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const path = require('path');
 
+const defaultConfig = getDefaultConfig(__dirname);
+
+// Never watch or bundle files under docs/ (QA screenshots, reports, specs): saving one there
+// must not reload the app in the middle of a test. src/ and the rest stay watched.
+const escapeForRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const docsBlockPattern = new RegExp(
+  `^${escapeForRegExp(path.resolve(__dirname, 'docs'))}[\\/\\\\].*`,
+);
+const defaultBlockList = defaultConfig.resolver.blockList;
+const blockList = [
+  ...(Array.isArray(defaultBlockList) ? defaultBlockList : [defaultBlockList]).filter(Boolean),
+  docsBlockPattern,
+];
+
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
@@ -9,6 +23,7 @@ const path = require('path');
  */
 const config = {
   resolver: {
+    blockList,
     // Add .cjs extension support
     sourceExts: ['js', 'jsx', 'ts', 'tsx', 'json', 'cjs'],
     // Handle pretty-format module resolution issue
@@ -28,4 +43,4 @@ const config = {
   },
 };
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = mergeConfig(defaultConfig, config);
