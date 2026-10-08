@@ -25,7 +25,7 @@ const GoogleMapsTest = () => {
   const testMapFunctionality = () => {
     Alert.alert(
       'Google Maps Test',
-      `✅ API Key: ${MAPS_CONFIG.API_KEY.substring(0, 10)}...\n` +
+      `✅ API Key: ${MAPS_CONFIG.API_KEY ? 'Configured' : 'Missing'}\n` +
       `✅ Map Loaded: ${mapLoaded ? 'Yes' : 'No'}\n` +
       `✅ Location Permission: ${locationPermission ? 'Granted' : 'Not Granted'}\n` +
       `✅ Default Region: Karachi, Pakistan\n` +
@@ -96,7 +96,7 @@ const GoogleMapsTest = () => {
       <View style={styles.infoContainer}>
         <Text style={styles.infoTitle}>Configuration:</Text>
         <Text style={styles.infoText}>
-          API Key: {MAPS_CONFIG.API_KEY.substring(0, 20)}...
+          API Key: {MAPS_CONFIG.API_KEY ? 'Configured' : 'Missing'}
         </Text>
         <Text style={styles.infoText}>
           Default Region: Karachi, Pakistan

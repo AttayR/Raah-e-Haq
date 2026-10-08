@@ -23,7 +23,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>GMSApiKey</key>
-	<string>AIzaSyBx-73GJ6HchOWC_zCTsg8uRUBuxKnOHUc</string>
+	<string>MAPS_KEY</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

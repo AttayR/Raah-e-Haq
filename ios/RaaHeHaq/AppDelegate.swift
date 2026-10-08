@@ -20,8 +20,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Configure Firebase first
     FirebaseApp.configure()
     
-    // 👇 Add Google Maps API key setup right after Firebase
-    GMSServices.provideAPIKey("AIzaSyBx-73GJ6HchOWC_zCTsg8uRUBuxKnOHUc")
+    // Google Maps SDK key: GMSApiKey in Info.plist, filled from MAPS_KEY in the env file
+    // at build time (Info.plist preprocessing with react-native-config's GeneratedInfoPlistDotEnv.h).
+    if let mapsKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
+       !mapsKey.isEmpty, mapsKey != "MAPS_KEY" {
+      GMSServices.provideAPIKey(mapsKey)
+    } else {
+      NSLog("[RaaHeHaq] GMSApiKey is not set; add MAPS_KEY to the env file and rebuild")
+    }
 
     // Configure Firebase Messaging
     UNUserNotificationCenter.current().delegate = self

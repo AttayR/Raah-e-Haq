@@ -141,6 +141,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Google Maps SDK key for AndroidManifest.xml (${MAPS_KEY}), read from the env file
+        // by react-native-config above. Never hardcode it in the manifest.
+        manifestPlaceholders = [MAPS_KEY: project.env.get("MAPS_KEY") ?: ""]
     }
     signingConfigs {
         debug {
