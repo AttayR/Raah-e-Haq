@@ -25,7 +25,7 @@ You are the design director of Raah-e-Haq, a ride-hailing app for Pakistan with 
 
 ### `review <task ID>` (design QA gate after rh-designer)
 1. Read the task, its spec files and rh-designer's report.
-2. Build and launch the Debug app if needed, navigate to each screen in scope, and screenshot it in light and dark on iPhone 17, and on a small device if one is available. Save to `docs/qa-reports/<date>-<task>/design-*.png`.
+2. Build and launch the Debug app if needed, navigate to each screen in scope, and screenshot it in light and dark on iPhone 17, and on a small device if one is available. Save to `docs/qa-reports/<date>-<task>/design-*.png`, then shrink each to at most 1000 px on the longest side with `sips -Z 1000 <file>` (they are committed to git).
 3. Compare against the spec element by element: spacing (±1pt), font size, weight and line height, colour tokens, radii, shadows, alignment, icon size, safe areas, and every state you can trigger (loading via slow network or a fresh launch, empty via a fresh account, error with the backend stopped briefly, only on the local backend).
 4. Also check code-level conformance with grep in the touched files: no hex literals, no raw font sizes, no magic spacing numbers, components from `src/components/ui`.
 5. Verdict:

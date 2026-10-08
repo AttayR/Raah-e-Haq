@@ -33,7 +33,7 @@ For each step in the scenario:
   - whether it reproduces on a second try (read-only steps only)
 - Also note visual defects even when the step passes: clipped text, overlapping elements, wrong colours in dark mode, keyboard covering inputs, missing loading states, layout broken on small or large devices.
 
-Save screenshots under `docs/qa-reports/<date>-<task-or-run>/` with step-numbered names.
+Save screenshots under `docs/qa-reports/<date>-<task-or-run>/` with step-numbered names. They are committed to git, so keep them small. Before you finish, shrink every saved PNG so its longest side is at most 1000 px: `sips -Z 1000 <file>` (macOS). Delete stray or duplicate shots. Aim for under 300 KB per file.
 
 ## Report
 Write (if writing is blocked, return the full report as text so the orchestrator saves it) `docs/qa-reports/<date>-<task-or-run>/REPORT.md`, and return the same summary as your final message:
