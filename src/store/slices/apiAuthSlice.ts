@@ -15,6 +15,7 @@ import {
 import { logout } from '../thunks/sessionThunks';
 import { resetApp } from '../actions';
 import { rejectionMessage } from '../../core/api/errors';
+import { withRefusedStatus } from '../../core/auth/normalizeUser';
 
 export type AuthState = {
   user: User | null;
@@ -239,6 +240,11 @@ const authSlice = createSlice({
         // Dropped because the session ended (T-103): the signed-out state stays untouched.
         if (isStaleSessionRejection(action.payload)) {
           return;
+        }
+        // 403 ACCOUNT_* (BE-32): the account is blocked; AuthFlow routes on the merged status.
+        const refused = state.isAuthenticated && state.user ? withRefusedStatus(state.user, action.payload) : null;
+        if (refused) {
+          state.user = refused;
         }
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');

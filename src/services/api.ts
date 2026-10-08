@@ -202,27 +202,64 @@ apiClient.interceptors.response.use(
   }
 );
 
+/** BE-32 account statuses. Only `active` may use the app; see core/auth/normalizeUser. */
+export type AccountStatus = 'active' | 'inactive' | 'pending' | 'suspended' | 'rejected';
+
+/** The roles the app knows. Anything else the server sends normalises to `role: null`. */
+export type UserRole = 'driver' | 'passenger' | 'admin';
+
+/**
+ * A user as the server sends it (login, verify-otp, register, GET /auth/profile, GET /user,
+ * GET|PUT /profile). The shapes differ per endpoint (register has `user_type`, the profile
+ * has `roles[]`, older builds cached users without `role`), so never store or route on this:
+ * pass it through normalizeUser() (core/auth/normalizeUser) to get a User.
+ */
+export interface ApiUser {
+  id: number | string;
+  role?: string | null;
+  user_type?: string | null;
+  roles?: Array<string | { name?: string }> | null;
+  status?: string | null;
+  [key: string]: unknown;
+}
+
+/** The normalised signed-in user (normalizeUser). Routing reads only `role` and `status`. */
 export interface User {
   id: number;
   name: string;
   email: string;
-  phone: string;
+  /** BE-35: null until a number is verified; the number waiting for its code is pending_phone. */
+  phone: string | null;
+  pending_phone?: string | null;
+  phone_verified_at?: string | null;
+  status: AccountStatus;
+  /** BE-32: why the account was rejected or suspended, when the server sends it. */
+  rejection_reason?: string | null;
+  /** `role ?? user_type ?? roles[0]`, restricted to the roles the app knows. */
+  role: UserRole | null;
+  roles: string[];
+  languages?: string[];
   cnic?: string;
   address?: string;
   country?: string;
-  status: 'pending' | 'active' | 'suspended';
-  role: 'driver' | 'passenger' | 'admin';
-  roles: string[];
+  bio?: string;
+  gender?: string;
+  date_of_birth?: string;
+  profile_image_url?: string;
   emergency_contact?: string;
+  emergency_contact_name?: string;
+  emergency_contact_relation?: string;
   license_number?: string;
+  license_type?: string;
+  license_expiry_date?: string;
   vehicle_type?: string;
   preferred_payment?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface AuthResponse {
-  user: User;
+  user: ApiUser;
   token: string;
   token_type: string;
   /** BE-25: ISO 8601 idle expiry of the token (slides forward on use); null if none. */
@@ -231,7 +268,7 @@ export interface AuthResponse {
 
 /** POST /auth/register: drivers get no token until approved (token and token_type are null). */
 export interface RegisterResponse {
-  user: User;
+  user: ApiUser;
   token: string | null;
   token_type: string | null;
   expires_at?: string | null;
@@ -513,20 +550,21 @@ class ApiService {
   }
 
   // User Profile Methods
-  async getProfile(): Promise<ApiResponse<{ user: User }>> {
+  async getProfile(): Promise<ApiResponse<{ user: ApiUser }>> {
     const response = await apiClient.get('/auth/profile');
     return response.data;
   }
 
-  // PUT /profile (there is no PUT /auth/profile). data is the raw user model with a `roles`
-  // relation, not the normalised auth user; normalizeUser lands in T-105, the profile screen in T-504.
-  async updateProfile(userData: Partial<User>): Promise<ApiResponse<User>> {
+  // PUT /profile (there is no PUT /auth/profile). BE-29: data is the owner's profile (the same
+  // shape as GET /auth/profile, with `role`, `roles[]` and `languages[]`), not wrapped in
+  // `{ user }`; callers pass it through normalizeUser. A new phone waits in pending_phone (BE-35).
+  async updateProfile(userData: Partial<User>): Promise<ApiResponse<ApiUser>> {
     const response = await apiClient.put('/profile', userData);
     return response.data;
   }
 
   // Test Authentication
-  async testAuth(): Promise<ApiResponse<{ user: User }>> {
+  async testAuth(): Promise<ApiResponse<{ user: ApiUser }>> {
     const response = await apiClient.get('/user');
     return response.data;
   }

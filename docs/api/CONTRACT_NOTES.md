@@ -43,7 +43,12 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 | Method + path | Exists | Documented | App code | Notes |
 |---|---|---|---|---|
 | POST `/auth/login` | yes | yes | `apiService.login` | 401 `Invalid credentials`, 403 `ACCOUNT_*` (BE-25). `data: {user, token, token_type, expires_at}`. A 401 here is a wrong password, never a session expiry (T-104) |
-| POST `/auth/register` | yes | yes | `register`, `registerWithImages` (multipart) | 201 `data: {user, token, token_type}`. **Drivers get `token: null`** until approved |
+| POST `/auth/register` | yes | yes | `register`, `registerWithImages` (multipart) | 201 `data: {user, token, token_type, phone_verification}`. **Drivers get `token: null`** until approved. BE-35: never 422 for a taken phone (format/country 422 only); `user.phone` is null and `user.pending_phone` set until verified; `phone_verification: {phone, code_sent, expires_in, verification_token, verification_token_expires_in}` (+ `code, message, retry_after` when `code_sent` is false). Keep `verification_token` in memory only |
+| POST `/auth/phone/verify` | yes | no (T-201) | — | BE-35. `{verification_token, otp_code}` → 200 `data.user{id, phone, phone_verified_at, status}`; 422 `invalid_code` / `verification_token_invalid`; 429 `code_exhausted` / `otp_verify_limit` / `otp_ip_limit`; 409 `phone_needs_review`; 403 ACCOUNT_* |
+| POST `/auth/phone/resend` | yes | no (T-201) | — | BE-35. `{verification_token}` → 200, or the send-otp refusals (429/503 with `retry_after`) |
+| POST `/profile/phone` | yes | no (T-504) | — | BE-35. Bearer; `{phone}` sets `pending_phone` and texts a code (also resends). PUT `/profile` no longer changes the phone |
+| POST `/profile/phone/verify` | yes | no (T-504) | — | BE-35. Bearer; `{otp_code}` → 200 phone switched; wrong code 422 (never 401) |
+| DELETE `/profile/phone/pending` | yes | no (T-504) | — | BE-35. Bearer; clears `pending_phone` and its live code; also cleared by re-sending the current number to PUT /profile or POST /profile/phone |
 | POST `/auth/send-otp` | yes | yes | `sendOtp` | BE-27: same generic 200 whether or not the phone is registered (no 404). BE-28: 429 `otp_cooldown`/`otp_send_limit`/`otp_ip_limit` + `retry_after`; 503 `sms_unavailable` (daily SMS budget) or `busy` + `retry_after`; non-PK numbers 422. `otp_code` null outside local |
 | POST `/auth/verify-otp` | yes | yes | `verifyOtp` | 401 `Invalid or expired OTP` (never a session expiry). BE-28: 429 `code_exhausted` (+ `retry_after` until a new code can be sent) or `otp_verify_limit`. `data: {user, token, token_type, expires_at}` |
 | POST `/auth/forgot-password` | yes | yes | `forgotPassword` | |

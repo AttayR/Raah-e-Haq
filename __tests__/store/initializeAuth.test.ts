@@ -1,6 +1,7 @@
 /**
  * T-103 / AUTH-04, INF-08: cold-start session check. Only a 401 ends the stored session;
- * offline, timeouts, 5xx and 403 ACCOUNT_* keep it. A null result signs out whatever was
+ * offline, timeouts, 5xx and 403 ACCOUNT_* keep it (403 ACCOUNT_* also merges the refused
+ * status, T-105). A null result signs out whatever was
  * rehydrated. A logout while a profile request is in flight wins over the late result.
  */
 import { configureStore } from '@reduxjs/toolkit';
@@ -146,7 +147,7 @@ describe('initializeAuth (T-103)', () => {
     expect(await authStorage.getToken()).toBe(TOKEN);
   });
 
-  it('403 ACCOUNT_*: does not wipe the session (account-status routing is T-106)', async () => {
+  it('403 ACCOUNT_*: does not wipe the session (status merge: normalizeUserThunks.test)', async () => {
     await storeSession();
     mock.onGet('/auth/profile').reply(403, {
       success: false,
@@ -159,6 +160,7 @@ describe('initializeAuth (T-103)', () => {
     await store.dispatch(initializeAuth());
 
     expect(store.getState().apiAuth.isAuthenticated).toBe(true);
+    expect(store.getState().apiAuth.user?.status).toBe('suspended');
     expect(await authStorage.getToken()).toBe(TOKEN);
   });
 

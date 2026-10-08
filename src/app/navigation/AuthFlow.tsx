@@ -5,53 +5,32 @@ import AuthStack from './stacks/AuthStack';
 import RootNavigation from './RootNavigation';
 import DriverPendingApprovalScreen from '../../screens/Driver/DriverPendingApprovalScreen';
 import SplashScreen from '../../components/SplashScreen';
+import { resolveAuthRoute } from '../../core/auth/normalizeUser';
 import { logger } from '../../core/logging/logger';
 
+/**
+ * Routes on the normalised `user.role` and `user.status` only (AUTH-08, T-105); every thunk
+ * that stores a user passes it through normalizeUser first.
+ */
 export default function AuthFlow() {
-  const { isAuthenticated, user, profileCompleted, isInitialized } = useSelector(
-    (state: RootState) => state.apiAuth,
-  );
+  const { isAuthenticated, user, isInitialized } = useSelector((state: RootState) => state.apiAuth);
 
-  // Until initializeAuth has checked the stored session, route nowhere (no Login flash).
-  if (!isInitialized) {
-    return <SplashScreen />;
+  const route = resolveAuthRoute({ isInitialized, isAuthenticated, user });
+  logger.debug('AuthFlow - route:', { route, role: user?.role ?? null, status: user?.status ?? null });
+
+  switch (route) {
+    case 'splash':
+      // Until initializeAuth has checked the stored session, route nowhere (no Login flash).
+      return <SplashScreen />;
+    case 'account-status':
+      // Pending, inactive, suspended or rejected (BE-32), or no role this app serves. The
+      // status-specific screen is T-106; until then the existing pending screen (with sign-out).
+      return <DriverPendingApprovalScreen />;
+    case 'driver':
+    case 'passenger':
+      return <RootNavigation />;
+    case 'auth':
+    default:
+      return <AuthStack />;
   }
-
-  logger.debug('AuthFlow - Current state:', { isAuthenticated, hasUser: !!user, profileCompleted });
-
-  // Check if user is active and has a role
-  const isUserActive = user?.status === 'active';
-  const userRole = user?.role;
-  const isDriver = userRole === 'driver';
-  const isPassenger = userRole === 'passenger';
-
-  logger.debug('AuthFlow - User role check:', { 
-    role: userRole, 
-    isDriver, 
-    isPassenger, 
-    isUserActive 
-  });
-
-  // If authenticated, user is active, and has a role, show main app
-  if (isAuthenticated && user && isUserActive && userRole) {
-    logger.debug('AuthFlow - User authenticated and active with role, showing main app');
-    logger.debug('AuthFlow - User role:', userRole);
-    return <RootNavigation />;
-  }
-
-  // If authenticated but user is not active (pending approval), show pending approval screen
-  if (isAuthenticated && user && !isUserActive) {
-    logger.debug('AuthFlow - User not active (pending approval), showing pending approval screen');
-    return <DriverPendingApprovalScreen />;
-  }
-
-  // If authenticated but missing role, show auth screens for role selection
-  if (isAuthenticated && user && isUserActive && !userRole) {
-    logger.debug('AuthFlow - User authenticated but missing role, showing auth screens');
-    return <AuthStack />;
-  }
-
-  // If not authenticated or still loading, show auth screens
-  logger.debug('AuthFlow - User not authenticated, showing auth screens');
-  return <AuthStack />;
 }

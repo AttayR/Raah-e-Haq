@@ -9,7 +9,8 @@ import {
   User,
 } from '../../services/api';
 import { authStorage } from '../../services/authStorage';
-import { unwrap, toApiError, toThunkRejection, ThunkRejection } from '../../core/api/errors';
+import { unwrap, toApiError, toThunkRejection, ThunkRejection, ApiError } from '../../core/api/errors';
+import { normalizeUser, UNKNOWN_STATUS, withRefusedStatus } from '../../core/auth/normalizeUser';
 import { logApiFailure } from '../../core/api/logApiFailure';
 import {
   bumpSessionEpoch,
@@ -40,6 +41,18 @@ export interface AuthSession {
   token: string;
   tokenType: string;
 }
+
+/**
+ * Every user the app ingests goes through normalizeUser (AUTH-08), so Redux and storage only
+ * ever hold the normalised `role` and `status`. A payload that is not a user is a bad response.
+ */
+const requireUser = (raw: unknown): User => {
+  const user = normalizeUser(raw);
+  if (!user) {
+    throw new ApiError({ kind: 'unknown', message: 'Invalid response format from server' });
+  }
+  return user;
+};
 
 /** For endpoints whose success body has only a message (no data). */
 const messageOf = (body: { success: boolean; message?: string }, fallback: string): string => {
@@ -78,14 +91,15 @@ export const loginUser = createAsyncThunk<AuthSession, LoginRequest, ThunkConfig
     try {
       logger.debug('🔄 Redux Thunk - Starting user login...');
       const data = unwrap(await apiService.login(credentials));
+      const user = requireUser(data.user);
 
       // A logout while this ran wins: nothing is stored and the state stays signed out.
-      if (!(await storeNewSession(data, startedIn))) {
+      if (!(await storeNewSession({ ...data, user }, startedIn))) {
         return rejectWithValue(staleSessionRejection());
       }
       logger.debug('✅ Redux Thunk - Login successful');
 
-      return { user: data.user, token: data.token, tokenType: data.token_type };
+      return { user, token: data.token, tokenType: data.token_type };
     } catch (error) {
       logApiFailure('loginUser failed', error);
       return rejectWithValue(toThunkRejection(error, 'Login failed'));
@@ -100,7 +114,7 @@ export const registerUser = createAsyncThunk<User, RegisterRequest, ThunkConfig>
       logger.debug('🔄 Redux Thunk - Starting user registration...');
       const data = unwrap(await apiService.register(userData));
       logger.debug('✅ Redux Thunk - Registration successful');
-      return data.user;
+      return requireUser(data.user);
     } catch (error) {
       logApiFailure('registerUser failed', error);
       return rejectWithValue(toThunkRejection(error, 'Registration failed'));
@@ -122,18 +136,19 @@ export const registerUserWithImages = createAsyncThunk<
     try {
       logger.debug('🔄 Redux Thunk - Starting user registration with images...');
       const data = unwrap(await apiService.registerWithImages(userData));
+      const user = requireUser(data.user);
 
       // Drivers get no token until an admin approves them (token is null). Whether a token
       // should be kept at all after registration is AUTH-17 (T-202).
       const stored = data.token
-        ? await storeNewSession({ ...data, token: data.token }, startedIn)
-        : await authStorage.saveUser(data.user, startedIn);
+        ? await storeNewSession({ ...data, user, token: data.token }, startedIn)
+        : await authStorage.saveUser(user, startedIn);
       if (!stored) {
         return rejectWithValue(staleSessionRejection());
       }
       logger.debug('✅ Redux Thunk - Registration with images successful');
 
-      return { user: data.user, token: data.token, tokenType: data.token_type };
+      return { user, token: data.token, tokenType: data.token_type };
     } catch (error) {
       logApiFailure('registerUserWithImages failed', error);
       return rejectWithValue(toThunkRejection(error, 'Registration failed'));
@@ -166,13 +181,14 @@ export const verifyOtp = createAsyncThunk<AuthSession, VerifyOtpRequest, ThunkCo
     try {
       logger.debug('🔄 Redux Thunk - Starting OTP verification process...');
       const data = unwrap(await apiService.verifyOtp(otpData));
+      const user = requireUser(data.user);
 
-      if (!(await storeNewSession(data, startedIn))) {
+      if (!(await storeNewSession({ ...data, user }, startedIn))) {
         return rejectWithValue(staleSessionRejection());
       }
       logger.debug('✅ Redux Thunk - OTP verification successful');
 
-      return { user: data.user, token: data.token, tokenType: data.token_type };
+      return { user, token: data.token, tokenType: data.token_type };
     } catch (error) {
       logApiFailure('verifyOtp failed', error);
       return rejectWithValue(toThunkRejection(error, 'OTP verification failed'));
@@ -203,20 +219,35 @@ export const resetPassword = createAsyncThunk<string, ResetPasswordRequest, Thun
 );
 
 // User Profile Thunks
-export const getUserProfile = createAsyncThunk<User, void, ThunkConfig>(
+export const getUserProfile = createAsyncThunk<
+  User,
+  void,
+  ThunkConfig & { state: { apiAuth: { user: User | null } } }
+>(
   'auth/getUserProfile',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     const startedIn = currentSessionEpoch();
     try {
-      const data = unwrap(await apiService.getProfile());
+      const user = requireUser(unwrap(await apiService.getProfile()).user);
       // Signed out (or in again as someone else) while this was in flight: drop it. The
       // storage write re-checks the epoch, so a logout during the write also wins (T-104).
-      if (!(await authStorage.saveUser(data.user, startedIn)) || isStaleSession(startedIn)) {
+      if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
         return rejectWithValue(staleSessionRejection());
       }
-      return data.user;
+      return user;
     } catch (error) {
-      return rejectWithValue(toThunkRejection(error, 'Failed to get profile'));
+      const rejection = toThunkRejection(error, 'Failed to get profile');
+      // 403 ACCOUNT_* (BE-32): the reducer merges the refused status into the user; the cache
+      // gets it too (without rejection_reason), so an offline cold start does not route home.
+      const current = getState().apiAuth.user;
+      const refused = current ? withRefusedStatus(current, rejection) : null;
+      if (refused && !isStaleSession(startedIn)) {
+        await authStorage.saveUser(refused, startedIn);
+      }
+      if (isStaleSession(startedIn)) {
+        return rejectWithValue(staleSessionRejection());
+      }
+      return rejectWithValue(rejection);
     }
   }
 );
@@ -226,7 +257,8 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
   async (userData, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
-      const user = unwrap(await apiService.updateProfile(userData));
+      // BE-29: PUT /profile returns the profile itself as `data` (not `{ user }`).
+      const user = requireUser(unwrap(await apiService.updateProfile(userData)));
       if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
         return rejectWithValue(staleSessionRejection());
       }
@@ -243,8 +275,13 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
  * - no stored token: null (signed out)
  * - 200: the session with the fresh user from the server
  * - 401: the token is invalid, so it is cleared: null
- * - offline, timeout, 5xx, 403 ACCOUNT_* (BE-25; account-status routing is T-106): the stored
- *   session is kept and the user stays signed in. Only a 401 ends a session.
+ * - 403 ACCOUNT_* (BE-25/BE-32): the server is authoritative. The session is kept (a blocked
+ *   account's token answers 403, not 401) and the refused status is merged into the cached
+ *   user and saved, so AuthFlow routes to account status instead of home.
+ * - a 2xx that is not a valid profile: the token is kept, but the cached user is not trusted
+ *   to be active; it routes to account status (status UNKNOWN_STATUS, memory only).
+ * - offline, timeout, 5xx, other 4xx: the stored session is kept and routed from the cache.
+ *   Only a 401 ends a session.
  * If a logout happens while it runs, it rejects with staleSessionRejection() and the
  * reducer leaves the signed-out state alone.
  */
@@ -262,15 +299,20 @@ export const initializeAuth = createAsyncThunk<
         return null;
       }
       // The cached user, or the one redux-persist rehydrated (both without sensitive fields).
-      const storedUser = (await apiService.getUserData()) ?? getState().apiAuth.user ?? null;
+      // Either may come from an older build without `role`, so it is normalised again.
+      const storedUser =
+        (await apiService.getUserData()) ?? normalizeUser(getState().apiAuth.user) ?? null;
 
       let session: { user: User; token: string } | null;
+      let serverAnswered = false;
       try {
-        const data = unwrap(await apiService.getProfile());
-        if (!(await authStorage.saveUser(data.user, startedIn)) || isStaleSession(startedIn)) {
+        const body = await apiService.getProfile();
+        serverAnswered = true;
+        const user = requireUser(unwrap(body).user);
+        if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
           return rejectWithValue(staleSessionRejection());
         }
-        session = { user: data.user, token };
+        session = { user, token };
       } catch (error) {
         if (isStaleSession(startedIn)) {
           return rejectWithValue(staleSessionRejection());
@@ -281,6 +323,24 @@ export const initializeAuth = createAsyncThunk<
           bumpSessionEpoch();
           await apiService.clearAuthData();
           return null;
+        }
+        const refused = storedUser ? withRefusedStatus(storedUser, apiError) : null;
+        if (refused) {
+          // Blocked account (BE-32): keep the session, route to account status. The storage
+          // write drops rejection_reason, which stays in Redux memory only.
+          if (!(await authStorage.saveUser(refused, startedIn)) || isStaleSession(startedIn)) {
+            return rejectWithValue(staleSessionRejection());
+          }
+          return { user: refused, token };
+        }
+        if (serverAnswered) {
+          // The server answered 2xx but not with a profile (bad deploy, proxy or captive
+          // portal page). Signing out would throw away a session that may be fine, so the
+          // token stays; but nothing confirmed the account is active, so the cached user is
+          // not let into the home screens. Account status offers sign-out (and, from T-106,
+          // Check Status). Not written to user_data, so the next launch checks again.
+          logger.warn('initializeAuth - invalid profile response; routing to account status');
+          return storedUser ? { user: { ...storedUser, status: UNKNOWN_STATUS }, token } : null;
         }
         logger.warn('initializeAuth - profile check failed; keeping the stored session', {
           kind: apiError.kind,

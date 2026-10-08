@@ -2,6 +2,7 @@ import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isStaleSession } from '../store/sessionEpoch';
 import { toStoredUser } from '../core/auth/storedUser';
+import { normalizeUser } from '../core/auth/normalizeUser';
 import { logger } from '../core/logging/logger';
 import type { User } from './api';
 
@@ -191,7 +192,8 @@ export const authStorage = {
   async getUser(): Promise<User | null> {
     try {
       const raw = await AsyncStorage.getItem(USER_KEY);
-      return raw ? (JSON.parse(raw) as User) : null;
+      // user_data may have been written by an older build (no `role`, other shapes).
+      return raw ? normalizeUser(JSON.parse(raw)) : null;
     } catch {
       return null;
     }

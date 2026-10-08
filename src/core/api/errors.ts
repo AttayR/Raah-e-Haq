@@ -15,6 +15,15 @@ export type ApiErrorKind =
   | 'server'
   | 'unknown';
 
+/**
+ * BE-25/BE-32: what a 403 ACCOUNT_* body says about the account (`data.status`, and
+ * `data.rejection_reason` for ACCOUNT_REJECTED). Raw strings; core/auth/normalizeUser maps them.
+ */
+export interface AccountRefusal {
+  status?: string;
+  rejectionReason?: string | null;
+}
+
 export interface ApiErrorInit {
   kind: ApiErrorKind;
   message: string;
@@ -22,6 +31,7 @@ export interface ApiErrorInit {
   code?: string;
   fieldErrors?: FieldErrors;
   retryAfter?: number;
+  account?: AccountRefusal;
 }
 
 /** The only error type the API layer throws. Built in one place: the axios response interceptor. */
@@ -31,6 +41,7 @@ export class ApiError extends Error {
   readonly code?: string;
   readonly fieldErrors: FieldErrors;
   readonly retryAfter?: number;
+  readonly account?: AccountRefusal;
 
   constructor(init: ApiErrorInit) {
     super(init.message);
@@ -40,6 +51,9 @@ export class ApiError extends Error {
     this.code = init.code;
     this.fieldErrors = init.fieldErrors ?? {};
     this.retryAfter = init.retryAfter;
+    if (init.account) {
+      this.account = init.account;
+    }
   }
 }
 
@@ -112,6 +126,16 @@ const toPositiveNumber = (value: unknown): number | undefined => {
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+const toAccountRefusal = (data: unknown): AccountRefusal => {
+  if (!isObject(data)) return {};
+  const refusal: AccountRefusal = {};
+  if (typeof data.status === 'string') refusal.status = data.status;
+  if (typeof data.rejection_reason === 'string' || data.rejection_reason === null) {
+    refusal.rejectionReason = data.rejection_reason;
+  }
+  return refusal;
+};
+
 /** Reads the error fields out of any of the backend's error envelopes. */
 const fromBody = (body: unknown) => {
   if (!isObject(body)) return {};
@@ -136,6 +160,7 @@ const fromBody = (body: unknown) => {
     code,
     fieldErrors,
     retryAfter: toPositiveNumber(body.retry_after),
+    account: code && code.startsWith('ACCOUNT_') ? toAccountRefusal(body.data) : undefined,
   };
 };
 
@@ -161,6 +186,7 @@ export const toApiError = (error: unknown): ApiError => {
         code: parsed.code,
         fieldErrors,
         retryAfter: parsed.retryAfter ?? headerRetry,
+        account: parsed.account,
       });
     }
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
@@ -203,6 +229,8 @@ export interface ThunkRejection {
   code?: string;
   fieldErrors: FieldErrors;
   retryAfter?: number;
+  /** Set for a 403 ACCOUNT_* refusal (BE-25/BE-32). */
+  account?: AccountRefusal;
 }
 
 export const toThunkRejection = (error: unknown, fallbackMessage: string): ThunkRejection => {
@@ -216,6 +244,7 @@ export const toThunkRejection = (error: unknown, fallbackMessage: string): Thunk
     code: apiError.code,
     fieldErrors: apiError.fieldErrors,
     retryAfter: apiError.retryAfter,
+    ...(apiError.account ? { account: apiError.account } : {}),
   };
 };
 
