@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet, AppState } from 'react-native';
+import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet, AppState, Linking } from 'react-native';
 import { Marker, MapPressEvent } from 'react-native-maps';
 import SafeMapView from '../../components/SafeMapView';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -22,6 +22,9 @@ import FareDetails from '../../components/passenger/FareDetails';
 import AnimatedPolyline from '../../components/AnimatedPolyline';
 import RequestingCard from '../../components/passenger/RequestingCard';
 import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
+import { NearbyDriverMarkers, NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
+import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
+import { getDriverPhone, isRideActive } from '../../services/rideService';
 import { reverseGeocode } from '../../services/placesService';
 import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
@@ -53,12 +56,10 @@ const PassengerMapScreen = () => {
   const {
     currentRide,
     rideHistory,
-    availableDrivers,
     isLoading: rideLoading,
     error: rideError,
     requestRide: requestRideService,
     cancelRide: cancelRideService,
-    findNearbyDrivers,
     refreshRide,
   } = rideHook || {};
   
@@ -78,6 +79,21 @@ const PassengerMapScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const isFocused = useIsFocused();
+
+  // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is under way.
+  const rideActive = isRideActive(currentRide);
+  const nearbyDrivers = useNearbyDrivers(pickup ?? currentLocation, {
+    enabled: isFocused && !rideActive && stage !== 'requesting',
+  });
+  // Call button only while the server exposes driver.phone (accepted, still-active ride).
+  const driverPhone = getDriverPhone(currentRide);
+  const callDriver = useCallback(() => {
+    if (!driverPhone) return;
+    Linking.openURL(`tel:${encodeURIComponent(driverPhone)}`).catch(() => {
+      Alert.alert('Unable to call', 'Your device could not start the call.');
+    });
+  }, [driverPhone]);
 
   // Initialize map ready state
   useEffect(() => {
@@ -607,6 +623,7 @@ const PassengerMapScreen = () => {
         {destination && (
           <Marker coordinate={destination} title={MAPS_CONFIG.MARKERS.destination.title} pinColor={MAPS_CONFIG.MARKERS.destination.color} />
         )}
+        {!rideActive && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
         {routeCoordinates.length > 0 && (
           <AnimatedPolyline coordinates={routeCoordinates as any} strokeWidth={5} strokeColor={BrandColors.primary} durationMs={1200} />
          )}
@@ -647,6 +664,7 @@ const PassengerMapScreen = () => {
             </TouchableOpacity>
           </View>
         )}
+        {!rideActive && stage !== 'requesting' && <NearbyDriversStatus state={nearbyDrivers} />}
         <StageChips stage={stage} />
         {stage === 'home' && (
           <DualLocationPicker
@@ -843,7 +861,12 @@ const PassengerMapScreen = () => {
         )}
 
         {currentRide && currentRide.status === 'accepted' && (
-          <DriverAssignedCard name={currentRide.driver?.name || 'Driver'} vehicle={currentRide.vehicle_type || 'Car'} eta={'5 min'} />
+          <DriverAssignedCard
+            name={currentRide.driver?.name || 'Driver'}
+            vehicle={currentRide.vehicle_type || 'Car'}
+            eta={'5 min'}
+            onCall={driverPhone ? callDriver : undefined}
+          />
         )}
       </View>
       

@@ -6,6 +6,7 @@ type Props = {
   name?: string;
   vehicle?: string;
   eta?: string;
+  /** Shown only when set: the screen passes it only while the ride exposes driver.phone (BE-20). */
   onCall?: () => void;
   onMessage?: () => void;
 };
@@ -18,7 +19,11 @@ const DriverAssignedCard: React.FC<Props> = ({ name = 'Driver', vehicle = 'Car',
         <Text style={styles.title}>{name}</Text>
         <Text style={styles.sub}>{vehicle} • ETA {eta}</Text>
         <View style={styles.row}>
-          <TouchableOpacity style={styles.btn} onPress={onCall}><Text style={styles.btnText}>Call</Text></TouchableOpacity>
+          {onCall && (
+            <TouchableOpacity testID="driver-call-button" accessibilityRole="button" style={styles.btn} onPress={onCall}>
+              <Text style={styles.btnText}>Call</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.btn} onPress={onMessage}><Text style={styles.btnText}>Message</Text></TouchableOpacity>
         </View>
       </View>

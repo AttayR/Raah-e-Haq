@@ -4,8 +4,8 @@ import rideService, {
   RideRequest, 
   RideStopRequest,
   RideStopsUpdate,
-  DriverInRadius, 
-  DriverLocation,
+  NearbyDriver,
+  RideDriverLocation,
   LocationUpdate,
   NotificationResource
 } from '../services/rideService';
@@ -27,7 +27,7 @@ import { logger } from '../core/logging/logger';
 export interface RideState {
   currentRide: RideResource | null;
   rideHistory: RideResource[];
-  availableDrivers: DriverInRadius[];
+  availableDrivers: NearbyDriver[];
   isLoading: boolean;
   error: string | null;
 }
@@ -39,7 +39,7 @@ export interface RideActions {
   completeRide: (rideId: number, fare?: number, distance?: number, duration?: number) => Promise<RideResource>;
   cancelRide: (rideId: number) => Promise<RideResource>;
   updateDriverLocation: (location: LocationUpdate) => Promise<void>;
-  findNearbyDrivers: (latitude: number, longitude: number, radius?: number) => Promise<DriverInRadius[]>;
+  findNearbyDrivers: (latitude: number, longitude: number, radius?: number) => Promise<NearbyDriver[]>;
   refreshRide: (rideId: number) => Promise<RideResource>;
   refreshRideHistory: () => Promise<void>;
   clearError: () => void;
@@ -57,7 +57,7 @@ export interface RideActions {
   // Location tracking
   startLocationTracking: (config?: any) => Promise<void>;
   stopLocationTracking: () => void;
-  getDriverLocation: (driverId: number) => Promise<DriverLocation | null>;
+  getDriverLocation: (ride: RideResource) => Promise<RideDriverLocation>;
   
   // Notifications
   getNotifications: (page?: number, perPage?: number) => Promise<{data: NotificationResource[], pagination: any}>;
@@ -87,7 +87,8 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   });
 
   // Use notifications based on user type
-  const passengerNotifications = usePassengerNotifications(userId?.toString());
+  // Kept for its subscription side effects; the backend sends ride notifications.
+  usePassengerNotifications(userId?.toString());
   const driverNotifications = useDriverNotifications(userId?.toString());
 
   // Request a ride (Passenger)
@@ -110,34 +111,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
         isLoading: false,
       }));
 
-      // Find nearby drivers and send notifications
-      const drivers = await findNearbyDrivers(
-        rideData.pickup_latitude,
-        rideData.pickup_longitude,
-        5 // 5km radius
-      );
-
-      // Send notifications to nearby drivers (only if drivers exist)
-      if (drivers && Array.isArray(drivers)) {
-        for (const driver of drivers) {
-          await passengerNotifications.sendRideRequestNotification(driver.id, {
-            rideId: ride.id,
-            passengerName: 'Passenger', // TODO: Get actual passenger name
-            pickup: {
-              latitude: rideData.pickup_latitude,
-              longitude: rideData.pickup_longitude,
-              address: rideData.pickup_address,
-            },
-            destination: {
-              latitude: rideData.dropoff_latitude,
-              longitude: rideData.dropoff_longitude,
-              address: rideData.dropoff_address,
-            },
-            fare: 0, // Will be calculated
-            distance: '0 km', // Will be calculated
-          });
-        }
-      }
+      // The backend notifies nearby drivers (BE-20: nearby ids are opaque, not driver ids).
 
       // Show success modal
       showRideRequestedModal();
@@ -202,7 +176,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       
       throw error;
     }
-  }, [passengerNotifications]);
+  }, []);
 
   // Accept a ride (Driver)
   const acceptRide = useCallback(async (rideId: number, driverId: number): Promise<RideResource> => {
@@ -221,9 +195,6 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       // Send notification to passenger
       await driverNotifications.sendRideAcceptedNotification(ride.passenger_id, {
         rideId: ride.id,
-        driverName: 'Driver', // TODO: Get actual driver name
-        driverPhone: 'N/A', // TODO: Get actual driver phone
-        estimatedArrival: '5 minutes',
       });
 
       // Show success toast
@@ -415,35 +386,21 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     }
   }, []);
 
-  // Find nearby drivers
+  // Find nearby drivers once (GET /rides/nearby-drivers). The passenger map polls with
+  // useNearbyDrivers instead, which respects the 429 retry_after.
   const findNearbyDrivers = useCallback(async (
     latitude: number,
     longitude: number,
     radius: number = 5
-  ): Promise<DriverInRadius[]> => {
+  ): Promise<NearbyDriver[]> => {
     try {
-      logger.debug('🔍 Finding nearby drivers:', { latitude, longitude, radius });
-      const drivers = await rideService.getDriversInRadius(latitude, longitude, radius);
-      
-      // Ensure drivers is always an array
-      const safeDrivers = Array.isArray(drivers) ? drivers : [];
-      
-      setState(prev => ({
-        ...prev,
-        availableDrivers: safeDrivers,
-      }));
-
-      logger.debug('✅ Nearby drivers found:', safeDrivers);
-      return safeDrivers;
-    } catch (error) {
-      logger.error('❌ Failed to find nearby drivers:', error);
-      // Return empty array on error instead of throwing
-      const emptyDrivers: DriverInRadius[] = [];
-      setState(prev => ({
-        ...prev,
-        availableDrivers: emptyDrivers,
-      }));
-      return emptyDrivers;
+      const drivers = await rideService.getNearbyDrivers({ latitude, longitude, radiusKm: radius });
+      setState(prev => ({ ...prev, availableDrivers: drivers }));
+      return drivers;
+    } catch {
+      // rideService already logged it; the list is advisory.
+      setState(prev => ({ ...prev, availableDrivers: [] }));
+      return [];
     }
   }, []);
 
@@ -669,18 +626,11 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     }
   }, []);
 
-  // Get driver location
-  const getDriverLocation = useCallback(async (driverId: number): Promise<DriverLocation | null> => {
-    try {
-      logger.debug('📍 Getting driver location:', driverId);
-      const location = await locationTrackingService.getDriverLocation(driverId);
-      logger.debug('✅ Driver location fetched:', location);
-      return location;
-    } catch (error) {
-      logger.error('❌ Failed to get driver location:', error);
-      throw error;
-    }
-  }, []);
+  // Get the assigned driver's location; only asks the server while the ride is active (BE-20).
+  const getDriverLocation = useCallback(
+    (ride: RideResource): Promise<RideDriverLocation> => rideService.getDriverLocationForRide(ride),
+    [],
+  );
 
   // ==================== NOTIFICATION METHODS ====================
 

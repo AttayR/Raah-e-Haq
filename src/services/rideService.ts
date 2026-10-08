@@ -51,7 +51,7 @@ export interface RideResource {
   pickup_longitude: number;
   dropoff_latitude: number;
   dropoff_longitude: number;
-  status: 'requested' | 'accepted' | 'ongoing' | 'completed' | 'cancelled';
+  status: 'requested' | 'accepted' | 'arrived' | 'started' | 'ongoing' | 'completed' | 'cancelled';
   vehicle_type: string;
   passenger_count: number;
   special_instructions?: string;
@@ -78,13 +78,17 @@ export interface RideResource {
     phone: string;
     rating?: number;
   };
+  /**
+   * Non-admin viewers get a minimal card (BE-20). `phone` is present only for the passenger of
+   * an accepted, still-active ride (and for the driver themselves); use getDriverPhone().
+   */
   driver?: {
     id: number;
     name: string;
-    phone: string;
-    rating?: number;
-    vehicle_type?: string;
-    license_number?: string;
+    phone?: string | null;
+    profile_image_url?: string | null;
+    rating?: number | null;
+    vehicle_type?: string | null;
   };
   vehicle?: {
     id: number;
@@ -134,6 +138,7 @@ export type DriverLocationStatus = 'online' | 'available' | 'busy' | 'offline';
 /**
  * A driver's latest position, as returned by GET /tracking/driver/{id}/latest.
  * Non-admin callers get only these fields (BE-20, DriverPrivacy::PUBLIC_LOCATION_FIELDS).
+ * The server sends latitude/longitude/heading as decimal strings; getDriverLocation returns numbers.
  */
 export interface DriverLocation {
   driver_id: number;
@@ -143,6 +148,24 @@ export interface DriverLocation {
   status: DriverLocationStatus;
   last_seen_at: string;
 }
+
+/** Wire shape of the latest-location body (Laravel `decimal:8` casts serialise as strings). */
+interface DriverLocationWire {
+  driver_id: number;
+  latitude: number | string;
+  longitude: number | string;
+  heading?: number | string | null;
+  status: DriverLocationStatus;
+  last_seen_at: string;
+}
+
+/**
+ * GET /tracking/driver/{id}/latest during a ride: the position, or `available: false` when the
+ * server refuses it (403 outside an accepted, still-active ride) or the driver has not sent one.
+ */
+export type RideDriverLocation =
+  | { available: true; location: DriverLocation }
+  | { available: false };
 
 /** Body of POST /tracking/update-location (DriverTrackingController@updateLocation). */
 export interface LocationUpdate {
@@ -155,12 +178,20 @@ export interface LocationUpdate {
   accuracy?: number | null;
 }
 
-// TODO(T-110/BE-20): passengers must use GET /rides/nearby-drivers (opaque string id,
-// no name/phone). /tracking/drivers-in-radius is admin-only and returns 403 to passengers.
-export interface DriverInRadius {
-  id: number;
-  name: string;
-  phone: string;
+export type NearbyVehicleType = 'car' | 'bike' | 'rickshaw' | 'van';
+
+/** Radius bounds of GET /rides/nearby-drivers (BE-20, DriverPrivacy::MAX_NEARBY_RADIUS_KM). */
+export const NEARBY_MIN_RADIUS_KM = 1;
+export const NEARBY_MAX_RADIUS_KM = 10;
+export const NEARBY_DEFAULT_RADIUS_KM = 5;
+
+/**
+ * One entry of GET /rides/nearby-drivers (BE-20). No name, phone or user id: `id` is an opaque
+ * string bound to the viewer (stable for about an hour; use it only as a list/marker key),
+ * `rating` is in 0.5 steps, `location` is snapped to a ~550 m grid and refreshes every 2 minutes.
+ */
+export interface NearbyDriver {
+  id: string;
   rating: number;
   vehicle_type: string;
   distance_km: number;
@@ -170,6 +201,77 @@ export interface DriverInRadius {
     longitude: number;
   };
 }
+
+export interface NearbyDriversQuery {
+  latitude: number;
+  longitude: number;
+  radiusKm?: number;
+  vehicleType?: NearbyVehicleType;
+}
+
+/** Ride statuses during which the passenger may see the driver's phone and position (BE-20). */
+export const ACTIVE_RIDE_STATUSES: ReadonlyArray<string> = ['accepted', 'arrived', 'started', 'ongoing'];
+
+export const isRideActive = (ride: Pick<RideResource, 'status'> | null | undefined): boolean =>
+  !!ride && ACTIVE_RIDE_STATUSES.includes(ride.status);
+
+/**
+ * The driver's phone for the Call button: only from `ride.driver.phone`, which the server
+ * includes only while the ride is active (BE-20). Spaces and dashes are removed; anything
+ * that is not 7-15 digits with an optional leading + is rejected. Null hides the button.
+ */
+export const getDriverPhone = (ride: RideResource | null | undefined): string | null => {
+  if (!ride || !isRideActive(ride)) return null;
+  const phone = ride.driver?.phone;
+  if (typeof phone !== 'string') return null;
+  // Digits with an optional leading +, so a tel: link can't carry dial codes (; , # * etc.).
+  const compact = phone.replace(/[\s-]/g, '');
+  return /^\+?[0-9]{7,15}$/.test(compact) ? compact : null;
+};
+
+const toNumber = (value: unknown): number | null => {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+};
+
+const normalizeDriverLocation = (raw: DriverLocationWire | null | undefined): DriverLocation | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const latitude = toNumber(raw.latitude);
+  const longitude = toNumber(raw.longitude);
+  if (latitude === null || longitude === null) return null;
+  return {
+    driver_id: raw.driver_id,
+    latitude,
+    longitude,
+    heading: toNumber(raw.heading),
+    status: raw.status,
+    last_seen_at: raw.last_seen_at,
+  };
+};
+
+const normalizeNearbyDriver = (raw: unknown): NearbyDriver | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const item = raw as Record<string, unknown>;
+  const location = (item.location ?? {}) as Record<string, unknown>;
+  const latitude = toNumber(location.latitude);
+  const longitude = toNumber(location.longitude);
+  if (typeof item.id !== 'string' || item.id === '' || latitude === null || longitude === null) {
+    return null;
+  }
+  return {
+    id: item.id,
+    rating: toNumber(item.rating) ?? 0,
+    vehicle_type: typeof item.vehicle_type === 'string' ? item.vehicle_type : 'car',
+    distance_km: toNumber(item.distance_km) ?? 0,
+    estimated_arrival_min: toNumber(item.estimated_arrival_min) ?? 0,
+    location: { latitude, longitude },
+  };
+};
+
+const clampRadius = (radiusKm: number | undefined): number => {
+  const r = typeof radiusKm === 'number' && Number.isFinite(radiusKm) ? radiusKm : NEARBY_DEFAULT_RADIUS_KM;
+  return Math.min(NEARBY_MAX_RADIUS_KM, Math.max(NEARBY_MIN_RADIUS_KM, r));
+};
 
 /** data of POST /rides/{id}/stops, DELETE /rides/{id}/stops/{stop} and PUT /rides/{id}/stops/reorder. */
 export interface RideStopsUpdate {
@@ -394,36 +496,56 @@ class RideService {
   async getDriverLocation(driverId: number): Promise<DriverLocation | null> {
     try {
       logger.debug('📍 Fetching driver location:', driverId);
-      return unwrap(await apiService.get<DriverLocation | null>(`${this.trackingUrl}/driver/${driverId}/latest`));
+      return normalizeDriverLocation(
+        unwrap(await apiService.get<DriverLocationWire | null>(`${this.trackingUrl}/driver/${driverId}/latest`)),
+      );
     } catch (error) {
-      logger.error('❌ Failed to fetch driver location:', error);
+      logApiFailure('Failed to fetch driver location', error);
       throw error;
     }
   }
 
-  // Get drivers in radius. TODO(T-110/BE-20): admin-only route; passengers get 403.
-  async getDriversInRadius(
-    latitude: number,
-    longitude: number,
-    radiusKm: number = 5
-  ): Promise<DriverInRadius[]> {
+  /**
+   * The assigned driver's position for the passenger's ride. Never calls the server unless the
+   * ride is active and has a driver; a 403 (ride no longer active) is "not available", not an error.
+   */
+  async getDriverLocationForRide(ride: RideResource | null | undefined): Promise<RideDriverLocation> {
+    if (!ride || !isRideActive(ride) || typeof ride.driver_id !== 'number') {
+      return { available: false };
+    }
     try {
-      logger.debug('🔍 Finding drivers in radius:', { latitude, longitude, radiusKm });
-      const body = await apiService.get<DriverInRadius[]>(`${this.trackingUrl}/drivers-in-radius`, {
-        params: {
-          latitude,
-          longitude,
-          radius_km: radiusKm
-        }
-      });
-      const drivers = unwrap(body);
+      const location = await this.getDriverLocation(ride.driver_id);
+      return location ? { available: true, location } : { available: false };
+    } catch (error) {
+      if (isApiError(error) && error.kind === 'forbidden' && !error.code?.startsWith('ACCOUNT_')) {
+        return { available: false };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Available drivers near a point for the passenger map (GET /rides/nearby-drivers, BE-20).
+   * The radius is clamped to 1..10 km. Rate limited to 12 requests a minute per user: a 429
+   * rejects with ApiError kind 'rate_limited' and `retryAfter` (seconds).
+   */
+  async getNearbyDrivers(query: NearbyDriversQuery, signal?: AbortSignal): Promise<NearbyDriver[]> {
+    try {
+      const params: Record<string, string | number> = {
+        latitude: query.latitude,
+        longitude: query.longitude,
+        radius: clampRadius(query.radiusKm),
+      };
+      if (query.vehicleType) {
+        params.vehicle_type = query.vehicleType;
+      }
+      const drivers = unwrap(await apiService.get<unknown>(`${this.baseUrl}/nearby-drivers`, { params, signal }));
       if (!Array.isArray(drivers)) {
         return [];
       }
-      logger.debug('✅ Drivers found successfully:', drivers.length);
-      return drivers;
+      return drivers.map(normalizeNearbyDriver).filter((d): d is NearbyDriver => d !== null);
     } catch (error) {
-      logger.error('❌ Failed to find drivers in radius:', error);
+      logApiFailure('Failed to load nearby drivers', error);
       throw error;
     }
   }

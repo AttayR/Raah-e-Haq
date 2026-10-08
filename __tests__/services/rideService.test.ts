@@ -4,7 +4,7 @@
  */
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../src/services/api';
-import rideService, { RideResource } from '../../src/services/rideService';
+import rideService, { getDriverPhone, RideResource } from '../../src/services/rideService';
 import { ApiError } from '../../src/core/api/errors';
 
 const ride = {
@@ -157,5 +157,140 @@ describe('rideService errors are ApiError', () => {
   it('a 2xx body with success:false is not treated as a ride', async () => {
     mock.onGet('/rides/42').reply(200, { success: false, message: 'Ride not available' });
     await expect(rideService.getRide(42)).rejects.toMatchObject({ kind: 'unknown' });
+  });
+});
+
+describe('nearby drivers and driver location on the BE-20 contract (T-110)', () => {
+  const nearby = {
+    id: 'a1b2c3d4e5f60718',
+    rating: 4.5,
+    vehicle_type: 'car',
+    distance_km: 1.2,
+    estimated_arrival_min: 3,
+    location: { latitude: 31.52, longitude: 74.355 },
+  };
+
+  it('calls GET /rides/nearby-drivers (never /tracking/drivers-in-radius) with radius and vehicle_type', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(200, envelope([nearby]));
+    const drivers = await rideService.getNearbyDrivers({ latitude: 31.5, longitude: 74.3, radiusKm: 3, vehicleType: 'bike' });
+    expect(drivers).toEqual([nearby]);
+    expect(typeof drivers[0].id).toBe('string');
+    expect(mock.history.get).toHaveLength(1);
+    expect(mock.history.get[0].url).toBe('/rides/nearby-drivers');
+    expect(mock.history.get[0].params).toEqual({ latitude: 31.5, longitude: 74.3, radius: 3, vehicle_type: 'bike' });
+  });
+
+  it('clamps the radius to 1..10 km and defaults to 5', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(200, envelope([]));
+    await rideService.getNearbyDrivers({ latitude: 1, longitude: 2, radiusKm: 50 });
+    await rideService.getNearbyDrivers({ latitude: 1, longitude: 2, radiusKm: 0.2 });
+    await rideService.getNearbyDrivers({ latitude: 1, longitude: 2 });
+    expect(mock.history.get.map(r => r.params.radius)).toEqual([10, 1, 5]);
+    expect(mock.history.get[2].params).not.toHaveProperty('vehicle_type');
+  });
+
+  it('keeps only the documented fields and drops entries without an opaque id or position', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(
+      200,
+      envelope([
+        { ...nearby, name: 'Leaked Name', phone: '+923001234567', driver_id: 9 },
+        { ...nearby, id: 9 },
+        { ...nearby, id: 'x', location: { latitude: null, longitude: 74 } },
+      ]),
+    );
+    const drivers = await rideService.getNearbyDrivers({ latitude: 31.5, longitude: 74.3 });
+    expect(drivers).toEqual([nearby]);
+    expect(drivers[0]).not.toHaveProperty('name');
+    expect(drivers[0]).not.toHaveProperty('phone');
+  });
+
+  it('429 rejects as rate_limited with retry_after', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(429, {
+      success: false,
+      message: 'Too many requests. Please try again shortly.',
+      retry_after: 42,
+    });
+    await expect(rideService.getNearbyDrivers({ latitude: 31.5, longitude: 74.3 })).rejects.toMatchObject({
+      kind: 'rate_limited',
+      status: 429,
+      retryAfter: 42,
+    });
+  });
+
+  it('latest location: decimal strings become numbers', async () => {
+    mock.onGet('/tracking/driver/9/latest').reply(
+      200,
+      envelope({
+        driver_id: 9,
+        latitude: '31.52000000',
+        longitude: '74.35000000',
+        heading: '90.00',
+        status: 'busy',
+        last_seen_at: '2026-10-08T10:00:00Z',
+      }),
+    );
+    await expect(rideService.getDriverLocation(9)).resolves.toEqual({
+      driver_id: 9,
+      latitude: 31.52,
+      longitude: 74.35,
+      heading: 90,
+      status: 'busy',
+      last_seen_at: '2026-10-08T10:00:00Z',
+    });
+  });
+
+  it('getDriverLocationForRide does not call the server unless the ride is active with a driver', async () => {
+    for (const status of ['requested', 'completed', 'cancelled'] as const) {
+      await expect(rideService.getDriverLocationForRide({ ...ride, status })).resolves.toEqual({ available: false });
+    }
+    await expect(rideService.getDriverLocationForRide({ ...ride, driver_id: undefined })).resolves.toEqual({ available: false });
+    await expect(rideService.getDriverLocationForRide(null)).resolves.toEqual({ available: false });
+    expect(mock.history.get).toHaveLength(0);
+  });
+
+  it('getDriverLocationForRide treats 403 as "not available" (no throw)', async () => {
+    mock.onGet('/tracking/driver/9/latest').reply(403, {
+      success: false,
+      message: 'Forbidden. You do not have permission to access this resource.',
+    });
+    await expect(rideService.getDriverLocationForRide(ride)).resolves.toEqual({ available: false });
+  });
+
+  it('getDriverLocationForRide returns the position during an active ride, and null data as not available', async () => {
+    mock.onGet('/tracking/driver/9/latest').replyOnce(
+      200,
+      envelope({ driver_id: 9, latitude: 31.5, longitude: 74.3, heading: null, status: 'busy', last_seen_at: 't' }),
+    );
+    await expect(rideService.getDriverLocationForRide({ ...ride, status: 'started' })).resolves.toMatchObject({
+      available: true,
+      location: { latitude: 31.5, longitude: 74.3 },
+    });
+    mock.onGet('/tracking/driver/9/latest').replyOnce(200, envelope(null));
+    await expect(rideService.getDriverLocationForRide(ride)).resolves.toEqual({ available: false });
+  });
+
+  it('getDriverLocationForRide still throws other failures', async () => {
+    mock.onGet('/tracking/driver/9/latest').networkError();
+    await expect(rideService.getDriverLocationForRide(ride)).rejects.toMatchObject({ kind: 'network' });
+  });
+
+  it('getDriverPhone: ride.driver.phone only while the ride is active', () => {
+    const withPhone = { ...ride, driver: { id: 9, name: 'D', phone: '+923001234567' } };
+    expect(getDriverPhone(withPhone)).toBe('+923001234567');
+    expect(getDriverPhone({ ...withPhone, status: 'arrived' })).toBe('+923001234567');
+    expect(getDriverPhone({ ...withPhone, status: 'completed' })).toBeNull();
+    expect(getDriverPhone({ ...withPhone, status: 'requested' })).toBeNull();
+    expect(getDriverPhone({ ...ride, driver: { id: 9, name: 'D' } })).toBeNull();
+    expect(getDriverPhone({ ...ride, driver: { id: 9, name: 'D', phone: ' ' } })).toBeNull();
+    expect(getDriverPhone(null)).toBeNull();
+  });
+
+  it('getDriverPhone strips spaces and dashes and rejects anything that is not a plain number', () => {
+    const withPhone = (phone: string) => ({ ...ride, driver: { id: 9, name: 'D', phone } });
+    expect(getDriverPhone(withPhone('+92 300-123 4567'))).toBe('+923001234567');
+    expect(getDriverPhone(withPhone('03001234567'))).toBe('03001234567');
+    for (const bad of ['+923001234567;ext=1', '+923001234567,1', '*123#', '+92300#1234567', '12345', '+1234567890123456', '+92 300 abc 4567']) {
+      expect(getDriverPhone(withPhone(bad))).toBeNull();
+    }
   });
 });

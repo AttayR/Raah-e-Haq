@@ -166,6 +166,17 @@ Audited on 2026-10-03 by reading the code, at commit `9047c5d`. Severity:
 - `PassengerHomeScreen` is 1191 lines, `PassengerMapScreen` is 1042, and `useRide` is 828 (mixing driver and passenger logic).
 - **Fix:** split into a booking-flow container with one component per stage.
 
+### PAX-23 · P1 · bug: car ride requests always fail (422)
+`src/screens/Passenger/PassengerMapScreen.tsx` ~471 (`onRequestRide`)
+- Sends `vehicle_type: selectedVehicle` ('economy', 'comfort', 'premium') without the `vehicleTypeMapping` the other path uses. The server accepts only car, bike, rickshaw or van, so only Bike can be booked.
+- Also hardcodes `passenger_id: 11` and the addresses 'Pickup Location' and 'Destination Location'.
+- The expected 422 goes to logger.error, which shows a red LogBox.
+- Found in QA run 2026-10-08-T-110.
+
+### PAX-24 · P2 · bug: tapping a driver marker sets the destination
+- The map `onPress` handler doesn't ignore `nativeEvent.action === 'marker-press'`, so tapping a nearby-driver marker sets the destination and opens the Vehicle sheet. The callout (vehicle · ~ETA) is never shown.
+- Found in QA run 2026-10-08-T-110.
+
 ## Duplicates: which one is used
 
 | Pair | Used | Notes |
