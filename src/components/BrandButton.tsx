@@ -20,18 +20,21 @@ export default function BrandButton({
   disabled,
 }: Props) {
   const { theme } = useAppTheme();
-  const bg = theme.colors[variant];
+  // Disabled uses the theme's disabled fill/label (AUTH-18): the old 0.6 opacity was
+  // overwritten by the pressed-state style, so a disabled button looked enabled.
+  const bg = disabled ? theme.colors.disabledFill : theme.colors[variant];
   const base: ViewStyle = {
     backgroundColor: bg,
     paddingVertical: 14,
     borderRadius: 12,
-    opacity: disabled ? 0.6 : 1,
   };
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [base, style, { opacity: pressed ? 0.6 : 1 }]}
+      style={({ pressed }) => [base, style, { opacity: pressed && !disabled ? 0.6 : 1 }]}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
     >
       <Text
         style={[
@@ -42,6 +45,7 @@ export default function BrandButton({
             fontSize: 16,
           },
           textStyle,
+          disabled ? { color: theme.colors.disabledText } : null,
         ]}
       >
         {title}

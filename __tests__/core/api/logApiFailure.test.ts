@@ -38,6 +38,23 @@ describe('logApiFailure', () => {
     expect(warn).toHaveBeenCalledWith('loginUser failed', expect.objectContaining({ status }));
   });
 
+  it.each([
+    [503, { message: 'Phone verification is temporarily unavailable.', code: 'sms_unavailable', retry_after: 600 }],
+    [503, { message: 'The server is busy.', code: 'busy', retry_after: 5 }],
+    [429, { message: 'Too many incorrect attempts.', code: 'code_exhausted', retry_after: 20 }],
+    [429, { message: 'Too many codes from this network.', code: 'otp_ip_limit', retry_after: 3600 }],
+  ])('T-113: logs the expected OTP refusal %s %o as a warning (no red LogBox)', (status, body) => {
+    logApiFailure('sendOtp failed', axiosErrorWith(status, body));
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('sendOtp failed', expect.objectContaining({ status, code: body.code }));
+  });
+
+  it('T-113: a 503 without a known refusal code is still an error', () => {
+    logApiFailure('sendOtp failed', axiosErrorWith(503, { message: 'Service Unavailable' }));
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('logs offline as a warning with a non-empty summary', () => {
     const config = { headers: new AxiosHeaders() };
     logApiFailure('x failed', new AxiosError('Network Error', 'ERR_NETWORK', config));

@@ -6,7 +6,6 @@ import {
   StatusBar,
   ImageBackground,
   ScrollView,
-  Image,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -14,33 +13,31 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { useOtpTimers } from '../../hooks/useOtpTimers';
+import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import BrandButton from '../../components/BrandButton';
 import { errorToastMessage, toast } from '../../core/toast';
 import { BrandColors } from '../../theme/colors';
-import OtpService, { OTP_LENGTH, formatCountdown, sanitizeOtpInput } from '../../services/otpService';
+import OtpService, { OTP_LENGTH, formatCountdown, formatPkPhoneInput, sanitizeOtpInput } from '../../services/otpService';
 import { sendOtp, verifyOtp } from '../../store/thunks/apiThunks';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
 import { routesHome } from '../../core/auth/normalizeUser';
-import { classifyOtpRefusal } from '../../features/auth/otpRefusal';
+import { classifyOtpRefusal, isGlobalOtpRefusal, type OtpRefusalLike } from '../../features/auth/otpRefusal';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 import { styles } from './PhoneAuthScreen.styles';
+import { EmailFallback, KEYBOARD_DONE_ID, KeyboardDoneBar, PhoneAuthHeader } from './PhoneAuthParts';
 
 type AuthStep = 'phone' | 'verification';
 
 export default function PhoneAuthScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
-  const { sendOtpToPhone, verifyOtpCode, error, isLoading, isOtpSent, isOtpVerified, clearAuthError } = useApiAuth();
+  const { sendOtpToPhone, verifyOtpCode, isLoading, clearAuthError } = useApiAuth();
   const { resendIn, expiresIn, isExpired, codeSent, blockResend, expireCode, clearCode } = useOtpTimers();
-
-  // Debug logging for state changes
-  useEffect(() => {
-    logger.debug('📱 PhoneAuthScreen - Auth state changed:', { isLoading, error, isOtpSent, isOtpVerified });
-  }, [isLoading, error, isOtpSent, isOtpVerified]);
+  const keyboardUp = useKeyboardVisible();
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
   const [phoneInput, setPhoneInput] = useState('+92');
@@ -52,21 +49,34 @@ export default function PhoneAuthScreen() {
   const [codeBurned, setCodeBurned] = useState(false);
   // BE-28 otp_ip_limit / otp_verify_limit: phone sign-in is capped, so email is offered.
   const [suggestEmail, setSuggestEmail] = useState(false);
-  // The server's resend cooldown is per phone, so only that number is held back.
-  const [cooldownPhone, setCooldownPhone] = useState('');
-  const sendBlocked = resendIn > 0 && phoneInput.trim() === cooldownPhone;
+  // The resend cooldown is per phone, so only that number is held back; a global refusal
+  // (sms_unavailable, busy, otp_ip_limit) holds every number until retry_after (AUTH-18).
+  const [sendHold, setSendHold] = useState({ phone: '', global: false });
+  const sendBlocked = resendIn > 0 && (sendHold.global || phoneInput.trim() === sendHold.phone);
   // One send/verify at a time: a second tap lands before isLoading re-renders the button.
   const inFlight = useRef(false);
 
   // The auth error is shared with Login: leaving this screen must not carry it over (T-107).
   useEffect(() => () => clearAuthError(), [clearAuthError]);
 
+  // A code that ran out makes the last "Invalid or expired" refusal stale: the expiry line
+  // says what to do now. A burned code keeps its message (AUTH-18).
+  useEffect(() => {
+    if (isExpired && !codeBurned) {
+      setOtpError('');
+    }
+  }, [isExpired, codeBurned]);
+
+  /** Holds sending for retry_after: this number only, or every number for a global refusal. */
+  const holdSending = (phone: string, refusal?: OtpRefusalLike & { retryAfter?: number }) => {
+    blockResend(refusal?.retryAfter);
+    setSendHold({ phone, global: isGlobalOtpRefusal(refusal) });
+  };
+
   /**
-   * Sends (or resends) a code. Expiry comes from the server's expires_in. A refusal shows
-   * the server's message; what else happens is decided by its BE-28 `code` (T-111):
-   * cooldown, send limit and 503 sms_unavailable/busy hold resending for retry_after, and an
-   * IP limit also suggests email sign-in. The code itself is never read from the response
-   * (AUTH-02).
+   * Sends (or resends) a code; expiry comes from expires_in, never the code itself (AUTH-02).
+   * A refusal shows the server's message; its BE-28 `code` decides the rest (T-111, T-113):
+   * hold sending for retry_after (globally for sms_unavailable/busy/otp_ip_limit), suggest email.
    */
   const requestCode = async (isResend: boolean) => {
     const fallback = isResend ? COPY.fallbacks.resend : COPY.fallbacks.send;
@@ -78,26 +88,25 @@ export default function PhoneAuthScreen() {
     inFlight.current = true;
     try {
       const result = await sendOtpToPhone(phone);
-      logger.debug('📨 PhoneAuthScreen - Send OTP result:', result.type);
 
       if (sendOtp.fulfilled.match(result)) {
         codeSent(result.payload.expires_in);
-        setCooldownPhone(phone);
+        setSendHold({ phone, global: false });
         setCurrentStep('verification');
         setVerificationCode('');
         setCodeBurned(false);
         setSuggestEmail(false);
         setPhoneError('');
         setOtpError('');
-        toast.success(isResend ? COPY.toasts.resent : COPY.toasts.sent);
+        // The server's message (the same for every number); never our own "code sent" claim.
+        toast.success(result.payload.message || (isResend ? COPY.toasts.resent : COPY.toasts.sent));
         return;
       }
 
       const rejection = sendOtp.rejected.match(result) ? result.payload : undefined;
       const action = classifyOtpRefusal(rejection);
       if (action !== 'other') {
-        blockResend(rejection?.retryAfter);
-        setCooldownPhone(phone);
+        holdSending(phone, rejection);
       }
       setSuggestEmail(action === 'limit');
       const errorMessage = rejectionMessage(rejection, fallback);
@@ -114,7 +123,6 @@ export default function PhoneAuthScreen() {
   };
 
   const handleSendCode = async () => {
-    logger.debug('📱 PhoneAuthScreen - Starting send OTP process');
     setPhoneError('');
 
     const validation = OtpService.validatePhoneNumber(phoneInput.trim());
@@ -129,7 +137,6 @@ export default function PhoneAuthScreen() {
   };
 
   const handleVerifyCode = async () => {
-    logger.debug('📱 PhoneAuthScreen - Starting verify OTP process');
     if (codeBurned) {
       return;
     }
@@ -159,7 +166,6 @@ export default function PhoneAuthScreen() {
     inFlight.current = true;
     try {
       const result = await verifyOtpCode(otpData);
-      logger.debug('📨 PhoneAuthScreen - Verify OTP result:', result.type);
 
       if (verifyOtp.fulfilled.match(result)) {
         clearCode();
@@ -178,9 +184,9 @@ export default function PhoneAuthScreen() {
         setVerificationCode('');
         setCodeBurned(true);
         expireCode();
-        blockResend(rejection?.retryAfter);
+        holdSending(otpData.phone, rejection);
       } else if (action === 'unavailable') {
-        blockResend(rejection?.retryAfter);
+        holdSending(otpData.phone, rejection);
       }
       setSuggestEmail(action === 'limit');
       // 403 ACCOUNT_*: the server's message, plus the rejection reason when there is one (T-106).
@@ -199,7 +205,6 @@ export default function PhoneAuthScreen() {
   };
 
   const handleResendCode = async () => {
-    logger.debug('📱 PhoneAuthScreen - Starting resend OTP process');
     setIsResending(true);
     try {
       await requestCode(true);
@@ -217,25 +222,17 @@ export default function PhoneAuthScreen() {
     clearCode();
   };
 
+  // Back to Login on its Email tab (AUTH-18), not a new Login on the Phone tab.
   const renderEmailFallback = () =>
-    suggestEmail ? (
-      <View style={styles.emailFallback}>
-        <Text style={styles.emailFallbackText}>{COPY.emailFallback.hint}</Text>
-        <BrandButton
-          title={COPY.emailFallback.action}
-          onPress={() => navigation.navigate('Login')}
-          variant="secondary"
-          style={styles.resendButton}
-          textStyle={styles.buttonText}
-        />
-      </View>
-    ) : null;
+    suggestEmail ? <EmailFallback onPress={() => navigation.popTo('Login', { method: 'email' })} /> : null;
 
   const renderPhoneStep = () => (
     <View style={styles.formCard}>
-      <View style={styles.phoneIconContainer}>
-        <Icon name="smartphone" size={48} color={BrandColors.primary} />
-      </View>
+      {keyboardUp ? null : (
+        <View style={styles.phoneIconContainer}>
+          <Icon name="smartphone" size={48} color={BrandColors.primary} />
+        </View>
+      )}
       <Text style={styles.sectionTitle}>{COPY.phoneStep.title}</Text>
       <Text style={styles.sectionSubtitle}>{COPY.phoneStep.subtitle}</Text>
 
@@ -244,28 +241,12 @@ export default function PhoneAuthScreen() {
           placeholder={COPY.phoneStep.placeholder}
           value={phoneInput}
           onChangeText={(text) => {
-            // Enforce +92 prefix and allow up to 10 digits after it
-            const digits = text.replace(/\D/g, '');
-            let next = text;
-            if (text.startsWith('+92')) {
-              // Keep only up to 10 digits after +92
-              const after = text.slice(3).replace(/\D/g, '').slice(0, 10);
-              next = `+92${after}`;
-            } else if (/^03\d{0,9}$/.test(digits)) {
-              // 03XXXXXXXXX -> +92XXXXXXXXXX (partial as user types)
-              const after = digits.slice(1, 11);
-              next = `+92${after}`;
-            } else if (/^92\d{0,10}$/.test(digits)) {
-              next = `+${digits.slice(0, 12)}`;
-            } else {
-              // Fallback: always ensure +92 prefix
-              const after = digits.replace(/^92/, '').replace(/^0/, '').slice(0, 10);
-              next = `+92${after}`;
-            }
-            setPhoneInput(next);
+            setPhoneInput(formatPkPhoneInput(text));
             setPhoneError('');
           }}
           keyboardType="phone-pad"
+          returnKeyType="done"
+          inputAccessoryViewID={KEYBOARD_DONE_ID}
           autoFocus
           style={[styles.input, phoneError && styles.inputError]}
           maxLength={13}
@@ -306,9 +287,11 @@ export default function PhoneAuthScreen() {
 
   const renderVerificationStep = () => (
     <View style={styles.formCard}>
-      <View style={styles.verificationIconContainer}>
-        <Icon name="verified-user" size={48} color={BrandColors.primary} />
-      </View>
+      {keyboardUp ? null : (
+        <View style={styles.verificationIconContainer}>
+          <Icon name="verified-user" size={48} color={BrandColors.primary} />
+        </View>
+      )}
       <Text style={styles.sectionTitle}>{COPY.codeStep.title}</Text>
       <Text style={styles.sectionSubtitle}>{COPY.codeStep.subtitle(phoneInput)}</Text>
       <Text style={[styles.expiryHint, (isExpired || codeBurned) && styles.expiryHintExpired]}>
@@ -325,6 +308,8 @@ export default function PhoneAuthScreen() {
             setOtpError(''); // Clear error when user types
           }}
           keyboardType="number-pad"
+          returnKeyType="done"
+          inputAccessoryViewID={KEYBOARD_DONE_ID}
           textContentType="oneTimeCode"
           autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
           autoFocus
@@ -379,41 +364,17 @@ export default function PhoneAuthScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={BrandColors.primary}
-        translucent={false}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={BrandColors.primary} translucent={false} />
       <ImageBackground
         source={require('../../assets/images/background_raahe_haq.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        {/* Fixed Header */}
-        <View style={styles.fixedHeader}>
-          {/* Decorative Circles */}
-          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
-          <View style={styles.decorativeCircle3} />
-          <View style={styles.decorativeCircle4} />
-          <View style={styles.decorativeCircle5} />
-
-          <View style={styles.logoContainer}>
-            <View style={styles.logoWrapper}>
-              <Image
-                source={require('../../assets/images/logo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.title}>
-              {currentStep === 'phone' ? COPY.header.phoneTitle : COPY.header.codeTitle}
-            </Text>
-            <Text style={styles.subtitle}>
-              {currentStep === 'phone' ? COPY.header.phoneSubtitle : COPY.header.codeSubtitle}
-            </Text>
-          </View>
-        </View>
+        <PhoneAuthHeader
+          title={currentStep === 'phone' ? COPY.header.phoneTitle : COPY.header.codeTitle}
+          subtitle={currentStep === 'phone' ? COPY.header.phoneSubtitle : COPY.header.codeSubtitle}
+          compact={keyboardUp}
+        />
 
         {/* Scrollable Content */}
         <KeyboardAvoidingView
@@ -433,6 +394,7 @@ export default function PhoneAuthScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </ImageBackground>
+      <KeyboardDoneBar />
     </SafeAreaView>
   );
 }

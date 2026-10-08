@@ -1,5 +1,5 @@
 /** T-111: OTP screens branch on the BE-28 `code`, not on status heuristics. */
-import { classifyOtpRefusal } from '../../../src/features/auth/otpRefusal';
+import { classifyOtpRefusal, isGlobalOtpRefusal } from '../../../src/features/auth/otpRefusal';
 
 describe('classifyOtpRefusal (T-111, BE-28)', () => {
   it.each([
@@ -25,5 +25,22 @@ describe('classifyOtpRefusal (T-111, BE-28)', () => {
     expect(classifyOtpRefusal({ kind: 'forbidden', code: 'ACCOUNT_SUSPENDED' })).toBe('other');
     expect(classifyOtpRefusal({ kind: 'server' })).toBe('other');
     expect(classifyOtpRefusal(undefined)).toBe('other');
+  });
+});
+
+describe('isGlobalOtpRefusal (T-113, AUTH-18)', () => {
+  it.each(['sms_unavailable', 'busy', 'otp_ip_limit'])('%s holds every number', code => {
+    expect(isGlobalOtpRefusal({ code })).toBe(true);
+  });
+
+  it.each(['otp_cooldown', 'otp_send_limit', 'code_exhausted', 'otp_verify_limit', 'rate_limited', undefined])(
+    '%s holds only the typed number',
+    code => {
+      expect(isGlobalOtpRefusal({ kind: 'rate_limited', code })).toBe(false);
+    },
+  );
+
+  it('handles a missing refusal', () => {
+    expect(isGlobalOtpRefusal(undefined)).toBe(false);
   });
 });

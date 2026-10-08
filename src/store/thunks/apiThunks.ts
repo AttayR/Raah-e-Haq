@@ -165,11 +165,17 @@ export const sendOtp = createAsyncThunk<OtpSentInfo, string, ThunkConfig>(
   async (phone, { rejectWithValue }) => {
     try {
       logger.debug('🔄 Redux Thunk - Starting OTP send process...');
-      const data = unwrap(await apiService.sendOtp(phone));
+      const body = await apiService.sendOtp(phone);
+      const data = unwrap(body);
       logger.debug('✅ Redux Thunk - OTP sent; expires in', data.expires_in, 'seconds');
       // The local backend may echo otp_code (APP_ENV=local + debug). It is dropped here so
       // it never reaches Redux, redux-persist, the UI or the logs (AUTH-02, INF-05).
-      return { phone: data.phone, expires_in: data.expires_in };
+      // The message is kept: it is the same for every number and never claims a code was sent.
+      return {
+        phone: data.phone,
+        expires_in: data.expires_in,
+        ...(typeof body.message === 'string' && body.message ? { message: body.message } : {}),
+      };
     } catch (error) {
       logApiFailure('sendOtp failed', error);
       // 429 carries retryAfter (seconds) from the body or the Retry-After header (BE-16).

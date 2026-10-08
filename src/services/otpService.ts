@@ -10,6 +10,24 @@ export const OTP_LENGTH = 6;
 export const sanitizeOtpInput = (text: string): string =>
   (text || '').replace(/\D/g, '').slice(0, OTP_LENGTH);
 
+/**
+ * Phone field text as the user types: always "+92" plus at most 10 digits. "03XXXXXXXXX"
+ * and "92XXXXXXXXXX" become "+92XXXXXXXXXX" (moved out of PhoneAuthScreen in T-113).
+ */
+export const formatPkPhoneInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '');
+  if (text.startsWith('+92')) {
+    return `+92${text.slice(3).replace(/\D/g, '').slice(0, 10)}`;
+  }
+  if (/^03\d{0,9}$/.test(digits)) {
+    return `+92${digits.slice(1, 11)}`;
+  }
+  if (/^92\d{0,10}$/.test(digits)) {
+    return `+${digits.slice(0, 12)}`;
+  }
+  return `+92${digits.replace(/^92/, '').replace(/^0/, '').slice(0, 10)}`;
+};
+
 /** Whole seconds left until `deadlineMs` (never negative). */
 export const secondsUntil = (deadlineMs: number | null, nowMs: number): number =>
   deadlineMs == null ? 0 : Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000));

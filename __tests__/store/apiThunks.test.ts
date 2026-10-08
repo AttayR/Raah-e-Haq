@@ -48,7 +48,8 @@ describe('api thunks', () => {
       data: { phone: '03001234567', otp_code: null, expires_in: 60 },
     });
     const result = await makeStore().dispatch(sendOtp('03001234567'));
-    expect(result.payload).toEqual({ phone: '03001234567', expires_in: 60 });
+    // T-113: the server's send message is kept for the toast; never the code.
+    expect(result.payload).toEqual({ phone: '03001234567', expires_in: 60, message: 'OTP sent successfully' });
   });
 
   it('sendOtp drops an otp_code echoed by the local backend (AUTH-02, T-101)', async () => {
@@ -61,7 +62,8 @@ describe('api thunks', () => {
     const result = await store.dispatch(sendOtp('+923001234567'));
 
     expect(sendOtp.fulfilled.match(result)).toBe(true);
-    expect(result.payload).toEqual({ phone: '+923001234567', expires_in: 60 });
+    expect(result.payload).toEqual({ phone: '+923001234567', expires_in: 60, message: 'OTP sent successfully' });
+    expect(JSON.stringify(result.payload)).not.toContain('482913');
     expect(JSON.stringify(store.getState())).not.toContain('482913');
     expect(store.getState().auth.otpData).toEqual({ phone: '+923001234567', expires_in: 60 });
   });

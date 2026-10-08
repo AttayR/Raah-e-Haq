@@ -5,7 +5,8 @@ import SignupScreen from '../../../screens/Auth/SignupScreen';
 import PhoneAuthScreen from '../../../screens/Auth/PhoneAuthScreen';
 
 export type AuthStackParamList = {
-  Login: undefined;
+  /** `method` opens Login on that tab (PhoneAuth's email fallback, T-113). */
+  Login: { method?: 'phone' | 'email' } | undefined;
   Signup: { role?: 'driver'|'passenger' } | undefined;
   PhoneAuth: undefined;
 };

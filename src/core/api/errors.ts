@@ -80,6 +80,10 @@ const DEFAULT_MESSAGES: Record<ApiErrorKind, string> = {
  */
 const USER_FACING_SERVER_CODES: ReadonlySet<string> = new Set(['sms_unavailable', 'busy']);
 
+/** True for a 5xx the backend sends on purpose with user-facing text (BE-28 sms_unavailable/busy). */
+export const isUserFacingServerCode = (code?: string): boolean =>
+  code != null && USER_FACING_SERVER_CODES.has(code);
+
 /**
  * Server text is shown only for kinds where the backend writes user-facing messages.
  * 5xx and unclassified bodies can carry exception text (SQL, PII), so they always get our
@@ -88,7 +92,7 @@ const USER_FACING_SERVER_CODES: ReadonlySet<string> = new Set(['sms_unavailable'
 const displayMessage = (kind: ApiErrorKind, serverMessage?: string, code?: string): string => {
   if (!serverMessage) return DEFAULT_MESSAGES[kind];
   if (kind === 'server') {
-    return code && USER_FACING_SERVER_CODES.has(code) ? serverMessage : DEFAULT_MESSAGES[kind];
+    return isUserFacingServerCode(code) ? serverMessage : DEFAULT_MESSAGES[kind];
   }
   return kind === 'unknown' ? DEFAULT_MESSAGES[kind] : serverMessage;
 };

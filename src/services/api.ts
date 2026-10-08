@@ -326,7 +326,10 @@ export interface SendOtpResponse {
 }
 
 /** What the app keeps after send-otp: never the code itself (AUTH-02, INF-05). */
-export type OtpSentInfo = Pick<SendOtpResponse, 'phone' | 'expires_in'>;
+export type OtpSentInfo = Pick<SendOtpResponse, 'phone' | 'expires_in'> & {
+  /** The server's send message (BE-27: the same for known and unknown numbers). */
+  message?: string;
+};
 
 export interface LoginRequest {
   email: string;

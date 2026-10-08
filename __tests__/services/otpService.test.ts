@@ -1,6 +1,7 @@
 import OtpService, {
   OTP_LENGTH,
   formatCountdown,
+  formatPkPhoneInput,
   sanitizeOtpInput,
   secondsUntil,
 } from '../../src/services/otpService';
@@ -37,5 +38,19 @@ describe('otpService (T-101)', () => {
     expect(formatCountdown(59)).toBe('59s');
     expect(formatCountdown(125)).toBe('2:05');
     expect(formatCountdown(3700)).toBe('1:01:40');
+  });
+});
+
+describe('formatPkPhoneInput (T-113, moved from PhoneAuthScreen)', () => {
+  it.each([
+    ['+92', '+92'],
+    ['+923001234567', '+923001234567'],
+    ['+9230012345679', '+923001234567'],
+    ['03001234567', '+923001234567'],
+    ['923001234567', '+923001234567'],
+    ['3001234567', '+923001234567'],
+    ['', '+92'],
+  ])('%s -> %s', (input, expected) => {
+    expect(formatPkPhoneInput(input)).toBe(expected);
   });
 });

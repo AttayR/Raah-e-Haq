@@ -1,4 +1,4 @@
-import { toApiError, type ApiErrorKind } from './errors';
+import { isUserFacingServerCode, toApiError, type ApiErrorKind } from './errors';
 import { logger } from '../logging/logger';
 
 /**
@@ -20,6 +20,13 @@ const EXPECTED_KINDS: ReadonlySet<ApiErrorKind> = new Set<ApiErrorKind>([
 ]);
 
 /**
+ * A 503 the backend sends on purpose (BE-28 `sms_unavailable`, `busy`): a refusal with a
+ * user-facing message and retry_after that the screen handles, not a server fault (AUTH-18).
+ */
+const isExpected = (kind: ApiErrorKind, code?: string): boolean =>
+  EXPECTED_KINDS.has(kind) || (kind === 'server' && isUserFacingServerCode(code));
+
+/**
  * Logs a failed API call as a keyed summary (kind, status, code, display-safe message), so
  * the line is never empty and never carries the request config or body.
  */
@@ -33,7 +40,7 @@ export const logApiFailure = (context: string, error: unknown): void => {
     // A non-API error (a bug in our code) keeps its type so it can be found.
     cause: apiError === error || !(error instanceof Error) ? undefined : error.name,
   };
-  if (EXPECTED_KINDS.has(apiError.kind)) {
+  if (isExpected(apiError.kind, apiError.code)) {
     logger.warn(context, summary);
   } else {
     logger.error(context, summary);

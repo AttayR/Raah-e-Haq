@@ -40,3 +40,15 @@ export function classifyOtpRefusal(refusal: OtpRefusalLike | null | undefined): 
       return refusal?.kind === 'rate_limited' && !refusal.code ? 'cooldown' : 'other';
   }
 }
+
+/**
+ * Refusals that are not about the typed number (AUTH-18): the day's SMS budget is spent
+ * (`sms_unavailable`), a server lock timed out (`busy`), or this network hit its daily cap
+ * (`otp_ip_limit`). Sending is held for every number until `retry_after`, so changing a
+ * digit does not re-enable Send.
+ */
+const GLOBAL_REFUSAL_CODES: ReadonlySet<string> = new Set(['sms_unavailable', 'busy', 'otp_ip_limit']);
+
+export function isGlobalOtpRefusal(refusal: OtpRefusalLike | null | undefined): boolean {
+  return refusal?.code != null && GLOBAL_REFUSAL_CODES.has(refusal.code);
+}

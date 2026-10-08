@@ -1,6 +1,7 @@
 import { StyleSheet, Dimensions } from 'react-native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
+import { Spacing } from '../../theme/spacing';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -26,6 +27,11 @@ export const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     zIndex: 10,
+  },
+  /** Keyboard up (T-113): title only, so Send/Verify stay above the keyboard. */
+  fixedHeaderCompact: {
+    paddingTop: Spacing[2],
+    paddingBottom: Spacing[4],
   },
   keyboardView: {
     flex: 1,
@@ -123,6 +129,9 @@ export const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     marginBottom: 8,
+  },
+  titleCompact: {
+    marginBottom: 0,
   },
   subtitle: {
     ...Typography.subtitle,
@@ -274,6 +283,24 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     gap: 8,
+  },
+  emailFallbackButton: {
+    minWidth: 120,
+    paddingHorizontal: Spacing[6],
+  },
+  doneBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing[4],
+    paddingVertical: Spacing[2],
+  },
+  doneButton: {
+    paddingHorizontal: Spacing[2],
+    paddingVertical: Spacing[1],
+  },
+  doneText: {
+    ...Typography.button,
   },
   emailFallbackText: {
     ...Typography.small,

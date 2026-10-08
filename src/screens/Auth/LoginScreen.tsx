@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import BrandButton from '../../components/BrandButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
@@ -24,6 +24,7 @@ import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
 import { routesHome } from '../../core/auth/normalizeUser';
 import { loginUser } from '../../store/thunks/apiThunks';
+import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 
 type LoginMethod = 'phone' | 'email';
 
@@ -34,7 +35,16 @@ export default function LoginScreen() {
   const navigation = useNavigation<any>();
   const { login, error, isLoading, clearAuthError, forgotPasswordRequest } = useApiAuth();
   
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>('phone');
+  const route = useRoute<RouteProp<AuthStackParamList, 'Login'>>();
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>(route.params?.method ?? 'phone');
+
+  // PhoneAuth's "Sign in with email" comes back here with method 'email' (T-113). Each return
+  // is a new params object, so the tab switches every time, even after the user changed it.
+  useEffect(() => {
+    if (route.params?.method) {
+      setLoginMethod(route.params.method);
+    }
+  }, [route.params]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});

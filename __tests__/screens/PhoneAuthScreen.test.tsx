@@ -12,6 +12,8 @@ import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import apiAuthReducer from '../../src/store/slices/apiAuthSlice';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
+import { Keyboard, ScrollView } from 'react-native';
+import { KEYBOARD_DONE_ID } from '../../src/screens/Auth/PhoneAuthParts';
 
 // The real store module starts redux-persist (a timer that outlives the test); the screen
 // only needs the typed hooks, so they are pointed at the test store's Provider.
@@ -21,9 +23,10 @@ jest.mock('../../src/store', () => {
 });
 
 const mockNavigate = jest.fn();
+const mockPopTo = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: mockNavigate }),
+  useNavigation: () => ({ navigate: mockNavigate, popTo: mockPopTo }),
 }));
 
 const PHONE = '+923001234567';
@@ -219,7 +222,10 @@ describe('PhoneAuthScreen (T-101)', () => {
     };
     const verifyCalls = () => mock.history.post.filter(r => r.url === '/auth/verify-otp').length;
 
-    beforeEach(() => mockNavigate.mockClear());
+    beforeEach(() => {
+      mockNavigate.mockClear();
+      mockPopTo.mockClear();
+    });
 
     it('code_exhausted: clears the input, disables Verify, offers Resend after retry_after', async () => {
       replyLocalSend();
@@ -288,7 +294,9 @@ describe('PhoneAuthScreen (T-101)', () => {
       await waitFor(() => expect(screen.getAllByText(message).length).toBeGreaterThan(0));
       expect(screen.getByText('You can still sign in with your email and password.')).toBeTruthy();
       fireEvent.press(screen.getByText('Sign in with email'));
-      expect(mockNavigate).toHaveBeenCalledWith('Login');
+      // T-113: back to the existing Login, on its Email tab.
+      expect(mockPopTo).toHaveBeenCalledWith('Login', { method: 'email' });
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
 
     it('otp_verify_limit on verify: shows the server message and suggests email sign-in', async () => {
@@ -330,6 +338,115 @@ describe('PhoneAuthScreen (T-101)', () => {
 
       await waitFor(() => expect(screen.getAllByText(message).length).toBeGreaterThan(0));
       expect(screen.getByText('Resend code in 5s')).toBeTruthy();
+    });
+  });
+
+  describe('T-113: AUTH-18 polish', () => {
+    const SERVER_SENT = 'If this number is registered, a verification code has been sent to it.';
+    const OTHER_PHONE = '+923001234568';
+    const sendButton = () => screen.getByRole('button', { name: /^Send Code/ });
+    const isDisabled = (el: { props: { accessibilityState?: { disabled?: boolean } } }) =>
+      el.props.accessibilityState?.disabled === true;
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('send success toasts the server message, never our own "code sent" claim', async () => {
+      const success = jest.spyOn(toast, 'success');
+      mock.onPost('/auth/send-otp').reply(200, { success: true, message: SERVER_SENT, data: { phone: PHONE, expires_in: 60 } });
+      renderScreen();
+      await sendCode();
+      await waitFor(() => expect(success).toHaveBeenCalledWith(SERVER_SENT));
+      expect(success).not.toHaveBeenCalledWith('OTP sent successfully');
+      expect(screen.queryByText(/We sent a code/)).toBeNull();
+    });
+
+    it('without a server message the fallback copy makes no claim either', async () => {
+      const success = jest.spyOn(toast, 'success');
+      mock.onPost('/auth/send-otp').reply(200, { success: true, data: { phone: PHONE, expires_in: 60 } });
+      renderScreen();
+      await sendCode();
+      await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
+      expect(success.mock.calls[0][0]).toMatch(/^If this number is registered/);
+    });
+
+    it.each([
+      ['sms_unavailable', 503, 'Phone verification is temporarily unavailable. Please try again later.'],
+      ['busy', 503, 'The server is busy. Please try again in a few seconds.'],
+      ['otp_ip_limit', 429, 'Too many codes requested from this network today. Please try again later.'],
+    ])('%s blocks Send for every number until retry_after', async (code, status, message) => {
+      mock.onPost('/auth/send-otp').reply(status, { success: false, message, code, retry_after: 600 });
+      renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByText('Send Code (10:00)')).toBeTruthy());
+
+      fireEvent.changeText(screen.getByPlaceholderText('Enter phone number'), OTHER_PHONE);
+      expect(screen.getByText('Send Code (10:00)')).toBeTruthy();
+      expect(isDisabled(sendButton())).toBe(true);
+      fireEvent.press(sendButton());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(mock.history.post.filter(r => r.url === '/auth/send-otp')).toHaveLength(1);
+
+      act(() => {
+        jest.advanceTimersByTime(600_000);
+      });
+      expect(isDisabled(sendButton())).toBe(false);
+    });
+
+    it('a per-number cooldown still lets another number send', async () => {
+      const message = 'Please wait before requesting another code.';
+      mock.onPost('/auth/send-otp').reply(429, { success: false, message, code: 'otp_cooldown', retry_after: 50 });
+      renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByText('Send Code (50s)')).toBeTruthy());
+      fireEvent.changeText(screen.getByPlaceholderText('Enter phone number'), OTHER_PHONE);
+      expect(screen.getByText('Send Code')).toBeTruthy();
+      expect(isDisabled(sendButton())).toBe(false);
+    });
+
+    it('Verify is disabled until a full code is typed', async () => {
+      replyLocalSend();
+      renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
+      const verify = () => screen.getByRole('button', { name: 'Verify Code' });
+      expect(isDisabled(verify())).toBe(true);
+      fireEvent.changeText(screen.getByPlaceholderText('6-digit code'), '123456');
+      expect(isDisabled(verify())).toBe(false);
+    });
+
+    it('clears the old "Invalid or expired" error when the code expires', async () => {
+      replyLocalSend();
+      mock.onPost('/auth/verify-otp').reply(401, { success: false, message: 'Invalid or expired OTP' });
+      renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
+      fireEvent.changeText(screen.getByPlaceholderText('6-digit code'), '123456');
+      fireEvent.press(screen.getByRole('button', { name: 'Verify Code' }));
+      await waitFor(() => expect(screen.getAllByText('Invalid or expired OTP').length).toBeGreaterThan(0));
+
+      act(() => {
+        jest.advanceTimersByTime(60_000);
+      });
+      act(() => toast.hide());
+      expect(screen.getByText('Code expired. Please request a new code.')).toBeTruthy();
+      expect(screen.queryByText('Invalid or expired OTP')).toBeNull();
+    });
+
+    it('number-pad inputs get the Done bar, and Done closes the keyboard', async () => {
+      const dismiss = jest.spyOn(Keyboard, 'dismiss');
+      replyLocalSend();
+      renderScreen();
+      expect(screen.getByPlaceholderText('Enter phone number').props.inputAccessoryViewID).toBe(KEYBOARD_DONE_ID);
+      fireEvent.press(screen.getByText('Done'));
+      expect(dismiss).toHaveBeenCalled();
+
+      await sendCode();
+      await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
+      expect(screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID).toBe(KEYBOARD_DONE_ID);
+      // The first tap on Verify acts instead of only closing the keyboard.
+      expect(screen.UNSAFE_getByType(ScrollView).props.keyboardShouldPersistTaps).toBe('handled');
     });
   });
 });

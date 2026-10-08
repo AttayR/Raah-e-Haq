@@ -10,7 +10,7 @@ export const PHONE_AUTH_COPY = {
     phoneTitle: 'Phone Verification',
     phoneSubtitle: 'Enter your phone number to get started',
     codeTitle: 'Verify Code',
-    codeSubtitle: 'Enter the code sent to your phone',
+    codeSubtitle: 'Enter your verification code',
   },
   phoneStep: {
     title: 'Enter your phone number',
@@ -23,7 +23,8 @@ export const PHONE_AUTH_COPY = {
   },
   codeStep: {
     title: 'Enter verification code',
-    subtitle: (phone: string) => `We sent a code to ${phone}. Enter it to verify your phone number.`,
+    /** BE-27: known and unknown numbers get the same answer, so this never claims a code was sent. */
+    subtitle: (phone: string) => `If ${phone} has an account, enter the code from the SMS.`,
     placeholder: (length: number) => `${length}-digit code`,
     expiresIn: (countdown: string) => `Code expires in ${countdown}`,
     expired: 'Code expired. Please request a new code.',
@@ -42,9 +43,13 @@ export const PHONE_AUTH_COPY = {
     hint: 'You can still sign in with your email and password.',
     action: 'Sign in with email',
   },
+  keyboard: {
+    done: 'Done',
+  },
+  /** Used only when the send response has no message; the server's message is shown first. */
   toasts: {
-    sent: 'OTP sent successfully',
-    resent: 'Verification code sent again',
+    sent: 'If this number is registered, you will get a code by SMS.',
+    resent: 'If this number is registered, a new code is on its way.',
     verified: 'Phone number verified successfully!',
   },
   fallbacks: {
