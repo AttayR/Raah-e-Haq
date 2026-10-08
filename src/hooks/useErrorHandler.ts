@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { showToast } from '../components/ToastProvider';
+import { toast } from '../core/toast';
+import { isApiError } from '../core/api/errors';
 import { logger } from '../core/logging/logger';
 
 export interface AppError {
@@ -17,7 +18,7 @@ export const useErrorHandler = () => {
     error: Error | string,
     context?: string,
     showAlert: boolean = true,
-    showToast: boolean = true
+    withToast: boolean = true
   ) => {
     const errorObj: AppError = {
       code: 'APP_ERROR',
@@ -37,9 +38,10 @@ export const useErrorHandler = () => {
     // Add to errors list
     setErrors(prev => [...prev.slice(-9), errorObj]); // Keep only last 10 errors
 
-    // Show user-friendly message
-    const userMessage = getUserFriendlyMessage(errorObj);
-    
+    // Show user-friendly message (ApiError text is already safe copy from the API layer)
+    const userMessage = isApiError(error) ? error.message : getUserFriendlyMessage(errorObj);
+
+    // One feedback path per error (PAX-16): the alert when asked for, otherwise a toast.
     if (showAlert) {
       Alert.alert(
         'Error',
@@ -52,10 +54,8 @@ export const useErrorHandler = () => {
         ],
         { cancelable: true }
       );
-    }
-
-    if (showToast) {
-      showToast('error', userMessage);
+    } else if (withToast) {
+      toast.error(userMessage);
     }
 
     return errorObj;

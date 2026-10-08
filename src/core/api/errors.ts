@@ -151,9 +151,8 @@ export const toApiError = (error: unknown): ApiError => {
     return new ApiError({ kind: 'network', message: DEFAULT_MESSAGES.network });
   }
 
-  if (error instanceof Error) {
-    return new ApiError({ kind: 'unknown', message: error.message || DEFAULT_MESSAGES.unknown });
-  }
+  // A plain Error's text is technical ("undefined is not an object", Firebase codes, stack
+  // fragments), so it is never shown; the original stays loggable at the call site.
   return new ApiError({ kind: 'unknown', message: DEFAULT_MESSAGES.unknown });
 };
 
@@ -188,8 +187,10 @@ export interface ThunkRejection {
 
 export const toThunkRejection = (error: unknown, fallbackMessage: string): ThunkRejection => {
   const apiError = toApiError(error);
+  // Anything that did not come from the API layer gets the thunk's own, more specific copy.
+  const fromApi = isApiError(error) || axios.isAxiosError(error) || axios.isCancel(error);
   return {
-    message: apiError.message || fallbackMessage,
+    message: fromApi ? apiError.message || fallbackMessage : fallbackMessage,
     kind: apiError.kind,
     status: apiError.status,
     fieldErrors: apiError.fieldErrors,

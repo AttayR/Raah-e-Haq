@@ -7,6 +7,7 @@ import {
 } from '@react-navigation/native';
 
 import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
@@ -59,12 +60,14 @@ export default function App() {
   }, []);
 
   return (
-    <ReduxProvider>
-      <ThemeProvider>
-        <NotificationManager>
-          <ThemedNav />
-        </NotificationManager>
-      </ThemeProvider>
-    </ReduxProvider>
+    <SafeAreaProvider>
+      <ReduxProvider>
+        <ThemeProvider>
+          <NotificationManager>
+            <ThemedNav />
+          </NotificationManager>
+        </ThemeProvider>
+      </ReduxProvider>
+    </SafeAreaProvider>
   );
 }

@@ -19,7 +19,7 @@ import { setProfileCompleted, setUserProfile } from '../../store/slices/authSlic
 import BrandButton from '../../components/BrandButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import { saveUserBasicInfo } from '../../services/userService';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
@@ -200,10 +200,7 @@ export default function BasicInfoScreen() {
       dispatch(setUserProfile(savedUserProfile));
 
       // Show success toast
-      showToast(
-        'success',
-        'Your information has been saved successfully.'
-      );
+      toast.success('Your information has been saved successfully.');
 
       // Dispatch setProfileCompleted immediately after showing toast
       logger.debug('BasicInfoScreen - Dispatching setProfileCompleted immediately...');

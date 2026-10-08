@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUserRole } from '../../store/slices/authSlice';
 import { RootState } from '../../store';
@@ -39,13 +39,13 @@ export default function RoleSelectionScreen() {
       logger.debug('Role selected:', role);
     } catch (error) {
       logger.error('Error selecting role:', error);
-      showToast('error', 'Failed to select role. Please try again.');
+      toast.error('Failed to select role. Please try again.');
     }
   };
 
   const handleContinue = async () => {
     if (!selectedRole) {
-      showToast('error', 'Please select a role to continue');
+      toast.error('Please select a role to continue');
       return;
     }
 
@@ -76,7 +76,7 @@ export default function RoleSelectionScreen() {
       }
     } catch (error) {
       logger.error('Error continuing with role selection:', error);
-      showToast('error', 'Failed to continue. Please try again.');
+      toast.error('Failed to continue. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -14,7 +14,7 @@ import { BrandColors } from '../../theme/colors';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { useApiAuth } from '../../hooks/useApiAuth';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
 
@@ -29,10 +29,10 @@ const DriverSettingsScreen = () => {
     try {
       logger.debug('DriverSettingsScreen - Logging out...');
       await logout();
-      showToast('success', 'Logged out successfully');
+      toast.success('Logged out successfully');
     } catch (error) {
       logger.error('DriverSettingsScreen - Logout error:', error);
-      showToast('error', 'Failed to logout');
+      toast.error('Failed to logout');
     }
   };
   

@@ -1,42 +1,20 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useSyncExternalStore } from 'react';
 import { View, StyleSheet } from 'react-native';
-import ModernToast, { ToastConfig } from './ModernToast';
+import ModernToast from './ModernToast';
 import ModernModal, { ModernModalConfig } from './ModernModal';
+import { toast, toastStore, type ToastAction } from '../core/toast';
 import { logger } from '../core/logging/logger';
 
 interface NotificationManagerProps {
   children: React.ReactNode;
 }
 
-// Global state for notifications
-let toastQueue: ToastConfig[] = [];
+// Global state for modals. Toasts live in src/core/toast (the one toast API).
 let modalConfig: ModernModalConfig | null = null;
 let listeners: Array<() => void> = [];
 
 const notifyListeners = () => {
   listeners.forEach(listener => listener());
-};
-
-// Toast functions
-export const showToast = (config: Omit<ToastConfig, 'id'>) => {
-  const toastId = `toast_${Date.now()}_${Math.random()}`;
-  const newToast: ToastConfig = {
-    id: toastId,
-    duration: 4000,
-    ...config,
-  };
-  
-  toastQueue.push(newToast);
-  notifyListeners();
-};
-
-export const hideToast = (id?: string) => {
-  if (id) {
-    toastQueue = toastQueue.filter(toast => toast.id !== id);
-  } else {
-    toastQueue = [];
-  }
-  notifyListeners();
 };
 
 // Modal functions
@@ -48,43 +26,6 @@ export const showModal = (config: ModernModalConfig) => {
 export const hideModal = () => {
   modalConfig = null;
   notifyListeners();
-};
-
-// Convenience functions for common notifications
-export const showSuccessToast = (title: string, message?: string, action?: ToastConfig['action']) => {
-  showToast({
-    type: 'success',
-    title,
-    message,
-    action,
-  });
-};
-
-export const showErrorToast = (title: string, message?: string, action?: ToastConfig['action']) => {
-  showToast({
-    type: 'error',
-    title,
-    message,
-    action,
-  });
-};
-
-export const showInfoToast = (title: string, message?: string, action?: ToastConfig['action']) => {
-  showToast({
-    type: 'info',
-    title,
-    message,
-    action,
-  });
-};
-
-export const showLoadingToast = (title: string, message?: string) => {
-  showToast({
-    type: 'loading',
-    title,
-    message,
-    duration: 0, // Don't auto-hide loading toasts
-  });
 };
 
 export const showSuccessModal = (
@@ -135,18 +76,17 @@ export const showLoadingModal = (
   });
 };
 
-// Ride-specific notification functions
+// Ride-specific notification functions (thin wrappers over the one toast API)
+const logAction = (label: string, note: string): ToastAction => ({
+  label,
+  onPress: () => logger.debug(note),
+});
+
 export const showRideRequestedToast = () => {
-  showSuccessToast(
+  toast.success(
     'Ride Requested! 🚗',
     'Your ride request has been created and we\'re finding nearby drivers.',
-    {
-      label: 'View Status',
-      onPress: () => {
-        // Navigate to ride status screen
-        logger.debug('Navigate to ride status');
-      },
-    }
+    { action: logAction('View Status', 'Navigate to ride status') },
   );
 };
 
@@ -174,72 +114,46 @@ export const showRideRequestedModal = () => {
 };
 
 export const showDriverFoundToast = (driverName: string) => {
-  showSuccessToast(
+  toast.success(
     'Driver Found! 🎉',
     `${driverName} has accepted your ride and is on the way.`,
-    {
-      label: 'Track Driver',
-      onPress: () => {
-        logger.debug('Navigate to driver tracking');
-      },
-    }
+    { action: logAction('Track Driver', 'Navigate to driver tracking') },
   );
 };
 
 export const showRideStartedToast = () => {
-  showInfoToast(
+  toast.info(
     'Ride Started! 🚀',
     'Your ride has begun. Enjoy your journey!',
   );
 };
 
 export const showRideCompletedToast = (fare: number) => {
-  showSuccessToast(
+  toast.success(
     'Ride Completed! ✅',
     `Your ride has been completed. Total fare: $${fare}`,
-    {
-      label: 'Rate Driver',
-      onPress: () => {
-        logger.debug('Open rating modal');
-      },
-    }
+    { action: logAction('Rate Driver', 'Open rating modal') },
   );
 };
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) => {
-  const [currentToast, setCurrentToast] = useState<ToastConfig | null>(null);
-  const [currentModal, setCurrentModal] = useState<ModernModalConfig | null>(null);
+  const currentToast = useSyncExternalStore(toastStore.subscribe, toastStore.getCurrent);
+  const [currentModal, setCurrentModal] = useState<ModernModalConfig | null>(modalConfig);
 
-  const updateNotifications = useCallback(() => {
-    // Update toast
-    if (toastQueue.length > 0 && !currentToast) {
-      setCurrentToast(toastQueue[0]);
-    }
-
-    // Update modal
+  const updateModal = useCallback(() => {
     setCurrentModal(modalConfig);
-  }, [currentToast]);
+  }, []);
 
   React.useEffect(() => {
-    listeners.push(updateNotifications);
-    updateNotifications();
+    listeners.push(updateModal);
+    updateModal();
 
     return () => {
-      listeners = listeners.filter(listener => listener !== updateNotifications);
+      listeners = listeners.filter(listener => listener !== updateModal);
     };
-  }, [updateNotifications]);
+  }, [updateModal]);
 
-  const handleToastHide = (id: string) => {
-    setCurrentToast(null);
-    toastQueue = toastQueue.filter(toast => toast.id !== id);
-    
-    // Show next toast if available
-    if (toastQueue.length > 0) {
-      setTimeout(() => {
-        setCurrentToast(toastQueue[0]);
-      }, 100);
-    }
-  };
+  const handleToastHide = useCallback((id: string) => toast.hide(id), []);
 
   const handleModalClose = () => {
     setCurrentModal(null);
@@ -249,15 +163,16 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) =
   return (
     <View style={styles.container}>
       {children}
-      
-      {/* Toast */}
+
+      {/* Toast: one at a time; key remounts it so each toast animates and times out on its own */}
       {currentToast && (
         <ModernToast
+          key={currentToast.id}
           config={currentToast}
           onHide={handleToastHide}
         />
       )}
-      
+
       {/* Modal */}
       {currentModal && (
         <ModernModal

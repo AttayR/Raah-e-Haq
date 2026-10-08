@@ -108,7 +108,13 @@ describe('toApiError', () => {
   it('passes ApiError through and wraps plain errors', () => {
     const original = new ApiError({ kind: 'auth', message: 'x' });
     expect(toApiError(original)).toBe(original);
-    expect(toApiError(new Error('boom'))).toMatchObject({ kind: 'unknown', message: 'boom' });
+    expect(toApiError(new Error('boom'))).toMatchObject({
+      kind: 'unknown',
+      message: 'Something went wrong. Please try again.',
+    });
+    expect(toApiError("undefined is not an object (evaluating 'a.b')").message).toBe(
+      'Something went wrong. Please try again.',
+    );
   });
 });
 
@@ -124,6 +130,16 @@ describe('unwrap', () => {
 });
 
 describe('thunk rejection helpers', () => {
+  it('toThunkRejection uses the fallback for a plain Error, never its raw text', () => {
+    expect(toThunkRejection(new Error('[auth/internal-error] stack...'), 'Login failed')).toEqual({
+      message: 'Login failed',
+      kind: 'unknown',
+      status: undefined,
+      fieldErrors: {},
+      retryAfter: undefined,
+    });
+  });
+
   it('toThunkRejection keeps message, fieldErrors and retryAfter', () => {
     const rejection = toThunkRejection(
       axiosErrorWith(429, { success: false, message: 'Wait', errors: { phone: ['Wait'] }, retry_after: 60 }),

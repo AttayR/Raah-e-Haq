@@ -18,7 +18,7 @@ import { useApiAuth } from '../../hooks/useApiAuth';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
 
@@ -61,7 +61,7 @@ export default function LoginScreen() {
       navigation.navigate('PhoneAuth');
     } catch (err) {
       logger.error('Navigation error:', err);
-      showToast('error', 'Unable to navigate to phone authentication');
+      toast.error('Unable to navigate to phone authentication');
     }
   };
 
@@ -71,7 +71,7 @@ export default function LoginScreen() {
       navigation.navigate('Signup');
     } catch (err) {
       logger.error('Navigation error:', err);
-      showToast('error', 'Unable to navigate to signup');
+      toast.error('Unable to navigate to signup');
     }
   };
 
@@ -108,16 +108,16 @@ export default function LoginScreen() {
       
       if (result.type.endsWith('/fulfilled')) {
         logger.debug('✅ Login successful!');
-        showToast('success', 'Login successful!');
+        toast.success('Login successful!');
         // Navigation will be handled by the auth state change
       } else {
         logger.debug('❌ Login failed');
         logger.debug('🚨 Error details:', result.payload);
-        showToast('error', rejectionMessage(result.payload, 'Login failed. Please try again.'));
+        toast.error(rejectionMessage(result.payload, 'Login failed. Please try again.'));
       }
     } catch (err: any) {
       logger.error('Email sign in error:', err);
-      showToast('error', 'An unexpected error occurred. Please try again.');
+      toast.error('An unexpected error occurred. Please try again.');
     }
   };
 
@@ -139,13 +139,13 @@ export default function LoginScreen() {
       const result = await forgotPasswordRequest(email.trim());
       
       if (result.type.endsWith('/fulfilled')) {
-        showToast('success', 'Password reset email sent! Please check your inbox.');
+        toast.success('Password reset email sent! Please check your inbox.');
       } else {
-        showToast('error', rejectionMessage(result.payload, 'Failed to send password reset email. Please try again.'));
+        toast.error(rejectionMessage(result.payload, 'Failed to send password reset email. Please try again.'));
       }
     } catch (err: any) {
       logger.error('Password reset error:', err);
-      showToast('error', 'Failed to send password reset email. Please try again.');
+      toast.error('Failed to send password reset email. Please try again.');
     }
   };
 
@@ -161,10 +161,10 @@ export default function LoginScreen() {
   const handleGoogleSignIn = async () => {
     try {
       clearValidationErrors();
-      showToast('info', 'Google Sign-In is not available with API authentication. Please use email or phone authentication.');
+      toast.info('Google Sign-In is not available with API authentication. Please use email or phone authentication.');
     } catch (err: any) {
       logger.error('Google sign-in error:', err);
-      showToast('error', 'Google Sign-In is not available. Please use email or phone authentication.');
+      toast.error('Google Sign-In is not available. Please use email or phone authentication.');
     }
   };
 

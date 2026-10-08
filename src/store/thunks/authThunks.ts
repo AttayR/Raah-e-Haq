@@ -20,7 +20,7 @@ import {
   getUserByCnic,
 } from '../../services/firebaseAuth';
 import firestore from '@react-native-firebase/firestore';
-import { showToast } from '../../components/ToastProvider';
+import { errorToastMessage, toast } from '../../core/toast';
 import {
   setAuthError,
   setAuthLoading,
@@ -99,13 +99,13 @@ export const sendVerificationCodeThunk = (phoneNumber: string) => async (dispatc
       userStatus: result.isExistingUser ? 'existing' : 'new',
       userProfile: result.userProfile
     }));
-    showToast('success', `Verification code sent to ${formattedPhone}`);
+    toast.success('Verification code sent');
     
     return result;
   } catch (error: any) {
-    const errorMessage = error.message || 'Failed to send verification code';
+    const errorMessage = errorToastMessage(error, 'Failed to send verification code') ?? 'Failed to send verification code';
     dispatch(setAuthError(errorMessage));
-    showToast('error', errorMessage);
+    toast.fromError(error, 'Failed to send verification code');
     throw error;
   }
 };
@@ -165,7 +165,7 @@ export const verifyCodeThunk = (
       
       dispatch(setSession(session));
       logger.debug('verifyCodeThunk - Existing user signed in successfully');
-      showToast('success', 'Signed in successfully');
+      toast.success('Signed in successfully');
       return { user, userProfile: existingUserProfile, session, isExistingUser: true };
     }
     
@@ -197,7 +197,7 @@ export const verifyCodeThunk = (
       
       dispatch(setSession(session));
       logger.debug('verifyCodeThunk - User authenticated without role, ready for role selection');
-      showToast('success', 'Phone verified successfully');
+      toast.success('Phone verified successfully');
       return { user, userProfile: null, session, isExistingUser: false };
     }
     
@@ -225,13 +225,13 @@ export const verifyCodeThunk = (
     dispatch(setSession(session));
     
     logger.debug('verifyCodeThunk - Verification completed successfully');
-    showToast('success', 'Account created successfully');
+    toast.success('Account created successfully');
     return { user, userProfile, session, isExistingUser: false };
   } catch (error: any) {
     logger.error('verifyCodeThunk - Error:', error);
-    const errorMessage = error.message || 'Failed to verify code';
+    const errorMessage = errorToastMessage(error, 'Failed to verify code') ?? 'Failed to verify code';
     dispatch(setAuthError(errorMessage));
-    showToast('error', errorMessage);
+    toast.fromError(error, 'Failed to verify code');
     throw error;
   }
 };
@@ -439,13 +439,13 @@ export const emailSignInThunk = (email: string, password: string) => async (disp
     
     dispatch(setSession(session));
     logger.debug('emailSignInThunk - Email signin successful');
-    showToast('success', 'Signed in successfully');
+    toast.success('Signed in successfully');
     return { user, userProfile, session, isExistingUser };
   } catch (error: any) {
     logger.error('emailSignInThunk - Error:', error);
-    const errorMessage = error.message || 'Failed to sign in';
+    const errorMessage = errorToastMessage(error, 'Failed to sign in') ?? 'Failed to sign in';
     dispatch(setAuthError(errorMessage));
-    showToast('error', errorMessage);
+    toast.fromError(error, 'Failed to sign in');
     throw error;
   }
 };
@@ -464,13 +464,13 @@ export const resetPasswordThunk = (email: string) => async (dispatch: AppDispatc
     
     await resetPassword(email.trim());
     logger.debug('resetPasswordThunk - Password reset email sent');
-    showToast('success', 'Password reset email sent');
+    toast.success('Password reset email sent');
     return true;
   } catch (error: any) {
     logger.error('resetPasswordThunk - Error:', error);
-    const errorMessage = error.message || 'Failed to send password reset email';
+    const errorMessage = errorToastMessage(error, 'Failed to send password reset email') ?? 'Failed to send password reset email';
     dispatch(setAuthError(errorMessage));
-    showToast('error', errorMessage);
+    toast.fromError(error, 'Failed to send password reset email');
     throw error;
   }
 };
@@ -550,13 +550,13 @@ export const detailedRegistrationThunk = (
     
     dispatch(setSession(session));
     logger.debug('detailedRegistrationThunk - Detailed registration successful');
-    showToast('success', 'Account created successfully');
+    toast.success('Account created successfully');
     return { user, userProfile, session };
   } catch (error: any) {
     logger.error('detailedRegistrationThunk - Error:', error);
-    const errorMessage = error.message || 'Failed to create account';
+    const errorMessage = errorToastMessage(error, 'Failed to create account') ?? 'Failed to create account';
     dispatch(setAuthError(errorMessage));
-    showToast('error', errorMessage);
+    toast.fromError(error, 'Failed to create account');
     throw error;
   }
 };
@@ -590,7 +590,7 @@ export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
         
         dispatch(setSession(session));
         logger.debug('googleSignInThunk - Google sign-in successful');
-        showToast('success', 'Signed in with Google successfully');
+        toast.success('Signed in with Google successfully');
         return { user: result.user, userProfile, session };
       } else {
         // User profile not found, create one
@@ -615,7 +615,7 @@ export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
         
         dispatch(setSession(session));
         logger.debug('googleSignInThunk - Google sign-in successful with new profile');
-        showToast('success', 'Signed in with Google successfully');
+        toast.success('Signed in with Google successfully');
         return { user: result.user, userProfile: newUserProfile, session };
       }
     } else {
@@ -623,9 +623,9 @@ export const googleSignInThunk = () => async (dispatch: AppDispatch) => {
     }
   } catch (error: any) {
     logger.error('googleSignInThunk - Error:', error);
-    const errorMessage = error.message || 'Failed to sign in with Google';
+    const errorMessage = errorToastMessage(error, 'Failed to sign in with Google') ?? 'Failed to sign in with Google';
     dispatch(setAuthError(errorMessage));
-    showToast('error', errorMessage);
+    toast.fromError(error, 'Failed to sign in with Google');
     throw error;
   }
 };
@@ -691,13 +691,13 @@ export const driverRegistrationThunk = (
     dispatch(setSession(session));
     
     logger.debug('driverRegistrationThunk - Driver registration completed successfully');
-    showToast('success', 'Driver registration submitted for approval');
+    toast.success('Driver registration submitted for approval');
     
     return { userProfile, session };
   } catch (error: any) {
     logger.error('driverRegistrationThunk - Error:', error);
-    dispatch(setAuthError(error.message || 'Driver registration failed'));
-    showToast('error', error.message || 'Driver registration failed');
+    dispatch(setAuthError(errorToastMessage(error, 'Driver registration failed') ?? 'Driver registration failed'));
+    toast.fromError(error, 'Driver registration failed');
     throw error;
   }
 };

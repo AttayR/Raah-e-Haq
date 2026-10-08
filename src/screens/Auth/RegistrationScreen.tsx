@@ -20,7 +20,7 @@ import PersonalInfoStep from './steps/PersonalInfoStep';
 import VehicleInfoStep from './steps/VehicleInfoStep';
 import DocumentsStep from './steps/DocumentsStep';
 import ReviewStep from './steps/ReviewStep';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage, ThunkRejection } from '../../core/api/errors';
 
@@ -177,7 +177,7 @@ export default function RegistrationScreen() {
 
   const handleNext = () => {
     if (!canProceedToNext()) {
-      showToast('error', 'Please fill all required fields before proceeding');
+      toast.error('Please fill all required fields before proceeding');
       return;
     }
 
@@ -204,7 +204,7 @@ export default function RegistrationScreen() {
       const { apiService } = await import('../../services/api');
       const isConnected = await apiService.testNetworkConnectivity();
       if (!isConnected) {
-        showToast('error', 'Network connection failed. Please check your internet connection.');
+        toast.error('Network connection failed. Please check your internet connection.');
         return;
       }
 
@@ -215,25 +215,25 @@ export default function RegistrationScreen() {
 
       // Validate password strength
       if (formData.password.length < 8) {
-        showToast('error', 'Password must be at least 8 characters long');
+        toast.error('Password must be at least 8 characters long');
         return;
       }
       if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(formData.password)) {
-        showToast('error', 'Password must contain at least one uppercase letter, one lowercase letter, and one number');
+        toast.error('Password must contain at least one uppercase letter, one lowercase letter, and one number');
         return;
       }
       if (!formData.dateOfBirth || !formData.dateOfBirth.trim()) {
-        showToast('error', 'Date of birth is required');
+        toast.error('Date of birth is required');
         setCurrentStep('personal');
         return;
       }
       if (!formData.gender) {
-        showToast('error', 'Gender is required');
+        toast.error('Gender is required');
         setCurrentStep('personal');
         return;
       }
       if (formData.role === 'passenger' && !formData.emergencyRelationship?.trim()) {
-        showToast('error', 'Emergency contact relationship is required');
+        toast.error('Emergency contact relationship is required');
         setCurrentStep('personal');
         return;
       }
@@ -259,13 +259,13 @@ export default function RegistrationScreen() {
           return v === undefined || v === null || String(v).trim() === '';
         });
         if (missing) {
-          showToast('error', `${missing.label} is required`);
+          toast.error(`${missing.label} is required`);
           setCurrentStep('vehicle');
           return;
         }
         const vehicleYearNum = parseInt(String(formData.vehicleYear || ''), 10);
         if (!Number.isNaN(vehicleYearNum) && vehicleYearNum > 2025) {
-          showToast('error', 'Vehicle year must not be greater than 2025');
+          toast.error('Vehicle year must not be greater than 2025');
           setCurrentStep('vehicle');
           return;
         }
@@ -276,7 +276,7 @@ export default function RegistrationScreen() {
       // if (formData.role === 'passenger' && 
       //     (!formData.cnicFrontPicture || formData.cnicFrontPicture.trim() === '' ||
       //      !formData.cnicBackPicture || formData.cnicBackPicture.trim() === '')) {
-      //   showToast('error', 'CNIC front and back images are required for passenger registration. Please complete the document upload step.');
+      //   toast.error('CNIC front and back images are required for passenger registration. Please complete the document upload step.');
       //   return;
       // }
 
@@ -341,7 +341,7 @@ export default function RegistrationScreen() {
       
       if (result.type.endsWith('/fulfilled')) {
         logger.debug('✅ Account created successfully!');
-        showToast('success', 'Your account has been created successfully! Please wait for admin approval.');
+        toast.success('Your account has been created successfully! Please wait for admin approval.');
         navigation.navigate('Login');
       } else {
         logger.debug('❌ Registration failed');
@@ -356,9 +356,9 @@ export default function RegistrationScreen() {
           const driverFields = ['license_type', 'license_expiry_date', 'license_plate', 'registration_number', 'driving_experience', 'vehicle_make', 'vehicle_model', 'vehicle_year', 'vehicle_color', 'bank_name', 'bank_branch', 'bank_account_number'];
           const hasDriverError = Object.keys(fieldErrors).some((k) => driverFields.includes(k));
           setCurrentStep(hasDriverError && formData.role === 'driver' ? 'vehicle' : 'personal');
-          showToast('error', payload?.message || 'Please fix the errors below.');
+          toast.error(payload?.message || 'Please fix the errors below.');
         } else {
-          showToast('error', rejectionMessage(payload, 'Registration failed'));
+          toast.error(rejectionMessage(payload, 'Registration failed'));
         }
       }
       
@@ -369,7 +369,7 @@ export default function RegistrationScreen() {
         stack: registrationError.stack,
         response: registrationError.response?.data
       });
-      showToast('error', registrationError.message || 'Registration failed');
+      toast.fromError(registrationError, 'Registration failed');
     } finally {
       setSubmitting(false);
     }

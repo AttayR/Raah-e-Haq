@@ -17,7 +17,7 @@ import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
 import { useApiAuth } from '../../hooks/useApiAuth';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 
 const PassengerSettingsScreen = () => {
@@ -45,10 +45,10 @@ const PassengerSettingsScreen = () => {
     try {
       logger.debug('PassengerSettingsScreen - Logging out...');
       await logout();
-      showToast('success', 'Logged out successfully');
+      toast.success('Logged out successfully');
     } catch (error) {
       logger.error('PassengerSettingsScreen - Logout error:', error);
-      showToast('error', 'Failed to logout');
+      toast.error('Failed to logout');
     }
   };
 

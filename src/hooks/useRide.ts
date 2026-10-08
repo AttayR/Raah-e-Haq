@@ -20,10 +20,8 @@ import {
   showRideStartedToast, 
   showRideCompletedToast,
   showErrorModal,
-  showSuccessToast,
-  showLoadingToast,
-  hideToast
 } from '../components/NotificationManager';
+import { toast } from '../core/toast';
 import { logger } from '../core/logging/logger';
 
 export interface RideState {
@@ -97,14 +95,14 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     // Show loading toast
-    showLoadingToast('Creating Ride Request', 'Please wait while we process your request...');
+    const loadingToastId = toast.loading('Creating Ride Request', 'Please wait while we process your request...');
     
     try {
       logger.debug('🚗 Requesting ride:', rideData);
       const ride = await rideService.createRide(rideData);
       
       // Hide loading toast
-      hideToast();
+      toast.hide(loadingToastId);
       
       setState(prev => ({
         ...prev,
@@ -148,7 +146,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       return ride;
     } catch (error) {
       // Hide loading toast
-      hideToast();
+      toast.hide(loadingToastId);
       
       logger.error('❌ Failed to request ride:', error);
       
@@ -229,13 +227,15 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       });
 
       // Show success toast
-      showSuccessToast(
+      toast.success(
         'Ride Accepted! 🎉',
         'You have successfully accepted the ride. Head to the pickup location.',
         {
-          label: 'View Details',
-          onPress: () => {
-            logger.debug('Navigate to ride details');
+          action: {
+            label: 'View Details',
+            onPress: () => {
+              logger.debug('Navigate to ride details');
+            },
           },
         }
       );

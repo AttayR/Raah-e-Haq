@@ -16,7 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { signOutUser } from '../../services/firebaseAuth';
 import { setSignedOut } from '../../store/slices/authSlice';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
@@ -44,20 +44,20 @@ export default function DriverPendingApprovalScreen() {
             onPress: async () => {
               await signOutUser();
               dispatch(setSignedOut());
-              showToast('success', 'Signed out successfully');
+              toast.success('Signed out successfully');
             },
           },
         ]
       );
     } catch (error) {
       logger.error('Error signing out:', error);
-      showToast('error', 'Failed to sign out');
+      toast.error('Failed to sign out');
     }
   };
 
   const handleRefresh = () => {
     setRefreshCount(prev => prev + 1);
-    showToast('info', 'Checking approval status...');
+    toast.info('Checking approval status...');
   };
 
   const getStatusInfo = () => {

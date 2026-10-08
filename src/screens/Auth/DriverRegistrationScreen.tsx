@@ -15,7 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { driverRegistrationThunk } from '../../store/thunks/authThunks';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
@@ -97,7 +97,7 @@ export default function DriverRegistrationScreen() {
 
   const handleNext = () => {
     if (!canProceedToNext()) {
-      showToast('error', 'Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -165,12 +165,12 @@ export default function DriverRegistrationScreen() {
 
       await dispatch(driverRegistrationThunk(phoneNumber, profileData));
       
-      showToast('success', 'Driver registration submitted for approval');
+      toast.success('Driver registration submitted for approval');
       // Navigation will be handled by AuthFlow based on driver status
       
     } catch (error: any) {
       logger.error('Driver registration error:', error);
-      showToast('error', error.message || 'Driver registration failed');
+      toast.fromError(error, 'Driver registration failed');
     }
   };
 

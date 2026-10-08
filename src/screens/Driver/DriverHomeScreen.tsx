@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import LinearGradient from 'react-native-linear-gradient';
-import { showToast } from '../../components/ToastProvider';
+import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 
 const { width, height } = Dimensions.get('window');
@@ -47,7 +47,7 @@ export default function DriverHomeScreen() {
       color: isOnline ? '#ef4444' : '#10b981',
       onPress: () => {
         if (!isDriverApproved) {
-          showToast('error', 'Your driver account is not approved yet');
+          toast.error('Your driver account is not approved yet');
           return;
         }
         setIsOnline(!isOnline);
