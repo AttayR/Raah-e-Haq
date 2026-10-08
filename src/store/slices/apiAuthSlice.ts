@@ -11,6 +11,7 @@ import {
   getUserProfile,
   updateUserProfile,
   initializeAuth,
+  isStaleSessionRejection,
 } from '../thunks/apiThunks';
 import { logout } from '../thunks/sessionThunks';
 import { resetApp } from '../actions';
@@ -66,24 +67,33 @@ const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Initialize Auth
+    // Initialize Auth (AUTH-04): a null result means signed out, whatever was rehydrated.
     builder
       .addCase(initializeAuth.pending, (state) => {
         state.status = 'loading';
       })
       .addCase(initializeAuth.fulfilled, (state, action) => {
+        if (!action.payload) {
+          return { ...initialState, isInitialized: true };
+        }
         state.status = 'succeeded';
         state.isInitialized = true;
-        if (action.payload) {
-          state.user = action.payload.user;
-          state.token = action.payload.token;
-          state.isAuthenticated = true;
-        }
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
       })
       .addCase(initializeAuth.rejected, (state, action) => {
-        state.status = 'failed';
-        state.isInitialized = true;
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
+        // Logged out while it ran: logout has already reset this slice (initialised).
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
+        // Storage could not be read: start signed out; the token stays for the next launch.
+        return {
+          ...initialState,
+          isInitialized: true,
+          status: 'failed',
+          error: rejectionMessage(action.payload, action.error.message || 'Something went wrong'),
+        };
       });
 
     // Login User
@@ -226,11 +236,19 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(getUserProfile.fulfilled, (state, action) => {
+        // Never re-write the user after logout (T-103; T-104 adds the full session epoch).
+        if (!state.isAuthenticated) {
+          return;
+        }
         state.status = 'succeeded';
         state.user = action.payload;
         state.error = null;
       })
       .addCase(getUserProfile.rejected, (state, action) => {
+        // Dropped because the session ended (T-103): the signed-out state stays untouched.
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });

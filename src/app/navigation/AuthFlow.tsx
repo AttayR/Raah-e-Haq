@@ -4,11 +4,19 @@ import { RootState } from '../../store';
 import AuthStack from './stacks/AuthStack';
 import RootNavigation from './RootNavigation';
 import DriverPendingApprovalScreen from '../../screens/Driver/DriverPendingApprovalScreen';
+import SplashScreen from '../../components/SplashScreen';
 import { logger } from '../../core/logging/logger';
 
 export default function AuthFlow() {
-  const { isAuthenticated, user, profileCompleted } = useSelector((state: RootState) => state.apiAuth);
-  
+  const { isAuthenticated, user, profileCompleted, isInitialized } = useSelector(
+    (state: RootState) => state.apiAuth,
+  );
+
+  // Until initializeAuth has checked the stored session, route nowhere (no Login flash).
+  if (!isInitialized) {
+    return <SplashScreen />;
+  }
+
   logger.debug('AuthFlow - Current state:', { isAuthenticated, hasUser: !!user, profileCompleted });
 
   // Check if user is active and has a role

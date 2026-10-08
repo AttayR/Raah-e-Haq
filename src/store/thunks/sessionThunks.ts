@@ -6,6 +6,7 @@ import webSocketService from '../../services/webSocketService';
 import locationTrackingService from '../../services/locationTrackingService';
 import notificationService from '../../services/notificationService';
 import { resetApp } from '../actions';
+import { bumpSessionEpoch } from '../sessionEpoch';
 import { logger } from '../../core/logging/logger';
 
 /** Injected by the store (thunk extraArgument) so this file never imports the store itself. */
@@ -44,6 +45,8 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
   'session/logout',
   async (options, { dispatch, extra }) => {
     const allDevices = !!options && options.allDevices === true;
+    // Results of requests started before this point belong to the old session (T-103).
+    bumpSessionEpoch();
     try {
       await step('server revoke', () =>
         allDevices

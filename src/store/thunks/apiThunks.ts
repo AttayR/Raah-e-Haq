@@ -8,7 +8,8 @@ import {
   OtpSentInfo,
   User,
 } from '../../services/api';
-import { unwrap, toThunkRejection, ThunkRejection } from '../../core/api/errors';
+import { unwrap, toApiError, toThunkRejection, ThunkRejection } from '../../core/api/errors';
+import { currentSessionEpoch, isStaleSession, STALE_SESSION_MESSAGE } from '../sessionEpoch';
 import { logger } from '../../core/logging/logger';
 
 /**
@@ -16,6 +17,16 @@ import { logger } from '../../core/logging/logger';
  * (and kind/status/retryAfter). Use rejectionMessage() to show it.
  */
 type ThunkConfig = { rejectValue: ThunkRejection };
+
+/** A result dropped because the session ended while the request ran (T-103). */
+export const staleSessionRejection = (): ThunkRejection => ({
+  message: STALE_SESSION_MESSAGE,
+  kind: 'cancelled',
+  fieldErrors: {},
+});
+
+export const isStaleSessionRejection = (payload: ThunkRejection | undefined): boolean =>
+  payload?.kind === 'cancelled' && payload.message === STALE_SESSION_MESSAGE;
 
 export interface AuthSession {
   user: User;
@@ -169,8 +180,13 @@ export const refreshToken = createAsyncThunk<string, void, ThunkConfig>(
 export const getUserProfile = createAsyncThunk<User, void, ThunkConfig>(
   'auth/getUserProfile',
   async (_, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
     try {
       const data = unwrap(await apiService.getProfile());
+      // Signed out (or in again as someone else) while this was in flight: drop it (T-103).
+      if (isStaleSession(startedIn)) {
+        return rejectWithValue(staleSessionRejection());
+      }
       await apiService.setUserData(data.user);
       return data.user;
     } catch (error) {
@@ -192,27 +208,54 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
   }
 );
 
-// Initialize Auth State
+// Initialize Auth State (AUTH-04, INF-08)
+/**
+ * Restores the stored session on cold start and checks it with GET /auth/profile.
+ * - no stored token: null (signed out)
+ * - 200: the session with the fresh user from the server
+ * - 401: the token is invalid, so it is cleared: null
+ * - offline, timeout, 5xx, 403 ACCOUNT_* (BE-25; account-status routing is T-106): the stored
+ *   session is kept and the user stays signed in. Only a 401 ends a session.
+ * If a logout happens while it runs, it rejects with staleSessionRejection() and the
+ * reducer leaves the signed-out state alone.
+ */
 export const initializeAuth = createAsyncThunk<{ user: User; token: string } | null, void, ThunkConfig>(
   'auth/initializeAuth',
   async (_, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
     try {
       const token = await apiService.getAuthToken();
-      const userData = await apiService.getUserData();
+      if (!token) {
+        return null;
+      }
+      const storedUser = await apiService.getUserData();
 
-      if (token && userData) {
-        // Verify token is still valid by making a test request
-        try {
-          await apiService.testAuth();
-          return { user: userData, token };
-        } catch (error) {
-          // Token is invalid, clear auth data
+      let session: { user: User; token: string } | null;
+      try {
+        const data = unwrap(await apiService.getProfile());
+        if (isStaleSession(startedIn)) {
+          return rejectWithValue(staleSessionRejection());
+        }
+        await apiService.setUserData(data.user);
+        session = { user: data.user, token };
+      } catch (error) {
+        if (isStaleSession(startedIn)) {
+          return rejectWithValue(staleSessionRejection());
+        }
+        const apiError = toApiError(error);
+        if (apiError.status === 401) {
           await apiService.clearAuthData();
           return null;
         }
+        logger.warn('initializeAuth - profile check failed; keeping the stored session', {
+          kind: apiError.kind,
+          status: apiError.status,
+        });
+        // Without a cached user there is nothing to route on; stay signed out but keep the
+        // token so the next launch can try again.
+        session = storedUser ? { user: storedUser, token } : null;
       }
-
-      return null;
+      return session;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Failed to initialize auth'));
     }
