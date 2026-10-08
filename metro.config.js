@@ -9,10 +9,15 @@ const escapeForRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const docsBlockPattern = new RegExp(
   `^${escapeForRegExp(path.resolve(__dirname, 'docs'))}[\\/\\\\].*`,
 );
+// Agent git worktrees (.claude/worktrees) are full checkouts with their own node_modules.
+const claudeBlockPattern = new RegExp(
+  `^${escapeForRegExp(path.resolve(__dirname, '.claude'))}[\\/\\\\].*`,
+);
 const defaultBlockList = defaultConfig.resolver.blockList;
 const blockList = [
   ...(Array.isArray(defaultBlockList) ? defaultBlockList : [defaultBlockList]).filter(Boolean),
   docsBlockPattern,
+  claudeBlockPattern,
 ];
 
 /**
