@@ -1,6 +1,30 @@
 import { apiService, VerifyOtpRequest } from './api';
 import { logger } from '../core/logging/logger';
 
+/** The backend issues and accepts exactly 6-digit codes (verify-otp: otp_code size:6). */
+export const OTP_LENGTH = 6;
+
+/**
+ * Keeps only the digits of typed, pasted or SMS-autofilled text ("123 456", "123-456",
+ * "Your code is 123456") and caps it at OTP_LENGTH.
+ */
+export const sanitizeOtpInput = (text: string): string =>
+  (text || '').replace(/\D/g, '').slice(0, OTP_LENGTH);
+
+/** Whole seconds left until `deadlineMs` (never negative). */
+export const secondsUntil = (deadlineMs: number | null, nowMs: number): number =>
+  deadlineMs == null ? 0 : Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000));
+
+/** 59 -> "59s", 125 -> "2:05", 3700 -> "1:01:40". */
+export const formatCountdown = (seconds: number): string => {
+  const s = Math.max(0, Math.floor(seconds));
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const rest = String(s % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`;
+};
+
 // OTP Service for handling phone verification operations
 export class OtpService {
   /**
@@ -113,14 +137,13 @@ export class OtpService {
       return { isValid: false, error: phoneCheck.error };
     }
 
-    if (!otpData.otp_code || otpData.otp_code.trim().length === 0) {
+    const otpCode = sanitizeOtpInput(otpData.otp_code);
+    if (otpCode.length === 0) {
       return { isValid: false, error: 'OTP code is required' };
     }
 
-    // Check OTP code format (typically 4-6 digits)
-    const otpCode = otpData.otp_code.trim();
-    if (!/^\d{4,6}$/.test(otpCode)) {
-      return { isValid: false, error: 'OTP code must be 4-6 digits' };
+    if (otpCode.length !== OTP_LENGTH) {
+      return { isValid: false, error: `OTP code must be ${OTP_LENGTH} digits` };
     }
 
     return { isValid: true };

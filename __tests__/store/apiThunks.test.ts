@@ -48,7 +48,22 @@ describe('api thunks', () => {
       data: { phone: '03001234567', otp_code: null, expires_in: 60 },
     });
     const result = await makeStore().dispatch(sendOtp('03001234567'));
-    expect(result.payload).toEqual({ phone: '03001234567', otp_code: null, expires_in: 60 });
+    expect(result.payload).toEqual({ phone: '03001234567', expires_in: 60 });
+  });
+
+  it('sendOtp drops an otp_code echoed by the local backend (AUTH-02, T-101)', async () => {
+    mock.onPost('/auth/send-otp').reply(200, {
+      success: true,
+      message: 'OTP sent successfully',
+      data: { phone: '+923001234567', otp_code: '482913', expires_in: 60 },
+    });
+    const store = makeStore();
+    const result = await store.dispatch(sendOtp('+923001234567'));
+
+    expect(sendOtp.fulfilled.match(result)).toBe(true);
+    expect(result.payload).toEqual({ phone: '+923001234567', expires_in: 60 });
+    expect(JSON.stringify(store.getState())).not.toContain('482913');
+    expect(store.getState().auth.otpData).toEqual({ phone: '+923001234567', expires_in: 60 });
   });
 
   it('registration 422 exposes fieldErrors and a display-safe message', async () => {

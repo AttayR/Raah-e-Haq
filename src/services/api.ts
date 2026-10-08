@@ -170,6 +170,9 @@ export interface SendOtpResponse {
   expires_in: number;
 }
 
+/** What the app keeps after send-otp: never the code itself (AUTH-02, INF-05). */
+export type OtpSentInfo = Pick<SendOtpResponse, 'phone' | 'expires_in'>;
+
 export interface LoginRequest {
   email: string;
   password: string;

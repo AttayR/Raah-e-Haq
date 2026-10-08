@@ -8,6 +8,7 @@ import apiAuthReducer from './slices/apiAuthSlice';
 import userReducer from './slices/userSlice';
 import tripReducer from './slices/tripSlice';
 import rideReducer from './slices/rideSlice';
+import { stripOtpTransform } from './persistTransforms';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -52,7 +53,7 @@ const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
   whitelist: ['auth', 'apiAuth', 'user'],
-  transforms: [clearAuthErrorsTransform],
+  transforms: [clearAuthErrorsTransform, stripOtpTransform],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

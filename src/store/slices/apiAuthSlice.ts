@@ -1,5 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { User } from '../../services/api';
+import { createSlice } from '@reduxjs/toolkit';
+import { User, OtpSentInfo } from '../../services/api';
 import {
   loginUser,
   registerUser,
@@ -22,11 +22,8 @@ export type AuthState = {
   isAuthenticated: boolean;
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
-  otpData: {
-    phone: string;
-    otp_code?: string | null;
-    expires_in: number;
-  } | null;
+  /** Phone and TTL of the last code sent. Never the code; never persisted (see store/persistTransforms). */
+  otpData: OtpSentInfo | null;
   isOtpSent: boolean;
   isOtpVerified: boolean;
   profileCompleted: boolean;
@@ -64,7 +61,7 @@ const authSlice = createSlice({
     clearProfileCompleted: (state) => {
       state.profileCompleted = false;
     },
-    resetAuthState: (state) => {
+    resetAuthState: () => {
       return { ...initialState, isInitialized: true };
     },
   },
@@ -133,7 +130,7 @@ const authSlice = createSlice({
       })
       .addCase(sendOtp.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.otpData = action.payload;
+        state.otpData = { phone: action.payload.phone, expires_in: action.payload.expires_in };
         state.isOtpSent = true;
         state.error = null;
       })
