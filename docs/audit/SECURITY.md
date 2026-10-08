@@ -265,6 +265,75 @@ Severity: **critical** (any user can take over accounts, money or the admin pane
 
 **Required fix:** don't cache notifications. Read them from `GET /notifications` (T-502), or clear the cache on logout (T-102).
 
+### SEC-19 · low · app transport: WebSocket URLs from API responses are opened without checks and bypass `env.WS_URL`
+Found in the Phase 0 gate audit (app `087162a`).
+
+**Evidence**
+- `src/services/webSocketService.ts:52-55, 105-108` passes `websocket_url` from `POST /websocket/subscribe-ride` and `/subscribe-driver` straight to `new WebSocket(...)`. Nothing checks the scheme or host.
+- The backend hardcodes the host: `WebSocketController.php:68, 132` returns `wss://raahehaq.com/ws/...`. A Debug build pointed at the local backend therefore still opens sockets to the production host. That defeats T-005's single source for URLs and the "never touch production" rule.
+- Only the notifications socket (`:156`) uses `env.WS_URL`.
+- Today the impact is nil, because no WebSocket server exists (FEAT-12 / BE-12).
+
+**Impact:** once sockets exist, a misconfigured or tampered response could downgrade the driver's or passenger's live location to `ws://`, or send it to a foreign host. Dev and QA builds would connect to production.
+
+**Required fix**
+- **App:** build socket URLs from `env.WS_URL` plus the channel path, or accept a server URL only if its origin equals `env.WS_URL`'s origin and it uses `wss://` when `!__DEV__`. Add a unit test.
+- **Backend:** derive `websocket_url` from config (`APP_WS_URL`), not a literal.
+- Do this with BE-12 / T-308 (or whichever task builds the real-time layer).
+
+### SEC-20 · low · app logging: gaps in the redacting logger
+Found in the Phase 0 gate audit (app `087162a`).
+
+**Evidence** (`src/core/logging/logger.ts`)
+- **Strings:** `:26, 51-52` mask only `?key=`/`token=`/`otp=` query values. A `Bearer <token>` or `Authorization: ...` inside a string (an error message or a library message echoing headers) is printed as is, including by `logger.error` in release.
+- **Keys:** `:21, 24` don't cover `date_of_birth`/`dob`, `gender` or `ip`, even in strict mode. These fields are sent at registration (`src/services/api.ts:188-189, 311-312`).
+- **Debug-level calls with positional PII** that key-based redaction can't catch (dev only, but they land in tracked QA logs such as `docs/qa-reports/2026-10-08-T-003/device-js-log.txt`):
+  - `PassengerHomeScreen.tsx:97, 100` (coordinates and reverse-geocoded address)
+  - `BasicInfoScreen.tsx:189` and `FirebaseTest.tsx:21` (uid)
+  - `placesService.ts:35, 49, 52, 76` (coordinate URL and the geocoding responses; Nominatim removal is PAX-18 / T-303)
+- The QA log in the repo holds only seed data and a simulator location (checked), so no real data has leaked.
+
+**Required fix**
+- Add a string pattern that masks `Bearer\s+\S+`.
+- Add `dob|date_of_birth|gender|\bip\b` to the key set.
+- Turn the positional calls into keyed objects, or drop them.
+- Extend `__tests__/core/logging/logger.test.ts` for each case.
+
+### SEC-21 · low · app API client: token guard checks only `config.url`, not `baseURL`
+Found in the Phase 0 gate audit (app `087162a`).
+
+**Evidence**
+- `src/services/api.ts:62-66, 71`: `isApiUrl(config.url)` treats every relative URL as our API.
+- A call such as `apiClient.get('/x', {baseURL: 'https://other.host'})` would therefore get the bearer token.
+- No caller passes `baseURL` today (checked with grep). Third-party calls (Google, Nominatim) use `fetch`, not `apiClient`.
+
+**Impact:** latent token leak to a third party if a future caller overrides `baseURL`.
+
+**Required fix:** check the resolved URL instead: `isApiUrl(apiClient.getUri(config))`, or compare `config.baseURL ?? API_BASE_URL` too. Add a unit test with a foreign `baseURL`. Do this in T-104 (the interceptor rewrite).
+
+## Phase 0 gate re-audit (app, 2026-10-08, `087162a`)
+Scope: T-001 to T-008 end to end (env, logger, babel console stripping, API client and error model, toasts, repo hygiene).
+- **Fixed by Phase 0:**
+  - No `console.*` remains in `src` outside the logger, and ESLint `no-console` is an error.
+  - Release strips every console call except `console.error`, and that call goes through the strict redactor.
+  - The bearer token is sent only to the API origin.
+  - 5xx and unclassified server text is never shown. The backend no longer returns `$e->getMessage()` from API controllers.
+  - The stale bundle and the npm lockfile are gone.
+  - Debug Android cleartext is limited to localhost, 127.0.0.1 and 10.0.2.2.
+  - `.env.development` and `.env.production` are ignored and were never committed. `.env.production` uses `https`/`wss`.
+  - The `AIza…` value in `logger.test.ts` is a short fake, not the real key.
+- **Still open, already tracked:**
+  - Maps key in native files and git history (INF-06 / T-109 / B-02)
+  - Release cleartext in `src/main` `network_security_config.xml` (INF-21 / T-108)
+  - Token and `otpData` in AsyncStorage and redux-persist (INF-20, AUTH-02 / T-101, T-104)
+  - 401 never logs out; dead `refresh_token` branch (AUTH-05 / T-104)
+  - Incomplete logout (AUTH-09 / T-102)
+  - Dependency advisories unchanged at 8 critical, 141 high, 80 moderate, 7 low (SEC-11). Phase 0 added only dev dependencies.
+  - `http://` accepted in release (SEC-17)
+  - Notification cache (SEC-18)
+  - Unauthenticated notifications socket (INF-13)
+- **Dependency audit tooling:** the repo uses Yarn 1.22, which has no `yarn npm audit`, and T-004 removed `package-lock.json`, so `npm audit` has nothing to read. The read-only `yarn audit --groups dependencies` was used instead.
+
 ## Non-security observation (for the feature tracker)
 `GET /rides/pending` and `/rides/nearby-drivers` are shadowed by `rides/{ride}` (already FEAT-01 / BE-02).
 

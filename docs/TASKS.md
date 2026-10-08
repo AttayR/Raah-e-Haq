@@ -22,7 +22,7 @@
 | T-101 | 1 | Stop displaying/persisting OTP | T-007 | yes | agent | todo | Backend part = BE-16 (was B-01); BE-16 contract: send-otp/verify-otp may return 429 with retry_after; show message, resend countdown from retry_after (60 s after each send); otp_code optional/null; use server expires_in (60 s) not hardcoded 300 |
 | T-102 | 1 | Single logout thunk used everywhere | T-007 | yes | agent | todo | QA 2026-10-08: add a confirmation dialog before logout |
 | T-103 | 1 | Auth bootstrap: splash, offline-tolerant init | T-102 | yes | agent | todo | |
-| T-104 | 1 | Token in Keychain + single-flight 401 handling | T-103 | yes | agent | todo |; 401 from verify-otp/login must not trigger the refresh-token branch (api.ts:79-101); BE-25 contract: on 401 clear session and go to login (never refresh after 401); store data.expires_at; optional POST /auth/refresh with Bearer before expiry; remove dead refresh_token logic |
+| T-104 | 1 | Token in Keychain + single-flight 401 handling | T-103 | yes | agent | todo |; 401 from verify-otp/login must not trigger the refresh-token branch (api.ts:79-101); BE-25 contract: on 401 clear session and go to login (never refresh after 401); store data.expires_at; optional POST /auth/refresh with Bearer before expiry; remove dead refresh_token logic; SEC-21: isApiUrl should check apiClient.getUri(config) so a per-request baseURL override never gets the token |
 | T-105 | 1 | normalizeUser + role/status routing | T-103 | yes | agent | todo | Confirm with B-03 |
 | T-106 | 1 | Account-status screen (pending/suspended) rebuilt | T-105 | yes | agent | todo |; BE-25 contract: 403 {code: ACCOUNT_PENDING|ACCOUNT_INACTIVE|ACCOUNT_SUSPENDED|ACCOUNT_REJECTED, data.status}; pending login now returns 200 + token limited to allowlist; Check Status → GET /auth/profile; sign-out → POST /auth/logout; User.status type add inactive; when T-106 ships (pending screen with real Check Status + logoutUser), set AUTH_PENDING_LOGIN_TOKENS=true on the backend; handle 403 ACCOUNT_INACTIVE/SUSPENDED on any route (not just login): log out and show account-status screen |
 | T-107 | 1 | Remove Firebase auth path; fix slices & persist config | T-106 | yes | agent | todo | QA T-008: shared auth error not cleared when leaving PhoneAuth / switching login method (banner carries over) |
@@ -79,8 +79,8 @@
 | T-617 | 6 | Activity: ride history, ride details/receipt, wallet | T-608, T-609, T-610, T-501, T-508 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-618 | 6 | Account: settings, profile view/edit, saved places (both roles) | T-608, T-610, T-504, T-509, T-511 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
 | T-619 | 6 | Help & support, invite friends, delete account | T-618, T-511 | yes | agent | todo | Builder: rh-designer; Design review: rh-design-director |
-| T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | Fallback UI follows ErrorState (DESIGN_SYSTEM §5.20) once T-608 lands; T-003 security: gate should assert release bundle has no console.log; strict mode could mask phone/email/CNIC-shaped substrings in strings and drop stack in release |
-| T-701 | 7 | Delete dead code + unused dependencies | T-605, T-615, T-616 | yes | agent | todo | |
+| T-606 | 6 | Root ErrorBoundary + crash reporting | T-006 | no | agent | todo | Fallback UI follows ErrorState (DESIGN_SYSTEM §5.20) once T-608 lands; T-003 security: gate should assert release bundle has no console.log; strict mode could mask phone/email/CNIC-shaped substrings in strings and drop stack in release; SEC-20: logger masks "Bearer <token>" in strings, adds dob/gender/ip keys; convert positional PII debug calls (PassengerHomeScreen:97,100, BasicInfoScreen:189, placesService) to keyed objects |
+| T-701 | 7 | Delete dead code + unused dependencies | T-605, T-615, T-616 | yes | agent | todo |; SEC-11: remove firebase JS SDK (protobufjs/grpc criticals) and upgrade axios (13 high advisories) as part of dependency cleanup; re-run yarn audit |
 | T-702 | 7 | TypeScript + ESLint to zero; gate requires zero | T-701 | no | agent | todo | |
 | T-703 | 7 | Maestro E2E flows for QA scenarios | T-405 | no | agent | todo | |
 | T-704 | 7 | CI (GitHub Actions) | T-702 | no | agent | todo | |
@@ -109,7 +109,7 @@
 | BE-09 | 5 | My wallet (cash only): balance + transactions; lock admin payment routes | BE-04 | yes | agent | todo | FEAT-09; Admin-only locking of payments/* is owned by BE-18; BE-09 does only the user wallet endpoints |
 | BE-10 | 5 | Fix banners 500 + filter by date/audience/position | BE-00 | yes | agent | todo | FEAT-10 |
 | BE-11 | 5 | Push: device tokens, FCM send, preferences, broadcasts in list | BE-00, BE-18 | yes | agent | todo | FEAT-11; prod creds = B-11; must land after BE-18 (BE-00 security review: admin broadcast path works now) |
-| BE-12 | 4 | Realtime with Laravel Reverb (channels, Sanctum broadcast auth, events) | BE-03 | yes | agent | todo | FEAT-12 (supersedes B-06 part); prod hosting = B-10 |
+| BE-12 | 4 | Realtime with Laravel Reverb (channels, Sanctum broadcast auth, events) | BE-03 | yes | agent | todo | FEAT-12 (supersedes B-06 part); prod hosting = B-10; SEC-19: websocket_url from config/env, not hardcoded wss://raahehaq.com; app builds socket URLs from env.WS_URL (T-308) |
 | BE-13 | 5 | In-ride chat API (messages, chats list, broadcast) | BE-12 | yes | agent | todo | FEAT-13 |
 | BE-14 | 5 | Saved places CRUD | BE-00 | yes | agent | todo | FEAT-14 |
 | BE-15 | 5 | Profile completeness (driver vehicle/licence, stats) + account deletion | BE-00 | yes | agent | todo | FEAT-15 |
