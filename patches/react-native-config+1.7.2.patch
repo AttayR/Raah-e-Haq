@@ -1,0 +1,36 @@
+diff --git a/node_modules/react-native-config/ios/ReactNativeConfig/BuildDotenvConfig.rb b/node_modules/react-native-config/ios/ReactNativeConfig/BuildDotenvConfig.rb
+index 2fa392b..39c6f9b 100755
+--- a/node_modules/react-native-config/ios/ReactNativeConfig/BuildDotenvConfig.rb
++++ b/node_modules/react-native-config/ios/ReactNativeConfig/BuildDotenvConfig.rb
+@@ -13,7 +13,8 @@ Encoding.default_external = Encoding::UTF_8
+ Encoding.default_internal = Encoding::UTF_8
+ 
+ dotenv, custom_env, resolution = read_dot_env(envs_root)
+-puts "read dotenv #{dotenv}"
++# Never print the values: they include API keys and would land in the build logs.
++puts "read dotenv: #{dotenv.size} keys (values not printed)"
+ 
+ # create obj file that sets DOT_ENV as a NSDictionary
+ dotenv_objc = dotenv.map { |k, v| %(@"#{k}":@"#{v.chomp}") }.join(',')
+diff --git a/node_modules/react-native-config/react-native-config.podspec b/node_modules/react-native-config/react-native-config.podspec
+index 792d8c3..88a3e76 100644
+--- a/node_modules/react-native-config/react-native-config.podspec
++++ b/node_modules/react-native-config/react-native-config.podspec
+@@ -24,7 +24,7 @@ Pod::Spec.new do |s|
+   s.script_phase = {
+     name: 'Config codegen',
+     script: %(
+-set -ex
++set -e
+ HOST_PATH="$SRCROOT/../.."
+ "${PODS_TARGET_SRCROOT}/ios/ReactNativeConfig/BuildDotenvConfig.rb" "$HOST_PATH" "${PODS_TARGET_SRCROOT}/ios/ReactNativeConfig"
+ ),
+@@ -53,7 +53,7 @@ HOST_PATH="$SRCROOT/../.."
+     ext.script_phase = {
+       name: 'Config codegen',
+       script: %(
+-        set -ex
++        set -e
+         HOST_PATH="$SRCROOT/../.."
+         "${PODS_TARGET_SRCROOT}/ios/ReactNativeConfig/BuildDotenvConfig.rb" "$HOST_PATH" "${PODS_TARGET_SRCROOT}/ios/ReactNativeConfig"
+         ),

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "verify": "node scripts/quality-gate.js",
     "verify:update": "node scripts/quality-gate.js --update",
-    "api:health": "node scripts/api-health.js"
+    "api:health": "node scripts/api-health.js",
+    "postinstall": "patch-package --error-on-fail"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -78,6 +79,7 @@
     "babel-plugin-transform-remove-console": "^6.9.4",
     "eslint": "^8.19.0",
     "jest": "^29.6.3",
+    "patch-package": "^8.0.1",
     "prettier": "2.8.8",
     "react-native-asset": "^2.1.1",
     "react-test-renderer": "19.1.0",
