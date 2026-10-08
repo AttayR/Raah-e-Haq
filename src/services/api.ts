@@ -106,6 +106,9 @@ const NO_SESSION_EXPIRY_PATHS = [
   '/auth/verify-otp',
   '/auth/send-otp',
   '/auth/register',
+  // BE-35: the registration phone step runs before any session exists (T-111).
+  '/auth/phone/verify',
+  '/auth/phone/resend',
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/logout',
@@ -369,6 +372,44 @@ export interface VerifyOtpRequest {
   otp_code: string;
 }
 
+/** POST /auth/phone/verify (BE-35/BE-38): the registration's verification_token and the code. */
+export interface VerifyPhoneRequest {
+  verification_token: string;
+  otp_code: string;
+}
+
+/** POST /auth/phone/resend (BE-35). */
+export interface ResendPhoneCodeRequest {
+  verification_token: string;
+}
+
+/**
+ * POST /auth/phone/verify 200 (BE-38). `user` is `{id, name, email, role, roles, phone,
+ * phone_verified_at, status}`. `token` (and token_type, expires_at) is null when the account
+ * may not sign in yet (a driver pending approval).
+ */
+export interface VerifyPhoneResponse {
+  user: ApiUser;
+  token: string | null;
+  token_type: string | null;
+  expires_at?: string | null;
+}
+
+/**
+ * POST /auth/phone/resend 200 and registration's `phone_verification` (BE-35). A refused
+ * send comes as 429/503 from resend; on registration it is `code_sent: false` with the BE-28
+ * `code`, `message` and `retry_after`. `otp_code` is echoed only by APP_ENV=local + debug.
+ */
+export interface PhoneCodeSentResponse {
+  phone: string;
+  code_sent: boolean;
+  expires_in: number;
+  otp_code?: string | null;
+  code?: string;
+  message?: string;
+  retry_after?: number;
+}
+
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -566,6 +607,33 @@ class ApiService {
     } catch (err: unknown) {
       const error = toApiError(err);
       logApiFailure('ApiService#verifyOtp failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * BE-35/BE-38: proves a new account's phone with the registration verification_token.
+   * The token is a credential for this step: it is never logged or stored (memory only).
+   */
+  async verifyPhone(request: VerifyPhoneRequest): Promise<ApiResponse<VerifyPhoneResponse>> {
+    try {
+      const response = await apiClient.post('/auth/phone/verify', request);
+      return response.data;
+    } catch (err: unknown) {
+      const error = toApiError(err);
+      logApiFailure('ApiService#verifyPhone failed', error);
+      throw error;
+    }
+  }
+
+  /** BE-35: texts a new code for the registration's pending phone. */
+  async resendPhoneCode(request: ResendPhoneCodeRequest): Promise<ApiResponse<PhoneCodeSentResponse>> {
+    try {
+      const response = await apiClient.post('/auth/phone/resend', request);
+      return response.data;
+    } catch (err: unknown) {
+      const error = toApiError(err);
+      logApiFailure('ApiService#resendPhoneCode failed', error);
       throw error;
     }
   }

@@ -4,13 +4,15 @@ import {
   LoginRequest,
   RegisterRequest,
   VerifyOtpRequest,
+  VerifyPhoneRequest,
+  ResendPhoneCodeRequest,
   ResetPasswordRequest,
   OtpSentInfo,
   User,
 } from '../../services/api';
 import { authStorage } from '../../services/authStorage';
 import { unwrap, toApiError, toThunkRejection, ThunkRejection, ApiError } from '../../core/api/errors';
-import { normalizeUser, UNKNOWN_STATUS, withRefusedStatus } from '../../core/auth/normalizeUser';
+import { mergeServerUser, normalizeUser, UNKNOWN_STATUS, withRefusedStatus } from '../../core/auth/normalizeUser';
 import { logApiFailure } from '../../core/api/logApiFailure';
 import {
   bumpSessionEpoch,
@@ -194,6 +196,67 @@ export const verifyOtp = createAsyncThunk<AuthSession, VerifyOtpRequest, ThunkCo
     } catch (error) {
       logApiFailure('verifyOtp failed', error);
       return rejectWithValue(toThunkRejection(error, 'OTP verification failed'));
+    }
+  }
+);
+
+/** POST /auth/phone/verify: the user, and whether a session was stored (a token came back). */
+export interface VerifiedPhone {
+  user: User;
+  signedIn: boolean;
+}
+
+/**
+ * BE-35/BE-38 registration phone step (used by T-201). The returned user is merged into the
+ * one already held (registration's), so a missing or null role never nulls it, and the
+ * proven number is no longer pending. With a token the session is stored like a login
+ * (Keychain, new session epoch); a driver pending approval gets no token, so nothing is
+ * stored and the user stays signed out.
+ */
+export const verifyPhone = createAsyncThunk<
+  VerifiedPhone,
+  VerifyPhoneRequest,
+  ThunkConfig & { state: { apiAuth: { user: User | null } } }
+>(
+  'auth/verifyPhone',
+  async (request, { rejectWithValue, getState }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const data = unwrap(await apiService.verifyPhone(request));
+      const merged = mergeServerUser(getState().apiAuth.user, data.user);
+      if (!merged) {
+        throw new ApiError({ kind: 'unknown', message: 'Invalid response format from server' });
+      }
+      const user: User = { ...merged, pending_phone: null };
+
+      if (!data.token) {
+        if (isStaleSession(startedIn)) {
+          return rejectWithValue(staleSessionRejection());
+        }
+        return { user, signedIn: false };
+      }
+      if (!(await storeNewSession({ user, token: data.token, expires_at: data.expires_at }, startedIn))) {
+        return rejectWithValue(staleSessionRejection());
+      }
+      return { user, signedIn: true };
+    } catch (error) {
+      logApiFailure('verifyPhone failed', error);
+      return rejectWithValue(toThunkRejection(error, 'Phone verification failed'));
+    }
+  }
+);
+
+/** BE-35: resend the registration code. Like sendOtp, an echoed otp_code is dropped here. */
+export const resendPhoneCode = createAsyncThunk<OtpSentInfo, ResendPhoneCodeRequest, ThunkConfig>(
+  'auth/resendPhoneCode',
+  async (request, { rejectWithValue }) => {
+    try {
+      const data = unwrap(await apiService.resendPhoneCode(request));
+      return { phone: data.phone, expires_in: data.expires_in };
+    } catch (error) {
+      logApiFailure('resendPhoneCode failed', error);
+      // 429/503 carry code and retryAfter (BE-28), as for sendOtp.
+      return rejectWithValue(toThunkRejection(error, 'Failed to resend code'));
     }
   }
 );

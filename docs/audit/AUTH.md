@@ -135,6 +135,14 @@ Audited on 2026-10-03 by reading the code, at commit `9047c5d`. Line numbers ref
 - `registerUserWithImages` stores `response.data.token` if present. On the next launch, `initializeAuth` would silently log the user in.
 - There is no reducer case for this thunk, so `status` and `error` never update during registration.
 
+### AUTH-18 · P3 · bug: phone OTP refusal polish (T-111 QA)
+`src/screens/Auth/PhoneAuthScreen.tsx`, `src/core/api/logApiFailure.ts`
+- Expected refusals (429 otp limits, 503 sms_unavailable) go to logger.error, which shows a red LogBox in dev.
+- Global refusals (sms_unavailable, otp_ip_limit) only block the number that was typed; changing one digit re-enables Send.
+- Send success copy claims a code was sent, even for unknown numbers.
+- The email fallback opens the Phone tab.
+- Keyboard covers Send/Verify with no way to dismiss it, and disabled Verify looks enabled.
+
 ## Current flow
 
 **Passenger:**

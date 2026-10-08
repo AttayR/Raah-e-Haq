@@ -5,6 +5,7 @@ import {
   registerUser,
   sendOtp,
   verifyOtp,
+  verifyPhone,
   forgotPassword,
   resetPassword,
   getUserProfile,
@@ -190,6 +191,29 @@ const authSlice = createSlice({
         state.status = 'failed';
         state.error = accountRefusalMessage(action.payload, action.error.message || 'Something went wrong');
         state.isOtpVerified = false;
+      });
+
+    // Verify registration phone (BE-35/BE-38, T-201 screen): a session only with a token.
+    builder
+      .addCase(verifyPhone.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(verifyPhone.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.user = action.payload.user;
+        state.error = null;
+        if (action.payload.signedIn) {
+          state.isAuthenticated = true;
+          state.statusUnverified = false;
+        }
+      })
+      .addCase(verifyPhone.rejected, (state, action) => {
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
+        state.status = 'failed';
+        state.error = accountRefusalMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
     // Forgot Password

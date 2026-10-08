@@ -159,6 +159,42 @@ export function normalizeUser(raw: unknown): User | null {
   return user;
 }
 
+/**
+ * Merges a user from a response that sends only some fields (BE-35/BE-38 phone verify:
+ * `{id, name, email, role, roles, phone, phone_verified_at, status}`) into the user the app
+ * already holds, then normalises the result. Fields the response leaves out, or sends as
+ * null, an empty string role or an empty `roles` list, keep their current value, so such a
+ * response never nulls the role. When the response names roles but no role, its roles
+ * decide. A different id is a different account: only the response counts then.
+ */
+export function mergeServerUser(existing: User | null | undefined, raw: unknown): User | null {
+  const incoming = normalizeUser(raw);
+  if (!incoming || !isRecord(raw)) {
+    return null;
+  }
+  if (!existing || existing.id !== incoming.id) {
+    return incoming;
+  }
+  const present: RawRecord = {};
+  Object.entries(raw).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+    if (key === 'roles' && Array.isArray(value) && value.length === 0) {
+      return;
+    }
+    if ((key === 'role' || key === 'user_type') && !isPresentString(value)) {
+      return;
+    }
+    present[key] = value;
+  });
+  const base: RawRecord = { ...existing };
+  if ('roles' in present && !('role' in present) && !('user_type' in present)) {
+    delete base.role;
+  }
+  return normalizeUser({ ...base, ...present });
+}
+
 /** The status each BE-25 refusal code stands for (the body's `data.status` may refine it). */
 const statusForRefusalCode = (code: string | undefined): AccountStatus | null => {
   switch (code) {

@@ -3,6 +3,7 @@
  * `status` only. Payloads mirror the local backend (AuthController, ProfileResource).
  */
 import {
+  mergeServerUser,
   normalizeUser,
   refusedAccountStatus,
   resolveAuthRoute,
@@ -196,5 +197,58 @@ describe('403 ACCOUNT_* refusals (BE-25/BE-32)', () => {
     expect(withRefusedStatus(user, { status: 403, code: 'ACCOUNT_REJECTED', account: { status: 'rejected', rejectionReason: 'Blurry' } }))
       .toMatchObject({ id: 1, role: 'driver', status: 'rejected', rejection_reason: 'Blurry' });
     expect(withRefusedStatus(user, { status: 500 })).toBeNull();
+  });
+});
+
+describe('mergeServerUser (T-111, BE-35/BE-38 phone verify)', () => {
+  const registered = normalizeUser({
+    id: 12,
+    name: 'New Passenger',
+    email: 'new@example.test',
+    phone: null,
+    pending_phone: '+923000000012',
+    status: 'active',
+    role: 'passenger',
+    roles: ['passenger'],
+    cnic: '00000-0000000-0',
+  });
+
+  it('keeps the role when the response has none (BE-35 shape {id, phone, phone_verified_at, status})', () => {
+    const merged = mergeServerUser(registered, {
+      id: 12,
+      phone: '+923000000012',
+      phone_verified_at: '2026-10-08T10:00:00+00:00',
+      status: 'active',
+    });
+    expect(merged).toMatchObject({
+      id: 12,
+      role: 'passenger',
+      roles: ['passenger'],
+      phone: '+923000000012',
+      phone_verified_at: '2026-10-08T10:00:00+00:00',
+      name: 'New Passenger',
+      cnic: '00000-0000000-0',
+    });
+  });
+
+  it('null role and empty roles never override the held role', () => {
+    const merged = mergeServerUser(registered, { id: 12, role: null, roles: [], status: 'active' });
+    expect(merged?.role).toBe('passenger');
+    expect(merged?.roles).toEqual(['passenger']);
+  });
+
+  it('the server values win where they are present (BE-38 full user)', () => {
+    const merged = mergeServerUser(registered, { id: 12, status: 'pending', role: 'driver', roles: ['driver'] });
+    expect(merged).toMatchObject({ status: 'pending', role: 'driver', roles: ['driver'] });
+  });
+
+  it('roles without role: the response roles decide', () => {
+    expect(mergeServerUser(registered, { id: 12, roles: ['driver'] })?.role).toBe('driver');
+  });
+
+  it('another id, or nothing held: only the response counts; not a user: null', () => {
+    expect(mergeServerUser(registered, { id: 99, status: 'active' })).toMatchObject({ id: 99, role: null, name: '' });
+    expect(mergeServerUser(null, { id: 12, role: 'passenger', status: 'active' })).toMatchObject({ id: 12, role: 'passenger' });
+    expect(mergeServerUser(registered, { phone: '+923000000012' })).toBeNull();
   });
 });
