@@ -14,6 +14,15 @@ text: string;
 mutedText: string;
 border: string;
 overlay: string;
+/**
+ * Text, icon and border colour of outline/secondary controls on `surface`/`background`:
+ * the brand primary in light mode, a light brand tint in dark mode (>= 4.5:1 text, >= 3:1
+ * border). Added by T-106; T-601 replaces it with the full semantic set.
+ */
+accent: string;
+/** Fill and label of a disabled filled button (readable, clearly inactive). */
+disabledFill: string;
+disabledText: string;
 };
 };
 
@@ -31,6 +40,9 @@ text: BrandColors.light.text,
 mutedText: '#4B5563',
 border: '#E5E7EB',
 overlay: 'rgba(0,0,0,0.08)',
+accent: BrandColors.primary,
+disabledFill: '#E5E7EB',
+disabledText: '#4B5563',
 },
 };
 
@@ -48,5 +60,8 @@ text: BrandColors.dark.text,
 mutedText: '#A3A3A3',
 border: '#2E2E2E',
 overlay: 'rgba(255,255,255,0.08)',
+accent: BrandColors.dark.accent,
+disabledFill: '#2E2E2E',
+disabledText: '#A3A3A3',
 },
 };

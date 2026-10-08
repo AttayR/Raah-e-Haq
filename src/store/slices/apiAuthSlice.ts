@@ -13,8 +13,9 @@ import {
   isStaleSessionRejection,
 } from '../thunks/apiThunks';
 import { logout } from '../thunks/sessionThunks';
-import { resetApp } from '../actions';
+import { accountStatusRefused, resetApp } from '../actions';
 import { rejectionMessage } from '../../core/api/errors';
+import { accountRefusalMessage } from '../../core/auth/accountRefusal';
 import { withRefusedStatus } from '../../core/auth/normalizeUser';
 
 export type AuthState = {
@@ -29,6 +30,13 @@ export type AuthState = {
   isOtpVerified: boolean;
   profileCompleted: boolean;
   isInitialized: boolean;
+  /**
+   * The server answered GET /auth/profile with something that is not a profile, so nothing
+   * confirmed the account's status (initializeAuth); `user.status` is UNKNOWN_STATUS then and
+   * the account-status screen says "couldn't confirm" instead of "deactivated". Cleared by any
+   * answer that states the status (a profile or a 403 ACCOUNT_*).
+   */
+  statusUnverified: boolean;
 };
 
 const initialState: AuthState = {
@@ -42,6 +50,7 @@ const initialState: AuthState = {
   isOtpVerified: false,
   profileCompleted: false,
   isInitialized: false,
+  statusUnverified: false,
 };
 
 const authSlice = createSlice({
@@ -81,6 +90,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
+        state.statusUnverified = action.payload.statusUnverified === true;
       })
       .addCase(initializeAuth.rejected, (state, action) => {
         // Logged out while it ran: logout has already reset this slice (initialised).
@@ -107,6 +117,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
+        state.statusUnverified = false;
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -115,7 +126,8 @@ const authSlice = createSlice({
           return;
         }
         state.status = 'failed';
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
+        // A 403 ACCOUNT_* refusal shows the server's message plus the rejection reason (BE-32).
+        state.error = accountRefusalMessage(action.payload, action.error.message || 'Something went wrong');
         state.isAuthenticated = false;
       });
 
@@ -165,6 +177,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
+        state.statusUnverified = false;
         state.isOtpVerified = true;
         state.otpData = null;
         state.isOtpSent = false;
@@ -175,7 +188,7 @@ const authSlice = createSlice({
           return;
         }
         state.status = 'failed';
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
+        state.error = accountRefusalMessage(action.payload, action.error.message || 'Something went wrong');
         state.isOtpVerified = false;
       });
 
@@ -215,7 +228,15 @@ const authSlice = createSlice({
       .addCase(logout.pending, (state) => {
         state.status = 'loading';
       })
-      .addCase(resetApp, () => ({ ...initialState, isInitialized: true }));
+      .addCase(resetApp, () => ({ ...initialState, isInitialized: true }))
+      // 403 ACCOUNT_* on any request of this session (store/thunks/sessionThunks accountRefused).
+      .addCase(accountStatusRefused, (state, action) => {
+        if (!state.isAuthenticated) {
+          return;
+        }
+        state.user = action.payload;
+        state.statusUnverified = false;
+      });
 
     // Get User Profile
     builder
@@ -234,6 +255,7 @@ const authSlice = createSlice({
         }
         state.status = 'succeeded';
         state.user = action.payload;
+        state.statusUnverified = false;
         state.error = null;
       })
       .addCase(getUserProfile.rejected, (state, action) => {
@@ -245,6 +267,7 @@ const authSlice = createSlice({
         const refused = state.isAuthenticated && state.user ? withRefusedStatus(state.user, action.payload) : null;
         if (refused) {
           state.user = refused;
+          state.statusUnverified = false;
         }
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');

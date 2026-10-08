@@ -16,6 +16,12 @@ export const BrandColors = {
     surface: '#1A1A1A',
     text: '#F5F5F5',
     mutedText: '#A1A1A1',
+    /**
+     * Light brand tint for text, icons and borders of outline/secondary controls on dark
+     * surfaces (navy primary is ~1.5:1 there; this is ~8:1 on dark.surface). T-106; fold into
+     * the T-601 semantic set.
+     */
+    accent: '#9DB2F0',
   },
 } as const;
 

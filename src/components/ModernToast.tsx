@@ -144,7 +144,7 @@ const ModernToast: React.FC<ModernToastProps> = ({ config, onHide }) => {
               {title}
             </Text>
             {message ? (
-              <Text style={[styles.message, { color: palette.text }]} numberOfLines={2}>
+              <Text style={[styles.message, { color: palette.text }]} numberOfLines={4}>
                 {message}
               </Text>
             ) : null}

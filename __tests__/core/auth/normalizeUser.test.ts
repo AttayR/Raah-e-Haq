@@ -92,9 +92,24 @@ describe('normalizeUser', () => {
 
   it('roles the app does not know give role null; known ones later in roles[] are found', () => {
     expect(normalizeUser({ id: 1, status: 'active', roles: ['super-admin'] })?.role).toBeNull();
-    expect(normalizeUser({ id: 1, role: 'super-admin', roles: ['super-admin', 'passenger'] })?.role).toBe('passenger');
+    expect(normalizeUser({ id: 1, roles: ['super-admin', 'passenger'] })?.role).toBe('passenger');
     expect(normalizeUser({ id: 1, role: ' Driver ' })?.role).toBe('driver');
     expect(normalizeUser({ id: 1 })).toMatchObject({ role: null, roles: [] });
+  });
+
+  it('T-106 security: a present but unknown role string gives null, with no fallback', () => {
+    expect(normalizeUser({ id: 1, role: 'super-admin', roles: ['super-admin', 'passenger'] })?.role).toBeNull();
+    expect(normalizeUser({ id: 1, role: 'owner', user_type: 'driver', roles: ['driver'] })?.role).toBeNull();
+    expect(normalizeUser({ id: 1, user_type: 'staff', roles: ['passenger'] })?.role).toBeNull();
+    // Missing, null or empty is not "present": the next field decides.
+    expect(normalizeUser({ id: 1, role: '', user_type: 'passenger' })?.role).toBe('passenger');
+    expect(normalizeUser({ id: 1, role: null, roles: ['driver'] })?.role).toBe('driver');
+  });
+
+  it('T-106 security: any admin in roles[] makes the user an admin', () => {
+    expect(normalizeUser({ id: 1, role: 'passenger', roles: ['passenger', 'admin'] })?.role).toBe('admin');
+    expect(normalizeUser({ id: 1, role: 'driver', roles: [{ name: 'Admin' }] })?.role).toBe('admin');
+    expect(normalizeUser({ id: 1, user_type: 'driver', roles: ['driver'] })?.role).toBe('driver');
   });
 
   it.each(['active', 'inactive', 'pending', 'suspended', 'rejected'])('status %s is kept (BE-32)', (status) => {

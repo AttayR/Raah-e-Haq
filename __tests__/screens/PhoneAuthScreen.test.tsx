@@ -139,4 +139,59 @@ describe('PhoneAuthScreen (T-101)', () => {
     });
     expect(screen.getByText('Send Code')).toBeTruthy();
   });
+
+  describe('T-106: success toast only when it opens home; refusal reason as the toast subtitle', () => {
+    const enterAndVerify = async () => {
+      await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
+      fireEvent.changeText(screen.getByPlaceholderText('6-digit code'), '123456');
+      const verifyButtons = screen.getAllByText('Verify Code');
+      fireEvent.press(verifyButtons[verifyButtons.length - 1]);
+    };
+    const session = (status: string) => ({
+      success: true,
+      data: { token: 'test-token-not-real', token_type: 'Bearer', user: { id: 31, status, role: 'passenger', roles: ['passenger'] } },
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ['active', true],
+      ['pending', false],
+    ])('verified as %s: success toast shown = %s', async (status, shown) => {
+      const success = jest.spyOn(toast, 'success');
+      replyLocalSend();
+      mock.onPost('/auth/verify-otp').reply(200, session(status));
+      const store = renderScreen();
+      await sendCode();
+      await enterAndVerify();
+      await waitFor(() => expect(store.getState().apiAuth.isAuthenticated).toBe(true));
+      // Let the screen's handler finish after the thunk settles, so "not shown" is not vacuous.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const verifiedToasts = success.mock.calls.filter(([title]) => title === 'Phone number verified successfully!');
+      expect(verifiedToasts.length > 0).toBe(shown);
+    });
+
+    it('403 ACCOUNT_REJECTED: the toast keeps the reason as its second line', async () => {
+      const error = jest.spyOn(toast, 'error');
+      replyLocalSend();
+      mock.onPost('/auth/verify-otp').reply(403, {
+        success: false,
+        message: 'Your account application was not approved. Please contact support.',
+        code: 'ACCOUNT_REJECTED',
+        data: { status: 'rejected', rejection_reason: 'Licence expired' },
+      });
+      renderScreen();
+      await sendCode();
+      await enterAndVerify();
+      await waitFor(() =>
+        expect(error).toHaveBeenCalledWith(
+          'Your account application was not approved. Please contact support.',
+          'Reason: Licence expired',
+          expect.objectContaining({ duration: expect.any(Number) }),
+        ),
+      );
+    });
+  });
 });

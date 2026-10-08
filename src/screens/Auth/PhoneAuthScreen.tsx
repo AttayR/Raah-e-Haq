@@ -24,6 +24,8 @@ import { sendOtp, verifyOtp } from '../../store/thunks/apiThunks';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
+import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
+import { routesHome } from '../../core/auth/normalizeUser';
 
 type AuthStep = 'phone' | 'verification';
 
@@ -132,7 +134,10 @@ export default function PhoneAuthScreen() {
 
       if (verifyOtp.fulfilled.match(result)) {
         clearCode();
-        toast.success('Phone number verified successfully!');
+        // Only when it opens a home screen; account status explains a pending/blocked account (T-106).
+        if (routesHome(result.payload.user)) {
+          toast.success('Phone number verified successfully!');
+        }
         // Navigation is handled by the auth flow based on auth state.
         return;
       }
@@ -142,10 +147,12 @@ export default function PhoneAuthScreen() {
       if (rejection?.kind === 'rate_limited' && !rejection.retryAfter) {
         expireCode();
       }
-      const errorMessage = rejectionMessage(rejection, 'Invalid verification code');
-      logger.debug('❌ PhoneAuthScreen - OTP verification failed:', errorMessage);
-      setOtpError(errorMessage);
-      toast.error(errorMessage);
+      // 403 ACCOUNT_*: the server's message, plus the rejection reason when there is one (T-106).
+      const { message: refusalText, reason } = accountRefusalParts(rejection, 'Invalid verification code');
+      logger.debug('❌ PhoneAuthScreen - OTP verification failed:', { kind: rejection?.kind, status: rejection?.status, code: rejection?.code });
+      // Inline: both lines. Toast: the reason as its second line, so the title limit never cuts it.
+      setOtpError(reason ? `${refusalText}\n${reason}` : refusalText);
+      toast.error(refusalText, reason ?? undefined, reason ? { duration: REFUSAL_TOAST_DURATION_MS } : undefined);
     } catch (err: unknown) {
       logger.error('💥 PhoneAuthScreen - Error verifying code:', err);
       setOtpError(errorToastMessage(err, 'Failed to verify code') ?? 'Failed to verify code');

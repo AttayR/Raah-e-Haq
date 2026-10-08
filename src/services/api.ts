@@ -9,7 +9,7 @@ import { env } from '../config/env';
 import { authStorage } from './authStorage';
 import { currentSessionEpoch, isStaleSession } from '../store/sessionEpoch';
 import { logger } from '../core/logging/logger';
-import { toApiError } from '../core/api/errors';
+import { toApiError, type ApiError } from '../core/api/errors';
 import { logApiFailure } from '../core/api/logApiFailure';
 import type { ApiResponse } from '../core/api/types';
 
@@ -136,9 +136,25 @@ export const setUnauthorizedHandler = (handler: UnauthorizedHandler | null): voi
   unauthorizedHandler = handler;
 };
 
-/** Test-only: forget the handler and the single-flight latch between test cases. */
+/** What to do when a request of the current session gets 403 ACCOUNT_* (T-106). */
+type AccountRefusedHandler = (error: ApiError) => void;
+
+let accountRefusedHandler: AccountRefusedHandler | null = null;
+
+/**
+ * Registered by the store: a 403 ACCOUNT_* (BE-25/BE-32) on any route of the current session
+ * means the account is blocked (or still pending); the handler merges that status into the
+ * signed-in user so AuthFlow routes to the account-status screen. Injected like the 401
+ * handler, so this module never imports the store.
+ */
+export const setAccountRefusedHandler = (handler: AccountRefusedHandler | null): void => {
+  accountRefusedHandler = handler;
+};
+
+/** Test-only: forget the handlers and the single-flight latch between test cases. */
 export const __resetUnauthorizedStateForTests = (): void => {
   unauthorizedHandler = null;
+  accountRefusedHandler = null;
   reportedExpiredEpoch = null;
 };
 
@@ -157,6 +173,27 @@ const reportUnauthorized = (config?: InternalAxiosRequestConfig): void => {
   }
   if (unauthorizedHandler?.() === true) {
     reportedExpiredEpoch = epoch;
+  }
+};
+
+const isAccountRefusal = (error: ApiError): boolean =>
+  error.status === 403 && typeof error.code === 'string' && error.code.startsWith('ACCOUNT_');
+
+/**
+ * Only a refusal of a request that carried the current session's token counts. Sign-in and
+ * logout paths are skipped: login/verify-otp refusals are shown by their screens, and
+ * /auth/logout also answers 403 for a blocked account (the logout thunk clears the local
+ * session whatever it answers).
+ */
+const reportAccountRefused = (error: ApiError, config?: InternalAxiosRequestConfig): void => {
+  const epoch = config?.authSessionEpoch;
+  if (!isAccountRefusal(error) || epoch === undefined || isStaleSession(epoch) || isNoSessionExpiryPath(config?.url)) {
+    return;
+  }
+  try {
+    accountRefusedHandler?.(error);
+  } catch (handlerError) {
+    logger.warn('Account refusal handler failed', { name: handlerError instanceof Error ? handlerError.name : typeof handlerError });
   }
 };
 
@@ -185,7 +222,8 @@ apiClient.interceptors.request.use(
 );
 
 // Response interceptor: every failure is normalised to ApiError (src/core/api/errors.ts) so
-// callers never parse axios errors themselves; a 401 of the current session ends it.
+// callers never parse axios errors themselves; a 401 of the current session ends it, and a
+// 403 ACCOUNT_* of the current session routes to account status (T-106).
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
@@ -197,6 +235,9 @@ apiClient.interceptors.response.use(
     const apiError = toApiError(error);
     if (apiError.status === 401 && axios.isAxiosError(error)) {
       reportUnauthorized(error.config);
+    }
+    if (apiError.status === 403 && axios.isAxiosError(error)) {
+      reportAccountRefused(apiError, error.config);
     }
     return Promise.reject(apiError);
   }

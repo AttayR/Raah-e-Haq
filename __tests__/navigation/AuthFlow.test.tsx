@@ -18,7 +18,7 @@ jest.mock('../../src/app/navigation/RootNavigation', () => {
   const { Text: MockText } = require('react-native');
   return () => <MockText>route:home</MockText>;
 });
-jest.mock('../../src/screens/Driver/DriverPendingApprovalScreen', () => {
+jest.mock('../../src/features/auth/screens/AccountStatusScreen', () => {
   const { Text: MockText } = require('react-native');
   return () => <MockText>route:account-status</MockText>;
 });

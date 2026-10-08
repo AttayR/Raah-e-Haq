@@ -279,14 +279,14 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
  *   account's token answers 403, not 401) and the refused status is merged into the cached
  *   user and saved, so AuthFlow routes to account status instead of home.
  * - a 2xx that is not a valid profile: the token is kept, but the cached user is not trusted
- *   to be active; it routes to account status (status UNKNOWN_STATUS, memory only).
+ *   to be active; it routes to account status (status UNKNOWN_STATUS, `statusUnverified`).
  * - offline, timeout, 5xx, other 4xx: the stored session is kept and routed from the cache.
  *   Only a 401 ends a session.
  * If a logout happens while it runs, it rejects with staleSessionRejection() and the
  * reducer leaves the signed-out state alone.
  */
 export const initializeAuth = createAsyncThunk<
-  { user: User; token: string } | null,
+  { user: User; token: string; statusUnverified?: boolean } | null,
   void,
   ThunkConfig & { state: { apiAuth: { user: User | null } } }
 >(
@@ -337,10 +337,16 @@ export const initializeAuth = createAsyncThunk<
           // The server answered 2xx but not with a profile (bad deploy, proxy or captive
           // portal page). Signing out would throw away a session that may be fine, so the
           // token stays; but nothing confirmed the account is active, so the cached user is
-          // not let into the home screens. Account status offers sign-out (and, from T-106,
-          // Check Status). Not written to user_data, so the next launch checks again.
+          // not let into the home screens. Account status says the status could not be
+          // confirmed and offers Check Status and Sign Out (T-106). This status is not
+          // written to user_data, but redux-persist does write it to persist:root with the
+          // rest of apiAuth. That is harmless and fails closed: the next launch prefers
+          // user_data, routes nowhere until this check runs again, and a cached active
+          // status never wins over an unconfirmed one in this launch.
           logger.warn('initializeAuth - invalid profile response; routing to account status');
-          return storedUser ? { user: { ...storedUser, status: UNKNOWN_STATUS }, token } : null;
+          return storedUser
+            ? { user: { ...storedUser, status: UNKNOWN_STATUS }, token, statusUnverified: true }
+            : null;
         }
         logger.warn('initializeAuth - profile check failed; keeping the stored session', {
           kind: apiError.kind,

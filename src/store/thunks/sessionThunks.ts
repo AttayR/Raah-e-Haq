@@ -5,8 +5,11 @@ import { clearAuthSession } from '../../services/firebaseAuth';
 import webSocketService from '../../services/webSocketService';
 import locationTrackingService from '../../services/locationTrackingService';
 import notificationService from '../../services/notificationService';
-import { resetApp } from '../actions';
-import { bumpSessionEpoch } from '../sessionEpoch';
+import { accountStatusRefused, resetApp } from '../actions';
+import { bumpSessionEpoch, currentSessionEpoch } from '../sessionEpoch';
+import { authStorage } from '../../services/authStorage';
+import { withRefusedStatus, type RefusalLike } from '../../core/auth/normalizeUser';
+import type { User } from '../../services/api';
 import { logger } from '../../core/logging/logger';
 
 /** Injected by the store (thunk extraArgument) so this file never imports the store itself. */
@@ -90,5 +93,59 @@ export const sessionExpired =
     }
     logger.warn('Session expired (401); signing out');
     dispatch(logout());
+    return true;
+  };
+
+type AccountRefusedState = {
+  apiAuth: { isInitialized: boolean; isAuthenticated: boolean; user: User | null };
+};
+
+/**
+ * A request of the current session got 403 ACCOUNT_* (setAccountRefusedHandler in
+ * services/api.ts, T-106). The server is authoritative: the refused status (and a
+ * rejection_reason, memory only) is merged into the signed-in user, so AuthFlow routes to the
+ * account-status screen. The session is kept, as on cold start (initializeAuth): a blocked
+ * token answers 403 for a while and then 401, which T-104 turns into a normal sign-out; Sign
+ * Out clears the local session even though /auth/logout also answers 403.
+ * Ignored before bootstrap (initializeAuth handles its own 403) and when signed out (the
+ * login screens show the refusal). When an active user is blocked, live sockets close and
+ * location tracking is reset (last position dropped) right away instead of waiting for the
+ * home screens to unmount.
+ */
+export const accountRefused =
+  (refusal: RefusalLike): ThunkAction<boolean, AccountRefusedState, SessionThunkExtra, UnknownAction> =>
+  (dispatch, getState) => {
+    const { isInitialized, isAuthenticated, user } = getState().apiAuth;
+    if (!isInitialized || !isAuthenticated || !user) {
+      return false;
+    }
+    const refused = withRefusedStatus(user, refusal);
+    if (!refused) {
+      return false;
+    }
+    const wasActive = user.status === 'active';
+    if (refused.status === user.status && refused.rejection_reason === user.rejection_reason) {
+      return false;
+    }
+    logger.warn('Account refused by the server; routing to account status', { status: refused.status });
+    dispatch(accountStatusRefused(refused));
+    // The cache gets the status too (never rejection_reason), so an offline cold start does
+    // not route home; skipped if the session ends meanwhile.
+    authStorage.saveUser(refused, currentSessionEpoch()).catch((error: unknown) => {
+      logger.warn('accountRefused - could not cache the refused status', {
+        name: error instanceof Error ? error.name : typeof error,
+      });
+    });
+    if (wasActive) {
+      try {
+        webSocketService.closeAll();
+        // reset, not stop: the last position and listeners are dropped right away.
+        locationTrackingService.reset();
+      } catch (error) {
+        logger.warn('accountRefused - could not stop live services', {
+          name: error instanceof Error ? error.name : typeof error,
+        });
+      }
+    }
     return true;
   };

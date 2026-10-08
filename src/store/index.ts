@@ -10,8 +10,8 @@ import {
   clearFirebaseAuthTransientTransform,
 } from './persistTransforms';
 import { rootReducer } from './rootReducer';
-import { sessionExpired, type SessionThunkExtra } from './thunks/sessionThunks';
-import { setUnauthorizedHandler } from '../services/api';
+import { accountRefused, sessionExpired, type SessionThunkExtra } from './thunks/sessionThunks';
+import { setAccountRefusedHandler, setUnauthorizedHandler } from '../services/api';
 
 export { rootReducer } from './rootReducer';
 
@@ -46,6 +46,10 @@ export const persistor = persistStore(store);
 // A 401 on a request that carried the current session's token ends the session (T-104,
 // BE-25: no refresh after a 401).
 setUnauthorizedHandler(() => store.dispatch(sessionExpired()));
+// A 403 ACCOUNT_* on any route of the current session routes to account status (T-106).
+setAccountRefusedHandler((error) => {
+  store.dispatch(accountRefused(error));
+});
 export type RootState = ReturnType<typeof rootReducer>;
 export type AppDispatch = typeof store.dispatch;
 

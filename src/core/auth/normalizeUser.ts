@@ -89,10 +89,34 @@ const NULLABLE_STRING_FIELDS = ['pending_phone', 'phone_verified_at', 'rejection
 
 type NullableStringField = (typeof NULLABLE_STRING_FIELDS)[number];
 
+const isPresentString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim() !== '';
+
 /**
- * Derives `role` as `role ?? user_type ?? roles[0]` (only roles the app knows count) and
- * `status` (unknown or missing: UNKNOWN_STATUS). Returns null when the payload is not a user
- * at all (not an object, or no valid id).
+ * The role the app routes on (fail closed, T-106 security):
+ * - any `admin` in `roles[]` makes the user an admin, whatever `role` says (admins are not
+ *   served by this app, so they land on account status)
+ * - the first of `role`, `user_type` that is present decides: a present but unknown string
+ *   (`'super-admin'`) gives null, with no fallback to the next field or to `roles[]`
+ * - only when both are missing (or null/empty) the first known role in `roles[]` counts
+ */
+const deriveRole = (raw: RawRecord, roles: string[]): UserRole | null => {
+  if (roles.some(name => toRole(name) === 'admin')) {
+    return 'admin';
+  }
+  if (isPresentString(raw.role)) {
+    return toRole(raw.role);
+  }
+  if (isPresentString(raw.user_type)) {
+    return toRole(raw.user_type);
+  }
+  return roles.map(toRole).find((r): r is UserRole => r !== null) ?? null;
+};
+
+/**
+ * Derives `role` (deriveRole: fail closed, only roles the app knows count) and `status`
+ * (unknown or missing: UNKNOWN_STATUS). Returns null when the payload is not a user at all
+ * (not an object, or no valid id).
  */
 export function normalizeUser(raw: unknown): User | null {
   if (!isRecord(raw)) {
@@ -104,8 +128,7 @@ export function normalizeUser(raw: unknown): User | null {
   }
 
   const roles = toRoleNames(raw.roles);
-  const role =
-    toRole(raw.role) ?? toRole(raw.user_type) ?? roles.map(toRole).find((r): r is UserRole => r !== null) ?? null;
+  const role = deriveRole(raw, roles);
 
   const user: User = {
     id,
@@ -228,3 +251,12 @@ export function resolveAuthRoute(state: {
   }
   return 'account-status';
 }
+
+/**
+ * Whether a signed-in user goes to a home stack (active driver or passenger) rather than the
+ * account-status screen. Screens use it to decide, e.g., whether "Login successful" is true.
+ */
+export const routesHome = (user: Pick<User, 'role' | 'status'>): boolean => {
+  const route = resolveAuthRoute({ isInitialized: true, isAuthenticated: true, user });
+  return route === 'driver' || route === 'passenger';
+};

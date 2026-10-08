@@ -21,6 +21,9 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
+import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
+import { routesHome } from '../../core/auth/normalizeUser';
+import { loginUser } from '../../store/thunks/apiThunks';
 
 type LoginMethod = 'phone' | 'email';
 
@@ -106,14 +109,20 @@ export default function LoginScreen() {
       
       logger.debug('🔍 Result type:', result.type);
       
-      if (result.type.endsWith('/fulfilled')) {
+      if (loginUser.fulfilled.match(result)) {
         logger.debug('✅ Login successful!');
-        toast.success('Login successful!');
-        // Navigation will be handled by the auth state change
+        // Only when it opens a home screen: a pending/blocked/admin account lands on account
+        // status, which explains itself (T-106). Navigation is handled by AuthFlow.
+        if (routesHome(result.payload.user)) {
+          toast.success('Login successful!');
+        }
       } else {
         logger.debug('❌ Login failed');
-        logger.debug('🚨 Error details:', result.payload);
-        toast.error(rejectionMessage(result.payload, 'Login failed. Please try again.'));
+        const rejection = loginUser.rejected.match(result) ? result.payload : undefined;
+        logger.debug('🚨 Error details:', { kind: rejection?.kind, status: rejection?.status, code: rejection?.code });
+        // 403 ACCOUNT_*: the server's message, plus the rejection reason as the second line (T-106).
+        const { message, reason } = accountRefusalParts(rejection, 'Login failed. Please try again.');
+        toast.error(message, reason ?? undefined, reason ? { duration: REFUSAL_TOAST_DURATION_MS } : undefined);
       }
     } catch (err: any) {
       logger.error('Email sign in error:', err);
