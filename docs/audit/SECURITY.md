@@ -377,3 +377,142 @@ Scope: T-001 to T-008 end to end (env, logger, babel console stripping, API clie
 ### SEC-25 · low · backend privacy: other tables with phones/IPs lack retention
 - **Where:** `otps` (expired rows never deleted), `analytics_events`, `login_attempts`, `security_events`; audit rows deleted whole after 180 days (loses BE-36/44 evidence).
 - **Fix:** BE-46.
+
+## Phase 1 gate audit (app + backend, 2026-10-08)
+rh-security, `audit` mode, reading code only. **App:** `fix/phase-1-auth` at `17aff38` (T-101 to T-113). **Backend:** `fix/production-hardening` at `a565a08` (BE-16 to BE-51). No request was sent to any server. Tools: `git`/`grep`, `php artisan route:list --json` (local, offline), `composer audit --locked`, `yarn audit --groups dependencies`, `yarn verify` (PASS: TS 128, ESLint 82/133, Jest 430/430, bundle ok).
+
+**Status of earlier findings after Phase 1**
+| Finding | Status |
+|---|---|
+| SEC-01 role checks | Fixed in code (BE-18). Every `api/users`, `payments`, `security`, `analytics` admin route and all of `admin/*` carry `role:admin` (route list checked). |
+| SEC-02 seeded admin | Fixed in code (BE-19). The live account is still owner work (B-12). |
+| SEC-03 driver privacy | Fixed (BE-20 + T-110). The app calls only `/rides/nearby-drivers` (opaque ids, radius clamped 1-10 km) and reads the driver's phone and position only during an active ride. |
+| SEC-04 registration logging | Fixed (BE-21, BE-26). No backend `Log::` call takes request values. Phones are masked (`Phone::mask`), and `QueryException` is reported without its bindings. |
+| SEC-05 public documents | Fixed (BE-22). Documents sit on a private disk behind short-lived `signed:relative` URLs, and `PrivateFileController` checks the path and sends `no-store` and a sandbox CSP. |
+| SEC-06 debug in production | Fixed in code (BE-23). `config/app.php` forces debug off outside local/testing, and `ProductionConfigGuard` also flags an empty `APP_KEY`, the `log` SMS driver, `TRUSTED_PROXIES=*` and a non-https maps URL. Checking the live server is owner work (B-12). |
+| SEC-07 token lifetime | Fixed (BE-25, BE-32, BE-43). Tokens expire after 30 idle days and slide on use. Moving an account out of active/pending renames and caps its tokens, and `EnsureUserIsActive` refuses them on every route except logout. Every `auth:sanctum` route except `logout`/`logout-all` carries the middleware, and it reads the live status on every request, so a bulk status update can't leave a working token. A password change or reset revokes the other tokens. The only remaining gap is that no absolute cap is set by default (`SANCTUM_EXPIRATION` is empty). This is accepted. |
+| SEC-08 OTP abuse | Fixed (BE-27, BE-28, BE-33, BE-35). Codes are hashed and consumed atomically. Every OTP path (login, registration, phone change, keep-phone code, decoy registration) goes through `OtpLimiter` per phone, per IP and per account, plus the SMS budget and sub-budget. SMS goes out only through `SmsService::send`, which checks the country allowlist. |
+| SEC-13 enumeration | Fixed (BE-27, BE-38). send-otp, forgot-password (API and web) and register give one answer whether or not the account exists. |
+| SEC-18 notification cache | Partly fixed. Logout clears it (T-102/T-104), but it is still cached in plain text while signed in. |
+| SEC-21 token to foreign `baseURL` | Fixed (T-104). `isTokenTarget` compares the resolved `apiClient.getUri(config)` origin and fails closed on URLs it can't parse. |
+| SEC-10, SEC-11 dependencies | Unchanged: composer 46 advisories in 14 packages; yarn 8 critical, 141 high, 80 moderate, 7 low. BE-50 makes the `guzzlehttp/guzzle` and `psr7` advisories more relevant, because the server now makes outbound calls with the server key in the query string. `allow_redirects=false` reduces the risk. Do `composer update` (SEC-10) before production. |
+| SEC-17, SEC-20 | Still open, low. Release cleartext is now blocked at OS level (T-108 Android config; iOS ATS), so an `http://` URL in `.env.production` fails at run time instead of leaking. The logger still doesn't mask `Bearer …` inside strings. |
+
+**What Phase 1 got right (checked, no finding)**
+- **Token storage:** the token is in Keychain/Keystore (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`). There is a one-time migration from the plain key and a reinstall guard. Writes are serialised and tagged with the session epoch. Logout clears the Keychain and AsyncStorage, resets every slice, purges redux-persist, and stops sockets, location tracking, notifications and in-flight requests. Only `apiAuth` is persisted, with no token, no OTP and no sensitive fields (v1 migration drops the Firebase `auth`/`user` slices).
+- **401/403 handling:**
+  - A 401 on a request that carried the current session's token triggers one logout (single flight). Sign-in and logout paths are excluded.
+  - A 403 `ACCOUNT_*` on any route merges the refused status into the user and routes to account status.
+  - Routing reads only the normalised `role`/`status` and fails closed: an unknown status becomes `inactive`, `admin` and unknown roles go to account status. The server enforces roles anyway.
+- **OTP:** the app never keeps, shows or logs `otp_code`. The `verification_token` lives in memory only. The backend echoes the code only when `APP_ENV=local` and debug is on.
+- **Web paths match the API:** web login, register, forgot/reset password, email verify and profile phone change all go through the same `AccountStatus`, `EmailOwnership` (BE-38/44), `PhoneVerification` and `OtpLimiter` code. `EnsureUserIsActive` is appended to the whole web group.
+- **Maps proxy (BE-50):**
+  - The key is only server-side and only https. Redirects are not followed, and an upstream exception (whose URL holds the key) is never reported.
+  - Inputs are validated and coordinates are rounded before they go upstream.
+  - Limits: per IP, per user per minute and per day, plus a global daily budget. Caching is off by default.
+  - Error bodies use fixed copy.
+- **Build config:**
+  - Release signing comes only from `RH_UPLOAD_*`; a release build never falls back to the debug key.
+  - Release has `cleartextTrafficPermitted=false`. The debug override is limited to localhost, 127.0.0.1 and 10.0.2.2.
+  - iOS has `NSAllowsArbitraryLoads=false` and no background location (B-08). Usage strings are accurate.
+  - The Maps key comes from the git-ignored env file through `manifestPlaceholders` and Info.plist preprocessing.
+  - The react-native-config patch prints only the number of keys.
+  - Secrets: no new tracked secrets in either repo. The only `AIza…` strings are the public-by-design Firebase configs and a fake key in `MapsProxyTest`.
+
+### SEC-26 · medium · backend authN: API password login has no per-account limit (the web login has one)
+**Evidence**
+- `app/Http/Controllers/Api/AuthController.php:38-63` (`POST /api/auth/login`) calls `Auth::attempt` with only the per-IP `throttle:20,1` shared by all `auth/*` routes (`routes/api.php:33`).
+- There is no per-email counter or lockout, and failed attempts aren't recorded. The login validation accepts `min:6` (`:42`), while the password policy is `Password::defaults()` (8 characters, no other rule).
+- The web login does have a limit: `app/Http/Requests/Auth/LoginRequest.php:42-96` allows 5 tries per email+IP, with `RateLimiter::hit` on failure and on `signupIsPending`. The API path skips it.
+- Under Pakistani carrier-grade NAT, 20 auth requests per minute per IP is also tight: one client on a shared IP can block sign-in for everyone else on that address (availability).
+
+**Impact:** an attacker who rotates IPs can guess passwords for a known email without limit. This is the BE-28 "limiter that one path bypasses" pattern, for passwords instead of OTPs.
+
+**Required fix**
+- Add a per-account limiter on API login: for example 5 failures per 15 minutes per email+IP, plus about 20 per hour per email across all IPs. Over the limit, answer 429 with `code: rate_limited` and `retry_after` in the BE-28 envelope.
+- Count unknown emails the same way, so the limiter can't be used to enumerate accounts.
+- Share the limiter key with `LoginRequest`, so the web and API paths together get one budget per account.
+- Clear the counter on success.
+- Consider raising the per-IP auth throttle and leaning on the per-phone, per-email and per-account limits instead (CGNAT).
+- Add feature tests.
+
+### SEC-27 · medium · backend authN: checks of the current password are unthrottled on every path except email change
+**Evidence**
+- `EmailOwnership::checkChangePassword` (`app/Services/EmailOwnership.php:394-414`) allows 5 wrong passwords per account per 15 minutes (BE-38/42), so that "a stolen session alone can't move the account to another inbox".
+- The other paths that check the current password have no such limit:
+  - `POST /api/profile/change-password`: `Api/ProfileController.php:227-243` calls `Hash::check` under only the general `throttle:120,1` per user. On success it sets a new password and revokes every other token.
+  - Web `PUT /password`: `Auth/PasswordController.php:19`, `current_password` rule, no throttle.
+  - Web `POST /confirm-password`: `Auth/ConfirmablePasswordController.php:27`, no throttle.
+  - Web `DELETE /profile`: `ProfileController.php` `destroy`, `current_password` rule, no throttle.
+
+**Impact:** whoever holds a stolen token or session can guess the current password at about 120 tries a minute. Once the guess is right, they change the password, which signs the victim out on every other device, and then take over the email. This bypasses the protection BE-38 added for email change.
+
+**Required fix**
+- Use one per-account limiter for every current-password check (for example the `email-change-password:{id}` key renamed to `password-check:{id}`, 5 per 15 minutes), with a 429 that carries `retry_after`. Apply it to API change-password, web `PUT /password`, `confirm-password` and `DELETE /profile`.
+- Add feature tests for each path.
+
+### SEC-28 · medium · backend integrity: web profile lets drivers and passengers rewrite their CNIC and licence number after approval
+**Evidence**
+- `app/Http/Requests/ProfileUpdateRequest.php:37-41` accepts `cnic` (required), `license_number` and `vehicle_type`.
+- `ProfileController::update` (`app/Http/Controllers/ProfileController.php:63`) fills them straight into the user. The form is `resources/views/profile/edit.blade.php:141,197`.
+- Any active user can sign in on the web `/login` and reach `/profile/edit`, because only `/admin` is restricted to admins.
+- Nothing sends the driver back to review or writes an audit event.
+- The API `PUT /profile` deliberately doesn't accept these fields (`Api/ProfileController.php:31-47`). The web path bypasses that.
+- The rule dates from the original admin-panel commit (`6d89b1f`), so this was not introduced in Phase 1.
+
+**Impact:** after admin approval, a driver can replace the CNIC and licence on record with any value. The verified identity that admins, support or the police rely on after an incident then no longer matches the person who was reviewed.
+
+**Required fix**
+- Show identity fields read-only for non-admins: drop `cnic`, `license_number` and `vehicle_type` from `ProfileUpdateRequest`, and hide the inputs in `profile/edit.blade.php`.
+- If changing them is a product need, a change sends the account back to `pending` review with a `PhoneMoveAudit`-style admin event.
+- Add a feature test: a driver's `PATCH /profile` with a new `cnic` leaves it unchanged.
+
+### SEC-29 · low · app storage: the cached user keeps contact PII in plain AsyncStorage
+**Evidence**
+- `src/core/auth/storedUser.ts:9-10` is a blocklist. It drops CNIC, licence, bank, emergency contact, date of birth and rejection reason, but keeps `phone`, `pending_phone`, `email`, `address`, `gender`, `bio` and `profile_image_url`.
+- Both copies are written in plain text: `user_data` (`src/services/authStorage.ts:208,220`) and `persist:root` `apiAuth.user` (`src/store/persistTransforms.ts` `withoutSecrets`).
+- The cache is only there so an offline cold start routes on `role`/`status` (T-104).
+- This was raised as "consider stripping address/gender" in the T-104/T-107 reviews and not acted on.
+
+**Impact:** a device backup, a forensic dump or a rooted device exposes the user's phone, email and home address. Logout does clear both copies.
+
+**Required fix**
+- Turn `toStoredUser` into an allowlist: `id`, `name`, `role`, `roles`, `status`, `phone_verified_at`, and optionally `profile_image_url`. Fetch everything else from `GET /auth/profile`.
+- Add a unit test that an unknown new field is not stored.
+
+### SEC-30 · low · backend: inconsistent API error envelopes, and admin free text in logs
+**Evidence**
+- `bootstrap/app.php:56-120` renders the app envelope only for validation errors, throttle 429s and lock timeouts. 401 (`AuthenticationException`), 403 from `signed`, 404, 405 and 500 still use Laravel's default `{message}` body with no `success:false` and no `code`.
+- The `nearby-drivers` limiter has its own 429 response (`app/Providers/AppServiceProvider.php:86-90`) without `code: rate_limited`, so it bypasses the BE-28 envelope.
+- The app maps errors by HTTP status, so nothing breaks today (`src/core/api/errors.ts:102-107`).
+- `Admin/DriverVerificationController.php:102,112` logs the admin's free-text `rejection_reason`, which can contain document numbers.
+
+**Impact:** low. Clients that branch on `code` (T-111 style) can mis-handle these paths, and the log can hold PII an admin typed.
+
+**Required fix**
+- Render `AuthenticationException`, `HttpExceptionInterface` and `InvalidSignatureException` for `api/*` in the `{success:false, message, code}` envelope (`unauthenticated`, `not_found`, `forbidden`, `server_error`).
+- Add `code: rate_limited` to the nearby-drivers 429.
+- Log only the length of `rejection_reason`, or a flag that one was given.
+
+### Phase 1 gate checklist
+| Item | Result |
+|---|---|
+| App 1 Secrets | OK. No new tracked secrets. Maps key only in ignored env files (git history: B-02). Build logs no longer print values (T-112). |
+| App 2 Token storage | OK. Keychain, epoch-guarded, full logout. SEC-29 (low) |
+| App 3 Logging | OK for Phase 1 code (keyed summaries via `logApiFailure`). SEC-20 still open (low) |
+| App 4 Transport | OK. Release cleartext off on both platforms. SEC-17 (low) |
+| App 5 Auth flows | OK. OTP never kept. 401 leads to logout. 403 `ACCOUNT_*` routes to account status. Roles are enforced server-side (BE-18). |
+| App 6 Input/navigation | OK. No WebView, `eval` or deep links. The `tel:` link is validated (T-110). Push handlers come later (T-502). |
+| App 7 Permissions | OK. Foreground location only (B-08). Polling runs only while the app is active. |
+| App 8 Dependencies | SEC-11 unchanged |
+| BE 1 Config | OK in code (guard and template). Live check: B-12, B-16 |
+| BE 2 AuthN | SEC-26, SEC-27 (medium). OTP, tokens and revocation OK. |
+| BE 3 AuthZ/IDOR | OK for Phase 1 scope. Rides beyond BE-24/BE-30 stay with BE-01..04. |
+| BE 4 Mass assignment | SEC-28 (web profile identity fields). The API profile allowlists its fields. |
+| BE 5 Injection | OK. Maps inputs are validated and the query is built by Guzzle. |
+| BE 6 Uploads | OK (BE-22) |
+| BE 7 Races | OK for OTP consume, phone claim (locks), token refresh (delete-as-claim) and status change (row lock). Wallet stays with SEC-09 / BE-09. |
+| BE 8 WebSockets | n/a (no server yet, BE-12) |
+| BE 9 Headers/CORS | OK. Signed email pages send `no-referrer`, private files send `no-store` and a sandbox CSP. SEC-30 (low) |
+
+**Phase 1 gate verdict: PASS.** No critical or high finding is open in the code. Before production, the owner still has to do B-02, B-11, B-12, B-13, B-15 and B-16. Production is down (B-09).
