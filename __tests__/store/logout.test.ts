@@ -15,10 +15,10 @@ import notificationService from '../../src/services/notificationService';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, LOGOUT_REQUEST_TIMEOUT_MS, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { loginUser } from '../../src/store/thunks/apiThunks';
-import { setCurrentTrip } from '../../src/store/slices/tripSlice';
-import { setMode, setIsRequesting } from '../../src/store/slices/rideSlice';
+import { createActiveRide } from '../../src/features/active-ride/slice';
 import type { User } from '../../src/services/api';
 import type { NotificationResource } from '../../src/services/rideService';
+import { makeRide, makeRideRequest } from '../../test-utils/rideFixtures';
 
 const user: User = {
   id: 7,
@@ -44,6 +44,8 @@ const incomingNotification: NotificationResource = {
   updated_at: '2026-10-08T10:00:00Z',
 };
 
+const activeRide = makeRide({ status: 'accepted' });
+
 const makeStore = () => {
   const extra: SessionThunkExtra = { purgePersistedState: jest.fn(() => Promise.resolve()) };
   const store = configureStore({
@@ -64,9 +66,7 @@ const signIn = async (store: ReturnType<typeof makeStore>['store']) => {
       password: 'not-a-real-password',
     }),
   );
-  store.dispatch(setCurrentTrip({ id: 'trip-1', status: 'ongoing' }));
-  store.dispatch(setMode('bidding'));
-  store.dispatch(setIsRequesting(true));
+  store.dispatch(createActiveRide.fulfilled(activeRide, 'req-2', makeRideRequest()));
   await authStorage.saveSession({ token: TOKEN, user });
   await AsyncStorage.multiSet([
     ['@auth_session', JSON.stringify({ uid: 'firebase-uid' })],
@@ -81,8 +81,8 @@ const expectFullySignedOut = async (
 ) => {
   const initial = initialRoot();
   const state = store.getState();
-  expect(state.trip).toEqual(initial.trip);
-  expect(state.ride).toEqual(initial.ride);
+  expect(state.activeRide).toEqual(initial.activeRide);
+  expect(state.activeRide.ride).toBeNull();
   // apiAuth is the initial state too, except the app stays initialised (no bootstrap rerun).
   expect(state.apiAuth).toEqual({ ...initial.apiAuth, isInitialized: true });
   expect(state.apiAuth.isAuthenticated).toBe(false);

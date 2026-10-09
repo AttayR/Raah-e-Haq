@@ -3,20 +3,21 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppTheme } from '../../providers/ThemeProvider';
 import PassengerHomeScreen from 'src/screens/Passenger/PassengerHomeScreen';
-import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
 import PassengerChatScreen from 'src/screens/Passenger/chat/PassengerChatScreen';
 import PassengerSettingsScreen from 'src/screens/Passenger/PassengerSettingsScreen';
 
 export type PassengerTabParamList = {
   Home: undefined;
-  Map: undefined;
   Notifications: undefined;
   Chat: undefined;
   Settings: undefined;
 };
 
 const Tab = createBottomTabNavigator<PassengerTabParamList>();
+
+// No Map tab: booking is the PassengerMap stack route, opened from Home (T-301, PAX-10;
+// DESIGN_SYSTEM §8 IA). A second mount had its own copy of the ride state.
 
 const PassengerBottomTabs = () => {
   const { theme } = useAppTheme();
@@ -51,15 +52,6 @@ const PassengerBottomTabs = () => {
   }}
 />
 
-      <Tab.Screen
-        name="Map"
-        component={PassengerMapScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="map" color={color} size={size} />
-          ),
-        }}
-      />
       <Tab.Screen
         name="Notifications"
         component={PassengerNotificationsScreen}

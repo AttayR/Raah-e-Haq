@@ -10,7 +10,6 @@ import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
 import { useFare } from '../../hooks/useFare';
-import { useRide } from '../../hooks/useRide';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
@@ -30,6 +29,12 @@ import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
 import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
 import { logger } from '../../core/logging/logger';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch } from '../../store';
+import { clearActiveRide, selectActiveRide } from '../../features/active-ride/slice';
+import { useActiveRideActions, useActiveRidePolling } from '../../features/active-ride/hooks';
+import { isRideInProgress, isRideTerminal } from '../../features/active-ride/status';
+import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
 
 const PassengerMapScreen = () => {
   const navigation = useNavigation();
@@ -51,17 +56,10 @@ const PassengerMapScreen = () => {
     unsubscribeFromPassengerNotifications,
     sendRideRequestNotification,
   } = usePassengerNotifications('passenger_id'); // TODO: Get actual passenger ID from auth
-  // Use comprehensive ride service
-  const rideHook = useRide(11, 'passenger'); // TODO: Get actual passenger ID from auth
-  const {
-    currentRide,
-    rideHistory,
-    isLoading: rideLoading,
-    error: rideError,
-    requestRide: requestRideService,
-    cancelRide: cancelRideService,
-    refreshRide,
-  } = rideHook || {};
+  // The active ride lives in Redux (T-301): one copy for every screen, restored on launch.
+  const dispatch = useDispatch<AppDispatch>();
+  const currentRide = useSelector(selectActiveRide);
+  const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions();
   
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
   const { vehicleType, getFare } = useFare();
@@ -80,11 +78,19 @@ const PassengerMapScreen = () => {
   const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const isFocused = useIsFocused();
+  // Status poll while the ride is in progress and this screen is focused; cleaned up on unmount.
+  useActiveRidePolling(isFocused);
 
   // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is under way.
   const rideActive = isRideActive(currentRide);
+  // While a ride is in progress the panel follows the server, not the booking steps: the
+  // requesting card until a driver accepts, then the driver card (T-301; full stage
+  // machine is T-304).
+  const rideInProgress = isRideInProgress(currentRide);
+  const shownStage: typeof stage = rideInProgress ? 'requesting' : stage;
+
   const nearbyDrivers = useNearbyDrivers(pickup ?? currentLocation, {
-    enabled: isFocused && !rideActive && stage !== 'requesting',
+    enabled: isFocused && !rideActive && shownStage !== 'requesting',
   });
   // Call button only while the server exposes driver.phone (accepted, still-active ride).
   const driverPhone = getDriverPhone(currentRide);
@@ -367,11 +373,38 @@ const PassengerMapScreen = () => {
     clearRoute();
   }, [clearRoute]);
 
+  // A ride from Redux (booked here, or restored on launch) puts its own pickup and
+  // destination on the map, once per ride (not on every poll).
+  const shownRideIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!currentRide || !isRideInProgress(currentRide) || shownRideIdRef.current === currentRide.id) return;
+    shownRideIdRef.current = currentRide.id;
+    setPickup({ latitude: Number(currentRide.pickup_latitude), longitude: Number(currentRide.pickup_longitude) });
+    setDestination({ latitude: Number(currentRide.dropoff_latitude), longitude: Number(currentRide.dropoff_longitude) });
+    setPickupQuery(currentRide.pickup_address);
+    setDestQuery(currentRide.dropoff_address);
+  }, [currentRide]);
+
+  // A final status from the poll ends the ride here: say how it ended, then start over.
+  const endedRideStatus = isRideTerminal(currentRide) ? currentRide?.status : undefined;
+  useEffect(() => {
+    if (!endedRideStatus) return;
+    if (endedRideStatus === 'completed') {
+      Alert.alert(ACTIVE_RIDE_COPY.completedTitle, ACTIVE_RIDE_COPY.completedMessage);
+    } else {
+      Alert.alert(ACTIVE_RIDE_COPY.cancelledTitle, ACTIVE_RIDE_COPY.cancelledMessage);
+    }
+    shownRideIdRef.current = null;
+    dispatch(clearActiveRide());
+    resetSelection();
+  }, [endedRideStatus, dispatch, resetSelection]);
+
   // Navigation functions
   const goBack = useCallback(() => {
     const stageOrder: Array<typeof stage> = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
     const currentIndex = stageOrder.indexOf(stage);
-    if (currentIndex > 0) {
+    // A ride in progress stays in Redux; Back only leaves the screen.
+    if (currentIndex > 0 && !rideInProgress) {
       const prevStage = stageOrder[currentIndex - 1];
       setStage(prevStage);
       setError(null);
@@ -379,7 +412,7 @@ const PassengerMapScreen = () => {
       // Go back to home screen
       navigation.goBack();
     }
-  }, [stage, navigation]);
+  }, [stage, navigation, rideInProgress]);
 
   // Cancel ride functionality
   const handleCancelRide = useCallback(() => {
@@ -639,7 +672,7 @@ const PassengerMapScreen = () => {
         <TouchableOpacity style={styles.iconButton} onPress={resetSelection}>
           <Icon name="refresh" size={22} color={BrandColors.primary} />
         </TouchableOpacity>
-        {stage !== 'home' && (
+        {shownStage !== 'home' && (
           <TouchableOpacity style={styles.iconButton} onPress={goBack}>
             <Icon name="arrow-back" size={22} color={BrandColors.primary} />
           </TouchableOpacity>
@@ -664,9 +697,9 @@ const PassengerMapScreen = () => {
             </TouchableOpacity>
           </View>
         )}
-        {!rideActive && stage !== 'requesting' && <NearbyDriversStatus state={nearbyDrivers} />}
-        <StageChips stage={stage} />
-        {stage === 'home' && (
+        {!rideActive && shownStage !== 'requesting' && <NearbyDriversStatus state={nearbyDrivers} />}
+        <StageChips stage={shownStage} />
+        {shownStage === 'home' && (
           <DualLocationPicker
             pickup={pickup}
             destination={destination}
@@ -721,11 +754,11 @@ const PassengerMapScreen = () => {
           />
         )}
 
-        {stage === 'pickup' && (
+        {shownStage === 'pickup' && (
           <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup(s.coords); setStage('destination'); }} />
         )}
 
-        {stage === 'destination' && (
+        {shownStage === 'destination' && (
           <View>
             <LocationSearch
               mode="destination"
@@ -746,7 +779,7 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {stage === 'vehicle' && (
+        {shownStage === 'vehicle' && (
           <View>
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 0, borderRadius: 12, padding: 12 }}>
               <Text style={{ fontSize: 12, color: '#666' }}>Trip Details</Text>
@@ -803,7 +836,7 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {stage === 'fare' && fareInfo && (
+        {shownStage === 'fare' && fareInfo && (
           <View>
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -840,7 +873,7 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {stage === 'requesting' && (
+        {shownStage === 'requesting' && !rideActive && (
           <View>
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -860,7 +893,7 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {currentRide && currentRide.status === 'accepted' && (
+        {currentRide && rideActive && (
           <DriverAssignedCard
             name={currentRide.driver?.name || 'Driver'}
             vehicle={currentRide.vehicle_type || 'Car'}

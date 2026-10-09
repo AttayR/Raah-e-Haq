@@ -1,14 +1,15 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import DriverStack from './stacks/DriverStack';
-import PassengerStack from './stacks/PassengerStack';
+import PassengerStack, { type PassengerStackParamList } from './stacks/PassengerStack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { logger } from '../../core/logging/logger';
 
 export type RootStackParamList = {
   Driver: undefined;
-  Passenger: undefined;
+  Passenger: NavigatorScreenParams<PassengerStackParamList> | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

@@ -1,13 +1,12 @@
 import { combineReducers, type Reducer, type UnknownAction } from '@reduxjs/toolkit';
 import apiAuthReducer from './slices/apiAuthSlice';
-import tripReducer from './slices/tripSlice';
-import rideReducer from './slices/rideSlice';
+import activeRideReducer from '../features/active-ride/slice';
 import { resetApp } from './actions';
 
 const appReducer = combineReducers({
   apiAuth: apiAuthReducer,
-  trip: tripReducer,
-  ride: rideReducer,
+  // The passenger's active ride (T-301); replaces the unused `trip` and `ride` slices.
+  activeRide: activeRideReducer,
 });
 
 /** `resetApp` (dispatched by logout) returns every slice to its initial state. */

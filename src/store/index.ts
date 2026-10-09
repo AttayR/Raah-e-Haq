@@ -20,7 +20,7 @@ const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
   // Only the API session (user and flags, no token, no OTP, no transient status/error).
-  // trip and ride are per-session UI state and start empty on every launch.
+  // activeRide is never persisted: it is restored from the server on launch (T-301).
   whitelist: ['apiAuth'],
   version: PERSIST_VERSION,
   // Drops the removed Firebase `auth` and `user` slices an older build persisted (T-107).

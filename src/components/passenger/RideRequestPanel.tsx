@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BrandColors } from '../../theme/colors';
 import { useAppSelector } from '../../store';
+import { selectInProgressRide } from '../../features/active-ride/slice';
 
 type Props = {
   onRequest: () => void;
@@ -9,16 +10,18 @@ type Props = {
 };
 
 const RideRequestPanel: React.FC<Props> = ({ onRequest, disabled }) => {
-  const ride = useAppSelector((s) => s.ride);
+  // T-301: the old `ride` slice is gone; the active ride lives in activeRide.
+  const activeRide = useAppSelector(selectInProgressRide);
+  const isSubmitting = useAppSelector((s) => s.activeRide.isSubmitting);
 
   return (
     <View style={styles.container}>
-      {ride.activeRide ? (
+      {activeRide ? (
         <View style={styles.row}>
           <Text style={styles.title}>Ride Active</Text>
-          <Text style={styles.sub}>{ride.activeRide.status.toUpperCase()}</Text>
+          <Text style={styles.sub}>{activeRide.status.toUpperCase()}</Text>
         </View>
-      ) : ride.currentRequestId ? (
+      ) : isSubmitting ? (
         <View style={styles.row}>
           <Text style={styles.title}>Request Sent</Text>
           <Text style={styles.sub}>Waiting for driver…</Text>
