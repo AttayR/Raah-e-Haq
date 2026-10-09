@@ -34,7 +34,7 @@ export interface RideState {
 
 export interface RideActions {
   requestRide: (rideData: RideRequest) => Promise<RideResource>;
-  acceptRide: (rideId: number, driverId: number) => Promise<RideResource>;
+  acceptRide: (rideId: number) => Promise<RideResource>;
   startRide: (rideId: number) => Promise<RideResource>;
   completeRide: (rideId: number, fare?: number, distance?: number, duration?: number) => Promise<RideResource>;
   cancelRide: (rideId: number) => Promise<RideResource>;
@@ -179,12 +179,12 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   }, []);
 
   // Accept a ride (Driver)
-  const acceptRide = useCallback(async (rideId: number, driverId: number): Promise<RideResource> => {
+  const acceptRide = useCallback(async (rideId: number): Promise<RideResource> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      logger.debug('✅ Accepting ride:', rideId, driverId);
-      const ride = await rideService.acceptRide(rideId, driverId);
+      logger.debug('✅ Accepting ride:', rideId);
+      const ride = await rideService.acceptRide(rideId);
       
       setState(prev => ({
         ...prev,

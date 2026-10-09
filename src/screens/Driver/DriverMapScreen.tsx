@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -14,16 +14,38 @@ import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useIsFocused } from '@react-navigation/native';
 import { useRide } from '../../hooks/useRide';
-import { useAppSelector } from '../../app/providers/ReduxProvider';
+import { useAppDispatch, useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { logger } from '../../core/logging/logger';
 import { useDriverStatusToggle } from '../../features/driver-status/hooks';
 import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
+import { loadDriverStatus } from '../../features/driver-status/slice';
+import {
+  usePendingRidePolling,
+  useRideRequestActions,
+  useRideRequestFeed,
+} from '../../features/driver-requests/hooks';
+import {
+  clearDriverActiveRide,
+  selectDriverActiveRide,
+  setDriverActiveRide,
+} from '../../features/driver-ride/slice';
+import { RideRequestPanel } from '../../components/driver/IncomingRequestCard';
 
 const { width, height } = Dimensions.get('window');
+
+/** RideResource coordinates arrive as decimal strings. */
+const toCoordinate = (lat: unknown, lng: unknown): Location | null => {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  return lat != null && lng != null && Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? { latitude, longitude }
+    : null;
+};
 
 interface Location {
   latitude: number;
@@ -51,15 +73,12 @@ const DriverMapScreen = () => {
   
   // Use comprehensive ride service
   const {
-    currentRide,
-    rideHistory,
-    isLoading: rideLoading,
-    error: rideError,
-    acceptRide,
     startRide,
     completeRide,
-    refreshRideHistory,
   } = useRide(uid ? parseInt(uid) : undefined, 'driver');
+  const dispatch = useAppDispatch();
+  // The accepted ride (POST /rides/{id}/assign-driver, T-404); T-405 rebuilds this flow.
+  const currentRide = useAppSelector(selectDriverActiveRide);
   
   // Use native location hook
   const {
@@ -71,6 +90,20 @@ const DriverMapScreen = () => {
   // Online/offline is the server's answer (GET/PUT /driver/status, T-401), shared with Home.
   const { isOnline, isOnRide, isChecking, disabled: toggleDisabled, toggle } = useDriverStatusToggle();
   const isLoadingLocation = locationLoading || !currentLocation;
+
+  // Incoming requests (T-403): GET /rides/pending every 5 s while online, without a ride,
+  // in the foreground and on this screen. The device position is the documented fallback.
+  const isFocused = useIsFocused();
+  const pollLocation = useMemo(
+    () => (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : null),
+    [currentLocation],
+  );
+  usePendingRidePolling({ isFocused, location: pollLocation });
+  const { view: requestView, retry: retryRequests } = useRideRequestFeed(pollLocation);
+  const { acceptingId, accept: acceptRequest, reject: rejectRequest } = useRideRequestActions();
+  const showRequests = isOnline && !isOnRide && !currentRide;
+  const pickupCoordinate = currentRide ? toCoordinate(currentRide.pickup_latitude, currentRide.pickup_longitude) : null;
+  const dropoffCoordinate = currentRide ? toCoordinate(currentRide.dropoff_latitude, currentRide.dropoff_longitude) : null;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -155,22 +188,17 @@ const DriverMapScreen = () => {
     toggle();
   };
 
-  const handleAcceptRide = async (rideId: number) => {
-    try {
-      logger.debug('Accepting ride:', rideId);
-      await acceptRide(rideId, uid ? parseInt(uid) : 0);
-      
-      Alert.alert('Ride Accepted', 'You have accepted the ride request');
-    } catch (error) {
-      logger.error('Error accepting ride:', error);
-      Alert.alert('Error', 'Failed to accept ride');
-    }
+  // Accept / reject (T-404): the hook guards double taps, shows the toast for each refusal and
+  // puts the accepted ride in the driverRide slice, which drives the Active Ride card below.
+  const handleAcceptRide = (rideId: number) => {
+    acceptRequest(rideId);
   };
 
   const handleStartRide = async () => {
     if (currentRide) {
       try {
-        await startRide(currentRide.id);
+        const ride = await startRide(currentRide.id);
+        dispatch(setDriverActiveRide(ride));
         Alert.alert('Ride Started', 'You can now navigate to the passenger');
       } catch (error) {
         logger.error('Error starting ride:', error);
@@ -182,13 +210,11 @@ const DriverMapScreen = () => {
   const handleCompleteRide = async () => {
     if (currentRide) {
       try {
-        // Calculate fare, distance, duration (mock values for now)
-        const fare = 150; // PKR
-        const distance = 5.2; // km
-        const duration = 15; // minutes
-        
-        await completeRide(currentRide.id, fare, distance, duration);
-        Alert.alert('Ride Completed', `Fare: PKR ${fare}`);
+        // The server computes the fare (BE-30 ignores a client fare); T-405 moves this to BE-04.
+        const ride = await completeRide(currentRide.id);
+        dispatch(clearDriverActiveRide());
+        dispatch(loadDriverStatus());
+        Alert.alert('Ride Completed', `Fare: PKR ${ride.total_fare}`);
       } catch (error) {
         logger.error('Error completing ride:', error);
         Alert.alert('Error', 'Failed to complete ride');
@@ -233,19 +259,19 @@ const DriverMapScreen = () => {
         )}
 
         {/* Active ride markers */}
-        {currentRide && (
-          <>
-            <Marker
-              coordinate={currentRide.pickup}
-              title="Pickup Location"
-              pinColor="green"
-            />
-            <Marker
-              coordinate={currentRide.destination}
-              title="Destination"
-              pinColor="red"
-            />
-          </>
+        {pickupCoordinate && (
+          <Marker
+            coordinate={pickupCoordinate}
+            title="Pickup Location"
+            pinColor="green"
+          />
+        )}
+        {dropoffCoordinate && (
+          <Marker
+            coordinate={dropoffCoordinate}
+            title="Destination"
+            pinColor="red"
+          />
         )}
         </SafeMapView>
       </MapErrorBoundary>
@@ -299,34 +325,16 @@ const DriverMapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Incoming Ride Request */}
-      {currentRide && currentRide.status === 'requested' && (
+      {/* Incoming Ride Requests (T-403/T-404) */}
+      {showRequests && (
         <View style={styles.rideRequestCard}>
-          <View style={styles.rideRequestHeader}>
-            <Text style={styles.rideRequestTitle}>New Ride Request</Text>
-            <TouchableOpacity onPress={() => {/* TODO: Implement reject */}}>
-              <Icon name="close" size={24} color={BrandColors.error} />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.rideRequestInfo}>
-            <Text style={styles.passengerName}>{currentRide.passenger?.name || 'Passenger'}</Text>
-            <Text style={styles.passengerPhone}>{currentRide.passenger?.phone || 'N/A'}</Text>
-            <Text style={styles.passengerRating}>⭐ {currentRide.passenger?.rating || '5.0'}</Text>
-          </View>
-          
-          <View style={styles.rideRequestDetails}>
-            <Text style={styles.fare}>₨ {currentRide.fare || '150'}</Text>
-            <Text style={styles.distance}>{currentRide.distance_km || '5.2'} km</Text>
-            <Text style={styles.duration}>{currentRide.duration_min || '15'} min</Text>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.acceptButton}
-            onPress={() => handleAcceptRide(currentRide.id)}
-          >
-            <Text style={styles.acceptButtonText}>Accept Ride</Text>
-          </TouchableOpacity>
+          <RideRequestPanel
+            view={requestView}
+            acceptingId={acceptingId}
+            onAccept={handleAcceptRide}
+            onReject={rejectRequest}
+            onRetry={retryRequests}
+          />
         </View>
       )}
 
@@ -451,77 +459,12 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'white',
   },
+  // Positions the request panel; the card itself is themed (components/driver/IncomingRequestCard).
   rideRequestCard: {
     position: 'absolute',
     bottom: 100,
     left: 20,
     right: 20,
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  rideRequestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  rideRequestTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: BrandColors.text,
-  },
-  rideRequestInfo: {
-    marginBottom: 15,
-  },
-  passengerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: BrandColors.text,
-    marginBottom: 5,
-  },
-  passengerPhone: {
-    fontSize: 14,
-    color: BrandColors.mutedText,
-    marginBottom: 5,
-  },
-  passengerRating: {
-    fontSize: 14,
-    color: BrandColors.warning,
-  },
-  rideRequestDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  fare: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: BrandColors.success,
-  },
-  distance: {
-    fontSize: 14,
-    color: BrandColors.mutedText,
-  },
-  duration: {
-    fontSize: 14,
-    color: BrandColors.mutedText,
-  },
-  acceptButton: {
-    backgroundColor: BrandColors.success,
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-  },
-  acceptButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
   },
   activeRideCard: {
     position: 'absolute',

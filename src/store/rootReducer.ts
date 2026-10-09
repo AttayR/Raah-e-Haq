@@ -2,6 +2,8 @@ import { combineReducers, type Reducer, type UnknownAction } from '@reduxjs/tool
 import apiAuthReducer from './slices/apiAuthSlice';
 import activeRideReducer from '../features/active-ride/slice';
 import driverStatusReducer from '../features/driver-status/slice';
+import driverRequestsReducer from '../features/driver-requests/slice';
+import driverRideReducer from '../features/driver-ride/slice';
 import { resetApp } from './actions';
 
 const appReducer = combineReducers({
@@ -10,6 +12,9 @@ const appReducer = combineReducers({
   activeRide: activeRideReducer,
   // The driver's server-backed online state (T-401).
   driverStatus: driverStatusReducer,
+  // The driver's incoming requests from GET /rides/pending (T-403) and the accepted ride (T-404).
+  driverRequests: driverRequestsReducer,
+  driverRide: driverRideReducer,
 });
 
 /** `resetApp` (dispatched by logout) returns every slice to its initial state. */

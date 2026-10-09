@@ -423,15 +423,12 @@ class RideService {
     }
   }
 
-  // Assign driver to a ride
-  async assignDriver(rideId: number, driverId: number): Promise<RideResource> {
+  // The signed-in driver takes a ride (BE-03): no body, the driver is the token's user.
+  // The driver app accepts through features/driver-requests (T-404).
+  async assignDriver(rideId: number): Promise<RideResource> {
     try {
-      logger.debug('👨‍💼 Assigning driver:', rideId, driverId);
-      return unwrap(
-        await apiService.post<RideResource>(`${this.baseUrl}/${rideId}/assign-driver`, {
-          driver_id: driverId
-        }),
-      );
+      logger.debug('👨‍💼 Assigning driver:', rideId);
+      return unwrap(await apiService.post<RideResource>(`${this.baseUrl}/${rideId}/assign-driver`));
     } catch (error) {
       logger.error('❌ Failed to assign driver:', error);
       throw error;
@@ -449,14 +446,11 @@ class RideService {
     }
   }
 
-  // Driver accepts a ride
-  async acceptRide(rideId: number, driverId: number): Promise<RideResource> {
+  // Driver accepts a ride: the atomic POST /rides/{id}/assign-driver (T-404), not a PUT.
+  async acceptRide(rideId: number): Promise<RideResource> {
     try {
-      logger.debug('✅ Driver accepting ride:', rideId, driverId);
-      const response = await this.updateRide(rideId, {
-        status: 'accepted',
-        driver_id: driverId
-      });
+      logger.debug('✅ Driver accepting ride:', rideId);
+      const response = await this.assignDriver(rideId);
       logger.debug('✅ Ride accepted successfully:', response.id);
       return response;
     } catch (error) {
@@ -607,19 +601,6 @@ class RideService {
       return await this.getDriverRides(driverId, 'accepted,ongoing');
     } catch (error) {
       logger.error('❌ Failed to fetch active driver rides:', error);
-      throw error;
-    }
-  }
-
-  // Get pending rides for driver
-  // TODO(T-403/BE-02): use GET /rides/pending; GET /rides only lists the driver's own rides.
-  async getPendingRides(): Promise<RideResource[]> {
-    try {
-      logger.debug('⏳ Fetching pending rides');
-      const page = await this.getRides({ status: 'requested' });
-      return page.data;
-    } catch (error) {
-      logger.error('❌ Failed to fetch pending rides:', error);
       throw error;
     }
   }

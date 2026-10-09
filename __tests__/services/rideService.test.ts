@@ -43,12 +43,13 @@ describe('rideService returns the ride object from the envelope', () => {
     await expect(rideService.getRide(42)).resolves.toEqual(ride);
   });
 
-  it('acceptRide (PUT /rides/{id})', async () => {
-    mock.onPut('/rides/42').reply(200, envelope(ride));
-    const result = await rideService.acceptRide(42, 9);
+  it('acceptRide uses POST /rides/{id}/assign-driver with no body (T-404)', async () => {
+    mock.onPost('/rides/42/assign-driver').reply(200, envelope(ride));
+    const result = await rideService.acceptRide(42);
     expect(result).toEqual(ride);
     expect(result.passenger_id).toBe(3);
-    expect(JSON.parse(mock.history.put[0].data)).toEqual({ status: 'accepted', driver_id: 9 });
+    expect(mock.history.put).toHaveLength(0);
+    expect(mock.history.post[0].data).toBeUndefined();
   });
 
   it('startRide and completeRide', async () => {
@@ -64,7 +65,8 @@ describe('rideService returns the ride object from the envelope', () => {
     await expect(rideService.cancelRide(42)).resolves.toMatchObject({ status: 'cancelled' });
 
     mock.onPost('/rides/42/assign-driver').reply(200, envelope(ride));
-    await expect(rideService.assignDriver(42, 9)).resolves.toEqual(ride);
+    await expect(rideService.assignDriver(42)).resolves.toEqual(ride);
+    expect(mock.history.post[1].data).toBeUndefined();
   });
 
   it('createRide (201)', async () => {
