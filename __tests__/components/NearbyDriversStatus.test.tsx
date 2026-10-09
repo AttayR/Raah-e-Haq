@@ -36,4 +36,8 @@ describe('NearbyDriversStatus', () => {
     expect(nearbyDriverDescription(driver)).toBe('car · 4.5★ · ~2 min');
     expect(nearbyDriverDescription({ ...driver, rating: 0 })).toBe('car · ~2 min');
   });
+
+  it('marker text has no type label when the vehicle type is unknown (null)', () => {
+    expect(nearbyDriverDescription({ ...driver, vehicle_type: null })).toBe('4.5★ · ~2 min');
+  });
 });

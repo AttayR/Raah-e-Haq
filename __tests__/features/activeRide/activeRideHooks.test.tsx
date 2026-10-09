@@ -10,7 +10,6 @@ import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import { createActiveRide } from '../../../src/features/active-ride/slice';
 import {
-  ACTIVE_RIDE_POLL_MS,
   useActiveRidePolling,
   useRestoreActiveRide,
 } from '../../../src/features/active-ride/hooks';
@@ -38,21 +37,30 @@ const withRide = (status: 'requested' | 'completed' = 'requested') => {
   return store;
 };
 
-/** Advances one poll interval and lets the request settle. */
+/**
+ * Runs the timers that are due now (one poll interval) and the promises they start, so the
+ * request and its reducer settle inside act() without depending on microtask counts.
+ */
 const tick = async () => {
   await act(async () => {
-    jest.advanceTimersByTime(ACTIVE_RIDE_POLL_MS);
+    await jest.runOnlyPendingTimersAsync();
   });
+};
+
+/** Lets an already started request (the read on focus) settle. */
+const settle = async () => {
   await act(async () => {
-    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(0);
   });
 };
 
 describe('useActiveRidePolling', () => {
-  it('polls GET /rides/{id} every interval and stops once the ride is completed', async () => {
+  it('reads the ride at once on focus, then every interval, and stops once it is completed', async () => {
     jest.useFakeTimers();
     const store = withRide();
     mock
+      .onGet('/rides/21')
+      .replyOnce(200, envelope(makeRide({ id: 21, status: 'requested' })))
       .onGet('/rides/21')
       .replyOnce(200, envelope(makeRide({ id: 21, status: 'accepted' })))
       .onGet('/rides/21')
@@ -60,14 +68,34 @@ describe('useActiveRidePolling', () => {
 
     renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(store) });
 
-    expect(mock.history.get).toHaveLength(0);
+    // T-301 follow-up: no wait of one interval when the screen gains focus.
+    await settle();
+    expect(mock.history.get).toHaveLength(1);
+
     await tick();
-    await waitFor(() => expect(store.getState().activeRide.ride?.status).toBe('accepted'));
+    expect(store.getState().activeRide.ride?.status).toBe('accepted');
     await tick();
-    await waitFor(() => expect(store.getState().activeRide.ride?.status).toBe('completed'));
+    expect(store.getState().activeRide.ride?.status).toBe('completed');
 
     await tick();
     await tick();
+    expect(mock.history.get).toHaveLength(3);
+  });
+
+  it('refreshes again when the screen regains focus', async () => {
+    jest.useFakeTimers();
+    mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21 })));
+    const { rerender } = renderHook(({ focused }: { focused: boolean }) => useActiveRidePolling(focused), {
+      wrapper: wrapperFor(withRide()),
+      initialProps: { focused: true },
+    });
+    await settle();
+    rerender({ focused: false });
+    await tick();
+    expect(mock.history.get).toHaveLength(1);
+
+    rerender({ focused: true });
+    await settle();
     expect(mock.history.get).toHaveLength(2);
   });
 
@@ -77,6 +105,7 @@ describe('useActiveRidePolling', () => {
 
     renderHook(() => useActiveRidePolling(false), { wrapper: wrapperFor(withRide()) });
     renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(withRide('completed')) });
+    await settle();
     await tick();
 
     expect(mock.history.get).toHaveLength(0);
@@ -87,10 +116,13 @@ describe('useActiveRidePolling', () => {
     mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21 })));
 
     const { unmount } = renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(withRide()) });
+    await settle();
     unmount();
     await tick();
+    await tick();
 
-    expect(mock.history.get).toHaveLength(0);
+    // Only the read on focus; no interval survives the unmount.
+    expect(mock.history.get).toHaveLength(1);
   });
 });
 

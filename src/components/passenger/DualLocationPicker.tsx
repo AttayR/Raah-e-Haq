@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import LocationSearch from './LocationSearch';
+import LocationSearch, { suggestionAddress } from './LocationSearch';
 import { BrandColors } from '../../theme/colors';
 
 type Coords = { latitude: number; longitude: number } | null;
@@ -12,8 +12,9 @@ type Props = {
   destQuery: string;
   onPickupQuery: (q: string) => void;
   onDestQuery: (q: string) => void;
-  onSelectPickup: (c: { latitude: number; longitude: number }) => void;
-  onSelectDestination: (c: { latitude: number; longitude: number }) => void;
+  /** `address` is the picked suggestion's text, sent with the ride (T-302). */
+  onSelectPickup: (c: { latitude: number; longitude: number }, address: string) => void;
+  onSelectDestination: (c: { latitude: number; longitude: number }, address: string) => void;
   onUseCurrentLocation?: () => void;
   onSwap?: () => void;
 };
@@ -36,13 +37,13 @@ const DualLocationPicker: React.FC<Props> = ({
       <View style={styles.row}>
         <View style={styles.dotPickup} />
         <View style={{ flex: 1 }}>
-          <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={onPickupQuery} onSelect={(s) => onSelectPickup(s.coords)} readOnly={pickupQuery.endsWith('…')} />
+          <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={onPickupQuery} onSelect={(s) => onSelectPickup(s.coords, suggestionAddress(s))} readOnly={pickupQuery.endsWith('…')} />
         </View>
       </View>
       <View style={styles.row}>
         <View style={styles.dotDestination} />
         <View style={{ flex: 1 }}>
-          <LocationSearch mode="destination" query={destQuery} onChangeQuery={onDestQuery} onSelect={(s) => onSelectDestination(s.coords)} />
+          <LocationSearch mode="destination" query={destQuery} onChangeQuery={onDestQuery} onSelect={(s) => onSelectDestination(s.coords, suggestionAddress(s))} />
         </View>
       </View>
       <View style={styles.actions}>

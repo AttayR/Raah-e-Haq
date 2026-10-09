@@ -1,8 +1,12 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { fetchAutocomplete, fetchPlaceDetails } from '../../services/placesService';
 
 type Suggestion = { id: string; title: string; subtitle: string; icon: string; coords: { latitude: number; longitude: number } };
+
+/** "Title, subtitle" of a picked suggestion: the address sent with the ride (T-302). */
+export const suggestionAddress = (s: Pick<Suggestion, 'title' | 'subtitle'>): string =>
+  s.subtitle && s.subtitle !== s.title ? `${s.title}, ${s.subtitle}` : s.title;
 
 type Props = {
   mode: 'pickup' | 'destination';

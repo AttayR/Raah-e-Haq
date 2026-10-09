@@ -2,6 +2,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from '../src/store/rootReducer';
 import type { RideRequest, RideResource } from '../src/services/rideService';
+import type { User } from '../src/services/api';
 
 /** A RideResource as GET /rides/{id} returns it (fake local data only). */
 export const makeRide = (overrides: Partial<RideResource> = {}): RideResource => ({
@@ -37,7 +38,6 @@ export const makeRide = (overrides: Partial<RideResource> = {}): RideResource =>
 
 /** A POST /rides body (fake local data only). */
 export const makeRideRequest = (overrides: Partial<RideRequest> = {}): RideRequest => ({
-  passenger_id: 9,
   pickup_address: 'Fake Pickup Street',
   dropoff_address: 'Fake Dropoff Road',
   pickup_latitude: 31.52,
@@ -61,5 +61,35 @@ export const envelope = (data: unknown, extra: Record<string, unknown> = {}) => 
 export const page = (rides: RideResource[]) =>
   envelope(rides, { pagination: { current_page: 1, last_page: 1, per_page: 20, total: rides.length } });
 
-export const makeStore = () => configureStore({ reducer: rootReducer });
+/** The passenger id of makeRide() and of the user makeStore() signs in by default. */
+export const FIXTURE_PASSENGER_ID = 9;
+
+/** A signed-in passenger (fake local data only). */
+export const makePassenger = (id: number = FIXTURE_PASSENGER_ID): User => ({
+  id,
+  name: 'Fake Passenger',
+  email: 'passenger@example.test',
+  phone: null,
+  status: 'active',
+  role: 'passenger',
+  roles: ['passenger'],
+});
+
+/**
+ * A store with the real root reducer. By default a passenger (id 9, the makeRide passenger)
+ * is signed in; `{ userId: null }` gives a signed-out store.
+ */
+export const makeStore = ({ userId = FIXTURE_PASSENGER_ID }: { userId?: number | null } = {}) => {
+  const initial = rootReducer(undefined, { type: '@@fixtures/init' });
+  return configureStore({
+    reducer: rootReducer,
+    preloadedState: {
+      ...initial,
+      apiAuth: {
+        ...initial.apiAuth,
+        user: userId === null ? null : makePassenger(userId),
+      },
+    },
+  });
+};
 export type TestStore = ReturnType<typeof makeStore>;

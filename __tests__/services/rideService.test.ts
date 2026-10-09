@@ -70,7 +70,6 @@ describe('rideService returns the ride object from the envelope', () => {
   it('createRide (201)', async () => {
     mock.onPost('/rides').reply(201, envelope({ ...ride, status: 'requested' }));
     const created = await rideService.createRide({
-      passenger_id: 3,
       pickup_address: 'Pickup',
       dropoff_address: 'Dropoff',
       pickup_latitude: 31.52,
@@ -118,7 +117,6 @@ describe('rideService errors are ApiError', () => {
     });
     const error = await rideService
       .createRide({
-        passenger_id: 3,
         pickup_address: '',
         dropoff_address: 'Dropoff',
         pickup_latitude: 31.52,
@@ -202,6 +200,35 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
     expect(drivers).toEqual([nearby]);
     expect(drivers[0]).not.toHaveProperty('name');
     expect(drivers[0]).not.toHaveProperty('phone');
+  });
+
+  it('a null or unknown vehicle_type stays null; it is never guessed as car (BE-58)', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(
+      200,
+      envelope([
+        { ...nearby, id: 'n1', vehicle_type: null },
+        { ...nearby, id: 'n2', vehicle_type: 'motorcycle' },
+        { ...nearby, id: 'n3', vehicle_type: 'bike' },
+      ]),
+    );
+    const drivers = await rideService.getNearbyDrivers({ latitude: 31.5, longitude: 74.3 });
+    expect(drivers.map(d => d.vehicle_type)).toEqual([null, null, 'bike']);
+  });
+
+  it('createRide sends the body as built: no passenger_id', async () => {
+    mock.onPost('/rides').reply(201, envelope({ ...ride, status: 'requested' }));
+    await rideService.createRide({
+      pickup_address: 'Pickup',
+      dropoff_address: 'Dropoff',
+      pickup_latitude: 31.52,
+      pickup_longitude: 74.35,
+      dropoff_latitude: 31.48,
+      dropoff_longitude: 74.3,
+      vehicle_type: 'rickshaw',
+    });
+    const body = JSON.parse(mock.history.post[0].data);
+    expect(body).not.toHaveProperty('passenger_id');
+    expect(body.vehicle_type).toBe('rickshaw');
   });
 
   it('429 rejects as rate_limited with retry_after', async () => {

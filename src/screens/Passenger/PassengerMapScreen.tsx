@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet, AppState, Linking } from 'react-native';
 import { Marker, MapPressEvent } from 'react-native-maps';
 import SafeMapView from '../../components/SafeMapView';
@@ -9,15 +9,12 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
-import { useFare } from '../../hooks/useFare';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { apiService, cancelAllRequests } from '../../services/api';
-import LocationSearch from '../../components/passenger/LocationSearch';
+import { cancelAllRequests } from '../../services/api';
+import LocationSearch, { suggestionAddress } from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
-import VehicleOptions, { VehicleOption } from '../../components/passenger/VehicleOptions';
-import FareDetails from '../../components/passenger/FareDetails';
 import AnimatedPolyline from '../../components/AnimatedPolyline';
 import RequestingCard from '../../components/passenger/RequestingCard';
 import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
@@ -35,9 +32,18 @@ import { clearActiveRide, selectActiveRide } from '../../features/active-ride/sl
 import { useActiveRideActions, useActiveRidePolling } from '../../features/active-ride/hooks';
 import { isRideInProgress, isRideTerminal } from '../../features/active-ride/status';
 import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
+import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
+import { useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
+import { FareReview, VehicleChoice } from '../../features/ride-booking/components/BookingChoices';
+import { BOOKING_COPY } from '../../features/ride-booking/copy';
+
+/** A picked point: coordinates and the address the passenger saw (T-302). */
+type Place = BookingPlace;
 
 const PassengerMapScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
   const mapRef = useRef<any>(null);
   const { handleError } = useErrorHandler();
   
@@ -47,32 +53,26 @@ const PassengerMapScreen = () => {
     requestLocationPermission,
   } = useNativeLocation();
   
-  // Use passenger notifications
-  const {
-    isInitialized: notificationsInitialized,
-    fcmToken,
-    hasPermission: hasNotificationPermission,
-    subscribeToPassengerNotifications,
-    unsubscribeFromPassengerNotifications,
-    sendRideRequestNotification,
-  } = usePassengerNotifications('passenger_id'); // TODO: Get actual passenger ID from auth
+  usePassengerNotifications();
   // The active ride lives in Redux (T-301): one copy for every screen, restored on launch.
   const dispatch = useDispatch<AppDispatch>();
   const currentRide = useSelector(selectActiveRide);
-  const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions();
+  // BE-37: a refused booking for an unverified phone opens the profile, where the number is
+  // verified (T-504 builds that flow).
+  const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
+    onPhoneNotVerified: () => navigation.navigate('PassengerPofile'),
+  });
   
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
-  const { vehicleType, getFare } = useFare();
 
-  const [pickup, setPickup] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [stops, setStops] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [destination, setDestination] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [pickup, setPickup] = useState<Place | null>(null);
+  const [stops, setStops] = useState<Place[]>([]);
+  const [destination, setDestination] = useState<Place | null>(null);
   const [addingStop, setAddingStop] = useState(false);
   const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
-  const [_rideHistory, setRideHistory] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
@@ -171,26 +171,6 @@ const PassengerMapScreen = () => {
     }, [])
   );
 
-  // Handle app state changes to prevent MapView crashes
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'background' && mapRef.current) {
-        try {
-          // Pause MapView when app goes to background
-          mapRef.current.setNativeProps({ onPause: true });
-        } catch (error) {
-          logger.debug('MapView pause error:', error);
-        }
-      }
-    };
-
-    // Note: AppState is not imported, but this is a common pattern
-    // You might need to import AppState from 'react-native' if needed
-    return () => {
-      // Cleanup
-    };
-  }, []);
-
   const swapPickupDrop = useCallback(() => {
     if (pickup && destination) {
       const newPickup = destination;
@@ -202,33 +182,11 @@ const PassengerMapScreen = () => {
     }
   }, [pickup, destination, fetchRoute, clearRoute]);
 
-  const [fareInfo, setFareInfo] = useState<{ fare: number; distance: number; duration: number } | null>(null);
-
-  // Calculate fare when pickup and destination change
-  useEffect(() => {
-    const calculateFare = async () => {
-      if (pickup && destination) {
-        try {
-          logger.debug('💰 Calculating fare in PassengerMapScreen:', { pickup, destination });
-          const result = await getFare(pickup, destination);
-          logger.debug('✅ Fare calculated in PassengerMapScreen:', result);
-          setFareInfo(result);
-        } catch (error) {
-          logger.error('❌ Error calculating fare in PassengerMapScreen:', error);
-          // Set fallback fare info
-          setFareInfo({
-            fare: 150,
-            distance: 5.0,
-            duration: 10
-          });
-        }
-      } else {
-        setFareInfo(null);
-      }
-    };
-
-    calculateFare();
-  }, [pickup, destination, getFare]);
+  // Vehicle catalogue (GET /public/vehicle-types) and one server estimate per route (BE-05).
+  const vehicleTypes = useVehicleTypes();
+  const estimates = useFareEstimates(pickup, destination, stops);
+  const selectedType = vehicleTypes.data?.find((t) => t.key === selectedVehicle) ?? null;
+  const tripSummary = estimates.data ? BOOKING_COPY.tripSummary(estimates.data.distance_km, estimates.data.duration_min) : null;
 
   const onPressMap = useCallback((e: MapPressEvent) => {
     const coord = e.nativeEvent.coordinate;
@@ -295,6 +253,7 @@ const PassengerMapScreen = () => {
     }
   }, [currentLocation, isMapReady]);
 
+  // The Advanced panel's request (removed in T-309) goes through the same builder.
   const handleRequestRide = async (rideData: {
     pickup_address: string;
     dropoff_address: string;
@@ -305,58 +264,26 @@ const PassengerMapScreen = () => {
     vehicle_type: string;
     passenger_count: number;
     special_instructions: string;
-    stops: any[];
+    stops: { address: string; latitude: number; longitude: number; stop_order: number }[];
   }) => {
+    const built = buildRideRequest({
+      pickup: { latitude: rideData.pickup_latitude, longitude: rideData.pickup_longitude, address: rideData.pickup_address },
+      dropoff: { latitude: rideData.dropoff_latitude, longitude: rideData.dropoff_longitude, address: rideData.dropoff_address },
+      stops: [...rideData.stops].sort((x, y) => x.stop_order - y.stop_order),
+      vehicleType: rideData.vehicle_type,
+      passengerCount: rideData.passenger_count,
+      specialInstructions: rideData.special_instructions,
+    });
+    if (!built.ok) {
+      setError(built.error);
+      return;
+    }
     try {
-      if (!requestRideService) {
-        handleError('Ride service is not available. Please restart the app.', 'SERVICE_ERROR');
-        return;
-      }
-
-      // Check authentication
-      const token = await apiService.getAuthToken();
-      if (!token) {
-        handleError('Please log in to request a ride', 'AUTHENTICATION_ERROR');
-        return;
-      }
-
-      // Map vehicle types to API-compatible values
-      const vehicleTypeMapping: { [key: string]: string } = {
-        'bike': 'bike',
-        'economy': 'car',
-        'comfort': 'car',
-        'premium': 'car',
-        'van': 'van'
-      };
-
-      const mappedVehicleType = vehicleTypeMapping[rideData.vehicle_type] || rideData.vehicle_type;
-      
-      logger.debug('Original vehicle type:', rideData.vehicle_type);
-      logger.debug('Mapped vehicle type:', mappedVehicleType);
-
-      const processedRideData = {
-        ...rideData,
-        vehicle_type: mappedVehicleType,
-        // Add service level for car variants
-        ...(rideData.vehicle_type !== 'bike' && rideData.vehicle_type !== 'van' && {
-          service_level: rideData.vehicle_type // economy, comfort, premium
-        })
-      };
-
-      logger.debug('Requesting ride with processed data:', processedRideData);
-      
-      const fullRideData = {
-        passenger_id: 11, // TODO: Get actual passenger ID from auth
-        ...processedRideData
-      };
-
-      await requestRideService(fullRideData);
-      Alert.alert('Ride Requested', 'Looking for nearby drivers...');
-      setError(null); // Clear any previous errors
+      await requestRideService(built.request);
+      setError(null);
       setShowAdvancedRidePanel(false);
-    } catch (error) {
-      handleError(error as Error, 'RIDE_REQUEST_ERROR');
-      setError('Failed to request ride. Please try again.');
+    } catch {
+      // requestRide already showed the server's message (or routed the refusal).
     }
   };
 
@@ -458,73 +385,52 @@ const PassengerMapScreen = () => {
     }
   }, []);
 
-  // Save state to history
-  const saveToHistory = useCallback((action: string, data: any) => {
-    const historyEntry = {
-      id: Date.now(),
-      action,
-      data,
-      timestamp: new Date().toISOString(),
-      stage
-    };
-    setRideHistory(prev => [historyEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
-  }, [stage]);
-
-
   // optional stop flow not used in staged UI; keep data for future use
 
-  // Default: populate pickup with current location and resolve address when location becomes available
+  // Pickup at the passenger's position; its address is resolved and kept with the point.
+  const pickupAtCurrentLocation = useCallback(async () => {
+    if (!currentLocation) return null;
+    const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
+    setPickup(cur);
+    setPickupQuery('Resolving address…');
+    const addr = await reverseGeocode(cur.latitude, cur.longitude).catch(() => null);
+    setPickupQuery(addr || 'Current Location');
+    // Only if the passenger has not picked another pickup meanwhile.
+    if (addr) setPickup((p) => (p && p.latitude === cur.latitude && p.longitude === cur.longitude ? { ...p, address: addr } : p));
+    return cur;
+  }, [currentLocation]);
+
+  // Default: populate pickup with current location when it becomes available
   useEffect(() => {
-    (async () => {
-      if (!currentLocation) return;
-      if (pickup) return; // don't override if user already set it
-      const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
-      setPickup(cur);
-      try {
-        setPickupQuery('Resolving address…');
-        const addr = await reverseGeocode(cur.latitude, cur.longitude);
-        setPickupQuery(addr || 'Current Location');
-      } catch {
-        setPickupQuery('Current Location');
-      }
-    })();
-  }, [currentLocation, pickup]);
+    if (currentLocation && !pickup) pickupAtCurrentLocation();
+  }, [currentLocation, pickup, pickupAtCurrentLocation]);
 
   const onRequestRide = useCallback(async () => {
-    if (!pickup || !destination || !fareInfo) {
-      setError('Please select both pickup and destination.');
-      return;
-    }
-    
     setIsLoading(true);
     setError(null);
-    
     try {
-      saveToHistory('ride_request', { pickup, destination, fareInfo, selectedVehicle });
-      
-      const ride = await requestRideService({
-        passenger_id: 11, // TODO: Get actual passenger ID from auth
-        pickup_address: 'Pickup Location', // TODO: Get actual address
-        dropoff_address: 'Destination Location', // TODO: Get actual address
-        pickup_latitude: pickup.latitude,
-        pickup_longitude: pickup.longitude,
-        dropoff_latitude: destination.latitude,
-        dropoff_longitude: destination.longitude,
-        vehicle_type: (selectedVehicle as any) || vehicleType,
+      // Map-tapped points have no address yet: geocode them (or use their coordinates).
+      const [p, d, ...st] = await withAddresses([pickup, destination, ...stops], reverseGeocode);
+      const built = buildRideRequest({
+        pickup: p,
+        dropoff: d,
+        stops: st.filter((x): x is Place => x !== null),
+        vehicleType: selectedVehicle,
       });
-      
-      const rideId = ride.id;
-      
+      if (!built.ok) {
+        setError(built.error);
+        setStage('fare');
+        return;
+      }
+      await requestRideService(built.request);
       setStage('requesting');
-      Alert.alert('Ride Requested', `Your ride request has been created.\nRide ID: ${rideId}\nFare: PKR ${fareInfo.fare || 0}\n${fareInfo.distance || 0} km • ${fareInfo.duration || 0} min`);
-    } catch (err) {
-      logger.error('Ride request error:', err);
-      setError('Failed to request ride. Please try again.');
+    } catch {
+      // requestRide already showed the server's message (or routed the refusal).
       setStage('fare'); // Go back to fare stage on error
     } finally {
       setIsLoading(false);
     }
-  }, [pickup, destination, fareInfo, vehicleType, selectedVehicle, requestRideService, saveToHistory]);
+  }, [pickup, destination, stops, selectedVehicle, requestRideService]);
 
   // Auto-fit map to the route whenever it updates
   useEffect(() => {
@@ -707,8 +613,8 @@ const PassengerMapScreen = () => {
             destQuery={destQuery}
             onPickupQuery={setPickupQuery}
             onDestQuery={setDestQuery}
-            onSelectPickup={(c) => {
-              setPickup(c);
+            onSelectPickup={(c, address) => {
+              setPickup({ ...c, address });
               if (destination) {
                 fetchRoute(c, destination);
                 setStage('vehicle');
@@ -716,8 +622,8 @@ const PassengerMapScreen = () => {
                 setStage('destination');
               }
             }}
-            onSelectDestination={(c) => {
-              setDestination(c);
+            onSelectDestination={(c, address) => {
+              setDestination({ ...c, address });
               if (pickup) {
                 fetchRoute(pickup, c);
                 setStage('vehicle');
@@ -726,20 +632,10 @@ const PassengerMapScreen = () => {
               }
             }}
             onUseCurrentLocation={async () => {
-              if (currentLocation) {
-                const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
-                setPickup(cur);
-                try {
-                  setPickupQuery('Resolving address…');
-                  const addr = await reverseGeocode(cur.latitude, cur.longitude);
-                  setPickupQuery(addr || 'Current Location');
-                } catch {
-                  setPickupQuery('Current Location');
-                }
-                if (destination) {
-                  fetchRoute(cur, destination);
-                  setStage('vehicle');
-                }
+              const cur = await pickupAtCurrentLocation();
+              if (cur && destination) {
+                fetchRoute(cur, destination);
+                setStage('vehicle');
               }
             }}
             onSwap={() => {
@@ -755,7 +651,7 @@ const PassengerMapScreen = () => {
         )}
 
         {shownStage === 'pickup' && (
-          <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup(s.coords); setStage('destination'); }} />
+          <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }} />
         )}
 
         {shownStage === 'destination' && (
@@ -769,7 +665,7 @@ const PassengerMapScreen = () => {
                   setPickup({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
                 }
                 const nextPickup = pickup || (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined);
-                setDestination(s.coords);
+                setDestination({ ...s.coords, address: suggestionAddress(s) });
                 if (nextPickup) {
                   fetchRoute(nextPickup, s.coords);
                 }
@@ -797,15 +693,11 @@ const PassengerMapScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-              {fareInfo && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>}
+              {tripSummary && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{tripSummary}</Text>}
             </View>
-            <VehicleOptions
-              options={[
-                { id: 'bike', name: 'Bike', eta: '5 min', desc: 'Affordable', price: `Rs ${Math.max(50, Math.round((fareInfo?.fare || 100) * 0.6))}`, icon: '🏍️' },
-                { id: 'economy', name: 'Economy', eta: '7 min', desc: 'Comfortable', price: `Rs ${fareInfo?.fare || 150}`, icon: '🚗' },
-                { id: 'comfort', name: 'Comfort', eta: '8 min', desc: 'AC • Premium', price: `Rs ${Math.round((fareInfo?.fare || 200) * 1.4)}`, icon: '🚙' },
-                { id: 'premium', name: 'Premium', eta: '10 min', desc: 'Luxury • AC', price: `Rs ${Math.round((fareInfo?.fare || 300) * 2)}`, icon: '🏎️' },
-              ] as VehicleOption[]}
+            <VehicleChoice
+              vehicleTypes={vehicleTypes}
+              estimates={estimates}
               selectedId={selectedVehicle}
               onSelect={(id) => { setSelectedVehicle(id); setStage('fare'); }}
             />
@@ -814,8 +706,8 @@ const PassengerMapScreen = () => {
                 <Text style={{ fontWeight: '700', color: '#111827', marginBottom: 6 }}>Add optional stops (up to 5)</Text>
                 <StopsEditor
                   stops={stops}
-                  onAddStop={(c) => {
-                    const ns = [...stops, c].slice(0, 5);
+                  onAddStop={(c, address) => {
+                    const ns = [...stops, { ...c, address }].slice(0, 5);
                     setStops(ns);
                     fetchRouteWithWaypoints(pickup, ns, destination);
                   }}
@@ -836,7 +728,7 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {shownStage === 'fare' && fareInfo && (
+        {shownStage === 'fare' && (
           <View>
             <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -850,24 +742,11 @@ const PassengerMapScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {(selectedVehicle || vehicleType).toString()} • {fareInfo.distance || 0} km • {fareInfo.duration || 0} min</Text>
+              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {selectedType?.label ?? '—'}{tripSummary ? ` • ${tripSummary}` : ''}</Text>
             </View>
-            <FareDetails
-              vehicleName={(selectedVehicle || vehicleType).toString()}
-              distanceKm={`${fareInfo.distance || 0} km`}
-              estimate={`Rs ${fareInfo.fare || 0}`}
-              breakdown={[
-                { label: 'Base Fare', value: 'Rs 50' },
-                { 
-                  label: `Distance (${fareInfo.distance || 0} km @ Rs 30/km)`, 
-                  value: `Rs ${Math.max(0, Math.round((fareInfo.distance || 0) * 30))}` 
-                },
-                { 
-                  label: `Time (${fareInfo.duration || 0} min @ Rs 2/min)`, 
-                  value: `Rs ${Math.max(0, Math.round((fareInfo.duration || 0) * 2))}` 
-                },
-                { label: 'Discount', value: 'Rs 0' },
-              ]}
+            <FareReview
+              vehicleType={selectedType}
+              estimates={estimates}
               onConfirm={() => { onRequestRide(); setStage('requesting'); }}
             />
           </View>

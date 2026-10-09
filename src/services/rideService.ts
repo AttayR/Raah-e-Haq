@@ -10,19 +10,22 @@ export interface RideLocation {
   address?: string;
 }
 
+/**
+ * Body of POST /rides (BE-01/BE-37/BE-58). The passenger is the token user, so there is no
+ * `passenger_id`; `vehicle_type` is a catalogue key (GET /public/vehicle-types). Build it
+ * with features/ride-booking/buildRideRequest, never by hand.
+ */
 export interface RideRequest {
-  passenger_id: number;
   pickup_address: string;
   dropoff_address: string;
   pickup_latitude: number;
   pickup_longitude: number;
   dropoff_latitude: number;
   dropoff_longitude: number;
-  vehicle_type: string;
-  service_level?: string; // economy, comfort, premium for car variants
-  passenger_count: number;
-  special_instructions: string;
-  stops: RideStopRequest[];
+  vehicle_type: VehicleTypeKey;
+  passenger_count?: number;
+  special_instructions?: string;
+  stops?: RideStopRequest[];
 }
 
 export interface RideStopRequest {
@@ -178,7 +181,13 @@ export interface LocationUpdate {
   accuracy?: number | null;
 }
 
-export type NearbyVehicleType = 'car' | 'bike' | 'rickshaw' | 'van';
+/** The vehicle types the server accepts everywhere (BE-58 enum, GET /public/vehicle-types). */
+export const VEHICLE_TYPE_KEYS = ['car', 'bike', 'rickshaw', 'van'] as const;
+export type VehicleTypeKey = (typeof VEHICLE_TYPE_KEYS)[number];
+export const isVehicleTypeKey = (value: unknown): value is VehicleTypeKey =>
+  typeof value === 'string' && (VEHICLE_TYPE_KEYS as ReadonlyArray<string>).includes(value);
+
+export type NearbyVehicleType = VehicleTypeKey;
 
 /** Radius bounds of GET /rides/nearby-drivers (BE-20, DriverPrivacy::MAX_NEARBY_RADIUS_KM). */
 export const NEARBY_MIN_RADIUS_KM = 1;
@@ -193,7 +202,8 @@ export const NEARBY_DEFAULT_RADIUS_KM = 5;
 export interface NearbyDriver {
   id: string;
   rating: number;
-  vehicle_type: string;
+  /** BE-58: null when the driver has no (known) vehicle type; never guessed as car. */
+  vehicle_type: VehicleTypeKey | null;
   distance_km: number;
   estimated_arrival_min: number;
   location: {
@@ -261,7 +271,7 @@ const normalizeNearbyDriver = (raw: unknown): NearbyDriver | null => {
   return {
     id: item.id,
     rating: toNumber(item.rating) ?? 0,
-    vehicle_type: typeof item.vehicle_type === 'string' ? item.vehicle_type : 'car',
+    vehicle_type: isVehicleTypeKey(item.vehicle_type) ? item.vehicle_type : null,
     distance_km: toNumber(item.distance_km) ?? 0,
     estimated_arrival_min: toNumber(item.estimated_arrival_min) ?? 0,
     location: { latitude, longitude },
@@ -320,12 +330,9 @@ class RideService {
     const cancelSource = createCancellableRequest();
 
     try {
-      logger.debug('🚗 Creating ride request:', rideData);
+      logger.debug('🚗 Creating ride request:', rideData.vehicle_type);
 
-      // Validate required fields
-      if (!rideData.passenger_id) {
-        throw new Error('Passenger ID is required');
-      }
+      // Validate required fields (the passenger comes from the token, BE-01)
       if (!rideData.pickup_latitude || !rideData.pickup_longitude) {
         throw new Error('Pickup coordinates are required');
       }
@@ -343,7 +350,8 @@ class RideService {
       if (isApiError(error) && error.kind === 'cancelled') {
         logger.debug('🚫 Ride creation cancelled');
       } else {
-        logger.error('❌ Failed to create ride:', error);
+        // Refusals (422, 403 PHONE_NOT_VERIFIED) are warnings, not a red LogBox (PAX-23).
+        logApiFailure('Failed to create ride', error);
       }
       // ApiError (from the axios interceptor) carries kind, status, message and fieldErrors.
       throw error;
@@ -614,52 +622,6 @@ class RideService {
       logger.error('❌ Failed to fetch pending rides:', error);
       throw error;
     }
-  }
-
-  // Calculate fare estimate
-  async calculateFare(
-    pickupLat: number,
-    pickupLng: number,
-    dropoffLat: number,
-    dropoffLng: number,
-    vehicleType?: string
-  ): Promise<{ fare: number; distance: number; duration: number }> {
-    try {
-      logger.debug('💰 Calculating fare:', { pickupLat, pickupLng, dropoffLat, dropoffLng, vehicleType });
-
-      // For now, return a mock calculation
-      // In real implementation, this would call a fare calculation API
-      const distance = this.calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
-      const baseFare = 50; // Base fare in PKR
-      const perKmRate = 25; // Per km rate in PKR
-  const fare = Math.round(baseFare + (distance * perKmRate));
-  const duration = Math.round(distance * 2); // Rough estimate: 2 minutes per km
-
-      const result = { fare, distance, duration };
-      logger.debug('✅ Fare calculated successfully:', result);
-      return result;
-  } catch (error) {
-      logger.error('❌ Failed to calculate fare:', error);
-      throw error;
-    }
-  }
-
-  // Helper method to calculate distance between two points
-  private calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371; // Radius of the Earth in kilometers
-    const dLat = this.deg2rad(lat2 - lat1);
-    const dLng = this.deg2rad(lng2 - lng1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distance in kilometers
-    return Math.round(distance * 100) / 100; // Round to 2 decimal places
-  }
-
-  private deg2rad(deg: number): number {
-    return deg * (Math.PI / 180);
   }
 
   // ==================== STOP MANAGEMENT METHODS ====================

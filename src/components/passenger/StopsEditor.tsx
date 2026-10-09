@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import LocationSearch from './LocationSearch';
+import LocationSearch, { suggestionAddress } from './LocationSearch';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-type Coords = { latitude: number; longitude: number };
+type Coords = { latitude: number; longitude: number; address?: string | null };
 
 type Props = {
   stops: Coords[];
-  onAddStop: (c: Coords) => void;
+  /** `address` is the picked suggestion's text, sent with the ride (T-302). */
+  onAddStop: (c: Coords, address: string) => void;
   onRemoveStop: (index: number) => void;
   maxStops?: number;
 };
@@ -19,7 +20,7 @@ const StopsEditor: React.FC<Props> = ({ stops, onAddStop, onRemoveStop, maxStops
       {stops.map((s, idx) => (
         <View key={`stop-${idx}`} style={styles.row}>
           <View style={styles.dot} />
-          <Text style={styles.stopText}>Stop {idx + 1}: {s.latitude.toFixed(4)}, {s.longitude.toFixed(4)}</Text>
+          <Text style={styles.stopText}>Stop {idx + 1}: {s.address || `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}`}</Text>
           <TouchableOpacity onPress={() => onRemoveStop(idx)} style={styles.removeBtn}>
             <Icon name="close" size={16} color="#ef4444" />
           </TouchableOpacity>
@@ -31,7 +32,10 @@ const StopsEditor: React.FC<Props> = ({ stops, onAddStop, onRemoveStop, maxStops
             mode="destination"
             query={query}
             onChangeQuery={setQuery}
-            onSelect={(sel) => { onAddStop(sel.coords); setQuery(''); }}
+            onSelect={(sel) => {
+              onAddStop(sel.coords, suggestionAddress(sel));
+              setQuery('');
+            }}
           />
         </View>
       )}

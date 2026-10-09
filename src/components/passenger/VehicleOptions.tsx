@@ -5,7 +5,8 @@ import { BrandColors } from '../../theme/colors';
 export type VehicleOption = {
   id: string;
   name: string;
-  eta: string;
+  /** Pickup ETA; left out until the server provides one (T-310). */
+  eta?: string;
   desc: string;
   price: string;
   image?: any;
@@ -24,7 +25,7 @@ const VehicleOptions: React.FC<Props> = ({ options, selectedId, onSelect }) => {
       {options.map((opt) => {
         const selected = selectedId === opt.id;
         return (
-          <TouchableOpacity key={opt.id} style={[styles.card, selected && styles.cardSelected]} onPress={() => onSelect(opt.id)}>
+          <TouchableOpacity key={opt.id} testID={`vehicle-option-${opt.id}`} style={[styles.card, selected && styles.cardSelected]} onPress={() => onSelect(opt.id)}>
             <View style={styles.vehicleIcon}>
               {opt.image ? (
                 <Image source={opt.image} style={{ width: 40, height: 40, resizeMode: 'contain' }} />
@@ -35,8 +36,8 @@ const VehicleOptions: React.FC<Props> = ({ options, selectedId, onSelect }) => {
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{opt.name}</Text>
               <View style={styles.detailsRow}>
-                <Text style={styles.detail}>{opt.eta}</Text>
-                <Text style={styles.dot}>•</Text>
+                {opt.eta ? <Text style={styles.detail}>{opt.eta}</Text> : null}
+                {opt.eta ? <Text style={styles.dot}>•</Text> : null}
                 <Text style={styles.detail}>{opt.desc}</Text>
               </View>
             </View>

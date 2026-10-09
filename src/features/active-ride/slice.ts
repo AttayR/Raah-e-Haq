@@ -35,8 +35,11 @@ export const initialActiveRideState: ActiveRideState = {
   error: null,
 };
 
-/** Only the slice is typed here, so this file never imports the store. */
-type SliceRoot = { activeRide: ActiveRideState };
+/**
+ * Only what these thunks read is typed here, so this file never imports the store. The
+ * signed-in user (apiAuth.user) is read to restore only that passenger's ride.
+ */
+type SliceRoot = { activeRide: ActiveRideState; apiAuth?: { user: { id: number } | null } };
 type ThunkConfig = { state: SliceRoot; rejectValue: ThunkRejection };
 
 const staleSession = (): ThunkRejection => ({
@@ -46,15 +49,21 @@ const staleSession = (): ThunkRejection => ({
 });
 
 /**
- * Asks the server for the signed-in user's in-progress ride (launch restore, T-301).
- * Skipped while one is already running. A result that arrives after a logout is dropped.
+ * Asks the server for the signed-in passenger's in-progress ride (launch restore, T-301).
+ * Only a ride whose passenger_id is the signed-in user is kept. Skipped while one is already
+ * running. A result that arrives after a logout is dropped.
  */
 export const restoreActiveRide = createAsyncThunk<RideResource | null, void, ThunkConfig>(
   'activeRide/restore',
-  async (_, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
+    const passengerId = getState().apiAuth?.user?.id;
+    if (typeof passengerId !== 'number') {
+      // Signed out (or no profile yet): there is no passenger to restore a ride for.
+      return null;
+    }
     try {
-      const ride = await fetchActiveRide();
+      const ride = await fetchActiveRide(passengerId);
       return isStaleSession(startedIn) ? rejectWithValue(staleSession()) : ride;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Could not check for an active ride'));

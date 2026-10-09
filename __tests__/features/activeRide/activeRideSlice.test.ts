@@ -55,26 +55,49 @@ describe('restoreActiveRide (launch restore)', () => {
     expect(store.getState().activeRide.restoreStatus).toBe('done');
   });
 
-  it('falls back to the newest rides when the server rejects the status list (422, before BE-01)', async () => {
-    mock
-      .onGet('/rides', { params: { status: ACTIVE_RIDE_STATUS_QUERY } })
-      .reply(422, { success: false, message: 'Validation failed', errors: { status: ['The selected status is invalid.'] } });
+  it('keeps only a ride of the signed-in passenger (T-301 follow-up)', async () => {
     mock.onGet('/rides').reply(
       200,
       page([
-        makeRide({ id: 12, status: 'completed' }),
+        makeRide({ id: 12, passenger_id: 77, status: 'accepted' }),
         makeRide({ id: 11, status: 'requested' }),
-        makeRide({ id: 10, status: 'ongoing' }),
       ]),
     );
     const store = makeStore();
 
     await store.dispatch(restoreActiveRide());
 
-    expect(mock.history.get).toHaveLength(2);
-    expect(mock.history.get[1].params).toBeUndefined();
-    // Newest in-progress ride; the finished one is never treated as live.
     expect(store.getState().activeRide.ride?.id).toBe(11);
+  });
+
+  it('restores nothing when only other users\' rides come back', async () => {
+    mock.onGet('/rides').reply(200, page([makeRide({ passenger_id: 77, status: 'ongoing' })]));
+    const store = makeStore();
+
+    await store.dispatch(restoreActiveRide());
+
+    expect(store.getState().activeRide.ride).toBeNull();
+    expect(store.getState().activeRide.restoreStatus).toBe('done');
+  });
+
+  it('does not ask the server when nobody is signed in', async () => {
+    const store = makeStore({ userId: null });
+
+    await store.dispatch(restoreActiveRide());
+
+    expect(mock.history.get).toHaveLength(0);
+    expect(store.getState().activeRide.ride).toBeNull();
+  });
+
+  it('a 422 for the status list fails the restore; there is no unfiltered fallback (BE-01 is live)', async () => {
+    mock.onGet('/rides').reply(422, { success: false, message: 'Validation failed', errors: { status: ['invalid'] } });
+    const store = makeStore();
+
+    await store.dispatch(restoreActiveRide());
+
+    expect(mock.history.get).toHaveLength(1);
+    expect(store.getState().activeRide.ride).toBeNull();
+    expect(store.getState().activeRide.restoreStatus).toBe('failed');
   });
 
   it('ignores finished rides even if the server returns them for the filter', async () => {
