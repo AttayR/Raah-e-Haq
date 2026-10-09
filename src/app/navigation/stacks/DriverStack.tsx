@@ -4,6 +4,7 @@ import DriverBottomTabs from '../tabs/DriverBottomTabs';
 import DriverProfile from 'src/screens/Driver/DriverProfile';
 import DriverMessagesScreen from 'src/screens/Driver/DriverMessagesScreen';
 import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
+import { useDriverStatusSync } from '../../../features/driver-status/hooks';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -25,6 +26,9 @@ export type DriverStackParamList = {
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
 const DriverStack = () => {
+  // Driver online/offline from the server: after sign-in (this mounts) and on foreground (T-401).
+  useDriverStatusSync();
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen 

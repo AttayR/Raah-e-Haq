@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,9 @@ import { useNavigation } from '@react-navigation/native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import LinearGradient from 'react-native-linear-gradient';
-import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
+import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
+import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -29,7 +30,9 @@ const isLargeScreen = width >= 1024;
 export default function DriverHomeScreen() {
   const { theme } = useAppTheme();
   const navigation = useNavigation();
-  const [isOnline, setIsOnline] = useState(false);
+  // Online/offline is the server's answer (GET/PUT /driver/status, T-401), shared with Map.
+  useLoadDriverStatusOnMount();
+  const { isOnline, isOnRide, isBusy, isChecking, disabled: toggleDisabled, toggle } = useDriverStatusToggle();
   const { confirmLogout, isLoggingOut } = useLogout();
   
   // Get user data from Redux store
@@ -38,19 +41,32 @@ export default function DriverHomeScreen() {
   // Check if driver is approved
   const isDriverApproved = user?.status === 'active';
 
+  const onlineSubtitle = isBusy
+    ? DRIVER_STATUS_COPY.updatingSubtitle
+    : isOnRide
+    ? DRIVER_STATUS_COPY.onRideSubtitle
+    : isOnline
+    ? DRIVER_STATUS_COPY.goOfflineSubtitle
+    : DRIVER_STATUS_COPY.goOnlineSubtitle;
+  const statusLabel = isChecking
+    ? DRIVER_STATUS_COPY.checking
+    : isOnRide
+    ? DRIVER_STATUS_COPY.onRide
+    : isOnline
+    ? DRIVER_STATUS_COPY.online
+    : DRIVER_STATUS_COPY.offline;
+
   const quickActions = [
     {
       id: 'online',
-      title: isOnline ? 'Go Offline' : 'Go Online',
-      subtitle: isOnline ? 'Stop receiving rides' : 'Start receiving rides',
+      title: isOnline ? DRIVER_STATUS_COPY.goOffline : DRIVER_STATUS_COPY.goOnline,
+      subtitle: onlineSubtitle,
       icon: isOnline ? 'pause-circle-filled' : 'play-circle-filled',
       color: isOnline ? '#ef4444' : '#10b981',
+      disabled: toggleDisabled,
+      // The server decides (403 not approved / no vehicle, 409 on a ride) and its message is shown.
       onPress: () => {
-        if (!isDriverApproved) {
-          toast.error('Your driver account is not approved yet');
-          return;
-        }
-        setIsOnline(!isOnline);
+        toggle();
       },
     },
     {
@@ -250,7 +266,7 @@ export default function DriverHomeScreen() {
           >
             <View style={styles.statusIndicator} />
             <Text style={styles.statusText}>
-              {isOnline ? 'Online' : 'Offline'}
+              {statusLabel}
             </Text>
           </View>
         </LinearGradient>
@@ -300,6 +316,9 @@ export default function DriverHomeScreen() {
                     action.id === 'online' && isOnline && styles.activeActionCard
                   ]}
                   onPress={action.onPress}
+                  disabled={action.disabled ?? false}
+                  accessibilityState={{ disabled: action.disabled ?? false }}
+                  testID={`driver-home-action-${action.id}`}
                   activeOpacity={0.7}
                 >
                   <View style={styles.actionContent}>

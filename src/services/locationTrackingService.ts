@@ -1,5 +1,4 @@
 import rideService, { LocationUpdate, DriverLocation } from './rideService';
-import apiService from './api';
 import { logger } from '../core/logging/logger';
 
 export interface LocationData {
@@ -311,20 +310,6 @@ class LocationTrackingService {
   // Get current configuration
   getConfig(): TrackingConfig {
     return { ...this.config };
-  }
-
-  // Set driver status
-  // TODO(BE-06/T-401): POST /tracking/update-status does not exist on the backend (404).
-  // Driver online/offline moves to POST /driver/status (BE-06). No caller uses this today.
-  async setDriverStatus(status: 'online' | 'offline' | 'busy'): Promise<void> {
-    try {
-      await apiService.post('/tracking/update-status', { status });
-
-      logger.debug('📍 Driver status updated:', status);
-    } catch (error) {
-      logger.error('❌ Failed to update driver status:', error);
-      throw error;
-    }
   }
 }
 

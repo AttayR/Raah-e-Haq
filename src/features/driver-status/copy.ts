@@ -1,0 +1,21 @@
+/** Static copy for the driver online/offline toggle (T-401). Server refusals bring their own text. */
+export const DRIVER_STATUS_COPY = {
+  online: 'Online',
+  offline: 'Offline',
+  onRide: 'On a ride',
+  checking: 'Checking status…',
+  unknown: 'Status unavailable',
+  goOnline: 'Go Online',
+  goOffline: 'Go Offline',
+  goOnlineSubtitle: 'Start receiving rides',
+  goOfflineSubtitle: 'Stop receiving rides',
+  onRideSubtitle: 'Finish your ride to go offline',
+  updatingSubtitle: 'Please wait…',
+  mapOnline: 'Online - Available for rides',
+  mapOffline: 'Offline - Not receiving requests',
+  mapOnRide: 'On a ride',
+  mapChecking: 'Checking your status…',
+  onRideToggleBlocked: 'You cannot go offline during a ride.',
+  loadFailed: 'Could not check your online status',
+  updateFailed: 'Could not change your online status. Please try again.',
+} as const;

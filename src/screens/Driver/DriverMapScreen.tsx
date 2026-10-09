@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -20,6 +20,8 @@ import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { logger } from '../../core/logging/logger';
+import { useDriverStatusToggle } from '../../features/driver-status/hooks';
+import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
 
 const { width, height } = Dimensions.get('window');
 
@@ -66,7 +68,8 @@ const DriverMapScreen = () => {
     requestLocationPermission,
   } = useNativeLocation();
   
-  const [isOnline, setIsOnline] = useState(false);
+  // Online/offline is the server's answer (GET/PUT /driver/status, T-401), shared with Home.
+  const { isOnline, isOnRide, isChecking, disabled: toggleDisabled, toggle } = useDriverStatusToggle();
   const isLoadingLocation = locationLoading || !currentLocation;
 
   // Cleanup on unmount
@@ -121,10 +124,8 @@ const DriverMapScreen = () => {
     }
   }, [currentLocation]);
 
-  // Location posting, ride-request listening and the online/offline call were Firebase-era
-  // code (undefined helpers, wrong signatures) that never ran while `uid` came from the
-  // Firebase slice (always null). They are not wired to the API driver id here; T-401 builds
-  // them on POST/GET /driver/status (BE-06).
+  // Online/offline comes from the driverStatus slice (T-401). Location posting (T-402) and
+  // ride-request polling (T-403) key on its `isOnline`.
 
   // Subscribe to driver notifications when online
   useEffect(() => {
@@ -138,7 +139,8 @@ const DriverMapScreen = () => {
   }, [isOnline, uid, notificationsInitialized, subscribeToDriverNotifications, unsubscribeFromDriverNotifications]);
 
   const toggleOnlineStatus = () => {
-    if (!currentLocation) {
+    // Going online needs a location to post; going offline never does.
+    if (!isOnline && !currentLocation) {
       Alert.alert(
         'Location Required',
         'Please enable location services to go online.',
@@ -150,7 +152,7 @@ const DriverMapScreen = () => {
       return;
     }
 
-    setIsOnline(!isOnline);
+    toggle();
   };
 
   const handleAcceptRide = async (rideId: number) => {
@@ -163,10 +165,6 @@ const DriverMapScreen = () => {
       logger.error('Error accepting ride:', error);
       Alert.alert('Error', 'Failed to accept ride');
     }
-  };
-
-  const handleRejectRide = () => {
-    setIncomingRide(null);
   };
 
   const handleStartRide = async () => {
@@ -261,8 +259,15 @@ const DriverMapScreen = () => {
             color={isLoadingLocation ? BrandColors.warning : BrandColors.success} 
           />
           <Text style={styles.statusText}>
-            {isLoadingLocation ? 'Getting your location...' : 
-             isOnline ? 'Online - Available for rides' : 'Offline - Not receiving requests'}
+            {isLoadingLocation
+              ? 'Getting your location...'
+              : isChecking
+              ? DRIVER_STATUS_COPY.mapChecking
+              : isOnRide
+              ? DRIVER_STATUS_COPY.mapOnRide
+              : isOnline
+              ? DRIVER_STATUS_COPY.mapOnline
+              : DRIVER_STATUS_COPY.mapOffline}
           </Text>
         </View>
       </View>
@@ -274,8 +279,17 @@ const DriverMapScreen = () => {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.onlineButton, isOnline && styles.onlineButtonActive]}
+          style={[
+            styles.onlineButton,
+            isOnline && styles.onlineButtonActive,
+            toggleDisabled && styles.onlineButtonDisabled,
+          ]}
           onPress={toggleOnlineStatus}
+          disabled={toggleDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={isOnline ? DRIVER_STATUS_COPY.goOffline : DRIVER_STATUS_COPY.goOnline}
+          accessibilityState={{ disabled: toggleDisabled }}
+          testID="driver-map-online-toggle"
         >
           <Icon 
             name={isOnline ? "pause-circle-filled" : "play-circle-filled"} 
@@ -419,8 +433,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  // Keeps the white circle; the ring shows the online state (QA T-107b).
   onlineButtonActive: {
-    backgroundColor: BrandColors.warning + '20',
+    borderWidth: 3,
+    borderColor: BrandColors.warning,
+  },
+  onlineButtonDisabled: {
+    opacity: 0.5,
   },
   driverMarker: {
     width: 40,
