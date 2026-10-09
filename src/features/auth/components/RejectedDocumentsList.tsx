@@ -90,7 +90,7 @@ export default function RejectedDocumentsList(props: Props) {
             style={[styles.item, { borderColor: colors.border, backgroundColor: colors.background }]}
           >
             <View style={styles.itemHeader}>
-              <Icon name={item.kind === 'vehicle' ? 'directions-car' : 'description'} size={20} color={colors.warning} />
+              <Icon name={item.kind === 'vehicle' ? 'directions-car' : 'description'} size={20} color={colors.danger} />
               <Text style={[styles.itemTitle, { color: colors.text }]}>{item.label}</Text>
             </View>
             <Text style={[styles.itemReason, { color: colors.mutedText }]}>

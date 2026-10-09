@@ -648,9 +648,9 @@ export default function PassengerHomeScreen() {
                 onPress={confirmLogout}
                 disabled={isLoggingOut}
               >
-                <Icon name="logout" size={24} color={theme.colors.warning} />
+                <Icon name="logout" size={24} color={theme.colors.danger} />
                 <Text
-                  style={[styles.accountText, { color: theme.colors.warning }]}
+                  style={[styles.accountText, { color: theme.colors.danger }]}
                 >
                   Sign Out
                 </Text>

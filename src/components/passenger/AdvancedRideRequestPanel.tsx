@@ -60,6 +60,7 @@ const AdvancedRideRequestPanel: React.FC<AdvancedRideRequestPanelProps> = ({
         textSecondary: '#6B7280',
         border: '#E5E7EB',
         success: '#10B981',
+        onSuccess: '#FFFFFF',
         error: '#EF4444',
       }
     };
@@ -75,6 +76,7 @@ const AdvancedRideRequestPanel: React.FC<AdvancedRideRequestPanelProps> = ({
         textSecondary: '#6B7280',
         border: '#E5E7EB',
         success: '#10B981',
+        onSuccess: '#FFFFFF',
         error: '#EF4444',
       }
     };
@@ -393,7 +395,12 @@ const AdvancedRideRequestPanel: React.FC<AdvancedRideRequestPanelProps> = ({
               onPress={currentStep === totalSteps ? handleSubmit : handleNext}
               disabled={isLoading}
             >
-              <Text style={styles.nextButtonText}>
+              <Text
+                style={[
+                  styles.nextButtonText,
+                  currentStep === totalSteps && styles.submitButtonText,
+                ]}
+              >
                 {isLoading
                   ? 'Requesting...'
                   : currentStep === totalSteps
@@ -578,6 +585,11 @@ const createStyles = (theme: any) =>
     },
     submitButton: {
       backgroundColor: theme.colors.success,
+    },
+    // T-601: label is `onSuccess` - white on light #12753B (5.78:1), #0B0F1A on dark #4ACB7E
+    // (9.23:1). A white label on the dark fill would be only 2.07:1.
+    submitButtonText: {
+      color: theme.colors.onSuccess,
     },
     nextButtonText: {
       fontSize: 16,

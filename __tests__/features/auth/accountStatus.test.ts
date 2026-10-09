@@ -168,8 +168,10 @@ describe('theme tokens for outline / disabled controls (QA T-106 dark mode)', ()
     expect(contrast(colors.disabledText, colors.disabledFill)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('dark mode no longer uses navy primary for outline controls', () => {
-    expect(contrast(DarkTheme.colors.primary, DarkTheme.colors.surface)).toBeLessThan(3);
+  it('dark mode outline controls use primaryText, not the primary fill', () => {
+    // T-601: the dark primary fill (navy-500) is only 3.09:1 on surface, below text contrast.
+    expect(contrast(DarkTheme.colors.primary, DarkTheme.colors.surface)).toBeLessThan(4.5);
+    expect(DarkTheme.colors.accent).toBe(DarkTheme.colors.primaryText);
     expect(DarkTheme.colors.accent).not.toBe(DarkTheme.colors.primary);
   });
 });

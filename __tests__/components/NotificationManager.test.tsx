@@ -5,12 +5,16 @@ import NotificationManager from '../../src/components/NotificationManager';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import { toast, useToast } from '../../src/core/toast';
 
-const renderHost = (children: React.ReactNode = <Text>screen</Text>) =>
-  render(
+// ThemeProvider holds its children until the stored appearance is read (T-601).
+const renderHost = async (children: React.ReactNode = <Text>screen</Text>) => {
+  const result = render(
     <ThemeProvider>
       <NotificationManager>{children}</NotificationManager>
     </ThemeProvider>,
   );
+  await act(async () => {});
+  return result;
+};
 
 // Animations finish after their timing; run timers so exit callbacks fire.
 const advance = (ms: number) =>
@@ -28,8 +32,8 @@ afterEach(() => {
 });
 
 describe('NotificationManager toast host', () => {
-  it('renders a toast called from outside React (the old showToast was silent)', () => {
-    renderHost();
+  it('renders a toast called from outside React (the old showToast was silent)', async () => {
+    await renderHost();
     expect(screen.queryByTestId('toast')).toBeNull();
 
     act(() => {
@@ -39,9 +43,9 @@ describe('NotificationManager toast host', () => {
     expect(screen.getByText('Login failed. Please try again.')).toBeTruthy();
   });
 
-  it('announces the toast once for screen readers (no live region, so Android does not read it twice)', () => {
+  it('announces the toast once for screen readers (no live region, so Android does not read it twice)', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
-    renderHost();
+    await renderHost();
     act(() => {
       toast.error('No connection', 'Check your internet');
     });
@@ -50,8 +54,8 @@ describe('NotificationManager toast host', () => {
     announce.mockRestore();
   });
 
-  it('exposes the message and the action as separate accessibility elements', () => {
-    renderHost();
+  it('exposes the message and the action as separate accessibility elements', async () => {
+    await renderHost();
     act(() => {
       toast.info('Ride accepted', undefined, { action: { label: 'View', onPress: jest.fn() } });
     });
@@ -59,9 +63,9 @@ describe('NotificationManager toast host', () => {
     expect(screen.getByRole('button', { name: 'View' })).toBeTruthy();
   });
 
-  it('runs onHide exactly once after a tap dismiss', () => {
+  it('runs onHide exactly once after a tap dismiss', async () => {
     const onHide = jest.fn();
-    renderHost();
+    await renderHost();
     act(() => {
       toast.success('Saved', undefined, { onHide });
     });
@@ -70,8 +74,8 @@ describe('NotificationManager toast host', () => {
     expect(onHide).toHaveBeenCalledTimes(1);
   });
 
-  it('auto-hides after 3 s and then shows the next queued toast', () => {
-    renderHost();
+  it('auto-hides after 3 s and then shows the next queued toast', async () => {
+    await renderHost();
     act(() => {
       toast.success('First');
       toast.info('Second');
@@ -85,8 +89,8 @@ describe('NotificationManager toast host', () => {
     expect(screen.getByText('Second')).toBeTruthy();
   });
 
-  it('dismisses on tap', () => {
-    renderHost();
+  it('dismisses on tap', async () => {
+    await renderHost();
     act(() => {
       toast.warning('Tap me');
     });
@@ -95,8 +99,8 @@ describe('NotificationManager toast host', () => {
     expect(screen.queryByText('Tap me')).toBeNull();
   });
 
-  it('keeps a loading toast until it is hidden by id', () => {
-    renderHost();
+  it('keeps a loading toast until it is hidden by id', async () => {
+    await renderHost();
     let id = '';
     act(() => {
       id = toast.loading('Creating Ride Request');
@@ -108,9 +112,9 @@ describe('NotificationManager toast host', () => {
     expect(screen.queryByText('Creating Ride Request')).toBeNull();
   });
 
-  it('runs the action and dismisses', () => {
+  it('runs the action and dismisses', async () => {
     const onPress = jest.fn();
-    renderHost();
+    await renderHost();
     act(() => {
       toast.info('Ride accepted', undefined, { action: { label: 'View', onPress } });
     });
@@ -120,12 +124,12 @@ describe('NotificationManager toast host', () => {
     expect(screen.queryByText('Ride accepted')).toBeNull();
   });
 
-  it('useToast() returns the same API for components', () => {
+  it('useToast() returns the same API for components', async () => {
     function Shows() {
       const t = useToast();
       return <Text onPress={() => t.success('Saved')}>save</Text>;
     }
-    renderHost(<Shows />);
+    await renderHost(<Shows />);
     fireEvent.press(screen.getByText('save'));
     expect(screen.getByText('Saved')).toBeTruthy();
   });

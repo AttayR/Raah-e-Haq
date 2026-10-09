@@ -24,7 +24,7 @@ function ThemedNav() {
             primary: theme.colors.primary,
             background: theme.colors.background,
             card: theme.colors.surface,
-            text: theme.colors.text,
+            text: theme.colors.textPrimary,
             border: theme.colors.border,
           },
         }
@@ -35,14 +35,14 @@ function ThemedNav() {
             primary: theme.colors.primary,
             background: theme.colors.background,
             card: theme.colors.surface,
-            text: theme.colors.text,
+            text: theme.colors.textPrimary,
             border: theme.colors.border,
           },
         };
   return (
     <>
       <StatusBar
-        barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
+        barStyle={theme.statusBarStyle}
         backgroundColor={theme.colors.background}
       />
       <NavigationContainer theme={navTheme}>

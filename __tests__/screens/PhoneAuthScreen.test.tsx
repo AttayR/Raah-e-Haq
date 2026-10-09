@@ -34,7 +34,8 @@ const LOCAL_CODE = '482913';
 
 let mock: MockAdapter;
 
-const renderScreen = () => {
+// ThemeProvider holds its children until the stored appearance is read (T-601).
+const renderScreen = async () => {
   const store = configureStore({ reducer: { apiAuth: apiAuthReducer } });
   render(
     <Provider store={store}>
@@ -43,6 +44,7 @@ const renderScreen = () => {
       </ThemeProvider>
     </Provider>,
   );
+  await act(async () => {});
   return store;
 };
 
@@ -72,7 +74,7 @@ afterEach(() => {
 describe('PhoneAuthScreen (T-101)', () => {
   it('never shows the code the local backend echoes, nor test-code UI', async () => {
     replyLocalSend();
-    const store = renderScreen();
+    const store = await renderScreen();
     await sendCode();
 
     await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
@@ -86,7 +88,7 @@ describe('PhoneAuthScreen (T-101)', () => {
 
   it('shows expiry from the server expires_in, then an expired state with resend', async () => {
     replyLocalSend();
-    renderScreen();
+    await renderScreen();
     await sendCode();
 
     await waitFor(() => expect(screen.getByText('Code expires in 1:00')).toBeTruthy());
@@ -106,7 +108,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       verifyBody = JSON.parse(config.data);
       return [401, { success: false, message: 'Invalid or expired OTP' }];
     });
-    renderScreen();
+    await renderScreen();
     await sendCode();
     await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
 
@@ -135,7 +137,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       },
       { 'Retry-After': '42' },
     );
-    renderScreen();
+    await renderScreen();
     await sendCode();
 
     await waitFor(() =>
@@ -170,7 +172,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       const success = jest.spyOn(toast, 'success');
       replyLocalSend();
       mock.onPost('/auth/verify-otp').reply(200, session(status));
-      const store = renderScreen();
+      const store = await renderScreen();
       await sendCode();
       await enterAndVerify();
       await waitFor(() => expect(store.getState().apiAuth.isAuthenticated).toBe(true));
@@ -191,7 +193,7 @@ describe('PhoneAuthScreen (T-101)', () => {
         code: 'ACCOUNT_REJECTED',
         data: { status: 'rejected', rejection_reason: 'Licence expired' },
       });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await enterAndVerify();
       await waitFor(() =>
@@ -231,7 +233,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       replyLocalSend();
       const message = 'Too many incorrect attempts. Please request a new code.';
       mock.onPost('/auth/verify-otp').reply(429, ...refusal('code_exhausted', message, 20));
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await enterCode();
       pressVerify();
@@ -258,7 +260,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('a wrong code (401) does not burn the code: Verify still works', async () => {
       replyLocalSend();
       mock.onPost('/auth/verify-otp').reply(401, { success: false, message: 'Invalid or expired OTP' });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await enterCode();
       pressVerify();
@@ -273,7 +275,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it.each(['otp_cooldown', 'otp_send_limit'])('%s: counts down from retry_after before the next send', async code => {
       const message = 'Please wait before requesting another code.';
       mock.onPost('/auth/send-otp').reply(429, ...refusal(code, message, 90, 'phone'));
-      renderScreen();
+      await renderScreen();
       await sendCode();
 
       await waitFor(() => expect(screen.getAllByText(message).length).toBeGreaterThan(0));
@@ -288,7 +290,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('otp_ip_limit on send: shows the server message and suggests email sign-in', async () => {
       const message = 'Too many codes requested from this network today. Please try again later.';
       mock.onPost('/auth/send-otp').reply(429, ...refusal('otp_ip_limit', message, 3600, 'phone'));
-      renderScreen();
+      await renderScreen();
       await sendCode();
 
       await waitFor(() => expect(screen.getAllByText(message).length).toBeGreaterThan(0));
@@ -303,7 +305,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       replyLocalSend();
       const message = 'Too many incorrect codes for this number today. Please try again later.';
       mock.onPost('/auth/verify-otp').reply(429, ...refusal('otp_verify_limit', message, 3600));
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await enterCode();
       pressVerify();
@@ -315,7 +317,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('503 sms_unavailable: shows the server message (not the generic copy) and blocks sending for retry_after', async () => {
       const message = 'Phone verification is temporarily unavailable. Please try again later.';
       mock.onPost('/auth/send-otp').reply(503, ...refusal('sms_unavailable', message, 600, 'phone'));
-      renderScreen();
+      await renderScreen();
       await sendCode();
 
       await waitFor(() => expect(screen.getAllByText(message).length).toBeGreaterThan(0));
@@ -325,7 +327,7 @@ describe('PhoneAuthScreen (T-101)', () => {
 
     it('503 busy on resend: shows the server message and holds Resend for retry_after', async () => {
       replyLocalSend();
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(screen.getByText('Resend code in 1:00')).toBeTruthy());
       act(() => {
@@ -353,7 +355,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('send success toasts the server message, never our own "code sent" claim', async () => {
       const success = jest.spyOn(toast, 'success');
       mock.onPost('/auth/send-otp').reply(200, { success: true, message: SERVER_SENT, data: { phone: PHONE, expires_in: 60 } });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(success).toHaveBeenCalledWith(SERVER_SENT));
       expect(success).not.toHaveBeenCalledWith('OTP sent successfully');
@@ -363,7 +365,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('without a server message the fallback copy makes no claim either', async () => {
       const success = jest.spyOn(toast, 'success');
       mock.onPost('/auth/send-otp').reply(200, { success: true, data: { phone: PHONE, expires_in: 60 } });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
       expect(success.mock.calls[0][0]).toMatch(/^If this number is registered/);
@@ -375,7 +377,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       ['otp_ip_limit', 429, 'Too many codes requested from this network today. Please try again later.'],
     ])('%s blocks Send for every number until retry_after', async (code, status, message) => {
       mock.onPost('/auth/send-otp').reply(status, { success: false, message, code, retry_after: 600 });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(screen.getByText('Send Code (10:00)')).toBeTruthy());
 
@@ -397,7 +399,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('a per-number cooldown still lets another number send', async () => {
       const message = 'Please wait before requesting another code.';
       mock.onPost('/auth/send-otp').reply(429, { success: false, message, code: 'otp_cooldown', retry_after: 50 });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(screen.getByText('Send Code (50s)')).toBeTruthy());
       fireEvent.changeText(screen.getByPlaceholderText('Enter phone number'), OTHER_PHONE);
@@ -407,7 +409,7 @@ describe('PhoneAuthScreen (T-101)', () => {
 
     it('Verify is disabled until a full code is typed', async () => {
       replyLocalSend();
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
       const verify = () => screen.getByRole('button', { name: 'Verify Code' });
@@ -419,7 +421,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('clears the old "Invalid or expired" error when the code expires', async () => {
       replyLocalSend();
       mock.onPost('/auth/verify-otp').reply(401, { success: false, message: 'Invalid or expired OTP' });
-      renderScreen();
+      await renderScreen();
       await sendCode();
       await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
       fireEvent.changeText(screen.getByPlaceholderText('6-digit code'), '123456');
@@ -437,7 +439,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     it('number-pad inputs get the Done bar, and Done closes the keyboard', async () => {
       const dismiss = jest.spyOn(Keyboard, 'dismiss');
       replyLocalSend();
-      renderScreen();
+      await renderScreen();
       expect(screen.getByPlaceholderText('Enter phone number').props.inputAccessoryViewID).toBe(KEYBOARD_DONE_ID);
       fireEvent.press(screen.getByText('Done'));
       expect(dismiss).toHaveBeenCalled();

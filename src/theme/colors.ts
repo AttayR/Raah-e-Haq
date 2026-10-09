@@ -1,3 +1,12 @@
+import { darkColors, lightColors } from './tokens';
+import { extra, navy } from './palette';
+
+/**
+ * @deprecated Pre-T-601 static brand colours. They do not follow the colour scheme and the
+ * values predate DESIGN_SYSTEM §1 (`warning` here is a red, `secondary` is CSS 'orange').
+ * New code reads `useAppTheme().theme.colors.<semantic token>`; the remaining importers move
+ * over as their screens are redesigned (T-603 onward), then this object is deleted.
+ */
 export const BrandColors = {
   primary: '#011c72ff',    // Royal blue
   secondary: 'orange',  // Premium golden-orange
@@ -16,30 +25,26 @@ export const BrandColors = {
     surface: '#1A1A1A',
     text: '#F5F5F5',
     mutedText: '#A1A1A1',
-    /**
-     * Light brand tint for text, icons and borders of outline/secondary controls on dark
-     * surfaces (navy primary is ~1.5:1 there; this is ~8:1 on dark.surface). T-106; fold into
-     * the T-601 semantic set.
-     */
+    /** @deprecated use `theme.colors.primaryText` (dark value navy-300). */
     accent: '#9DB2F0',
   },
 } as const;
 
 /**
- * Toast colours from DESIGN_SYSTEM 5.16 (inverse surface in light, raised surface in dark;
- * tone icons use the dark-tone values, which pass contrast on both fills).
- * Folded into the semantic tokens by T-601.
+ * Toast colours (DESIGN_SYSTEM 5.16): inverse surface in light, raised surface in dark;
+ * tone icons use the dark-tone values, which pass contrast on both fills. Values now come
+ * from the semantic tokens; the shape is kept for ModernToast until T-608 replaces it.
  */
 export const ToastColors = {
-  light: { background: '#0F1422', text: '#FFFFFF' },
-  dark: { background: '#252D44', text: '#F2F4F9' },
+  light: { background: lightColors.textPrimary, text: lightColors.textInverse },
+  dark: { background: darkColors.surfaceRaised, text: darkColors.textPrimary },
   tone: {
-    success: '#4ACB7E',
-    error: '#FF7A7F',
-    warning: '#F2B44B',
-    info: '#7FA8F5',
-    loading: '#9DB2F0',
+    success: darkColors.success,
+    error: darkColors.danger,
+    warning: darkColors.warning,
+    info: darkColors.info,
+    loading: navy[300],
   },
-  action: '#9DB2F0',
-  shadow: '#000000',
+  action: navy[300],
+  shadow: extra.black,
 } as const;

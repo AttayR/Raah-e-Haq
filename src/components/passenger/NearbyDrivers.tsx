@@ -49,7 +49,7 @@ export const NearbyDriversStatus: React.FC<{ state: NearbyDriversState }> = ({ s
   const { theme } = useAppTheme();
   const text = statusText(state);
   if (!text) return null;
-  const color = state.status === 'error' ? theme.colors.warning : theme.colors.text;
+  const color = state.status === 'error' ? theme.colors.danger : theme.colors.textPrimary;
   return (
     <View
       testID="nearby-drivers-status"
