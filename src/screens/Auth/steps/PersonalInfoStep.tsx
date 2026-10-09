@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -10,32 +10,19 @@ import {
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedTextInput from '../../../components/ThemedTextInput';
-// import BrandButton from '../../../components/BrandButton';
+import type { RegistrationFormData } from '../../../features/auth/registration/registrationForm';
+import { validateStepField } from '../../../schemas/registrationSchema';
+import { mergeStepErrors } from './stepErrors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
-interface PersonalInfoData {
-  fullName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  cnic: string;
-  address: string;
-  phoneNumber: string;
-  dateOfBirth: string;
-  gender: 'male' | 'female' | 'other' | '';
-  emergencyContactNumber: string;
-  emergencyContactName: string;
-  emergencyRelationship: string;
-  preferredPayment: 'cash' | 'card' | 'wallet' | '';
-  role: 'driver' | 'passenger';
-}
+type PersonalInfoData = RegistrationFormData;
 
 interface PersonalInfoStepProps {
   data: PersonalInfoData;
   onDataChange: (data: Partial<PersonalInfoData>) => void;
-  errors: Record<string, string>;
+  errors: Partial<Record<string, string>>;
   apiErrors?: Record<string, string>;
   onClearApiError?: (field: string) => void;
 }
@@ -56,8 +43,12 @@ export const EMERGENCY_RELATION_OPTIONS: { value: string; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, onClearApiError }: PersonalInfoStepProps) {
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors = {}, onClearApiError }: PersonalInfoStepProps) {
+  const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
+  // The latest typed values: a blur can fire before the re-render that carries the last
+  // keystroke (tap Next right after typing), so blur checks read this, never a stale `data`.
+  const latest = useRef(data);
+  latest.current = data;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -70,76 +61,8 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
     );
   }
 
-  // Validation functions
-  const validateFullName = (name: string): string | undefined => {
-    if (!name || !name.trim()) return 'Full name is required';
-    if (name.trim().length < 2) return 'Full name must be at least 2 characters';
-    if (name.trim().length > 50) return 'Full name must be less than 50 characters';
-    if (!/^[a-zA-Z\s]+$/.test(name.trim())) return 'Full name can only contain letters and spaces';
-    return undefined;
-  };
-
-  const validateEmail = (email: string): string | undefined => {
-    if (!email || !email.trim()) return 'Email is required';
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) return 'Please enter a valid email address';
-    return undefined;
-  };
-
-  const validatePassword = (password: string): string | undefined => {
-    if (!password || !password.trim()) return 'Password is required';
-    if (password.length < 8) return 'Password must be at least 8 characters';
-    if (!/(?=.*[a-z])/.test(password)) return 'Password must contain at least one lowercase letter';
-    if (!/(?=.*[A-Z])/.test(password)) return 'Password must contain at least one uppercase letter';
-    if (!/(?=.*\d)/.test(password)) return 'Password must contain at least one number';
-    return undefined;
-  };
-
-  const validateConfirmPassword = (confirmPassword: string, password: string): string | undefined => {
-    if (!confirmPassword || !confirmPassword.trim()) return 'Please confirm your password';
-    if (confirmPassword !== password) return 'Passwords do not match';
-    return undefined;
-  };
-
-  const validateCNIC = (cnic: string): string | undefined => {
-    if (!cnic || !cnic.trim()) return 'CNIC is required';
-    const cnicRegex = /^\d{5}-\d{7}-\d$/;
-    if (!cnicRegex.test(cnic.trim())) return 'Please enter CNIC in format: 00000-0000000-0';
-    
-    // Additional validation for Pakistani CNIC
-    const cnicDigits = cnic.replace(/\D/g, '');
-    if (cnicDigits.length !== 13) return 'CNIC must have exactly 13 digits';
-    
-    return undefined;
-  };
-
-  const validateAddress = (address: string): string | undefined => {
-    if (!address || !address.trim()) return 'Address is required';
-    if (address.trim().length < 10) return 'Address must be at least 10 characters';
-    if (address.trim().length > 200) return 'Address must be less than 200 characters';
-    return undefined;
-  };
-
-  const validatePhoneNumber = (phone: string): string | undefined => {
-    if (!phone || !phone.trim()) return 'Phone number is required';
-    const phoneRegex = /^(\+92|0)?[0-9]{10}$/;
-    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
-      return 'Please enter a valid Pakistani phone number';
-    }
-    return undefined;
-  };
-
-  const validateDateOfBirth = (value: string): string | undefined => {
-    if (!value || !value.trim()) return 'Date of birth is required';
-    const trimmed = value.trim();
-    const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!isoRegex.test(trimmed)) return 'Use format YYYY-MM-DD (e.g. 1990-01-15)';
-    const date = new Date(trimmed);
-    if (Number.isNaN(date.getTime())) return 'Enter a valid date';
-    const today = new Date();
-    if (date > today) return 'Date of birth cannot be in the future';
-    return undefined;
-  };
+  // Schema errors from Next (T-201) plus the ones found on blur.
+  const validationErrors = mergeStepErrors(errors, localErrors);
 
   const formatCNIC = (value: string): string => {
     if (!value) return '';
@@ -175,59 +98,20 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
       processedValue = formatPhoneNumber(value);
     }
     
+    latest.current = { ...latest.current, [field]: processedValue };
     onDataChange({ [field]: processedValue });
-    
-    if (validationErrors[field]) {
-      setValidationErrors(prev => ({ ...prev, [field]: '' }));
-    }
+
+    // Typing makes this field's error stale, whatever set it (blur or Next).
+    setValidationErrors(prev => (prev[field] ? { ...prev, [field]: '' } : prev));
     const apiField = API_FIELD_MAP[field] || field;
     if (apiErrors[apiField] && onClearApiError) {
       onClearApiError(apiField);
     }
   };
 
-  const validateField = (field: keyof PersonalInfoData, value: string) => {
-    let error: string | undefined;
-    const safeValue = value || '';
-    
-    switch (field) {
-      case 'fullName':
-        error = validateFullName(safeValue);
-        break;
-      case 'email':
-        error = validateEmail(safeValue);
-        break;
-      case 'password':
-        error = validatePassword(safeValue);
-        break;
-      case 'confirmPassword':
-        error = validateConfirmPassword(safeValue, data.password || '');
-        break;
-      case 'cnic':
-        error = validateCNIC(safeValue);
-        break;
-      case 'address':
-        error = validateAddress(safeValue);
-        break;
-      case 'phoneNumber':
-        error = validatePhoneNumber(safeValue);
-        break;
-      case 'dateOfBirth':
-        error = validateDateOfBirth(safeValue);
-        break;
-      case 'gender':
-        error = !safeValue ? 'Gender is required' : undefined;
-        break;
-      case 'emergencyRelationship':
-        error = !safeValue || !safeValue.trim() ? 'Relationship is required' : undefined;
-        break;
-    }
-    
-    if (error) {
-      setValidationErrors(prev => ({ ...prev, [field]: error! }));
-    } else {
-      setValidationErrors(prev => ({ ...prev, [field]: '' }));
-    }
+  const validateField = (field: keyof PersonalInfoData) => {
+    const error = validateStepField('personal', field, latest.current);
+    setValidationErrors(prev => ({ ...prev, [field]: error ?? '' }));
   };
 
   const handleRoleChange = (role: 'driver' | 'passenger') => {
@@ -316,13 +200,13 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="Enter your full name"
             value={data.fullName || ''}
             onChangeText={(value) => handleInputChange('fullName', value)}
-            onBlur={() => validateField('fullName', data.fullName || '')}
+            onBlur={() => validateField('fullName')}
             autoCapitalize="words"
             style={styles.input}
           />
           {validationErrors.fullName && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.fullName}</Text>
             </View>
           )}
@@ -334,14 +218,16 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="Enter your email address"
             value={data.email || ''}
             onChangeText={(value) => handleInputChange('email', value)}
-            onBlur={() => validateField('email', data.email || '')}
+            onBlur={() => validateField('email')}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
             style={styles.input}
           />
           {validationErrors.email && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.email}</Text>
             </View>
           )}
@@ -353,13 +239,13 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="+92XXXXXXXXXX"
             value={data.phoneNumber || ''}
             onChangeText={(value) => handleInputChange('phoneNumber', value)}
-            onBlur={() => validateField('phoneNumber', data.phoneNumber || '')}
+            onBlur={() => validateField('phoneNumber')}
             keyboardType="phone-pad"
             style={styles.input}
           />
           {validationErrors.phoneNumber && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.phoneNumber}</Text>
             </View>
           )}
@@ -371,14 +257,14 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="00000-0000000-0"
             value={data.cnic || ''}
             onChangeText={(value) => handleInputChange('cnic', value)}
-            onBlur={() => validateField('cnic', data.cnic || '')}
+            onBlur={() => validateField('cnic')}
             keyboardType="numeric"
             maxLength={15}
             style={styles.input}
           />
           {validationErrors.cnic && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.cnic}</Text>
             </View>
           )}
@@ -390,7 +276,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="Enter your complete address"
             value={data.address || ''}
             onChangeText={(value) => handleInputChange('address', value)}
-            onBlur={() => validateField('address', data.address || '')}
+            onBlur={() => validateField('address')}
             multiline
             numberOfLines={3}
             textAlignVertical="top"
@@ -398,7 +284,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
           />
           {(validationErrors.address || apiErrors.address) && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.address || apiErrors.address}</Text>
             </View>
           )}
@@ -410,14 +296,14 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="YYYY-MM-DD (e.g. 1990-01-15)"
             value={data.dateOfBirth || ''}
             onChangeText={(value) => handleInputChange('dateOfBirth', value)}
-            onBlur={() => validateField('dateOfBirth', data.dateOfBirth || '')}
+            onBlur={() => validateField('dateOfBirth')}
             keyboardType="numeric"
             maxLength={10}
             style={styles.input}
           />
           {(validationErrors.dateOfBirth || apiErrors.date_of_birth) && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.dateOfBirth || apiErrors.date_of_birth}</Text>
             </View>
           )}
@@ -443,7 +329,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
           </View>
           {(validationErrors.gender || apiErrors.gender) && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.gender || apiErrors.gender}</Text>
             </View>
           )}
@@ -461,7 +347,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
               placeholder="Create a strong password"
               value={data.password || ''}
               onChangeText={(value) => handleInputChange('password', value)}
-              onBlur={() => validateField('password', data.password || '')}
+              onBlur={() => validateField('password')}
               secureTextEntry={!showPassword}
               style={[styles.input, styles.passwordInput]}
             />
@@ -478,7 +364,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
           </View>
           
           {/* Password Strength Indicator */}
-          {data.password && data.password.length > 0 && (
+          {passwordStrength.strength !== '' && (
             <View style={styles.passwordStrengthContainer}>
               <View style={styles.passwordStrengthBar}>
                 <View 
@@ -499,7 +385,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
           
           {(validationErrors.password || apiErrors.password) && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.password || apiErrors.password}</Text>
             </View>
           )}
@@ -512,7 +398,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
               placeholder="Confirm your password"
               value={data.confirmPassword || ''}
               onChangeText={(value) => handleInputChange('confirmPassword', value)}
-              onBlur={() => validateField('confirmPassword', data.confirmPassword || '')}
+              onBlur={() => validateField('confirmPassword')}
               secureTextEntry={!showConfirmPassword}
               style={[styles.input, styles.passwordInput]}
             />
@@ -529,7 +415,7 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
           </View>
           {validationErrors.confirmPassword && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.confirmPassword}</Text>
             </View>
           )}
@@ -546,9 +432,16 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="+92XXXXXXXXXX"
             value={data.emergencyContactNumber || ''}
             onChangeText={(value) => handleInputChange('emergencyContactNumber', value)}
+            onBlur={() => validateField('emergencyContactNumber')}
             keyboardType="phone-pad"
             style={styles.input}
           />
+          {validationErrors.emergencyContactNumber && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Text style={styles.errorText}>{validationErrors.emergencyContactNumber}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.inputGroup}>
@@ -557,9 +450,16 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
             placeholder="Full name of emergency contact"
             value={data.emergencyContactName || ''}
             onChangeText={(value) => handleInputChange('emergencyContactName', value)}
+            onBlur={() => validateField('emergencyContactName')}
             autoCapitalize="words"
             style={styles.input}
           />
+          {validationErrors.emergencyContactName && (
+            <View style={styles.errorContainer}>
+              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Text style={styles.errorText}>{validationErrors.emergencyContactName}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.inputGroup}>
@@ -583,33 +483,13 @@ export default function PersonalInfoStep({ data, onDataChange, apiErrors = {}, o
           </View>
           {(validationErrors.emergencyRelationship || apiErrors.passenger_emergency_contact_relation) && (
             <View style={styles.errorContainer}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.emergencyRelationship || apiErrors.passenger_emergency_contact_relation}</Text>
             </View>
           )}
         </View>
       </View>
 
-      {/* Preferences */}
-      <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Preferences</Text>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Preferred Payment Method</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {(['cash','card','wallet'] as const).map((method) => (
-              <TouchableOpacity
-                key={method}
-                onPress={() => onDataChange({ preferredPayment: method })}
-                style={[styles.chip, data.preferredPayment === method && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, data.preferredPayment === method && styles.chipTextActive]}>
-                  {method.charAt(0).toUpperCase() + method.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </View>
     </View>
   );
 }

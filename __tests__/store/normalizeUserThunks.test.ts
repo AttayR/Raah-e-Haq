@@ -120,14 +120,14 @@ describe('thunks store the normalised user (T-105)', () => {
     expect(result.payload).toMatchObject({ id: 8, role: 'passenger', roles: ['passenger'], phone: null, pending_phone: '+923000000008' });
   });
 
-  it('register with images (driver, no token): caches the normalised user', async () => {
+  it('register with images, backend before BE-35 (driver, no token): caches the normalised user', async () => {
     const user = { id: 10, name: 'New Driver', email: 'nd@example.test', user_type: 'driver', status: 'pending', phone: null };
     mock.onPost('/auth/register').reply(201, { success: true, data: { user, token: null, token_type: null } });
     const store = makeStore();
 
     const result = await store.dispatch(registerUserWithImages({ ...registration, user_type: 'driver' }));
 
-    expect(result.payload).toEqual({ user: expect.objectContaining({ id: 10, role: 'driver', status: 'pending' }) });
+    expect(result.payload).toEqual({ kind: 'registered', user: expect.objectContaining({ id: 10, role: 'driver', status: 'pending' }) });
     expect(await storedUserData()).toMatchObject({ id: 10, role: 'driver', status: 'pending' });
   });
 

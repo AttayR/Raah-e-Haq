@@ -330,12 +330,35 @@ export interface AuthResponse {
   expires_at?: string | null;
 }
 
-/** POST /auth/register: drivers get no token until approved (token and token_type are null). */
+/**
+ * POST /auth/register 201. BE-35/BE-38: `user` has no id and there is no token; the account
+ * proves its phone with `phone_verification.verification_token` (POST /auth/phone/verify),
+ * which returns the token. A backend from before BE-35 instead sends a user with an id and
+ * `token` (null for a driver pending approval) and no phone_verification.
+ */
 export interface RegisterResponse {
-  user: ApiUser;
-  token: string | null;
-  token_type: string | null;
+  user: Record<string, unknown>;
+  phone_verification?: RegistrationPhoneVerification;
+  token?: string | null;
+  token_type?: string | null;
   expires_at?: string | null;
+}
+
+/**
+ * register's `phone_verification` (BE-35). `code_sent: false` means no code went out yet and
+ * carries the BE-28 refusal `code`, `message` and `retry_after`. The verification_token is a
+ * bearer secret for the phone step: memory only, never stored or logged.
+ */
+export interface RegistrationPhoneVerification {
+  phone: string;
+  code_sent: boolean;
+  expires_in: number;
+  verification_token: string;
+  verification_token_expires_in?: number;
+  code?: string;
+  message?: string;
+  retry_after?: number;
+  otp_code?: string | null;
 }
 
 /** POST /auth/send-otp (BE-16): otp_code is null outside APP_ENV=local; expires_in is seconds. */
@@ -385,6 +408,17 @@ export interface RegisterRequest {
   bank_branch?: string;
   bank_account_number?: string;
 }
+
+/** POST /auth/register as multipart (registerWithImages): images are local file URIs. */
+export type RegisterWithImagesRequest = RegisterRequest & {
+  passenger_cnic_front_image?: string;
+  passenger_cnic_back_image?: string;
+  passenger_profile_image?: string;
+  passenger_preferred_payment?: 'cash' | 'card' | 'mobile_wallet';
+  passenger_emergency_contact?: string;
+  passenger_emergency_contact_name?: string;
+  passenger_emergency_contact_relation?: string;
+};
 
 export interface SendOtpRequest {
   phone: string;
@@ -478,15 +512,7 @@ class ApiService {
   }
 
   // Alternative registration method using /users endpoint with multipart/form-data
-  async registerWithImages(userData: RegisterRequest & { 
-    passenger_cnic_front_image?: string; 
-    passenger_cnic_back_image?: string; 
-    passenger_profile_image?: string;
-    passenger_preferred_payment?: 'cash' | 'card' | 'mobile_wallet';
-    passenger_emergency_contact?: string;
-    passenger_emergency_contact_name?: string;
-    passenger_emergency_contact_relation?: string;
-  }): Promise<ApiResponse<RegisterResponse>> {
+  async registerWithImages(userData: RegisterWithImagesRequest): Promise<ApiResponse<RegisterResponse>> {
     logger.debug('🌐 API Service - Registering user with images...');
     logger.debug('📡 Endpoint: POST /auth/register (multipart/form-data)');
 

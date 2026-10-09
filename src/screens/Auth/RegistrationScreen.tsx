@@ -1,403 +1,189 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  SafeAreaView, 
-  StatusBar, 
-  ImageBackground, 
+import React, { useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  SafeAreaView,
+  StatusBar,
+  ImageBackground,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useApiAuth } from '../../hooks/useApiAuth';
-import { BrandColors } from '../../theme/colors';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useApiAuth } from '../../hooks/useApiAuth';
+import { useOtpTimers } from '../../hooks/useOtpTimers';
+import { BrandColors } from '../../theme/colors';
 import PersonalInfoStep from './steps/PersonalInfoStep';
 import VehicleInfoStep from './steps/VehicleInfoStep';
 import DocumentsStep from './steps/DocumentsStep';
 import ReviewStep from './steps/ReviewStep';
+import RegistrationHeader from './RegistrationHeader';
+import { KeyboardDoneBar } from './PhoneAuthParts';
+import { styles } from './RegistrationScreen.styles';
 import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
-import { rejectionMessage, ThunkRejection } from '../../core/api/errors';
+import { rejectionMessage } from '../../core/api/errors';
+import { formatCountdown } from '../../services/otpService';
+import { registerUserWithImages, type PendingPhoneVerification } from '../../store/thunks/apiThunks';
+import { firstInvalidStep, validateStep, type StepErrors } from '../../schemas/registrationSchema';
+import {
+  INITIAL_REGISTRATION_FORM,
+  REGISTRATION_STEPS,
+  type RegistrationFormData,
+  type RegistrationRole,
+  type RegistrationStep,
+} from '../../features/auth/registration/registrationForm';
+import { buildRegistrationRequest } from '../../features/auth/registration/buildRegistrationRequest';
+import RegistrationPhoneStep from '../../features/auth/components/RegistrationPhoneStep';
+import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
+import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 
-const { width: screenWidth } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
+/** Server field names that belong to the vehicle step (a 422 on them opens that step). */
+const DRIVER_FIELDS = [
+  'license_type', 'license_expiry_date', 'license_plate', 'registration_number', 'driving_experience',
+  'vehicle_make', 'vehicle_model', 'vehicle_year', 'vehicle_color', 'bank_name', 'bank_branch',
+  'bank_account_number',
+];
 
-type RegistrationStep = 'personal' | 'vehicle' | 'documents' | 'review';
-
-interface RegistrationData {
-  // Personal Info
-  fullName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  cnic: string;
-  address: string;
-  phoneNumber: string;
-  dateOfBirth: string; // YYYY-MM-DD
-  gender: 'male' | 'female' | 'other' | '';
-  // Emergency Contact (per passenger/driver forms)
-  emergencyContactNumber: string;
-  emergencyContactName: string;
-  emergencyRelationship: string; // e.g., Father, Mother, Spouse, Friend
-  
-  // Vehicle Info (for drivers)
-  vehicleType: string;
-  vehicleNumber: string;
-  vehicleBrand: string;
-  vehicleModel: string;
-  vehicleYear: string;
-  vehicleColor: string;
-  licenseType: string;
-  licenseExpiryDate: string; // YYYY-MM-DD
-  licensePlate: string;
-  registrationNumber: string;
-  drivingExperience: string;
-  bankName: string;
-  bankBranch: string;
-  bankAccountNumber: string;
-  
-  // Documents
-  driverPicture: string;
-  cnicPicture: string;
-  licenseFrontPicture: string; // For drivers
-  licenseBackPicture: string;  // For drivers
-  cnicFrontPicture: string; // For passengers
-  cnicBackPicture: string;  // For passengers
-  profilePicture: string;    // For passengers (and optional for drivers)
-  vehiclePictures: string[];
-  
-  // Role
-  role: 'driver' | 'passenger';
-  // Preferences
-  preferredPayment: 'cash' | 'card' | 'wallet' | '';
+/** What registration left for the phone step. In memory only: the token is a bearer secret. */
+interface PhoneStepState {
+  pending: PendingPhoneVerification;
+  role: RegistrationRole | null;
 }
 
 export default function RegistrationScreen() {
-  const navigation = useNavigation<any>();
-  const { registerWithImages, isLoading } = useApiAuth();
-  
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const { registerWithImages } = useApiAuth();
+  // BE-53: 429 rate_limited on register holds Create Account for retry_after.
+  const { resendIn: submitWait, blockResend: holdSubmit } = useOtpTimers();
+
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
   const [submitting, setSubmitting] = useState(false);
+  const [stepErrors, setStepErrors] = useState<StepErrors>({});
   const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
-  const [formData, setFormData] = useState<RegistrationData>({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    cnic: '',
-    address: '',
-    phoneNumber: '',
-    dateOfBirth: '',
-    gender: '',
-    emergencyContactNumber: '',
-    emergencyContactName: '',
-    emergencyRelationship: '',
-    vehicleType: '',
-    vehicleNumber: '',
-    vehicleBrand: '',
-    vehicleModel: '',
-    vehicleYear: '',
-    vehicleColor: '',
-    licenseType: '',
-    licenseExpiryDate: '',
-    licensePlate: '',
-    registrationNumber: '',
-    drivingExperience: '',
-    bankName: '',
-    bankBranch: '',
-    bankAccountNumber: '',
-    driverPicture: '',
-    cnicPicture: '',
-    licenseFrontPicture: '',
-    licenseBackPicture: '',
-    cnicFrontPicture: '',
-    cnicBackPicture: '',
-    profilePicture: '',
-    vehiclePictures: [],
-    role: 'passenger',
-    preferredPayment: '',
-  });
+  const [formData, setFormData] = useState<RegistrationFormData>(INITIAL_REGISTRATION_FORM);
+  const [phoneStep, setPhoneStep] = useState<PhoneStepState | null>(null);
+  // One registration at a time: a second tap lands before `submitting` re-renders the button.
+  const inFlight = useRef(false);
 
-  const steps = [
-    { key: 'personal', title: 'Personal Info', icon: 'person' },
-    { key: 'vehicle', title: 'Vehicle Info', icon: 'local-taxi' },
-    { key: 'documents', title: 'Documents', icon: 'description' },
-    { key: 'review', title: 'Review', icon: 'check-circle' },
-  ];
+  const stepIndex = REGISTRATION_STEPS.findIndex((step) => step.key === currentStep);
 
-  const updateFormData = (patch: Partial<RegistrationData>) => {
-    setFormData(prev => ({ ...prev, ...patch }));
+  const updateFormData = (patch: Partial<RegistrationFormData>) => {
+    setFormData((prev) => ({ ...prev, ...patch }));
+    // An edited field's schema error is stale; the next Next re-validates it.
+    setStepErrors((prev) => {
+      const next = { ...prev };
+      (Object.keys(patch) as (keyof RegistrationFormData)[]).forEach((key) => delete next[key]);
+      return next;
+    });
   };
 
-  const getCurrentStepIndex = () => {
-    return steps.findIndex(step => step.key === currentStep);
-  };
-
-  const getProgressPercentage = () => {
-    const currentIndex = getCurrentStepIndex();
-    return ((currentIndex + 1) / steps.length) * 100;
-  };
-
-  const canProceedToNext = (): boolean => {
-    switch (currentStep) {
-      case 'personal':
-        return !!(formData.fullName && formData.email && formData.password && 
-                 formData.confirmPassword && formData.cnic && formData.address);
-      case 'vehicle':
-        if (formData.role === 'passenger') return true;
-        return !!(formData.vehicleType && formData.vehicleNumber && formData.vehicleBrand &&
-                 formData.vehicleModel && formData.vehicleYear && formData.vehicleColor &&
-                 formData.licenseType && formData.licenseExpiryDate && formData.licensePlate &&
-                 formData.registrationNumber && formData.drivingExperience &&
-                 formData.bankName && formData.bankBranch && formData.bankAccountNumber);
-      case 'documents':
-        if (formData.role === 'passenger') {
-          // Temporarily skip CNIC image validation for testing
-          // TODO: Re-enable when proper image upload is implemented
-          return true; // Allow progression without images for now
-          // return !!(formData.cnicFrontPicture && formData.cnicFrontPicture.trim() !== '' &&
-          //          formData.cnicBackPicture && formData.cnicBackPicture.trim() !== '');
-        } else {
-          // Drivers need driver picture, CNIC picture, and vehicle pictures
-          return !!(formData.driverPicture && 
-                   formData.cnicPicture && 
-                   formData.vehiclePictures.length >= 4);
-        }
-      case 'review':
-        return true;
-      default:
-        return false;
-    }
-  };
+  const clearApiError = (field: string) =>
+    setApiValidationErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
 
   const handleNext = () => {
-    if (!canProceedToNext()) {
-      toast.error('Please fill all required fields before proceeding');
+    const errors = validateStep(currentStep, formData);
+    setStepErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error(COPY.form.fixErrors);
       return;
     }
-
-    const currentIndex = getCurrentStepIndex();
-    if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1].key as RegistrationStep);
+    if (stepIndex < REGISTRATION_STEPS.length - 1) {
+      setCurrentStep(REGISTRATION_STEPS[stepIndex + 1].key);
     }
   };
 
   const handlePrevious = () => {
-    const currentIndex = getCurrentStepIndex();
-    if (currentIndex > 0) {
-      setCurrentStep(steps[currentIndex - 1].key as RegistrationStep);
+    if (stepIndex > 0) {
+      setStepErrors({});
+      setCurrentStep(REGISTRATION_STEPS[stepIndex - 1].key);
     }
   };
 
+  /** 422 field errors: shown on their inputs, and the form opens the step that has them. */
+  const showServerFieldErrors = (fieldErrors: Record<string, string[]>, message: string) => {
+    const errors: Record<string, string> = {};
+    Object.entries(fieldErrors).forEach(([field, messages]) => {
+      errors[field] = messages[0] ?? '';
+    });
+    setApiValidationErrors(errors);
+    const hasDriverError = Object.keys(errors).some((key) => DRIVER_FIELDS.includes(key));
+    setCurrentStep(hasDriverError && formData.role === 'driver' ? 'vehicle' : 'personal');
+    toast.error(message);
+  };
+
   const handleSubmit = async () => {
+    if (inFlight.current || submitWait > 0) {
+      return;
+    }
+    // Every step again: a step left with Previous may have been edited since its Next.
+    const invalid = firstInvalidStep(formData);
+    if (invalid) {
+      setCurrentStep(invalid.step);
+      setStepErrors(invalid.errors);
+      toast.error(COPY.form.fixErrors);
+      return;
+    }
+
+    inFlight.current = true;
+    setSubmitting(true);
+    setApiValidationErrors({});
     try {
-      setSubmitting(true);
-      logger.debug('🚀 Starting account creation process...');
+      const result = await registerWithImages(buildRegistrationRequest(formData));
 
-      // Test network connectivity first
-      logger.debug('🌐 Testing network connectivity...');
-      const { apiService } = await import('../../services/api');
-      const isConnected = await apiService.testNetworkConnectivity();
-      if (!isConnected) {
-        toast.error('Network connection failed. Please check your internet connection.');
-        return;
-      }
-
-      // Ensure phone number is properly formatted
-      const formattedPhone = formData.phoneNumber.startsWith('+') 
-        ? formData.phoneNumber 
-        : `+${formData.phoneNumber}`;
-
-      // Validate password strength
-      if (formData.password.length < 8) {
-        toast.error('Password must be at least 8 characters long');
-        return;
-      }
-      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(formData.password)) {
-        toast.error('Password must contain at least one uppercase letter, one lowercase letter, and one number');
-        return;
-      }
-      if (!formData.dateOfBirth || !formData.dateOfBirth.trim()) {
-        toast.error('Date of birth is required');
-        setCurrentStep('personal');
-        return;
-      }
-      if (!formData.gender) {
-        toast.error('Gender is required');
-        setCurrentStep('personal');
-        return;
-      }
-      if (formData.role === 'passenger' && !formData.emergencyRelationship?.trim()) {
-        toast.error('Emergency contact relationship is required');
-        setCurrentStep('personal');
-        return;
-      }
-
-      // Driver: validate required vehicle and bank fields before submit
-      if (formData.role === 'driver') {
-        const driverRequired: { key: keyof typeof formData; label: string }[] = [
-          { key: 'licenseType', label: 'License type' },
-          { key: 'licenseExpiryDate', label: 'License expiry date' },
-          { key: 'licensePlate', label: 'License plate' },
-          { key: 'registrationNumber', label: 'Registration number' },
-          { key: 'drivingExperience', label: 'Driving experience' },
-          { key: 'vehicleBrand', label: 'Vehicle make' },
-          { key: 'vehicleModel', label: 'Vehicle model' },
-          { key: 'vehicleYear', label: 'Vehicle year' },
-          { key: 'vehicleColor', label: 'Vehicle color' },
-          { key: 'bankName', label: 'Bank name' },
-          { key: 'bankBranch', label: 'Bank branch' },
-          { key: 'bankAccountNumber', label: 'Bank account number' },
-        ];
-        const missing = driverRequired.find(({ key }) => {
-          const v = formData[key];
-          return v === undefined || v === null || String(v).trim() === '';
-        });
-        if (missing) {
-          toast.error(`${missing.label} is required`);
-          setCurrentStep('vehicle');
+      if (registerUserWithImages.fulfilled.match(result)) {
+        const outcome = result.payload;
+        if (outcome.kind === 'verify_phone') {
+          // BE-35/BE-38: the same answer for a new and a taken email; the code step decides.
+          const role = outcome.role === 'driver' || outcome.role === 'passenger' ? outcome.role : formData.role;
+          setPhoneStep({ pending: outcome.phoneVerification, role });
+          if (outcome.message) {
+            toast.success(outcome.message);
+          }
           return;
         }
-        const vehicleYearNum = parseInt(String(formData.vehicleYear || ''), 10);
-        if (!Number.isNaN(vehicleYearNum) && vehicleYearNum > 2025) {
-          toast.error('Vehicle year must not be greater than 2025');
-          setCurrentStep('vehicle');
-          return;
-        }
+        // A backend from before BE-35: no phone step.
+        toast.success(COPY.form.created);
+        navigation.popTo('Login');
+        return;
       }
 
-      // Temporarily skip CNIC image validation for testing
-      // TODO: Re-enable when proper image upload is implemented
-      // if (formData.role === 'passenger' && 
-      //     (!formData.cnicFrontPicture || formData.cnicFrontPicture.trim() === '' ||
-      //      !formData.cnicBackPicture || formData.cnicBackPicture.trim() === '')) {
-      //   toast.error('CNIC front and back images are required for passenger registration. Please complete the document upload step.');
-      //   return;
-      // }
-
-      setApiValidationErrors({});
-
-      // Prepare registration data for API
-      const registrationData = {
-        name: formData.fullName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        password_confirmation: formData.confirmPassword,
-        user_type: formData.role,
-        phone: formattedPhone,
-        cnic: formData.cnic.trim(),
-        address: formData.address.trim(),
-        emergency_contact: formData.emergencyContactNumber || formattedPhone,
-        ...(formData.dateOfBirth && { date_of_birth: formData.dateOfBirth }),
-        ...(formData.gender && { gender: formData.gender }),
-        // Add CNIC images for passengers
-        ...(formData.role === 'passenger' && {
-          passenger_cnic_front_image: formData.cnicFrontPicture,
-          passenger_cnic_back_image: formData.cnicBackPicture,
-          passenger_profile_image: formData.profilePicture,
-          passenger_emergency_contact: formData.emergencyContactNumber || formattedPhone,
-          passenger_emergency_contact_name: formData.emergencyContactName,
-          passenger_emergency_contact_relation: formData.emergencyRelationship || 'other',
-          passenger_preferred_payment: formData.preferredPayment || 'cash',
-        }),
-        ...(formData.role === 'driver' && {
-          vehicle_type: formData.vehicleType,
-          license_number: formData.vehicleNumber,
-          preferred_payment: formData.preferredPayment || 'cash',
-          license_type: formData.licenseType,
-          license_expiry_date: formData.licenseExpiryDate,
-          license_plate: formData.licensePlate || formData.vehicleNumber,
-          registration_number: formData.registrationNumber || formData.vehicleNumber,
-          driving_experience: formData.drivingExperience,
-          vehicle_make: formData.vehicleBrand,
-          vehicle_model: formData.vehicleModel,
-          vehicle_year: formData.vehicleYear,
-          vehicle_color: formData.vehicleColor,
-          bank_name: formData.bankName,
-          bank_branch: formData.bankBranch,
-          bank_account_number: formData.bankAccountNumber,
-        }),
-      };
-      
-      logger.debug('📤 Sending registration request to API...');
-      
-      // Use the new registration method with images
-      const result = await registerWithImages(registrationData);
-      
-      logger.debug('🔍 Result type:', result.type);
-      
-      // Log detailed error information if registration failed
-      if (result.type.endsWith('/rejected')) {
-        logger.debug('❌ Registration failed with details:', {
-          payload: result.payload,
-          error: 'error' in result ? result.error : 'Unknown error',
-        });
-      }
-      
-      if (result.type.endsWith('/fulfilled')) {
-        logger.debug('✅ Account created successfully!');
-        toast.success('Your account has been created successfully! Please wait for admin approval.');
-        navigation.navigate('Login');
+      const payload = registerUserWithImages.rejected.match(result) ? result.payload : undefined;
+      const message = rejectionMessage(payload, COPY.fallbacks.register);
+      logger.debug('RegistrationScreen - registration refused', { kind: payload?.kind, status: payload?.status, code: payload?.code });
+      if (payload?.kind === 'rate_limited') {
+        holdSubmit(payload.retryAfter);
+        toast.error(message);
+      } else if (payload && Object.keys(payload.fieldErrors).length > 0) {
+        showServerFieldErrors(payload.fieldErrors, message);
       } else {
-        logger.debug('❌ Registration failed');
-        const payload = result.payload as ThunkRejection | undefined;
-        const serverFieldErrors = payload?.fieldErrors ?? {};
-        if (Object.keys(serverFieldErrors).length > 0) {
-          const fieldErrors: Record<string, string> = {};
-          Object.entries(serverFieldErrors).forEach(([field, messages]) => {
-            fieldErrors[field] = messages[0] ?? '';
-          });
-          setApiValidationErrors(fieldErrors);
-          const driverFields = ['license_type', 'license_expiry_date', 'license_plate', 'registration_number', 'driving_experience', 'vehicle_make', 'vehicle_model', 'vehicle_year', 'vehicle_color', 'bank_name', 'bank_branch', 'bank_account_number'];
-          const hasDriverError = Object.keys(fieldErrors).some((k) => driverFields.includes(k));
-          setCurrentStep(hasDriverError && formData.role === 'driver' ? 'vehicle' : 'personal');
-          toast.error(payload?.message || 'Please fix the errors below.');
-        } else {
-          toast.error(rejectionMessage(payload, 'Registration failed'));
-        }
+        toast.error(message);
       }
-      
-    } catch (registrationError: any) {
-      logger.error('💥 Registration error caught:', registrationError);
-      logger.error('🔍 Error details:', {
-        message: registrationError.message,
-        stack: registrationError.stack,
-        response: registrationError.response?.data
-      });
-      toast.fromError(registrationError, 'Registration failed');
+    } catch (error: unknown) {
+      logger.error('RegistrationScreen - registration error', error);
+      toast.fromError(error, COPY.fallbacks.register);
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   };
 
   const renderStepContent = () => {
-    // Safety check for undefined formData
-    if (!formData) {
-      return (
-        <View style={styles.container}>
-          <Text style={styles.errorText}>Loading...</Text>
-        </View>
-      );
-    }
-
     switch (currentStep) {
       case 'personal':
         return (
           <PersonalInfoStep
             data={formData}
             onDataChange={updateFormData}
-            errors={{}}
+            errors={stepErrors}
             apiErrors={apiValidationErrors}
-            onClearApiError={(field) => setApiValidationErrors((prev) => {
-              const next = { ...prev };
-              delete next[field];
-              return next;
-            })}
+            onClearApiError={clearApiError}
           />
         );
       case 'vehicle':
@@ -405,416 +191,92 @@ export default function RegistrationScreen() {
           <VehicleInfoStep
             data={formData}
             onDataChange={updateFormData}
-            errors={{}}
+            errors={stepErrors}
             apiErrors={apiValidationErrors}
-            onClearApiError={(field) => setApiValidationErrors((prev) => {
-              const next = { ...prev };
-              delete next[field];
-              return next;
-            })}
+            onClearApiError={clearApiError}
           />
         );
       case 'documents':
-        return (
-          <DocumentsStep
-            data={formData}
-            onDataChange={updateFormData}
-            errors={{}}
-          />
-        );
+        return <DocumentsStep data={formData} onDataChange={updateFormData} errors={stepErrors} />;
       case 'review':
-        return (
-          <ReviewStep
-            data={formData}
-            onDataChange={updateFormData}
-          />
-        );
+        return <ReviewStep data={formData} onDataChange={updateFormData} />;
       default:
         return null;
     }
   };
 
+  const renderButtons = () => (
+    <View style={styles.buttonContainerScrollable}>
+      {stepIndex > 0 && (
+        <TouchableOpacity style={styles.previousButton} onPress={handlePrevious} disabled={submitting}>
+          <Icon name="arrow-back" size={20} color={BrandColors.primary} />
+          <Text style={styles.previousButtonText}>{COPY.form.previous}</Text>
+        </TouchableOpacity>
+      )}
+      {currentStep === 'review' ? (
+        <TouchableOpacity
+          style={[styles.submitButton, (submitting || submitWait > 0) && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting || submitWait > 0}
+          accessibilityRole="button"
+        >
+          {submitting ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={styles.submitButtonText.color} />
+              <Text style={styles.submitButtonText}>{COPY.form.creating}</Text>
+            </View>
+          ) : (
+            <Text style={styles.submitButtonText}>
+              {submitWait > 0 ? COPY.form.createIn(formatCountdown(submitWait)) : COPY.form.create}
+            </Text>
+          )}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext} accessibilityRole="button">
+          <Text style={styles.nextButtonText}>{COPY.form.next}</Text>
+          <Icon name="arrow-forward" size={20} color={styles.nextButtonText.color} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={BrandColors.primary}
-        translucent={false}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={BrandColors.primary} translucent={false} />
       <ImageBackground
         source={require('../../assets/images/background_raahe_haq.png')}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        {/* Compact Header */}
-        <View style={styles.fixedHeader}>
-          {/* Decorative Circles */}
-          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
-          <View style={styles.decorativeCircle3} />
-          <View style={styles.decorativeCircle4} />
-          <View style={styles.decorativeCircle5} />
-          
-          <View style={styles.logoContainer}>
-            <View style={styles.logoWrapper}>
-              <Image 
-                source={require('../../assets/images/logo.png')} 
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>
-              Join RaaH-e-Haq as {formData.role === 'driver' ? 'Driver' : 'Passenger'}
-            </Text>
-          </View>
+        <RegistrationHeader
+          title={phoneStep ? COPY.verify.headerTitle : COPY.form.title}
+          subtitle={phoneStep ? COPY.verify.headerSubtitle : COPY.form.subtitle(formData.role)}
+          stepIndex={phoneStep ? null : stepIndex}
+        />
 
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { width: `${getProgressPercentage()}%` }
-                ]} 
-              />
-            </View>
-            <Text style={styles.progressText}>
-              Step {getCurrentStepIndex() + 1} of {steps.length}
-            </Text>
-          </View>
-
-          {/* Step Indicators */}
-          <View style={styles.stepIndicators}>
-            {steps.map((step, index) => {
-              const isActive = step.key === currentStep;
-              const isCompleted = index < getCurrentStepIndex();
-              return (
-                <View key={step.key} style={styles.stepIndicator}>
-                  <View style={[
-                    styles.stepCircle,
-                    isActive && styles.stepCircleActive,
-                    isCompleted && styles.stepCircleCompleted
-                  ]}>
-                    <Icon 
-                      name={isCompleted ? 'check' : step.icon} 
-                      size={16} 
-                      color={isCompleted || isActive ? '#ffffff' : '#9ca3af'} 
-                    />
-                  </View>
-                  <Text style={[
-                    styles.stepTitle,
-                    isActive && styles.stepTitleActive
-                  ]}>
-                    {step.title}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Scrollable Content */}
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
-            {renderStepContent()}
-            {/* Buttons moved inside scrollable content */}
-            <View style={styles.buttonContainerScrollable}>
-              {getCurrentStepIndex() > 0 && (
-                <TouchableOpacity
-                  style={styles.previousButton}
-                  onPress={handlePrevious}
-                  disabled={isLoading}
-                >
-                  <Icon name="arrow-back" size={20} color={BrandColors.primary} />
-                  <Text style={styles.previousButtonText}>Previous</Text>
-                </TouchableOpacity>
-              )}
-              {currentStep === 'review' ? (
-                <TouchableOpacity
-                  style={[styles.submitButton, !canProceedToNext() && styles.submitButtonDisabled]}
-                  onPress={handleSubmit}
-                  disabled={!canProceedToNext() || isLoading || submitting}
-                >
-                  {submitting || isLoading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator color="#ffffff" />
-                      <Text style={styles.submitButtonText}>Creating Account...</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.submitButtonText}>Create Account</Text>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.nextButton, !canProceedToNext() && styles.nextButtonDisabled]}
-                  onPress={handleNext}
-                  disabled={!canProceedToNext() || isLoading || submitting}
-                >
-                  <Text style={styles.nextButtonText}>Next</Text>
-                  <Icon name="arrow-forward" size={20} color="#ffffff" />
-                </TouchableOpacity>
-              )}
-            </View>
+            {phoneStep ? (
+              <RegistrationPhoneStep
+                pending={phoneStep.pending}
+                role={phoneStep.role}
+                onGoToSignIn={() => navigation.popTo('Login')}
+              />
+            ) : (
+              <>
+                {renderStepContent()}
+                {renderButtons()}
+              </>
+            )}
           </View>
         </ScrollView>
       </ImageBackground>
+      <KeyboardDoneBar />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BrandColors.primary,
-  },
-  backgroundImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  fixedHeader: {
-    backgroundColor: BrandColors.primary,
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    position: 'relative',
-    overflow: 'hidden',
-    zIndex: 10,
-  },
-  decorativeCircle1: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    top: -30,
-    right: -30,
-  },
-  decorativeCircle2: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    top: 20,
-    left: -20,
-  },
-  decorativeCircle3: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    bottom: 10,
-    right: 50,
-  },
-  decorativeCircle4: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    top: 60,
-    right: 80,
-  },
-  decorativeCircle5: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    bottom: -20,
-    left: 30,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    zIndex: 2,
-    marginBottom: 12,
-  },
-  logoWrapper: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  logoImage: {
-    width: 44,
-    height: 44,
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: isSmallScreen ? 20 : 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: isSmallScreen ? 12 : 14,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  progressContainer: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    marginBottom: 6,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 2,
-  },
-  progressText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  stepIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
-  },
-  stepIndicator: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  stepCircleActive: {
-    backgroundColor: '#ffffff',
-  },
-  stepCircleCompleted: {
-    backgroundColor: '#10b981',
-  },
-  stepTitle: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 10,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  stepTitleActive: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  scrollView: {
-    flex: 1,
-    marginTop: -6,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 24,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: isSmallScreen ? 16 : 20,
-    paddingTop: 20,
-    maxWidth: 500,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  buttonContainerScrollable: {
-    paddingHorizontal: isSmallScreen ? 16 : 20,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  previousButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BrandColors.primary,
-    gap: 8,
-  },
-  previousButtonText: {
-    color: BrandColors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  nextButtonContainer: {
-    flex: 1,
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: BrandColors.primary,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
-  },
-  nextButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  nextButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#10b981',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 16,
-    textAlign: 'center',
-    padding: 20,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-});

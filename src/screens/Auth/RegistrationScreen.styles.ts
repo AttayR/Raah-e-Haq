@@ -1,0 +1,263 @@
+import { Dimensions, StyleSheet } from 'react-native';
+import { BrandColors } from '../../theme/colors';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+
+export const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: BrandColors.primary,
+  },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  fixedHeader: {
+    backgroundColor: BrandColors.primary,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    position: 'relative',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: -30,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    top: 20,
+    left: -20,
+  },
+  decorativeCircle3: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    bottom: 10,
+    right: 50,
+  },
+  decorativeCircle4: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    top: 60,
+    right: 80,
+  },
+  decorativeCircle5: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    bottom: -20,
+    left: 30,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    zIndex: 2,
+    marginBottom: 12,
+  },
+  logoWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  logoImage: {
+    width: 44,
+    height: 44,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: isSmallScreen ? 20 : 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: isSmallScreen ? 12 : 14,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  progressContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+    marginBottom: 6,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 2,
+  },
+  progressText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  stepIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+  },
+  stepIndicator: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  stepCircleActive: {
+    backgroundColor: '#ffffff',
+  },
+  stepCircleCompleted: {
+    backgroundColor: '#10b981',
+  },
+  stepIconActive: {
+    color: '#ffffff',
+  },
+  stepIconIdle: {
+    color: '#9ca3af',
+  },
+  stepTitle: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  stepTitleActive: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+    marginTop: -6,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: isSmallScreen ? 16 : 20,
+    paddingTop: 20,
+    maxWidth: 500,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  buttonContainerScrollable: {
+    paddingHorizontal: isSmallScreen ? 16 : 20,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  previousButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BrandColors.primary,
+    gap: 8,
+  },
+  previousButtonText: {
+    color: BrandColors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  nextButtonContainer: {
+    flex: 1,
+  },
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BrandColors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  nextButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 16,
+    textAlign: 'center',
+    padding: 20,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+});

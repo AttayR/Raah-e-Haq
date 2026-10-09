@@ -3,6 +3,8 @@ import {
   apiService,
   LoginRequest,
   RegisterRequest,
+  RegisterWithImagesRequest,
+  RegistrationPhoneVerification,
   VerifyOtpRequest,
   VerifyPhoneRequest,
   ResendPhoneCodeRequest,
@@ -143,33 +145,88 @@ export const registerUser = createAsyncThunk<User, RegisterRequest, ThunkConfig>
   }
 );
 
-export const registerUserWithImages = createAsyncThunk<
-  AuthSession,
-  RegisterRequest & {
-    passenger_cnic_front_image?: string;
-    passenger_cnic_back_image?: string;
-  },
-  ThunkConfig
->(
+/**
+ * What registration leaves for the phone step (BE-35/BE-38). `verificationToken` is a bearer
+ * secret: the screen keeps it in memory only; it is never stored, persisted or logged.
+ * `refusal` is set when no code went out yet (`code_sent: false`): resend after retryAfter.
+ */
+export interface PendingPhoneVerification {
+  phone: string;
+  codeSent: boolean;
+  expiresIn: number;
+  verificationToken: string;
+  refusal?: { code?: string; message?: string; retryAfter?: number };
+}
+
+/**
+ * - `verify_phone`: BE-35/BE-38 backend. Nothing is stored: the account has no token yet and
+ *   the response no user id; POST /auth/phone/verify returns both (verifyPhone).
+ * - `registered`: a backend from before BE-35 (user with id, token null for a pending
+ *   driver). Stored as before, so the app works with either backend while they roll out.
+ */
+export type RegistrationOutcome =
+  | { kind: 'verify_phone'; message?: string; role: User['role']; phoneVerification: PendingPhoneVerification }
+  | { kind: 'registered'; user: User };
+
+const toPendingPhoneVerification = (raw: unknown): PendingPhoneVerification | null => {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const pv = raw as Partial<RegistrationPhoneVerification>;
+  if (typeof pv.verification_token !== 'string' || pv.verification_token === '' || typeof pv.phone !== 'string') {
+    return null;
+  }
+  // An echoed otp_code (local backend) is dropped here, as in sendOtp (AUTH-02).
+  const pending: PendingPhoneVerification = {
+    phone: pv.phone,
+    codeSent: pv.code_sent !== false,
+    expiresIn: typeof pv.expires_in === 'number' ? pv.expires_in : 0,
+    verificationToken: pv.verification_token,
+  };
+  if (pv.code_sent === false) {
+    pending.refusal = {
+      ...(typeof pv.code === 'string' ? { code: pv.code } : {}),
+      ...(typeof pv.message === 'string' && pv.message ? { message: pv.message } : {}),
+      ...(typeof pv.retry_after === 'number' ? { retryAfter: pv.retry_after } : {}),
+    };
+  }
+  return pending;
+};
+
+const registrationRole = (raw: Record<string, unknown>): User['role'] => {
+  const role = typeof raw.role === 'string' ? raw.role : raw.user_type;
+  return role === 'driver' || role === 'passenger' ? role : null;
+};
+
+export const registerUserWithImages = createAsyncThunk<RegistrationOutcome, RegisterWithImagesRequest, ThunkConfig>(
   'auth/registerUserWithImages',
   async (userData, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
-      logger.debug('🔄 Redux Thunk - Starting user registration with images...');
-      const data = unwrap(await apiService.registerWithImages(userData));
-      const user = requireUser(data.user);
+      const body = await apiService.registerWithImages(userData);
+      const data = unwrap(body);
 
-      // Drivers get no token until an admin approves them (token is null). Whether a token
-      // should be kept at all after registration is AUTH-17 (T-202).
+      // BE-38: no token and no user id; the phone step finishes the registration. This
+      // response is the same whether or not the email already had an account.
+      const phoneVerification = toPendingPhoneVerification(data.phone_verification);
+      if (phoneVerification) {
+        return {
+          kind: 'verify_phone',
+          ...(typeof body.message === 'string' && body.message ? { message: body.message } : {}),
+          role: registrationRole(data.user ?? {}),
+          phoneVerification,
+        };
+      }
+
+      // Before BE-35: drivers get no token until an admin approves them (token is null).
+      const user = requireUser(data.user);
       const stored = data.token
         ? await storeNewSession({ ...data, user, token: data.token }, startedIn)
         : await authStorage.saveUser(user, startedIn);
       if (!stored) {
         return rejectWithValue(staleSessionRejection());
       }
-      logger.debug('✅ Redux Thunk - Registration with images successful');
-
-      return { user };
+      return { kind: 'registered', user };
     } catch (error) {
       logApiFailure('registerUserWithImages failed', error);
       return rejectWithValue(toThunkRejection(error, 'Registration failed'));

@@ -20,7 +20,7 @@ import {
   clearProfileCompleted,
   resetAuthState,
 } from '../store/slices/apiAuthSlice';
-import { LoginRequest, RegisterRequest, VerifyOtpRequest, ResetPasswordRequest } from '../services/api';
+import { LoginRequest, RegisterRequest, RegisterWithImagesRequest, VerifyOtpRequest, ResetPasswordRequest } from '../services/api';
 
 export const useApiAuth = () => {
   const dispatch = useAppDispatch();
@@ -42,10 +42,7 @@ export const useApiAuth = () => {
   }, [dispatch]);
 
   // Register new user with images
-  const registerWithImages = useCallback(async (userData: RegisterRequest & { 
-    passenger_cnic_front_image?: string; 
-    passenger_cnic_back_image?: string; 
-  }) => {
+  const registerWithImages = useCallback(async (userData: RegisterWithImagesRequest) => {
     return dispatch(registerUserWithImages(userData));
   }, [dispatch]);
 

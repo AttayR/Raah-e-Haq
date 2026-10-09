@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { vehicleTypeLabel } from '../../../features/auth/registration/registrationForm';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -44,12 +45,6 @@ interface ReviewStepProps {
   onDataChange: (data: Partial<ReviewData>) => void;
 }
 
-const vehicleTypeLabels: Record<string, string> = {
-  car: 'Car',
-  bike: 'Bike',
-  van: 'Van',
-  truck: 'Truck',
-};
 
 export default function ReviewStep({ data }: ReviewStepProps) {
   // Safety check for undefined data
@@ -105,7 +100,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>Vehicle Type</Text>
             <Text style={styles.infoValue}>
-              {vehicleTypeLabels[data.vehicleType || ''] || data.vehicleType || 'Not provided'}
+              {data.vehicleType ? vehicleTypeLabel(data.vehicleType) : 'Not provided'}
             </Text>
           </View>
           <View style={styles.infoItem}>

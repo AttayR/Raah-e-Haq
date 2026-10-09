@@ -13,6 +13,7 @@ import { launchImageLibrary, ImagePickerResponse, MediaType, PhotoQuality } from
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../../core/logging/logger';
+import { mergeStepErrors } from './stepErrors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -32,12 +33,14 @@ interface DocumentsData {
 interface DocumentsStepProps {
   data: DocumentsData;
   onDataChange: (data: Partial<DocumentsData>) => void;
-  errors: Record<string, string>;
+  errors: Partial<Record<string, string>>;
 }
 
 export default function DocumentsStep({ data, onDataChange, errors }: DocumentsStepProps) {
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
+  // Schema errors from Next (T-201) plus the step's own picker errors.
+  const validationErrors = mergeStepErrors(errors, localErrors);
 
   // Safety check for undefined data
   if (!data) {
@@ -132,31 +135,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
     onDataChange({ vehiclePictures: newPictures });
   };
 
-  const validateDriverPicture = (picture: string): string | undefined => {
-    if (!picture || !picture.trim()) return 'Driver picture is required';
-    return undefined;
-  };
-
-  const validateCnicPicture = (picture: string): string | undefined => {
-    if (!picture || !picture.trim()) return 'CNIC picture is required';
-    return undefined;
-  };
-
-  const validateCnicFrontPicture = (picture: string): string | undefined => {
-    if (!picture || !picture.trim()) return 'CNIC front picture is required';
-    return undefined;
-  };
-
-  const validateCnicBackPicture = (picture: string): string | undefined => {
-    if (!picture || !picture.trim()) return 'CNIC back picture is required';
-    return undefined;
-  };
-
-  const validateVehiclePictures = (pictures: string[]): string | undefined => {
-    if (!pictures || pictures.length < 4) return 'At least 4 vehicle pictures are required';
-    if (pictures.length > 6) return 'Maximum 6 vehicle pictures allowed';
-    return undefined;
-  };
+  // Required documents are checked by registrationSchema (driverDocuments) on Next.
 
   const renderImagePicker = (
     label: string,

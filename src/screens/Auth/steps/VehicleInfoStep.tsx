@@ -10,32 +10,19 @@ import {
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedTextInput from '../../../components/ThemedTextInput';
+import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth/registration/registrationForm';
+import { maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
+import { mergeStepErrors } from './stepErrors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
-interface VehicleInfoData {
-  vehicleType: string;
-  vehicleNumber: string;
-  vehicleBrand: string;
-  vehicleModel: string;
-  vehicleYear: string;
-  vehicleColor: string;
-  licenseType: string;
-  licenseExpiryDate: string;
-  licensePlate: string;
-  registrationNumber: string;
-  drivingExperience: string;
-  bankName: string;
-  bankBranch: string;
-  bankAccountNumber: string;
-  role: 'driver' | 'passenger';
-}
+type VehicleInfoData = RegistrationFormData;
 
 interface VehicleInfoStepProps {
   data: VehicleInfoData;
   onDataChange: (data: Partial<VehicleInfoData>) => void;
-  errors: Record<string, string>;
+  errors: Partial<Record<string, string>>;
   apiErrors?: Record<string, string>;
   onClearApiError?: (field: string) => void;
 }
@@ -50,33 +37,6 @@ const LICENSE_TYPES = [
 
 const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '20', '25', '30'];
 
-const vehicleTypes = [
-  { 
-    id: 'car', 
-    label: 'Car', 
-    icon: 'directions-car',
-    description: 'Sedan, Hatchback, SUV'
-  },
-  { 
-    id: 'bike', 
-    label: 'Bike', 
-    icon: 'motorcycle',
-    description: 'Motorcycle, Scooter'
-  },
-  { 
-    id: 'van', 
-    label: 'Van', 
-    icon: 'local-shipping',
-    description: 'Minivan, Cargo Van'
-  },
-  { 
-    id: 'truck', 
-    label: 'Truck', 
-    icon: 'local-shipping',
-    description: 'Pickup, Delivery Truck'
-  },
-];
-
 const vehicleBrands = [
   'Toyota', 'Honda', 'Suzuki', 'Nissan', 'Mitsubishi', 'Hyundai', 'Kia',
   'Ford', 'Chevrolet', 'BMW', 'Mercedes-Benz', 'Audi', 'Volkswagen',
@@ -88,12 +48,14 @@ const vehicleColors = [
   'Orange', 'Brown', 'Gold', 'Purple', 'Pink', 'Other'
 ];
 
-// API allows vehicle year up to 2025 (must not be greater than 2025)
-const MAX_VEHICLE_YEAR = 2025;
-const vehicleYears = Array.from({ length: 20 }, (_, i) => (MAX_VEHICLE_YEAR - i).toString());
+/** The newest 20 model years the backend accepts (BE-29: up to next year, AUTH-12). */
+const vehicleYearOptions = (): string[] => {
+  const max = maxVehicleYear();
+  return Array.from({ length: 20 }, (_, i) => (max - i).toString());
+};
 
 export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors = {}, onClearApiError }: VehicleInfoStepProps) {
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
@@ -109,44 +71,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
     );
   }
 
-  // Validation functions
-  const validateVehicleType = (type: string): string | undefined => {
-    if (!type || !type.trim()) return 'Vehicle type is required';
-    return undefined;
-  };
-
-  const validateVehicleNumber = (number: string): string | undefined => {
-    if (!number || !number.trim()) return 'Vehicle number is required';
-    const numberRegex = /^[A-Z]{2,3}\s?\d{4}\s?[A-Z]{1,2}$/;
-    if (!numberRegex.test(number.trim().toUpperCase())) {
-      return 'Please enter a valid vehicle number (e.g., ABC-1234 or ABC-1234-D)';
-    }
-    return undefined;
-  };
-
-  const validateVehicleBrand = (brand: string): string | undefined => {
-    if (!brand || !brand.trim()) return 'Vehicle brand is required';
-    return undefined;
-  };
-
-  const validateVehicleModel = (model: string): string | undefined => {
-    if (!model || !model.trim()) return 'Vehicle model is required';
-    return undefined;
-  };
-
-  const validateVehicleYear = (year: string): string | undefined => {
-    if (!year || !year.trim()) return 'Vehicle year is required';
-    const yearNum = parseInt(year, 10);
-    if (isNaN(yearNum) || yearNum < 2000 || yearNum > MAX_VEHICLE_YEAR) {
-      return `Please enter a valid year between 2000 and ${MAX_VEHICLE_YEAR}`;
-    }
-    return undefined;
-  };
-
-  const validateVehicleColor = (color: string): string | undefined => {
-    if (!color || !color.trim()) return 'Vehicle color is required';
-    return undefined;
-  };
+  // Schema errors from Next (T-201) plus the ones found on blur.
+  const validationErrors = mergeStepErrors(errors, localErrors);
+  const vehicleYears = vehicleYearOptions();
 
   const formatVehicleNumber = (value: string): string => {
     if (!value) return '';
@@ -179,59 +106,8 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
   };
 
   const validateField = (field: keyof VehicleInfoData, value: string) => {
-    let error: string | undefined;
-    const safeValue = value || '';
-    
-    switch (field) {
-      case 'vehicleType':
-        error = validateVehicleType(safeValue);
-        break;
-      case 'vehicleNumber':
-        error = validateVehicleNumber(safeValue);
-        break;
-      case 'vehicleBrand':
-        error = validateVehicleBrand(safeValue);
-        break;
-      case 'vehicleModel':
-        error = validateVehicleModel(safeValue);
-        break;
-      case 'vehicleYear':
-        error = validateVehicleYear(safeValue);
-        break;
-      case 'vehicleColor':
-        error = validateVehicleColor(safeValue);
-        break;
-      case 'licenseType':
-        error = !safeValue ? 'License type is required' : undefined;
-        break;
-      case 'licenseExpiryDate':
-        error = !safeValue ? 'License expiry date is required' : undefined;
-        break;
-      case 'licensePlate':
-        error = !safeValue ? 'License plate is required' : undefined;
-        break;
-      case 'registrationNumber':
-        error = !safeValue ? 'Registration number is required' : undefined;
-        break;
-      case 'drivingExperience':
-        error = !safeValue ? 'Driving experience is required' : undefined;
-        break;
-      case 'bankName':
-        error = !safeValue ? 'Bank name is required' : undefined;
-        break;
-      case 'bankBranch':
-        error = !safeValue ? 'Bank branch is required' : undefined;
-        break;
-      case 'bankAccountNumber':
-        error = !safeValue ? 'Bank account number is required' : undefined;
-        break;
-    }
-    
-    if (error) {
-      setValidationErrors(prev => ({ ...prev, [field]: error! }));
-    } else {
-      setValidationErrors(prev => ({ ...prev, [field]: '' }));
-    }
+    const error = validateStepField('vehicle', field, { ...data, [field]: value || '' });
+    setValidationErrors(prev => ({ ...prev, [field]: error ?? '' }));
   };
 
   const handleVehicleTypeSelect = (type: string) => {
@@ -284,7 +160,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Vehicle Type *</Text>
           <View style={styles.vehicleTypeGrid}>
-            {vehicleTypes.map((type) => (
+            {VEHICLE_TYPES.map((type) => (
               <TouchableOpacity
                 key={type.id}
                 style={[

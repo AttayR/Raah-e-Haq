@@ -72,7 +72,7 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 | DELETE `/rides/{id}` | yes | yes | `deleteRide` (unused) | 400 unless the ride can be deleted; admin-only once BE-24 lands (403 `FORBIDDEN`) |
 | POST `/rides/{id}/assign-driver` | yes | yes | `assignDriver` (unused) | BE-30: **driver comes from the token**, the body (`driver_id`) is ignored, and the accept is atomic. 403 `FORBIDDEN` (not a driver, or own ride), 403 `DRIVER_NOT_ACTIVE`, 400 `RIDE_ALREADY_ACCEPTED` / `DRIVER_NOT_AVAILABLE` (no `available` location). 409 for a lost race comes later in BE-03. **BE-37:** a driver without a verified phone gets 403 `PHONE_NOT_VERIFIED` here and on PUT `{status:'accepted'}` |
 | POST `/rides/{id}/cancel` | yes | yes | `cancelRide` | `data: RideResource` |
-| GET `/rides/pending` | **shadowed** | yes | not called (`getPendingRides` uses `GET /rides?status=requested`) | Registered after `apiResource`, so `rides/{ride}` swallows it (404). Fix is BE-02; the app switch is T-403 (TODO in code) |
+| GET `/rides/pending` | yes (BE-02) | yes | not called yet (`getPendingRides` still uses `GET /rides?status=requested`; switch in T-403) | Driver role, driver from token (no `driver_id`). Query: optional `latitude`/`longitude` (fallback when no ping in 5 min), `radius` km ≤ 20. 200 `data: RideResource[] + estimated_distance, estimated_pickup_min, estimated_fare`, `meta:{radius_km, vehicle_types, location_source, max_age_minutes}`; minimal passenger card, no phone. 409 `error.code` DRIVER_NOT_AVAILABLE / DRIVER_ON_RIDE / NO_APPROVED_VEHICLE; 422 (`code: LOCATION_REQUIRED` when no location); 429 `rate_limited` (30/min). Note: 409 code is in `error.code`, 422/429 in top-level `code` |
 | GET `/rides/nearby-drivers` | yes | yes | not called yet | BE-20 contract above; the app switch is T-110 |
 | POST `/rides/{id}/stops` | yes | yes | `addStop` | `data` is **not** a ride: `{id, stops, updated_fare, updated_distance, updated_duration}` (`RideStopsUpdate`). `useRide` now merges it into the current ride |
 | DELETE `/rides/{id}/stops/{stop}` | yes | yes | `removeStop` | same `RideStopsUpdate` shape |
@@ -85,12 +85,12 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 
 | Method + path | Exists | Documented | App code | Notes |
 |---|---|---|---|---|
-| POST `/tracking/update-location` | yes | yes | `rideService.updateDriverLocation` (the one remaining version), `locationTrackingService` periodic upload | Body `{latitude, longitude, status?: online\|available\|busy\|offline, address?, speed?, heading?, accuracy?}`. 201 `data: DriverLocation`. `DriverMapScreen` still passes two args (DRV-03, T-402) |
+| POST `/tracking/update-location` | yes | yes | `rideService.updateDriverLocation` (the one remaining version), `locationTrackingService` periodic upload | **BE-06:** driver role only. Body `{latitude, longitude, heading?, speed? (m/s), accuracy? (m), address?}` as numbers; body `status` is ignored, negative speed/heading/accuracy are treated as null. 201 `data:{driver_id, latitude, longitude, heading, status: available\|busy, last_seen_at, driver_status}`. 409 `DRIVER_OFFLINE` when offline (nothing stored). 60/min. `DriverMapScreen` still passes two args (DRV-03, T-402) |
 | GET `/tracking/driver/{id}/latest` | yes | yes (API_DOCUMENTATION) | `rideService.getDriverLocation`, `locationTrackingService.getDriverLocation` | BE-20: 403 unless there is an active ride. `data` may be `null` when the driver has no location yet |
 | GET `/tracking/driver/{id}/location` | **no** | yes (COMPLETE_API_DOCUMENTATION, RIDE_MODULE_API_FLOW) | was `locationTrackingService.getDriverLocation` and `rideService.getDriverLocationById` | **Fixed in T-007:** both now use `/latest`, and the duplicate `getDriverLocationById` was removed. The docs are wrong |
 | GET `/tracking/drivers-in-radius` | yes, **admin-only** | yes | `rideService.getDriversInRadius` via `useRide.findNearbyDrivers` | Passengers get 403 since BE-20. TODO(T-110) in code: move to `/rides/nearby-drivers` (string ids, no name/phone) |
 | GET `/tracking/ride/{ride}/path` | yes | yes | `getRidePath` (unused) | Ownership check is BE-24 |
-| POST `/tracking/update-status` | **no** | no | `locationTrackingService.setDriverStatus` (no callers) | **Broken (404).** TODO(BE-06/T-401) in code: driver online/offline becomes `POST/GET /driver/status` |
+| POST `/tracking/update-status` | **no** | no | `locationTrackingService.setDriverStatus` (no callers) | **Never existed.** Use BE-06 `GET /driver/status` and `PUT\|POST /driver/status {status: online\|available\|offline}` → `data:{status: offline\|available\|on_ride, is_online, can_accept_rides, active_ride_id, changed_at, last_location_at}`; 403 `NO_APPROVED_VEHICLE`/`DRIVER_NOT_ACTIVE`, 409 `RIDE_IN_PROGRESS`, 422 unknown status; 30/min (T-401) |
 
 ### Notifications (`notificationService.ts`, through `rideService`)
 
@@ -124,7 +124,7 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 
 1. **Earnings, ride history detail, chat, ratings, driver status, fare estimate, vehicle catalogue:** none of these exist on the backend. They are planned as BE-08 (stats/earnings), BE-01 (history), BE-13 (chat), BE-07 (rating), BE-06 (driver status), BE-05 (estimate + catalogue).
 2. **`/tracking/driver/{id}/latest` vs `/rides/nearby-drivers`:** settled by BE-20. Passengers use nearby-drivers before a ride and `/latest` only during an active ride.
-3. **`/tracking/update-status`:** it never existed. Settled: BE-06 adds `/driver/status`. Should it also normalise `online` vs `available`? BE-06 notes say yes.
+3. **`/tracking/update-status`:** it never existed. Settled and built (BE-06): `/driver/status`; `online` is accepted as `available`; `on_ride` is derived from active rides. Accept (`POST /rides/{id}/assign-driver`) returns 400 `DRIVER_NOT_AVAILABLE` when offline and 409 `DRIVER_ON_RIDE` during a ride. Passenger tracking: `GET /rides/{id}/driver-location` (participants only, data null when not active).
 4. **Refresh tokens:** settled in T-104 with BE-25: no refresh token; 401 → logout; no proactive `/auth/refresh` while the idle expiry slides and the absolute cap is off.
 5. **Error envelope:** the backend mixes shapes A and B. The app handles both. Unifying them on the server would simplify things (candidate for BE-26/BE-29).
 6. **`RideResource.driver`/`passenger`:** relation shapes differ by viewer (BE-20). The app's `RideResource.driver.phone` must be treated as optional (T-110).

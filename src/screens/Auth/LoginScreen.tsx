@@ -336,6 +336,8 @@ export default function LoginScreen() {
                       }}
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="email"
                       style={styles.input}
                     />
                     {validationErrors.email && (

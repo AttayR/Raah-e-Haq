@@ -37,7 +37,7 @@ Safe test location (local): Gulberg III, Lahore (31.5204, 74.3587). After `migra
 ## Rules
 - **Data creation.** On the local backend, scenarios marked **Creates data** run without asking (owner approved 2026-10-08) and must finish with their cleanup step. On production they need the owner's go-ahead per run.
 - **Two simulators.** Two-device scenarios run the passenger and driver apps on two different simulators, each with its own signed-in test account.
-- **Credentials.** On the local backend, agents sign in with the local test accounts above. Agents never type production passwords or OTPs; a production login screen means `BLOCKED` until the owner signs in. OTP on local: the code is stored hashed and never logged (BE-16); read it from the `send-otp` response, which echoes `otp_code` only when the local backend runs with APP_ENV=local and APP_DEBUG=true. A resend within 60 s returns 429 (set `OTP_RESEND_COOLDOWN_SECONDS=0` in the local backend .env if a scenario needs rapid resends). Never from production.
+- **Credentials.** On the local backend, agents sign in with the local test accounts above. Agents never type production passwords or OTPs; a production login screen means `BLOCKED` until the owner signs in. OTP on local: the code is stored hashed and never logged (BE-16); the local `send-otp`/`register`/`resend` responses echo `otp_code` (APP_ENV=local, APP_DEBUG=true) but the app drops it on purpose, and the SMS log (LogSmsGateway) logs only the masked number. For entry in the app use the BE-61 local test code: the local backend .env sets `OTP_LOCAL_TEST_CODE=246810` and `OTP_LOCAL_TEST_NUMBERS=+92300999`, so every OTP for a made-up +92300999xxxx number is 246810 (local/testing only; production ignores it and alerts). Real-looking numbers still get random codes. No tinker needed. A resend within 60 s returns 429 (set `OTP_RESEND_COOLDOWN_SECONDS=0` in the local backend .env if a scenario needs rapid resends). Never from production.
 
 ## Smoke (read-only)
 
@@ -193,6 +193,6 @@ Precondition: an accepted ride between the local passenger and the local driver 
 1. Phone login on the local backend. Send the code.
 2. **Expected:**
    - There is no OTP value, "Use This OTP" button or "Test Code" text on screen.
-   - The code is read from the local DB/log for entry.
+   - For entry use the BE-61 local test code 246810 with a +92300999xxxx number; codes are never read from logs.
    - Verify succeeds.
 3. Backend check (BE-16): with `APP_ENV=production` in a feature test, the send-otp response has no `otp_code`.

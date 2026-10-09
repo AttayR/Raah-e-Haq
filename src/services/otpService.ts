@@ -28,6 +28,43 @@ export const formatPkPhoneInput = (text: string): string => {
   return `+92${digits.replace(/^92/, '').replace(/^0/, '').slice(0, 10)}`;
 };
 
+/** Characters a typed phone number may contain besides digits (backend Phone::ALLOWED). */
+const PHONE_ALLOWED = /^[0-9+\-\s()./]+$/;
+/** The only numbers the backend accepts (BE-27/BE-28): Pakistani mobiles, +92 3xx xxxxxxx. */
+const PK_MOBILE_E164 = /^\+923\d{9}$/;
+
+/**
+ * The E.164 form the backend stores for a typed Pakistani mobile number, or null when the
+ * server would refuse it (422). Mirrors the backend's Phone::toE164 for country code 92:
+ * "+92 300 1234567", "00923001234567", "923001234567", "03001234567", "3001234567",
+ * "+03001234567" and "+92 0300 1234567" all become "+923001234567". Non-+92 numbers are
+ * refused (sms.allowed_country_codes is Pakistan only).
+ */
+export const toPkMobileE164 = (input: string): string | null => {
+  const trimmed = (input || '').trim();
+  if (trimmed === '' || !PHONE_ALLOWED.test(trimmed)) {
+    return null;
+  }
+  const digits = trimmed.replace(/\D/g, '');
+  let e164: string;
+  if (trimmed.startsWith('+') && !digits.startsWith('0')) {
+    e164 = `+${digits}`;
+  } else if (digits.startsWith('00')) {
+    e164 = `+${digits.slice(2)}`;
+  } else if (digits.startsWith('0')) {
+    e164 = `+92${digits.slice(1)}`;
+  } else if (digits.length === 10) {
+    e164 = `+92${digits}`;
+  } else {
+    e164 = `+${digits}`;
+  }
+  // "+92 0300 ...": the national trunk 0 never follows the country code.
+  if (e164.startsWith('+920')) {
+    e164 = `+92${e164.slice(4)}`;
+  }
+  return PK_MOBILE_E164.test(e164) ? e164 : null;
+};
+
 /** Whole seconds left until `deadlineMs` (never negative). */
 export const secondsUntil = (deadlineMs: number | null, nowMs: number): number =>
   deadlineMs == null ? 0 : Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000));
