@@ -5,6 +5,7 @@
 import { act, renderHook } from '@testing-library/react-native';
 import type { LatLng } from 'react-native-maps';
 import {
+  BOOKING_REGION_DELTA,
   DRIVER_APPROACH_EDGE_PADDING,
   driverApproachCoordinates,
   fitKeyOf,
@@ -101,16 +102,21 @@ describe('T-312: refit key, map ready, passenger gestures', () => {
     expect(fit).toHaveBeenCalledTimes(1);
   });
 
-  type CameraProps = { stage: PassengerRideStage; location: { latitude: number; longitude: number } };
+  type CameraProps = {
+    stage: PassengerRideStage | null;
+    location: { latitude: number; longitude: number };
+    home?: LatLng | null;
+  };
 
   const setupCamera = (initial: CameraProps) => {
     const fit = jest.fn();
-    const mapRef = { current: { fitToCoordinates: fit } };
+    const animate = jest.fn();
+    const mapRef = { current: { fitToCoordinates: fit, animateToRegion: animate } };
     const hook = renderHook(
-      ({ stage, location }: CameraProps) => usePassengerRideCamera(mapRef, stage, location, pickupRide),
+      ({ stage, location, home }: CameraProps) => usePassengerRideCamera(mapRef, stage, location, pickupRide, home),
       { initialProps: initial },
     );
-    return { ...hook, fit };
+    return { ...hook, fit, animate };
   };
 
   it('a screen mounted mid-ride fits once the map becomes ready', () => {
@@ -146,3 +152,60 @@ describe('T-312: refit key, map ready, passenger gestures', () => {
   });
 });
 
+describe('T-313: the ride is cleared', () => {
+  type Props = { stage: PassengerRideStage | null; home: LatLng | null };
+  const home = { latitude: 31.51, longitude: 74.34 };
+
+  const setup = (initial: Props) => {
+    const fit = jest.fn();
+    const animate = jest.fn();
+    const mapRef = { current: { fitToCoordinates: fit, animateToRegion: animate } };
+    const hook = renderHook(
+      ({ stage, home: point }: Props) => usePassengerRideCamera(mapRef, stage, driver, pickupRide, point),
+      { initialProps: initial },
+    );
+    return { ...hook, fit, animate };
+  };
+
+  it('after a hand-panned ride, Done drops the pause and recentres on the booking point', () => {
+    const { result, rerender, animate } = setup({ stage: 'driver_en_route', home: null });
+    act(() => result.current.onMapReady());
+    act(() => result.current.onRegionChangeComplete({} as never, { isGesture: true }));
+    expect(result.current.isFollowing()).toBe(false);
+
+    rerender({ stage: 'completed', home: null });
+    expect(animate).not.toHaveBeenCalled();
+
+    // Done: the ride is cleared and the screen passes the passenger's position.
+    rerender({ stage: null, home });
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate).toHaveBeenCalledWith({
+      latitude: 31.51,
+      longitude: 74.34,
+      latitudeDelta: BOOKING_REGION_DELTA,
+      longitudeDelta: BOOKING_REGION_DELTA,
+    });
+
+    // The next ride follows the driver again (no pause carried over), and re-renders on the
+    // booking map do not recentre again.
+    rerender({ stage: null, home: { latitude: 31.6, longitude: 74.4 } });
+    expect(animate).toHaveBeenCalledTimes(1);
+    rerender({ stage: 'driver_en_route', home: null });
+    expect(result.current.isFollowing()).toBe(true);
+  });
+
+  it('does not recentre on first mount without a ride, before the map is ready, or without a point', () => {
+    const first = setup({ stage: null, home });
+    act(() => first.result.current.onMapReady());
+    expect(first.animate).not.toHaveBeenCalled();
+
+    const notReady = setup({ stage: 'cancelled', home });
+    notReady.rerender({ stage: null, home });
+    expect(notReady.animate).not.toHaveBeenCalled();
+
+    const noPoint = setup({ stage: 'cancelled', home: null });
+    act(() => noPoint.result.current.onMapReady());
+    noPoint.rerender({ stage: null, home: null });
+    expect(noPoint.animate).not.toHaveBeenCalled();
+  });
+});

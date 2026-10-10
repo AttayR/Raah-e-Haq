@@ -101,7 +101,10 @@ const PassengerMapScreen = () => {
     refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
   });
   // Driver on the way (T-311/T-312): keep the driver and the pickup in view, until the passenger pans.
-  const { isFollowing: isRideCameraFollowing, ...rideCamera } = usePassengerRideCamera(mapRef, rideStage?.stage, driverLocation, currentRide);
+  // Ride cleared (T-313): recentre on the pickup, else the passenger.
+  const { isFollowing: isRideCameraFollowing, ...rideCamera } = usePassengerRideCamera(
+    mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation,
+  );
   // Call button only while the server exposes driver.phone (accepted, still-active ride).
   const driverPhone = getDriverPhone(currentRide);
   const callDriver = useCallback(() => {

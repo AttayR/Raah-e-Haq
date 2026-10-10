@@ -10,6 +10,10 @@ import type { PassengerRideStage } from './stage';
  * T-312: the fit waits for the native map (a screen mounted mid-ride fits once the map is
  * ready), refits only when a point moved ~10 m, and stops after the passenger's own pan or
  * zoom until the ride stage changes.
+ *
+ * T-313: when the ride is cleared (Done after completed / cancelled) the pause is dropped and
+ * the map recentres on the booking point (pickup, else the passenger), instead of staying
+ * wherever the passenger last panned it.
  */
 
 /** Room for the top controls and the bottom ride panel around the two points. */
@@ -80,6 +84,14 @@ export const useFitCoordinates = (
   }, [key, mapRef]);
 };
 
+/** The map ref the ride camera needs: fit for the driver approach, animate for the recentre. */
+export interface RideCameraMap extends FitToCoordinatesMap {
+  animateToRegion: (region: Region, duration?: number) => void;
+}
+
+/** The booking map's zoom (the same span the screen uses for the passenger's position). */
+export const BOOKING_REGION_DELTA = 0.01;
+
 export interface PassengerRideCamera {
   /**
    * True while the auto-fit owns the camera (driver on the way, not paused by the passenger),
@@ -96,23 +108,40 @@ export interface PassengerRideCamera {
  * The passenger map's ride camera (T-311/T-312): fits the driver and the pickup while the
  * driver is on the way, once the map is ready. A gesture by the passenger (Google Maps
  * reports `isGesture`; our own animations are not gestures) pauses it for the rest of the
- * current stage; the next stage resumes it.
+ * current stage; the next stage resumes it. When the ride is cleared (T-313) the map
+ * recentres on `home` (the pickup, else the passenger's position), when known.
  */
 export const usePassengerRideCamera = (
-  mapRef: RefObject<FitToCoordinatesMap | null>,
+  mapRef: RefObject<RideCameraMap | null>,
   stage: PassengerRideStage | null | undefined,
   driverLocation: Pick<DriverLocation, 'latitude' | 'longitude'> | null,
   ride: Pick<RideResource, 'pickup_latitude' | 'pickup_longitude'> | null,
+  home: LatLng | null = null,
 ): PassengerRideCamera => {
   const [mapReady, setMapReady] = useState(false);
   const [pausedStage, setPausedStage] = useState<PassengerRideStage | null>(null);
   const current = stage ?? null;
   const paused = pausedStage !== null && pausedStage === current;
+  const latestHome = useRef(home);
+  latestHome.current = home;
+  const mapReadyRef = useRef(mapReady);
+  mapReadyRef.current = mapReady;
+  const previousStage = useRef(current);
 
-  // A new stage resumes the fit.
+  // A new stage resumes the fit. The ride cleared (a stage, then none): back to the booking map.
   useEffect(() => {
     setPausedStage(null);
-  }, [current]);
+    const hadRide = previousStage.current !== null;
+    previousStage.current = current;
+    const point = latestHome.current;
+    if (!hadRide || current !== null || !mapReadyRef.current || !point) return;
+    mapRef.current?.animateToRegion({
+      latitude: point.latitude,
+      longitude: point.longitude,
+      latitudeDelta: BOOKING_REGION_DELTA,
+      longitudeDelta: BOOKING_REGION_DELTA,
+    });
+  }, [current, mapRef]);
 
   useFitCoordinates(mapRef, paused ? null : driverApproachCoordinates(current, driverLocation, ride), {
     ready: mapReady,
