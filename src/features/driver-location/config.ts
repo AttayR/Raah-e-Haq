@@ -16,6 +16,17 @@ export const DRIVER_LOCATION_CONFIG = {
    * the server's arrival check (BE-64) judges where the driver is now (T-409).
    */
   arrivalPingMaxAgeMs: 20_000,
+  /**
+   * While tracking, no new fix for this long restarts the device watcher once (T-410). A
+   * restart delivers a fresh fix at once, so a driver standing still is refreshed too.
+   */
+  watchRestartAfterMs: 60_000,
+  /**
+   * A fix older than this is never posted (heartbeat or arrival ping): the server must not
+   * see a frozen position as the driver's current one (T-410). Above `watchRestartAfterMs`,
+   * so a healthy watcher always has a fix this fresh.
+   */
+  maxFixAgeMs: 90_000,
 } as const;
 
 export interface DriverLocationConfig {

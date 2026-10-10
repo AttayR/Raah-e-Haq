@@ -1,0 +1,15 @@
+diff --git a/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm b/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm
+index 03df64d..b8088d4 100644
+--- a/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm
++++ b/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm
+@@ -412,7 +412,9 @@ - (void)enableBackgroundLocationUpdates
+                           useSignificantChanges:options.useSignificantChanges];
+ 
+   if (didPause) {
+-    [self startObserving];
++    // Resume the paused watch with its own options. A bare `[self startObserving]` resolves to
++    // RCTEventEmitter's no-op hook, so the watch silently ended after this one-shot request.
++    [self startObserving:_observerOptions];
+   }
+ }
+ 

@@ -5,6 +5,7 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   Alert, 
+  Linking,
   StatusBar
 } from 'react-native';
 import { Marker } from 'react-native-maps';
@@ -16,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
-import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { useDriverDeviceLocation } from '../../features/driver-location/hooks';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { logger } from '../../core/logging/logger';
 import { useDriverStatusToggle } from '../../features/driver-status/hooks';
@@ -69,16 +70,13 @@ const DriverMapScreen = () => {
   const currentRide = useAppSelector(selectDriverActiveRide);
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
   
-  // Use native location hook
-  const {
-    currentLocation,
-    isLoading: locationLoading,
-    requestLocationPermission,
-  } = useNativeLocation();
+  // The position comes from the tracker's one shared watcher (T-410): asking the device here
+  // (getCurrentPosition) ended the tracker's watch on iOS while a ride was running.
+  const currentLocation = useDriverDeviceLocation();
   
   // Online/offline is the server's answer (GET/PUT /driver/status, T-401), shared with Home.
   const { isOnline, isOnRide, isChecking, disabled: toggleDisabled, toggle } = useDriverStatusToggle();
-  const isLoadingLocation = locationLoading || !currentLocation;
+  const isLoadingLocation = !currentLocation;
 
   // Incoming requests (T-403/T-404) are polled and shown by RideRequestHost, mounted once for
   // all driver tabs (T-408), so they arrive on Home as well as here.
@@ -99,12 +97,35 @@ const DriverMapScreen = () => {
     };
   }, []);
 
-  // Get current location
-  const getCurrentLocation = () => {
-    if (currentLocation) {
-      requestLocationPermission(); // Refresh location
-    } else {
-      requestLocationPermission();
+  // No position yet: location services are off or not allowed for the app.
+  const promptForLocation = () => {
+    Alert.alert(
+      'Location Required',
+      'Please enable location services to go online.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() }
+      ]
+    );
+  };
+
+  // Recentre on the latest position; without one, location is off or not allowed yet.
+  const centreOnLocation = () => {
+    if (!currentLocation) {
+      promptForLocation();
+      return;
+    }
+    if (mapReady && mapRef.current) {
+      try {
+        mapRef.current.animateToRegion({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      } catch (error) {
+        logger.error('Error animating to region:', error);
+      }
     }
   };
 
@@ -121,9 +142,14 @@ const DriverMapScreen = () => {
     return MAPS_CONFIG.DEFAULT_REGION;
   };
 
-  // Move map to current location (again once the map is ready)
+  // Move the map to the first position once the map is ready. Later fixes (the live watcher,
+  // T-410) move the marker only, so the map does not jump while the driver pans it; the
+  // locate button recentres on demand.
+  const centredOnceRef = useRef(false);
   useEffect(() => {
+    if (centredOnceRef.current) return;
     if (mapReady && currentLocation && mapRef.current && currentLocation.latitude && currentLocation.longitude) {
+      centredOnceRef.current = true;
       try {
         mapRef.current.animateToRegion({
           latitude: currentLocation.latitude,
@@ -155,14 +181,7 @@ const DriverMapScreen = () => {
   const toggleOnlineStatus = () => {
     // Going online needs a location to post; going offline never does.
     if (!isOnline && !currentLocation) {
-      Alert.alert(
-        'Location Required',
-        'Please enable location services to go online.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Enable Location', onPress: requestLocationPermission }
-        ]
-      );
+      promptForLocation();
       return;
     }
 
@@ -247,7 +266,7 @@ const DriverMapScreen = () => {
 
       {/* Control Buttons */}
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation}>
+        <TouchableOpacity testID="driver-map-locate" style={styles.locationButton} onPress={centreOnLocation}>
           <Icon name="my-location" size={24} color={BrandColors.primary} />
         </TouchableOpacity>
         

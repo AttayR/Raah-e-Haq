@@ -63,3 +63,21 @@ export const useDriverLastLocation = (): LatLng | null => {
   }, []);
   return location;
 };
+
+/**
+ * The driver's device position for a screen that shows it even while tracking is off (the
+ * driver map when offline, T-410). It holds the tracker's one shared watcher while mounted and
+ * in the foreground, instead of asking the device itself: on iOS a one-shot
+ * `getCurrentPosition` during a watch ends the tracker's watch.
+ */
+export const useDriverDeviceLocation = (): LatLng | null => {
+  const isActive = useAppIsActive();
+  const location = useDriverLastLocation();
+  useEffect(() => {
+    if (!isActive) {
+      return undefined;
+    }
+    return locationTrackingService.acquireLocationWatch();
+  }, [isActive]);
+  return location;
+};

@@ -56,11 +56,18 @@ const requestForegroundPermission = async (): Promise<boolean> => {
 /**
  * The driver's one location tracker (T-402, DRV-03/09/10/18).
  *
- * - One device watcher (`watchPosition`) and one timer, both owned here. Starting twice is a
- *   no-op; `stopTracking` clears both. Nothing runs in the background: the caller
- *   (useDriverLocationTracking) stops it when the app leaves the foreground.
+ * - The app's only device watcher (`watchPosition`), owned here (T-410). Tracking holds it, and
+ *   a screen that needs positions while not tracking holds it with `acquireLocationWatch`; it
+ *   runs while anyone holds it and nothing else may start or stop a native watch. On iOS a
+ *   `getCurrentPosition` while a watch runs ends that watch (patched in patches/, but driver
+ *   screens read positions from here instead of asking the device themselves).
+ * - One post timer while tracking; starting twice is a no-op, `stopTracking` clears it. Nothing
+ *   runs in the background: the callers stop when the app leaves the foreground.
  * - Posts POST /tracking/update-location at most every `minPostIntervalMs`, and skips a post
  *   when the driver moved less than `minMoveMeters` and the last post is under `heartbeatMs` old.
+ *   A fix older than `maxFixAgeMs` is never posted, so a frozen position is not sent as fresh.
+ * - Self-heal (T-410): while tracking, no new fix for `watchRestartAfterMs` restarts the watcher
+ *   once; the next restart needs another full silent window.
  * - 409 DRIVER_OFFLINE: stops, then calls `onDriverOffline` (the caller reloads the status).
  *   403: stops. 429: waits `retry_after`. Other failures are retried on the next tick.
  * - Every async answer carries the run's generation, so nothing from a stopped run (or a
@@ -69,7 +76,6 @@ const requestForegroundPermission = async (): Promise<boolean> => {
 class LocationTrackingService {
   private active = false;
   private generation = 0;
-  private watchId: number | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastLocation: LocationFix | null = null;
   private lastPost: LastPostedLocation | null = null;
@@ -77,6 +83,20 @@ class LocationTrackingService {
   private blockedUntil = 0;
   private onDriverOffline: (() => void) | undefined;
   private listeners: Set<(location: LocationFix) => void> = new Set();
+
+  // The shared device watcher.
+  private watchId: number | null = null;
+  private watchGeneration = 0;
+  /** Tracking holds the watcher (set once permission was granted). */
+  private trackingHoldsWatch = false;
+  /** Holders through `acquireLocationWatch` whose permission step succeeded. */
+  private watchRefs = 0;
+  /** Bumped by `reset`, so a holder from a previous session cannot release a new one's hold. */
+  private session = 0;
+  /** When the device last delivered a fix, or the watcher (re)started (epoch ms). */
+  private lastSignAt = 0;
+  /** When the device last delivered a fix (epoch ms); 0 before the first one. */
+  private lastFixAt = 0;
 
   /** Starts the watcher and the post timer. Resolves false when permission was refused or it was stopped meanwhile. */
   async startTracking(options: TrackingOptions = {}): Promise<boolean> {
@@ -88,12 +108,7 @@ class LocationTrackingService {
     const generation = ++this.generation;
 
     try {
-      Geolocation.setRNConfiguration({
-        skipPermissionRequests: false,
-        authorizationLevel: 'whenInUse',
-        enableBackgroundLocationUpdates: false,
-      });
-      const granted = await requestForegroundPermission();
+      const granted = await this.preparePermission();
       if (generation !== this.generation) {
         return false;
       }
@@ -103,14 +118,13 @@ class LocationTrackingService {
         return false;
       }
 
-      this.watchId = Geolocation.watchPosition(
-        (position) => this.handlePosition(generation, position),
-        (error) => this.handleWatchError(generation, error),
-        DRIVER_LOCATION_WATCH_OPTIONS,
-      );
+      this.trackingHoldsWatch = true;
+      this.syncWatch();
       this.timer = setInterval(() => {
-        this.flush(generation);
+        this.tick(generation);
       }, DRIVER_LOCATION_CONFIG.minPostIntervalMs);
+      // A watcher already held by a screen may have a fix to post now, or be silent already.
+      this.tick(generation);
       return true;
     } catch (error) {
       logger.warn('Driver location: could not start the watcher', { error });
@@ -121,18 +135,16 @@ class LocationTrackingService {
     }
   }
 
-  /** Clears the watcher and the timer. The next start posts at once. */
+  /** Stops posting and releases tracking's hold on the watcher. The next start posts at once. */
   stopTracking(): void {
     this.generation += 1;
     this.active = false;
-    if (this.watchId !== null) {
-      Geolocation.clearWatch(this.watchId);
-      this.watchId = null;
-    }
+    this.trackingHoldsWatch = false;
     if (this.timer !== null) {
       clearInterval(this.timer);
       this.timer = null;
     }
+    this.syncWatch();
     this.inFlight = null;
     this.blockedUntil = 0;
     this.lastPost = null;
@@ -140,21 +152,54 @@ class LocationTrackingService {
   }
 
   /**
-   * Back to the signed-out state (called by logout, T-104): stops tracking and forgets the
-   * last position and the listeners, so nothing of one user's session reaches the next one.
+   * Holds the shared watcher without posting (T-410), for a screen that shows the driver's
+   * position while tracking may be off (the driver map when offline). Returns the release
+   * function; calling it more than once is harmless. Positions arrive through
+   * `addLocationListener` / `getLastLocation`.
+   */
+  acquireLocationWatch(): () => void {
+    const session = this.session;
+    let released = false;
+    let counted = false;
+    this.preparePermission()
+      .then((granted) => {
+        if (released || session !== this.session || !granted) return;
+        counted = true;
+        this.watchRefs += 1;
+        this.syncWatch();
+      })
+      .catch((error: unknown) => {
+        logger.warn('Driver location: could not hold the watcher', { error });
+      });
+    return () => {
+      if (released) return;
+      released = true;
+      if (!counted || session !== this.session) return;
+      this.watchRefs = Math.max(0, this.watchRefs - 1);
+      this.syncWatch();
+    };
+  }
+
+  /**
+   * Back to the signed-out state (called by logout, T-104): stops tracking and the watcher and
+   * forgets the last position and the listeners, so nothing of one user's session reaches the
+   * next one.
    */
   reset(): void {
+    this.session += 1;
+    this.watchRefs = 0;
     this.stopTracking();
     this.lastLocation = null;
+    this.lastFixAt = 0;
     this.listeners.clear();
   }
 
   /**
    * One extra post when the server's copy may be old (T-409, before POST /rides/{id}/arrived):
-   * if tracking runs, has a fix, and the last accepted post is older than `maxAgeMs` (or there
-   * is none), the latest fix is posted now, ignoring the movement throttle (a 429 wait is still
-   * honoured). A post already in flight is awaited instead. Never throws, never loops: failures
-   * go through the usual handling and the caller carries on.
+   * if tracking runs, has a fresh fix, and the last accepted post is older than `maxAgeMs` (or
+   * there is none), the latest fix is posted now, ignoring the movement throttle (a 429 wait is
+   * still honoured). A post already in flight is awaited instead. Never throws, never loops:
+   * failures go through the usual handling and the caller carries on.
    */
   async pingIfStale(maxAgeMs: number): Promise<void> {
     if (this.inFlight) {
@@ -165,7 +210,7 @@ class LocationTrackingService {
     const now = Date.now();
     if (now < this.blockedUntil) return;
     const fix = this.lastLocation;
-    if (!fix) return;
+    if (!fix || !this.isFixFresh(now)) return;
     if (this.lastPost && now - this.lastPost.at < maxAgeMs) return;
     await this.post(this.generation, fix, now);
   }
@@ -178,7 +223,7 @@ class LocationTrackingService {
     return this.lastLocation;
   }
 
-  /** Positions from the shared watcher while tracking runs. Returns the unsubscribe function. */
+  /** Positions from the shared watcher while it runs. Returns the unsubscribe function. */
   addLocationListener(listener: (location: LocationFix) => void): () => void {
     this.listeners.add(listener);
     return () => {
@@ -191,11 +236,69 @@ class LocationTrackingService {
     return rideService.getDriverLocation(driverId);
   }
 
-  private handlePosition(generation: number, position: DevicePosition): void {
+  /** Foreground-only configuration and permission, shared by every holder of the watcher. */
+  private async preparePermission(): Promise<boolean> {
+    Geolocation.setRNConfiguration({
+      skipPermissionRequests: false,
+      authorizationLevel: 'whenInUse',
+      enableBackgroundLocationUpdates: false,
+    });
+    return requestForegroundPermission();
+  }
+
+  /** Runs the device watcher exactly while someone holds it. */
+  private syncWatch(): void {
+    const wanted = this.trackingHoldsWatch || this.watchRefs > 0;
+    if (wanted && this.watchId === null) {
+      this.startWatch();
+    } else if (!wanted && this.watchId !== null) {
+      this.stopWatch();
+    }
+  }
+
+  private startWatch(): void {
+    const watchGeneration = ++this.watchGeneration;
+    this.lastSignAt = Date.now();
+    this.watchId = Geolocation.watchPosition(
+      (position) => this.handlePosition(watchGeneration, position),
+      (error) => this.handleWatchError(watchGeneration, error),
+      DRIVER_LOCATION_WATCH_OPTIONS,
+    );
+  }
+
+  private stopWatch(): void {
+    this.watchGeneration += 1;
+    if (this.watchId !== null) {
+      Geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+  }
+
+  /** The post timer: self-heal a silent watcher, then post when the throttle allows it. */
+  private tick(generation: number): void {
     if (generation !== this.generation) return;
-    const fix = toLocationFix(position, Date.now());
+    const now = Date.now();
+    const silentForMs = now - this.lastSignAt;
+    if (this.watchId !== null && silentForMs > DRIVER_LOCATION_CONFIG.watchRestartAfterMs) {
+      logger.warn('Driver location: no new fix, restarting the watcher', { silentForMs });
+      this.stopWatch();
+      this.startWatch();
+    }
+    this.flush(generation);
+  }
+
+  private isFixFresh(now: number): boolean {
+    return this.lastFixAt > 0 && now - this.lastFixAt < DRIVER_LOCATION_CONFIG.maxFixAgeMs;
+  }
+
+  private handlePosition(watchGeneration: number, position: DevicePosition): void {
+    if (watchGeneration !== this.watchGeneration) return;
+    const now = Date.now();
+    const fix = toLocationFix(position, now);
     if (!fix) return;
     this.lastLocation = fix;
+    this.lastFixAt = now;
+    this.lastSignAt = now;
     this.listeners.forEach((listener) => {
       try {
         listener(fix);
@@ -203,24 +306,27 @@ class LocationTrackingService {
         logger.warn('Driver location listener failed', { error });
       }
     });
-    this.flush(generation);
+    if (this.active) {
+      this.flush(this.generation);
+    }
   }
 
-  private handleWatchError(generation: number, error: GeolocationError): void {
-    if (generation !== this.generation) return;
+  private handleWatchError(watchGeneration: number, error: GeolocationError): void {
+    if (watchGeneration !== this.watchGeneration) return;
     logger.warn('Driver location watcher error', { code: error.code });
     if (error.code === error.PERMISSION_DENIED) {
+      this.watchRefs = 0;
       this.stopTracking();
     }
   }
 
-  /** Posts the latest fix when the throttle allows it. One request at a time. */
+  /** Posts the latest fix when the throttle allows it and the fix is fresh. One request at a time. */
   private flush(generation: number): void {
     if (generation !== this.generation || this.inFlight) return;
     const now = Date.now();
     if (now < this.blockedUntil) return;
     const fix = this.lastLocation;
-    if (!fix || !shouldPostLocation(fix, this.lastPost, now)) return;
+    if (!fix || !this.isFixFresh(now) || !shouldPostLocation(fix, this.lastPost, now)) return;
     this.post(generation, fix, now);
   }
 
