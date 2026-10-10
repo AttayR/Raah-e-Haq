@@ -158,7 +158,9 @@ describe('DriverRideScreen', () => {
 
     fireEvent.press(screen.getByTestId('driver-ride-arrived'));
     await waitFor(() =>
-      expect(errorSpy).toHaveBeenCalledWith('You are too far from the pickup point. About 812 m away.'),
+      expect(errorSpy).toHaveBeenCalledWith('You are too far from the pickup point.', 'About 812 m away.', {
+        topOffset: 64,
+      }),
     );
     await settle(store);
 

@@ -7,11 +7,16 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { ApiError } from '../../../src/core/api/errors';
+import { ApiError, type ApiErrorExtra, type ThunkRejection } from '../../../src/core/api/errors';
 import { toast } from '../../../src/core/toast';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { driverRideApi } from '../../../src/features/driver-ride/api';
-import { useDriverRideFlow, useDriverRideRestore } from '../../../src/features/driver-ride/hooks';
+import {
+  DRIVER_RIDE_TOAST_OPTIONS,
+  driverRideRefusalToast,
+  useDriverRideFlow,
+  useDriverRideRestore,
+} from '../../../src/features/driver-ride/hooks';
 import { selectDriverActiveRide, setDriverActiveRide } from '../../../src/features/driver-ride/slice';
 import { driverStatusApi, type DriverAvailability } from '../../../src/features/driver-status/api';
 import { loadDriverStatus } from '../../../src/features/driver-status/slice';
@@ -59,6 +64,45 @@ const renderFlow = async (ride: RideResource) => {
   return { store, ...hook };
 };
 
+describe('driverRideRefusalToast (T-411)', () => {
+  const notNear = (message: string, extra?: ApiErrorExtra): ThunkRejection => ({
+    kind: 'validation',
+    status: 422,
+    code: 'not_near_pickup',
+    message,
+    fieldErrors: {},
+    extra,
+  });
+
+  it('puts the distance on its own line so a long server message cannot cut it off', () => {
+    expect(
+      driverRideRefusalToast(
+        notNear('You are too far from the pickup point to mark arrived', { distance_m: 959.6, radius_m: 300 }),
+        'x',
+      ),
+    ).toEqual({ title: 'You are too far from the pickup point to mark arrived.', message: 'About 960 m away.' });
+  });
+
+  it('keeps the server sentence as is when it already ends with a full stop', () => {
+    expect(driverRideRefusalToast(notNear('You are too far.', { distance_m: 812.4 }), 'x')).toEqual({
+      title: 'You are too far.',
+      message: 'About 812 m away.',
+    });
+  });
+
+  it('shows only the title when the distance is missing or not usable', () => {
+    expect(driverRideRefusalToast(notNear('Too far', { distance_m: Number.NaN }), 'x')).toEqual({ title: 'Too far.' });
+    expect(driverRideRefusalToast(notNear('Too far', { distance_m: -5 }), 'x')).toEqual({ title: 'Too far.' });
+    expect(driverRideRefusalToast(notNear(''), 'x')).toEqual({ title: 'You are not at the pickup yet.' });
+  });
+});
+
+describe('DRIVER_RIDE_TOAST_OPTIONS (T-411)', () => {
+  it('starts the toast below the 56-point back button and its 8-point top gap', () => {
+    expect(DRIVER_RIDE_TOAST_OPTIONS.topOffset).toBe(64);
+  });
+});
+
 describe('useDriverRideFlow', () => {
   it('reads the ride on mount and on return to the foreground, and cleans up', async () => {
     const { unmount } = await renderFlow(makeRide({ status: 'accepted' }));
@@ -104,7 +148,11 @@ describe('useDriverRideFlow', () => {
     });
 
     expect(ok).toBe(false);
-    expect(toast.error).toHaveBeenCalledWith('The ride changed. Showing the latest status.');
+    expect(toast.error).toHaveBeenCalledWith(
+      'The ride changed. Showing the latest status.',
+      undefined,
+      DRIVER_RIDE_TOAST_OPTIONS,
+    );
     await waitFor(() => expect(result.current.step).toBe('cancelled'));
     expect(getRide).toHaveBeenCalledTimes(2);
   });
@@ -129,7 +177,7 @@ describe('useDriverRideFlow', () => {
       await result.current.arrived();
     });
 
-    expect(toast.error).toHaveBeenCalledWith('This ride is no longer assigned to you.');
+    expect(toast.error).toHaveBeenCalledWith('This ride is no longer assigned to you.', undefined, DRIVER_RIDE_TOAST_OPTIONS);
     expect(selectDriverActiveRide(store.getState())).toBeNull();
     expect(getStatus).toHaveBeenCalled();
   });

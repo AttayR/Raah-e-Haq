@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import NotificationManager from '../../src/components/NotificationManager';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
@@ -122,6 +122,30 @@ describe('NotificationManager toast host', () => {
     advance(500);
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Ride accepted')).toBeNull();
+  });
+
+  it('shows both lines in full and joins them with one separator in the announcement (T-411)', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    await renderHost();
+    act(() => {
+      toast.error('You are too far from the pickup point.', 'About 960 m away.');
+    });
+    expect(screen.getByText('About 960 m away.')).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith('You are too far from the pickup point. About 960 m away.');
+    announce.mockRestore();
+  });
+
+  it('moves the toast down by topOffset so it clears a floating back button (T-411)', async () => {
+    await renderHost();
+    act(() => {
+      toast.info('Default');
+    });
+    const defaultTop = StyleSheet.flatten(screen.getByTestId('toast').props.style).top as number;
+    act(() => toast.hide());
+    act(() => {
+      toast.info('Offset', undefined, { topOffset: 64 });
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('toast').props.style).top).toBe(defaultTop + 64);
   });
 
   it('useToast() returns the same API for components', async () => {

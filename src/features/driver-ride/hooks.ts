@@ -3,9 +3,10 @@ import { AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
-import { toast } from '../../core/toast';
+import { toast, type ToastOptions } from '../../core/toast';
 import type { RideResource } from '../../services/rideService';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
+import { layout, space } from '../../theme/spacing';
 import { loadDriverStatus, selectDriverStatusState, type DriverStatusState } from '../driver-status/slice';
 import { DRIVER_RIDE_CODES, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
@@ -45,23 +46,46 @@ const SUCCESS_COPY: Record<DriverRideTransition | 'stop', string> = {
 };
 
 /**
- * BE-64 422 `not_near_pickup`: the server's message, plus "About N m away." when it sent the
- * distance.
+ * Toasts on the driver ride screen sit below its floating back button (top: inset + 8, 56 high)
+ * so they never cover it (T-411).
  */
-const notNearPickupMessage = (payload: ThunkRejection): string => {
-  const base = rejectionMessage(payload, DRIVER_RIDE_COPY.notNearPickup);
-  const distance = payload.extra?.distance_m;
-  if (typeof distance !== 'number' || !Number.isFinite(distance) || distance < 0) return base;
-  return `${base} ${DRIVER_RIDE_COPY.aboutAway.replace('{m}', String(Math.round(distance)))}`;
+export const DRIVER_RIDE_TOAST_OPTIONS: Pick<ToastOptions, 'topOffset'> = {
+  topOffset: layout.touchTargetDriving + space[2],
 };
 
-/** The message for a refused step: our copy for known codes, else the server's safe text. */
-export const driverRideRefusalMessage = (payload: ThunkRejection | undefined, fallback: string): string => {
-  if (payload?.code === DRIVER_RIDE_CODES.notNearPickup) return notNearPickupMessage(payload);
-  if (payload?.code === DRIVER_RIDE_CODES.notAssignedDriver) return DRIVER_RIDE_COPY.notAssigned;
-  if (payload?.code === DRIVER_RIDE_CODES.cannotBeCancelled) return DRIVER_RIDE_COPY.cannotCancel;
-  if (payload?.code === DRIVER_RIDE_CODES.invalidTransition) return DRIVER_RIDE_COPY.changedElsewhere;
-  return rejectionMessage(payload, fallback);
+/** A toast's text: the title, and an optional second line that is always shown in full. */
+export interface DriverRideToastText {
+  title: string;
+  message?: string;
+}
+
+/** Ends the text with a full stop unless it already ends its sentence. */
+const asSentence = (text: string): string => {
+  const trimmed = text.trim();
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+};
+
+/**
+ * BE-64 422 `not_near_pickup`: the server's message as the title, and "About N m away." on its
+ * own line when it sent the distance, so a long message can never cut the distance off (T-411).
+ */
+const notNearPickupText = (payload: ThunkRejection): DriverRideToastText => {
+  const title = asSentence(rejectionMessage(payload, DRIVER_RIDE_COPY.notNearPickup));
+  const distance = payload.extra?.distance_m;
+  if (typeof distance !== 'number' || !Number.isFinite(distance) || distance < 0) return { title };
+  return { title, message: DRIVER_RIDE_COPY.aboutAway.replace('{m}', String(Math.round(distance))) };
+};
+
+/** The toast for a refused step: our copy for known codes, else the server's safe text. */
+export const driverRideRefusalToast = (
+  payload: ThunkRejection | undefined,
+  fallback: string,
+): DriverRideToastText => {
+  if (payload?.code === DRIVER_RIDE_CODES.notNearPickup) return notNearPickupText(payload);
+  if (payload?.code === DRIVER_RIDE_CODES.notAssignedDriver) return { title: DRIVER_RIDE_COPY.notAssigned };
+  if (payload?.code === DRIVER_RIDE_CODES.cannotBeCancelled) return { title: DRIVER_RIDE_COPY.cannotCancel };
+  if (payload?.code === DRIVER_RIDE_CODES.invalidTransition) return { title: DRIVER_RIDE_COPY.changedElsewhere };
+  return { title: rejectionMessage(payload, fallback) };
 };
 
 export interface DriverRideFlow {
@@ -110,7 +134,8 @@ export const useDriverRideFlow = (): DriverRideFlow => {
   const handleRefusal = useCallback(
     (payload: ThunkRejection | undefined, skipped: boolean, id: number): void => {
       if (skipped || isStaleSessionRejection(payload)) return;
-      toast.error(driverRideRefusalMessage(payload, DRIVER_RIDE_COPY.actionFailed));
+      const { title, message } = driverRideRefusalToast(payload, DRIVER_RIDE_COPY.actionFailed);
+      toast.error(title, message, DRIVER_RIDE_TOAST_OPTIONS);
       if (payload?.code && REFETCH_CODES.has(payload.code)) {
         dispatch(refreshDriverRide(id));
       } else if (payload?.kind === 'forbidden') {
@@ -126,7 +151,7 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       if (arg === null) return false;
       const action = await dispatch(advanceDriverRide(arg));
       if (advanceDriverRide.fulfilled.match(action)) {
-        toast.success(SUCCESS_COPY[arg.action]);
+        toast.success(SUCCESS_COPY[arg.action], undefined, DRIVER_RIDE_TOAST_OPTIONS);
         return true;
       }
       handleRefusal(action.payload, !!action.meta.condition, arg.rideId);
@@ -140,7 +165,7 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       if (rideId === null) return false;
       const action = await dispatch(cancelDriverRide({ rideId, note }));
       if (cancelDriverRide.fulfilled.match(action)) {
-        toast.success(DRIVER_RIDE_COPY.cancelledDone);
+        toast.success(DRIVER_RIDE_COPY.cancelledDone, undefined, DRIVER_RIDE_TOAST_OPTIONS);
         // The server no longer reports `on_ride`; the toggle and the request feed follow it.
         dispatch(loadDriverStatus());
         return true;

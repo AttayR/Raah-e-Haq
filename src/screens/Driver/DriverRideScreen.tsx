@@ -13,7 +13,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import { toast } from '../../core/toast';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
-import { useDriverRideFlow } from '../../features/driver-ride/hooks';
+import { DRIVER_RIDE_TOAST_OPTIONS, useDriverRideFlow } from '../../features/driver-ride/hooks';
 import {
   activeStops,
   getPassengerPhone,
@@ -77,12 +77,12 @@ const DriverRideScreen: React.FC = () => {
 
   const onCall = useCallback(() => {
     if (!phone) return;
-    Linking.openURL(`tel:${encodeURIComponent(phone)}`).catch(() => toast.error(COPY.callFailed));
+    Linking.openURL(`tel:${encodeURIComponent(phone)}`).catch(() => toast.error(COPY.callFailed, undefined, DRIVER_RIDE_TOAST_OPTIONS));
   }, [phone]);
 
   const onNavigate = useCallback(() => {
     if (!target) return;
-    Linking.openURL(mapsDirectionsUrl(target.coordinate, Platform.OS)).catch(() => toast.error(COPY.navigateFailed));
+    Linking.openURL(mapsDirectionsUrl(target.coordinate, Platform.OS)).catch(() => toast.error(COPY.navigateFailed, undefined, DRIVER_RIDE_TOAST_OPTIONS));
   }, [target]);
 
   const onCancel = useCallback(

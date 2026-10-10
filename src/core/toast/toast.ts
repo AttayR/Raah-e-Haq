@@ -22,6 +22,11 @@ export interface ToastOptions {
   duration?: number;
   action?: ToastAction;
   onHide?: () => void;
+  /**
+   * Extra points between the safe-area top and the toast, so it clears a floating control at
+   * the top of the screen (e.g. a map screen's back button). Defaults to 0.
+   */
+  topOffset?: number;
 }
 
 export interface ToastConfig extends ToastOptions {

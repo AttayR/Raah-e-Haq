@@ -44,8 +44,9 @@ const ModernToast: React.FC<ModernToastProps> = ({ config, onHide }) => {
 
   const palette = theme.mode === 'dark' ? ToastColors.dark : ToastColors.light;
   const toneColor = ToastColors.tone[config.type];
-  const { id, title, message, duration, type, action } = config;
-  const label = message ? `${title}. ${message}` : title;
+  const { id, title, message, duration, type, action, topOffset = 0 } = config;
+  // One separator between the lines, never "..": a title may already end its sentence.
+  const label = message ? `${title}${/[.!?]$/.test(title) ? '' : '.'} ${message}` : title;
 
   const hide = useCallback(() => {
     if (hiding.current) return;
@@ -119,7 +120,7 @@ const ModernToast: React.FC<ModernToastProps> = ({ config, onHide }) => {
       style={[
         styles.container,
         {
-          top: insets.top + 8,
+          top: insets.top + 8 + topOffset,
           backgroundColor: palette.background,
           opacity,
           transform: [{ translateY }],
