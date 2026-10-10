@@ -93,20 +93,37 @@ export interface RideResource {
     rating?: number | null;
     vehicle_type?: string | null;
   };
+  /** The assigned vehicle as non-admin viewers get it (BE-01 RideResource::vehicleFor). */
   vehicle?: {
     id: number;
-    brand: string;
-    model: string;
-    year?: string;
-    color?: string;
-    license_plate: string;
-  };
+    vehicle_type?: string | null;
+    make?: string | null;
+    model?: string | null;
+    color?: string | null;
+    license_plate?: string | null;
+  } | null;
+  /** BE-05: the server's breakdown of total_fare; null when the ride has no fare yet. */
+  min_fare_adjustment?: number | string | null;
+  fare_breakdown?: RideFareBreakdown | null;
+  /** BE-04: who ended the ride (passenger | driver | system | weather | other). */
+  cancellation_reason?: string | null;
+  cancellation_note?: string | null;
   requested_at: string;
   accepted_at?: string;
   arrived_at?: string;
   started_at?: string;
   completed_at?: string;
   cancelled_at?: string;
+}
+
+/** RideResource.fare_breakdown (BE-05). Laravel decimals may arrive as strings. */
+export interface RideFareBreakdown {
+  base: number | string;
+  distance: number | string;
+  time: number | string;
+  stops: number | string;
+  min_fare_adjustment: number | string;
+  total: number | string;
 }
 
 export interface RideStopResource {
@@ -508,20 +525,24 @@ class RideService {
   }
 
   /**
-   * The assigned driver's position for the passenger's ride. Never calls the server unless the
-   * ride is active and has a driver; a 403 (ride no longer active) is "not available", not an error.
+   * The assigned driver's position for the passenger's ride (GET /rides/{id}/driver-location,
+   * BE-06). Never calls the server unless the ride is active and has a driver; `data: null`
+   * (no fresh position, ride not active) and a 403 are "not available", not an error.
    */
   async getDriverLocationForRide(ride: RideResource | null | undefined): Promise<RideDriverLocation> {
     if (!ride || !isRideActive(ride) || typeof ride.driver_id !== 'number') {
       return { available: false };
     }
     try {
-      const location = await this.getDriverLocation(ride.driver_id);
+      const location = normalizeDriverLocation(
+        unwrap(await apiService.get<DriverLocationWire | null>(`${this.baseUrl}/${ride.id}/driver-location`)),
+      );
       return location ? { available: true, location } : { available: false };
     } catch (error) {
       if (isApiError(error) && error.kind === 'forbidden' && !error.code?.startsWith('ACCOUNT_')) {
         return { available: false };
       }
+      logApiFailure('Failed to fetch the ride driver location', error);
       throw error;
     }
   }

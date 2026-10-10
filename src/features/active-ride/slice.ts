@@ -3,7 +3,7 @@ import rideService, { type RideRequest, type RideResource } from '../../services
 import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
 import { currentSessionEpoch, isStaleSession, STALE_SESSION_MESSAGE } from '../../store/sessionEpoch';
 import { fetchActiveRide } from './api';
-import { isRideInProgress } from './status';
+import { isRideInProgress, isRideTerminal } from './status';
 
 /**
  * The passenger's active ride: the single source of truth for every screen (T-301, PAX-10).
@@ -101,7 +101,7 @@ export const refreshActiveRide = createAsyncThunk<RideResource, number, ThunkCon
   { condition: (_, { getState }) => !getState().activeRide.isRefreshing },
 );
 
-/** POST /rides/{id}/cancel; on success there is no active ride any more. */
+/** POST /rides/{id}/cancel; on success the active ride is the cancelled ride (not in progress). */
 export const cancelActiveRide = createAsyncThunk<RideResource, number, ThunkConfig>(
   'activeRide/cancel',
   async (rideId, { rejectWithValue }) => {
@@ -157,8 +157,9 @@ const activeRideSlice = createSlice({
       })
       .addCase(refreshActiveRide.fulfilled, (state, action: PayloadAction<RideResource>) => {
         state.isRefreshing = false;
-        // Ignore an answer for a ride that is no longer the active one (cancelled, cleared).
-        if (state.ride && state.ride.id === action.payload.id) {
+        // Ignore an answer for a ride that is no longer the active one (cleared), and a late
+        // answer that would bring a finished ride (e.g. just cancelled) back to life.
+        if (state.ride && state.ride.id === action.payload.id && !isRideTerminal(state.ride)) {
           state.ride = action.payload;
         }
       })
@@ -176,8 +177,10 @@ const activeRideSlice = createSlice({
       })
       .addCase(cancelActiveRide.fulfilled, (state, action) => {
         state.isSubmitting = false;
+        // The cancelled ride stays until the screen has shown it (T-304: one outcome card,
+        // the same one a poll that saw the cancel first shows); clearActiveRide ends it.
         if (state.ride && state.ride.id === action.payload.id) {
-          state.ride = null;
+          state.ride = action.payload;
         }
       })
       .addCase(cancelActiveRide.rejected, (state, action) => {
@@ -192,6 +195,8 @@ export const { clearActiveRide } = activeRideSlice.actions;
 export const selectActiveRide = (state: SliceRoot): RideResource | null => state.activeRide.ride;
 export const selectActiveRideRestoreStatus = (state: SliceRoot): ActiveRideRestoreStatus =>
   state.activeRide.restoreStatus;
+/** POST /rides or the cancel is in flight. */
+export const selectActiveRideSubmitting = (state: SliceRoot): boolean => state.activeRide.isSubmitting;
 /** The active ride only while it is in progress (not completed or cancelled). */
 export const selectInProgressRide = (state: SliceRoot): RideResource | null =>
   isRideInProgress(state.activeRide.ride) ? state.activeRide.ride : null;

@@ -16,11 +16,9 @@ import { cancelAllRequests } from '../../services/api';
 import LocationSearch, { suggestionAddress } from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
 import AnimatedPolyline from '../../components/AnimatedPolyline';
-import RequestingCard from '../../components/passenger/RequestingCard';
-import DriverAssignedCard from '../../components/passenger/DriverAssignedCard';
 import { NearbyDriverMarkers, NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
-import { getDriverPhone, isRideActive } from '../../services/rideService';
+import { getDriverPhone } from '../../services/rideService';
 import { reverseGeocode } from '../../services/placesService';
 import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
@@ -28,10 +26,13 @@ import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideReq
 import { logger } from '../../core/logging/logger';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '../../store';
-import { clearActiveRide, selectActiveRide } from '../../features/active-ride/slice';
-import { useActiveRideActions, useActiveRidePolling } from '../../features/active-ride/hooks';
-import { isRideInProgress, isRideTerminal } from '../../features/active-ride/status';
+import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '../../features/active-ride/slice';
+import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
+import { isRideInProgress } from '../../features/active-ride/status';
 import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
+import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
+import { mapTapTarget, type MapPickTarget } from '../../features/ride-booking/mapTap';
+import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
@@ -68,7 +69,8 @@ const PassengerMapScreen = () => {
   const [pickup, setPickup] = useState<Place | null>(null);
   const [stops, setStops] = useState<Place[]>([]);
   const [destination, setDestination] = useState<Place | null>(null);
-  const [addingStop, setAddingStop] = useState(false);
+  // Map taps set a location only in this explicit mode (T-304, PAX-14).
+  const [mapPick, setMapPick] = useState<MapPickTarget | null>(null);
   const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
@@ -78,26 +80,27 @@ const PassengerMapScreen = () => {
   const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const isFocused = useIsFocused();
-  // Status poll while the ride is in progress and this screen is focused; cleaned up on unmount.
-  useActiveRidePolling(isFocused);
+  // Status poll (and the assigned driver's position) while the ride is in progress and this
+  // screen is focused; cleaned up on unmount.
+  const { driverLocation } = useActiveRidePolling(isFocused);
 
-  // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is under way.
-  const rideActive = isRideActive(currentRide);
-  // While a ride is in progress the panel follows the server, not the booking steps: the
-  // requesting card until a driver accepts, then the driver card (T-301; full stage
-  // machine is T-304).
-  const rideInProgress = isRideInProgress(currentRide);
-  const shownStage: typeof stage = rideInProgress ? 'requesting' : stage;
+  // While a ride exists the panel follows the server's status (T-304 stage machine), not
+  // the booking steps; that includes its outcome (completed / cancelled) until Done.
+  const rideStage = usePassengerRideStage(currentRide);
+  const rideSubmitting = useSelector(selectActiveRideSubmitting);
+  const rideShown = !!currentRide;
+  const shownStage: typeof stage = rideShown ? 'requesting' : stage;
 
+  // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked.
   const nearbyDrivers = useNearbyDrivers(pickup ?? currentLocation, {
-    enabled: isFocused && !rideActive && shownStage !== 'requesting',
+    enabled: isFocused && shownStage !== 'requesting',
   });
   // Call button only while the server exposes driver.phone (accepted, still-active ride).
   const driverPhone = getDriverPhone(currentRide);
   const callDriver = useCallback(() => {
     if (!driverPhone) return;
     Linking.openURL(`tel:${encodeURIComponent(driverPhone)}`).catch(() => {
-      Alert.alert('Unable to call', 'Your device could not start the call.');
+      Alert.alert(ACTIVE_RIDE_COPY.callFailedTitle, ACTIVE_RIDE_COPY.callFailedMessage);
     });
   }, [driverPhone]);
 
@@ -188,37 +191,37 @@ const PassengerMapScreen = () => {
   const selectedType = vehicleTypes.data?.find((t) => t.key === selectedVehicle) ?? null;
   const tripSummary = estimates.data ? BOOKING_COPY.tripSummary(estimates.data.distance_km, estimates.data.duration_min) : null;
 
+  // PAX-14/PAX-24: only in the explicit choose-on-map mode, never on a marker press.
   const onPressMap = useCallback((e: MapPressEvent) => {
-    const coord = e.nativeEvent.coordinate;
-    const newStop = { latitude: coord.latitude, longitude: coord.longitude };
-    
-    if (!pickup) {
-      setPickup(newStop);
-      clearRoute();
-      setStage('destination');
-      return;
-    }
-    if (!destination) {
-      setDestination(newStop);
-      fetchRouteWithWaypoints(pickup, [], newStop);
-      setStage('vehicle');
-      return;
-    }
-    if (addingStop && stops.length < 5) {
-      const ns = [...stops, newStop];
+    const target = mapTapTarget({ mode: mapPick, action: e.nativeEvent.action, rideShown });
+    if (!target) return;
+    const point = { latitude: e.nativeEvent.coordinate.latitude, longitude: e.nativeEvent.coordinate.longitude };
+    setMapPick(null);
+    if (target === 'pickup') {
+      setPickup(point);
+      setPickupQuery(BOOKING_COPY.pinnedOnMap);
+      if (destination) {
+        fetchRouteWithWaypoints(point, stops, destination);
+        setStage('vehicle');
+      } else {
+        clearRoute();
+        setStage('destination');
+      }
+    } else if (target === 'destination') {
+      setDestination(point);
+      setDestQuery(BOOKING_COPY.pinnedOnMap);
+      if (pickup) {
+        fetchRouteWithWaypoints(pickup, stops, point);
+        setStage('vehicle');
+      } else {
+        setStage('pickup');
+      }
+    } else if (pickup && destination && stops.length < 5) {
+      const ns = [...stops, point];
       setStops(ns);
       fetchRouteWithWaypoints(pickup, ns, destination);
-      setAddingStop(false);
-      return;
     }
-    // If everything is set and user taps again, start fresh from new pickup
-    setPickup(newStop);
-    setStops([]);
-    setDestination(null);
-    setAddingStop(false);
-    clearRoute();
-    setStage('destination');
-  }, [pickup, stops, destination, addingStop, fetchRouteWithWaypoints, clearRoute]);
+  }, [mapPick, rideShown, pickup, stops, destination, fetchRouteWithWaypoints, clearRoute]);
 
   const centerOnUser = useCallback(() => {
     if (currentLocation && mapRef.current && isMapReady) {
@@ -291,7 +294,7 @@ const PassengerMapScreen = () => {
     setPickup(null);
     setStops([]);
     setDestination(null);
-    setAddingStop(false);
+    setMapPick(null);
     setStage('home');
     setSelectedVehicle(undefined);
     setPickupQuery('');
@@ -312,26 +315,19 @@ const PassengerMapScreen = () => {
     setDestQuery(currentRide.dropoff_address);
   }, [currentRide]);
 
-  // A final status from the poll ends the ride here: say how it ended, then start over.
-  const endedRideStatus = isRideTerminal(currentRide) ? currentRide?.status : undefined;
-  useEffect(() => {
-    if (!endedRideStatus) return;
-    if (endedRideStatus === 'completed') {
-      Alert.alert(ACTIVE_RIDE_COPY.completedTitle, ACTIVE_RIDE_COPY.completedMessage);
-    } else {
-      Alert.alert(ACTIVE_RIDE_COPY.cancelledTitle, ACTIVE_RIDE_COPY.cancelledMessage);
-    }
+  // The passenger has seen the outcome (completed / cancelled): start over.
+  const finishRide = useCallback(() => {
     shownRideIdRef.current = null;
     dispatch(clearActiveRide());
     resetSelection();
-  }, [endedRideStatus, dispatch, resetSelection]);
+  }, [dispatch, resetSelection]);
 
   // Navigation functions
   const goBack = useCallback(() => {
     const stageOrder: Array<typeof stage> = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
     const currentIndex = stageOrder.indexOf(stage);
-    // A ride in progress stays in Redux; Back only leaves the screen.
-    if (currentIndex > 0 && !rideInProgress) {
+    // A ride stays in Redux; Back only leaves the screen.
+    if (currentIndex > 0 && !rideShown) {
       const prevStage = stageOrder[currentIndex - 1];
       setStage(prevStage);
       setError(null);
@@ -339,35 +335,30 @@ const PassengerMapScreen = () => {
       // Go back to home screen
       navigation.goBack();
     }
-  }, [stage, navigation, rideInProgress]);
+  }, [stage, navigation, rideShown]);
 
-  // Cancel ride functionality
+  // Cancel: the outcome is shown once, by the stage panel (a poll that saw the cancel first
+  // shows the same card), so no success alert here; a 409 just re-reads the ride.
   const handleCancelRide = useCallback(() => {
-    Alert.alert(
-      'Cancel Ride',
-      'Are you sure you want to cancel this ride?',
-      [
-        { text: 'Keep Ride', style: 'cancel' },
-        { 
-          text: 'Cancel Ride', 
-          style: 'destructive',
-          onPress: async () => {
-            if (currentRide && cancelRideService) {
-              try {
-                await cancelRideService(currentRide.id);
-                Alert.alert('Ride Cancelled', 'Your ride has been cancelled.');
-                resetSelection();
-              } catch (error) {
-                logger.error('Error cancelling ride:', error);
-                Alert.alert('Error', 'Failed to cancel ride.');
-              }
-            } else {
-              resetSelection();
-            }
+    Alert.alert(ACTIVE_RIDE_COPY.cancelConfirmTitle, ACTIVE_RIDE_COPY.cancelConfirmMessage, [
+      { text: ACTIVE_RIDE_COPY.keepRide, style: 'cancel' },
+      {
+        text: ACTIVE_RIDE_COPY.cancelRide,
+        style: 'destructive',
+        onPress: async () => {
+          if (!currentRide) {
+            resetSelection();
+            return;
           }
-        }
-      ]
-    );
+          try {
+            await cancelRideService(currentRide.id);
+          } catch (cancelError) {
+            const message = cancelError instanceof Error ? cancelError.message : ACTIVE_RIDE_COPY.cancelFailedFallback;
+            Alert.alert(ACTIVE_RIDE_COPY.cancelFailedTitle, message);
+          }
+        },
+      },
+    ]);
   }, [currentRide, cancelRideService, resetSelection]);
 
   // Edit field functionality
@@ -562,7 +553,8 @@ const PassengerMapScreen = () => {
         {destination && (
           <Marker coordinate={destination} title={MAPS_CONFIG.MARKERS.destination.title} pinColor={MAPS_CONFIG.MARKERS.destination.color} />
         )}
-        {!rideActive && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
+        {!rideShown && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
+        <AssignedDriverMarker location={driverLocation} />
         {routeCoordinates.length > 0 && (
           <AnimatedPolyline coordinates={routeCoordinates as any} strokeWidth={5} strokeColor={BrandColors.primary} durationMs={1200} />
          )}
@@ -575,7 +567,7 @@ const PassengerMapScreen = () => {
         <TouchableOpacity style={styles.iconButton} onPress={centerOnUser}>
           <Icon name="my-location" size={22} color={BrandColors.primary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton} onPress={resetSelection}>
+        <TouchableOpacity style={styles.iconButton} onPress={rideShown ? undefined : resetSelection} disabled={rideShown}>
           <Icon name="refresh" size={22} color={BrandColors.primary} />
         </TouchableOpacity>
         {shownStage !== 'home' && (
@@ -603,8 +595,9 @@ const PassengerMapScreen = () => {
             </TouchableOpacity>
           </View>
         )}
-        {!rideActive && shownStage !== 'requesting' && <NearbyDriversStatus state={nearbyDrivers} />}
-        <StageChips stage={shownStage} />
+        {shownStage !== 'requesting' && <NearbyDriversStatus state={nearbyDrivers} />}
+        {!rideShown && <StageChips stage={shownStage} />}
+        {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
         {shownStage === 'home' && (
           <DualLocationPicker
             pickup={pickup}
@@ -649,9 +642,13 @@ const PassengerMapScreen = () => {
             }}
           />
         )}
+        {shownStage === 'home' && <ChooseOnMapButton onPress={() => setMapPick(pickup ? 'destination' : 'pickup')} />}
 
         {shownStage === 'pickup' && (
-          <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }} />
+          <View>
+            <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }} />
+            <ChooseOnMapButton onPress={() => setMapPick('pickup')} />
+          </View>
         )}
 
         {shownStage === 'destination' && (
@@ -672,6 +669,7 @@ const PassengerMapScreen = () => {
                 setStage('vehicle');
               }}
             />
+            <ChooseOnMapButton onPress={() => setMapPick('destination')} />
           </View>
         )}
 
@@ -719,9 +717,7 @@ const PassengerMapScreen = () => {
                   maxStops={5}
                 />
                 {stops.length < 5 && (
-                  <TouchableOpacity onPress={() => setAddingStop(true)} style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9999 }}>
-                    <Text style={{ color: BrandColors.primary, fontWeight: '700' }}>+ Add via map</Text>
-                  </TouchableOpacity>
+                  <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={() => setMapPick('stop')} />
                 )}
               </View>
             )}
@@ -752,32 +748,14 @@ const PassengerMapScreen = () => {
           </View>
         )}
 
-        {shownStage === 'requesting' && !rideActive && (
-          <View>
-            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#666' }}>Requesting Ride...</Text>
-                <TouchableOpacity onPress={handleCancelRide} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 8 }}>
-                  <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel Request</Text>
-                </TouchableOpacity>
-              </View>
-              {isLoading && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-            <Icon name="refresh" size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
-            <Text style={{ fontSize: 11, color: '#9CA3AF' }}>Please wait while we find a driver...</Text>
-          </View>
-        )}
-            </View>
-            <RequestingCard />
-          </View>
-        )}
-
-        {currentRide && rideActive && (
-          <DriverAssignedCard
-            name={currentRide.driver?.name || 'Driver'}
-            vehicle={currentRide.vehicle_type || 'Car'}
-            eta={'5 min'}
+        {shownStage === 'requesting' && (
+          <ActiveRidePanel
+            stageState={rideStage ?? { rideId: null, stage: 'searching', notice: null }}
+            ride={currentRide}
+            onCancel={handleCancelRide}
+            onDone={finishRide}
             onCall={driverPhone ? callDriver : undefined}
+            busy={isLoading || rideSubmitting}
           />
         )}
       </View>
@@ -876,97 +854,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     elevation: 8,
     gap: 10,
-  },
-  selectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  selectionText: {
-    fontSize: 14,
-    color: '#374151',
-    flexShrink: 1,
-  },
-  dotPickup: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: MAPS_CONFIG.MARKERS.pickup.color,
-  },
-  dotStop: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FFA500',
-  },
-  dotDestination: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: MAPS_CONFIG.MARKERS.destination.color,
-  },
-  removeButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  instructionText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 6,
-  },
-  stopRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  stopButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  stopButtonText: {
-    color: BrandColors.primary,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  fareRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fareAmount: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: BrandColors.primary,
-  },
-  fareMeta: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  requestButton: {
-    backgroundColor: BrandColors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  requestButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  requestButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
   },
   errorContainer: { backgroundColor: '#fee2e2', margin: 4, marginBottom: 8, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   errorContent: { flex: 1 },

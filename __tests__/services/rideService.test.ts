@@ -278,7 +278,7 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
   });
 
   it('getDriverLocationForRide treats 403 as "not available" (no throw)', async () => {
-    mock.onGet('/tracking/driver/9/latest').reply(403, {
+    mock.onGet('/rides/42/driver-location').reply(403, {
       success: false,
       message: 'Forbidden. You do not have permission to access this resource.',
     });
@@ -286,7 +286,7 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
   });
 
   it('getDriverLocationForRide returns the position during an active ride, and null data as not available', async () => {
-    mock.onGet('/tracking/driver/9/latest').replyOnce(
+    mock.onGet('/rides/42/driver-location').replyOnce(
       200,
       envelope({ driver_id: 9, latitude: 31.5, longitude: 74.3, heading: null, status: 'busy', last_seen_at: 't' }),
     );
@@ -294,12 +294,12 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
       available: true,
       location: { latitude: 31.5, longitude: 74.3 },
     });
-    mock.onGet('/tracking/driver/9/latest').replyOnce(200, envelope(null));
+    mock.onGet('/rides/42/driver-location').replyOnce(200, envelope(null));
     await expect(rideService.getDriverLocationForRide(ride)).resolves.toEqual({ available: false });
   });
 
   it('getDriverLocationForRide still throws other failures', async () => {
-    mock.onGet('/tracking/driver/9/latest').networkError();
+    mock.onGet('/rides/42/driver-location').networkError();
     await expect(rideService.getDriverLocationForRide(ride)).rejects.toMatchObject({ kind: 'network' });
   });
 

@@ -20,4 +20,10 @@ export const BOOKING_COPY = {
   phoneNotVerifiedTitle: 'Verify your phone number',
   phoneNotVerifiedAction: 'Verify number',
   notNow: 'Not now',
+  chooseOnMap: 'Choose on map',
+  addStopOnMap: '+ Add via map',
+  pinnedOnMap: 'Pinned on map',
+  mapPickHint: (target: 'pickup' | 'destination' | 'stop') =>
+    target === 'pickup' ? 'Tap the map to set your pickup' : target === 'destination' ? 'Tap the map to set your destination' : 'Tap the map to add a stop',
+  mapPickCancel: 'Cancel',
 } as const;

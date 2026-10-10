@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import type { RideRequest, RideResource } from '../../services/rideService';
+import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
 import { rejectionMessage } from '../../core/api/errors';
 import { toast } from '../../core/toast';
 import { hideModal, showErrorModal, showRideRequestedModal } from '../../components/NotificationManager';
@@ -17,6 +17,7 @@ import {
 } from './slice';
 import { isRideInProgress } from './status';
 import { ACTIVE_RIDE_COPY } from './copy';
+import { advanceRideStage, isDriverTrackable, type PassengerRideStageState } from './stage';
 
 /** How often the passenger's ride status is re-read while it is in progress. */
 export const ACTIVE_RIDE_POLL_MS = 10_000;
@@ -41,24 +42,91 @@ type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
  * focused). It reads the ride at once when it starts (focus, a new ride), then every
  * interval. One interval keyed on the ride id: it stops on a final status, when the ride
  * changes, when disabled, and on unmount.
+ *
+ * T-304: on the same ticks, while a driver is assigned (accepted, arrived, started), it reads
+ * GET /rides/{id}/driver-location and returns the driver's position (null when the server has
+ * none or refuses it). It is read at once when a driver gets assigned, and dropped when the
+ * ride leaves those statuses; nothing is set after unmount.
  */
-export const useActiveRidePolling = (enabled: boolean): void => {
+export const useActiveRidePolling = (enabled: boolean): { driverLocation: DriverLocation | null } => {
   const dispatch = useDispatch<ActiveRideDispatch>();
   const ride = useSelector(selectActiveRide);
   const rideId = ride?.id;
   const inProgress = isRideInProgress(ride);
+  const trackable = isDriverTrackable(ride);
+  const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
+
+  // The latest ride for the interval callback, so a status change does not restart the timer.
+  const rideRef = useRef(ride);
+  rideRef.current = ride;
+  const locationInFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const readDriverLocation = useCallback((forRideId: number) => {
+    const current = rideRef.current;
+    if (!current || current.id !== forRideId || !isDriverTrackable(current) || locationInFlight.current) return;
+    locationInFlight.current = true;
+    rideService
+      .getDriverLocationForRide(current)
+      .then((result) => {
+        const still = rideRef.current;
+        if (mounted.current && still?.id === forRideId && isDriverTrackable(still)) {
+          setDriverLocation(result.available ? result.location : null);
+        }
+      })
+      .catch(() => {
+        // Offline or a server error: keep the last position; the next tick asks again.
+      })
+      .finally(() => {
+        locationInFlight.current = false;
+      });
+  }, []);
 
   useEffect(() => {
     if (!enabled || rideId === undefined || !inProgress) {
       return undefined;
     }
-    // Back on the screen: show the current status now, not up to one interval later.
-    dispatch(refreshActiveRide(rideId));
-    const timer = setInterval(() => {
+    const poll = () => {
       dispatch(refreshActiveRide(rideId));
-    }, ACTIVE_RIDE_POLL_MS);
+      readDriverLocation(rideId);
+    };
+    // Back on the screen: show the current status now, not up to one interval later.
+    poll();
+    const timer = setInterval(poll, ACTIVE_RIDE_POLL_MS);
     return () => clearInterval(timer);
-  }, [dispatch, enabled, rideId, inProgress]);
+  }, [dispatch, enabled, rideId, inProgress, readDriverLocation]);
+
+  // A driver was just assigned: show them now. No driver any more: hide the marker.
+  useEffect(() => {
+    if (!trackable || rideId === undefined) {
+      setDriverLocation(null);
+      return;
+    }
+    if (enabled) readDriverLocation(rideId);
+  }, [enabled, trackable, rideId, readDriverLocation]);
+
+  return { driverLocation };
+};
+
+/**
+ * The passenger stage of the active ride (T-304): stage-machine state derived from the
+ * server status, remembering the previous stage of the same ride so a requeue (driver
+ * cancelled, ride back to `requested`) shows the "finding another driver" notice.
+ */
+export const usePassengerRideStage = (ride: RideResource | null): PassengerRideStageState | null => {
+  const [state, setState] = useState<PassengerRideStageState | null>(() => advanceRideStage(null, ride));
+  const next = advanceRideStage(state, ride);
+  if (next !== state) {
+    // Derived state from props (React's documented pattern): re-render at once with `next`.
+    setState(next);
+  }
+  return next;
 };
 
 /**
@@ -133,11 +201,21 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
     [dispatch],
   );
 
+  /**
+   * POST /rides/{id}/cancel. Resolves 'cancelled' (the ride is now the cancelled ride), or
+   * 'conflict' when the server says the ride moved on meanwhile (409: started, or already
+   * ended by the driver or a poll); the ride is then re-read so the screen shows its real
+   * stage, and no error is shown. Other failures reject with a display-safe message.
+   */
   const cancelRide = useCallback(
-    async (rideId: number): Promise<RideResource> => {
+    async (rideId: number): Promise<'cancelled' | 'conflict'> => {
       const action = await dispatch(cancelActiveRide(rideId));
       if (cancelActiveRide.fulfilled.match(action)) {
-        return action.payload;
+        return 'cancelled';
+      }
+      if (action.payload?.kind === 'conflict') {
+        dispatch(refreshActiveRide(rideId));
+        return 'conflict';
       }
       throw new Error(rejectionMessage(action.payload, ACTIVE_RIDE_COPY.cancelFailedFallback));
     },

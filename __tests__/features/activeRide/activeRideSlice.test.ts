@@ -32,7 +32,7 @@ afterEach(() => {
 const request = makeRideRequest();
 
 describe('status helpers (API statuses)', () => {
-  it('requested, accepted and ongoing are in progress; completed and cancelled are final', () => {
+  it('requested, accepted, arrived and started are in progress; completed and cancelled are final', () => {
     expect((['requested', 'accepted', 'arrived', 'started', 'ongoing'] as const).every((status) =>
       isRideInProgress(makeRide({ status })))).toBe(true);
     expect(isRideInProgress(makeRide({ status: 'completed' }))).toBe(false);
@@ -221,14 +221,30 @@ describe('create, poll and cancel share one ride', () => {
     expect(store.getState().activeRide.ride).toBeNull();
   });
 
-  it('cancel clears the active ride', async () => {
+  it('cancel leaves the cancelled ride (not in progress) for the outcome card (T-304)', async () => {
     const store = makeStore();
     store.dispatch(createActiveRide.fulfilled(makeRide({ id: 21 }), 'req', request));
-    mock.onPost('/rides/21/cancel').reply(200, envelope(makeRide({ id: 21, status: 'cancelled' })));
+    mock.onPost('/rides/21/cancel').reply(
+      200,
+      envelope(makeRide({ id: 21, status: 'cancelled', cancellation_reason: 'passenger' })),
+    );
 
     await store.dispatch(cancelActiveRide(21));
 
+    expect(store.getState().activeRide.ride).toMatchObject({ id: 21, status: 'cancelled', cancellation_reason: 'passenger' });
+    expect(selectInProgressRide(store.getState())).toBeNull();
+    store.dispatch(clearActiveRide());
     expect(store.getState().activeRide.ride).toBeNull();
+  });
+
+  it('a late poll answer never brings a cancelled ride back (poll / cancel race, T-304)', async () => {
+    const store = makeStore();
+    store.dispatch(createActiveRide.fulfilled(makeRide({ id: 21, status: 'accepted' }), 'req', request));
+    store.dispatch(cancelActiveRide.fulfilled(makeRide({ id: 21, status: 'cancelled' }), 'c', 21));
+
+    store.dispatch(refreshActiveRide.fulfilled(makeRide({ id: 21, status: 'accepted' }), 'r', 21));
+
+    expect(store.getState().activeRide.ride?.status).toBe('cancelled');
   });
 
   it('logout (resetApp) empties the slice', () => {
