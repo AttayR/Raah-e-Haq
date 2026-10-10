@@ -31,7 +31,7 @@ import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } fro
 import { isRideInProgress } from '../../features/active-ride/status';
 import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
 import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
-import { driverApproachCoordinates, useFitCoordinates } from '../../features/active-ride/camera';
+import { usePassengerRideCamera } from '../../features/active-ride/camera';
 import { mapTapTarget, type MapPickTarget } from '../../features/ride-booking/mapTap';
 import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -100,8 +100,8 @@ const PassengerMapScreen = () => {
     enabled: isFocused && (shownStage !== 'requesting' || rideEnded),
     refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
   });
-  // Driver on the way (T-311): keep the driver and the pickup both in view.
-  useFitCoordinates(mapRef, driverApproachCoordinates(rideStage?.stage, driverLocation, currentRide));
+  // Driver on the way (T-311/T-312): keep the driver and the pickup in view, until the passenger pans.
+  const { isFollowing: isRideCameraFollowing, ...rideCamera } = usePassengerRideCamera(mapRef, rideStage?.stage, driverLocation, currentRide);
   // Call button only while the server exposes driver.phone (accepted, still-active ride).
   const driverPhone = getDriverPhone(currentRide);
   const callDriver = useCallback(() => {
@@ -247,9 +247,9 @@ const PassengerMapScreen = () => {
     }
   }, [currentLocation, requestLocationPermission, isMapReady]);
 
-  // Initialize location
+  // Initialize location (not while the ride camera follows the driver).
   useEffect(() => {
-    if (currentLocation && mapRef.current && isMapReady) {
+    if (currentLocation && mapRef.current && isMapReady && !isRideCameraFollowing()) {
       try {
         mapRef.current.animateToRegion({
           latitude: currentLocation.latitude,
@@ -261,7 +261,7 @@ const PassengerMapScreen = () => {
         logger.debug('Error animating to current location:', error);
       }
     }
-  }, [currentLocation, isMapReady]);
+  }, [currentLocation, isMapReady, isRideCameraFollowing]);
 
   // The Advanced panel's request (removed in T-309) goes through the same builder.
   const handleRequestRide = async (rideData: {
@@ -520,9 +520,10 @@ const PassengerMapScreen = () => {
                onMapReady={() => {
                  logger.debug('SafeMapView onMapReady called');
                  setIsMapReady(true);
+                 rideCamera.onMapReady();
                  // Delay the region animation to ensure map is fully ready
                  setTimeout(() => {
-                   if (currentLocation && mapRef.current) {
+                   if (currentLocation && mapRef.current && !isRideCameraFollowing()) {
                      try {
                        mapRef.current.animateToRegion({
                          latitude: currentLocation.latitude,
@@ -536,6 +537,7 @@ const PassengerMapScreen = () => {
                    }
                  }, 500);
                }}
+               onRegionChangeComplete={rideCamera.onRegionChangeComplete}
                onMapLoaded={() => {
                  logger.debug('SafeMapView onMapLoaded called');
                  setIsMapReady(true);

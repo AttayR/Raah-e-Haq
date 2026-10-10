@@ -2,12 +2,14 @@
  * T-311: while the driver is on the way the passenger map fits the driver and the pickup
  * (QA 2026-10-10-ride-e2e-b: the driver pin sat at the screen edge).
  */
-import { renderHook } from '@testing-library/react-native';
+import { act, renderHook } from '@testing-library/react-native';
 import type { LatLng } from 'react-native-maps';
 import {
   DRIVER_APPROACH_EDGE_PADDING,
   driverApproachCoordinates,
+  fitKeyOf,
   useFitCoordinates,
+  usePassengerRideCamera,
   type FitToCoordinatesMap,
 } from '../../../src/features/active-ride/camera';
 import type { PassengerRideStage } from '../../../src/features/active-ride/stage';
@@ -75,3 +77,72 @@ describe('useFitCoordinates', () => {
     expect(fit).not.toHaveBeenCalled();
   });
 });
+
+describe('T-312: refit key, map ready, passenger gestures', () => {
+  it('the refit key ignores moves under ~10 m (4 decimals)', () => {
+    const a = [{ latitude: 31.52041, longitude: 74.35871 }];
+    const jitter = [{ latitude: 31.52044, longitude: 74.35873 }]; // ~3 m
+    const moved = [{ latitude: 31.5206, longitude: 74.3587 }]; // ~20 m
+    expect(fitKeyOf(jitter)).toBe(fitKeyOf(a));
+    expect(fitKeyOf(moved)).not.toBe(fitKeyOf(a));
+  });
+
+  it('useFitCoordinates waits for the map to be ready, then fits the same points once', () => {
+    const fit = jest.fn();
+    const mapRef = { current: { fitToCoordinates: fit } };
+    const points = driverApproachCoordinates('driver_en_route', driver, pickupRide);
+    const { rerender } = renderHook(({ ready }: { ready: boolean }) => useFitCoordinates(mapRef, points, { ready }), {
+      initialProps: { ready: false },
+    });
+    expect(fit).not.toHaveBeenCalled();
+    rerender({ ready: true });
+    expect(fit).toHaveBeenCalledTimes(1);
+    rerender({ ready: true });
+    expect(fit).toHaveBeenCalledTimes(1);
+  });
+
+  type CameraProps = { stage: PassengerRideStage; location: { latitude: number; longitude: number } };
+
+  const setupCamera = (initial: CameraProps) => {
+    const fit = jest.fn();
+    const mapRef = { current: { fitToCoordinates: fit } };
+    const hook = renderHook(
+      ({ stage, location }: CameraProps) => usePassengerRideCamera(mapRef, stage, location, pickupRide),
+      { initialProps: initial },
+    );
+    return { ...hook, fit };
+  };
+
+  it('a screen mounted mid-ride fits once the map becomes ready', () => {
+    const { result, fit } = setupCamera({ stage: 'driver_en_route', location: driver });
+    expect(fit).not.toHaveBeenCalled();
+    act(() => result.current.onMapReady());
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(result.current.isFollowing()).toBe(true);
+  });
+
+  it('pauses after the passenger pans or zooms, and resumes on the next stage', () => {
+    const { result, fit, rerender } = setupCamera({ stage: 'driver_en_route', location: driver });
+    act(() => result.current.onMapReady());
+    expect(fit).toHaveBeenCalledTimes(1);
+
+    // Our own fit animation is not a gesture: still following.
+    act(() => result.current.onRegionChangeComplete({} as never, { isGesture: false }));
+    rerender({ stage: 'driver_en_route', location: { latitude: 31.525, longitude: 74.365 } });
+    expect(fit).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.onRegionChangeComplete({} as never, { isGesture: true }));
+    expect(result.current.isFollowing()).toBe(false);
+    rerender({ stage: 'driver_en_route', location: { latitude: 31.522, longitude: 74.362 } });
+    expect(fit).toHaveBeenCalledTimes(2);
+
+    // Driver arrived: a new stage clears the pause (nothing to fit in this stage).
+    rerender({ stage: 'driver_arrived', location: { latitude: 31.522, longitude: 74.362 } });
+    expect(fit).toHaveBeenCalledTimes(2);
+    // Back to en route (e.g. a re-read of the ride): following again.
+    rerender({ stage: 'driver_en_route', location: { latitude: 31.522, longitude: 74.362 } });
+    expect(result.current.isFollowing()).toBe(true);
+    expect(fit).toHaveBeenCalledTimes(3);
+  });
+});
+
