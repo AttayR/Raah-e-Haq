@@ -12,7 +12,7 @@ import { logger } from '../../../src/core/logging/logger';
 import * as modals from '../../../src/components/NotificationManager';
 import { RideRequestRefused, useActiveRideActions } from '../../../src/features/active-ride/hooks';
 import { classifyRideRequestFailure } from '../../../src/features/ride-booking/rideRequestFailure';
-import { makeRideRequest, makeStore } from '../../../test-utils/rideFixtures';
+import { envelope, makeRide, makeRideRequest, makeStore } from '../../../test-utils/rideFixtures';
 
 let mock: MockAdapter;
 let showError: jest.SpyInstance;
@@ -68,6 +68,27 @@ describe('classifyRideRequestFailure', () => {
     expect(classifyRideRequestFailure({ ...base, kind: 'forbidden', status: 403, code: 'NOT_A_PASSENGER', message: 'Only passengers' }, 'x'))
       .toEqual({ kind: 'message', message: 'Only passengers' });
     expect(classifyRideRequestFailure(undefined, 'fallback')).toEqual({ kind: 'message', message: 'fallback' });
+  });
+});
+
+describe('useActiveRideActions.requestRide success (T-311)', () => {
+  it('opens no "Ride Requested" modal: the ride panel shows the searching stage', async () => {
+    mock.onPost('/rides').reply(201, envelope(makeRide({ id: 31 })));
+    const requestedModal = jest.spyOn(modals, 'showRideRequestedModal').mockImplementation(() => undefined);
+    const successModal = jest.spyOn(modals, 'showSuccessModal').mockImplementation(() => undefined);
+    const modal = jest.spyOn(modals, 'showModal').mockImplementation(() => undefined);
+    const result = renderActions();
+
+    let ride: unknown;
+    await act(async () => {
+      ride = await result.current.requestRide(makeRideRequest());
+    });
+
+    expect(ride).toMatchObject({ id: 31 });
+    expect(requestedModal).not.toHaveBeenCalled();
+    expect(successModal).not.toHaveBeenCalled();
+    expect(modal).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
   });
 });
 

@@ -80,6 +80,16 @@ describe('FareReview', () => {
     getByText('Rs 150');
   });
 
+  it('T-311: labels the booking price as an estimate, not the final fare', () => {
+    const { getByText, queryByText } = render(
+      <FareReview vehicleType={types[0]} estimates={loaded(estimates)} onConfirm={jest.fn()} />,
+    );
+    getByText('Estimated fare');
+    getByText('Estimated total');
+    getByText('Your final fare is calculated when the trip ends.');
+    expect(queryByText('Total')).toBeNull();
+  });
+
   it('shows the estimate error with Retry instead of a made-up fare', () => {
     const failed = loaded<FareEstimates>(null, 'error', 'Could not calculate the fare.');
     const { getByText, queryByText } = render(<FareReview vehicleType={types[0]} estimates={failed} onConfirm={jest.fn()} />);

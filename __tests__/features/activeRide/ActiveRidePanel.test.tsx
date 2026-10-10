@@ -73,6 +73,8 @@ describe('ActiveRidePanel', () => {
     expect(getByText('Rs 200')).toBeTruthy();
     expect(getByText('Stops')).toBeTruthy();
     expect(getByText('Pay your driver in cash')).toBeTruthy();
+    // T-311: the summary is the final fare (the booking price was only an estimate).
+    expect(getByText('Final fare')).toBeTruthy();
     expect(queryByTestId('active-ride-cancel')).toBeNull();
     fireEvent.press(getByTestId('active-ride-done'));
     expect(onDone).toHaveBeenCalledTimes(1);

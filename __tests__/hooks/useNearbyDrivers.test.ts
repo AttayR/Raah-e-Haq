@@ -226,4 +226,36 @@ describe('useNearbyDrivers', () => {
     await advance(NEARBY_ERROR_RETRY_MS * 3);
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it('T-311: a new refreshKey (ride ended) asks again now, not at the next 30 s tick', async () => {
+    spy.mockResolvedValueOnce([]).mockResolvedValue([driver]);
+    const { result, rerender } = renderHook(
+      ({ refreshKey }: { refreshKey: string }) => useNearbyDrivers(lahore, { refreshKey }),
+      { initialProps: { refreshKey: '7:active' } },
+    );
+    await advance(0);
+    expect(result.current.drivers).toEqual([]);
+
+    // Well past the 10 s floor, well before the 30 s poll.
+    await advance(NEARBY_MIN_GAP_MS + 1_000);
+    expect(spy).toHaveBeenCalledTimes(1);
+    rerender({ refreshKey: '7:ended' });
+    await advance(0);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+  });
+
+  it('T-311: a refreshKey change still keeps the 10 s floor', async () => {
+    spy.mockResolvedValue([driver]);
+    const { rerender } = renderHook(
+      ({ refreshKey }: { refreshKey: string }) => useNearbyDrivers(lahore, { refreshKey }),
+      { initialProps: { refreshKey: 'a' } },
+    );
+    await advance(0);
+    rerender({ refreshKey: 'b' });
+    await advance(NEARBY_MIN_GAP_MS - 1);
+    expect(spy).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
 });

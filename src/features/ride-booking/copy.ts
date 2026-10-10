@@ -16,6 +16,11 @@ export const BOOKING_COPY = {
   breakdownTime: (min: number) => `Time (${min} min)`,
   breakdownStops: 'Stops',
   breakdownMinimum: 'Minimum fare adjustment',
+  // T-311: the booking price is the server's quote; the final fare is set when the trip ends.
+  estimatedFareTitle: 'Estimated fare',
+  fareBreakdownTitle: 'Fare breakdown',
+  estimatedTotal: 'Estimated total',
+  estimateNote: 'Your final fare is calculated when the trip ends.',
   tripSummary: (km: number, min: number) => `${km} km • ${min} min`,
   phoneNotVerifiedTitle: 'Verify your phone number',
   phoneNotVerifiedAction: 'Verify number',

@@ -29,6 +29,11 @@ export interface UseNearbyDriversOptions {
   enabled?: boolean;
   radiusKm?: number;
   vehicleType?: NearbyVehicleType;
+  /**
+   * T-311: a new value asks again now (still no sooner than MIN_GAP_MS after the last
+   * request) instead of at the next POLL_MS tick, e.g. right after a ride ends.
+   */
+  refreshKey?: string | number;
 }
 
 type Center = { latitude: number; longitude: number } | null | undefined;
@@ -55,7 +60,7 @@ const useAppIsActive = (): boolean => {
 };
 
 export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOptions = {}): NearbyDriversState => {
-  const { enabled: enabledOption = true, radiusKm, vehicleType } = options;
+  const { enabled: enabledOption = true, radiusKm, vehicleType, refreshKey } = options;
   const appActive = useAppIsActive();
   const enabled = enabledOption && appActive;
   const [state, setState] = useState<NearbyDriversState>(INITIAL);
@@ -120,7 +125,8 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
       if (timer) clearTimeout(timer);
       controller?.abort();
     };
-  }, [enabled, lat, lng, radiusKm, vehicleType]);
+    // refreshKey only restarts the schedule (its value is not read).
+  }, [enabled, lat, lng, radiusKm, vehicleType, refreshKey]);
 
   return state;
 };

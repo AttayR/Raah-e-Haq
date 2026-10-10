@@ -98,7 +98,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
               )}
             </>
           )}
-          <FareRow label={ACTIVE_RIDE_COPY.totalLabel} value={formatFare(fare.total)} strong />
+          <FareRow label={ACTIVE_RIDE_COPY.finalFareLabel} value={formatFare(fare.total)} strong />
           {fare.paymentMethod && (
             <Text style={[styles.sub, { color: c.textSecondary }]}>{ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod)}</Text>
           )}

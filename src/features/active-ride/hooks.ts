@@ -4,7 +4,7 @@ import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
 import { rejectionMessage } from '../../core/api/errors';
 import { toast } from '../../core/toast';
-import { hideModal, showErrorModal, showRideRequestedModal } from '../../components/NotificationManager';
+import { hideModal, showErrorModal } from '../../components/NotificationManager';
 import { classifyRideRequestFailure, type RideRequestFailure } from '../ride-booking/rideRequestFailure';
 import { BOOKING_COPY } from '../ride-booking/copy';
 import {
@@ -159,11 +159,10 @@ export interface ActiveRideActionsOptions {
 }
 
 /**
- * Create and cancel for the booking screen, with the same feedback the screen had through
- * useRide: a loading toast, the "ride requested" modal, and an error modal with the
- * server's display-safe message (for a 422 the field message). PHONE_NOT_VERIFIED offers
- * phone verification instead; 403 ACCOUNT_* and a stale session show nothing (the API
- * client routes those). Both reject on failure, so the screen keeps its own error state.
+ * Create and cancel for the booking screen: a loading toast while POST /rides runs, and an
+ * error modal with the server's display-safe message (for a 422 the field message).
+ * PHONE_NOT_VERIFIED offers phone verification instead; 403 ACCOUNT_* and a stale session
+ * show nothing (the API client routes those). Both reject on failure, so the screen keeps its own error state.
  */
 export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => {
   const dispatch = useDispatch<ActiveRideDispatch>();
@@ -176,7 +175,8 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
       const action = await dispatch(createActiveRide(request));
       toast.hide(loadingToastId);
       if (createActiveRide.fulfilled.match(action)) {
-        showRideRequestedModal();
+        // No success modal (T-311): the ActiveRidePanel shows the searching stage, and a modal
+        // left open would cover the driver card once the ride moves on.
         return action.payload;
       }
       const failure = classifyRideRequestFailure(action.payload, ACTIVE_RIDE_COPY.requestFailedFallback);

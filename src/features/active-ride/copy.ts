@@ -27,7 +27,8 @@ export const ACTIVE_RIDE_COPY = {
   driverFallbackName: 'Your driver',
   driverMarkerTitle: 'Your driver',
   plate: (plate: string) => `Plate ${plate}`,
-  totalLabel: 'Total',
+  // T-311: the completed summary is the server's final fare, not the booking estimate.
+  finalFareLabel: 'Final fare',
   breakdownDistance: 'Distance',
   breakdownTime: 'Time',
   paymentLabel: (method: string) => (method === 'cash' ? 'Pay your driver in cash' : `Payment: ${method}`),

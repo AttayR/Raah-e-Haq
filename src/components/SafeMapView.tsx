@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import MapView, { MapViewProps, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { EdgePadding, LatLng, MapViewProps, PROVIDER_GOOGLE } from 'react-native-maps';
 import { BrandColors } from '../theme/colors';
 import { logger } from '../core/logging/logger';
 
@@ -13,6 +13,7 @@ export interface SafeMapViewRef {
   animateToCoordinate: (coordinate: any, duration?: number) => void;
   fitToElements: (options?: { edgePadding?: any; animated?: boolean }) => void;
   fitToSuppliedMarkers: (markers: string[], animated?: boolean) => void;
+  fitToCoordinates: (coordinates: LatLng[], options?: { edgePadding?: EdgePadding; animated?: boolean }) => void;
 }
 
 const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
@@ -62,6 +63,15 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
             mapRef.current.fitToSuppliedMarkers(markers, animated);
           } catch (error) {
             logger.debug('SafeMapView: Error fitting to markers:', error);
+          }
+        }
+      },
+      fitToCoordinates: (coordinates: LatLng[], options = { animated: true }) => {
+        if (mapRef.current && isMapReady && isMounted) {
+          try {
+            mapRef.current.fitToCoordinates(coordinates, options);
+          } catch (error) {
+            logger.debug('SafeMapView: Error fitting to coordinates:', error);
           }
         }
       },

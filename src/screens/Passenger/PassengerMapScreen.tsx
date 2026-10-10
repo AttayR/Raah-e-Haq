@@ -31,6 +31,7 @@ import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } fro
 import { isRideInProgress } from '../../features/active-ride/status';
 import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
 import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
+import { driverApproachCoordinates, useFitCoordinates } from '../../features/active-ride/camera';
 import { mapTapTarget, type MapPickTarget } from '../../features/ride-booking/mapTap';
 import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -91,10 +92,16 @@ const PassengerMapScreen = () => {
   const rideShown = !!currentRide;
   const shownStage: typeof stage = rideShown ? 'requesting' : stage;
 
-  // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked.
+  // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked. Once
+  // the ride has ended (T-311) they are read again at once, and again on Done, so the map
+  // does not say "No drivers nearby" until the next 30 s tick.
+  const rideEnded = rideStage?.stage === 'completed' || rideStage?.stage === 'cancelled';
   const nearbyDrivers = useNearbyDrivers(pickup ?? currentLocation, {
-    enabled: isFocused && shownStage !== 'requesting',
+    enabled: isFocused && (shownStage !== 'requesting' || rideEnded),
+    refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
   });
+  // Driver on the way (T-311): keep the driver and the pickup both in view.
+  useFitCoordinates(mapRef, driverApproachCoordinates(rideStage?.stage, driverLocation, currentRide));
   // Call button only while the server exposes driver.phone (accepted, still-active ride).
   const driverPhone = getDriverPhone(currentRide);
   const callDriver = useCallback(() => {
