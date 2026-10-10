@@ -7,6 +7,7 @@ import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
 import DriverRideScreen from 'src/screens/Driver/DriverRideScreen';
 import { useDriverStatusSync } from '../../../features/driver-status/hooks';
 import { useDriverRideRestore } from '../../../features/driver-ride/hooks';
+import { useDriverLocationTracking } from '../../../features/driver-location/hooks';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -34,6 +35,8 @@ const DriverStack = () => {
   useDriverStatusSync();
   // A ride the server reports as active (on_ride + active_ride_id) is read back (T-405).
   useDriverRideRestore();
+  // The one foreground location tracker: online or on a ride, app in the foreground (T-402).
+  useDriverLocationTracking();
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

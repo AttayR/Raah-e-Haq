@@ -192,11 +192,14 @@ export type RideDriverLocation =
   | { available: true; location: DriverLocation }
   | { available: false };
 
-/** Body of POST /tracking/update-location (DriverTrackingController@updateLocation). */
+/**
+ * Body of POST /tracking/update-location (BE-06). Never `driver_id` or `status`: the server
+ * takes the driver from the token and ignores a body status. The driver app posts through
+ * features/driver-location (T-402).
+ */
 export interface LocationUpdate {
   latitude: number;
   longitude: number;
-  status?: DriverLocationStatus;
   address?: string;
   speed?: number | null;
   heading?: number | null;

@@ -11,7 +11,6 @@ import rideService, {
 } from '../services/rideService';
 import webSocketService from '../services/webSocketService';
 import notificationService from '../services/notificationService';
-import locationTrackingService from '../services/locationTrackingService';
 import { usePassengerNotifications } from './usePassengerNotifications';
 import { useDriverNotifications } from './useDriverNotifications';
 import { 
@@ -49,8 +48,6 @@ export interface RideActions {
   getNavigationInstructions: (rideId: number) => Promise<any>;
   
   // Location tracking
-  startLocationTracking: (config?: any) => Promise<void>;
-  stopLocationTracking: () => void;
   getDriverLocation: (ride: RideResource) => Promise<RideDriverLocation>;
   
   // Notifications
@@ -428,29 +425,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   }, []);
 
   // ==================== LOCATION TRACKING METHODS ====================
-
-  // Start location tracking
-  const startLocationTracking = useCallback(async (config?: any): Promise<void> => {
-    try {
-      logger.debug('📍 Starting location tracking:', config);
-      await locationTrackingService.startTracking(config);
-      logger.debug('✅ Location tracking started');
-    } catch (error) {
-      logger.error('❌ Failed to start location tracking:', error);
-      throw error;
-    }
-  }, []);
-
-  // Stop location tracking
-  const stopLocationTracking = useCallback((): void => {
-    try {
-      logger.debug('📍 Stopping location tracking');
-      locationTrackingService.stopTracking();
-      logger.debug('✅ Location tracking stopped');
-    } catch (error) {
-      logger.error('❌ Failed to stop location tracking:', error);
-    }
-  }, []);
+  // The driver's own position is posted by the one tracker (useDriverLocationTracking, T-402).
 
   // Get the assigned driver's location; only asks the server while the ride is active (BE-20).
   const getDriverLocation = useCallback(
@@ -585,8 +560,6 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
     getNavigationInstructions,
     
     // Location tracking
-    startLocationTracking,
-    stopLocationTracking,
     getDriverLocation,
     
     // Notifications

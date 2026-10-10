@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -47,6 +47,9 @@ interface Location {
 
 const DriverMapScreen = () => {
   const mapRef = useRef<any>(null);
+  // SafeMapView ignores animateToRegion until the map is ready, so a position that arrives
+  // earlier is applied once it is (otherwise the map stays on the default region).
+  const [mapReady, setMapReady] = useState(false);
   
   // The signed-in driver comes from the API session (apiAuth); the Firebase uid is gone (INF-10).
   const userId = useAppSelector(state => state.apiAuth.user?.id ?? null);
@@ -124,9 +127,9 @@ const DriverMapScreen = () => {
     return MAPS_CONFIG.DEFAULT_REGION;
   };
 
-  // Move map to current location
+  // Move map to current location (again once the map is ready)
   useEffect(() => {
-    if (currentLocation && mapRef.current && currentLocation.latitude && currentLocation.longitude) {
+    if (mapReady && currentLocation && mapRef.current && currentLocation.latitude && currentLocation.longitude) {
       try {
         mapRef.current.animateToRegion({
           latitude: currentLocation.latitude,
@@ -138,10 +141,11 @@ const DriverMapScreen = () => {
         logger.error('Error animating to region:', error);
       }
     }
-  }, [currentLocation]);
+  }, [currentLocation, mapReady]);
 
-  // Online/offline comes from the driverStatus slice (T-401). Location posting (T-402) and
-  // ride-request polling (T-403) key on its `isOnline`.
+  // Online/offline comes from the driverStatus slice (T-401). Ride-request polling (T-403) keys
+  // on its `isOnline`; location posting is the driver-wide tracker (useDriverLocationTracking
+  // in DriverStack, T-402), not this screen.
 
   // Subscribe to driver notifications when online
   useEffect(() => {
@@ -192,7 +196,7 @@ const DriverMapScreen = () => {
           showsUserLocation={true}
           showsMyLocationButton={false}
           onMapReady={() => {
-            logger.debug('SafeMapView is ready');
+            setMapReady(true);
           }}
           onError={(error) => {
             logger.error('SafeMapView error:', error);
