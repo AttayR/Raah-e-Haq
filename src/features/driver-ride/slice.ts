@@ -1,9 +1,11 @@
 import { createAsyncThunk, createSlice, isAnyOf, type PayloadAction } from '@reduxjs/toolkit';
 import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
 import type { RideResource } from '../../services/rideService';
+import locationTrackingService from '../../services/locationTrackingService';
 import { currentSessionEpoch, isStaleSession } from '../../store/sessionEpoch';
 import { isStaleSessionRejection, staleSessionRejection } from '../../store/thunks/apiThunks';
 import { acceptRideRequest } from '../driver-requests/slice';
+import { DRIVER_LOCATION_CONFIG } from '../driver-location/config';
 import { DRIVER_RIDE_CODES, driverRideApi, runTransition, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
 import { isRestorableDriverRide } from './steps';
@@ -60,6 +62,9 @@ export type AdvanceDriverRideArg =
  * One forward step: arrived, start, complete (BE-04, no body: the server computes the fare),
  * or a stop marked done (POST /rides/{id}/stops/{stop}/complete, then GET /rides/{id}, since
  * the stop endpoint does not answer with the ride).
+ *
+ * Before "arrived", a location ping older than ~20 s is refreshed with one post (T-409), so
+ * the server's arrival check (BE-64, 422 `not_near_pickup`) sees where the driver is now.
  */
 export const advanceDriverRide = createAsyncThunk<RideResource, AdvanceDriverRideArg, ThunkConfig>(
   'driverRide/advance',
@@ -69,6 +74,9 @@ export const advanceDriverRide = createAsyncThunk<RideResource, AdvanceDriverRid
         if (arg.action === 'stop') {
           await driverRideApi.completeStop(arg.rideId, arg.stopId);
           return driverRideApi.get(arg.rideId);
+        }
+        if (arg.action === 'arrived') {
+          await locationTrackingService.pingIfStale(DRIVER_LOCATION_CONFIG.arrivalPingMaxAgeMs);
         }
         return runTransition(arg.rideId, arg.action);
       },

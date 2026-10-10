@@ -24,6 +24,13 @@ export interface AccountRefusal {
   rejectionReason?: string | null;
 }
 
+/**
+ * Numeric fields of the nested `error` object, for refusals that carry numbers the UI shows
+ * (BE-64 `not_near_pickup`: `distance_m`, `radius_m`). Numbers only: text from an error body
+ * is never carried beyond `message`.
+ */
+export type ApiErrorExtra = Readonly<Record<string, number>>;
+
 export interface ApiErrorInit {
   kind: ApiErrorKind;
   message: string;
@@ -32,6 +39,7 @@ export interface ApiErrorInit {
   fieldErrors?: FieldErrors;
   retryAfter?: number;
   account?: AccountRefusal;
+  extra?: ApiErrorExtra;
 }
 
 /** The only error type the API layer throws. Built in one place: the axios response interceptor. */
@@ -42,6 +50,7 @@ export class ApiError extends Error {
   readonly fieldErrors: FieldErrors;
   readonly retryAfter?: number;
   readonly account?: AccountRefusal;
+  readonly extra?: ApiErrorExtra;
 
   constructor(init: ApiErrorInit) {
     super(init.message);
@@ -53,6 +62,9 @@ export class ApiError extends Error {
     this.retryAfter = init.retryAfter;
     if (init.account) {
       this.account = init.account;
+    }
+    if (init.extra) {
+      this.extra = init.extra;
     }
   }
 }
@@ -140,6 +152,18 @@ const toAccountRefusal = (data: unknown): AccountRefusal => {
   return refusal;
 };
 
+/** The nested error's finite numeric fields (see ApiErrorExtra); undefined when there are none. */
+const toExtra = (nested: Record<string, unknown> | undefined): ApiErrorExtra | undefined => {
+  if (!nested) return undefined;
+  const extra: Record<string, number> = {};
+  Object.entries(nested).forEach(([key, value]) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      extra[key] = value;
+    }
+  });
+  return Object.keys(extra).length > 0 ? extra : undefined;
+};
+
 /** Reads the error fields out of any of the backend's error envelopes. */
 const fromBody = (body: unknown) => {
   if (!isObject(body)) return {};
@@ -165,6 +189,7 @@ const fromBody = (body: unknown) => {
     fieldErrors,
     retryAfter: toPositiveNumber(body.retry_after),
     account: code && code.startsWith('ACCOUNT_') ? toAccountRefusal(body.data) : undefined,
+    extra: toExtra(nested),
   };
 };
 
@@ -191,6 +216,7 @@ export const toApiError = (error: unknown): ApiError => {
         fieldErrors,
         retryAfter: parsed.retryAfter ?? headerRetry,
         account: parsed.account,
+        extra: parsed.extra,
       });
     }
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
@@ -235,6 +261,8 @@ export interface ThunkRejection {
   retryAfter?: number;
   /** Set for a 403 ACCOUNT_* refusal (BE-25/BE-32). */
   account?: AccountRefusal;
+  /** The nested error's numeric fields (e.g. BE-64 `distance_m`), when it has any. */
+  extra?: ApiErrorExtra;
 }
 
 export const toThunkRejection = (error: unknown, fallbackMessage: string): ThunkRejection => {
@@ -249,6 +277,7 @@ export const toThunkRejection = (error: unknown, fallbackMessage: string): Thunk
     fieldErrors: apiError.fieldErrors,
     retryAfter: apiError.retryAfter,
     ...(apiError.account ? { account: apiError.account } : {}),
+    ...(apiError.extra ? { extra: apiError.extra } : {}),
   };
 };
 

@@ -81,6 +81,23 @@ describe('toApiError', () => {
     expect(error).toMatchObject({ kind: 'forbidden', code: 'FORBIDDEN_FIELDS', message: 'Drivers cannot change: passenger_id' });
   });
 
+  it('carries the nested error\'s numbers (BE-64 not_near_pickup), never its other text', () => {
+    const error = toApiError(
+      axiosErrorWith(422, {
+        success: false,
+        message: 'You are too far from the pickup point.',
+        error: { code: 'not_near_pickup', message: 'You are too far from the pickup point.', distance_m: 812.4, radius_m: 300, note: 'x' },
+      }),
+    );
+    expect(error).toMatchObject({ kind: 'validation', code: 'not_near_pickup', message: 'You are too far from the pickup point.' });
+    expect(error.extra).toEqual({ distance_m: 812.4, radius_m: 300 });
+    expect(toThunkRejection(error, 'fallback').extra).toEqual({ distance_m: 812.4, radius_m: 300 });
+
+    const plain = toApiError(axiosErrorWith(409, { success: false, error: { code: 'X', message: 'm' } }));
+    expect(plain.extra).toBeUndefined();
+    expect(toThunkRejection(plain, 'fallback')).not.toHaveProperty('extra');
+  });
+
   it('never shows server text for 5xx (exception text can contain SQL or PII)', () => {
     const error = toApiError(
       axiosErrorWith(500, {

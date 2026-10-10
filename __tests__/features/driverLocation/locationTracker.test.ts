@@ -150,4 +150,65 @@ describe('locationTrackingService (T-402)', () => {
     await expect(started).resolves.toBe(false);
     expect(geo.watchPosition).not.toHaveBeenCalled();
   });
+
+  describe('pingIfStale (T-409, before POST /rides/{id}/arrived)', () => {
+    const MAX_AGE = DRIVER_LOCATION_CONFIG.arrivalPingMaxAgeMs;
+
+    it('posts the latest fix once when the last post is older than the limit, even without movement', async () => {
+      await locationTrackingService.startTracking();
+      emit(0);
+      await settle();
+      expect(post).toHaveBeenCalledTimes(1);
+
+      // Not moving: the throttle would wait for the heartbeat (30 s).
+      jest.setSystemTime(Date.now() + MAX_AGE + 1_000);
+      await locationTrackingService.pingIfStale(MAX_AGE);
+      expect(post).toHaveBeenCalledTimes(2);
+      expect(post).toHaveBeenLastCalledWith(BASE);
+
+      // Fresh now: a second call sends nothing.
+      await locationTrackingService.pingIfStale(MAX_AGE);
+      expect(post).toHaveBeenCalledTimes(2);
+    });
+
+    it('sends nothing while the last post is recent', async () => {
+      await locationTrackingService.startTracking();
+      emit(0);
+      await settle();
+      jest.setSystemTime(Date.now() + MAX_AGE - 5_000);
+      await locationTrackingService.pingIfStale(MAX_AGE);
+      expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends nothing when tracking is off or there is no fix yet', async () => {
+      await locationTrackingService.pingIfStale(MAX_AGE);
+      await locationTrackingService.startTracking();
+      await locationTrackingService.pingIfStale(MAX_AGE);
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    it('waits for a post already in flight instead of sending a second one', async () => {
+      let release: () => void = () => undefined;
+      post.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
+      await locationTrackingService.startTracking();
+      emit(0);
+      let done = false;
+      const ping = locationTrackingService.pingIfStale(MAX_AGE).then(() => { done = true; });
+      await settle();
+      expect(done).toBe(false);
+      release();
+      await ping;
+      expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it('never rejects when the post fails', async () => {
+      await locationTrackingService.startTracking();
+      emit(0);
+      await settle();
+      post.mockRejectedValueOnce(new ApiError({ kind: 'server', status: 500, message: 'x' }));
+      jest.setSystemTime(Date.now() + MAX_AGE + 1_000);
+      await expect(locationTrackingService.pingIfStale(MAX_AGE)).resolves.toBeUndefined();
+      expect(post).toHaveBeenCalledTimes(2);
+    });
+  });
 });

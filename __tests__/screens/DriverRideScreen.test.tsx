@@ -16,6 +16,8 @@ import type { RideResource, RideStopResource } from '../../src/services/rideServ
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
 import { OpenRideCard } from '../../src/components/driver/OpenRideCard';
 import { envelope, makeRide } from '../../test-utils/rideFixtures';
+import { toast } from '../../src/core/toast';
+import locationTrackingService from '../../src/services/locationTrackingService';
 
 const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
@@ -142,6 +144,48 @@ describe('DriverRideScreen', () => {
     fireEvent.press(screen.getByTestId('driver-ride-start'));
 
     await waitFor(() => screen.getByTestId('driver-ride-cancelled'));
+  });
+
+  it('a 422 not_near_pickup shows the server message with the distance and keeps the Arrived button (T-409)', async () => {
+    const errorSpy = jest.spyOn(toast, 'error').mockImplementation(() => '');
+    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger }));
+    await settle(store);
+    mock.onPost('/rides/41/arrived').reply(422, {
+      success: false,
+      message: 'You are too far from the pickup point.',
+      error: { code: 'not_near_pickup', message: 'You are too far from the pickup point.', distance_m: 812.4, radius_m: 300 },
+    });
+
+    fireEvent.press(screen.getByTestId('driver-ride-arrived'));
+    await waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith('You are too far from the pickup point. About 812 m away.'),
+    );
+    await settle(store);
+
+    expect(screen.getByTestId('driver-ride-title').props.children).toBe('Head to pickup');
+    expect(screen.getByTestId('driver-ride-arrived').props.accessibilityState).toMatchObject({ disabled: false });
+    expect(selectDriverActiveRide(store.getState())?.status).toBe('accepted');
+    // Nothing else was re-read or posted (no refetch loop, no status reload).
+    expect(mock.history.post.filter((r) => r.url === '/rides/41/arrived')).toHaveLength(1);
+    expect(mock.history.get.filter((r) => r.url === '/driver/status')).toHaveLength(0);
+  });
+
+  it('refreshes a stale location ping once before calling arrived (T-409)', async () => {
+    const order: string[] = [];
+    jest.spyOn(locationTrackingService, 'pingIfStale').mockImplementation(async (maxAgeMs: number) => {
+      order.push(`ping:${maxAgeMs}`);
+    });
+    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger }));
+    await settle(store);
+    mock.onPost('/rides/41/arrived').reply(() => {
+      order.push('arrived');
+      return [200, envelope(makeRide({ status: 'arrived', passenger }))];
+    });
+
+    fireEvent.press(screen.getByTestId('driver-ride-arrived'));
+    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for the passenger'));
+
+    expect(order).toEqual(['ping:20000', 'arrived']);
   });
 
   it('cancel needs a 3-character reason and sends it as the note', async () => {

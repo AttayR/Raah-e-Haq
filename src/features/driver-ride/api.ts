@@ -14,6 +14,10 @@ import type { RideResource } from '../../services/rideService';
  * - POST /rides/{id}/stops/{stop}/complete: answers with stop counters, not a ride, so the
  *   ride is read again afterwards.
  *
+ * - 422 `not_near_pickup` from /arrived (BE-64): the driver's latest location ping is farther
+ *   than the server's radius from pickup; `error.distance_m` / `error.radius_m` say how far.
+ *   The ride stays `accepted`.
+ *
  * Refusals: 403 NOT_ASSIGNED_DRIVER / DRIVER_NOT_ACTIVE; 409 INVALID_STATUS_TRANSITION or
  * RIDE_CANNOT_BE_CANCELLED (with `error.current_status`), 409 RIDE_NOT_ACTIVE /
  * STOP_ALREADY_COMPLETED / STOP_ALREADY_CANCELLED / STOP_NOT_ACTIVE for a stop.
@@ -27,6 +31,7 @@ export const DRIVER_RIDE_CODES = {
   stopAlreadyCompleted: 'STOP_ALREADY_COMPLETED',
   stopAlreadyCancelled: 'STOP_ALREADY_CANCELLED',
   stopNotActive: 'STOP_NOT_ACTIVE',
+  notNearPickup: 'not_near_pickup',
 } as const;
 
 /** The driver's cancel note bounds (BE-04 driverCancel, `note` max:500). */

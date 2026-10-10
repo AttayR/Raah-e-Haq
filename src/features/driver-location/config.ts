@@ -11,6 +11,11 @@ export const DRIVER_LOCATION_CONFIG = {
   minMoveMeters: 10,
   /** Wait after a 429 that carries no `retry_after`. */
   rateLimitBackoffMs: 60_000,
+  /**
+   * Before "I've arrived", a last post older than this is refreshed with one post first, so
+   * the server's arrival check (BE-64) judges where the driver is now (T-409).
+   */
+  arrivalPingMaxAgeMs: 20_000,
 } as const;
 
 export interface DriverLocationConfig {

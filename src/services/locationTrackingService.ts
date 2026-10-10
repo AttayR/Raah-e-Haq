@@ -73,7 +73,7 @@ class LocationTrackingService {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastLocation: LocationFix | null = null;
   private lastPost: LastPostedLocation | null = null;
-  private inFlight = false;
+  private inFlight: Promise<void> | null = null;
   private blockedUntil = 0;
   private onDriverOffline: (() => void) | undefined;
   private listeners: Set<(location: LocationFix) => void> = new Set();
@@ -133,7 +133,7 @@ class LocationTrackingService {
       clearInterval(this.timer);
       this.timer = null;
     }
-    this.inFlight = false;
+    this.inFlight = null;
     this.blockedUntil = 0;
     this.lastPost = null;
     this.onDriverOffline = undefined;
@@ -147,6 +147,27 @@ class LocationTrackingService {
     this.stopTracking();
     this.lastLocation = null;
     this.listeners.clear();
+  }
+
+  /**
+   * One extra post when the server's copy may be old (T-409, before POST /rides/{id}/arrived):
+   * if tracking runs, has a fix, and the last accepted post is older than `maxAgeMs` (or there
+   * is none), the latest fix is posted now, ignoring the movement throttle (a 429 wait is still
+   * honoured). A post already in flight is awaited instead. Never throws, never loops: failures
+   * go through the usual handling and the caller carries on.
+   */
+  async pingIfStale(maxAgeMs: number): Promise<void> {
+    if (this.inFlight) {
+      await this.inFlight;
+      return;
+    }
+    if (!this.active) return;
+    const now = Date.now();
+    if (now < this.blockedUntil) return;
+    const fix = this.lastLocation;
+    if (!fix) return;
+    if (this.lastPost && now - this.lastPost.at < maxAgeMs) return;
+    await this.post(this.generation, fix, now);
   }
 
   getTrackingStatus(): boolean {
@@ -200,9 +221,12 @@ class LocationTrackingService {
     if (now < this.blockedUntil) return;
     const fix = this.lastLocation;
     if (!fix || !shouldPostLocation(fix, this.lastPost, now)) return;
+    this.post(generation, fix, now);
+  }
 
-    this.inFlight = true;
-    driverLocationApi
+  /** Posts `fix`; resolves (never rejects) once the answer was handled. One request at a time. */
+  private post(generation: number, fix: LocationFix, now: number): Promise<void> {
+    const request = driverLocationApi
       .post(toLocationBody(fix))
       .then(() => {
         if (generation !== this.generation) return;
@@ -213,10 +237,12 @@ class LocationTrackingService {
         this.handlePostError(error, now);
       })
       .finally(() => {
-        if (generation === this.generation) {
-          this.inFlight = false;
+        if (generation === this.generation && this.inFlight === request) {
+          this.inFlight = null;
         }
       });
+    this.inFlight = request;
+    return request;
   }
 
   private handlePostError(error: unknown, now: number): void {

@@ -44,8 +44,20 @@ const SUCCESS_COPY: Record<DriverRideTransition | 'stop', string> = {
   stop: DRIVER_RIDE_COPY.stopDone,
 };
 
+/**
+ * BE-64 422 `not_near_pickup`: the server's message, plus "About N m away." when it sent the
+ * distance.
+ */
+const notNearPickupMessage = (payload: ThunkRejection): string => {
+  const base = rejectionMessage(payload, DRIVER_RIDE_COPY.notNearPickup);
+  const distance = payload.extra?.distance_m;
+  if (typeof distance !== 'number' || !Number.isFinite(distance) || distance < 0) return base;
+  return `${base} ${DRIVER_RIDE_COPY.aboutAway.replace('{m}', String(Math.round(distance)))}`;
+};
+
 /** The message for a refused step: our copy for known codes, else the server's safe text. */
 export const driverRideRefusalMessage = (payload: ThunkRejection | undefined, fallback: string): string => {
+  if (payload?.code === DRIVER_RIDE_CODES.notNearPickup) return notNearPickupMessage(payload);
   if (payload?.code === DRIVER_RIDE_CODES.notAssignedDriver) return DRIVER_RIDE_COPY.notAssigned;
   if (payload?.code === DRIVER_RIDE_CODES.cannotBeCancelled) return DRIVER_RIDE_COPY.cannotCancel;
   if (payload?.code === DRIVER_RIDE_CODES.invalidTransition) return DRIVER_RIDE_COPY.changedElsewhere;

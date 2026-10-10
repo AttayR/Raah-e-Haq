@@ -68,6 +68,9 @@ export const DRIVER_RIDE_COPY = {
   changedElsewhere: 'The ride changed. Showing the latest status.',
   notAssigned: 'This ride is no longer assigned to you.',
   cannotCancel: 'The ride can only be cancelled before the trip starts.',
+  notNearPickup: 'You are not at the pickup yet.',
+  /** Appended to the not-near-pickup message; `{m}` is the server's distance in metres. */
+  aboutAway: 'About {m} m away.',
   callFailed: 'Could not start a call on this device.',
   navigateFailed: 'Could not open the maps app.',
 } as const;
