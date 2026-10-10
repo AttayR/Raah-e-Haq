@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import locationTrackingService from '../../services/locationTrackingService';
+import type { LatLng } from '../driver-requests/api';
 import { useAppIsActive } from '../driver-requests/hooks';
 import { selectDriverActiveRide, type DriverRideState } from '../driver-ride/slice';
 import { isRestorableDriverRide } from '../driver-ride/steps';
@@ -41,4 +42,24 @@ export const useDriverLocationTracking = (): void => {
     });
     return () => locationTrackingService.stopTracking();
   }, [enabled, dispatch]);
+};
+
+const toLatLng = (fix: LatLng | null): LatLng | null =>
+  fix ? { latitude: fix.latitude, longitude: fix.longitude } : null;
+
+/**
+ * The tracker's latest device position (T-408), or null before the first fix. It reads the one
+ * watcher (useDriverLocationTracking) instead of starting another; the listener is removed on
+ * unmount.
+ */
+export const useDriverLastLocation = (): LatLng | null => {
+  const [location, setLocation] = useState<LatLng | null>(() =>
+    toLatLng(locationTrackingService.getLastLocation()),
+  );
+  useEffect(() => {
+    // A fix may have arrived between the first render and this effect.
+    setLocation(toLatLng(locationTrackingService.getLastLocation()));
+    return locationTrackingService.addLocationListener((fix) => setLocation(toLatLng(fix)));
+  }, []);
+  return location;
 };

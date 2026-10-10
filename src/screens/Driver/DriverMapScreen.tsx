@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -12,7 +12,7 @@ import SafeMapView from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
@@ -21,14 +21,9 @@ import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { logger } from '../../core/logging/logger';
 import { useDriverStatusToggle } from '../../features/driver-status/hooks';
 import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
-import {
-  usePendingRidePolling,
-  useRideRequestActions,
-  useRideRequestFeed,
-} from '../../features/driver-requests/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
-import { RideRequestPanel } from '../../components/driver/IncomingRequestCard';
 import { OpenRideCard } from '../../components/driver/OpenRideCard';
+import { DRIVER_MAP_CONTROLS } from '../../components/driver/rideRequestLayout';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 
 /** RideResource coordinates arrive as decimal strings. */
@@ -39,6 +34,14 @@ const toCoordinate = (lat: unknown, lng: unknown): Location | null => {
     ? { latitude, longitude }
     : null;
 };
+
+// The control column's sizes are shared with the ride request panel, which sits above it (T-408).
+const {
+  bottom: CONTROLS_BOTTOM,
+  locationButtonSize: LOCATION_BUTTON_SIZE,
+  locationButtonGap: LOCATION_BUTTON_GAP,
+  onlineButtonSize: ONLINE_BUTTON_SIZE,
+} = DRIVER_MAP_CONTROLS;
 
 interface Location {
   latitude: number;
@@ -77,17 +80,8 @@ const DriverMapScreen = () => {
   const { isOnline, isOnRide, isChecking, disabled: toggleDisabled, toggle } = useDriverStatusToggle();
   const isLoadingLocation = locationLoading || !currentLocation;
 
-  // Incoming requests (T-403): GET /rides/pending every 5 s while online, without a ride,
-  // in the foreground and on this screen. The device position is the documented fallback.
-  const isFocused = useIsFocused();
-  const pollLocation = useMemo(
-    () => (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : null),
-    [currentLocation],
-  );
-  usePendingRidePolling({ isFocused, location: pollLocation });
-  const { view: requestView, retry: retryRequests } = useRideRequestFeed(pollLocation);
-  const { acceptingId, accept: acceptRequest, reject: rejectRequest } = useRideRequestActions();
-  const showRequests = isOnline && !isOnRide && !currentRide;
+  // Incoming requests (T-403/T-404) are polled and shown by RideRequestHost, mounted once for
+  // all driver tabs (T-408), so they arrive on Home as well as here.
   const pickupCoordinate = currentRide ? toCoordinate(currentRide.pickup_latitude, currentRide.pickup_longitude) : null;
   const dropoffCoordinate = currentRide ? toCoordinate(currentRide.dropoff_latitude, currentRide.dropoff_longitude) : null;
 
@@ -173,15 +167,6 @@ const DriverMapScreen = () => {
     }
 
     toggle();
-  };
-
-  // Accept / reject (T-404): the hook guards double taps, shows the toast for each refusal and
-  // puts the accepted ride in the driverRide slice; the ride screen takes over (T-405).
-  const handleAcceptRide = async (rideId: number) => {
-    const ride = await acceptRequest(rideId);
-    if (ride) {
-      navigation.navigate('DriverRide');
-    }
   };
 
   return (
@@ -287,19 +272,6 @@ const DriverMapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Incoming Ride Requests (T-403/T-404) */}
-      {showRequests && (
-        <View style={styles.rideRequestCard}>
-          <RideRequestPanel
-            view={requestView}
-            acceptingId={acceptingId}
-            onAccept={handleAcceptRide}
-            onReject={rejectRequest}
-            onRetry={retryRequests}
-          />
-        </View>
-      )}
-
       {/* The ride in progress (T-405): its steps live on the DriverRide screen. */}
       {currentRide && (
         <View style={styles.activeRideCard}>
@@ -351,18 +323,18 @@ const styles = StyleSheet.create({
   },
   controls: {
     position: 'absolute',
-    bottom: 30,
+    bottom: CONTROLS_BOTTOM,
     right: 20,
     alignItems: 'center',
   },
   locationButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: LOCATION_BUTTON_SIZE,
+    height: LOCATION_BUTTON_SIZE,
+    borderRadius: LOCATION_BUTTON_SIZE / 2,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: LOCATION_BUTTON_GAP,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -370,9 +342,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   onlineButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: ONLINE_BUTTON_SIZE,
+    height: ONLINE_BUTTON_SIZE,
+    borderRadius: ONLINE_BUTTON_SIZE / 2,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
@@ -399,13 +371,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: 'white',
-  },
-  // Positions the request panel; the card itself is themed (components/driver/IncomingRequestCard).
-  rideRequestCard: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
   },
   // Positions the ride card; the card itself is themed (components/driver/OpenRideCard).
   activeRideCard: {
