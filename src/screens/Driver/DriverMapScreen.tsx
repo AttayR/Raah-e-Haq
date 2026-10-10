@@ -5,38 +5,31 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   Alert, 
-  Dimensions,
   StatusBar
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { Marker } from 'react-native-maps';
 import SafeMapView from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { BrandColors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useIsFocused } from '@react-navigation/native';
-import { useRide } from '../../hooks/useRide';
-import { useAppDispatch, useAppSelector } from '../../app/providers/ReduxProvider';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { logger } from '../../core/logging/logger';
 import { useDriverStatusToggle } from '../../features/driver-status/hooks';
 import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
-import { loadDriverStatus } from '../../features/driver-status/slice';
 import {
   usePendingRidePolling,
   useRideRequestActions,
   useRideRequestFeed,
 } from '../../features/driver-requests/hooks';
-import {
-  clearDriverActiveRide,
-  selectDriverActiveRide,
-  setDriverActiveRide,
-} from '../../features/driver-ride/slice';
+import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { RideRequestPanel } from '../../components/driver/IncomingRequestCard';
-
-const { width, height } = Dimensions.get('window');
+import { OpenRideCard } from '../../components/driver/OpenRideCard';
+import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 
 /** RideResource coordinates arrive as decimal strings. */
 const toCoordinate = (lat: unknown, lng: unknown): Location | null => {
@@ -53,7 +46,6 @@ interface Location {
 }
 
 const DriverMapScreen = () => {
-  const { theme } = useAppTheme();
   const mapRef = useRef<any>(null);
   
   // The signed-in driver comes from the API session (apiAuth); the Firebase uid is gone (INF-10).
@@ -65,20 +57,11 @@ const DriverMapScreen = () => {
     isInitialized: notificationsInitialized,
     subscribeToDriverNotifications,
     unsubscribeFromDriverNotifications,
-    sendRideAcceptedNotification,
-    sendDriverArrivedNotification,
-    sendRideStartedNotification,
-    sendRideCompletedNotification,
   } = useDriverNotifications(uid || undefined);
-  
-  // Use comprehensive ride service
-  const {
-    startRide,
-    completeRide,
-  } = useRide(uid ? parseInt(uid) : undefined, 'driver');
-  const dispatch = useAppDispatch();
-  // The accepted ride (POST /rides/{id}/assign-driver, T-404); T-405 rebuilds this flow.
+
+  // The accepted ride (POST /rides/{id}/assign-driver, T-404); its flow lives on DriverRide (T-405).
   const currentRide = useAppSelector(selectDriverActiveRide);
+  const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
   
   // Use native location hook
   const {
@@ -189,36 +172,11 @@ const DriverMapScreen = () => {
   };
 
   // Accept / reject (T-404): the hook guards double taps, shows the toast for each refusal and
-  // puts the accepted ride in the driverRide slice, which drives the Active Ride card below.
-  const handleAcceptRide = (rideId: number) => {
-    acceptRequest(rideId);
-  };
-
-  const handleStartRide = async () => {
-    if (currentRide) {
-      try {
-        const ride = await startRide(currentRide.id);
-        dispatch(setDriverActiveRide(ride));
-        Alert.alert('Ride Started', 'You can now navigate to the passenger');
-      } catch (error) {
-        logger.error('Error starting ride:', error);
-        Alert.alert('Error', 'Failed to start ride');
-      }
-    }
-  };
-
-  const handleCompleteRide = async () => {
-    if (currentRide) {
-      try {
-        // The server computes the fare (BE-30 ignores a client fare); T-405 moves this to BE-04.
-        const ride = await completeRide(currentRide.id);
-        dispatch(clearDriverActiveRide());
-        dispatch(loadDriverStatus());
-        Alert.alert('Ride Completed', `Fare: PKR ${ride.total_fare}`);
-      } catch (error) {
-        logger.error('Error completing ride:', error);
-        Alert.alert('Error', 'Failed to complete ride');
-      }
+  // puts the accepted ride in the driverRide slice; the ride screen takes over (T-405).
+  const handleAcceptRide = async (rideId: number) => {
+    const ride = await acceptRequest(rideId);
+    if (ride) {
+      navigation.navigate('DriverRide');
     }
   };
 
@@ -338,31 +296,10 @@ const DriverMapScreen = () => {
         </View>
       )}
 
-      {/* Active Ride Controls */}
-      {currentRide && (currentRide.status === 'accepted' || currentRide.status === 'ongoing') && (
+      {/* The ride in progress (T-405): its steps live on the DriverRide screen. */}
+      {currentRide && (
         <View style={styles.activeRideCard}>
-          <Text style={styles.activeRideTitle}>Active Ride</Text>
-          <Text style={styles.activeRidePassenger}>{currentRide.passenger?.name || 'Passenger'}</Text>
-          
-          <View style={styles.activeRideButtons}>
-            {currentRide.status === 'accepted' && (
-              <TouchableOpacity 
-                style={styles.startButton}
-                onPress={handleStartRide}
-              >
-                <Text style={styles.startButtonText}>Start Ride</Text>
-              </TouchableOpacity>
-            )}
-            
-            {currentRide.status === 'ongoing' && (
-              <TouchableOpacity 
-                style={styles.completeButton}
-                onPress={handleCompleteRide}
-              >
-                <Text style={styles.completeButtonText}>Complete Ride</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <OpenRideCard ride={currentRide} onOpen={() => navigation.navigate('DriverRide')} />
         </View>
       )}
     </View>
@@ -466,59 +403,12 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
   },
+  // Positions the ride card; the card itself is themed (components/driver/OpenRideCard).
   activeRideCard: {
     position: 'absolute',
     bottom: 100,
     left: 20,
     right: 20,
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  activeRideTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: BrandColors.text,
-    marginBottom: 10,
-  },
-  activeRidePassenger: {
-    fontSize: 16,
-    color: BrandColors.mutedText,
-    marginBottom: 20,
-  },
-  activeRideButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  startButton: {
-    flex: 1,
-    backgroundColor: BrandColors.primary,
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  startButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  completeButton: {
-    flex: 1,
-    backgroundColor: BrandColors.success,
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-  },
-  completeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
 

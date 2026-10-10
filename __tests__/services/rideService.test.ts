@@ -52,12 +52,10 @@ describe('rideService returns the ride object from the envelope', () => {
     expect(mock.history.post[0].data).toBeUndefined();
   });
 
-  it('startRide and completeRide', async () => {
-    mock.onPut('/rides/42').reply(200, envelope({ ...ride, status: 'ongoing' }));
-    await expect(rideService.startRide(42)).resolves.toMatchObject({ id: 42, status: 'ongoing' });
-
-    mock.onPut('/rides/42').reply(200, envelope({ ...ride, status: 'completed' }));
-    await expect(rideService.completeRide(42, 350, 4.2, 12)).resolves.toMatchObject({ status: 'completed' });
+  it('has no PUT start/complete: the driver lifecycle uses the BE-04 endpoints (T-405)', () => {
+    // features/driver-ride/api posts /rides/{id}/arrived|start|complete; no client fare is sent.
+    expect('startRide' in rideService).toBe(false);
+    expect('completeRide' in rideService).toBe(false);
   });
 
   it('cancelRide and assignDriver', async () => {

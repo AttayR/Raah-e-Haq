@@ -62,6 +62,11 @@ export interface RideResource {
   distance_fare: number;
   time_fare: number;
   total_fare: number;
+  /**
+   * BE-05: the parts of total_fare (decimal numbers or strings); null for legacy rows that only
+   * have a total. Read it with features/driver-ride/steps toRideSummary, never by hand.
+   */
+  fare_breakdown?: RideFareBreakdown | null;
   driver_earnings: number;
   platform_commission: number;
   distance_km?: number;
@@ -102,21 +107,21 @@ export interface RideResource {
     color?: string | null;
     license_plate?: string | null;
   } | null;
-  /** BE-05: the server's breakdown of total_fare; null when the ride has no fare yet. */
+  /** BE-05: the minimum-fare top-up included in total_fare. */
   min_fare_adjustment?: number | string | null;
-  fare_breakdown?: RideFareBreakdown | null;
-  /** BE-04: who ended the ride (passenger | driver | system | weather | other). */
-  cancellation_reason?: string | null;
-  cancellation_note?: string | null;
   requested_at: string;
   accepted_at?: string;
   arrived_at?: string;
   started_at?: string;
   completed_at?: string;
   cancelled_at?: string;
+  /** Who cancelled (`passenger`, `driver`, `system`, or an admin's reason). */
+  cancellation_reason?: string | null;
+  /** The free-text note given on cancel (a driver must give one, BE-04). */
+  cancellation_note?: string | null;
 }
 
-/** RideResource.fare_breakdown (BE-05). Laravel decimals may arrive as strings. */
+/** RideResource.fare_breakdown (BE-05): the same keys as POST /rides/estimate. */
 export interface RideFareBreakdown {
   base: number | string;
   distance: number | string;
@@ -472,39 +477,6 @@ class RideService {
       return response;
     } catch (error) {
       logger.error('❌ Failed to accept ride:', error);
-      throw error;
-    }
-  }
-
-  // Start a ride
-  async startRide(rideId: number): Promise<RideResource> {
-    try {
-      logger.debug('🚀 Starting ride:', rideId);
-      const response = await this.updateRide(rideId, {
-        status: 'ongoing'
-      });
-      logger.debug('✅ Ride started successfully:', response.id);
-      return response;
-    } catch (error) {
-      logger.error('❌ Failed to start ride:', error);
-      throw error;
-    }
-  }
-
-  // Complete a ride
-  async completeRide(rideId: number, fare?: number, distanceKm?: number, durationMin?: number): Promise<RideResource> {
-    try {
-      logger.debug('🏁 Completing ride:', rideId, { fare, distanceKm, durationMin });
-      const response = await this.updateRide(rideId, {
-        status: 'completed',
-        fare,
-        distance_km: distanceKm,
-        duration_min: durationMin
-      });
-      logger.debug('✅ Ride completed successfully:', response.id);
-      return response;
-    } catch (error) {
-      logger.error('❌ Failed to complete ride:', error);
       throw error;
     }
   }

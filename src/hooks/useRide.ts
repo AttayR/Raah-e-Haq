@@ -16,9 +16,6 @@ import { usePassengerNotifications } from './usePassengerNotifications';
 import { useDriverNotifications } from './useDriverNotifications';
 import { 
   showRideRequestedModal, 
-  showDriverFoundToast, 
-  showRideStartedToast, 
-  showRideCompletedToast,
   showErrorModal,
 } from '../components/NotificationManager';
 import { toast } from '../core/toast';
@@ -34,9 +31,6 @@ export interface RideState {
 
 export interface RideActions {
   requestRide: (rideData: RideRequest) => Promise<RideResource>;
-  acceptRide: (rideId: number) => Promise<RideResource>;
-  startRide: (rideId: number) => Promise<RideResource>;
-  completeRide: (rideId: number, fare?: number, distance?: number, duration?: number) => Promise<RideResource>;
   cancelRide: (rideId: number) => Promise<RideResource>;
   updateDriverLocation: (location: LocationUpdate) => Promise<void>;
   findNearbyDrivers: (latitude: number, longitude: number, radius?: number) => Promise<NearbyDriver[]>;
@@ -89,7 +83,7 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
   // Use notifications based on user type
   // Kept for its subscription side effects; the backend sends ride notifications.
   usePassengerNotifications(userId?.toString());
-  const driverNotifications = useDriverNotifications(userId?.toString());
+  useDriverNotifications(userId?.toString());
 
   // Request a ride (Passenger)
   const requestRide = useCallback(async (rideData: RideRequest): Promise<RideResource> => {
@@ -177,174 +171,6 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
       throw error;
     }
   }, []);
-
-  // Accept a ride (Driver)
-  const acceptRide = useCallback(async (rideId: number): Promise<RideResource> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      logger.debug('✅ Accepting ride:', rideId);
-      const ride = await rideService.acceptRide(rideId);
-      
-      setState(prev => ({
-        ...prev,
-        currentRide: ride,
-        isLoading: false,
-      }));
-
-      // Send notification to passenger
-      await driverNotifications.sendRideAcceptedNotification(ride.passenger_id, {
-        rideId: ride.id,
-      });
-
-      // Show success toast
-      toast.success(
-        'Ride Accepted! 🎉',
-        'You have successfully accepted the ride. Head to the pickup location.',
-        {
-          action: {
-            label: 'View Details',
-            onPress: () => {
-              logger.debug('Navigate to ride details');
-            },
-          },
-        }
-      );
-
-      logger.debug('✅ Ride accepted successfully:', ride);
-      return ride;
-    } catch (error) {
-      logger.error('❌ Failed to accept ride:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to accept ride',
-      }));
-
-      // Show error modal
-      showErrorModal(
-        'Failed to Accept Ride',
-        error instanceof Error ? error.message : 'Failed to accept ride',
-        {
-          label: 'Try Again',
-          onPress: () => {
-            logger.debug('Retry accept ride');
-          },
-        }
-      );
-      
-      throw error;
-    }
-  }, [driverNotifications]);
-
-  // Start a ride (Driver)
-  const startRide = useCallback(async (rideId: number): Promise<RideResource> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      logger.debug('🚀 Starting ride:', rideId);
-      const ride = await rideService.startRide(rideId);
-      
-      setState(prev => ({
-        ...prev,
-        currentRide: ride,
-        isLoading: false,
-      }));
-
-      // Send notification to passenger
-      await driverNotifications.sendRideStartedNotification(ride.passenger_id, {
-        rideId: ride.id,
-        driverName: 'Driver', // TODO: Get actual driver name
-        destination: ride.dropoff_address,
-        estimatedDuration: '15 minutes',
-      });
-
-      // Show success toast
-      showRideStartedToast();
-
-      logger.debug('✅ Ride started successfully:', ride);
-      return ride;
-    } catch (error) {
-      logger.error('❌ Failed to start ride:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to start ride',
-      }));
-
-      // Show error modal
-      showErrorModal(
-        'Failed to Start Ride',
-        error instanceof Error ? error.message : 'Failed to start ride',
-        {
-          label: 'Try Again',
-          onPress: () => {
-            logger.debug('Retry start ride');
-          },
-        }
-      );
-      
-      throw error;
-    }
-  }, [driverNotifications]);
-
-  // Complete a ride (Driver)
-  const completeRide = useCallback(async (
-    rideId: number,
-    fare?: number,
-    distance?: number,
-    duration?: number
-  ): Promise<RideResource> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      logger.debug('🏁 Completing ride:', rideId, { fare, distance, duration });
-      const ride = await rideService.completeRide(rideId, fare, distance, duration);
-      
-      setState(prev => ({
-        ...prev,
-        currentRide: null,
-        rideHistory: [ride, ...prev.rideHistory],
-        isLoading: false,
-      }));
-
-      // Send notification to passenger
-      await driverNotifications.sendRideCompletedNotification(ride.passenger_id, {
-        rideId: ride.id,
-        driverName: 'Driver', // TODO: Get actual driver name
-        fare: fare || 0,
-        duration: `${duration || 0} minutes`,
-        distance: `${distance || 0} km`,
-      });
-
-      // Show success toast
-      showRideCompletedToast(fare || 0);
-
-      logger.debug('✅ Ride completed successfully:', ride);
-      return ride;
-    } catch (error) {
-      logger.error('❌ Failed to complete ride:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to complete ride',
-      }));
-
-      // Show error modal
-      showErrorModal(
-        'Failed to Complete Ride',
-        error instanceof Error ? error.message : 'Failed to complete ride',
-        {
-          label: 'Try Again',
-          onPress: () => {
-            logger.debug('Retry complete ride');
-          },
-        }
-      );
-      
-      throw error;
-    }
-  }, [driverNotifications]);
 
   // Cancel a ride
   const cancelRide = useCallback(async (rideId: number): Promise<RideResource> => {
@@ -741,9 +567,6 @@ export const useRide = (userId?: number, userType?: 'passenger' | 'driver') => {
 
   const actions: RideActions = {
     requestRide,
-    acceptRide,
-    startRide,
-    completeRide,
     cancelRide,
     updateDriverLocation,
     findNearbyDrivers,
