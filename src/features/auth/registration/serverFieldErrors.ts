@@ -20,7 +20,7 @@ const STEP_FIELDS: ReadonlyArray<{ step: RegistrationStep; fields: readonly Form
     step: 'vehicle',
     fields: [
       'vehicleType', 'vehicleNumber', 'vehicleBrand', 'vehicleModel', 'vehicleYear', 'vehicleColor',
-      'licensePlate', 'registrationNumber', 'licenseType', 'licenseExpiryDate', 'drivingExperience',
+      'licensePlate', 'registrationNumber', 'licenseNumber', 'licenseType', 'licenseExpiryDate', 'drivingExperience',
       'bankName', 'bankBranch', 'bankAccountNumber',
     ],
   },
@@ -58,10 +58,10 @@ const PASSENGER_FIELDS: Readonly<Record<string, FormField>> = {
   passenger_cnic_back_image: 'cnicBackPicture',
 };
 
-/** buildRegistrationRequest sends license_number from vehicleNumber (T-203 adds its own input). */
+/** Driver fields; license_number and license_image have their own inputs (T-207). */
 const DRIVER_FIELDS: Readonly<Record<string, FormField>> = {
   vehicle_type: 'vehicleType',
-  license_number: 'vehicleNumber',
+  license_number: 'licenseNumber',
   vehicle_make: 'vehicleBrand',
   vehicle_model: 'vehicleModel',
   vehicle_year: 'vehicleYear',

@@ -56,6 +56,7 @@ export interface RegistrationFormData {
   vehicleModel: string;
   vehicleYear: string;
   vehicleColor: string;
+  licenseNumber: string; // Driving licence number (T-207: required for drivers)
   licenseType: string;
   licenseExpiryDate: string; // YYYY-MM-DD
   licensePlate: string;
@@ -97,6 +98,7 @@ export const INITIAL_REGISTRATION_FORM: RegistrationFormData = {
   vehicleModel: '',
   vehicleYear: '',
   vehicleColor: '',
+  licenseNumber: '',
   licenseType: '',
   licenseExpiryDate: '',
   licensePlate: '',

@@ -418,6 +418,8 @@ export type RegisterWithImagesRequest = RegisterRequest & {
   passenger_emergency_contact?: string;
   passenger_emergency_contact_name?: string;
   passenger_emergency_contact_relation?: string;
+  /** Driver: the driving licence front picture (required for drivers, T-207/BE-68). */
+  license_image?: string;
 };
 
 export interface SendOtpRequest {
@@ -567,6 +569,8 @@ class ApiService {
         if (userData.bank_name) formData.append('bank_name', userData.bank_name);
         if (userData.bank_branch) formData.append('bank_branch', userData.bank_branch);
         if (userData.bank_account_number) formData.append('bank_account_number', userData.bank_account_number);
+        const licenseImage = buildFile(userData.license_image, 'license_front.jpg');
+        if (licenseImage) formData.append('license_image', licenseImage);
       }
 
       // Attach passenger CNIC images when applicable

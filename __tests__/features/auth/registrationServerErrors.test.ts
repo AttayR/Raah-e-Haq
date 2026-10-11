@@ -112,4 +112,27 @@ describe('mapRegistrationServerErrors', () => {
     expect(result.fieldErrors).toEqual({ vehiclePictures: 'The vehicle front image must be an image.' });
     expect(result.step).toBe('documents');
   });
+
+  it('T-207: license_number, license_image and date_of_birth land on their own inputs', () => {
+    const result = mapRegistrationServerErrors(
+      {
+        license_number: ['The license number field is required.'],
+        license_image: ['The license image field is required.'],
+        date_of_birth: ['Drivers must be at least 18 years old.'],
+      },
+      'driver',
+    );
+    expect(result.fieldErrors).toEqual({
+      licenseNumber: 'The license number field is required.',
+      licenseFrontPicture: 'The license image field is required.',
+      dateOfBirth: 'Drivers must be at least 18 years old.',
+    });
+    expect(result.fieldErrors).not.toHaveProperty('vehicleNumber');
+    expect(result.step).toBe('personal');
+    expect(result.firstField).toBe('dateOfBirth');
+    expect(result.formErrors).toEqual([]);
+
+    const vehicleOnly = mapRegistrationServerErrors({ license_number: ['Too long.'] }, 'driver');
+    expect(vehicleOnly).toMatchObject({ step: 'vehicle', firstField: 'licenseNumber' });
+  });
 });

@@ -11,7 +11,7 @@ import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThemedTextInput from '../../../components/ThemedTextInput';
 import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth/registration/registrationForm';
-import { maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
+import { isStepFieldRequired, maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
 
@@ -391,6 +391,29 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             <View style={styles.errorContainer} ref={anchor('registrationNumber')}>
               <Icon name="error" size={16} color="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.registrationNumber}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Driving licence number (T-207: required for drivers, sent as license_number) */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>
+            Driving License Number{isStepFieldRequired('vehicle', 'licenseNumber', data.role) ? ' *' : ''}
+          </Text>
+          <ThemedTextInput
+            placeholder="As printed on your driving license"
+            value={data.licenseNumber || ''}
+            onChangeText={(value) => handleInputChange('licenseNumber', value)}
+            onBlur={() => validateField('licenseNumber', data.licenseNumber || '')}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={50}
+            style={styles.input}
+          />
+          {validationErrors.licenseNumber && (
+            <View style={styles.errorContainer} ref={anchor('licenseNumber')}>
+              <Icon name="error" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{validationErrors.licenseNumber}</Text>
             </View>
           )}
         </View>

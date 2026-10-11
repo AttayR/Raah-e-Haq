@@ -80,4 +80,25 @@ describe('buildRegistrationRequest', () => {
     expect(request).toMatchObject({ user_type: 'driver', vehicle_year: '2027', license_plate: 'LEA-1234', phone: '+923009990001' });
     expect(request).not.toHaveProperty('passenger_preferred_payment');
   });
+
+  it('sends license_number from the licence input and license_image from the licence front picture (T-207)', () => {
+    const request = buildRegistrationRequest({
+      ...form,
+      role: 'driver',
+      vehicleType: 'car',
+      vehicleNumber: 'LEA-1234',
+      licenseNumber: ' LHR-12345678 ',
+      licenseFrontPicture: 'file:///license-front.jpg',
+      licenseBackPicture: 'file:///license-back.jpg',
+    });
+    expect(request.license_number).toBe('LHR-12345678');
+    expect(request.license_number).not.toBe('LEA-1234');
+    expect(request.license_image).toBe('file:///license-front.jpg');
+  });
+
+  it('a passenger request carries no licence fields', () => {
+    const request = buildRegistrationRequest({ ...form, licenseNumber: 'X', licenseFrontPicture: 'file:///x.jpg' });
+    expect(request).not.toHaveProperty('license_number');
+    expect(request).not.toHaveProperty('license_image');
+  });
 });

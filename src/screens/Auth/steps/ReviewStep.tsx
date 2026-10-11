@@ -28,10 +28,12 @@ interface ReviewData {
   vehicleModel: string;
   vehicleYear: string;
   vehicleColor: string;
+  licenseNumber: string;
   
   // Documents
   driverPicture: string;
   cnicPicture: string;
+  licenseFrontPicture: string;
   vehiclePictures: string[];
   
   // Role
@@ -120,6 +122,10 @@ export default function ReviewStep({ data }: ReviewStepProps) {
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>Color</Text>
             <Text style={styles.infoValue}>{data.vehicleColor || 'Not provided'}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Driving License Number</Text>
+            <Text style={styles.infoValue}>{data.licenseNumber || 'Not provided'}</Text>
           </View>
         </View>
       </View>
@@ -257,8 +263,10 @@ export default function ReviewStep({ data }: ReviewStepProps) {
         data.vehicleModel || '',
         data.vehicleYear || '',
         data.vehicleColor || '',
+        data.licenseNumber || '',
         data.driverPicture || '',
-        data.cnicPicture || ''
+        data.cnicPicture || '',
+        data.licenseFrontPicture || ''
       );
     }
 

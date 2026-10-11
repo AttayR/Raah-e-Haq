@@ -51,7 +51,10 @@ export function buildRegistrationRequest(form: RegistrationFormData): RegisterWi
   return {
     ...request,
     vehicle_type: form.vehicleType,
-    license_number: form.vehicleNumber,
+    // The driving licence number from its own input (T-207); never the vehicle number.
+    license_number: form.licenseNumber.trim(),
+    // The licence front picture (local file URI), uploaded as the license_image file.
+    license_image: form.licenseFrontPicture,
     preferred_payment: PREFERRED_PAYMENT,
     license_type: form.licenseType,
     license_expiry_date: form.licenseExpiryDate,

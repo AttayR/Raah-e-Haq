@@ -4,8 +4,10 @@
  * password rules apply at step 1, and the vehicle year limit moves with the calendar.
  */
 import {
+  DRIVER_AGE_MESSAGE,
   firstInvalidStep,
   isStepFieldRequired,
+  latestBirthDateForAge,
   maxVehicleYear,
   validateStep,
   validateStepField,
@@ -44,6 +46,7 @@ const validDriver: RegistrationFormData = {
   vehicleModel: 'Corolla',
   vehicleYear: '2020',
   vehicleColor: 'White',
+  licenseNumber: 'LHR-12345678',
   licenseType: 'LTV',
   licenseExpiryDate: '2099-01-01',
   licensePlate: 'LEA-1234',
@@ -54,6 +57,7 @@ const validDriver: RegistrationFormData = {
   bankAccountNumber: '0000000000',
   driverPicture: 'file:///driver.jpg',
   cnicPicture: 'file:///cnic.jpg',
+  licenseFrontPicture: 'file:///license-front.jpg',
   vehiclePictures: ['file:///1.jpg', 'file:///2.jpg', 'file:///3.jpg', 'file:///4.jpg'],
 };
 
@@ -213,10 +217,75 @@ describe('T-206: date of birth and required markers', () => {
     expect(isStepFieldRequired('documents', 'driverPicture', 'driver')).toBe(true);
     expect(isStepFieldRequired('documents', 'cnicPicture', 'driver')).toBe(true);
     expect(isStepFieldRequired('documents', 'vehiclePictures', 'driver')).toBe(true);
-    // The backend takes licence images as nullable and the schema does not ask for them.
-    expect(isStepFieldRequired('documents', 'licenseFrontPicture', 'driver')).toBe(false);
+    // T-207: the licence front picture is required for drivers (license_image); the back stays optional.
+    expect(isStepFieldRequired('documents', 'licenseFrontPicture', 'driver')).toBe(true);
     expect(isStepFieldRequired('documents', 'licenseBackPicture', 'driver')).toBe(false);
     expect(isStepFieldRequired('personal', 'emergencyContactName', 'passenger')).toBe(true);
     expect(isStepFieldRequired('personal', 'emergencyContactName', 'driver')).toBe(false);
+  });
+});
+
+describe('T-207: drivers are 18+ and hold a driving licence', () => {
+  // 2026-10-11 local noon: the 18th birthday cutoff is 2008-10-11.
+  const today = () => jest.useFakeTimers({ now: new Date(2026, 9, 11, 12, 0, 0) });
+
+  it('a driver born 17 years 364 days ago is refused, under Date of Birth', () => {
+    today();
+    expect(validateStep('personal', { ...validDriver, dateOfBirth: '2008-10-12' })).toEqual({
+      dateOfBirth: DRIVER_AGE_MESSAGE,
+    });
+    expect(DRIVER_AGE_MESSAGE).toBe('Drivers must be at least 18 years old.');
+    expect(validateStepField('personal', 'dateOfBirth', { ...validDriver, dateOfBirth: '2008-10-12' })).toBe(
+      'Drivers must be at least 18 years old.',
+    );
+  });
+
+  it('a driver who turns 18 today (or is older) passes', () => {
+    today();
+    expect(validateStep('personal', { ...validDriver, dateOfBirth: '2008-10-11' })).toEqual({});
+    expect(validateStep('personal', { ...validDriver, dateOfBirth: '1990-01-15' })).toEqual({});
+  });
+
+  it('passengers keep the old rule: any real past date', () => {
+    today();
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '2008-10-12' })).toEqual({});
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '2020-05-01' })).toEqual({});
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '2026-10-11' }).dateOfBirth).toBe(
+      'Date of birth must be in the past',
+    );
+  });
+
+  it('a future date says "in the past" first, not the age rule', () => {
+    today();
+    expect(validateStep('personal', { ...validDriver, dateOfBirth: '2999-01-01' }).dateOfBirth).toBe(
+      'Date of birth must be in the past',
+    );
+  });
+
+  it('the cutoff on 29 February is 28 February 18 years earlier', () => {
+    expect(latestBirthDateForAge(18, new Date(2028, 1, 29, 9))).toBe('2010-02-28');
+    expect(latestBirthDateForAge(18, new Date(2026, 9, 11, 9))).toBe('2008-10-11');
+    expect(latestBirthDateForAge(18, new Date(2027, 0, 1, 0, 5))).toBe('2009-01-01');
+  });
+
+  it('requires the licence number (max 50) and the licence front picture for drivers', () => {
+    expect(validateStep('vehicle', { ...validDriver, licenseNumber: ' ' })).toEqual({
+      licenseNumber: 'License number is required',
+    });
+    expect(validateStep('vehicle', { ...validDriver, licenseNumber: 'X'.repeat(51) }).licenseNumber).toBe(
+      'License number must be at most 50 characters',
+    );
+    expect(validateStep('documents', { ...validDriver, licenseFrontPicture: '' })).toEqual({
+      licenseFrontPicture: 'License front picture is required',
+    });
+    expect(validateStep('documents', { ...validDriver, licenseBackPicture: '' })).toEqual({});
+  });
+
+  it('the required * follows the schema: drivers yes, passengers no', () => {
+    expect(isStepFieldRequired('vehicle', 'licenseNumber', 'driver')).toBe(true);
+    expect(isStepFieldRequired('vehicle', 'licenseNumber', 'passenger')).toBe(false);
+    expect(isStepFieldRequired('documents', 'licenseFrontPicture', 'passenger')).toBe(false);
+    expect(validateStep('vehicle', validPassenger)).toEqual({});
+    expect(validateStep('documents', validPassenger)).toEqual({});
   });
 });

@@ -25,6 +25,11 @@ export const maxVehicleYear = (now: Date = new Date()): number => now.getFullYea
 /** Oldest accepted year of birth (app-side typo guard; the backend only needs a past date). */
 export const MIN_BIRTH_YEAR = 1900;
 
+/** Drivers must be at least this old on the day they register (owner decision, T-207/BE-68). */
+export const MIN_DRIVER_AGE = 18;
+
+export const DRIVER_AGE_MESSAGE = `Drivers must be at least ${MIN_DRIVER_AGE} years old.`;
+
 const CNIC_FORMAT = /^\d{5}-\d{7}-\d$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -34,6 +39,19 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const todayIso = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+};
+
+/**
+ * The latest date of birth of someone who is `years` old today (YYYY-MM-DD), read when a rule
+ * runs. Born on 29 February: the cutoff falls on 28 February in a non-leap year, so the rule
+ * is never looser than the backend's `today - 18 years`.
+ */
+export const latestBirthDateForAge = (years: number, now: Date = new Date()): string => {
+  const year = now.getFullYear() - years;
+  const month = now.getMonth();
+  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  const day = Math.min(now.getDate(), lastDayOfMonth);
+  return `${year}-${pad(month + 1)}-${pad(day)}`;
 };
 
 /** A real calendar date in YYYY-MM-DD (rejects 2026-02-30). */
@@ -131,7 +149,15 @@ const passengerPersonal = yup.object({
     .oneOf([...EMERGENCY_RELATIONS], 'Relationship is required'),
 });
 
-const driverPersonal = yup.object(personalBase);
+/** Drivers: 18+ on the day they register (BE-68: date_of_birth <= today - 18 years). */
+const driverPersonal = yup.object({
+  ...personalBase,
+  dateOfBirth: personalBase.dateOfBirth.test(
+    'driver-adult',
+    DRIVER_AGE_MESSAGE,
+    (value) => !isIsoDate(value) || (value as string) <= latestBirthDateForAge(MIN_DRIVER_AGE),
+  ),
+});
 
 const driverVehicle = yup.object({
   vehicleType: yup
@@ -154,6 +180,8 @@ const driverVehicle = yup.object({
       return true;
     }),
   vehicleColor: requiredText('Vehicle color', 50),
+  // Driving licence number: required for drivers (owner decision, T-207/BE-68; max:50 on the API).
+  licenseNumber: requiredText('License number', 50),
   licenseType: requiredText('License type', 10),
   licenseExpiryDate: yup
     .string()
@@ -172,6 +200,8 @@ const driverVehicle = yup.object({
 const driverDocuments = yup.object({
   driverPicture: yup.string().required('Driver picture is required'),
   cnicPicture: yup.string().required('CNIC picture is required'),
+  // Sent as license_image, required for drivers (T-207/BE-68). The back side stays optional.
+  licenseFrontPicture: yup.string().required('License front picture is required'),
   vehiclePictures: yup
     .array()
     .of(yup.string())
