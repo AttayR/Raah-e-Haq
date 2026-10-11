@@ -46,17 +46,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+    self.launchOptions = launchOptions
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "RaaHeHaq",
-      in: window,
-      launchOptions: launchOptions
-    )
-
+    // The window and React root are created in SceneDelegate: iOS 27 terminates apps
+    // that have not adopted the UIScene lifecycle (T-115).
     return true
   }
+
+  // Kept for SceneDelegate, which starts React Native once the window scene connects.
+  var launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   
   // Handle Firebase messaging
   func application(_ application: UIApplication,
@@ -71,6 +69,45 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                               willPresent notification: UNNotification,
                               withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
     completionHandler([[.alert, .sound]])
+  }
+}
+
+// MARK: - UIScene lifecycle (required on iOS 27, T-115)
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene,
+          let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let factory = appDelegate.reactNativeFactory else {
+      NSLog("[SceneDelegate] React Native factory missing; cannot start the app")
+      return
+    }
+
+    // If iOS reconnects a scene (it can drop one in the background), move the existing
+    // React window onto it instead of starting a second React root.
+    if let existing = appDelegate.window, existing.rootViewController != nil {
+      existing.windowScene = windowScene
+      self.window = existing
+      existing.makeKeyAndVisible()
+      return
+    }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    // Native modules (Reanimated keyboard observer, RNFirebase messaging) still read
+    // UIApplication.shared.delegate.window, so keep the AppDelegate pointing at it.
+    appDelegate.window = window
+
+    factory.startReactNative(
+      withModuleName: "RaaHeHaq",
+      in: window,
+      launchOptions: appDelegate.launchOptions
+    )
   }
 }
 
