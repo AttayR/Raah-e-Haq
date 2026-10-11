@@ -3,14 +3,14 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  SafeAreaView, 
   StatusBar, 
   ImageBackground, 
-  ScrollView,
   TouchableOpacity,
   Image,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AuthKeyboardScroll from '../../features/auth/components/AuthKeyboardScroll';
 import BrandButton from '../../components/BrandButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -111,9 +111,10 @@ export default function LoginScreen() {
         errors.email = 'Please enter a valid email address';
       }
       
-      if (!password.trim()) {
+      // The password is sent exactly as typed: spaces can be part of it (T-204, AUTH-14).
+      if (!password) {
         errors.password = 'Password is required';
-      } else if (!validatePassword(password.trim())) {
+      } else if (!validatePassword(password)) {
         errors.password = 'Password must be at least 6 characters';
       }
 
@@ -124,7 +125,7 @@ export default function LoginScreen() {
 
       logger.debug('🔐 Starting login process...');
       
-      const result = await login({ email: email.trim(), password: password.trim() });
+      const result = await login({ email: email.trim(), password });
       
       logger.debug('🔍 Result type:', result.type);
       
@@ -190,18 +191,10 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    try {
-      clearValidationErrors();
-      toast.info('Google Sign-In is not available with API authentication. Please use email or phone authentication.');
-    } catch (err: any) {
-      logger.error('Google sign-in error:', err);
-      toast.error('Google Sign-In is not available. Please use email or phone authentication.');
-    }
-  };
-
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // Top edge only: the navy band sits under the status bar / Dynamic Island; the scroll
+    // content pads itself above the home indicator (T-204).
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar
         barStyle="light-content"
         backgroundColor={BrandColors.primary}
@@ -212,36 +205,31 @@ export default function LoginScreen() {
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        {/* Fixed Header */}
-        <View style={styles.fixedHeader}>
-          {/* Decorative Circles */}
-          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
-          <View style={styles.decorativeCircle3} />
-          <View style={styles.decorativeCircle4} />
-          <View style={styles.decorativeCircle5} />
-          
-          <View style={styles.logoContainer}>
-            <View style={styles.logoWrapper}>
-              <Image 
-                source={require('../../assets/images/logo.png')} 
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.title}>Welcome to RaaH-E-Haq</Text>
-            <Text style={styles.subtitle}>
-              Sign in to your account or create a new one
-            </Text>
-          </View>
-        </View>
+        <AuthKeyboardScroll>
+          {/* Header scrolls with the form, so the keyboard leaves room for the inputs */}
+          <View style={styles.header}>
+            {/* Decorative Circles */}
+            <View style={styles.decorativeCircle1} />
+            <View style={styles.decorativeCircle2} />
+            <View style={styles.decorativeCircle3} />
+            <View style={styles.decorativeCircle4} />
+            <View style={styles.decorativeCircle5} />
 
-        {/* Scrollable Content */}
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+            <View style={styles.logoContainer}>
+              <View style={styles.logoWrapper}>
+                <Image 
+                  source={require('../../assets/images/logo.png')} 
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.title}>Welcome to RaaH-E-Haq</Text>
+              <Text style={styles.subtitle}>
+                Sign in to your account or create a new one
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.container}>
             {/* Login Form Card */}
             <View style={styles.formCard}>
@@ -374,34 +362,6 @@ export default function LoginScreen() {
                     />
                   </View>
 
-                  {/* Divider */}
-                  <View style={styles.dividerContainer}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>OR</Text>
-                    <View style={styles.dividerLine} />
-                  </View>
-
-                  {/* Google Sign-In Button */}
-                  <View style={styles.buttonContainer}>
-                    <TouchableOpacity
-                      style={styles.googleButton}
-                      onPress={handleGoogleSignIn}
-                      disabled={isLoading}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.googleLogoContainer}>
-                        <View style={styles.googleLogo}>
-                          <View style={styles.googleLogoInner}>
-                            <Text style={styles.googleG}>G</Text>
-                          </View>
-                        </View>
-                      </View>
-                      <Text style={styles.googleButtonText}>
-                        {isLoading ? 'Signing in...' : 'Continue with Google'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  
                   <TouchableOpacity
                     onPress={handleForgotPassword}
                     style={styles.forgotPasswordContainer}
@@ -440,7 +400,7 @@ export default function LoginScreen() {
               </View>
             </View>
           </View>
-        </ScrollView>
+        </AuthKeyboardScroll>
       </ImageBackground>
     </SafeAreaView>
   );
@@ -456,7 +416,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  fixedHeader: {
+  header: {
     backgroundColor: BrandColors.primary,
     paddingTop: 18,
     paddingHorizontal: 18,
@@ -466,14 +426,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     zIndex: 10,
-  },
-  scrollView: {
-    flex: 1,
-    marginTop: -8, // Light overlap to keep separation
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 24,
   },
   container: {
     flex: 1,
@@ -729,84 +681,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     textAlign: 'left',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    ...Typography.body,
-    color: '#6b7280',
-    marginHorizontal: 16,
-    fontSize: 14,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  googleLogoContainer: {
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleLogo: {
-    width: 20,
-    height: 20,
-    borderRadius: 2,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-    borderWidth: 0.5,
-    borderColor: '#e5e7eb',
-  },
-  googleLogoInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#4285F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleG: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    fontFamily: 'Roboto',
-    textAlign: 'center',
-  },
-  googleButtonText: {
-    ...Typography.body,
-    color: '#374151',
-    fontWeight: '600',
   },
   createAccountCard: {
     backgroundColor: '#ffffff',

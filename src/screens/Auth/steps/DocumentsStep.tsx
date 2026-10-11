@@ -7,7 +7,6 @@ import {
   Dimensions,
   Image,
   Alert,
-  ScrollView,
 } from 'react-native';
 import { launchImageLibrary, ImagePickerResponse, MediaType, PhotoQuality } from 'react-native-image-picker';
 import { BrandColors } from '../../../theme/colors';
@@ -240,7 +239,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
 
   if (data.role === 'passenger') {
     return (
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
         <View style={styles.formCard}>
           <Text style={styles.formTitle}>CNIC Verification</Text>
           <Text style={styles.formSubtitle}>
@@ -300,12 +299,12 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       <View style={styles.formCard}>
         <Text style={styles.formTitle}>Document Verification</Text>
         <Text style={styles.formSubtitle}>
@@ -376,13 +375,13 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           </View>
         </View>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    alignSelf: 'stretch',
   },
   skipCard: {
     backgroundColor: '#ffffff',

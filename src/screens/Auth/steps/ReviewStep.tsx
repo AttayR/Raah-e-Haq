@@ -3,10 +3,8 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ScrollView,
   Dimensions,
   Image,
-  TouchableOpacity,
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -279,7 +277,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
   const completionStatus = getCompletionStatus();
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       {/* Completion Status */}
       <View style={styles.completionCard}>
         <View style={styles.completionHeader}>
@@ -328,13 +326,13 @@ export default function ReviewStep({ data }: ReviewStepProps) {
           Your information will be used to verify your identity and provide our services.
         </Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    alignSelf: 'stretch',
   },
   completionCard: {
     backgroundColor: '#ffffff',

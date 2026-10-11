@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   ImageBackground,
-  ScrollView,
+  type ScrollView,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -39,6 +39,7 @@ import { buildRegistrationRequest } from '../../features/auth/registration/build
 import { mapRegistrationServerErrors } from '../../features/auth/registration/serverFieldErrors';
 import { FieldAnchorContext } from '../../features/auth/registration/fieldAnchors';
 import RegistrationPhoneStep from '../../features/auth/components/RegistrationPhoneStep';
+import AuthKeyboardScroll from '../../features/auth/components/AuthKeyboardScroll';
 import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 
@@ -289,7 +290,8 @@ export default function RegistrationScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // Top edge only; the scroll content pads itself above the home indicator (T-204).
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={BrandColors.primary} translucent={false} />
       <ImageBackground
         source={require('../../assets/images/background_raahe_haq.png')}
@@ -302,13 +304,7 @@ export default function RegistrationScreen() {
           stepIndex={phoneStep ? null : stepIndex}
         />
 
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        <AuthKeyboardScroll scrollRef={scrollRef} style={styles.scrollView}>
           <View
             ref={containerRef}
             style={styles.container}
@@ -330,7 +326,7 @@ export default function RegistrationScreen() {
               </FieldAnchorContext.Provider>
             )}
           </View>
-        </ScrollView>
+        </AuthKeyboardScroll>
       </ImageBackground>
       <KeyboardDoneBar />
     </SafeAreaView>

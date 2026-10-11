@@ -9,6 +9,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { ScrollView } from 'react-native';
 import RegistrationScreen from '../../src/screens/Auth/RegistrationScreen';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import { rootReducer } from '../../src/store/rootReducer';
@@ -95,6 +96,24 @@ afterEach(() => {
 });
 
 describe('RegistrationScreen (T-201)', () => {
+  it('every step sits in one keyboard-aware scroller, with no nested vertical ScrollView (T-204)', async () => {
+    await renderScreen();
+    const expectSingleScroller = () => {
+      const scrolls = screen.UNSAFE_getAllByType(ScrollView);
+      expect(scrolls).toHaveLength(1);
+      expect(scrolls[0].props.keyboardShouldPersistTaps).toBe('handled');
+    };
+    expectSingleScroller();
+    fillPassengerPersonal();
+    fireEvent.press(screen.getByText('Next')); // -> vehicle (skipped for passengers)
+    fireEvent.press(screen.getByText('Next')); // -> documents
+    expect(screen.getByText('CNIC Verification')).toBeTruthy();
+    expectSingleScroller();
+    fireEvent.press(screen.getByText('Next')); // -> review
+    expect(screen.getByText('Terms & Conditions')).toBeTruthy();
+    expectSingleScroller();
+  });
+
   it('Next on an empty step shows the schema errors inline and stays on step 1', async () => {
     await renderScreen();
 

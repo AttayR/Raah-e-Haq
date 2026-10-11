@@ -174,12 +174,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scrollView: {
-    flex: 1,
     marginTop: -6,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 24,
   },
   container: {
     flex: 1,

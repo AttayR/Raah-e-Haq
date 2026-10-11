@@ -2,13 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   ImageBackground,
-  ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApiAuth } from '../../hooks/useApiAuth';
@@ -28,6 +26,7 @@ import { routesHome } from '../../core/auth/normalizeUser';
 import { classifyOtpRefusal, isGlobalOtpRefusal, type OtpRefusalLike } from '../../features/auth/otpRefusal';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
+import AuthKeyboardScroll from '../../features/auth/components/AuthKeyboardScroll';
 import { styles } from './PhoneAuthScreen.styles';
 import { EmailFallback, KEYBOARD_DONE_ID, KeyboardDoneBar, PhoneAuthHeader } from './PhoneAuthParts';
 
@@ -363,7 +362,8 @@ export default function PhoneAuthScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // Top edge only; the scroll content pads itself above the home indicator (T-204).
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={BrandColors.primary} translucent={false} />
       <ImageBackground
         source={require('../../assets/images/background_raahe_haq.png')}
@@ -377,22 +377,12 @@ export default function PhoneAuthScreen() {
         />
 
         {/* Scrollable Content */}
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.container}>
-              {currentStep === 'phone' && renderPhoneStep()}
-              {currentStep === 'verification' && renderVerificationStep()}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+        <AuthKeyboardScroll style={styles.scrollView}>
+          <View style={styles.container}>
+            {currentStep === 'phone' && renderPhoneStep()}
+            {currentStep === 'verification' && renderVerificationStep()}
+          </View>
+        </AuthKeyboardScroll>
       </ImageBackground>
       <KeyboardDoneBar />
     </SafeAreaView>

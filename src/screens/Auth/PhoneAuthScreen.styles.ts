@@ -33,16 +33,8 @@ export const styles = StyleSheet.create({
     paddingTop: Spacing[2],
     paddingBottom: Spacing[4],
   },
-  keyboardView: {
-    flex: 1,
-    marginTop: -8, // Light overlap to keep separation
-  },
   scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 24,
+    marginTop: -8, // Light overlap to keep separation
   },
   container: {
     flex: 1,

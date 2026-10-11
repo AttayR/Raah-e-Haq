@@ -235,7 +235,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           </TouchableOpacity>
           {showBrandDropdown && (
             <View style={styles.dropdownList}>
-              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                 {vehicleBrands.map((brand) => (
                   <TouchableOpacity
                     key={brand}
@@ -296,7 +296,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             </TouchableOpacity>
             {showYearDropdown && (
               <View style={styles.dropdownList}>
-                <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+                <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                   {vehicleYears.map((year) => (
                     <TouchableOpacity
                       key={year}
@@ -337,7 +337,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             </TouchableOpacity>
             {showColorDropdown && (
               <View style={styles.dropdownList}>
-                <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+                <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                   {vehicleColors.map((color) => (
                     <TouchableOpacity
                       key={color}
@@ -409,7 +409,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           </TouchableOpacity>
           {showLicenseTypeDropdown && (
             <View style={styles.dropdownList}>
-              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                 {LICENSE_TYPES.map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
@@ -461,7 +461,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           </TouchableOpacity>
           {showExperienceDropdown && (
             <View style={styles.dropdownList}>
-              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                 {DRIVING_EXPERIENCE_OPTIONS.map((y) => (
                   <TouchableOpacity
                     key={y}
