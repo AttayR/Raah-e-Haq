@@ -64,7 +64,7 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 | POST `/auth/forgot-password` | yes | yes | `forgotPassword` | |
 | POST `/auth/reset-password` | yes | yes | `resetPassword` | |
 | POST `/auth/logout` | yes | yes | `logout` | BE-43: 200 for any authenticated token, including blocked (suspended/rejected/inactive/pending) accounts; deletes the presented token. `logout-all` deletes all of the user's tokens. 401 only for a missing/invalid token. The app still clears local state whatever the result |
-| POST `/auth/logout-all` | yes | yes | `logoutAll` | |
+| POST `/auth/logout-all` | yes | yes | `logoutAll` | BE-68: both logouts also set a driver offline (see BE-68 section) |
 | POST `/auth/refresh` | yes | yes | not called | Bearer, no body; rotates the token (the old one is revoked; a racing second refresh gets 401) and returns `{token, token_type, expires_at}`. T-104 removed the dead `refresh_token` interceptor branch and the unused thunk; see "Session and 401" |
 | GET `/auth/profile` | yes | yes | `getProfile`, `initializeAuth` (cold-start check, T-103) | `data: {user}` (normalised: `role`, `roles[]`) |
 | PUT `/profile` | yes | yes | `updateProfile` | **Path fixed in T-007** (the app called `PUT /auth/profile`, which does not exist). `data` is the raw user model with a `roles` relation, not `{user}`. Resource shape is BE-29; normalizeUser is T-105; no screen calls it yet (T-504) |
@@ -226,3 +226,15 @@ Rules the app should follow:
 - **Preferences gate push only:** in-app rows are always written. `push_enabled:false` stops every push; `ride_updates` gates `ride`, `promotions` gates `promo`, `chat` gates `chat`; `wallet`/`system` only follow `push_enabled`. `sound_alerts` = sound on/off for pushes (and the driver app's local alert sound).
 - **Who gets ride notifications:** the other party only. Driver accepts → passenger (`driver_assigned`); arrived/started/completed → passenger; driver cancels → passenger; passenger cancels → the assigned driver (nothing if no driver yet); admin assign/cancel → both.
 - **Locally there are no FCM credentials:** registration works, pushes are skipped server-side (log warning). Production needs B-11 (service-account JSON) and a queue worker.
+
+## BE-68: driver logout goes offline, drivers 18+, licence required (2026-10-11, for T-207)
+
+Owner decisions 2026-10-11. Passengers are unaffected by all three.
+
+**Logout sets a driver offline.** POST `/auth/logout`, POST `/auth/logout-all` and the web `POST /logout` set the driver's stored status to `offline` (response unchanged). A signed-out driver gets no ride requests (`GET /rides/pending` → 409 `DRIVER_NOT_AVAILABLE`, accept refused) until the app calls POST `/driver/status {status: online}` again after the next sign-in. The app should not rely on the driver's previous online state surviving a sign-out.
+- **During an active ride** (accepted/arrived/started) logout is never refused and the ride is not touched: GET `/driver/status` still reports `on_ride` with `active_ride_id`, location posting and POST `/rides/{id}/arrived|start|complete` keep working after signing in again, and when the ride ends the driver is `offline` (not `available`). The app may still warn the driver before signing out mid-ride.
+- Logout on one device takes the driver offline for every device (status is per account).
+
+**Drivers must be 18+.** For `user_type=driver`, `date_of_birth` must be on or before today − 18 years (server date; the 18th birthday passes). Otherwise 422 with `errors.date_of_birth[0] = "Drivers must be at least 18 years old."`. Applies to POST `/auth/register` (and the web register form), admin create/edit (web admin and `POST/PUT /api/users`, also when the driver role is added to an account whose stored date is under 18), and PUT `/profile` for a driver changing their own `date_of_birth`. Passengers: only the existing `before:today` rule.
+
+**Driving licence required.** POST `/auth/register` for a driver now requires `license_image` (image, jpeg/png/jpg/gif, ≤ 5 MB) in addition to `license_number`: missing either → 422 `errors.license_image` / `errors.license_number` (the request must be multipart, `registerWithImages`). The other driver images stay optional on the API. `license` is in the default `DRIVER_REQUIRED_DOCUMENTS` (`profile,cnic_front,cnic_back,license`), so an account is approved only once its licence item is approved; already-approved drivers are not affected.
