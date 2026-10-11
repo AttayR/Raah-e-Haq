@@ -1,9 +1,10 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { Marker } from 'react-native-maps';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { CarMarker } from '../ui/CarMarker';
 import type { NearbyDriver } from '../../services/rideService';
+import { MAX_FONT_SIZE_MULTIPLIER, radius, space, textStyles } from '../../theme';
 import type { NearbyDriversState } from '../../hooks/useNearbyDrivers';
 
 /** Marker callout text. Rating 0 means unrated, so it is left out. */
@@ -16,18 +17,20 @@ export const nearbyDriverDescription = (driver: NearbyDriver): string =>
     .filter((part): part is string => part !== null)
     .join(' · ');
 
-/** Map markers for GET /rides/nearby-drivers. Keys are the opaque per-viewer ids (BE-20). */
+/**
+ * Map markers for GET /rides/nearby-drivers, drawn as car badges (DESIGN_SYSTEM 5.21), not
+ * generic pins. Keys are the opaque per-viewer ids (BE-20).
+ */
 export const NearbyDriverMarkers: React.FC<{ drivers: NearbyDriver[] }> = ({ drivers }) => (
   <>
     {drivers.map(driver => (
-      <Marker
+      <CarMarker
         key={driver.id}
         testID={`nearby-driver-${driver.id}`}
         coordinate={driver.location}
         title={MAPS_CONFIG.MARKERS.driver.title}
         description={nearbyDriverDescription(driver)}
-        pinColor={MAPS_CONFIG.MARKERS.driver.color}
-        tracksViewChanges={false}
+        muted
       />
     ))}
   </>
@@ -57,8 +60,8 @@ export const NearbyDriversStatus: React.FC<{ state: NearbyDriversState }> = ({ s
       accessibilityLiveRegion="polite"
       style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
     >
-      {state.status === 'loading' && <ActivityIndicator size="small" color={theme.colors.accent} />}
-      <Text style={[styles.text, { color }]} numberOfLines={2}>
+      {state.status === 'loading' && <ActivityIndicator size="small" color={theme.colors.primaryText} />}
+      <Text style={[styles.text, { color }]} numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
         {text}
       </Text>
     </View>
@@ -69,13 +72,14 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: space[2],
     alignSelf: 'flex-start',
-    maxWidth: '70%',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    maxWidth: '100%',
+    minHeight: 32,
+    paddingHorizontal: space[3],
+    paddingVertical: space[1],
+    borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  text: { fontSize: 12, fontWeight: '600' },
+  text: { ...textStyles.label, flexShrink: 1 },
 });

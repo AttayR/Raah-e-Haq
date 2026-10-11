@@ -1,43 +1,49 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import { Chip } from '../ui/Chip';
+import { space } from '../../theme';
 
 type Props = {
   stage: 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
 };
 
-const STAGES: { key: Props['stage']; label: string; icon: string }[] = [
-  { key: 'pickup', label: 'Pickup', icon: '📍' },
-  { key: 'destination', label: 'Destination', icon: '🎯' },
-  { key: 'vehicle', label: 'Vehicle', icon: '🚗' },
-  { key: 'fare', label: 'Fare', icon: '💰' },
-  { key: 'requesting', label: 'Request', icon: '🔔' },
+const STAGES: { key: Props['stage']; label: string }[] = [
+  { key: 'pickup', label: 'Pickup' },
+  { key: 'destination', label: 'Destination' },
+  { key: 'vehicle', label: 'Vehicle' },
+  { key: 'fare', label: 'Fare' },
+  { key: 'requesting', label: 'Request' },
 ];
 
+/** Booking step indicator: one line that scrolls sideways on narrow screens (no wrapping). */
 const StageChips: React.FC<Props> = ({ stage }) => {
   return (
-    <View style={styles.row}>
-      {STAGES.map((s) => {
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
+      contentContainerStyle={styles.row}
+      testID="booking-stage-chips"
+    >
+      {STAGES.map((s, index) => {
         const active = s.key === stage || (stage === 'home' && s.key === 'pickup');
         return (
-          <View key={s.key} style={[styles.chip, active && styles.chipActive]}>
-            <Text style={styles.icon}>{s.icon}</Text>
-            <Text style={[styles.text, active && styles.textActive]}>{s.label}</Text>
-          </View>
+          <Chip
+            key={s.key}
+            label={`${index + 1}. ${s.label}`}
+            selected={active}
+            accessibilityLabel={`Step ${index + 1} of ${STAGES.length}: ${s.label}${active ? ', current' : ''}`}
+          />
         );
       })}
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9999 },
-  chipActive: { backgroundColor: '#eef6ff', borderWidth: 1, borderColor: '#67a9ff' },
-  icon: { fontSize: 12 },
-  text: { fontSize: 12, color: '#6b7280', fontWeight: '700' },
-  textActive: { color: '#2563eb' },
+  // Bleeds to the sheet edges so chips scroll off-screen instead of being cut at the padding.
+  scroll: { marginHorizontal: -space[4] },
+  row: { gap: space[2], paddingHorizontal: space[4] },
 });
 
 export default StageChips;
-
-

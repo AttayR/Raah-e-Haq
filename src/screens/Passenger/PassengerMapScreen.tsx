@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, StatusBar, Text, TouchableOpacity, View, StyleSheet, AppState, Linking } from 'react-native';
-import { Marker, MapPressEvent } from 'react-native-maps';
+import { Alert, AppState, Keyboard, Linking, StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { MapPressEvent } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView from '../../components/SafeMapView';
 import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
-import { BrandColors } from '../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
@@ -15,12 +15,10 @@ import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { cancelAllRequests } from '../../services/api';
 import LocationSearch, { suggestionAddress } from '../../components/passenger/LocationSearch';
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
-import AnimatedPolyline from '../../components/AnimatedPolyline';
 import { NearbyDriverMarkers, NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import { getDriverPhone } from '../../services/rideService';
 import { reverseGeocode } from '../../services/placesService';
-import StopsEditor from '../../components/passenger/StopsEditor';
 import StageChips from '../../components/passenger/StageChips';
 import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
 import { logger } from '../../core/logging/logger';
@@ -31,30 +29,39 @@ import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } fro
 import { isRideInProgress } from '../../features/active-ride/status';
 import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
 import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
-import { usePassengerRideCamera } from '../../features/active-ride/camera';
+import { regionInViewport, usePassengerRideCamera, viewportEdgePadding, type MapViewport } from '../../features/active-ride/camera';
 import { mapTapTarget, type MapPickTarget } from '../../features/ride-booking/mapTap';
 import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
 import { useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
-import { FareReview, VehicleChoice } from '../../features/ride-booking/components/BookingChoices';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
+import { BookingSheet } from '../../features/ride-booking/components/BookingSheet';
+import { MapTopControls, MAP_TOP_CONTROLS_HEIGHT } from '../../features/ride-booking/components/MapTopControls';
+import { BookingMapLayers } from '../../features/ride-booking/components/BookingMapLayers';
+import { BookingErrorBanner, LocationWaitState, MapPlaceholder } from '../../features/ride-booking/components/BookingNotices';
+import { FareStage, MAX_STOPS, VehicleStage } from '../../features/ride-booking/components/BookingStages';
+import { space } from '../../theme';
+import { displayAddress } from '../../features/passenger-home/greeting';
 
 /** A picked point: coordinates and the address the passenger saw (T-302). */
 type Place = BookingPlace;
+/** iPhone SE class height (667 pt): the capped sheets get a little more room. */
+const SHORT_WINDOW_HEIGHT = 700;
+
+type Stage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
 
 const PassengerMapScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
   const mapRef = useRef<any>(null);
   const { handleError } = useErrorHandler();
-  
-  const { 
-    currentLocation, 
-    isLoading: locationLoading,
-    requestLocationPermission,
-  } = useNativeLocation();
-  
+  const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
+  const { currentLocation, isLoading: locationLoading, requestLocationPermission } = useNativeLocation();
+
   usePassengerNotifications();
   // The active ride lives in Redux (T-301): one copy for every screen, restored on launch.
   const dispatch = useDispatch<AppDispatch>();
@@ -64,7 +71,7 @@ const PassengerMapScreen = () => {
   const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
     onPhoneNotVerified: () => navigation.navigate('PassengerPofile'),
   });
-  
+
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
 
   const [pickup, setPickup] = useState<Place | null>(null);
@@ -72,7 +79,7 @@ const PassengerMapScreen = () => {
   const [destination, setDestination] = useState<Place | null>(null);
   // Map taps set a location only in this explicit mode (T-304, PAX-14).
   const [mapPick, setMapPick] = useState<MapPickTarget | null>(null);
-  const [stage, setStage] = useState<'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting'>('home');
+  const [stage, setStage] = useState<Stage>('home');
   const [pickupQuery, setPickupQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
@@ -80,6 +87,15 @@ const PassengerMapScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  // While a search field is focused the sheet drops its extras so suggestions get the room.
+  const [searchFocused, setSearchFocused] = useState(false);
+  // T-314: what covers the map, so recentring and fitting keep points above the sheet.
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const [mapHeight, setMapHeight] = useState(0);
+  const viewport: MapViewport | null =
+    mapHeight > 0 ? { mapHeight, bottom: sheetHeight, top: insets.top + MAP_TOP_CONTROLS_HEIGHT } : null;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
   const isFocused = useIsFocused();
   // Status poll (and the assigned driver's position) while the ride is in progress and this
   // screen is focused; cleaned up on unmount.
@@ -90,7 +106,7 @@ const PassengerMapScreen = () => {
   const rideStage = usePassengerRideStage(currentRide);
   const rideSubmitting = useSelector(selectActiveRideSubmitting);
   const rideShown = !!currentRide;
-  const shownStage: typeof stage = rideShown ? 'requesting' : stage;
+  const shownStage: Stage = rideShown ? 'requesting' : stage;
 
   // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked. Once
   // the ride has ended (T-311) they are read again at once, and again on Done, so the map
@@ -101,9 +117,9 @@ const PassengerMapScreen = () => {
     refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
   });
   // Driver on the way (T-311/T-312): keep the driver and the pickup in view, until the passenger pans.
-  // Ride cleared (T-313): recentre on the pickup, else the passenger.
+  // Ride cleared (T-313): recentre on the pickup, else the passenger, above the sheet (T-314).
   const { isFollowing: isRideCameraFollowing, ...rideCamera } = usePassengerRideCamera(
-    mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation,
+    mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation, viewport,
   );
   // Call button only while the server exposes driver.phone (accepted, still-active ride).
   const driverPhone = getDriverPhone(currentRide);
@@ -114,74 +130,46 @@ const PassengerMapScreen = () => {
     });
   }, [driverPhone]);
 
-  // Initialize map ready state
+  // Show the map after a short delay even if onMapReady is slow.
   useEffect(() => {
-    // Set a timeout to show map after a short delay
-    const timer = setTimeout(() => {
-      setIsMapReady(true);
-    }, 1000);
-
+    const timer = setTimeout(() => setIsMapReady(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle MapView lifecycle to prevent crashes
+  // Unmount: drop the map ref and cancel the screen's network requests.
   useEffect(() => {
     return () => {
-      // Cleanup MapView when component unmounts
-      if (mapRef.current) {
-        try {
-          // Safely clear the map reference
-          mapRef.current = null;
-        } catch (error) {
-          logger.debug('MapView cleanup error:', error);
-        }
-      }
-      
-      // Cancel all active network requests
+      mapRef.current = null;
       try {
         cancelAllRequests();
-      } catch (error) {
-        logger.debug('Error cancelling requests:', error);
+      } catch (e) {
+        logger.debug('Error cancelling requests:', e);
       }
     };
   }, []);
 
-  // Handle app state changes to prevent MapView crashes
+  // Map calls are not made while the app is in the background.
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'background' || nextAppState === 'inactive') {
-        // Pause MapView when app goes to background
-        if (mapRef.current) {
-          try {
-            // Don't call any MapView methods when app is backgrounded
-            logger.debug('App backgrounded, pausing MapView operations');
-          } catch (error) {
-            logger.debug('Error handling app state change:', error);
-          }
-        }
+    const subscription = AppState.addEventListener('change', (next) => {
+      if ((next === 'background' || next === 'inactive') && mapRef.current) {
+        logger.debug('App backgrounded, pausing MapView operations');
       }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    });
     return () => subscription?.remove();
   }, []);
 
-  // Handle screen focus changes
   useFocusEffect(
     useCallback(() => {
-      // Screen is focused
       logger.debug('PassengerMapScreen focused');
-      
       return () => {
-        // Screen is unfocused - cleanup
         logger.debug('PassengerMapScreen unfocused - cleaning up');
         try {
           cancelAllRequests();
-        } catch (error) {
-          logger.debug('Error cancelling requests on unfocus:', error);
+        } catch (e) {
+          logger.debug('Error cancelling requests on unfocus:', e);
         }
       };
-    }, [])
+    }, []),
   );
 
   const swapPickupDrop = useCallback(() => {
@@ -226,45 +214,35 @@ const PassengerMapScreen = () => {
       } else {
         setStage('pickup');
       }
-    } else if (pickup && destination && stops.length < 5) {
+    } else if (pickup && destination && stops.length < MAX_STOPS) {
       const ns = [...stops, point];
       setStops(ns);
       fetchRouteWithWaypoints(pickup, ns, destination);
     }
   }, [mapPick, rideShown, pickup, stops, destination, fetchRouteWithWaypoints, clearRoute]);
 
+  // The passenger's position, centred in the part of the map above the sheet (T-314).
+  const animateToUser = useCallback((duration?: number) => {
+    if (!currentLocation || !mapRef.current) return;
+    try {
+      mapRef.current.animateToRegion(regionInViewport(currentLocation, viewportRef.current), duration);
+    } catch (e) {
+      logger.debug('Error animating to current location:', e);
+    }
+  }, [currentLocation]);
+
   const centerOnUser = useCallback(() => {
     if (currentLocation && mapRef.current && isMapReady) {
-      try {
-        mapRef.current.animateToRegion({
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      } catch (error) {
-        logger.debug('Error centering on user:', error);
-      }
+      animateToUser();
     } else if (!currentLocation) {
       requestLocationPermission();
     }
-  }, [currentLocation, requestLocationPermission, isMapReady]);
+  }, [currentLocation, requestLocationPermission, isMapReady, animateToUser]);
 
   // Initialize location (not while the ride camera follows the driver).
   useEffect(() => {
-    if (currentLocation && mapRef.current && isMapReady && !isRideCameraFollowing()) {
-      try {
-        mapRef.current.animateToRegion({
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      } catch (error) {
-        logger.debug('Error animating to current location:', error);
-      }
-    }
-  }, [currentLocation, isMapReady, isRideCameraFollowing]);
+    if (currentLocation && isMapReady && !isRideCameraFollowing()) animateToUser();
+  }, [currentLocation, isMapReady, isRideCameraFollowing, animateToUser]);
 
   // The Advanced panel's request (removed in T-309) goes through the same builder.
   const handleRequestRide = async (rideData: {
@@ -332,17 +310,14 @@ const PassengerMapScreen = () => {
     resetSelection();
   }, [dispatch, resetSelection]);
 
-  // Navigation functions
   const goBack = useCallback(() => {
-    const stageOrder: Array<typeof stage> = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
+    const stageOrder: Stage[] = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
     const currentIndex = stageOrder.indexOf(stage);
     // A ride stays in Redux; Back only leaves the screen.
     if (currentIndex > 0 && !rideShown) {
-      const prevStage = stageOrder[currentIndex - 1];
-      setStage(prevStage);
+      setStage(stageOrder[currentIndex - 1]);
       setError(null);
     } else {
-      // Go back to home screen
       navigation.goBack();
     }
   }, [stage, navigation, rideShown]);
@@ -371,31 +346,16 @@ const PassengerMapScreen = () => {
     ]);
   }, [currentRide, cancelRideService, resetSelection]);
 
-  // Edit field functionality
-  const editField = useCallback((field: 'pickup' | 'destination' | 'vehicle') => {
-    switch (field) {
-      case 'pickup':
-        setStage('pickup');
-        break;
-      case 'destination':
-        setStage('destination');
-        break;
-      case 'vehicle':
-        setStage('vehicle');
-        break;
-    }
-  }, []);
-
-  // optional stop flow not used in staged UI; keep data for future use
-
   // Pickup at the passenger's position; its address is resolved and kept with the point.
   const pickupAtCurrentLocation = useCallback(async () => {
     if (!currentLocation) return null;
     const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
     setPickup(cur);
-    setPickupQuery('Resolving address…');
-    const addr = await reverseGeocode(cur.latitude, cur.longitude).catch(() => null);
-    setPickupQuery(addr || 'Current Location');
+    setPickupQuery(BOOKING_COPY.resolvingAddress);
+    const raw = await reverseGeocode(cur.latitude, cur.longitude).catch(() => null);
+    // Street address without a leading Plus Code; the field says "Current location" until edited.
+    const addr = raw ? displayAddress(raw) : null;
+    setPickupQuery(BOOKING_COPY.currentLocation);
     // Only if the passenger has not picked another pickup meanwhile.
     if (addr) setPickup((p) => (p && p.latitude === cur.latitude && p.longitude === cur.longitude ? { ...p, address: addr } : p));
     return cur;
@@ -433,445 +393,242 @@ const PassengerMapScreen = () => {
     }
   }, [pickup, destination, stops, selectedVehicle, requestRideService]);
 
-  // Auto-fit map to the route whenever it updates
+  // Auto-fit map to the route whenever it updates, above the sheet (T-314). The sheet settles
+  // after the route arrives (keyboard closes, vehicle list loads), so a sheet height change of
+  // a step (40 pt) refits too; smaller changes do not move the camera.
+  const sheetStep = Math.round(sheetHeight / 40);
   useEffect(() => {
-    if (!mapRef.current) return;
-    if (routeCoordinates && routeCoordinates.length > 1) {
-      try {
-        // Use fitToElements to fit the map to show all route coordinates
-        mapRef.current.fitToElements({
-          edgePadding: { top: 80, right: 40, bottom: 300, left: 40 },
-          animated: true,
-        });
-      } catch (error) {
-        logger.debug('Error fitting map to route:', error);
-      }
+    if (!mapRef.current || !routeCoordinates || routeCoordinates.length < 2) return;
+    try {
+      mapRef.current.fitToCoordinates(routeCoordinates, { edgePadding: viewportEdgePadding(viewportRef.current), animated: true });
+    } catch (e) {
+      logger.debug('Error fitting map to route:', e);
     }
-  }, [routeCoordinates]);
+  }, [routeCoordinates, sheetStep]);
+
+  // "Set location on map" from the search results: close the keyboard, enter the map pick mode.
+  const chooseOnMap = useCallback((target: MapPickTarget) => {
+    Keyboard.dismiss();
+    setMapPick(target);
+  }, []);
+
+  const updateStops = useCallback((ns: Place[]) => {
+    if (!pickup || !destination) return;
+    setStops(ns);
+    fetchRouteWithWaypoints(pickup, ns, destination);
+  }, [pickup, destination, fetchRouteWithWaypoints]);
 
   if (!currentLocation && !locationLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="white" />
-        <Text style={styles.loadingTitle}>{locationLoading ? 'Getting Location...' : 'Initializing Map...'}</Text>
-        <Text style={styles.loadingText}>
-          {locationLoading 
-            ? 'Please enable location services' 
-            : 'Setting up location services'
-          }
-        </Text>
-        {locationLoading && (
-          <TouchableOpacity 
-            style={styles.retryButton} 
-            onPress={() => {
-              // Force re-initialization by requesting location permission
-              requestLocationPermission();
-            }}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
+    return <LocationWaitState onRetry={() => requestLocationPermission()} />;
   }
 
-  const canShowUserLocation = !!currentLocation;
   const initialRegion = currentLocation
-    ? {
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }
+    ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }
     : MAPS_CONFIG.DEFAULT_REGION;
+  const compact = searchFocused;
+  // Vehicle, fare and the ride itself: half the window (60% on short phones) so the route and
+  // the driver stay visible above the sheet; longer content scrolls.
+  const sheetRatio =
+    shownStage === 'vehicle' || shownStage === 'fare' || shownStage === 'requesting'
+      ? windowHeight <= SHORT_WINDOW_HEIGHT ? 0.6 : 0.5
+      : undefined;
 
   return (
     <ErrorBoundary
-      onError={(error, errorInfo) => {
-        logger.error('PassengerMapScreen Error:', error, errorInfo);
-        handleError(error, 'PASSENGER_MAP_ERROR');
+      onError={(e, errorInfo) => {
+        logger.error('PassengerMapScreen Error:', e, errorInfo);
+        handleError(e, 'PASSENGER_MAP_ERROR');
       }}
     >
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="white" />
+      <View
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}
+      >
+        <StatusBar barStyle={theme.statusBarStyle} />
 
-      {/* Location Permission Modal */}
-       {!isMapReady ? (
-         <View style={styles.map}>
-           <View style={styles.mapLoadingContainer}>
-             <Text style={styles.mapLoadingText}>Loading Map...</Text>
-           </View>
-         </View>
-       ) : (
-         <MapErrorBoundary
-           fallback={
-             <View style={styles.map}>
-               <View style={styles.mapLoadingContainer}>
-                 <Text style={styles.mapLoadingText}>Map Error - Please restart the app</Text>
-               </View>
-             </View>
-           }
-         >
-           <MapErrorBoundary>
-             <SafeMapView
-               ref={mapRef}
-               style={styles.map}
-               initialRegion={initialRegion}
-               onPress={onPressMap}
-               showsUserLocation={MAPS_CONFIG.CONTROLS.showUserLocation && canShowUserLocation}
-               showsMyLocationButton={Platform.OS === 'ios' ? (MAPS_CONFIG.CONTROLS.showMyLocationButton && canShowUserLocation) : false}
-               onMapReady={() => {
-                 logger.debug('SafeMapView onMapReady called');
-                 setIsMapReady(true);
-                 rideCamera.onMapReady();
-                 // Delay the region animation to ensure map is fully ready
-                 setTimeout(() => {
-                   if (currentLocation && mapRef.current && !isRideCameraFollowing()) {
-                     try {
-                       mapRef.current.animateToRegion({
-                         latitude: currentLocation.latitude,
-                         longitude: currentLocation.longitude,
-                         latitudeDelta: 0.01,
-                         longitudeDelta: 0.01,
-                       }, 1000);
-                     } catch (error) {
-                       logger.debug('Error in onMapReady animation:', error);
-                     }
-                   }
-                 }, 500);
-               }}
-               onRegionChangeComplete={rideCamera.onRegionChangeComplete}
-               onMapLoaded={() => {
-                 logger.debug('SafeMapView onMapLoaded called');
-                 setIsMapReady(true);
-               }}
-               fallbackComponent={
-                 <View style={styles.map}>
-                   <Text style={styles.fallbackText}>Map loading...</Text>
-                 </View>
-               }
-             >
-        {pickup && (
-          <Marker coordinate={pickup} title={MAPS_CONFIG.MARKERS.pickup.title} pinColor={MAPS_CONFIG.MARKERS.pickup.color} />
-        )}
-        {stops.map((stop, index) => (
-          <Marker 
-            key={`stop-${index}`} 
-            coordinate={stop} 
-            title={`Stop ${index + 1}`} 
-            pinColor="#FFA500" 
-          />
-        ))}
-        {destination && (
-          <Marker coordinate={destination} title={MAPS_CONFIG.MARKERS.destination.title} pinColor={MAPS_CONFIG.MARKERS.destination.color} />
-        )}
-        {!rideShown && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
-        <AssignedDriverMarker location={driverLocation} />
-        {routeCoordinates.length > 0 && (
-          <AnimatedPolyline coordinates={routeCoordinates as any} strokeWidth={5} strokeColor={BrandColors.primary} durationMs={1200} />
-         )}
-             </SafeMapView>
-           </MapErrorBoundary>
-         </MapErrorBoundary>
-       )}
-
-      <View style={styles.topControls}>
-        <TouchableOpacity style={styles.iconButton} onPress={centerOnUser}>
-          <Icon name="my-location" size={22} color={BrandColors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton} onPress={rideShown ? undefined : resetSelection} disabled={rideShown}>
-          <Icon name="refresh" size={22} color={BrandColors.primary} />
-        </TouchableOpacity>
-        {shownStage !== 'home' && (
-          <TouchableOpacity style={styles.iconButton} onPress={goBack}>
-            <Icon name="arrow-back" size={22} color={BrandColors.primary} />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity 
-          style={[styles.iconButton, styles.advancedButton]} 
-          onPress={() => setShowAdvancedRidePanel(true)}
-        >
-          <Icon name="add" size={22} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.bottomPanel}>
-        {error && (
-          <View style={styles.errorContainer}>
-            <View style={styles.errorContent}>
-              <Text style={styles.errorTitle}>Error</Text>
-              <Text style={styles.errorMessage}>{error}</Text>
-            </View>
-            <TouchableOpacity onPress={() => setError(null)} style={styles.errorClose}>
-              <Icon name="close" size={16} color="#dc2626" />
-            </TouchableOpacity>
-          </View>
-        )}
-        {shownStage !== 'requesting' && <NearbyDriversStatus state={nearbyDrivers} />}
-        {!rideShown && <StageChips stage={shownStage} />}
-        {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
-        {shownStage === 'home' && (
-          <DualLocationPicker
-            pickup={pickup}
-            destination={destination}
-            pickupQuery={pickupQuery}
-            destQuery={destQuery}
-            onPickupQuery={setPickupQuery}
-            onDestQuery={setDestQuery}
-            onSelectPickup={(c, address) => {
-              setPickup({ ...c, address });
-              if (destination) {
-                fetchRoute(c, destination);
-                setStage('vehicle');
-              } else {
-                setStage('destination');
-              }
-            }}
-            onSelectDestination={(c, address) => {
-              setDestination({ ...c, address });
-              if (pickup) {
-                fetchRoute(pickup, c);
-                setStage('vehicle');
-              } else {
-                setStage('pickup');
-              }
-            }}
-            onUseCurrentLocation={async () => {
-              const cur = await pickupAtCurrentLocation();
-              if (cur && destination) {
-                fetchRoute(cur, destination);
-                setStage('vehicle');
-              }
-            }}
-            onSwap={() => {
-              if (pickup && destination) {
-                const p = pickup; const d = destination;
-                setPickup(d);
-                setDestination(p);
-                clearRoute();
-                fetchRoute(d, p);
-              }
-            }}
-          />
-        )}
-        {shownStage === 'home' && <ChooseOnMapButton onPress={() => setMapPick(pickup ? 'destination' : 'pickup')} />}
-
-        {shownStage === 'pickup' && (
-          <View>
-            <LocationSearch mode="pickup" query={pickupQuery} onChangeQuery={setPickupQuery} onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }} />
-            <ChooseOnMapButton onPress={() => setMapPick('pickup')} />
-          </View>
+        {!isMapReady ? (
+          <MapPlaceholder message="Loading map…" />
+        ) : (
+          <MapErrorBoundary fallback={<MapPlaceholder message="Map error. Please restart the app." />}>
+            <MapErrorBoundary>
+              <SafeMapView
+                ref={mapRef}
+                style={styles.map}
+                initialRegion={initialRegion}
+                customMapStyle={theme.mapStyle}
+                onPress={onPressMap}
+                onMapReady={() => {
+                  setIsMapReady(true);
+                  rideCamera.onMapReady();
+                  // Delay the region animation to ensure map is fully ready
+                  setTimeout(() => {
+                    if (!isRideCameraFollowing()) animateToUser(1000);
+                  }, 500);
+                }}
+                onRegionChangeComplete={rideCamera.onRegionChangeComplete}
+                onMapLoaded={() => setIsMapReady(true)}
+                fallbackComponent={<MapPlaceholder message="Map loading…" />}
+              >
+                <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={routeCoordinates} />
+                {!rideShown && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
+                <AssignedDriverMarker location={driverLocation} />
+              </SafeMapView>
+            </MapErrorBoundary>
+          </MapErrorBoundary>
         )}
 
-        {shownStage === 'destination' && (
-          <View>
-            <LocationSearch
-              mode="destination"
-              query={destQuery}
-              onChangeQuery={setDestQuery}
-              onSelect={(s) => {
-                if (!pickup && currentLocation) {
-                  setPickup({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
+        <MapTopControls
+          onBack={goBack}
+          onRecenter={centerOnUser}
+          onReset={rideShown ? undefined : resetSelection}
+          onOpenAdvanced={() => setShowAdvancedRidePanel(true)}
+        />
+
+        <BookingSheet onHeightChange={setSheetHeight} maxHeightRatio={sheetRatio}>
+          {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
+          {shownStage !== 'requesting' && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
+          {!rideShown && !compact && <StageChips stage={shownStage} />}
+          {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
+
+          {shownStage === 'home' && (
+            <DualLocationPicker
+              pickup={pickup}
+              destination={destination}
+              pickupQuery={pickupQuery}
+              destQuery={destQuery}
+              onPickupQuery={setPickupQuery}
+              onDestQuery={setDestQuery}
+              compact={compact}
+              onFocusChange={setSearchFocused}
+              onChooseOnMap={chooseOnMap}
+              onSelectPickup={(c, address) => {
+                setPickup({ ...c, address });
+                if (destination) {
+                  fetchRoute(c, destination);
+                  setStage('vehicle');
+                } else {
+                  setStage('destination');
                 }
-                const nextPickup = pickup || (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined);
-                setDestination({ ...s.coords, address: suggestionAddress(s) });
-                if (nextPickup) {
-                  fetchRoute(nextPickup, s.coords);
-                }
-                setStage('vehicle');
               }}
+              onSelectDestination={(c, address) => {
+                setDestination({ ...c, address });
+                if (pickup) {
+                  fetchRoute(pickup, c);
+                  setStage('vehicle');
+                } else {
+                  setStage('pickup');
+                }
+              }}
+              onUseCurrentLocation={async () => {
+                const cur = await pickupAtCurrentLocation();
+                if (cur && destination) {
+                  fetchRoute(cur, destination);
+                  setStage('vehicle');
+                }
+              }}
+              onSwap={swapPickupDrop}
             />
-            <ChooseOnMapButton onPress={() => setMapPick('destination')} />
-          </View>
-        )}
+          )}
+          {shownStage === 'home' && !compact && <ChooseOnMapButton onPress={() => setMapPick(pickup ? 'destination' : 'pickup')} />}
 
-        {shownStage === 'vehicle' && (
-          <View>
-            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 0, borderRadius: 12, padding: 12 }}>
-              <Text style={{ fontSize: 12, color: '#666' }}>Trip Details</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ fontWeight: '700', color: '#2d3748' }}>Pickup → Destination</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => editField('pickup')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
-                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Edit Pickup</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => editField('destination')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
-                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Edit Dest</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={swapPickupDrop} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
-                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Swap</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              {tripSummary && <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{tripSummary}</Text>}
+          {shownStage === 'pickup' && (
+            <View style={styles.stack}>
+              <LocationSearch
+                mode="pickup"
+                query={pickupQuery}
+                onChangeQuery={setPickupQuery}
+                onFocusChange={setSearchFocused}
+                onChooseOnMap={() => chooseOnMap('pickup')}
+                onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }}
+              />
+              {!compact && <ChooseOnMapButton onPress={() => setMapPick('pickup')} />}
             </View>
-            <VehicleChoice
+          )}
+
+          {shownStage === 'destination' && (
+            <View style={styles.stack}>
+              <LocationSearch
+                mode="destination"
+                query={destQuery}
+                onChangeQuery={setDestQuery}
+                onFocusChange={setSearchFocused}
+                onChooseOnMap={() => chooseOnMap('destination')}
+                onSelect={(s) => {
+                  if (!pickup && currentLocation) {
+                    setPickup({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
+                  }
+                  const nextPickup = pickup || (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined);
+                  setDestination({ ...s.coords, address: suggestionAddress(s) });
+                  if (nextPickup) {
+                    fetchRoute(nextPickup, s.coords);
+                  }
+                  setStage('vehicle');
+                }}
+              />
+              {!compact && <ChooseOnMapButton onPress={() => setMapPick('destination')} />}
+            </View>
+          )}
+
+          {shownStage === 'vehicle' && (
+            <VehicleStage
+              pickupLabel={pickup?.address || pickupQuery}
+              dropoffLabel={destination?.address || destQuery}
+              tripSummary={tripSummary}
               vehicleTypes={vehicleTypes}
               estimates={estimates}
-              selectedId={selectedVehicle}
-              onSelect={(id) => { setSelectedVehicle(id); setStage('fare'); }}
+              selectedVehicle={selectedVehicle}
+              onSelectVehicle={(id) => { setSelectedVehicle(id); setStage('fare'); }}
+              onEditPickup={() => setStage('pickup')}
+              onEditDestination={() => setStage('destination')}
+              onSwap={swapPickupDrop}
+              canEditStops={!!(pickup && destination)}
+              stops={stops}
+              onAddStop={(c, address) => updateStops([...stops, { ...c, address }].slice(0, MAX_STOPS))}
+              onRemoveStop={(index) => updateStops(stops.filter((_, i) => i !== index))}
+              onAddStopOnMap={() => setMapPick('stop')}
+              onFocusChange={setSearchFocused}
             />
-            {pickup && destination && (
-              <View style={{ marginTop: 8 }}>
-                <Text style={{ fontWeight: '700', color: '#111827', marginBottom: 6 }}>Add optional stops (up to 5)</Text>
-                <StopsEditor
-                  stops={stops}
-                  onAddStop={(c, address) => {
-                    const ns = [...stops, { ...c, address }].slice(0, 5);
-                    setStops(ns);
-                    fetchRouteWithWaypoints(pickup, ns, destination);
-                  }}
-                  onRemoveStop={(index) => {
-                    const ns = stops.filter((_, i) => i !== index);
-                    setStops(ns);
-                    fetchRouteWithWaypoints(pickup, ns, destination);
-                  }}
-                  maxStops={5}
-                />
-                {stops.length < 5 && (
-                  <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={() => setMapPick('stop')} />
-                )}
-              </View>
-            )}
-          </View>
-        )}
+          )}
 
-        {shownStage === 'fare' && (
-          <View>
-            <View style={{ backgroundColor: '#f8f9ff', margin: 4, marginBottom: 8, borderRadius: 12, padding: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ fontSize: 12, color: '#666' }}>Review & Confirm</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => editField('vehicle')} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'white', borderRadius: 6 }}>
-                    <Text style={{ color: BrandColors.primary, fontWeight: '600', fontSize: 12 }}>Change Vehicle</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleCancelRide} style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
-                    <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 12 }}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Vehicle: {selectedType?.label ?? '—'}{tripSummary ? ` • ${tripSummary}` : ''}</Text>
-            </View>
-            <FareReview
+          {shownStage === 'fare' && (
+            <FareStage
+              vehicleLabel={selectedType?.label ?? null}
+              tripSummary={tripSummary}
               vehicleType={selectedType}
               estimates={estimates}
+              onChangeVehicle={() => setStage('vehicle')}
+              onCancel={handleCancelRide}
               onConfirm={() => { onRequestRide(); setStage('requesting'); }}
             />
-          </View>
-        )}
+          )}
 
-        {shownStage === 'requesting' && (
-          <ActiveRidePanel
-            stageState={rideStage ?? { rideId: null, stage: 'searching', notice: null }}
-            ride={currentRide}
-            onCancel={handleCancelRide}
-            onDone={finishRide}
-            onCall={driverPhone ? callDriver : undefined}
-            busy={isLoading || rideSubmitting}
-          />
-        )}
+          {shownStage === 'requesting' && (
+            <ActiveRidePanel
+              stageState={rideStage ?? { rideId: null, stage: 'searching', notice: null }}
+              ride={currentRide}
+              onCancel={handleCancelRide}
+              onDone={finishRide}
+              onCall={driverPhone ? callDriver : undefined}
+              busy={isLoading || rideSubmitting}
+            />
+          )}
+        </BookingSheet>
+
+        <AdvancedRideRequestPanel
+          visible={showAdvancedRidePanel}
+          onClose={() => setShowAdvancedRidePanel(false)}
+          onRequestRide={handleRequestRide}
+          isLoading={isLoading}
+        />
       </View>
-      
-      {/* Advanced Ride Request Panel */}
-      <AdvancedRideRequestPanel
-        visible={showAdvancedRidePanel}
-        onClose={() => setShowAdvancedRidePanel(false)}
-        onRequestRide={handleRequestRide}
-        isLoading={isLoading}
-      />
-    </View>
     </ErrorBoundary>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
+  container: { flex: 1 },
   map: { flex: 1 },
-  fallbackText: {
-    fontSize: 16,
-    color: BrandColors.primary,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 50,
-  },
-  mapLoadingContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapLoadingText: {
-    fontSize: 16,
-    color: BrandColors.primary,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  loadingTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: BrandColors.primary,
-    marginBottom: 6,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: BrandColors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  topControls: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    backgroundColor: 'white',
-    padding: 10,
-    borderRadius: 22,
-    elevation: 2,
-  },
-  advancedButton: {
-    backgroundColor: BrandColors.primary,
-  },
-  bottomPanel: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'white',
-    padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    elevation: 8,
-    gap: 10,
-  },
-  errorContainer: { backgroundColor: '#fee2e2', margin: 4, marginBottom: 8, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  errorContent: { flex: 1 },
-  errorTitle: { color: '#dc2626', fontWeight: '600', fontSize: 12 },
-  errorMessage: { color: '#dc2626', fontSize: 11, marginTop: 2 },
-  errorClose: { padding: 4 },
+  stack: { gap: space[2] },
 });
 
 export default PassengerMapScreen;

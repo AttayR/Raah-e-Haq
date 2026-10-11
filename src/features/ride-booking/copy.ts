@@ -26,6 +26,14 @@ export const BOOKING_COPY = {
   phoneNotVerifiedAction: 'Verify number',
   notNow: 'Not now',
   chooseOnMap: 'Choose on map',
+  /** Pickup field while the passenger's own position is the pickup (until they edit it). */
+  currentLocation: 'Current location',
+  /** Pickup field while the position's address is looked up (the field is read-only then). */
+  resolvingAddress: 'Resolving address…',
+  setLocationOnMap: 'Set location on map',
+  noPlacesTitle: 'No places found',
+  noPlacesBody: 'Check the spelling or choose on the map.',
+  searchFailed: "Search isn't working right now.",
   addStopOnMap: '+ Add via map',
   pinnedOnMap: 'Pinned on map',
   mapPickHint: (target: 'pickup' | 'destination' | 'stop') =>

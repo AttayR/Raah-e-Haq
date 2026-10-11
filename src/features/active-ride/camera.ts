@@ -14,6 +14,9 @@ import type { PassengerRideStage } from './stage';
  * T-313: when the ride is cleared (Done after completed / cancelled) the pause is dropped and
  * the map recentres on the booking point (pickup, else the passenger), instead of staying
  * wherever the passenger last panned it.
+ *
+ * T-314: with a `MapViewport` (sheet height, map height) the recentre and the fit keep the
+ * points in the visible part of the map above the bottom sheet.
  */
 
 /** Room for the top controls and the bottom ride panel around the two points. */
@@ -92,6 +95,76 @@ export interface RideCameraMap extends FitToCoordinatesMap {
 /** The booking map's zoom (the same span the screen uses for the passenger's position). */
 export const BOOKING_REGION_DELTA = 0.01;
 
+/**
+ * What covers the map (T-314): the bottom sheet's height and the space taken by the top
+ * controls, against the map's own height, all in points.
+ */
+export interface MapViewport {
+  mapHeight: number;
+  /** Height of the bottom sheet over the map. */
+  bottom: number;
+  /** Height of the controls (and status bar) over the top of the map. */
+  top?: number;
+}
+
+/** Never zoom out more than this to make up for the covered part. */
+const MAX_VIEWPORT_ZOOM_OUT = 3;
+
+/** At least this much map stays between the top and bottom insets. */
+export const MIN_VISIBLE_MAP = 160;
+
+/**
+ * Top and bottom insets scaled down together so that at least `MIN_VISIBLE_MAP` points of map
+ * stay between them (a tall sheet must not leave fits and recentres with no room).
+ */
+export const clampViewportInsets = (viewport: MapViewport): { top: number; bottom: number } => {
+  const top = Math.max(0, viewport.top ?? 0);
+  const bottom = Math.max(0, viewport.bottom);
+  const room = Math.max(0, viewport.mapHeight - MIN_VISIBLE_MAP);
+  const total = top + bottom;
+  if (total <= room || total === 0) return { top, bottom };
+  const k = room / total;
+  return { top: top * k, bottom: bottom * k };
+};
+
+/**
+ * The region that puts `point` in the middle of the part of the map the passenger can see
+ * (above the sheet, below the controls), showing `delta` of latitude there. Without a usable
+ * viewport it is the plain region centred on the point.
+ */
+export const regionInViewport = (
+  point: LatLng,
+  viewport?: MapViewport | null,
+  delta: number = BOOKING_REGION_DELTA,
+): Region => {
+  const plain = { latitude: point.latitude, longitude: point.longitude, latitudeDelta: delta, longitudeDelta: delta };
+  if (!viewport || viewport.mapHeight <= 0) return plain;
+  const { top, bottom } = clampViewportInsets(viewport);
+  const visible = viewport.mapHeight - top - bottom;
+  if (visible <= 0 || (top === 0 && bottom === 0)) return plain;
+  const latitudeDelta = delta * Math.min(viewport.mapHeight / visible, MAX_VIEWPORT_ZOOM_OUT);
+  const degreesPerPoint = latitudeDelta / viewport.mapHeight;
+  // The visible middle sits (bottom - top) / 2 above the map's middle: move the centre south.
+  return {
+    latitude: point.latitude - ((bottom - top) / 2) * degreesPerPoint,
+    longitude: point.longitude,
+    latitudeDelta,
+    longitudeDelta: delta,
+  };
+};
+
+/** Fit padding that keeps fitted points above the sheet and below the controls (DESIGN_SYSTEM 5.21). */
+export const viewportEdgePadding = (viewport?: MapViewport | null): EdgePadding => {
+  if (!viewport || viewport.bottom <= 0) return DRIVER_APPROACH_EDGE_PADDING;
+  // 24 of breathing room on each side, inside the clamp.
+  const { top, bottom } = clampViewportInsets({
+    mapHeight: viewport.mapHeight,
+    top: Math.max(viewport.top ?? 0, 0) + 24,
+    bottom: viewport.bottom + 24,
+  });
+  return { top, right: 48, bottom, left: 48 };
+};
+
 export interface PassengerRideCamera {
   /**
    * True while the auto-fit owns the camera (driver on the way, not paused by the passenger),
@@ -117,6 +190,7 @@ export const usePassengerRideCamera = (
   driverLocation: Pick<DriverLocation, 'latitude' | 'longitude'> | null,
   ride: Pick<RideResource, 'pickup_latitude' | 'pickup_longitude'> | null,
   home: LatLng | null = null,
+  viewport: MapViewport | null = null,
 ): PassengerRideCamera => {
   const [mapReady, setMapReady] = useState(false);
   const [pausedStage, setPausedStage] = useState<PassengerRideStage | null>(null);
@@ -124,6 +198,8 @@ export const usePassengerRideCamera = (
   const paused = pausedStage !== null && pausedStage === current;
   const latestHome = useRef(home);
   latestHome.current = home;
+  const latestViewport = useRef(viewport);
+  latestViewport.current = viewport;
   const mapReadyRef = useRef(mapReady);
   mapReadyRef.current = mapReady;
   const previousStage = useRef(current);
@@ -135,16 +211,13 @@ export const usePassengerRideCamera = (
     previousStage.current = current;
     const point = latestHome.current;
     if (!hadRide || current !== null || !mapReadyRef.current || !point) return;
-    mapRef.current?.animateToRegion({
-      latitude: point.latitude,
-      longitude: point.longitude,
-      latitudeDelta: BOOKING_REGION_DELTA,
-      longitudeDelta: BOOKING_REGION_DELTA,
-    });
+    // T-314: centred in the part above the sheet, not behind it.
+    mapRef.current?.animateToRegion(regionInViewport(point, latestViewport.current));
   }, [current, mapRef]);
 
   useFitCoordinates(mapRef, paused ? null : driverApproachCoordinates(current, driverLocation, ride), {
     ready: mapReady,
+    edgePadding: viewportEdgePadding(viewport),
   });
 
   const following = useRef(false);
