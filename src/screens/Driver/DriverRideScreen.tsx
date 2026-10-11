@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Marker } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
+import { Screen } from '../../components/ui';
 import { CancelReasonSheet } from '../../components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../components/driver/DriverRidePanel';
 import { DriverRideSummary } from '../../components/driver/DriverRideSummary';
@@ -14,7 +15,12 @@ import type { AppTheme } from '../../theme';
 import { toast } from '../../core/toast';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import { openRideChat } from '../../features/chat/navigation';
-import { DRIVER_RIDE_TOAST_OPTIONS, useDriverRideFlow } from '../../features/driver-ride/hooks';
+import { useAppIsActive } from '../../features/driver-requests/hooks';
+import {
+  DRIVER_RIDE_TOAST_OPTIONS,
+  useDriverRideFlow,
+  useDriverRideStatusPolling,
+} from '../../features/driver-ride/hooks';
 import {
   activeStops,
   getPassengerPhone,
@@ -35,6 +41,10 @@ const toRegion = (point: LatLng | null) =>
  * order) → complete → the server's fare summary. Every step is a BE-04 request; the screen
  * only shows what the server answered. Location stays foreground only (B-08): the map shows
  * the device position and "Navigate" hands off to the platform maps app.
+ *
+ * T-413: while the screen is focused and the app is in the foreground the ride is re-read every
+ * ~8 s, so a passenger cancel shows "Ride cancelled" (and a completion the summary) without the
+ * driver acting. The map follows the theme (dark map style) under a status-bar scrim.
  */
 const DriverRideScreen: React.FC = () => {
   const { theme } = useAppTheme();
@@ -44,6 +54,9 @@ const DriverRideScreen: React.FC = () => {
   const flow = useDriverRideFlow();
   const { ride, step, pendingAction } = flow;
   const [cancelOpen, setCancelOpen] = useState(false);
+  const isFocused = useIsFocused();
+  const appActive = useAppIsActive();
+  useDriverRideStatusPolling(isFocused && appActive);
 
   const target = navigationTarget(ride);
   const phone = getPassengerPhone(ride);
@@ -104,7 +117,7 @@ const DriverRideScreen: React.FC = () => {
 
   if (!ride) {
     return (
-      <View style={[styles.container, styles.centered]} testID="driver-ride-empty">
+      <Screen edges={[]} contentStyle={styles.centered} testID="driver-ride-empty">
         {pendingAction === 'restore' ? (
           <ActivityIndicator color={theme.colors.primary} />
         ) : (
@@ -113,81 +126,92 @@ const DriverRideScreen: React.FC = () => {
         <TouchableOpacity onPress={goBack} accessibilityRole="button" testID="driver-ride-back-to-map">
           <Text style={styles.link}>{COPY.backToMap}</Text>
         </TouchableOpacity>
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container} accessibilityLabel={COPY.screenA11y}>
-      <MapErrorBoundary>
-        <SafeMapView
-          style={styles.map}
-          showsUserLocation
-          showsMyLocationButton={false}
-          ref={mapRef}
-          initialRegion={toRegion(region)}
+    // Map screens own no safe-area padding: overlays place themselves from the insets.
+    <Screen edges={[]} testID="driver-ride">
+      <View style={styles.container} accessibilityLabel={COPY.screenA11y}>
+        <MapErrorBoundary>
+          <SafeMapView
+            style={styles.map}
+            showsUserLocation
+            showsMyLocationButton={false}
+            ref={mapRef}
+            initialRegion={toRegion(region)}
+            customMapStyle={theme.mapStyle}
+          >
+            {pickup && <Marker coordinate={pickup} title={COPY.pickup} pinColor={theme.colors.pickupPin} />}
+            {activeStops(ride).map((stop) => {
+              const coordinate = toLatLng(stop.latitude, stop.longitude);
+              return coordinate ? (
+                <Marker key={stop.id} coordinate={coordinate} title={COPY.stop} pinColor={theme.colors.stopPin} />
+              ) : null;
+            })}
+            {dropoff && <Marker coordinate={dropoff} title={COPY.dropoff} pinColor={theme.colors.dropoffPin} />}
+          </SafeMapView>
+        </MapErrorBoundary>
+
+        {/* Scrim under the status bar so map labels never sit behind the clock (as on DriverMap). */}
+        <View
+          pointerEvents="none"
+          testID="driver-ride-status-bar-scrim"
+          style={[styles.statusBarScrim, { height: insets.top }]}
+        />
+
+        <TouchableOpacity
+          style={[styles.backButton, { top: insets.top + theme.space[2] }]}
+          onPress={goBack}
+          accessibilityRole="button"
+          accessibilityLabel={COPY.back}
+          testID="driver-ride-back"
         >
-          {pickup && <Marker coordinate={pickup} title={COPY.pickup} pinColor={theme.colors.pickupPin} />}
-          {activeStops(ride).map((stop) => {
-            const coordinate = toLatLng(stop.latitude, stop.longitude);
-            return coordinate ? (
-              <Marker key={stop.id} coordinate={coordinate} title={COPY.stop} pinColor={theme.colors.stopPin} />
-            ) : null;
-          })}
-          {dropoff && <Marker coordinate={dropoff} title={COPY.dropoff} pinColor={theme.colors.dropoffPin} />}
-        </SafeMapView>
-      </MapErrorBoundary>
+          <Icon name="arrow-back" size={24} color={theme.colors.textPrimary} />
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.backButton, { top: insets.top + theme.space[2] }]}
-        onPress={goBack}
-        accessibilityRole="button"
-        accessibilityLabel={COPY.back}
-        testID="driver-ride-back"
-      >
-        <Icon name="arrow-back" size={24} color={theme.colors.textPrimary} />
-      </TouchableOpacity>
+        <ScrollView
+          style={styles.sheet}
+          contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + theme.space[4] }]}
+        >
+          {step === 'summary' ? (
+            <DriverRideSummary ride={ride} onDone={onDone} />
+          ) : step === 'cancelled' ? (
+            <View style={styles.card} testID="driver-ride-cancelled">
+              <Text style={styles.cardTitle}>{COPY.cancelled}</Text>
+              <Text style={styles.emptyText}>{COPY.cancelledBody}</Text>
+              <TouchableOpacity style={styles.doneButton} onPress={onDone} accessibilityRole="button" testID="driver-ride-done">
+                <Text style={styles.doneText}>{COPY.done}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <DriverRidePanel
+              ride={ride}
+              step={step}
+              pendingAction={pendingAction}
+              phone={phone}
+              canNavigate={target !== null}
+              onCall={onCall}
+              onMessage={onMessage}
+              onNavigate={onNavigate}
+              onArrived={flow.arrived}
+              onStart={flow.start}
+              onComplete={flow.complete}
+              onCompleteStop={flow.completeStop}
+              onCancel={() => setCancelOpen(true)}
+            />
+          )}
+        </ScrollView>
 
-      <ScrollView
-        style={styles.sheet}
-        contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + theme.space[4] }]}
-      >
-        {step === 'summary' ? (
-          <DriverRideSummary ride={ride} onDone={onDone} />
-        ) : step === 'cancelled' ? (
-          <View style={styles.card} testID="driver-ride-cancelled">
-            <Text style={styles.cardTitle}>{COPY.cancelled}</Text>
-            <Text style={styles.emptyText}>{COPY.cancelledBody}</Text>
-            <TouchableOpacity style={styles.doneButton} onPress={onDone} accessibilityRole="button" testID="driver-ride-done">
-              <Text style={styles.doneText}>{COPY.done}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <DriverRidePanel
-            ride={ride}
-            step={step}
-            pendingAction={pendingAction}
-            phone={phone}
-            canNavigate={target !== null}
-            onCall={onCall}
-            onMessage={onMessage}
-            onNavigate={onNavigate}
-            onArrived={flow.arrived}
-            onStart={flow.start}
-            onComplete={flow.complete}
-            onCompleteStop={flow.completeStop}
-            onCancel={() => setCancelOpen(true)}
-          />
-        )}
-      </ScrollView>
-
-      <CancelReasonSheet
-        visible={cancelOpen}
-        submitting={pendingAction === 'cancel'}
-        onSubmit={onCancel}
-        onClose={() => setCancelOpen(false)}
-      />
-    </View>
+        <CancelReasonSheet
+          visible={cancelOpen}
+          submitting={pendingAction === 'cancel'}
+          onSubmit={onCancel}
+          onClose={() => setCancelOpen(false)}
+        />
+      </View>
+    </Screen>
   );
 };
 
@@ -205,6 +229,14 @@ const createStyles = (theme: AppTheme) =>
     },
     map: {
       flex: 1,
+    },
+    statusBarScrim: {
+      position: 'absolute',
+      top: 0,
+      start: 0,
+      end: 0,
+      backgroundColor: theme.colors.surface,
+      opacity: theme.layout.statusBarScrimOpacity,
     },
     backButton: {
       position: 'absolute',

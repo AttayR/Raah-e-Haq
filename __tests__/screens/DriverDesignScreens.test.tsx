@@ -17,10 +17,16 @@ import { driverStatusApi } from '../../src/features/driver-status/api';
 import DriverHomeScreen from '../../src/screens/Driver/DriverHomeScreen';
 import DriverSettingsScreen from '../../src/screens/Driver/DriverSettingsScreen';
 import DriverMapScreen from '../../src/screens/Driver/DriverMapScreen';
+import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
+import { driverRideApi } from '../../src/features/driver-ride/api';
+import { initialDriverRideState } from '../../src/features/driver-ride/slice';
+import type { RideResource } from '../../src/services/rideService';
+import { makeRide } from '../../test-utils/rideFixtures';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: mockNavigate }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn(), canGoBack: () => true }),
+  useIsFocused: () => true,
 }));
 const mockNavigate = jest.fn();
 
@@ -46,6 +52,7 @@ const user = (status: User['status']): User => ({
 const renderScreen = async (
   Screen: React.ComponentType,
   { mode = 'light', status = 'active', driverStatus = 'offline' }: Record<string, string> = {},
+  ride: RideResource | null = null,
 ) => {
   mockScheme.mockReturnValue(mode as 'light' | 'dark');
   jest
@@ -54,7 +61,11 @@ const renderScreen = async (
   const initial = rootReducer(undefined, { type: '@@init' });
   const store = configureStore({
     reducer: rootReducer,
-    preloadedState: { ...initial, apiAuth: { ...initial.apiAuth, user: user(status as User['status']) } },
+    preloadedState: {
+      ...initial,
+      apiAuth: { ...initial.apiAuth, user: user(status as User['status']) },
+      driverRide: { ...initialDriverRideState, ride },
+    },
   });
   render(
     <Provider store={store}>
@@ -98,6 +109,18 @@ describe('DriverHomeScreen', () => {
     expect(screen.queryByTestId('driver-home-pending-banner')).toBeNull();
     // Sign out and the profile row live in Settings; the avatar opens the profile.
     expect(screen.queryByText('Sign out')).toBeNull();
+    // No ride: no resume card.
+    expect(screen.queryByTestId('driver-home-resume-ride')).toBeNull();
+  });
+
+  it('on a ride: shows a Resume ride card with the step that opens the ride screen (T-413)', async () => {
+    const ride = makeRide({ status: 'accepted', passenger: { id: 9, name: 'Ayesha', phone: '' } });
+    await renderScreen(DriverHomeScreen, { mode: 'dark', driverStatus: 'on_ride' }, ride);
+    expect(screen.getByTestId('driver-home-resume-ride')).toBeTruthy();
+    expect(screen.getByTestId('driver-home-resume-ride-step').props.children).toBe('Head to pickup');
+    expect(screen.getByText('Ayesha')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('driver-home-resume-ride-button'));
+    expect(mockNavigate).toHaveBeenCalledWith('DriverRide');
   });
 
   it('dark + online: dark surfaces, green dot, outline Go offline', async () => {
@@ -167,5 +190,24 @@ describe('DriverMapScreen status chip', () => {
     expect(screen.getByText('Getting your location…')).toBeTruthy();
     const pin = screen.getByTestId('driver-map-status-pin');
     expect(flat(pin.props.style).color ?? pin.props.color).toBe(LightTheme.colors.warning);
+  });
+});
+
+describe('DriverRideScreen (T-413)', () => {
+  it.each([
+    ['light', LightTheme],
+    ['dark', DarkTheme],
+  ] as const)('%s: the map follows the theme and a surface scrim sits under the status bar', async (mode, theme) => {
+    const ride = makeRide({ status: 'accepted' });
+    jest.spyOn(driverRideApi, 'get').mockResolvedValue(ride);
+    await renderScreen(DriverRideScreen, { mode }, ride);
+    const map = screen.UNSAFE_root.findAll(
+      (node) => node.props.customMapStyle !== undefined && typeof node.type !== 'string',
+    )[0];
+    expect(map.props.customMapStyle).toBe(theme.mapStyle);
+    expect(flat(screen.getByTestId('driver-ride-status-bar-scrim').props.style).backgroundColor).toBe(
+      theme.colors.surface,
+    );
+    expect(flat(screen.getByTestId('driver-ride').props.style).backgroundColor).toBe(theme.colors.background);
   });
 });

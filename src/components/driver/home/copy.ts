@@ -16,6 +16,10 @@ export const DRIVER_HOME_COPY = {
   statOnline: 'Online time',
   statRating: 'Rating',
   statsUnavailable: "Today's numbers aren't available yet.",
+  // Resume ride card (T-413).
+  resumeRideOverline: 'Ride in progress',
+  resumeRide: 'Resume ride',
+  resumeRideA11y: 'Resume your current ride',
 } as const;
 
 /** Greeting for the device's local hour. */

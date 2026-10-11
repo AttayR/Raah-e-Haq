@@ -23,6 +23,7 @@ const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack, canGoBack: () => true }),
+  useIsFocused: () => true,
 }));
 
 const stop = (overrides: Partial<RideStopResource>): RideStopResource => ({
@@ -227,6 +228,27 @@ describe('DriverRideScreen', () => {
     const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger: { id: 9, name: 'Ayesha', phone: '' } }));
     await settle(store);
     expect(screen.queryByTestId('driver-ride-call')).toBeNull();
+  });
+
+  it('shows "Ride cancelled" when the passenger cancels, without the driver acting (T-413)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger }));
+      await settle(store);
+      expect(screen.queryByTestId('driver-ride-cancelled')).toBeNull();
+
+      serverRide = makeRide({ status: 'cancelled', passenger });
+      await act(async () => {
+        jest.advanceTimersByTime(8000);
+      });
+      await waitFor(() => screen.getByTestId('driver-ride-cancelled'));
+      expect(screen.getByText('Ride cancelled')).toBeTruthy();
+      // The driver posted nothing: the poll only read the ride.
+      expect(mock.history.post).toHaveLength(0);
+      expect(mockGoBack).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shows an empty state without a ride', () => {

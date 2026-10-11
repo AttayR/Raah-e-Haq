@@ -5,9 +5,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootState } from '../../store';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
+import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { AppText, Badge, Card, Icon, ListItem, Screen, type IconName } from '../../components/ui';
 import { DriverHomeHeader } from '../../components/driver/home/DriverHomeHeader';
+import { DriverResumeRideCard } from '../../components/driver/home/DriverResumeRideCard';
 import { DriverStatusCard, type DriverStatusView } from '../../components/driver/home/DriverStatusCard';
 import { DriverTodayStats, type DriverTodayStatsValues } from '../../components/driver/home/DriverTodayStats';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
@@ -41,6 +43,8 @@ export default function DriverHomeScreen() {
   useLoadDriverStatusOnMount();
   const { isOnline, isOnRide, isBusy, isChecking, disabled, toggle } = useDriverStatusToggle();
   const { user } = useSelector((state: RootState) => state.apiAuth);
+  // The accepted ride (T-404/T-405); its steps live on the DriverRide screen (T-413).
+  const currentRide = useSelector(selectDriverActiveRide);
 
   const isDriverApproved = user?.status === 'active';
   const status: DriverStatusView = isChecking ? 'checking' : isOnRide ? 'onRide' : isOnline ? 'online' : 'offline';
@@ -66,6 +70,10 @@ export default function DriverHomeScreen() {
             {DRIVER_HOME_COPY.pendingApproval}
           </AppText>
         </View>
+      )}
+
+      {currentRide && (
+        <DriverResumeRideCard ride={currentRide} onResume={() => navigation.navigate('DriverRide')} />
       )}
 
       <DriverStatusCard
