@@ -43,6 +43,7 @@ The app is being taken from prototype to production through a tracked fix progra
 - **Backend remote (2026-10-09).** The backend now lives in the owner's own private repo `AttayR/Raah-e-Haq-backend`, git remote `mine` (`origin` stays the read-only Mubashir-Majeed repo). Push `main` and `fix/production-hardening` to `mine`. B-14 is resolved this way.
 - **Commits.** Commit message: `fix(T-012): <summary>` (or `feat`, `refactor`, `test`, `chore`, `style`). **No `Co-Authored-By` trailer and no mention of Claude or AI in any commit message.**
 - **Drivers (2026-10-11).** Logout sets a driver offline. Drivers must be 18 or older and must provide a driving licence at registration.
+- **Priority (2026-10-11).** 1) Wallet, production level (cash only, no gateway): ledger, ride settlement, driver commission/settlements, earnings and stats. 2) A modern, production-grade UI, consistent between passenger and driver. 3) WebSockets (BE-12/T-406) last.
 - **Still needs the owner:** anything on Hostinger/hPanel or a server, Google Cloud/Firebase consoles (key rotation), Apple/Google store accounts and signing keys, real payment gateways, spending money, and anything touching production data or real users.
 
 ## Branches
