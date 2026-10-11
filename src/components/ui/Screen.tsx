@@ -1,5 +1,13 @@
 import React from 'react';
-import { ScrollView, StatusBar, StyleSheet, View, type ViewStyle, type StyleProp } from 'react-native';
+import {
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  View,
+  type RefreshControlProps,
+  type ViewStyle,
+  type StyleProp,
+} from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { layout } from '../../theme';
@@ -14,6 +22,8 @@ export type ScreenProps = React.PropsWithChildren<{
   edges?: Edge[];
   /** Style of the scroll content (or of the inner View without `scroll`). */
   contentStyle?: StyleProp<ViewStyle>;
+  /** Pull to refresh for `scroll` screens (a `<RefreshControl>` tinted with a theme token). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
   testID?: string;
 }>;
 
@@ -22,7 +32,14 @@ export type ScreenProps = React.PropsWithChildren<{
  * bar style from the theme, so no screen sets StatusBar itself.
  * Keyboard avoidance (react-native-keyboard-controller) comes with T-602 for form screens.
  */
-export function Screen({ scroll = false, edges = ['top'], contentStyle, testID, children }: ScreenProps) {
+export function Screen({
+  scroll = false,
+  edges = ['top'],
+  contentStyle,
+  refreshControl,
+  testID,
+  children,
+}: ScreenProps) {
   const { theme } = useAppTheme();
   const background = { backgroundColor: theme.colors.background };
   return (
@@ -34,6 +51,7 @@ export function Screen({ scroll = false, edges = ['top'], contentStyle, testID, 
           contentContainerStyle={[styles.scrollContent, contentStyle]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
         >
           {children}
         </ScrollView>

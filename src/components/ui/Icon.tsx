@@ -59,6 +59,9 @@ const glyphs = {
   // Added for driver documents (T-203); additive only.
   document: 'description',
   upload: 'file-upload',
+  // Added for the passenger profile view (T-618); additive only.
+  calendar: 'event',
+  email: 'mail-outline',
 } as const;
 
 export type IconName = keyof typeof glyphs;
