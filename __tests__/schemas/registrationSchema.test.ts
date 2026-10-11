@@ -5,6 +5,7 @@
  */
 import {
   firstInvalidStep,
+  isStepFieldRequired,
   maxVehicleYear,
   validateStep,
   validateStepField,
@@ -190,5 +191,32 @@ describe('documents step and submit', () => {
       errors: { vehicleColor: 'Vehicle color is required' },
     });
     expect(firstInvalidStep({ ...validDriver, password: 'weak' })?.step).toBe('personal');
+  });
+});
+
+describe('T-206: date of birth and required markers', () => {
+  it('refuses a year of birth before 1900 (typo guard), accepts a real past date', () => {
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '0199-01-15' }).dateOfBirth).toBe(
+      'Year of birth must be 1900 or later',
+    );
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '1900-01-01' }).dateOfBirth).toBeUndefined();
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '2000-02-29' }).dateOfBirth).toBeUndefined();
+    expect(validateStep('personal', { ...validPassenger, dateOfBirth: '1990-01' }).dateOfBirth).toBe(
+      'Use format YYYY-MM-DD (e.g. 1990-01-15)',
+    );
+  });
+
+  it('marks only the documents the schema requires for the role', () => {
+    for (const field of ['profilePicture', 'cnicFrontPicture', 'cnicBackPicture'] as const) {
+      expect(isStepFieldRequired('documents', field, 'passenger')).toBe(false);
+    }
+    expect(isStepFieldRequired('documents', 'driverPicture', 'driver')).toBe(true);
+    expect(isStepFieldRequired('documents', 'cnicPicture', 'driver')).toBe(true);
+    expect(isStepFieldRequired('documents', 'vehiclePictures', 'driver')).toBe(true);
+    // The backend takes licence images as nullable and the schema does not ask for them.
+    expect(isStepFieldRequired('documents', 'licenseFrontPicture', 'driver')).toBe(false);
+    expect(isStepFieldRequired('documents', 'licenseBackPicture', 'driver')).toBe(false);
+    expect(isStepFieldRequired('personal', 'emergencyContactName', 'passenger')).toBe(true);
+    expect(isStepFieldRequired('personal', 'emergencyContactName', 'driver')).toBe(false);
   });
 });

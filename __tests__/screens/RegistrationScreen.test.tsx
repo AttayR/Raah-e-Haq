@@ -61,7 +61,7 @@ const fillPassengerPersonal = () => {
   fireEvent.changeText(screen.getAllByPlaceholderText('+92XXXXXXXXXX')[0], '03009990001');
   type('00000-0000000-0', '3520212345671');
   type('Enter your complete address', 'House 1, Street 2, Lahore');
-  type('YYYY-MM-DD (e.g. 1990-01-15)', '1990-01-15');
+  type('YYYY-MM-DD (e.g. 1990-01-15)', '19900115'); // digits only: the iOS number pad has no "-" (T-206)
   fireEvent.press(screen.getByText('Female'));
   type('Create a strong password', 'Secret123');
   type('Confirm your password', 'Secret123');
@@ -112,6 +112,27 @@ describe('RegistrationScreen (T-201)', () => {
     fireEvent.press(screen.getByText('Next')); // -> review
     expect(screen.getByText('Terms & Conditions')).toBeTruthy();
     expectSingleScroller();
+  });
+
+  it('date of birth typed as digits on the number pad gets its dashes (T-206)', async () => {
+    await renderScreen();
+    const dob = () => screen.getByPlaceholderText('YYYY-MM-DD (e.g. 1990-01-15)');
+    expect(dob().props.maxLength).toBe(10);
+    fireEvent.changeText(dob(), '199001');
+    expect(dob().props.value).toBe('1990-01');
+    fireEvent.changeText(dob(), '1990-'); // backspace over the "0" of "1990-0"
+    expect(dob().props.value).toBe('1990');
+    fireEvent.changeText(dob(), '19900115');
+    expect(dob().props.value).toBe('1990-01-15');
+  });
+
+  it('passenger documents show no required marker on the optional CNIC images (T-206)', async () => {
+    await renderScreen();
+    fillPassengerPersonal();
+    fireEvent.press(screen.getByText('Next')); // -> vehicle (skipped for passengers)
+    fireEvent.press(screen.getByText('Next')); // -> documents
+    expect(screen.getByText('CNIC Front Picture')).toBeTruthy();
+    expect(screen.queryByText('*')).toBeNull();
   });
 
   it('Next on an empty step shows the schema errors inline and stays on step 1', async () => {

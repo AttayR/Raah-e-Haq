@@ -14,6 +14,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../../core/logging/logger';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
+import { isStepFieldRequired } from '../../../schemas/registrationSchema';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -144,12 +145,12 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
     onPress: () => void,
     field: keyof DocumentsData,
     errorMessage?: string,
-    isRequired: boolean = true
   ) => (
     <View style={styles.imagePickerContainer}>
       <View style={styles.imagePickerHeader}>
         <Text style={styles.imagePickerLabel}>{label}</Text>
-        {isRequired && <Text style={styles.requiredText}>*</Text>}
+        {/* Only fields the schema requires for this role get a * (T-206). */}
+        {isStepFieldRequired('documents', field, data.role) && <Text style={styles.requiredText}>*</Text>}
       </View>
       <TouchableOpacity 
         style={[styles.imagePicker, imageUri && styles.imagePickerFilled]} 
@@ -184,7 +185,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
     <View style={styles.imagePickerContainer}>
       <View style={styles.imagePickerHeader}>
         <Text style={styles.imagePickerLabel}>Vehicle Pictures</Text>
-        <Text style={styles.requiredText}>*</Text>
+        {isStepFieldRequired('documents', 'vehiclePictures', data.role) && <Text style={styles.requiredText}>*</Text>}
       </View>
       <Text style={styles.vehiclePicturesSubtitle}>
         Upload 4-6 clear pictures of your vehicle from different angles
@@ -252,8 +253,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             data.profilePicture,
             () => openImagePicker('profile'),
             'profilePicture',
-            validationErrors.profilePicture,
-            false
+            validationErrors.profilePicture
           )}
 
           {/* CNIC Front Picture for Passengers */}
@@ -262,8 +262,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             data.cnicFrontPicture,
             () => openImagePicker('cnicFront'),
             'cnicFrontPicture',
-            validationErrors.cnicFrontPicture,
-            true
+            validationErrors.cnicFrontPicture
           )}
 
           {/* CNIC Back Picture for Passengers */}
@@ -272,8 +271,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             data.cnicBackPicture,
             () => openImagePicker('cnicBack'),
             'cnicBackPicture',
-            validationErrors.cnicBackPicture,
-            true
+            validationErrors.cnicBackPicture
           )}
         </View>
 
@@ -317,8 +315,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           data.driverPicture,
           () => openImagePicker('driver'),
           'driverPicture',
-          validationErrors.driverPicture,
-          true
+          validationErrors.driverPicture
         )}
 
         {/* CNIC Picture */}
@@ -327,8 +324,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           data.cnicPicture,
           () => openImagePicker('cnic'),
           'cnicPicture',
-          validationErrors.cnicPicture,
-          true
+          validationErrors.cnicPicture
         )}
 
         {/* License Front/Back */}
@@ -337,16 +333,14 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           data.licenseFrontPicture,
           () => openImagePicker('licenseFront'),
           'licenseFrontPicture',
-          validationErrors.licenseFrontPicture,
-          true
+          validationErrors.licenseFrontPicture
         )}
         {renderImagePicker(
           'License Back',
           data.licenseBackPicture,
           () => openImagePicker('licenseBack'),
           'licenseBackPicture',
-          validationErrors.licenseBackPicture,
-          true
+          validationErrors.licenseBackPicture
         )}
 
         {/* Vehicle Pictures */}

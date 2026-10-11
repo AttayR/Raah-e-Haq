@@ -14,6 +14,7 @@ import type { RegistrationFormData } from '../../../features/auth/registration/r
 import { validateStepField } from '../../../schemas/registrationSchema';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
+import { formatCnicInput, formatIsoDateInput } from '../../../features/auth/registration/inputFormat';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -59,18 +60,6 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
   // Schema errors from Next (T-201) plus the ones found on blur.
   const validationErrors = mergeStepErrors(errors, localErrors);
 
-  const formatCNIC = (value: string): string => {
-    if (!value) return '';
-    const digits = value.replace(/\D/g, '');
-    if (digits.length <= 5) {
-      return digits;
-    } else if (digits.length <= 12) {
-      return `${digits.slice(0, 5)}-${digits.slice(5)}`;
-    } else {
-      return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`;
-    }
-  };
-
   const formatPhoneNumber = (value: string): string => {
     if (!value) return '';
     const digits = value.replace(/\D/g, '');
@@ -88,7 +77,10 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
     let processedValue = value || '';
     
     if (field === 'cnic') {
-      processedValue = formatCNIC(value);
+      processedValue = formatCnicInput(value);
+    } else if (field === 'dateOfBirth') {
+      // Number pad has no "-" on iOS (T-206): type digits, the dashes are inserted.
+      processedValue = formatIsoDateInput(value);
     } else if (field === 'phoneNumber') {
       processedValue = formatPhoneNumber(value);
     }

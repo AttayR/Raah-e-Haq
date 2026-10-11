@@ -1,6 +1,7 @@
 import * as yup from 'yup';
 import { toPkMobileE164 } from '../services/otpService';
 import {
+  INITIAL_REGISTRATION_FORM,
   VEHICLE_TYPE_IDS,
   type RegistrationFormData,
   type RegistrationRole,
@@ -20,6 +21,9 @@ export const MIN_VEHICLE_YEAR = 1980;
 
 /** Next year's models go on sale this year (VehicleYear::max): computed on every call. */
 export const maxVehicleYear = (now: Date = new Date()): number => now.getFullYear() + 1;
+
+/** Oldest accepted year of birth (app-side typo guard; the backend only needs a past date). */
+export const MIN_BIRTH_YEAR = 1900;
 
 const CNIC_FORMAT = /^\d{5}-\d{7}-\d$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -91,7 +95,13 @@ const personalBase = {
     .trim()
     .required('Date of birth is required')
     .test('iso-date', 'Use format YYYY-MM-DD (e.g. 1990-01-15)', (value) => isIsoDate(value))
-    .test('past', 'Date of birth must be in the past', (value) => !isIsoDate(value) || (value as string) < todayIso()),
+    .test('past', 'Date of birth must be in the past', (value) => !isIsoDate(value) || (value as string) < todayIso())
+    // Stricter than the backend (date, before:today) on purpose: catches typos like 0199.
+    .test(
+      'plausible',
+      `Year of birth must be ${MIN_BIRTH_YEAR} or later`,
+      (value) => !isIsoDate(value) || Number((value as string).slice(0, 4)) >= MIN_BIRTH_YEAR,
+    ),
   gender: yup
     .string()
     .required('Gender is required')
@@ -226,6 +236,19 @@ export function validateStepField(
     }
     throw error;
   }
+}
+
+/**
+ * Whether a step field is required for a role (drives the `*` markers, T-206): a field is
+ * required when the schema refuses it empty. Fields the schema doesn't know are optional.
+ */
+export function isStepFieldRequired(
+  step: RegistrationStep,
+  field: keyof RegistrationFormData,
+  role: RegistrationRole,
+): boolean {
+  const empty: RegistrationFormData = { ...INITIAL_REGISTRATION_FORM, role };
+  return validateStepField(step, field, empty) !== undefined;
 }
 
 const STEP_ORDER: RegistrationStep[] = ['personal', 'vehicle', 'documents', 'review'];
