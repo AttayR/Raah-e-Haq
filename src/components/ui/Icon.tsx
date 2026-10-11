@@ -31,17 +31,19 @@ const glyphs = {
   logout: 'logout',
   phone: 'phone',
   pin: 'location-on',
+  promo: 'local-offer',
   power: 'power-settings-new',
   retry: 'refresh',
   rides: 'local-taxi',
   send: 'send',
+  settings: 'settings',
   shield: 'privacy-tip',
   star: 'star',
   theme: 'brightness-6',
+  wallet: 'account-balance-wallet',
   warning: 'error-outline',
   // Added for the passenger Home and booking map (T-604); additive only.
   add: 'add',
-  back: 'arrow-back',
   bookmark: 'bookmark-border',
   clear: 'cancel',
   close: 'close',
@@ -54,7 +56,6 @@ const glyphs = {
   search: 'search',
   starOutline: 'star-outline',
   swap: 'swap-vert',
-  wallet: 'account-balance-wallet',
 } as const;
 
 export type IconName = keyof typeof glyphs;

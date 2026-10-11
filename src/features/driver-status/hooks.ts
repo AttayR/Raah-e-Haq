@@ -5,6 +5,7 @@ import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage } from '../../core/api/errors';
 import { toast } from '../../core/toast';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
+import { askForPushInContext } from '../notifications/push';
 import { DRIVER_STATUS_CODES } from './api';
 import { DRIVER_STATUS_COPY } from './copy';
 import {
@@ -80,8 +81,11 @@ export const useDriverStatusToggle = (): DriverStatusToggle => {
       toast.info(DRIVER_STATUS_COPY.onRideToggleBlocked);
       return false;
     }
-    const action = await dispatch(setDriverStatus(isOnline ? 'offline' : 'online'));
+    const goingOnline = !isOnline;
+    const action = await dispatch(setDriverStatus(goingOnline ? 'online' : 'offline'));
     if (setDriverStatus.fulfilled.match(action)) {
+      // Online is when ride-request pushes matter: ask for permission here (T-502).
+      if (goingOnline) askForPushInContext();
       return true;
     }
     // Skipped by the in-flight guard (condition): nothing was sent, nothing to say.

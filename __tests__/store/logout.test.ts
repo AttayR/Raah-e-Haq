@@ -11,13 +11,13 @@ import { apiClient } from '../../src/services/api';
 import { authStorage } from '../../src/services/authStorage';
 import webSocketService from '../../src/services/webSocketService';
 import locationTrackingService from '../../src/services/locationTrackingService';
-import notificationService from '../../src/services/notificationService';
+import { fetchUnreadCount } from '../../src/features/notifications/slice';
+import { getRegisteredDeviceToken, registerDeviceToken, resetPushDevice } from '../../src/features/notifications/push';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, LOGOUT_REQUEST_TIMEOUT_MS, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { loginUser } from '../../src/store/thunks/apiThunks';
 import { createActiveRide } from '../../src/features/active-ride/slice';
 import type { User } from '../../src/services/api';
-import type { NotificationResource } from '../../src/services/rideService';
 import { makeRide, makeRideRequest } from '../../test-utils/rideFixtures';
 
 const user: User = {
@@ -34,15 +34,8 @@ const user: User = {
 
 const TOKEN = 'test-token-not-real';
 
-const incomingNotification: NotificationResource = {
-  id: 2,
-  user_id: 7,
-  type: 'ride_accepted',
-  title: 'Driver found',
-  message: 'On the way',
-  created_at: '2026-10-08T10:00:00Z',
-  updated_at: '2026-10-08T10:00:00Z',
-};
+/** A fake FCM token (shape only). */
+const DEVICE_TOKEN = 'fake-fcm-token:abcdefghijklmnopqrstuvwxyz';
 
 const activeRide = makeRide({ status: 'accepted' });
 
@@ -104,6 +97,7 @@ const expectFullySignedOut = async (
 let mock: MockAdapter;
 
 beforeEach(async () => {
+  resetPushDevice();
   mock = new MockAdapter(apiClient);
   await authStorage.clear();
   await AsyncStorage.clear();
@@ -231,7 +225,7 @@ describe('logout thunk (T-102)', () => {
     await expectFullySignedOut(store, extra);
   });
 
-  it('resets the location and notification singletons (no data carries over to the next user)', async () => {
+  it('resets location tracking, the notifications slice and the push device (no data carries over to the next user)', async () => {
     const { store } = makeStore();
     await signIn(store);
     mock.onPost('/auth/logout').reply(200, { success: true });
@@ -240,23 +234,59 @@ describe('logout thunk (T-102)', () => {
       lastLocation: { latitude: 31.5, longitude: 74.3, timestamp: 1 },
     });
     expect(locationTrackingService.getLastLocation()).not.toBeNull();
-    const locationListener = jest.fn();
-    locationTrackingService.addLocationListener(locationListener);
-    const countListener = jest.fn();
-    notificationService.addUnreadCountListener(countListener);
     mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 4 } });
-    await notificationService.getUnreadCount();
-    expect(notificationService.getCurrentUnreadCount()).toBe(4);
+    await store.dispatch(fetchUnreadCount());
+    expect(store.getState().notifications.unreadCount).toBe(4);
+    mock.onPost('/devices').reply(200, { success: true, data: { platform: 'ios', last_seen_at: 'now' } });
+    await expect(registerDeviceToken(DEVICE_TOKEN)).resolves.toBe(true);
+    expect(getRegisteredDeviceToken()).toBe(DEVICE_TOKEN);
 
     await store.dispatch(logout());
 
     expect(locationTrackingService.getLastLocation()).toBeNull();
-    expect(notificationService.getCurrentUnreadCount()).toBe(0);
-    // Listeners of the old session are gone: a new event reaches none of them.
-    countListener.mockClear();
-    notificationService.handleIncomingNotification(incomingNotification);
-    expect(countListener).not.toHaveBeenCalled();
-    notificationService.reset();
+    expect(store.getState().notifications.unreadCount).toBe(0);
+    expect(getRegisteredDeviceToken()).toBeNull();
+  });
+
+  it('sends this device\'s push token with /auth/logout so the server unregisters it (T-502)', async () => {
+    const { store, extra } = makeStore();
+    await signIn(store);
+    mock.onPost('/devices').reply(200, { success: true, data: {} });
+    await registerDeviceToken(DEVICE_TOKEN);
+    mock.onPost('/auth/logout').reply(200, { success: true });
+
+    await store.dispatch(logout());
+
+    const revoke = mock.history.post.find((r) => r.url === '/auth/logout');
+    expect(JSON.parse(revoke?.data)).toEqual({ device_token: DEVICE_TOKEN });
+    expect(mock.history.delete).toHaveLength(0);
+    await expectFullySignedOut(store, extra);
+  });
+
+  it('when the revoke fails, DELETE /devices/{token} still unregisters the push device (T-502)', async () => {
+    const { store, extra } = makeStore();
+    await signIn(store);
+    mock.onPost('/devices').reply(200, { success: true, data: {} });
+    await registerDeviceToken(DEVICE_TOKEN);
+    mock.onPost('/auth/logout').reply(500, { success: false, message: 'Server error' });
+    mock.onDelete(`/devices/${encodeURIComponent(DEVICE_TOKEN)}`).reply(200, { success: true, data: null });
+
+    await store.dispatch(logout());
+
+    expect(mock.history.delete.map((r) => r.url)).toEqual([`/devices/${encodeURIComponent(DEVICE_TOKEN)}`]);
+    expect(mock.history.delete[0].headers?.Authorization).toBe(`Bearer ${TOKEN}`);
+    await expectFullySignedOut(store, extra);
+  });
+
+  it('without a registered push token the revoke has no body (nothing to unregister)', async () => {
+    const { store } = makeStore();
+    await signIn(store);
+    resetPushDevice();
+    mock.onPost('/auth/logout').reply(200, { success: true });
+
+    await store.dispatch(logout());
+
+    expect(mock.history.post[0].data).toBeUndefined();
   });
 
   it('a login that finishes after logout stores nothing and stays signed out', async () => {

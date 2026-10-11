@@ -4,6 +4,7 @@ import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
 import { rejectionMessage } from '../../core/api/errors';
 import { toast } from '../../core/toast';
+import { askForPushInContext } from '../notifications/push';
 import { hideModal, showErrorModal } from '../../components/NotificationManager';
 import { classifyRideRequestFailure, type RideRequestFailure } from '../ride-booking/rideRequestFailure';
 import { BOOKING_COPY } from '../ride-booking/copy';
@@ -177,6 +178,8 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
       if (createActiveRide.fulfilled.match(action)) {
         // No success modal (T-311): the ActiveRidePanel shows the searching stage, and a modal
         // left open would cover the driver card once the ride moves on.
+        // The moment push matters (driver assigned / arrived): ask for permission here (T-502).
+        askForPushInContext();
         return action.payload;
       }
       const failure = classifyRideRequestFailure(action.payload, ACTIVE_RIDE_COPY.requestFailedFallback);

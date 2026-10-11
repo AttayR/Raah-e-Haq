@@ -1,4 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import React, { useCallback, useState } from 'react';
 import {
   View,
@@ -10,9 +12,8 @@ import {
   ScrollView,
   ImageBackground,
   RefreshControl,
-  Switch,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import Icon from 'src/assets/icons/index';
 import { RootState } from 'src/store';
 import { BrandColors } from 'src/theme/colors';
@@ -20,15 +21,12 @@ import { useLogout } from '../../hooks/useLogout';
 import { logger } from '../../core/logging/logger';
 
 const PassengerSettingsScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
   const { user } = useSelector(
     (state: RootState) => state.apiAuth,
   );
   const { confirmLogout, isLoggingOut } = useLogout();
   const [refreshing, setRefreshing] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [rideUpdatesEnabled, setRideUpdatesEnabled] = useState(true);
-  const [promoEnabled, setPromoEnabled] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -149,30 +147,16 @@ const PassengerSettingsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Preferences Section */}
+        {/* Preferences Section: push switches live on the preferences screen (BE-11, T-502) */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Preferences</Text>
-          <View style={styles.optionItem}>
+          <TouchableOpacity style={styles.optionItem} onPress={() => navigation.navigate('NotificationPreferences')}>
             <View style={styles.optionInfo}>
               <Icon name="notifications" size={20} color={BrandColors.primary} type={'materialIcon'} />
-              <Text style={styles.optionText}>Push Notifications</Text>
+              <Text style={styles.optionText}>Notification Settings</Text>
             </View>
-            <Switch value={pushEnabled} onValueChange={setPushEnabled} thumbColor={pushEnabled ? BrandColors.primary : '#f3f4f6'} trackColor={{ true: BrandColors.primary, false: '#d1d5db' }} />
-          </View>
-          <View style={[styles.optionItem, styles.borderTop]}>
-            <View style={styles.optionInfo}>
-              <Icon name="local-taxi" size={20} color={BrandColors.primary} type={'materialIcon'} />
-              <Text style={styles.optionText}>Ride Updates</Text>
-            </View>
-            <Switch value={rideUpdatesEnabled} onValueChange={setRideUpdatesEnabled} thumbColor={rideUpdatesEnabled ? BrandColors.primary : '#f3f4f6'} trackColor={{ true: BrandColors.primary, false: '#d1d5db' }} />
-          </View>
-          <View style={[styles.optionItem, styles.borderTop]}>
-            <View style={styles.optionInfo}>
-              <Icon name="local-offer" size={20} color={BrandColors.primary} type={'materialIcon'} />
-              <Text style={styles.optionText}>Promotional Alerts</Text>
-            </View>
-            <Switch value={promoEnabled} onValueChange={setPromoEnabled} thumbColor={promoEnabled ? BrandColors.primary : '#f3f4f6'} trackColor={{ true: BrandColors.primary, false: '#d1d5db' }} />
-          </View>
+            <Icon name="chevron-small-right" size={20} color="#9ca3af" type={'entypoIcon'} />
+          </TouchableOpacity>
         </View>
 
         {/* Support Section */}

@@ -13,9 +13,9 @@ import { space } from '../../theme';
 
 /**
  * Driver Settings tab (T-618 driver side, shared-settings spec). Every row leads somewhere:
- * Edit profile opens DriverProfile, Notifications opens the OS settings (no persisted
- * preferences before BE-11), Sign out is the shared confirm flow (T-102). Help & support and
- * Privacy come back with T-511.
+ * Edit profile opens DriverProfile, Notifications opens the push preferences (BE-11, T-502)
+ * with the phone's own settings as a second row, Sign out is the shared confirm flow (T-102).
+ * Help & support and Privacy come back with T-511.
  */
 const DriverSettingsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
@@ -66,10 +66,17 @@ const DriverSettingsScreen = () => {
           icon="bell"
           title={DRIVER_SETTINGS_COPY.notifications}
           subtitle={DRIVER_SETTINGS_COPY.notificationsSubtitle}
+          onPress={() => navigation.navigate('NotificationPreferences')}
+          testID="driver-settings-notifications"
+        />
+        <ListItem
+          icon="settings"
+          title={DRIVER_SETTINGS_COPY.phoneNotifications}
+          subtitle={DRIVER_SETTINGS_COPY.phoneNotificationsSubtitle}
           onPress={() => {
             Linking.openSettings();
           }}
-          testID="driver-settings-notifications"
+          testID="driver-settings-phone-notifications"
         />
       </ListGroup>
 

@@ -29,15 +29,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       NSLog("[RaaHeHaq] GMSApiKey is not set; add MAPS_KEY to the env file and rebuild")
     }
 
-    // Configure Firebase Messaging
-    UNUserNotificationCenter.current().delegate = self
-    
-    let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-    UNUserNotificationCenter.current().requestAuthorization(
-      options: authOptions,
-      completionHandler: { _, _ in }
-    )
-    
+    // Push permission is asked in context from JS (ride requested, driver online, the
+    // notifications screen), never at launch (T-502, INF-14). Registering for remote
+    // notifications shows no prompt; React Native Firebase owns the notification-center
+    // delegate, so a foreground push reaches JS (in-app toast) without a system banner.
     application.registerForRemoteNotifications()
     
     let delegate = ReactNativeDelegate()
@@ -63,14 +58,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 }
 
-// MARK: - UNUserNotificationCenterDelegate
-extension AppDelegate: UNUserNotificationCenterDelegate {
-  func userNotificationCenter(_ center: UNUserNotificationCenter,
-                              willPresent notification: UNNotification,
-                              withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-    completionHandler([[.alert, .sound]])
-  }
-}
 
 // MARK: - UIScene lifecycle (required on iOS 27, T-115)
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {

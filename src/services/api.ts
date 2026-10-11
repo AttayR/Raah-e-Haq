@@ -697,8 +697,12 @@ class ApiService {
     return response.data;
   }
 
-  async logout(config?: AxiosRequestConfig): Promise<ApiResponse> {
-    const response = await apiClient.post('/auth/logout', undefined, config);
+  /**
+   * POST /auth/logout. `body.device_token` also removes that push device on the server (BE-11),
+   * which works even for a blocked account.
+   */
+  async logout(config?: AxiosRequestConfig, body?: { device_token: string }): Promise<ApiResponse> {
+    const response = await apiClient.post('/auth/logout', body, config);
     return response.data;
   }
 

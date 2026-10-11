@@ -22,14 +22,6 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: jest.fn() }),
 }));
 
-jest.mock('../../src/hooks/useDriverNotifications', () => ({
-  useDriverNotifications: () => ({
-    isInitialized: false,
-    subscribeToDriverNotifications: jest.fn(),
-    unsubscribeFromDriverNotifications: jest.fn(),
-  }),
-}));
-
 const geo = Geolocation as jest.Mocked<typeof Geolocation>;
 type PositionCallback = (position: { coords: Record<string, number>; timestamp: number }) => void;
 

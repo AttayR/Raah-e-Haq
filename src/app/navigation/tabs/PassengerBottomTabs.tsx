@@ -6,6 +6,7 @@ import PassengerHomeScreen from 'src/screens/Passenger/PassengerHomeScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
 import ChatListScreen from '../../../features/chat/screens/ChatListScreen';
 import PassengerSettingsScreen from 'src/screens/Passenger/PassengerSettingsScreen';
+import { unreadBadgeLabel, useUnreadNotificationCount } from '../../../features/notifications/hooks';
 
 export type PassengerTabParamList = {
   Home: undefined;
@@ -21,6 +22,8 @@ const Tab = createBottomTabNavigator<PassengerTabParamList>();
 
 const PassengerBottomTabs = () => {
   const { theme } = useAppTheme();
+  // Unread badge from the notifications slice; useNotificationsSync (role stack) keeps it fresh (T-502).
+  const unreadBadge = unreadBadgeLabel(useUnreadNotificationCount());
 
   return (
     <Tab.Navigator
@@ -59,6 +62,8 @@ const PassengerBottomTabs = () => {
           tabBarIcon: ({ color, size }) => (
             <Icon name="notifications" color={color} size={size} />
           ),
+          tabBarBadge: unreadBadge,
+          tabBarBadgeStyle: { backgroundColor: theme.colors.dangerFill, color: theme.colors.onPrimary },
         }}
       />
       <Tab.Screen

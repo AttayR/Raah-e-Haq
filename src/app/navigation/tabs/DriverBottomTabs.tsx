@@ -13,6 +13,7 @@ import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
 import DriverNotificationsScreen from 'src/screens/Driver/DriverNotificationsScreen';
 import ChatListScreen from '../../../features/chat/screens/ChatListScreen';
 import DriverSettingsScreen from 'src/screens/Driver/DriverSettingsScreen';
+import { unreadBadgeLabel, useUnreadNotificationCount } from '../../../features/notifications/hooks';
 import { RideRequestHost } from '../../../components/driver/RideRequestHost';
 import { rideRequestBottomOffset } from '../../../components/driver/rideRequestLayout';
 
@@ -31,6 +32,8 @@ const DEFAULT_TAB_BAR_HEIGHT = 49;
 
 const DriverBottomTabs = () => {
   const { theme } = useAppTheme();
+  // Unread badge from the notifications slice; useNotificationsSync (role stack) keeps it fresh (T-502).
+  const unreadBadge = unreadBadgeLabel(useUnreadNotificationCount());
   const insets = useSafeAreaInsets();
   // Ride requests (T-408) sit above the tab bar on every tab: its measured height, and the open
   // tab (the Map tab also shows the feed's loading and empty states).
@@ -85,6 +88,8 @@ const DriverBottomTabs = () => {
           component={DriverNotificationsScreen}
           options={{
             tabBarIcon: ({ color, size }) => <Icon name="notifications" color={color} size={size} />,
+            tabBarBadge: unreadBadge,
+            tabBarBadgeStyle: { backgroundColor: theme.colors.dangerFill, color: theme.colors.onPrimary },
           }}
         />
         <Tab.Screen

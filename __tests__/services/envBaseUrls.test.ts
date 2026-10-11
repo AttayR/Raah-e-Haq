@@ -7,7 +7,7 @@ import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { env } from '../../src/config/env';
 import { apiClient } from '../../src/services/api';
-import notificationService from '../../src/services/notificationService';
+import { notificationsApi } from '../../src/features/notifications/api';
 import webSocketService from '../../src/services/webSocketService';
 import locationTrackingService from '../../src/services/locationTrackingService';
 
@@ -45,9 +45,9 @@ describe('backend URLs come from env', () => {
     });
   });
 
-  it('notificationService calls env.API_URL through the axios client', async () => {
+  it('notificationsApi calls env.API_URL through the axios client', async () => {
     mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 2 } });
-    await expect(notificationService.getUnreadCount()).resolves.toBe(2);
+    await expect(notificationsApi.unreadCount()).resolves.toBe(2);
     expectAxiosCall('get', '/notifications/unread-count');
   });
 

@@ -155,11 +155,31 @@ jest.mock('@react-native-firebase/messaging', () => {
   const messaging = Object.assign(jest.fn(() => messagingInstance), {
     AuthorizationStatus: {NOT_DETERMINED: -1, DENIED: 0, AUTHORIZED: 1, PROVISIONAL: 2},
   });
+  // Modular API (v22+): each function takes the instance first and delegates to it, so a
+  // test can stub `getMessaging().getToken` and the modular `getToken` both.
+  const modular = {};
+  [
+    'requestPermission',
+    'hasPermission',
+    'getToken',
+    'deleteToken',
+    'onMessage',
+    'onTokenRefresh',
+    'onNotificationOpenedApp',
+    'getInitialNotification',
+    'setBackgroundMessageHandler',
+    'registerDeviceForRemoteMessages',
+    'subscribeToTopic',
+    'unsubscribeFromTopic',
+  ].forEach(name => {
+    modular[name] = jest.fn((instance, ...args) => instance[name](...args));
+  });
   return {
     __esModule: true,
     default: messaging,
     getMessaging: jest.fn(() => messagingInstance),
     AuthorizationStatus: messaging.AuthorizationStatus,
+    ...modular,
   };
 });
 

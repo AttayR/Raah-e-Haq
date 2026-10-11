@@ -4,6 +4,7 @@ import activeRideReducer from '../features/active-ride/slice';
 import driverStatusReducer from '../features/driver-status/slice';
 import driverRequestsReducer from '../features/driver-requests/slice';
 import driverRideReducer from '../features/driver-ride/slice';
+import notificationsReducer from '../features/notifications/slice';
 import { resetApp } from './actions';
 
 const appReducer = combineReducers({
@@ -15,6 +16,8 @@ const appReducer = combineReducers({
   // The driver's incoming requests from GET /rides/pending (T-403) and the accepted ride (T-404).
   driverRequests: driverRequestsReducer,
   driverRide: driverRideReducer,
+  // The signed-in user's notifications and unread count, both roles (T-502).
+  notifications: notificationsReducer,
 });
 
 /** `resetApp` (dispatched by logout) returns every slice to its initial state. */

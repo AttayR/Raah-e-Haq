@@ -2,7 +2,9 @@ import { createAsyncThunk, type ThunkAction, type UnknownAction } from '@reduxjs
 import { apiService, cancelAllRequests } from '../../services/api';
 import webSocketService from '../../services/webSocketService';
 import locationTrackingService from '../../services/locationTrackingService';
-import notificationService from '../../services/notificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { notificationsApi } from '../../features/notifications/api';
+import { getRegisteredDeviceToken, resetPushDevice } from '../../features/notifications/push';
 import { accountStatusRefused, resetApp } from '../actions';
 import { bumpSessionEpoch, currentSessionEpoch } from '../sessionEpoch';
 import { authStorage } from '../../services/authStorage';
@@ -20,6 +22,9 @@ export interface LogoutOptions {
   allDevices?: boolean;
 }
 
+/** AsyncStorage key of the notification cache older builds kept per user. */
+export const LEGACY_NOTIFICATIONS_CACHE_KEY = 'notifications';
+
 /** An offline logout must not leave the user waiting for the 30 s default timeout. */
 export const LOGOUT_REQUEST_TIMEOUT_MS = 8000;
 
@@ -34,7 +39,8 @@ const step = async (name: string, fn: () => unknown): Promise<void> => {
 
 /**
  * The one logout (AUTH-09). Always ends signed out, even offline or on a 401:
- * 1. ask the server to revoke the token (best effort, needs the token, so it goes first)
+ * 1. ask the server to revoke the token (best effort, needs the token, so it goes first),
+ *    with this device's push token so it is unregistered too (T-502)
  * 2. stop sockets, location tracking and in-flight requests of this user
  * 3. clear the token (Keychain), the cached user, any legacy session keys and cached per-user
  *    data in AsyncStorage
@@ -51,20 +57,38 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
     const allDevices = !!options && options.allDevices === true;
     // Results of requests started before this point belong to the old session (T-103).
     bumpSessionEpoch();
+    // This device's FCM token (T-502): sent with the revoke so the server stops pushing to it.
+    const deviceToken = getRegisteredDeviceToken();
     try {
-      await step('server revoke', () =>
-        allDevices
-          ? apiService.logoutAll({ timeout: LOGOUT_REQUEST_TIMEOUT_MS })
-          : apiService.logout({ timeout: LOGOUT_REQUEST_TIMEOUT_MS }),
-      );
+      await step('server revoke', async () => {
+        if (allDevices) {
+          // logout-all also removes every device of the user (BE-11).
+          await apiService.logoutAll({ timeout: LOGOUT_REQUEST_TIMEOUT_MS });
+          return;
+        }
+        try {
+          await apiService.logout(
+            { timeout: LOGOUT_REQUEST_TIMEOUT_MS },
+            deviceToken ? { device_token: deviceToken } : undefined,
+          );
+        } catch (error) {
+          // The revoke failed (offline, 5xx): still try to drop the push device so this phone
+          // stops getting the old user's notifications, then report the original failure.
+          if (deviceToken) {
+            await notificationsApi.unregisterDevice(deviceToken, LOGOUT_REQUEST_TIMEOUT_MS).catch(() => undefined);
+          }
+          throw error;
+        }
+      });
       await step('close sockets', () => webSocketService.closeAll());
       // Stop and forget the last position and listeners, so user A's location is never
       // posted under user B (T-104).
       await step('reset location tracking', () => locationTrackingService.reset());
-      await step('reset notifications', () => notificationService.reset());
+      await step('reset push device', () => resetPushDevice());
       await step('cancel requests', () => cancelAllRequests());
       await step('clear auth storage', () => apiService.clearAuthData());
-      await step('clear cached notifications', () => notificationService.clearStoredNotifications());
+      // Pre-T-502 builds cached the notification list under this key.
+      await step('clear cached notifications', () => AsyncStorage.removeItem(LEGACY_NOTIFICATIONS_CACHE_KEY));
     } finally {
       dispatch(resetApp());
       await step('purge persisted state', () => extra.purgePersistedState());

@@ -24,14 +24,6 @@ jest.mock('@react-navigation/native', () => ({
 }));
 const mockNavigate = jest.fn();
 
-jest.mock('../../src/hooks/useDriverNotifications', () => ({
-  useDriverNotifications: () => ({
-    isInitialized: false,
-    subscribeToDriverNotifications: jest.fn(),
-    unsubscribeFromDriverNotifications: jest.fn(),
-  }),
-}));
-
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
   default: jest.fn(() => 'light'),
@@ -144,12 +136,15 @@ describe('DriverSettingsScreen', () => {
     expect(screen.queryByText('Help & support')).toBeNull();
   });
 
-  it('Edit profile opens DriverProfile; Notifications opens the OS settings', async () => {
+  it('Edit profile opens DriverProfile; Notifications opens the preferences screen (T-502); phone settings stays a row', async () => {
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
     await renderScreen(DriverSettingsScreen);
     fireEvent.press(screen.getByRole('button', { name: 'Edit profile, Update your personal information' }));
     expect(mockNavigate).toHaveBeenCalledWith('DriverProfile');
     fireEvent.press(screen.getByTestId('driver-settings-notifications'));
+    expect(mockNavigate).toHaveBeenCalledWith('NotificationPreferences');
+    expect(openSettings).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('driver-settings-phone-notifications'));
     expect(openSettings).toHaveBeenCalledTimes(1);
   });
 

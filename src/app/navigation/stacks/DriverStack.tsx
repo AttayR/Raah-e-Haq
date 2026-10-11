@@ -9,6 +9,9 @@ import { useDriverRideRestore } from '../../../features/driver-ride/hooks';
 import { useDriverLocationTracking } from '../../../features/driver-location/hooks';
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
+import { useNotificationsSync } from '../../../features/notifications/hooks';
+import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
+import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -18,6 +21,8 @@ export type DriverStackParamList = {
   DriverMap: undefined;
   /** The driver's current ride (T-405); it reads the ride from the driverRide slice. */
   DriverRide: undefined;
+  /** Settings → Notifications: push preferences (T-502, BE-11). */
+  NotificationPreferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
@@ -29,6 +34,9 @@ const DriverStack = () => {
   useDriverRideRestore();
   // The one foreground location tracker: online or on a ride, app in the foreground (T-402).
   useDriverLocationTracking();
+  // The one unread-count owner and FCM (device registration, foreground toast, tap routing) (T-502).
+  useNotificationsSync();
+  usePushNotifications('driver');
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -54,6 +62,7 @@ const DriverStack = () => {
         component={DriverRideScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     </Stack.Navigator>
   );
 };

@@ -78,5 +78,27 @@ test('an in-progress ride from the server opens the booking route on launch', as
 
   await waitFor(() => expect(screen.getByText('screen:PassengerMap')).toBeTruthy());
   expect(store.getState().activeRide.ride?.id).toBe(55);
-  expect(mock.history.get).toHaveLength(1);
+  // The active ride is read once (the stack also owns the unread-count read, T-502).
+  expect(mock.history.get.filter((r) => r.url === '/rides')).toHaveLength(1);
+});
+
+test('the passenger stack is the one owner of the unread count: one request, and the tab shows the badge (T-502)', async () => {
+  mock.onGet('/rides').reply(200, page([]));
+  mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 3 } });
+  mock.onPost('/devices').reply(200, { success: true, data: { platform: 'ios', last_seen_at: 'now' } });
+  const store = makeStore();
+
+  const screen = renderPassengerApp(store);
+
+  await waitFor(() => expect(store.getState().notifications.unreadCount).toBe(3));
+  expect(mock.history.get.filter((r) => r.url === '/notifications/unread-count')).toHaveLength(1);
+  // Nothing else asks for the list on launch: only the list screen loads it.
+  expect(mock.history.get.filter((r) => r.url === '/notifications')).toHaveLength(0);
+  expect(screen.getByText('3')).toBeTruthy();
+  // Push permission is already granted in the messaging mock: the device is registered.
+  await waitFor(() => expect(mock.history.post.filter((r) => r.url === '/devices')).toHaveLength(1));
+  expect(JSON.parse(mock.history.post.find((r) => r.url === '/devices')?.data)).toEqual({
+    token: 'test-fcm-token',
+    platform: 'ios',
+  });
 });

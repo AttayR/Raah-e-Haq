@@ -14,6 +14,9 @@ import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotific
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
+import { useNotificationsSync } from '../../../features/notifications/hooks';
+import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
+import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
@@ -27,6 +30,8 @@ export type PassengerStackParamList = {
   FavoriteLocations: undefined;
   Wallet: undefined;
   PassengerNotifications: undefined;
+  /** Settings → Notifications: push preferences (T-502, BE-11). */
+  NotificationPreferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
@@ -44,6 +49,9 @@ const PassengerStack = ({ navigation }: Props) => {
     navigation.navigate('Passenger', { screen: 'PassengerMap', initial: false });
   }, [navigation]);
   useRestoreActiveRide(openActiveRide);
+  // The one unread-count owner and FCM (device registration, foreground toast, tap routing) (T-502).
+  useNotificationsSync();
+  usePushNotifications('passenger');
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -57,6 +65,7 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="FavoriteLocations" component={FavoriteLocationsScreen} />
       <Stack.Screen name="Wallet" component={WalletScreen} />
       <Stack.Screen name="PassengerNotifications" component={PassengerNotificationsScreen} />
+      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     </Stack.Navigator>
   );
 };

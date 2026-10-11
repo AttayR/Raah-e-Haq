@@ -12,7 +12,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../app/providers/ReduxProvider';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useDriverDeviceLocation } from '../../features/driver-location/hooks';
-import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { logger } from '../../core/logging/logger';
 import { useDriverStatusToggle } from '../../features/driver-status/hooks';
 import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
@@ -52,17 +51,6 @@ const DriverMapScreen = () => {
   // earlier is applied once it is (otherwise the map stays on the default region).
   const [mapReady, setMapReady] = useState(false);
   
-  // The signed-in driver comes from the API session (apiAuth); the Firebase uid is gone (INF-10).
-  const userId = useAppSelector(state => state.apiAuth.user?.id ?? null);
-  const uid = userId != null ? String(userId) : null;
-  
-  // Use driver notifications
-  const {
-    isInitialized: notificationsInitialized,
-    subscribeToDriverNotifications,
-    unsubscribeFromDriverNotifications,
-  } = useDriverNotifications(uid || undefined);
-
   // The accepted ride (POST /rides/{id}/assign-driver, T-404); its flow lives on DriverRide (T-405).
   const currentRide = useAppSelector(selectDriverActiveRide);
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
@@ -163,17 +151,6 @@ const DriverMapScreen = () => {
   // Online/offline comes from the driverStatus slice (T-401). Ride-request polling (T-403) keys
   // on its `isOnline`; location posting is the driver-wide tracker (useDriverLocationTracking
   // in DriverStack, T-402), not this screen.
-
-  // Subscribe to driver notifications when online
-  useEffect(() => {
-    if (isOnline && uid && notificationsInitialized) {
-      subscribeToDriverNotifications();
-      
-      return () => {
-        unsubscribeFromDriverNotifications();
-      };
-    }
-  }, [isOnline, uid, notificationsInitialized, subscribeToDriverNotifications, unsubscribeFromDriverNotifications]);
 
   const toggleOnlineStatus = () => {
     // Going online needs a location to post; going offline never does.
