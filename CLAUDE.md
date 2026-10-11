@@ -42,6 +42,7 @@ The app is being taken from prototype to production through a tracked fix progra
 - **Branches and pushing.** Work happens on separate branches (see "Branches"); never commit directly on `main`/`master`. Owner decision 2026-10-09: keep `main` up to date by fast-forwarding it to the latest verified phase branch (app: `git push origin <phase-branch>:main`; backend: `git branch -f main fix/production-hardening` then push). Never force-push, never open or merge a PR, never delete remote branches.
 - **Backend remote (2026-10-09).** The backend now lives in the owner's own private repo `AttayR/Raah-e-Haq-backend`, git remote `mine` (`origin` stays the read-only Mubashir-Majeed repo). Push `main` and `fix/production-hardening` to `mine`. B-14 is resolved this way.
 - **Commits.** Commit message: `fix(T-012): <summary>` (or `feat`, `refactor`, `test`, `chore`, `style`). **No `Co-Authored-By` trailer and no mention of Claude or AI in any commit message.**
+- **Drivers (2026-10-11).** Logout sets a driver offline. Drivers must be 18 or older and must provide a driving licence at registration.
 - **Still needs the owner:** anything on Hostinger/hPanel or a server, Google Cloud/Firebase consoles (key rotation), Apple/Google store accounts and signing keys, real payment gateways, spending money, and anything touching production data or real users.
 
 ## Branches
