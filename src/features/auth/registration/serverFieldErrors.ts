@@ -28,7 +28,7 @@ const STEP_FIELDS: ReadonlyArray<{ step: RegistrationStep; fields: readonly Form
     step: 'documents',
     fields: [
       'profilePicture', 'cnicFrontPicture', 'cnicBackPicture', 'driverPicture', 'cnicPicture',
-      'licenseFrontPicture', 'licenseBackPicture', 'vehiclePictures',
+      'licenseFrontPicture', 'vehiclePictures',
     ],
   },
 ];
@@ -76,6 +76,7 @@ const DRIVER_FIELDS: Readonly<Record<string, FormField>> = {
   bank_account_number: 'bankAccountNumber',
   profile_image: 'driverPicture',
   cnic_front_image: 'cnicPicture',
+  cnic_back_image: 'cnicBackPicture',
   license_image: 'licenseFrontPicture',
   vehicle_front_image: 'vehiclePictures',
   vehicle_back_image: 'vehiclePictures',

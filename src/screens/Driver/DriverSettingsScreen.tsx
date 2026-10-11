@@ -13,7 +13,7 @@ import { space } from '../../theme';
 
 /**
  * Driver Settings tab (T-618 driver side, shared-settings spec). Every row leads somewhere:
- * Edit profile opens DriverProfile, Notifications opens the push preferences (BE-11, T-502)
+ * Edit profile opens DriverProfile, Vehicle & documents opens the documents list (T-203), Notifications opens the push preferences (BE-11, T-502)
  * with the phone's own settings as a second row, Sign out is the shared confirm flow (T-102).
  * Help & support and Privacy come back with T-511.
  */
@@ -61,6 +61,13 @@ const DriverSettingsScreen = () => {
           subtitle={DRIVER_SETTINGS_COPY.editProfileSubtitle}
           onPress={() => navigation.navigate('DriverProfile')}
           testID="driver-settings-edit-profile"
+        />
+        <ListItem
+          icon="document"
+          title={DRIVER_SETTINGS_COPY.documents}
+          subtitle={DRIVER_SETTINGS_COPY.documentsSubtitle}
+          onPress={() => navigation.navigate('DriverDocuments')}
+          testID="driver-settings-documents"
         />
         <ListItem
           icon="bell"

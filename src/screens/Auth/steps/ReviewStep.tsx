@@ -8,7 +8,11 @@ import {
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { vehicleTypeLabel } from '../../../features/auth/registration/registrationForm';
+import {
+  VEHICLE_PHOTO_SLOTS,
+  filledVehiclePhotoCount,
+  vehicleTypeLabel,
+} from '../../../features/auth/registration/registrationForm';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -33,6 +37,7 @@ interface ReviewData {
   // Documents
   driverPicture: string;
   cnicPicture: string;
+  cnicBackPicture: string;
   licenseFrontPicture: string;
   vehiclePictures: string[];
   
@@ -134,6 +139,8 @@ export default function ReviewStep({ data }: ReviewStepProps) {
 
   const renderDocuments = () => {
     if (data.role === 'passenger') return null;
+    const vehicleCount = filledVehiclePhotoCount(data.vehiclePictures);
+    const vehicleComplete = vehicleCount >= VEHICLE_PHOTO_SLOTS.length;
 
     return (
       <View style={styles.section}>
@@ -163,7 +170,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
           </View>
 
           <View style={styles.documentItem}>
-            <Text style={styles.documentLabel}>CNIC Picture</Text>
+            <Text style={styles.documentLabel}>CNIC Front</Text>
             <View style={styles.documentPreview}>
               {data.cnicPicture ? (
                 <Image source={{ uri: data.cnicPicture }} style={styles.documentImage} />
@@ -182,19 +189,42 @@ export default function ReviewStep({ data }: ReviewStepProps) {
             </View>
           </View>
 
+          <View style={styles.documentItem}>
+            <Text style={styles.documentLabel}>CNIC Back</Text>
+            <View style={styles.documentPreview}>
+              {data.cnicBackPicture ? (
+                <Image source={{ uri: data.cnicBackPicture }} style={styles.documentImage} />
+              ) : (
+                <View style={styles.documentPlaceholder}>
+                  <Icon name="credit-card" size={24} color="#9ca3af" />
+                </View>
+              )}
+              <View style={styles.documentStatus}>
+                <Icon
+                  name={data.cnicBackPicture ? 'check-circle' : 'error'}
+                  size={16}
+                  color={data.cnicBackPicture ? '#10b981' : '#ef4444'}
+                />
+              </View>
+            </View>
+          </View>
+
           <View style={styles.documentItemFull}>
             <Text style={styles.documentLabel}>Vehicle Pictures</Text>
             <View style={styles.vehiclePicturesPreview}>
-              {(data.vehiclePictures || []).length > 0 ? (
+              {vehicleCount > 0 ? (
                 <View style={styles.vehiclePicturesGrid}>
-                  {(data.vehiclePictures || []).slice(0, 4).map((uri, index) => (
-                    <Image key={index} source={{ uri }} style={styles.vehiclePicturePreview} />
-                  ))}
-                  {(data.vehiclePictures || []).length > 4 && (
-                    <View style={styles.morePicturesIndicator}>
-                      <Text style={styles.morePicturesText}>+{(data.vehiclePictures || []).length - 4}</Text>
-                    </View>
-                  )}
+                  {/* One preview per slot, in slot order; an empty slot shows a placeholder. */}
+                  {VEHICLE_PHOTO_SLOTS.map(({ label }, index) => {
+                    const uri = data.vehiclePictures?.[index];
+                    return uri ? (
+                      <Image key={label} source={{ uri }} style={styles.vehiclePicturePreview} accessibilityLabel={label} />
+                    ) : (
+                      <View key={label} style={styles.morePicturesIndicator} accessibilityLabel={label}>
+                        <Icon name="add-a-photo" size={16} color="#9ca3af" />
+                      </View>
+                    );
+                  })}
                 </View>
               ) : (
                 <View style={styles.noPicturesPlaceholder}>
@@ -204,14 +234,14 @@ export default function ReviewStep({ data }: ReviewStepProps) {
               )}
               <View style={styles.documentStatus}>
                 <Icon 
-                  name={(data.vehiclePictures || []).length >= 4 ? 'check-circle' : 'error'} 
+                  name={vehicleComplete ? 'check-circle' : 'error'} 
                   size={16} 
-                  color={(data.vehiclePictures || []).length >= 4 ? '#10b981' : '#ef4444'} 
+                  color={vehicleComplete ? '#10b981' : '#ef4444'} 
                 />
               </View>
             </View>
             <Text style={styles.vehiclePicturesCount}>
-              {(data.vehiclePictures || []).length}/6 pictures uploaded
+              {vehicleCount}/{VEHICLE_PHOTO_SLOTS.length} pictures uploaded
             </Text>
           </View>
         </View>
@@ -266,6 +296,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
         data.licenseNumber || '',
         data.driverPicture || '',
         data.cnicPicture || '',
+        data.cnicBackPicture || '',
         data.licenseFrontPicture || ''
       );
     }
@@ -518,11 +549,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  morePicturesText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
   },
   noPicturesPlaceholder: {
     flexDirection: 'row',

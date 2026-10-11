@@ -420,7 +420,50 @@ export type RegisterWithImagesRequest = RegisterRequest & {
   passenger_emergency_contact_relation?: string;
   /** Driver: the driving licence front picture (required for drivers, T-207/BE-68). */
   license_image?: string;
+  /** Driver registration images (T-203, BE-66: each becomes a driver document under review). */
+  profile_image?: string;
+  cnic_front_image?: string;
+  cnic_back_image?: string;
+  vehicle_front_image?: string;
+  vehicle_back_image?: string;
+  vehicle_left_image?: string;
+  vehicle_right_image?: string;
 };
+
+/** Driver image fields of POST /auth/register, in upload order (T-203). */
+export const DRIVER_REGISTRATION_IMAGE_FIELDS = [
+  'profile_image',
+  'cnic_front_image',
+  'cnic_back_image',
+  'license_image',
+  'vehicle_front_image',
+  'vehicle_back_image',
+  'vehicle_left_image',
+  'vehicle_right_image',
+] as const;
+
+/** A React Native multipart file part: the local URI with a name and MIME type. */
+export interface MultipartFile {
+  uri: string;
+  name: string;
+  type: string;
+}
+
+/** The server takes jpeg/png/jpg/gif only (BE-66/BE-68); anything else is labelled JPEG. */
+const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  png: 'image/png',
+  gif: 'image/gif',
+};
+
+/** A multipart file part for a local image URI (undefined when there is no image). */
+export function toMultipartFile(uri: string | undefined, fallbackName: string): MultipartFile | undefined {
+  if (!uri) return undefined;
+  // React Native needs the raw URI, including file:// on Android.
+  const lastSlash = uri.lastIndexOf('/');
+  const name = (lastSlash >= 0 ? uri.substring(lastSlash + 1) : '') || fallbackName;
+  const extension = name.includes('.') ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : '';
+  return { uri, name, type: IMAGE_MIME_BY_EXTENSION[extension] ?? 'image/jpeg' };
+}
 
 export interface SendOtpRequest {
   phone: string;
@@ -518,27 +561,6 @@ class ApiService {
     logger.debug('🌐 API Service - Registering user with images...');
     logger.debug('📡 Endpoint: POST /auth/register (multipart/form-data)');
 
-    // Helper to build a RN-compatible file object from a URI
-    const buildFile = (uri?: string, fallbackName?: string) => {
-      if (!uri) return undefined;
-      // React Native requires the raw URI, including file:// on Android
-      const normalizedUri = uri;
-      const filenameFromUri = () => {
-        try {
-          const lastSlash = normalizedUri.lastIndexOf('/');
-          const name = lastSlash >= 0 ? normalizedUri.substring(lastSlash + 1) : fallbackName || 'upload.jpg';
-          return name || 'upload.jpg';
-        } catch {
-          return fallbackName || 'upload.jpg';
-        }
-      };
-      const inferredName = filenameFromUri();
-      // Best-effort type inference
-      const lower = inferredName.toLowerCase();
-      const type = lower.endsWith('.png') ? 'image/png' : lower.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-      return { uri: normalizedUri, name: inferredName, type } as any;
-    };
-
     try {
       const formData = new FormData();
       formData.append('name', userData.name);
@@ -569,17 +591,20 @@ class ApiService {
         if (userData.bank_name) formData.append('bank_name', userData.bank_name);
         if (userData.bank_branch) formData.append('bank_branch', userData.bank_branch);
         if (userData.bank_account_number) formData.append('bank_account_number', userData.bank_account_number);
-        const licenseImage = buildFile(userData.license_image, 'license_front.jpg');
-        if (licenseImage) formData.append('license_image', licenseImage);
+        // Every image the driver form collected (T-203); each one becomes a document under review.
+        DRIVER_REGISTRATION_IMAGE_FIELDS.forEach((field) => {
+          const file = toMultipartFile(userData[field], `${field}.jpg`);
+          if (file) formData.append(field, file);
+        });
       }
 
       // Attach passenger CNIC images when applicable
       if (userData.user_type === 'passenger') {
-        const front = buildFile(userData.passenger_cnic_front_image, 'cnic_front.jpg');
-        const back = buildFile(userData.passenger_cnic_back_image, 'cnic_back.jpg');
+        const front = toMultipartFile(userData.passenger_cnic_front_image, 'cnic_front.jpg');
+        const back = toMultipartFile(userData.passenger_cnic_back_image, 'cnic_back.jpg');
         if (front) formData.append('passenger_cnic_front_image', front);
         if (back) formData.append('passenger_cnic_back_image', back);
-        const profile = buildFile(userData.passenger_profile_image, 'profile.jpg');
+        const profile = toMultipartFile(userData.passenger_profile_image, 'profile.jpg');
         if (profile) formData.append('passenger_profile_image', profile);
         formData.append('passenger_emergency_contact', userData.passenger_emergency_contact || userData.emergency_contact);
         if (userData.passenger_emergency_contact_name) formData.append('passenger_emergency_contact_name', userData.passenger_emergency_contact_name);

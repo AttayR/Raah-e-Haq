@@ -57,6 +57,7 @@ const validDriver: RegistrationFormData = {
   bankAccountNumber: '0000000000',
   driverPicture: 'file:///driver.jpg',
   cnicPicture: 'file:///cnic.jpg',
+  cnicBackPicture: 'file:///cnic-back.jpg',
   licenseFrontPicture: 'file:///license-front.jpg',
   vehiclePictures: ['file:///1.jpg', 'file:///2.jpg', 'file:///3.jpg', 'file:///4.jpg'],
 };
@@ -187,6 +188,24 @@ describe('documents step and submit', () => {
     });
   });
 
+  it('T-203: exactly 4 vehicle pictures (front, back, left, right); the driver CNIC back is required', () => {
+    const five = ['1', '2', '3', '4', '5'].map((n) => `file:///${n}.jpg`);
+    expect(validateStep('documents', { ...validDriver, vehiclePictures: five }).vehiclePictures).toBe(
+      'Upload 4 vehicle pictures: front, back, left and right',
+    );
+    // Cleared slots hold '': four entries with one empty is still missing a side.
+    expect(
+      validateStep('documents', { ...validDriver, vehiclePictures: ['file:///1.jpg', '', 'file:///3.jpg', 'file:///4.jpg'] })
+        .vehiclePictures,
+    ).toBe('Please upload at least 4 vehicle pictures (front, back, left, right)');
+    expect(validateStep('documents', { ...validDriver, cnicBackPicture: '' })).toEqual({
+      cnicBackPicture: 'CNIC back picture is required',
+    });
+    expect(isStepFieldRequired('documents', 'cnicBackPicture', 'driver')).toBe(true);
+    // Passengers keep it optional.
+    expect(isStepFieldRequired('documents', 'cnicBackPicture', 'passenger')).toBe(false);
+  });
+
   it('firstInvalidStep sends the user back to the first step with errors', () => {
     expect(firstInvalidStep(validPassenger)).toBeNull();
     expect(firstInvalidStep(validDriver)).toBeNull();
@@ -219,7 +238,6 @@ describe('T-206: date of birth and required markers', () => {
     expect(isStepFieldRequired('documents', 'vehiclePictures', 'driver')).toBe(true);
     // T-207: the licence front picture is required for drivers (license_image); the back stays optional.
     expect(isStepFieldRequired('documents', 'licenseFrontPicture', 'driver')).toBe(true);
-    expect(isStepFieldRequired('documents', 'licenseBackPicture', 'driver')).toBe(false);
     expect(isStepFieldRequired('personal', 'emergencyContactName', 'passenger')).toBe(true);
     expect(isStepFieldRequired('personal', 'emergencyContactName', 'driver')).toBe(false);
   });
@@ -278,7 +296,6 @@ describe('T-207: drivers are 18+ and hold a driving licence', () => {
     expect(validateStep('documents', { ...validDriver, licenseFrontPicture: '' })).toEqual({
       licenseFrontPicture: 'License front picture is required',
     });
-    expect(validateStep('documents', { ...validDriver, licenseBackPicture: '' })).toEqual({});
   });
 
   it('the required * follows the schema: drivers yes, passengers no', () => {

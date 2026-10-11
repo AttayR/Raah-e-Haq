@@ -1,6 +1,6 @@
 import type { RegisterWithImagesRequest } from '../../../services/api';
 import { toPkMobileE164 } from '../../../services/otpService';
-import type { RegistrationFormData } from './registrationForm';
+import { VEHICLE_PHOTO_SLOTS, type RegistrationFormData } from './registrationForm';
 
 /**
  * Payments are cash only for now (owner decision B-08), so the form does not ask. The backend
@@ -8,6 +8,36 @@ import type { RegistrationFormData } from './registrationForm';
  * preferred_payment), so it is always sent as cash.
  */
 const PREFERRED_PAYMENT = 'cash';
+
+type DriverImages = Pick<
+  RegisterWithImagesRequest,
+  | 'profile_image'
+  | 'cnic_front_image'
+  | 'cnic_back_image'
+  | 'license_image'
+  | 'vehicle_front_image'
+  | 'vehicle_back_image'
+  | 'vehicle_left_image'
+  | 'vehicle_right_image'
+>;
+
+/** Only the images that were picked: an empty slot is left out, never sent as "". */
+const optionalImages = (images: Record<keyof DriverImages, string | undefined>): DriverImages => {
+  const picked: DriverImages = {};
+  (Object.keys(images) as Array<keyof DriverImages>).forEach((field) => {
+    const uri = images[field];
+    if (uri) {
+      picked[field] = uri;
+    }
+  });
+  return picked;
+};
+
+/** Vehicle photos by slot index (VEHICLE_PHOTO_SLOTS order); an empty slot is skipped later. */
+const vehicleImages = (pictures: readonly string[]) => {
+  const [front, back, left, right] = VEHICLE_PHOTO_SLOTS.map((_, index) => pictures[index]);
+  return { vehicle_front_image: front, vehicle_back_image: back, vehicle_left_image: left, vehicle_right_image: right };
+};
 
 /**
  * POST /auth/register body from a form that passed every step's schema (T-201). The phone is
@@ -53,8 +83,15 @@ export function buildRegistrationRequest(form: RegistrationFormData): RegisterWi
     vehicle_type: form.vehicleType,
     // The driving licence number from its own input (T-207); never the vehicle number.
     license_number: form.licenseNumber.trim(),
-    // The licence front picture (local file URI), uploaded as the license_image file.
-    license_image: form.licenseFrontPicture,
+    // Every driver image the form collects, as local file URIs (T-203). Each becomes a driver
+    // document under review (BE-66).
+    ...optionalImages({
+      profile_image: form.driverPicture,
+      cnic_front_image: form.cnicPicture,
+      cnic_back_image: form.cnicBackPicture,
+      license_image: form.licenseFrontPicture,
+      ...vehicleImages(form.vehiclePictures),
+    }),
     preferred_payment: PREFERRED_PAYMENT,
     license_type: form.licenseType,
     license_expiry_date: form.licenseExpiryDate,

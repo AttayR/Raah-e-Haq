@@ -1,8 +1,8 @@
 /**
  * T-106 / AUTH-01, DRV-12: the account-status screen reads apiAuth (never Firebase), shows
  * role- and status-specific copy, "Check Status" calls GET /auth/profile and routes home once
- * active, pending drivers see their rejected documents and can re-upload them, and Sign Out
- * uses the single logout (T-102).
+ * active, pending drivers see their documents (GET /driver/documents, T-203) and can upload a
+ * missing or rejected one, and Sign Out uses the single logout (T-102).
  */
 import React from 'react';
 import { Alert } from 'react-native';
@@ -17,7 +17,9 @@ import { authStorage } from '../../src/services/authStorage';
 import { rootReducer } from '../../src/store/rootReducer';
 import { initializeAuth } from '../../src/store/thunks/apiThunks';
 import { LOGOUT_CONFIRM_TITLE } from '../../src/hooks/useLogout';
-import { ACCOUNT_STATUS_COPY, ACCOUNT_STATUS_VARIANTS, fillCopy, REJECTED_DOCUMENTS_COPY } from '../../src/features/auth/copy/accountStatus';
+import { ACCOUNT_STATUS_COPY, ACCOUNT_STATUS_VARIANTS } from '../../src/features/auth/copy/accountStatus';
+import { DRIVER_DOCUMENTS_COPY } from '../../src/features/driverDocuments/copy';
+import { DRIVER_DOCUMENT_TYPES } from '../../src/features/driverDocuments/types';
 import AuthFlow from '../../src/app/navigation/AuthFlow';
 import { toast } from '../../src/core/toast';
 import type { User } from '../../src/services/api';
@@ -64,10 +66,35 @@ const renderAs = async (user: User, profile: [number, unknown] = [200, { success
   return { store, screen };
 };
 
-const documentsBody = (documents: unknown[], vehicles: unknown[] = []) => ({
+type DocOverride = { status: string; can_upload?: boolean; rejection_reason?: string | null };
+
+/** A GET /driver/documents body: all eight types, `missing` unless overridden. */
+const documentsBody = (overrides: Record<string, DocOverride> = {}, allApproved = false) => ({
   success: true,
-  data: { documents, vehicles, expires_in: 600 },
+  data: {
+    documents: DRIVER_DOCUMENT_TYPES.map((type, index) => {
+      const o = overrides[type] ?? { status: 'missing' };
+      return {
+        id: o.status === 'missing' ? null : index + 1,
+        type,
+        required: ['profile', 'cnic_front', 'cnic_back', 'license'].includes(type),
+        status: o.status,
+        rejection_reason: o.rejection_reason ?? null,
+        can_upload: o.can_upload ?? (o.status === 'missing' || o.status === 'rejected'),
+        url: o.status === 'missing' ? null : `https://signed.example.test/${type}`,
+        updated_at: null,
+      };
+    }),
+    required_types: ['profile', 'cnic_front', 'cnic_back', 'license'],
+    all_required_approved: allApproved,
+    expires_in: 600,
+  },
 });
+
+const pickPhoto = (asset: Record<string, unknown>) =>
+  (launchImageLibrary as jest.Mock).mockResolvedValueOnce({ assets: [asset] });
+
+const JPEG = { uri: 'file:///tmp/licence.jpg', type: 'image/jpeg', fileName: 'licence.jpg', fileSize: 120000 };
 
 beforeEach(async () => {
   __resetUnauthorizedStateForTests();
@@ -82,20 +109,34 @@ afterEach(() => {
 });
 
 describe('AccountStatusScreen', () => {
-  it('pending driver: driver copy, rejected documents with reasons, and Check Status routes in when approved', async () => {
-    mock.onGet('/profile/documents').reply(
+  it('pending driver: driver copy, every document with its status and reason, and Check Status routes in when approved', async () => {
+    mock.onGet('/driver/documents').reply(
       200,
-      documentsBody([
-        { id: 1, document_type: 'cnic_front', verification_status: 'rejected', rejection_reason: 'Photo is blurry' },
-        { id: 2, document_type: 'cnic_back', verification_status: 'approved', rejection_reason: null },
-      ]),
+      documentsBody({
+        profile: { status: 'approved' },
+        cnic_front: { status: 'rejected', rejection_reason: 'Photo is blurry' },
+        license: { status: 'pending' },
+      }),
     );
     const { screen } = await renderAs(base);
 
     expect(screen.getByText(ACCOUNT_STATUS_VARIANTS.pendingDriver.title)).toBeTruthy();
-    expect(await screen.findByText('Photo is blurry')).toBeTruthy();
-    expect(screen.getByText('CNIC (front)')).toBeTruthy();
-    expect(screen.queryByText('CNIC (back)')).toBeNull();
+    expect(await screen.findByText(`${DRIVER_DOCUMENTS_COPY.reasonLabel} Photo is blurry`)).toBeTruthy();
+    expect(screen.getByText(DRIVER_DOCUMENTS_COPY.types.cnic_front)).toBeTruthy();
+    expect(screen.getByText(DRIVER_DOCUMENTS_COPY.types.vehicle_right)).toBeTruthy();
+    expect(screen.getByTestId('driver-document-profile-status')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.status.approved);
+    expect(screen.getByTestId('driver-document-license-status')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.status.pending);
+    expect(screen.getByTestId('driver-document-cnic_back-status')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.status.missing);
+    // Upload only where the server allows it: rejected (Re-upload) and missing (Upload).
+    expect(screen.getByLabelText(`${DRIVER_DOCUMENTS_COPY.reupload} ${DRIVER_DOCUMENTS_COPY.types.cnic_front}`)).toBeTruthy();
+    expect(screen.getByLabelText(`${DRIVER_DOCUMENTS_COPY.upload} ${DRIVER_DOCUMENTS_COPY.types.cnic_back}`)).toBeTruthy();
+    expect(screen.queryByTestId('driver-document-profile-upload')).toBeNull();
+    expect(screen.queryByTestId('driver-document-license-upload')).toBeNull();
+    // The signed URLs are never rendered or kept.
+    expect(JSON.stringify(screen.toJSON())).not.toContain('signed.example.test');
+    // Check Status and Sign Out come before the list in the tree (rendered above it).
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('account-status-sign-out')).toBeLessThan(tree.indexOf('driver-documents'));
 
     mock.onGet('/auth/profile').replyOnce(200, { success: true, data: { user: { ...base, status: 'active' } } });
     fireEvent.press(screen.getByTestId('account-status-check'));
@@ -103,7 +144,7 @@ describe('AccountStatusScreen', () => {
     expect(await screen.findByText('route:home')).toBeTruthy();
     expect(mock.history.get.filter((r) => r.url === '/auth/profile')).toHaveLength(2);
     // Approved: the screen is leaving, so the documents list is not fetched again.
-    expect(mock.history.get.filter((r) => r.url === '/profile/documents')).toHaveLength(1);
+    expect(mock.history.get.filter((r) => r.url === '/driver/documents')).toHaveLength(1);
     screen.unmount();
   });
 
@@ -112,8 +153,8 @@ describe('AccountStatusScreen', () => {
     const info = jest.spyOn(toast, 'info');
     const { screen } = await renderAs(passenger);
     expect(screen.getByText(ACCOUNT_STATUS_VARIANTS.pendingPassenger.title)).toBeTruthy();
-    expect(screen.queryByTestId('rejected-documents')).toBeNull();
-    expect(mock.history.get.some((r) => r.url === '/profile/documents')).toBe(false);
+    expect(screen.queryByTestId('driver-documents')).toBeNull();
+    expect(mock.history.get.some((r) => r.url === '/driver/documents')).toBe(false);
 
     mock.onGet('/auth/profile').replyOnce(200, { success: true, data: { user: passenger } });
     fireEvent.press(screen.getByTestId('account-status-check'));
@@ -122,22 +163,16 @@ describe('AccountStatusScreen', () => {
     screen.unmount();
   });
 
-  it('many rejected vehicles: actions stay above the list, which is collapsed with "Show N more"', async () => {
-    const vehicles = [1, 2, 3, 4, 5].map((id) => ({ id, verification_status: 'rejected', rejection_reason: `Reason ${id}` }));
-    mock.onGet('/profile/documents').reply(200, documentsBody([], vehicles));
+  it('documents load error shows a retry that loads the list again', async () => {
+    mock.onGet('/driver/documents').replyOnce(500, { success: false, message: 'boom' });
+    mock.onGet('/driver/documents').reply(200, documentsBody({}, false));
     const { screen } = await renderAs(base);
 
-    expect(await screen.findByText('Vehicle #1')).toBeTruthy();
-    expect(screen.getByText('Vehicle #3')).toBeTruthy();
-    expect(screen.queryByText('Vehicle #4')).toBeNull();
-    expect(screen.getByText(fillCopy(REJECTED_DOCUMENTS_COPY.showMore, { count: 2 }))).toBeTruthy();
-    // Check Status and Sign Out come before the list in the tree (rendered above it).
-    const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('account-status-sign-out')).toBeLessThan(tree.indexOf('rejected-documents'));
-
-    fireEvent.press(screen.getByTestId('rejected-documents-toggle'));
-    expect(screen.getByText('Vehicle #5')).toBeTruthy();
-    expect(screen.getByText(REJECTED_DOCUMENTS_COPY.showFewer)).toBeTruthy();
+    expect(await screen.findByTestId('driver-documents-error')).toBeTruthy();
+    expect(screen.getByText(DRIVER_DOCUMENTS_COPY.loadFailed)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('driver-documents-retry'));
+    expect(await screen.findByTestId('driver-document-profile')).toBeTruthy();
+    expect(screen.getByTestId('driver-documents-summary')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.intro);
     screen.unmount();
   });
 
@@ -206,71 +241,107 @@ describe('AccountStatusScreen', () => {
     screen.unmount();
   });
 
-  it('re-uploads a rejected document as multipart; a 409 refreshes the list', async () => {
-    mock
-      .onGet('/profile/documents')
-      .replyOnce(200, documentsBody([{ id: 4, document_type: 'driving_license', verification_status: 'rejected', rejection_reason: 'Cut off' }]))
-      .onGet('/profile/documents')
-      .reply(200, documentsBody([{ id: 4, document_type: 'driving_license', verification_status: 'pending', rejection_reason: null }]));
-    mock.onPost('/profile/documents/4').replyOnce(409, { success: false, message: 'Only a rejected item can be re-uploaded.', code: 'DOCUMENT_NOT_REJECTED' });
-    (launchImageLibrary as jest.Mock).mockResolvedValueOnce({
-      assets: [{ uri: 'file:///tmp/licence.jpg', type: 'image/jpeg', fileName: 'licence.jpg', fileSize: 120000 }],
-    });
+  it('uploads a rejected document as multipart `document` and shows the list from the response', async () => {
+    mock.onGet('/driver/documents').replyOnce(200, documentsBody({ license: { status: 'rejected', rejection_reason: 'Cut off' } }));
+    mock.onPost('/driver/documents/license').replyOnce(200, documentsBody({ license: { status: 'pending' } }));
+    const success = jest.spyOn(toast, 'success');
+    const append = jest.spyOn(FormData.prototype, 'append');
+    pickPhoto(JPEG);
 
     const { screen } = await renderAs(base);
-    fireEvent.press(await screen.findByTestId('reupload-document-4'));
+    const button = await screen.findByTestId('driver-document-license-upload');
+    await act(async () => {
+      fireEvent.press(button);
+    });
 
-    expect(await screen.findByTestId('rejected-documents-empty')).toBeTruthy();
-    const post = mock.history.post.find((r) => r.url === '/profile/documents/4');
+    await waitFor(() =>
+      expect(screen.getByTestId('driver-document-license-status')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.status.pending),
+    );
+    expect(screen.queryByTestId('driver-document-license-upload')).toBeNull();
+    const post = mock.history.post.find((r) => r.url === '/driver/documents/license');
     expect(post?.data).toBeInstanceOf(FormData);
-    expect(mock.history.get.filter((r) => r.url === '/profile/documents')).toHaveLength(2);
+    // Jest has Node's FormData, which cannot hold an RN file part: check what was appended.
+    expect(append.mock.calls).toEqual([['document', { uri: JPEG.uri, name: JPEG.fileName, type: JPEG.type }]]);
+    expect(success).toHaveBeenCalledWith(DRIVER_DOCUMENTS_COPY.uploaded);
+    // The POST answer is the new list: no extra GET.
+    expect(mock.history.get.filter((r) => r.url === '/driver/documents')).toHaveLength(1);
     screen.unmount();
   });
 
-  it('a rejected vehicle: pick the parts, then send them together', async () => {
+  it('409 DOCUMENT_NOT_REPLACEABLE refreshes the list', async () => {
     mock
-      .onGet('/profile/documents')
-      .replyOnce(200, documentsBody([], [{ id: 9, verification_status: 'rejected', rejection_reason: 'Plate not visible' }]))
-      .onGet('/profile/documents')
-      .reply(200, documentsBody([], [{ id: 9, verification_status: 'pending', rejection_reason: null }]));
-    mock.onPost('/profile/vehicles/9/documents').replyOnce(200, documentsBody([], []));
-    (launchImageLibrary as jest.Mock).mockResolvedValueOnce({
-      assets: [{ uri: 'file:///tmp/front.png', type: 'image/png', fileSize: 2000 }],
+      .onGet('/driver/documents')
+      .replyOnce(200, documentsBody({ license: { status: 'rejected', rejection_reason: 'Cut off' } }))
+      .onGet('/driver/documents')
+      .reply(200, documentsBody({ license: { status: 'pending' } }));
+    mock.onPost('/driver/documents/license').replyOnce(409, {
+      success: false,
+      message: 'Only a missing or rejected item can be uploaded.',
+      error: { code: 'DOCUMENT_NOT_REPLACEABLE' },
     });
+    const info = jest.spyOn(toast, 'info');
+    pickPhoto(JPEG);
 
     const { screen } = await renderAs(base);
-    expect(await screen.findByText('Plate not visible')).toBeTruthy();
-    expect(screen.getByText('Vehicle #1')).toBeTruthy();
-    // Collapsed until the driver chooses to replace photos.
-    expect(screen.queryByTestId('vehicle-9-front_image')).toBeNull();
-    fireEvent.press(screen.getByTestId('vehicle-9-open'));
-    const front = screen.getByTestId('vehicle-9-front_image');
+    const button = await screen.findByTestId('driver-document-license-upload');
     await act(async () => {
-      fireEvent.press(front);
+      fireEvent.press(button);
     });
-    expect(await screen.findByText(REJECTED_DOCUMENTS_COPY.selected)).toBeTruthy();
-    fireEvent.press(screen.getByTestId('vehicle-9-submit'));
 
-    expect(await screen.findByTestId('rejected-documents-empty')).toBeTruthy();
-    expect(mock.history.post.filter((r) => r.url === '/profile/vehicles/9/documents')).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.getByTestId('driver-document-license-status')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.status.pending),
+    );
+    expect(info).toHaveBeenCalledWith(DRIVER_DOCUMENTS_COPY.alreadyChanged);
+    expect(mock.history.get.filter((r) => r.url === '/driver/documents')).toHaveLength(2);
+    screen.unmount();
+  });
+
+  it('422 shows the server rule for the document; 409 NO_VEHICLE and 429 get their own message', async () => {
+    mock.onGet('/driver/documents').reply(200, documentsBody());
+    mock
+      .onPost('/driver/documents/cnic_back')
+      .replyOnce(422, {
+        success: false,
+        message: 'The given data was invalid.',
+        errors: { document: ['The document must not be greater than 5120 kilobytes.'] },
+      })
+      .onPost('/driver/documents/vehicle_front')
+      .replyOnce(409, { success: false, message: 'Add a vehicle first.', error: { code: 'NO_VEHICLE' } })
+      .onPost('/driver/documents/profile')
+      .replyOnce(429, { success: false, message: 'Too Many Attempts.' });
+    const error = jest.spyOn(toast, 'error');
+
+    const { screen } = await renderAs(base);
+    await screen.findByTestId('driver-document-cnic_back-upload');
+    for (const type of ['cnic_back', 'vehicle_front', 'profile']) {
+      pickPhoto(JPEG);
+      await act(async () => {
+        fireEvent.press(screen.getByTestId(`driver-document-${type}-upload`));
+      });
+    }
+
+    await waitFor(() => expect(error).toHaveBeenCalledTimes(3));
+    expect(error).toHaveBeenNthCalledWith(1, 'The document must not be greater than 5120 kilobytes.');
+    expect(error).toHaveBeenNthCalledWith(2, DRIVER_DOCUMENTS_COPY.noVehicle);
+    expect(error).toHaveBeenNthCalledWith(3, DRIVER_DOCUMENTS_COPY.rateLimited);
+    // Nothing changed on the server: the list is not reloaded, the uploads stay available.
+    expect(mock.history.get.filter((r) => r.url === '/driver/documents')).toHaveLength(1);
+    expect(screen.getByTestId('driver-document-cnic_back-upload')).toBeTruthy();
     screen.unmount();
   });
 
   it('a photo over 5 MB is refused before any upload', async () => {
-    mock.onGet('/profile/documents').reply(
-      200,
-      documentsBody([{ id: 5, document_type: 'cnic_back', verification_status: 'rejected', rejection_reason: 'Glare' }]),
-    );
-    (launchImageLibrary as jest.Mock).mockResolvedValueOnce({
-      assets: [{ uri: 'file:///tmp/big.jpg', type: 'image/jpeg', fileSize: 6 * 1024 * 1024 }],
-    });
+    mock.onGet('/driver/documents').reply(200, documentsBody({ cnic_back: { status: 'rejected', rejection_reason: 'Glare' } }));
+    const error = jest.spyOn(toast, 'error');
+    pickPhoto({ uri: 'file:///tmp/big.jpg', type: 'image/jpeg', fileSize: 6 * 1024 * 1024 });
     const { screen } = await renderAs(base);
-    const button = await screen.findByTestId('reupload-document-5');
+    const button = await screen.findByTestId('driver-document-cnic_back-upload');
     await act(async () => {
       fireEvent.press(button);
     });
     expect(mock.history.post).toHaveLength(0);
-    expect(screen.getByText(REJECTED_DOCUMENTS_COPY.reupload)).toBeTruthy();
+    expect(error).toHaveBeenCalledWith(DRIVER_DOCUMENTS_COPY.tooLarge);
+    expect(screen.getByLabelText(`${DRIVER_DOCUMENTS_COPY.reupload} ${DRIVER_DOCUMENTS_COPY.types.cnic_back}`)).toBeTruthy();
     screen.unmount();
   });
 

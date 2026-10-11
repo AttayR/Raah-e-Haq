@@ -33,6 +33,25 @@ export const VEHICLE_TYPE_IDS: readonly string[] = VEHICLE_TYPES.map((type) => t
 export const vehicleTypeLabel = (id: string): string =>
   VEHICLE_TYPES.find((type) => type.id === id)?.label ?? id;
 
+/**
+ * The vehicle photo slots, index-stable: slot i is always sent as `field` (T-203). An empty
+ * slot holds '' so removing one photo never shifts the others into the wrong side.
+ */
+export const VEHICLE_PHOTO_SLOTS = [
+  { label: 'Front', field: 'vehicle_front_image' },
+  { label: 'Back', field: 'vehicle_back_image' },
+  { label: 'Left side', field: 'vehicle_left_image' },
+  { label: 'Right side', field: 'vehicle_right_image' },
+] as const;
+
+/** The pictures with slot `index` set to `uri` ('' clears it); always one entry per slot. */
+export const setVehiclePhoto = (pictures: readonly string[], index: number, uri: string): string[] =>
+  VEHICLE_PHOTO_SLOTS.map((_, i) => (i === index ? uri : pictures[i] ?? ''));
+
+/** How many vehicle slots hold a photo. */
+export const filledVehiclePhotoCount = (pictures: readonly (string | undefined)[] | undefined): number =>
+  (pictures ?? []).filter((uri) => typeof uri === 'string' && uri.trim() !== '').length;
+
 export interface RegistrationFormData {
   // Personal Info
   fullName: string;
@@ -69,11 +88,11 @@ export interface RegistrationFormData {
   // Documents
   driverPicture: string;
   cnicPicture: string;
-  licenseFrontPicture: string; // For drivers
-  licenseBackPicture: string; // For drivers
+  licenseFrontPicture: string; // For drivers (sent as license_image)
   cnicFrontPicture: string; // For passengers
   cnicBackPicture: string; // For passengers
   profilePicture: string; // For passengers (and optional for drivers)
+  /** One entry per VEHICLE_PHOTO_SLOTS slot ('' when empty). */
   vehiclePictures: string[];
 
   role: RegistrationRole;
@@ -110,7 +129,6 @@ export const INITIAL_REGISTRATION_FORM: RegistrationFormData = {
   driverPicture: '',
   cnicPicture: '',
   licenseFrontPicture: '',
-  licenseBackPicture: '',
   cnicFrontPicture: '',
   cnicBackPicture: '',
   profilePicture: '',

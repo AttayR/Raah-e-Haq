@@ -51,8 +51,8 @@ describe('T-207: driving licence inputs', () => {
       />,
     );
     expect(screen.getByText('The license image field is required.')).toBeTruthy();
-    // One `*` per required driver document: profile picture, CNIC, licence front, vehicle
-    // pictures (the licence back stays optional). Before T-207 there were three.
-    expect(screen.getAllByText('*')).toHaveLength(4);
+    // One `*` per required driver document: profile picture, CNIC front, CNIC back (T-203),
+    // licence front, vehicle pictures. Before T-207 there were three.
+    expect(screen.getAllByText('*')).toHaveLength(5);
   });
 });

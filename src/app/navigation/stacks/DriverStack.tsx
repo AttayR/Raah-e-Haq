@@ -12,6 +12,7 @@ import { rideChatScreenId, type RideChatParams } from '../../../features/chat/na
 import { useNotificationsSync } from '../../../features/notifications/hooks';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
 import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
+import { DriverDocumentsScreen } from '../../../features/driverDocuments/screens/DriverDocumentsScreen';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -23,6 +24,8 @@ export type DriverStackParamList = {
   DriverRide: undefined;
   /** Settings → Notifications: push preferences (T-502, BE-11). */
   NotificationPreferences: undefined;
+  /** Settings → Vehicle & documents: review state + re-upload (T-203, BE-66). */
+  DriverDocuments: undefined;
 };
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
@@ -63,6 +66,7 @@ const DriverStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
+      <Stack.Screen name="DriverDocuments" component={DriverDocumentsScreen} />
     </Stack.Navigator>
   );
 };

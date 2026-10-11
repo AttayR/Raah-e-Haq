@@ -2,7 +2,9 @@ import * as yup from 'yup';
 import { toPkMobileE164 } from '../services/otpService';
 import {
   INITIAL_REGISTRATION_FORM,
+  VEHICLE_PHOTO_SLOTS,
   VEHICLE_TYPE_IDS,
+  filledVehiclePhotoCount,
   type RegistrationFormData,
   type RegistrationRole,
   type RegistrationStep,
@@ -199,14 +201,21 @@ const driverVehicle = yup.object({
 
 const driverDocuments = yup.object({
   driverPicture: yup.string().required('Driver picture is required'),
-  cnicPicture: yup.string().required('CNIC picture is required'),
+  cnicPicture: yup.string().required('CNIC front picture is required'),
+  // Sent as cnic_back_image (T-203); the server's approval rule needs it, so it is asked upfront.
+  cnicBackPicture: yup.string().required('CNIC back picture is required'),
   // Sent as license_image, required for drivers (T-207/BE-68). The back side stays optional.
   licenseFrontPicture: yup.string().required('License front picture is required'),
   vehiclePictures: yup
     .array()
     .of(yup.string())
-    .min(4, 'Please upload at least 4 vehicle pictures (front, back, left, right)')
-    .max(6, 'Maximum 6 vehicle pictures allowed'),
+    // Sent as vehicle_front/back/left/right_image (T-203): one photo per slot, empty slots are ''.
+    .max(VEHICLE_PHOTO_SLOTS.length, 'Upload 4 vehicle pictures: front, back, left and right')
+    .test(
+      'all-sides',
+      'Please upload at least 4 vehicle pictures (front, back, left, right)',
+      (value) => filledVehiclePhotoCount(value) >= VEHICLE_PHOTO_SLOTS.length,
+    ),
 });
 
 const NOTHING = yup.object({});

@@ -89,11 +89,52 @@ describe('buildRegistrationRequest', () => {
       vehicleNumber: 'LEA-1234',
       licenseNumber: ' LHR-12345678 ',
       licenseFrontPicture: 'file:///license-front.jpg',
-      licenseBackPicture: 'file:///license-back.jpg',
     });
     expect(request.license_number).toBe('LHR-12345678');
     expect(request.license_number).not.toBe('LEA-1234');
     expect(request.license_image).toBe('file:///license-front.jpg');
+  });
+
+  it('sends every driver image the form collected (T-203): profile, CNIC front/back, licence, 4 vehicle sides', () => {
+    const request = buildRegistrationRequest({
+      ...form,
+      role: 'driver',
+      vehicleType: 'car',
+      driverPicture: 'file:///driver.jpg',
+      cnicPicture: 'file:///cnic-front.jpg',
+      cnicBackPicture: 'file:///cnic-back.jpg',
+      licenseFrontPicture: 'file:///license-front.jpg',
+      vehiclePictures: ['file:///v-front.jpg', 'file:///v-back.jpg', 'file:///v-left.jpg', 'file:///v-right.jpg'],
+    });
+    expect(request).toMatchObject({
+      profile_image: 'file:///driver.jpg',
+      cnic_front_image: 'file:///cnic-front.jpg',
+      cnic_back_image: 'file:///cnic-back.jpg',
+      license_image: 'file:///license-front.jpg',
+      vehicle_front_image: 'file:///v-front.jpg',
+      vehicle_back_image: 'file:///v-back.jpg',
+      vehicle_left_image: 'file:///v-left.jpg',
+      vehicle_right_image: 'file:///v-right.jpg',
+    });
+    // Passenger image fields are never used for drivers.
+    expect(request).not.toHaveProperty('passenger_cnic_front_image');
+  });
+
+  it('leaves out driver images that were not picked (never sends "")', () => {
+    const request = buildRegistrationRequest({
+      ...form,
+      role: 'driver',
+      cnicPicture: 'file:///cnic-front.jpg',
+      vehiclePictures: ['file:///v-front.jpg', '', 'file:///v-left.jpg', ''],
+    });
+    expect(request.cnic_front_image).toBe('file:///cnic-front.jpg');
+    expect(request.vehicle_front_image).toBe('file:///v-front.jpg');
+    expect(request).not.toHaveProperty('cnic_back_image');
+    expect(request).not.toHaveProperty('profile_image');
+    // Index-stable: slot 2 is the left side even with slot 1 empty.
+    expect(request.vehicle_left_image).toBe('file:///v-left.jpg');
+    expect(request).not.toHaveProperty('vehicle_back_image');
+    expect(request).not.toHaveProperty('vehicle_right_image');
   });
 
   it('a passenger request carries no licence fields', () => {

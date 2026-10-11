@@ -7,7 +7,6 @@ import { ACCOUNT_STATUS_VARIANTS } from '../../../src/features/auth/copy/account
 import { accountRefusalMessage, accountRefusalParts } from '../../../src/core/auth/accountRefusal';
 import { routesHome } from '../../../src/core/auth/normalizeUser';
 import { DarkTheme, LightTheme } from '../../../src/theme';
-import { toRejectedItems, uploadProblem, MAX_UPLOAD_BYTES } from '../../../src/features/auth/documentsApi';
 import type { AccountStatus, UserRole } from '../../../src/services/api';
 
 const u = (status: AccountStatus, role: UserRole | null, rejection_reason?: string | null) => ({ status, role, rejection_reason });
@@ -45,9 +44,9 @@ describe('accountStatusView', () => {
   });
 
   it('pending drivers get the rejected-documents list; nobody else does', () => {
-    expect(accountStatusView(u('pending', 'driver'), false).showRejectedDocuments).toBe(true);
-    expect(accountStatusView(u('pending', 'passenger'), false).showRejectedDocuments).toBe(false);
-    expect(accountStatusView(u('rejected', 'driver'), false).showRejectedDocuments).toBe(false);
+    expect(accountStatusView(u('pending', 'driver'), false).showDocuments).toBe(true);
+    expect(accountStatusView(u('pending', 'passenger'), false).showDocuments).toBe(false);
+    expect(accountStatusView(u('rejected', 'driver'), false).showDocuments).toBe(false);
   });
 
   it('an active admin is not offered Check Status; an account without a role is', () => {
@@ -82,38 +81,6 @@ describe('accountRefusalMessage (login / verify-otp 403)', () => {
     ).toBe('Your account has been suspended.');
     expect(accountRefusalMessage({ message: 'Wrong password', kind: 'auth', status: 401, fieldErrors: {} }, 'Login failed')).toBe('Wrong password');
     expect(accountRefusalMessage(undefined, 'Login failed')).toBe('Login failed');
-  });
-});
-
-describe('documents (GET /profile/documents)', () => {
-  it('lists only rejected documents and vehicles, with their reasons', () => {
-    const items = toRejectedItems({
-      cnic_front_image: 'https://signed.example.test/x',
-      documents: [
-        { id: 1, document_type: 'cnic_front', verification_status: 'rejected', rejection_reason: 'Blurry' },
-        { id: 2, document_type: 'driving_license', verification_status: 'approved', rejection_reason: null },
-        { id: 3, document_type: 'police_certificate', verification_status: 'rejected', rejection_reason: null },
-      ],
-      vehicles: [
-        { id: 10, verification_status: 'approved', rejection_reason: null },
-        { id: 9, verification_status: 'rejected', rejection_reason: 'Plate not visible' },
-      ],
-    });
-    expect(items).toEqual([
-      { key: 'document-1', kind: 'document', id: 1, label: 'CNIC (front)', reason: 'Blurry' },
-      { key: 'document-3', kind: 'document', id: 3, label: 'Police certificate', reason: null },
-      // Named by position in the whole vehicle list (the payload has no make/plate).
-      { key: 'vehicle-9', kind: 'vehicle', id: 9, label: 'Vehicle #2', reason: 'Plate not visible' },
-    ]);
-    expect(toRejectedItems(null)).toEqual([]);
-  });
-
-  it('accepts JPEG/PNG up to 5 MB only', () => {
-    expect(uploadProblem({ type: 'image/jpeg', fileSize: 1000 })).toBeNull();
-    expect(uploadProblem({ type: 'image/png' })).toBeNull();
-    expect(uploadProblem({ type: 'image/heic', fileSize: 1000 })).not.toBeNull();
-    expect(uploadProblem({ type: 'image/jpeg', fileSize: MAX_UPLOAD_BYTES + 1 })).not.toBeNull();
-    expect(uploadProblem({})).not.toBeNull();
   });
 });
 

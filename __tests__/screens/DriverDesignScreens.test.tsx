@@ -166,6 +166,9 @@ describe('DriverSettingsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('DriverProfile');
     fireEvent.press(screen.getByTestId('driver-settings-notifications'));
     expect(mockNavigate).toHaveBeenCalledWith('NotificationPreferences');
+    // T-203: Vehicle & documents opens the documents list.
+    fireEvent.press(screen.getByTestId('driver-settings-documents'));
+    expect(mockNavigate).toHaveBeenCalledWith('DriverDocuments');
     expect(openSettings).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('driver-settings-phone-notifications'));
     expect(openSettings).toHaveBeenCalledTimes(1);

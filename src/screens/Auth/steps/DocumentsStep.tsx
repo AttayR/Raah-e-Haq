@@ -8,22 +8,39 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { launchImageLibrary, ImagePickerResponse, MediaType, PhotoQuality } from 'react-native-image-picker';
+import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../../core/logging/logger';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
 import { isStepFieldRequired } from '../../../schemas/registrationSchema';
+import { DOCUMENT_PICKER_OPTIONS, uploadProblem } from '../../../features/driverDocuments/upload';
+import {
+  VEHICLE_PHOTO_SLOTS,
+  filledVehiclePhotoCount,
+  setVehiclePhoto,
+} from '../../../features/auth/registration/registrationForm';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
+
+type PickerType = 'driver' | 'cnic' | 'cnicFront' | 'cnicBack' | 'vehicle' | 'licenseFront' | 'profile';
+
+const PICKER_FIELD: Record<PickerType, keyof DocumentsData> = {
+  driver: 'driverPicture',
+  cnic: 'cnicPicture',
+  cnicFront: 'cnicFrontPicture',
+  cnicBack: 'cnicBackPicture',
+  vehicle: 'vehiclePictures',
+  licenseFront: 'licenseFrontPicture',
+  profile: 'profilePicture',
+};
 
 interface DocumentsData {
   driverPicture: string;
   cnicPicture: string;
   licenseFrontPicture: string;
-  licenseBackPicture: string;
   cnicFrontPicture: string; // For passengers
   cnicBackPicture: string;  // For passengers
   profilePicture: string;
@@ -53,18 +70,11 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
     );
   }
 
-  const openImagePicker = (type: 'driver' | 'cnic' | 'cnicFront' | 'cnicBack' | 'vehicle' | 'licenseFront' | 'licenseBack' | 'profile') => {
-    const options = {
-      mediaType: 'photo' as MediaType,
-      quality: 0.8 as PhotoQuality,
-      maxWidth: 2000,
-      maxHeight: 2000,
-      selectionLimit: 1,
-      includeBase64: false,
-    };
-
+  /** `slot`: the vehicle photo slot that was tapped (its index is the side it is sent as). */
+  const openImagePicker = (type: PickerType, slot = 0) => {
     setIsUploading(true);
-    launchImageLibrary(options, (response: ImagePickerResponse) => {
+    // Scaled to 2000 px at 0.8 quality by the picker; still checked against the 5 MB rule below.
+    launchImageLibrary(DOCUMENT_PICKER_OPTIONS, (response: ImagePickerResponse) => {
       setIsUploading(false);
       
       if (response.didCancel) {
@@ -88,6 +98,13 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         type: asset?.type
       });
 
+      // The server takes JPEG/PNG/GIF up to 5 MB (T-203): say so now, not after Submit.
+      const problem = asset ? uploadProblem(asset) : null;
+      if (problem) {
+        setValidationErrors(prev => ({ ...prev, [PICKER_FIELD[type]]: problem }));
+        return;
+      }
+
       switch (type) {
         case 'driver':
           onDataChange({ driverPicture: imageUri });
@@ -100,10 +117,6 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         case 'licenseFront':
           onDataChange({ licenseFrontPicture: imageUri });
           setValidationErrors(prev => ({ ...prev, licenseFrontPicture: '' }));
-          break;
-        case 'licenseBack':
-          onDataChange({ licenseBackPicture: imageUri });
-          setValidationErrors(prev => ({ ...prev, licenseBackPicture: '' }));
           break;
         case 'cnicFront':
           onDataChange({ cnicFrontPicture: imageUri });
@@ -118,23 +131,17 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           setValidationErrors(prev => ({ ...prev, profilePicture: '' }));
           break;
         case 'vehicle':
-          const currentPictures = data.vehiclePictures || [];
-          if (currentPictures.length < 6) {
-            const newPictures = [...currentPictures, imageUri];
-            onDataChange({ vehiclePictures: newPictures });
-            setValidationErrors(prev => ({ ...prev, vehiclePictures: '' }));
-          } else {
-            Alert.alert('Limit Reached', 'Maximum 6 vehicle pictures allowed');
-          }
+          // Index-stable: the photo replaces the tapped slot only (T-203).
+          onDataChange({ vehiclePictures: setVehiclePhoto(data.vehiclePictures || [], slot, imageUri) });
+          setValidationErrors(prev => ({ ...prev, vehiclePictures: '' }));
           break;
       }
     });
   };
 
+  /** Clears one slot; the other sides keep their photos and positions. */
   const removeVehiclePicture = (index: number) => {
-    const currentPictures = data.vehiclePictures || [];
-    const newPictures = currentPictures.filter((_, i) => i !== index);
-    onDataChange({ vehiclePictures: newPictures });
+    onDataChange({ vehiclePictures: setVehiclePhoto(data.vehiclePictures || [], index, '') });
   };
 
   // Required documents are checked by registrationSchema (driverDocuments) on Next.
@@ -188,17 +195,19 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         {isStepFieldRequired('documents', 'vehiclePictures', data.role) && <Text style={styles.requiredText}>*</Text>}
       </View>
       <Text style={styles.vehiclePicturesSubtitle}>
-        Upload 4-6 clear pictures of your vehicle from different angles
+        Upload 4 clear pictures of your vehicle in this order: front, back, left side, right side
       </Text>
       <View style={styles.vehiclePicturesGrid}>
-        {Array.from({ length: 6 }, (_, index) => (
+        {VEHICLE_PHOTO_SLOTS.map(({ label: slotLabel }, index) => (
+          <View key={slotLabel}>
           <TouchableOpacity
-            key={index}
+            testID={`vehicle-photo-slot-${index}`}
+            accessibilityLabel={`Vehicle ${slotLabel} picture`}
             style={[
               styles.vehiclePictureSlot,
               data.vehiclePictures && data.vehiclePictures[index] && styles.vehiclePictureSlotFilled
             ]}
-            onPress={() => openImagePicker('vehicle')}
+            onPress={() => openImagePicker('vehicle', index)}
             disabled={isUploading}
           >
             {data.vehiclePictures && data.vehiclePictures[index] ? (
@@ -208,6 +217,8 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
                   style={styles.vehiclePicture} 
                 />
                 <TouchableOpacity
+                  testID={`vehicle-photo-remove-${index}`}
+                  accessibilityLabel={`Remove vehicle ${slotLabel} picture`}
                   style={styles.removeButton}
                   onPress={() => removeVehiclePicture(index)}
                 >
@@ -224,10 +235,13 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
               </View>
             )}
           </TouchableOpacity>
+          {/* The side under every slot, filled or empty. */}
+          <Text style={styles.vehiclePicturesCount}>{slotLabel}</Text>
+          </View>
         ))}
       </View>
       <Text style={styles.vehiclePicturesCount}>
-        {(data.vehiclePictures || []).length}/6 pictures uploaded
+        {filledVehiclePhotoCount(data.vehiclePictures)}/{VEHICLE_PHOTO_SLOTS.length} pictures uploaded
       </Text>
       {validationErrors.vehiclePictures && (
         <View style={styles.errorContainer} ref={anchor('vehiclePictures')}>
@@ -318,29 +332,29 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           validationErrors.driverPicture
         )}
 
-        {/* CNIC Picture */}
+        {/* CNIC front (sent as cnic_front_image) and back (cnic_back_image, T-203) */}
         {renderImagePicker(
-          'CNIC Picture',
+          'CNIC Front',
           data.cnicPicture,
           () => openImagePicker('cnic'),
           'cnicPicture',
           validationErrors.cnicPicture
         )}
+        {renderImagePicker(
+          'CNIC Back',
+          data.cnicBackPicture,
+          () => openImagePicker('cnicBack'),
+          'cnicBackPicture',
+          validationErrors.cnicBackPicture
+        )}
 
-        {/* License Front/Back */}
+        {/* Licence front (license_image). The server has no licence-back field, so none is asked. */}
         {renderImagePicker(
           'License Front',
           data.licenseFrontPicture,
           () => openImagePicker('licenseFront'),
           'licenseFrontPicture',
           validationErrors.licenseFrontPicture
-        )}
-        {renderImagePicker(
-          'License Back',
-          data.licenseBackPicture,
-          () => openImagePicker('licenseBack'),
-          'licenseBackPicture',
-          validationErrors.licenseBackPicture
         )}
 
         {/* Vehicle Pictures */}

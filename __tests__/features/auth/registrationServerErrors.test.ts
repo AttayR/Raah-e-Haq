@@ -113,6 +113,24 @@ describe('mapRegistrationServerErrors', () => {
     expect(result.step).toBe('documents');
   });
 
+  it('T-203: driver profile_image, cnic_front_image and cnic_back_image land on their pickers', () => {
+    const result = mapRegistrationServerErrors(
+      {
+        profile_image: ['The profile image must be an image.'],
+        cnic_front_image: ['Front too big.'],
+        cnic_back_image: ['Back too big.'],
+      },
+      'driver',
+    );
+    expect(result.fieldErrors).toEqual({
+      driverPicture: 'The profile image must be an image.',
+      cnicPicture: 'Front too big.',
+      cnicBackPicture: 'Back too big.',
+    });
+    expect(result.formErrors).toEqual([]);
+    expect(result.step).toBe('documents');
+  });
+
   it('T-207: license_number, license_image and date_of_birth land on their own inputs', () => {
     const result = mapRegistrationServerErrors(
       {

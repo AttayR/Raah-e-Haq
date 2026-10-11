@@ -7,6 +7,8 @@ export const DRIVER_SETTINGS_COPY = {
   accountGroup: 'Account',
   editProfile: 'Edit profile',
   editProfileSubtitle: 'Update your personal information',
+  documents: 'Vehicle & documents',
+  documentsSubtitle: 'Review status and re-upload rejected photos',
   notifications: 'Notifications',
   notificationsSubtitle: 'Choose which alerts you get',
   phoneNotifications: 'Phone notification settings',

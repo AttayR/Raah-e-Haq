@@ -36,8 +36,11 @@ export interface AccountStatusView extends AccountStatusVariantCopy {
   variant: AccountStatusVariant;
   /** Shown under the message: the rejection_reason held in memory, when there is one. */
   reason: string | null;
-  /** Pending drivers get the rejected-documents list (GET /profile/documents). */
-  showRejectedDocuments: boolean;
+  /**
+   * Pending drivers get their documents list (GET /driver/documents, T-203). A rejected or
+   * blocked account's token no longer works (BE-32), so only pending drivers can load it.
+   */
+  showDocuments: boolean;
 }
 
 export function accountStatusView(
@@ -53,6 +56,6 @@ export function accountStatusView(
     // An active admin has nothing to wait for; an account without a role may be fixed.
     canCheckStatus: variant === 'unsupportedRole' ? user.role !== 'admin' : copy.canCheckStatus,
     reason: variant === 'rejected' || variant === 'suspended' ? reason : null,
-    showRejectedDocuments: variant === 'pendingDriver',
+    showDocuments: variant === 'pendingDriver',
   };
 }

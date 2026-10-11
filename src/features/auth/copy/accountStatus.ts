@@ -56,7 +56,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
       'Our team is reviewing your documents and vehicle details. You can start driving as soon as your account is approved.',
     notes: [
       'Reviews usually take 24 to 48 hours.',
-      'If a document is rejected, it is listed below and you can upload a new one.',
+      'Your documents and their review status are listed below. Upload any that are missing or rejected.',
       'Tap Check Status to see whether you have been approved.',
     ],
     canCheckStatus: true,
@@ -143,57 +143,3 @@ export const ACCOUNT_STATUS_COPY = {
   /** Fallback name in the header when the profile has none. */
   fallbackName: 'Welcome',
 } as const;
-
-export const REJECTED_DOCUMENTS_COPY = {
-  title: 'Needs your attention',
-  intro: 'These items were rejected. Upload a clear new photo of each one.',
-  loading: 'Loading your documents…',
-  loadFailed: 'Could not load your documents.',
-  retry: 'Try again',
-  empty: 'None of your documents need changes right now.',
-  reupload: 'Upload new photo',
-  uploading: 'Uploading…',
-  uploaded: 'Uploaded. It will be reviewed again.',
-  uploadFailed: 'Upload failed. Please try again.',
-  /** 409 DOCUMENT_NOT_REJECTED: the item changed on the server meanwhile. */
-  alreadyChanged: 'This item was already updated. The list has been refreshed.',
-  tooLarge: 'The photo is larger than 5 MB. Choose a smaller one.',
-  wrongType: 'Choose a JPEG or PNG photo.',
-  pickFailed: 'Could not open your photos.',
-  noReason: 'No reason given.',
-  /** Labels for the item kinds; other document types show the server's type, humanised. */
-  documentFallback: 'Document',
-  vehicleLabel: 'Vehicle',
-  /** `{n}`: the vehicle's position in the driver's vehicle list (the payload has no make/plate). */
-  vehicleNumbered: 'Vehicle #{n}',
-  /** `{count}`: how many more rejected items are hidden. */
-  showMore: 'Show {count} more',
-  showFewer: 'Show fewer',
-  choosePhotos: 'Choose new photos',
-  cancel: 'Cancel',
-  vehicleIntro: 'Choose a new photo for each part that needs one, then send them together.',
-  selected: 'Selected',
-  sendForReview: 'Send for review',
-  vehicleFields: {
-    front_image: 'Front photo',
-    back_image: 'Back photo',
-    left_image: 'Left side photo',
-    right_image: 'Right side photo',
-    insurance_document: 'Insurance document',
-    registration_document: 'Registration document',
-  },
-  documentTypes: {
-    cnic_front: 'CNIC (front)',
-    cnic_back: 'CNIC (back)',
-    driving_license: 'Driving licence',
-    license_front: 'Driving licence (front)',
-    license_back: 'Driving licence (back)',
-    profile_photo: 'Profile photo',
-    vehicle_registration: 'Vehicle registration',
-    insurance: 'Insurance',
-  } as Record<string, string>,
-} as const;
-
-/** Fills `{name}` placeholders of a copy template. */
-export const fillCopy = (template: string, values: Record<string, string | number>): string =>
-  template.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match));

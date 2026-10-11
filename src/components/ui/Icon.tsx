@@ -56,6 +56,9 @@ const glyphs = {
   search: 'search',
   starOutline: 'star-outline',
   swap: 'swap-vert',
+  // Added for driver documents (T-203); additive only.
+  document: 'description',
+  upload: 'file-upload',
 } as const;
 
 export type IconName = keyof typeof glyphs;

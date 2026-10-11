@@ -10,9 +10,9 @@ import { useLogout } from '../../../hooks/useLogout';
 import { ACCOUNT_STATUS_COPY } from '../copy/accountStatus';
 import { accountStatusView } from '../accountStatus';
 import { useCheckAccountStatus } from '../hooks/useCheckAccountStatus';
-import { useRejectedDocuments } from '../hooks/useRejectedDocuments';
+import { useDriverDocuments } from '../../driverDocuments/hooks';
+import { DriverDocumentsList } from '../../driverDocuments/components/DriverDocumentsList';
 import AccountStatusCard from '../components/AccountStatusCard';
-import RejectedDocumentsList from '../components/RejectedDocumentsList';
 import { ON_PRIMARY, RADIUS, SPACING } from '../components/accountStatusStyles';
 
 type AccountStatusState = { apiAuth: { user: User | null; statusUnverified: boolean } };
@@ -30,7 +30,7 @@ const NO_USER: Pick<User, 'role' | 'status' | 'rejection_reason' | 'name'> = {
  * active, or active without a role this app serves. It reads only apiAuth (never Firebase);
  * copy per role and status comes from features/auth/copy/accountStatus.
  * - Check Status: GET /auth/profile; AuthFlow routes home once the account is active.
- * - Pending drivers: rejected documents/vehicles with their reason and a re-upload.
+ * - Pending drivers: their documents (GET /driver/documents) with status, reason and upload (T-203).
  * - Sign Out: the single logout (T-102), which clears the local session even when
  *   /auth/logout answers 403 for a blocked account.
  */
@@ -43,12 +43,12 @@ export default function AccountStatusScreen() {
 
   const { confirmLogout, isLoggingOut } = useLogout();
   const { check, checking, error } = useCheckAccountStatus(user);
-  const documents = useRejectedDocuments(view.showRejectedDocuments);
+  const documents = useDriverDocuments(view.showDocuments);
 
   const onCheckStatus = async () => {
     const routable = await check();
     // Routable: AuthFlow is unmounting this screen, so the list is not reloaded.
-    if (!routable && view.showRejectedDocuments) {
+    if (!routable && view.showDocuments) {
       documents.reload();
     }
   };
@@ -74,7 +74,7 @@ export default function AccountStatusScreen() {
 
         <AccountStatusCard view={view} colors={colors} />
 
-        {/* Actions first, so a long rejected-items list never pushes them off screen. */}
+        {/* Actions first, so the documents list never pushes them off screen. */}
         <View style={styles.actions}>
           {error ? (
             <Text testID="account-status-check-error" style={[styles.error, { color: colors.text }]}>
@@ -111,16 +111,17 @@ export default function AccountStatusScreen() {
           </TouchableOpacity>
         </View>
 
-        {view.showRejectedDocuments ? (
-          <RejectedDocumentsList
-            items={documents.items}
+        {view.showDocuments ? (
+          <DriverDocumentsList
+            documents={documents.documents}
+            allRequiredApproved={documents.allRequiredApproved}
             loading={documents.loading}
             error={documents.error}
-            uploadingKey={documents.uploadingKey}
-            colors={colors}
+            uploadingType={documents.uploadingType}
             onRetry={documents.reload}
-            onReuploadDocument={documents.reuploadDocument}
-            onReuploadVehicle={documents.reuploadVehicle}
+            onUpload={(type) => {
+              documents.upload(type);
+            }}
           />
         ) : null}
       </ScrollView>
