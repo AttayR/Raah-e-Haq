@@ -107,9 +107,9 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 
 | Method + path | Exists | Documented | App code | Notes |
 |---|---|---|---|---|
-| GET `/notifications` | yes | yes | `notificationService.getNotifications` | `data: Notification[]` plus `pagination`; 20 per page fixed (the server ignores `per_page`) |
-| POST `/notifications/{id}/read` | yes | yes | `markAsRead` | 403 nested envelope if it is not the caller's |
-| POST `/notifications/read-all` | yes | yes | `markAllAsRead` | no `data` |
+| GET `/notifications` | yes | yes | `notificationService.getNotifications` | `data: Notification[]` plus `pagination`; BE-11 changes the item shape and adds `per_page`/`category`/`unread` (see "BE-11" below) |
+| POST `/notifications/{id}/read` | yes | yes | `markAsRead` | BE-11: 404 `NOT_FOUND` (flat envelope) if it is not the caller's; was 403 |
+| POST `/notifications/read-all` | yes | yes | `markAllAsRead` | BE-11: `data: {unread_count: 0}` |
 | GET `/notifications/unread-count` | yes | yes | `getUnreadCount` | `data: {unread_count}` |
 
 `notificationService` still swallows errors and returns empty results (unchanged behaviour; real error states are T-502).
@@ -152,3 +152,77 @@ Paths are relative to `env.API_URL` (`…/api`). "Code" means `src/…` unless s
 | PUT `/rides/{id}` with `driver_id` (admin) | 422 `PHONE_NOT_VERIFIED`, `errors.driver_id` |
 | POST `/referrals/rewards/{id}/claim` | 403 `PHONE_NOT_VERIFIED` (claimant), 409 `REFERRED_PHONE_NOT_VERIFIED` (the referred friend has not verified; the reward stays pending) |
 | POST `/referrals/{id}/complete` (admin) | 409 `REFERRED_PHONE_NOT_VERIFIED` (referral stays pending) |
+
+## BE-13: in-ride chat (2026-10-11, for T-510)
+
+Backend worktree `rh-backend-be-13`, branch `be-13-chat` (not merged into `fix/production-hardening` yet). All routes: `auth:sanctum` + `active`. Participants are the ride's passenger and its **current** assigned driver; anyone else (other users, admins) gets 403. No realtime yet: poll `GET /rides/{id}/messages?after_id=<last_id>` (every 3–5 s while the thread is open, slower or stopped in the background). BE-12 will push the same message shape (without `is_mine` and `client_id`) on `private-ride.{id}` as event `chat.message` (and `chat.read`).
+
+Message object (`M`):
+
+```json
+{ "id": 41, "ride_id": 7, "client_id": "uuid-or-null", "sender_id": 12, "sender_role": "passenger|driver",
+  "is_mine": true, "body": "plain text", "created_at": "2026-10-11T12:00:00+00:00", "read_at": null }
+```
+
+`client_id` is returned only on your own messages (null on the other party's). `body` is plain text: render it as text, never HTML. The server removes control characters (except newline and tab), bidi marks (incl. U+061C), zero-width space, word joiner and BOM (ZWNJ/ZWJ stay), turns CRLF into LF, keeps at most one blank line in a row and trims. A body with nothing visible left is a 422. `read_at` is when the recipient read it.
+
+Other-party card (`P`), never a phone number: `{ "id": 5, "role": "driver|passenger", "first_name": "Bilal"|null, "profile_image_url": "https://…"|null }`. Calling the other party is outside this API (the phone stays on `RideResource` for the active ride, BE-20).
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| GET `/chats` | — | 200 `data.chats: [ { ride_id, ride_status, can_send, read_only_until, other_party: P, last_message: M\|null, unread_count } ]`, newest activity first, at most 50 | 401 |
+| GET `/rides/{id}/messages` | query `after_id` (int ≥0) **or** `before_id` (int ≥1), `limit` (1–100, default 50) | 200 `data: { ride_id, ride_status, can_send, read_only_until, other_party: P\|null, messages: [M], has_more, last_id, other_party_read_up_to_id }` | 403 `not_ride_participant`, 404, 410 `chat_expired`, 422 (both cursors, bad numbers) |
+| POST `/rides/{id}/messages` | `{ body: string (1–1000 chars after cleaning), client_id?: string ≤64 [A-Za-z0-9._:-] }` | 201 `data.message: M` (new); 200 same body with the **first** message when `client_id` repeats (safe retry) | 403 `not_ride_participant`, 409 `chat_not_open` (no driver yet), 409 `chat_closed` (ride ended), 422 `errors.body` / `errors.client_id`, 429 `rate_limited` (20 sends/min per user, `Retry-After`) |
+| POST `/rides/{id}/messages/read` | `{ up_to_id: int ≥1 }` | 200 `data: { ride_id, marked, unread_count }` | 403, 410 `chat_expired`, 422 `errors.up_to_id` |
+
+Errors use the BE-26 envelope: `{ success:false, message, error:{ code } }` (validation adds `errors`).
+
+Rules the UI should follow:
+
+- **Which rides list:** rides with an assigned driver that are `accepted`/`arrived`/`started` (even with no messages: `last_message` null), plus `completed`/`cancelled` rides with messages that ended less than 24 h ago. `read_only_until` is null for an active ride, else the ISO time the chat disappears. A requested ride (no driver) is not listed; its messages endpoint returns 200 with `other_party: null`, `can_send: false`, no messages.
+- **Composer:** show it only when `can_send` is true; after the ride ends show "read-only". A 409 `chat_closed` on send means the ride ended meanwhile: refresh and switch to read-only.
+- **Paging:** first load without a cursor returns the latest page, oldest first (`has_more` = older messages exist; load them with `before_id=<first id shown>`). Polling with `after_id=<last_id>` returns newer messages oldest first (`has_more` = call again at once). Keep `last_id` from each response as the next cursor (it stays the same when nothing is new).
+- **Sending:** generate a `client_id` (UUID) per message, show it optimistically, and resend with the same `client_id` on timeout or network error; match the POST response to the pending bubble by `client_id` (realtime events carry no `client_id`; de-duplicate them by `id`).
+- **Read receipts:** when the thread is visible, POST `/read` with the highest received message id. `other_party_read_up_to_id` = the highest id of **your** messages the other party has read (show "Seen" up to it). Reading also clears the ride's `chat_message` notification once nothing is unread.
+- **Requeue:** if a driver's cancel puts the ride back to `requested`, that driver loses access (403) and the next driver starts with an empty thread.
+- **Notifications:** each new message keeps one unread notification per ride for the recipient in `GET /notifications`: `type: "chat_message"`, `title` and `message` both `"New message from <first name>"` (no preview of the text), `data: { ride_id, message_id, sender_first_name, unread_count }`. Tapping it opens the ride's thread. Push delivery comes with BE-11.
+
+## BE-11: notifications list, push devices, preferences (2026-10-11, for T-502 / T-511)
+
+Backend `fix/production-hardening` (uncommitted at time of writing). All routes: `auth:sanctum` + `active:active,pending` (pending drivers can register a device and read notifications). Envelope `{ success, message, data }`; validation 422 `{ success:false, message, errors }`; 404 `{ success:false, message, code: "NOT_FOUND" }`; 429 `{ success:false, message, code:"rate_limited", retry_after }`.
+
+Notification item (`N`), the only shape `/notifications*` returns (no `created_by`, `target_user_ids`, `user_id`, `message` or `status`):
+
+```json
+{ "id": 12, "type": "driver_assigned", "category": "ride|promo|wallet|chat|system",
+  "title": "Driver Assigned", "body": "Your ride has been accepted by Ali",
+  "data": { "ride_id": 7 }, "image_url": null, "action_url": null, "action_text": null,
+  "is_broadcast": false, "read_at": null, "created_at": "2026-10-11T12:00:00+00:00" }
+```
+
+- `type`: ride types `driver_assigned`, `driver_arrived`, `ride_started`, `ride_completed`, `ride_cancelled`, `new_ride_request`, `stop_added`, `stop_removed`, `stop_order_updated`, `arrived_at_stop`, `stop_completed`, `navigate_next_stop`; admin types `info`, `success`, `warning`, `error`, `promotion`, `announcement`; `payment_received`; `chat_message` (BE-13). Treat unknown types as `system`.
+- `category`: `ride` (ride/stop types), `promo` (`promotion`), `wallet` (`payment_received`), `chat` (`chat_message`), `system` (everything else). Use it for the filter tabs and the icon.
+- `data` is always an object, a whitelist of ids/enums only: `ride_id`, `stop_id`, `message_id`, `unread_count`, `fare` (string PKR), `payment_method`, `requeued` (bool), `reason`, `cancelled_by` (`passenger|driver|admin`). No names, phones or addresses (the BE-13 `sender_first_name` is not passed through; the name is in `title`). Navigate with `data.ride_id`.
+- `is_broadcast`: true for an admin broadcast (to all users or the user's role). `created_at` is when it was sent. Broadcasts sent before the account was created are not listed.
+- `body` is plain text (render as text).
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| GET `/notifications` | query `page` (≥1), `per_page` (1–50, default 20), `category` (`ride\|promo\|wallet\|chat\|system`), `unread` (`1`/`0`) | 200 `data: [N]` newest first, `pagination: {current_page, last_page, per_page, total}` | 401, 422 (bad per_page/category) |
+| GET `/notifications/unread-count` | — | 200 `data: {unread_count}` (own rows + broadcasts not read by this user) | 401 |
+| POST `/notifications/{id}/read` | — (id digits) | 200 `data: N` with `read_at` set (idempotent) | 404 `NOT_FOUND` for someone else's row or an unaddressed broadcast (no 403) |
+| POST `/notifications/read-all` | — | 200 `data: {unread_count: 0}` | 401 |
+| GET `/notifications/preferences` | — | 200 `data: {push_enabled, ride_updates, promotions, chat, sound_alerts}` (all `true` until saved) | 401 |
+| PUT `/notifications/preferences` | any subset of the five booleans, e.g. `{promotions:false}` | 200 `data`: all five flags | 422 non-boolean or empty body; 429 (30/min) |
+| POST `/devices` | `{ token: FCM token (20–512 chars, [A-Za-z0-9:_.-]), platform: "ios"\|"android" }` | 200 `data: {platform, last_seen_at}` | 422 `errors.token` / `errors.platform`; 429 (20/min, shared with DELETE) |
+| DELETE `/devices/{token}` | — | 200 `data: null` (same answer if the token was not yours or unknown) | 401, 429 |
+| POST `/auth/logout` | optional `{ device_token }` | unchanged; also removes that device | — |
+| POST `/auth/logout-all` | — | unchanged; also removes all the user's devices | — |
+
+Rules the app should follow:
+
+- **Device token:** after sign-in (and on FCM `onTokenRefresh`, and on cold start while signed in) call POST `/devices`. It is an upsert: calling again just refreshes `last_seen_at`; a token registered by another account moves to the current one. The server keeps the newest 10 per user. On logout send `device_token` in POST `/auth/logout` (preferred: works even for a blocked account) or call DELETE `/devices/{token}` before logging out.
+- **Push payload** (FCM `data`, all strings): `category`, `type`, `notification_id` (the list item id; mark it read on open), `ride_id` (ride events). `notification.title/body` match the list item, except for stop events (`stop_added`, `arrived_at_stop`, `stop_completed`, `navigate_next_stop`): their push body is generic text with no address (e.g. "A stop was added to your ride"), while the list item keeps the full text. Silent (no sound) when `sound_alerts` is false.
+- **Preferences gate push only:** in-app rows are always written. `push_enabled:false` stops every push; `ride_updates` gates `ride`, `promotions` gates `promo`, `chat` gates `chat`; `wallet`/`system` only follow `push_enabled`. `sound_alerts` = sound on/off for pushes (and the driver app's local alert sound).
+- **Who gets ride notifications:** the other party only. Driver accepts → passenger (`driver_assigned`); arrived/started/completed → passenger; driver cancels → passenger; passenger cancels → the assigned driver (nothing if no driver yet); admin assign/cancel → both.
+- **Locally there are no FCM credentials:** registration works, pushes are skipped server-side (log warning). Production needs B-11 (service-account JSON) and a queue worker.
