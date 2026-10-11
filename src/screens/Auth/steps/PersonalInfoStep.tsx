@@ -13,6 +13,7 @@ import ThemedTextInput from '../../../components/ThemedTextInput';
 import type { RegistrationFormData } from '../../../features/auth/registration/registrationForm';
 import { validateStepField } from '../../../schemas/registrationSchema';
 import { mergeStepErrors } from './stepErrors';
+import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -23,14 +24,7 @@ interface PersonalInfoStepProps {
   data: PersonalInfoData;
   onDataChange: (data: Partial<PersonalInfoData>) => void;
   errors: Partial<Record<string, string>>;
-  apiErrors?: Record<string, string>;
-  onClearApiError?: (field: string) => void;
 }
-
-const API_FIELD_MAP: Record<string, string> = {
-  dateOfBirth: 'date_of_birth',
-  emergencyRelationship: 'passenger_emergency_contact_relation',
-};
 
 // API expects one of these values for passenger_emergency_contact_relation
 export const EMERGENCY_RELATION_OPTIONS: { value: string; label: string }[] = [
@@ -43,7 +37,7 @@ export const EMERGENCY_RELATION_OPTIONS: { value: string; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors = {}, onClearApiError }: PersonalInfoStepProps) {
+export default function PersonalInfoStep({ data, onDataChange, errors }: PersonalInfoStepProps) {
   const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
   // The latest typed values: a blur can fire before the re-render that carries the last
   // keystroke (tap Next right after typing), so blur checks read this, never a stale `data`.
@@ -51,6 +45,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
   latest.current = data;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const anchor = useFieldAnchor();
 
   // Safety check for undefined data
   if (!data) {
@@ -103,10 +98,6 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
 
     // Typing makes this field's error stale, whatever set it (blur or Next).
     setValidationErrors(prev => (prev[field] ? { ...prev, [field]: '' } : prev));
-    const apiField = API_FIELD_MAP[field] || field;
-    if (apiErrors[apiField] && onClearApiError) {
-      onClearApiError(apiField);
-    }
   };
 
   const validateField = (field: keyof PersonalInfoData) => {
@@ -205,7 +196,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             style={styles.input}
           />
           {validationErrors.fullName && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('fullName')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.fullName}</Text>
             </View>
@@ -226,7 +217,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             style={styles.input}
           />
           {validationErrors.email && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('email')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.email}</Text>
             </View>
@@ -244,7 +235,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             style={styles.input}
           />
           {validationErrors.phoneNumber && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('phoneNumber')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.phoneNumber}</Text>
             </View>
@@ -263,7 +254,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             style={styles.input}
           />
           {validationErrors.cnic && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('cnic')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.cnic}</Text>
             </View>
@@ -282,10 +273,10 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             textAlignVertical="top"
             style={[styles.input, styles.textArea]}
           />
-          {(validationErrors.address || apiErrors.address) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.address && (
+            <View style={styles.errorContainer} ref={anchor('address')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
-              <Text style={styles.errorText}>{validationErrors.address || apiErrors.address}</Text>
+              <Text style={styles.errorText}>{validationErrors.address}</Text>
             </View>
           )}
         </View>
@@ -301,10 +292,10 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             maxLength={10}
             style={styles.input}
           />
-          {(validationErrors.dateOfBirth || apiErrors.date_of_birth) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.dateOfBirth && (
+            <View style={styles.errorContainer} ref={anchor('dateOfBirth')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
-              <Text style={styles.errorText}>{validationErrors.dateOfBirth || apiErrors.date_of_birth}</Text>
+              <Text style={styles.errorText}>{validationErrors.dateOfBirth}</Text>
             </View>
           )}
         </View>
@@ -315,10 +306,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             {(['male', 'female', 'other'] as const).map((g) => (
               <TouchableOpacity
                 key={g}
-                onPress={() => {
-                  onDataChange({ gender: g });
-                  if (apiErrors.gender && onClearApiError) onClearApiError('gender');
-                }}
+                onPress={() => onDataChange({ gender: g })}
                 style={[styles.chip, data.gender === g && styles.chipActive]}
               >
                 <Text style={[styles.chipText, data.gender === g && styles.chipTextActive]}>
@@ -327,10 +315,10 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
               </TouchableOpacity>
             ))}
           </View>
-          {(validationErrors.gender || apiErrors.gender) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.gender && (
+            <View style={styles.errorContainer} ref={anchor('gender')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
-              <Text style={styles.errorText}>{validationErrors.gender || apiErrors.gender}</Text>
+              <Text style={styles.errorText}>{validationErrors.gender}</Text>
             </View>
           )}
         </View>
@@ -383,10 +371,10 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             </View>
           )}
           
-          {(validationErrors.password || apiErrors.password) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.password && (
+            <View style={styles.errorContainer} ref={anchor('password')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
-              <Text style={styles.errorText}>{validationErrors.password || apiErrors.password}</Text>
+              <Text style={styles.errorText}>{validationErrors.password}</Text>
             </View>
           )}
         </View>
@@ -414,7 +402,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             </TouchableOpacity>
           </View>
           {validationErrors.confirmPassword && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('confirmPassword')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.confirmPassword}</Text>
             </View>
@@ -437,7 +425,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             style={styles.input}
           />
           {validationErrors.emergencyContactNumber && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('emergencyContactNumber')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.emergencyContactNumber}</Text>
             </View>
@@ -455,7 +443,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             style={styles.input}
           />
           {validationErrors.emergencyContactName && (
-            <View style={styles.errorContainer}>
+            <View style={styles.errorContainer} ref={anchor('emergencyContactName')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.emergencyContactName}</Text>
             </View>
@@ -469,10 +457,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
             {EMERGENCY_RELATION_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt.value}
-                onPress={() => {
-                  onDataChange({ emergencyRelationship: opt.value });
-                  if (apiErrors.passenger_emergency_contact_relation && onClearApiError) onClearApiError('passenger_emergency_contact_relation');
-                }}
+                onPress={() => onDataChange({ emergencyRelationship: opt.value })}
                 style={[styles.chip, data.emergencyRelationship === opt.value && styles.chipActive]}
               >
                 <Text style={[styles.chipText, data.emergencyRelationship === opt.value && styles.chipTextActive]}>
@@ -481,10 +466,10 @@ export default function PersonalInfoStep({ data, onDataChange, errors, apiErrors
               </TouchableOpacity>
             ))}
           </View>
-          {(validationErrors.emergencyRelationship || apiErrors.passenger_emergency_contact_relation) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.emergencyRelationship && (
+            <View style={styles.errorContainer} ref={anchor('emergencyRelationship')}>
               <Icon name="error" size={16} color={styles.errorText.color} />
-              <Text style={styles.errorText}>{validationErrors.emergencyRelationship || apiErrors.passenger_emergency_contact_relation}</Text>
+              <Text style={styles.errorText}>{validationErrors.emergencyRelationship}</Text>
             </View>
           )}
         </View>

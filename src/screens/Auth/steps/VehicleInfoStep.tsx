@@ -13,6 +13,7 @@ import ThemedTextInput from '../../../components/ThemedTextInput';
 import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth/registration/registrationForm';
 import { maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
 import { mergeStepErrors } from './stepErrors';
+import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -23,8 +24,6 @@ interface VehicleInfoStepProps {
   data: VehicleInfoData;
   onDataChange: (data: Partial<VehicleInfoData>) => void;
   errors: Partial<Record<string, string>>;
-  apiErrors?: Record<string, string>;
-  onClearApiError?: (field: string) => void;
 }
 
 const LICENSE_TYPES = [
@@ -54,13 +53,14 @@ const vehicleYearOptions = (): string[] => {
   return Array.from({ length: 20 }, (_, i) => (max - i).toString());
 };
 
-export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors = {}, onClearApiError }: VehicleInfoStepProps) {
+export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleInfoStepProps) {
   const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showLicenseTypeDropdown, setShowLicenseTypeDropdown] = useState(false);
   const [showExperienceDropdown, setShowExperienceDropdown] = useState(false);
+  const anchor = useFieldAnchor();
 
   // Safety check for undefined data
   if (!data) {
@@ -190,10 +190,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
               </TouchableOpacity>
             ))}
           </View>
-          {(validationErrors.vehicleType || apiErrors.vehicle_type) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.vehicleType && (
+            <View style={styles.errorContainer} ref={anchor('vehicleType')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleType || apiErrors.vehicle_type}</Text>
+              <Text style={styles.errorText}>{validationErrors.vehicleType}</Text>
             </View>
           )}
         </View>
@@ -209,8 +209,8 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
             autoCapitalize="characters"
             style={styles.input}
           />
-          {(validationErrors.vehicleNumber) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.vehicleNumber && (
+            <View style={styles.errorContainer} ref={anchor('vehicleNumber')}>
               <Icon name="error" size={16} color="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.vehicleNumber}</Text>
             </View>
@@ -251,10 +251,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
               </ScrollView>
             </View>
           )}
-          {(validationErrors.vehicleBrand || apiErrors.vehicle_make) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.vehicleBrand && (
+            <View style={styles.errorContainer} ref={anchor('vehicleBrand')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleBrand || apiErrors.vehicle_make}</Text>
+              <Text style={styles.errorText}>{validationErrors.vehicleBrand}</Text>
             </View>
           )}
         </View>
@@ -269,10 +269,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
             onBlur={() => validateField('vehicleModel', data.vehicleModel || '')}
             style={styles.input}
           />
-          {(validationErrors.vehicleModel || apiErrors.vehicle_model) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.vehicleModel && (
+            <View style={styles.errorContainer} ref={anchor('vehicleModel')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleModel || apiErrors.vehicle_model}</Text>
+              <Text style={styles.errorText}>{validationErrors.vehicleModel}</Text>
             </View>
           )}
         </View>
@@ -312,10 +312,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
                 </ScrollView>
               </View>
             )}
-            {(validationErrors.vehicleYear || apiErrors.vehicle_year) && (
-              <View style={styles.errorContainer}>
+            {validationErrors.vehicleYear && (
+              <View style={styles.errorContainer} ref={anchor('vehicleYear')}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.vehicleYear || apiErrors.vehicle_year}</Text>
+                <Text style={styles.errorText}>{validationErrors.vehicleYear}</Text>
               </View>
             )}
           </View>
@@ -354,10 +354,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
                 </ScrollView>
               </View>
             )}
-            {(validationErrors.vehicleColor || apiErrors.vehicle_color) && (
-              <View style={styles.errorContainer}>
+            {validationErrors.vehicleColor && (
+              <View style={styles.errorContainer} ref={anchor('vehicleColor')}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.vehicleColor || apiErrors.vehicle_color}</Text>
+                <Text style={styles.errorText}>{validationErrors.vehicleColor}</Text>
               </View>
             )}
           </View>
@@ -369,13 +369,13 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
           <ThemedTextInput
             placeholder="e.g. ABC-1234-D"
             value={data.licensePlate || ''}
-            onChangeText={(v) => { onDataChange({ licensePlate: v }); onClearApiError?.('license_plate'); }}
+            onChangeText={(v) => onDataChange({ licensePlate: v })}
             style={styles.input}
           />
-          {(validationErrors.licensePlate || apiErrors.license_plate) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.licensePlate && (
+            <View style={styles.errorContainer} ref={anchor('licensePlate')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licensePlate || apiErrors.license_plate}</Text>
+              <Text style={styles.errorText}>{validationErrors.licensePlate}</Text>
             </View>
           )}
         </View>
@@ -384,13 +384,13 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
           <ThemedTextInput
             placeholder="Official registration number"
             value={data.registrationNumber || ''}
-            onChangeText={(v) => { onDataChange({ registrationNumber: v }); onClearApiError?.('registration_number'); }}
+            onChangeText={(v) => onDataChange({ registrationNumber: v })}
             style={styles.input}
           />
-          {(validationErrors.registrationNumber || apiErrors.registration_number) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.registrationNumber && (
+            <View style={styles.errorContainer} ref={anchor('registrationNumber')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.registrationNumber || apiErrors.registration_number}</Text>
+              <Text style={styles.errorText}>{validationErrors.registrationNumber}</Text>
             </View>
           )}
         </View>
@@ -417,7 +417,6 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
                     onPress={() => {
                       onDataChange({ licenseType: opt.value });
                       setShowLicenseTypeDropdown(false);
-                      onClearApiError?.('license_type');
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{opt.label}</Text>
@@ -427,10 +426,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
               </ScrollView>
             </View>
           )}
-          {(validationErrors.licenseType || apiErrors.license_type) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.licenseType && (
+            <View style={styles.errorContainer} ref={anchor('licenseType')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licenseType || apiErrors.license_type}</Text>
+              <Text style={styles.errorText}>{validationErrors.licenseType}</Text>
             </View>
           )}
         </View>
@@ -439,13 +438,13 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
           <ThemedTextInput
             placeholder="YYYY-MM-DD"
             value={data.licenseExpiryDate || ''}
-            onChangeText={(v) => { onDataChange({ licenseExpiryDate: v }); onClearApiError?.('license_expiry_date'); }}
+            onChangeText={(v) => onDataChange({ licenseExpiryDate: v })}
             style={styles.input}
           />
-          {(validationErrors.licenseExpiryDate || apiErrors.license_expiry_date) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.licenseExpiryDate && (
+            <View style={styles.errorContainer} ref={anchor('licenseExpiryDate')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licenseExpiryDate || apiErrors.license_expiry_date}</Text>
+              <Text style={styles.errorText}>{validationErrors.licenseExpiryDate}</Text>
             </View>
           )}
         </View>
@@ -470,7 +469,6 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
                     onPress={() => {
                       onDataChange({ drivingExperience: y });
                       setShowExperienceDropdown(false);
-                      onClearApiError?.('driving_experience');
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{y} years</Text>
@@ -480,10 +478,10 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
               </ScrollView>
             </View>
           )}
-          {(validationErrors.drivingExperience || apiErrors.driving_experience) && (
-            <View style={styles.errorContainer}>
+          {validationErrors.drivingExperience && (
+            <View style={styles.errorContainer} ref={anchor('drivingExperience')}>
               <Icon name="error" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.drivingExperience || apiErrors.driving_experience}</Text>
+              <Text style={styles.errorText}>{validationErrors.drivingExperience}</Text>
             </View>
           )}
         </View>
@@ -497,13 +495,13 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
             <ThemedTextInput
               placeholder="e.g. HBL, UBL, MCB"
               value={data.bankName || ''}
-              onChangeText={(v) => { onDataChange({ bankName: v }); onClearApiError?.('bank_name'); }}
+              onChangeText={(v) => onDataChange({ bankName: v })}
               style={styles.input}
             />
-            {(validationErrors.bankName || apiErrors.bank_name) && (
-              <View style={styles.errorContainer}>
+            {validationErrors.bankName && (
+              <View style={styles.errorContainer} ref={anchor('bankName')}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.bankName || apiErrors.bank_name}</Text>
+                <Text style={styles.errorText}>{validationErrors.bankName}</Text>
               </View>
             )}
           </View>
@@ -512,13 +510,13 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
             <ThemedTextInput
               placeholder="Branch name or address"
               value={data.bankBranch || ''}
-              onChangeText={(v) => { onDataChange({ bankBranch: v }); onClearApiError?.('bank_branch'); }}
+              onChangeText={(v) => onDataChange({ bankBranch: v })}
               style={styles.input}
             />
-            {(validationErrors.bankBranch || apiErrors.bank_branch) && (
-              <View style={styles.errorContainer}>
+            {validationErrors.bankBranch && (
+              <View style={styles.errorContainer} ref={anchor('bankBranch')}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.bankBranch || apiErrors.bank_branch}</Text>
+                <Text style={styles.errorText}>{validationErrors.bankBranch}</Text>
               </View>
             )}
           </View>
@@ -527,14 +525,14 @@ export default function VehicleInfoStep({ data, onDataChange, errors, apiErrors 
             <ThemedTextInput
               placeholder="IBAN or account number"
               value={data.bankAccountNumber || ''}
-              onChangeText={(v) => { onDataChange({ bankAccountNumber: v }); onClearApiError?.('bank_account_number'); }}
+              onChangeText={(v) => onDataChange({ bankAccountNumber: v })}
               keyboardType="number-pad"
               style={styles.input}
             />
-            {(validationErrors.bankAccountNumber || apiErrors.bank_account_number) && (
-              <View style={styles.errorContainer}>
+            {validationErrors.bankAccountNumber && (
+              <View style={styles.errorContainer} ref={anchor('bankAccountNumber')}>
                 <Icon name="error" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.bankAccountNumber || apiErrors.bank_account_number}</Text>
+                <Text style={styles.errorText}>{validationErrors.bankAccountNumber}</Text>
               </View>
             )}
           </View>

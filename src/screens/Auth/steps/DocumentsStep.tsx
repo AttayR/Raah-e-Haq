@@ -14,6 +14,7 @@ import { BrandColors } from '../../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { logger } from '../../../core/logging/logger';
 import { mergeStepErrors } from './stepErrors';
+import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -39,6 +40,7 @@ interface DocumentsStepProps {
 export default function DocumentsStep({ data, onDataChange, errors }: DocumentsStepProps) {
   const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
+  const anchor = useFieldAnchor();
   // Schema errors from Next (T-201) plus the step's own picker errors.
   const validationErrors = mergeStepErrors(errors, localErrors);
 
@@ -141,6 +143,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
     label: string,
     imageUri: string,
     onPress: () => void,
+    field: keyof DocumentsData,
     errorMessage?: string,
     isRequired: boolean = true
   ) => (
@@ -170,7 +173,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         )}
       </TouchableOpacity>
       {errorMessage && (
-        <View style={styles.errorContainer}>
+        <View style={styles.errorContainer} ref={anchor(field)}>
           <Icon name="error" size={16} color="#ef4444" />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
@@ -227,7 +230,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         {(data.vehiclePictures || []).length}/6 pictures uploaded
       </Text>
       {validationErrors.vehiclePictures && (
-        <View style={styles.errorContainer}>
+        <View style={styles.errorContainer} ref={anchor('vehiclePictures')}>
           <Icon name="error" size={16} color="#ef4444" />
           <Text style={styles.errorText}>{validationErrors.vehiclePictures}</Text>
         </View>
@@ -249,6 +252,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             'Profile Image (optional)',
             data.profilePicture,
             () => openImagePicker('profile'),
+            'profilePicture',
             validationErrors.profilePicture,
             false
           )}
@@ -258,6 +262,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             'CNIC Front Picture',
             data.cnicFrontPicture,
             () => openImagePicker('cnicFront'),
+            'cnicFrontPicture',
             validationErrors.cnicFrontPicture,
             true
           )}
@@ -267,6 +272,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
             'CNIC Back Picture',
             data.cnicBackPicture,
             () => openImagePicker('cnicBack'),
+            'cnicBackPicture',
             validationErrors.cnicBackPicture,
             true
           )}
@@ -311,6 +317,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           'Driver Profile Picture',
           data.driverPicture,
           () => openImagePicker('driver'),
+          'driverPicture',
           validationErrors.driverPicture,
           true
         )}
@@ -320,6 +327,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           'CNIC Picture',
           data.cnicPicture,
           () => openImagePicker('cnic'),
+          'cnicPicture',
           validationErrors.cnicPicture,
           true
         )}
@@ -329,6 +337,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           'License Front',
           data.licenseFrontPicture,
           () => openImagePicker('licenseFront'),
+          'licenseFrontPicture',
           validationErrors.licenseFrontPicture,
           true
         )}
@@ -336,6 +345,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           'License Back',
           data.licenseBackPicture,
           () => openImagePicker('licenseBack'),
+          'licenseBackPicture',
           validationErrors.licenseBackPicture,
           true
         )}

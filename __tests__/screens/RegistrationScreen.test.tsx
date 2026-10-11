@@ -206,3 +206,66 @@ describe('RegistrationScreen (T-201)', () => {
     expect(screen.queryByText('Weak')).toBeNull();
   });
 });
+
+describe('RegistrationScreen server field errors (T-202)', () => {
+  it('a 422 shows each field error under its input, opens step 1, one toast; editing clears only that field', async () => {
+    mock.onPost('/auth/register').reply(422, {
+      success: false,
+      message: 'Validation Error',
+      errors: {
+        email: ['The email field must be a valid email address.'],
+        phone: ['Enter a Pakistani mobile number.'],
+        passenger_emergency_contact_name: ['The passenger emergency contact name field is required.'],
+      },
+    });
+    const errorToast = jest.spyOn(toast, 'error');
+    const store = await renderScreen();
+    goToReview();
+    errorToast.mockClear();
+
+    fireEvent.press(createButton());
+
+    await waitFor(() => expect(screen.getByText('Step 1 of 4')).toBeTruthy());
+    expect(screen.getByText('The email field must be a valid email address.')).toBeTruthy();
+    expect(screen.getByText('Enter a Pakistani mobile number.')).toBeTruthy();
+    expect(screen.getByText('The passenger emergency contact name field is required.')).toBeTruthy();
+    expect(errorToast).toHaveBeenCalledTimes(1);
+    expect(errorToast).toHaveBeenCalledWith('Please fix the highlighted fields.');
+    // The registration thunk has reducer cases (AUTH-17).
+    expect(store.getState().apiAuth.status).toBe('failed');
+    expect(store.getState().apiAuth.error).toBe('Validation Error');
+
+    type('Enter your email address', 'passenger2@example.test');
+    expect(screen.queryByText('The email field must be a valid email address.')).toBeNull();
+    expect(screen.getByText('Enter a Pakistani mobile number.')).toBeTruthy();
+
+    // A server error survives moving between steps until its field is edited.
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
+    fireEvent.press(screen.getByText('Previous'));
+    expect(screen.getByText('Enter a Pakistani mobile number.')).toBeTruthy();
+    errorToast.mockRestore();
+  });
+
+  it('a 422 on a field no input shows is listed at form level and the form stays put', async () => {
+    mock.onPost('/auth/register').reply(422, {
+      success: false,
+      message: 'Validation Error',
+      errors: { passenger_preferred_payment: ['The selected passenger preferred payment is invalid.'] },
+    });
+    const errorToast = jest.spyOn(toast, 'error');
+    await renderScreen();
+    goToReview();
+    errorToast.mockClear();
+
+    fireEvent.press(createButton());
+
+    await waitFor(() =>
+      expect(screen.getByText('The selected passenger preferred payment is invalid.')).toBeTruthy(),
+    );
+    expect(screen.getByText('Step 4 of 4')).toBeTruthy();
+    expect(errorToast).toHaveBeenCalledTimes(1);
+    expect(errorToast).toHaveBeenCalledWith('Your details could not be accepted. See the message below.');
+    errorToast.mockRestore();
+  });
+});

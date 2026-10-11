@@ -3,6 +3,7 @@ import { User, OtpSentInfo } from '../../services/api';
 import {
   loginUser,
   registerUser,
+  registerUserWithImages,
   sendOtp,
   verifyOtp,
   verifyPhone,
@@ -148,6 +149,25 @@ const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
+      });
+
+    // Register with images (the registration form, T-202/AUTH-17). Never a session: a BE-38
+    // backend answers with the phone step, which signs in through verifyPhone.
+    builder
+      .addCase(registerUserWithImages.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(registerUserWithImages.fulfilled, (state) => {
+        state.status = 'succeeded';
+        state.error = null;
+      })
+      .addCase(registerUserWithImages.rejected, (state, action) => {
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
+        state.status = 'failed';
+        state.error = rejectionMessage(action.payload, action.error.message || 'Registration failed');
       });
 
     // Send OTP

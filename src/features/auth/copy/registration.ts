@@ -12,6 +12,8 @@ export const REGISTRATION_COPY = {
     /** A backend from before BE-35 (no phone step): the old success message. */
     created: 'Your account has been created successfully! Please wait for admin approval.',
     fixErrors: 'Please fix the highlighted fields.',
+    /** T-202: a 422 whose fields no input shows; the messages are listed above the buttons. */
+    notAccepted: 'Your details could not be accepted. See the message below.',
     next: 'Next',
     previous: 'Previous',
     create: 'Create Account',

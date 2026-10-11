@@ -1,5 +1,6 @@
 import { Dimensions, StyleSheet } from 'react-native';
 import { BrandColors } from '../../theme/colors';
+import { lightColors } from '../../theme/tokens';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -254,6 +255,24 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     padding: 20,
+  },
+  /** T-202: 422 messages for fields no input shows. */
+  formErrorBox: {
+    marginHorizontal: isSmallScreen ? 16 : 20,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: lightColors.dangerSoft,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  formErrorList: {
+    flex: 1,
+    gap: 4,
+  },
+  formErrorText: {
+    color: lightColors.danger,
+    fontSize: 14,
   },
   loadingContainer: {
     flexDirection: 'row',

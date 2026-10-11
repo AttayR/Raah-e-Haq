@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -36,16 +36,14 @@ import {
   type RegistrationStep,
 } from '../../features/auth/registration/registrationForm';
 import { buildRegistrationRequest } from '../../features/auth/registration/buildRegistrationRequest';
+import { mapRegistrationServerErrors } from '../../features/auth/registration/serverFieldErrors';
+import { FieldAnchorContext } from '../../features/auth/registration/fieldAnchors';
 import RegistrationPhoneStep from '../../features/auth/components/RegistrationPhoneStep';
 import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 
-/** Server field names that belong to the vehicle step (a 422 on them opens that step). */
-const DRIVER_FIELDS = [
-  'license_type', 'license_expiry_date', 'license_plate', 'registration_number', 'driving_experience',
-  'vehicle_make', 'vehicle_model', 'vehicle_year', 'vehicle_color', 'bank_name', 'bank_branch',
-  'bank_account_number',
-];
+/** How far above a field's error line the form scrolls, so its label and input show too. */
+const FIELD_SCROLL_OFFSET = 120;
 
 /** What registration left for the phone step. In memory only: the token is a bearer secret. */
 interface PhoneStepState {
@@ -62,30 +60,72 @@ export default function RegistrationScreen() {
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
   const [submitting, setSubmitting] = useState(false);
   const [stepErrors, setStepErrors] = useState<StepErrors>({});
-  const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
+  // T-202: the last 422, per form input (cleared when the input changes) and form-level.
+  const [serverErrors, setServerErrors] = useState<StepErrors>({});
+  const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [scrollTarget, setScrollTarget] = useState<{ field: string } | null>(null);
   const [formData, setFormData] = useState<RegistrationFormData>(INITIAL_REGISTRATION_FORM);
   const [phoneStep, setPhoneStep] = useState<PhoneStepState | null>(null);
   // One registration at a time: a second tap lands before `submitting` re-renders the button.
   const inFlight = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
+  // The form's container and its offset in the scroll content, to turn a field's position into a scroll offset.
+  const containerRef = useRef<View>(null);
+  const containerY = useRef(0);
+  // Error lines the steps mark with ref={anchor(field)}, and one stable ref callback per field.
+  const anchors = useRef(new Map<string, View>());
+  const anchorRefs = useRef(new Map<string, (node: View | null) => void>());
+
+  const anchor = useCallback((field: string) => {
+    let ref = anchorRefs.current.get(field);
+    if (!ref) {
+      ref = (node: View | null) => {
+        if (node) {
+          anchors.current.set(field, node);
+        } else {
+          anchors.current.delete(field);
+        }
+      };
+      anchorRefs.current.set(field, ref);
+    }
+    return ref;
+  }, []);
+
+  // After a 422 the step that has the first error is rendered; then scroll to that field.
+  useEffect(() => {
+    if (!scrollTarget) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const node = anchors.current.get(scrollTarget.field);
+      const container = containerRef.current;
+      if (!node || !container) return;
+      node.measureLayout(container, (_x, y) => {
+        const offset = containerY.current + y - FIELD_SCROLL_OFFSET;
+        scrollRef.current?.scrollTo({ y: Math.max(0, offset), animated: true });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollTarget]);
 
   const stepIndex = REGISTRATION_STEPS.findIndex((step) => step.key === currentStep);
 
   const updateFormData = (patch: Partial<RegistrationFormData>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
-    // An edited field's schema error is stale; the next Next re-validates it.
-    setStepErrors((prev) => {
+    const edited = Object.keys(patch) as (keyof RegistrationFormData)[];
+    const dropEdited = (prev: StepErrors) => {
+      if (!edited.some((key) => prev[key])) return prev;
       const next = { ...prev };
-      (Object.keys(patch) as (keyof RegistrationFormData)[]).forEach((key) => delete next[key]);
+      edited.forEach((key) => delete next[key]);
       return next;
-    });
+    };
+    // An edited field's errors are stale: the next Next re-validates it, the next submit re-asks the server.
+    setStepErrors(dropEdited);
+    setServerErrors(dropEdited);
+    if (patch.role !== undefined && patch.role !== formData.role) {
+      // The other role's form: the last 422 was about fields it may not have.
+      setServerErrors({});
+      setFormErrors([]);
+    }
   };
-
-  const clearApiError = (field: string) =>
-    setApiValidationErrors((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
 
   const handleNext = () => {
     const errors = validateStep(currentStep, formData);
@@ -106,16 +146,23 @@ export default function RegistrationScreen() {
     }
   };
 
-  /** 422 field errors: shown on their inputs, and the form opens the step that has them. */
-  const showServerFieldErrors = (fieldErrors: Record<string, string[]>, message: string) => {
-    const errors: Record<string, string> = {};
-    Object.entries(fieldErrors).forEach(([field, messages]) => {
-      errors[field] = messages[0] ?? '';
-    });
-    setApiValidationErrors(errors);
-    const hasDriverError = Object.keys(errors).some((key) => DRIVER_FIELDS.includes(key));
-    setCurrentStep(hasDriverError && formData.role === 'driver' ? 'vehicle' : 'personal');
-    toast.error(message);
+  /**
+   * 422 field errors (T-202): each under its input until that input changes; the form opens the
+   * first step that has one and scrolls to its first errored field. Fields no input shows are
+   * listed above the buttons. One toast sums it up.
+   */
+  const showServerFieldErrors = (fieldErrors: Record<string, string[]>) => {
+    const mapped = mapRegistrationServerErrors(fieldErrors, formData.role);
+    setServerErrors(mapped.fieldErrors);
+    setFormErrors(mapped.formErrors);
+    if (mapped.step && mapped.firstField) {
+      setStepErrors({});
+      setCurrentStep(mapped.step);
+      setScrollTarget({ field: mapped.firstField });
+      toast.error(COPY.form.fixErrors);
+    } else {
+      toast.error(COPY.form.notAccepted);
+    }
   };
 
   const handleSubmit = async () => {
@@ -133,7 +180,8 @@ export default function RegistrationScreen() {
 
     inFlight.current = true;
     setSubmitting(true);
-    setApiValidationErrors({});
+    setServerErrors({});
+    setFormErrors([]);
     try {
       const result = await registerWithImages(buildRegistrationRequest(formData));
 
@@ -161,7 +209,7 @@ export default function RegistrationScreen() {
         holdSubmit(payload.retryAfter);
         toast.error(message);
       } else if (payload && Object.keys(payload.fieldErrors).length > 0) {
-        showServerFieldErrors(payload.fieldErrors, message);
+        showServerFieldErrors(payload.fieldErrors);
       } else {
         toast.error(message);
       }
@@ -175,35 +223,35 @@ export default function RegistrationScreen() {
   };
 
   const renderStepContent = () => {
+    // Schema errors from the last Next win over the last 422's message for the same input.
+    const errors: StepErrors = { ...serverErrors, ...stepErrors };
     switch (currentStep) {
       case 'personal':
-        return (
-          <PersonalInfoStep
-            data={formData}
-            onDataChange={updateFormData}
-            errors={stepErrors}
-            apiErrors={apiValidationErrors}
-            onClearApiError={clearApiError}
-          />
-        );
+        return <PersonalInfoStep data={formData} onDataChange={updateFormData} errors={errors} />;
       case 'vehicle':
-        return (
-          <VehicleInfoStep
-            data={formData}
-            onDataChange={updateFormData}
-            errors={stepErrors}
-            apiErrors={apiValidationErrors}
-            onClearApiError={clearApiError}
-          />
-        );
+        return <VehicleInfoStep data={formData} onDataChange={updateFormData} errors={errors} />;
       case 'documents':
-        return <DocumentsStep data={formData} onDataChange={updateFormData} errors={stepErrors} />;
+        return <DocumentsStep data={formData} onDataChange={updateFormData} errors={errors} />;
       case 'review':
         return <ReviewStep data={formData} onDataChange={updateFormData} />;
       default:
         return null;
     }
   };
+
+  const renderFormErrors = () =>
+    formErrors.length > 0 ? (
+      <View style={styles.formErrorBox} accessibilityRole="alert">
+        <Icon name="error" size={18} color={styles.formErrorText.color} />
+        <View style={styles.formErrorList}>
+          {formErrors.map((message) => (
+            <Text key={message} style={styles.formErrorText}>
+              {message}
+            </Text>
+          ))}
+        </View>
+      </View>
+    ) : null;
 
   const renderButtons = () => (
     <View style={styles.buttonContainerScrollable}>
@@ -255,12 +303,19 @@ export default function RegistrationScreen() {
         />
 
         <ScrollView
+          ref={scrollRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.container}>
+          <View
+            ref={containerRef}
+            style={styles.container}
+            onLayout={(event) => {
+              containerY.current = event.nativeEvent.layout.y;
+            }}
+          >
             {phoneStep ? (
               <RegistrationPhoneStep
                 pending={phoneStep.pending}
@@ -268,10 +323,11 @@ export default function RegistrationScreen() {
                 onGoToSignIn={() => navigation.popTo('Login')}
               />
             ) : (
-              <>
+              <FieldAnchorContext.Provider value={anchor}>
                 {renderStepContent()}
+                {renderFormErrors()}
                 {renderButtons()}
-              </>
+              </FieldAnchorContext.Provider>
             )}
           </View>
         </ScrollView>

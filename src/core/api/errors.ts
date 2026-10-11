@@ -1,6 +1,8 @@
 import axios from 'axios';
 import type { ApiResponse, FieldErrors } from './types';
 
+export type { FieldErrors } from './types';
+
 export type ApiErrorKind =
   | 'network'
   | 'timeout'
@@ -279,6 +281,19 @@ export const toThunkRejection = (error: unknown, fallbackMessage: string): Thunk
     ...(apiError.account ? { account: apiError.account } : {}),
     ...(apiError.extra ? { extra: apiError.extra } : {}),
   };
+};
+
+/**
+ * The first message per field of a 422 `errors` map (Laravel sends a list per field), for
+ * forms that show one line under each input (T-202). Fields with no non-empty message are left out.
+ */
+export const firstFieldMessages = (fieldErrors: FieldErrors | undefined): Record<string, string> => {
+  const result: Record<string, string> = {};
+  Object.entries(fieldErrors ?? {}).forEach(([field, messages]) => {
+    const first = messages.find((message) => message.trim().length > 0);
+    if (first) result[field] = first;
+  });
+  return result;
 };
 
 /** Safe display text for a rejected thunk payload (never an object inside <Text>). */
