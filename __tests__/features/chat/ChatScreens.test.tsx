@@ -5,7 +5,7 @@
  * "Message" entry points on both ride panels open RideChat with the ride id.
  */
 import React from 'react';
-import { Linking, Text } from 'react-native';
+import { KeyboardAvoidingView, Linking, Text } from 'react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
@@ -79,6 +79,9 @@ describe('ChatThreadScreen', () => {
     expect(screen.getByTestId('chat-seen')).toHaveTextContent(/Seen/);
     expect(screen.getByTestId('chat-composer')).toBeTruthy();
     expect(screen.queryByTestId('chat-closed-notice')).toBeNull();
+    // T-512: the composer lives inside the iOS keyboard avoider.
+    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props).toMatchObject({ behavior: 'padding', keyboardVerticalOffset: 0 });
+    expect(screen.getByTestId('chat-keyboard-avoider')).toContainElement(screen.getByTestId('chat-composer'));
   });
 
   it('read-only after the ride ended: no composer, an explanation instead', async () => {
@@ -96,6 +99,24 @@ describe('ChatThreadScreen', () => {
     expect(screen.queryByTestId('chat-composer')).toBeNull();
     expect(screen.queryByTestId('chat-input')).toBeNull();
     expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(/This ride has ended\. The chat is read-only until/);
+  });
+
+  it('read-only notice says "tomorrow" when the window ends on another day (T-512)', async () => {
+    jest.setSystemTime(new Date(2026, 9, 11, 21, 0));
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(
+      threadPage({
+        canSend: false,
+        rideStatus: 'completed',
+        readOnlyUntil: new Date(2026, 9, 12, 12, 16).toISOString(),
+        messages: [message({ id: 1, body: 'Thanks', readAt: 'r' })],
+        lastId: 1,
+      }),
+    );
+    await renderWithStore(<ChatThreadScreen />);
+
+    expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(
+      /This ride has ended\. The chat is read-only until tomorrow at 12:16 PM\.$/,
+    );
   });
 
   it('no driver yet: the composer is hidden with the not-open notice', async () => {

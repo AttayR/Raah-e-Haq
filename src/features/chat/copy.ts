@@ -68,3 +68,26 @@ export const formatChatTime = (iso: string | null | undefined): string => {
   const suffix = hours >= 12 ? 'PM' : 'AM';
   return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${suffix}`;
 };
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** The local calendar day as a day number (DST-safe: the local date, counted in UTC days). */
+const dayIndexOf = (date: Date): number =>
+  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
+
+/**
+ * A time with its day when it isn't today (T-512): "9:05 AM" today, "tomorrow at 9:05 AM",
+ * "yesterday at 9:05 AM", otherwise "12 Oct at 9:05 AM" (plus the year when it differs).
+ * '' when the time does not parse. Local time, like `formatChatTime`.
+ */
+export const formatChatDayTime = (iso: string | null | undefined, now: Date = new Date()): string => {
+  const time = formatChatTime(iso);
+  if (!time || !iso) return time;
+  const date = new Date(iso);
+  const dayDiff = dayIndexOf(date) - dayIndexOf(now);
+  if (dayDiff === 0) return time;
+  if (dayDiff === 1) return `tomorrow at ${time}`;
+  if (dayDiff === -1) return `yesterday at ${time}`;
+  const year = date.getFullYear() === now.getFullYear() ? '' : ` ${date.getFullYear()}`;
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}${year} at ${time}`;
+};

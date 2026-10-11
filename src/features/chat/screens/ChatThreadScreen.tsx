@@ -25,8 +25,9 @@ import { getDriverPhone } from '../../../services/rideService';
 import { ChatComposer } from '../components/ChatComposer';
 import { ChatThreadHeader } from '../components/ChatThreadHeader';
 import { MessageBubble } from '../components/MessageBubble';
-import { CHAT_COPY, fallbackNameOf, formatChatTime, roleLabelOf } from '../copy';
+import { CHAT_COPY, fallbackNameOf, formatChatDayTime, roleLabelOf } from '../copy';
 import { useChatThread } from '../hooks';
+import { chatKeyboardAvoidingProps } from '../keyboard';
 import type { RideChatParams } from '../navigation';
 import { seenMessageId, threadItemsNewestFirst, type ChatThreadState, type ThreadItem } from '../thread';
 
@@ -49,7 +50,7 @@ const useRidePhone = (rideId: number): string | null => {
 const closedNoticeOf = (state: ChatThreadState): string => {
   const meta = state.meta;
   if (meta?.readOnlyUntil) {
-    const time = formatChatTime(meta.readOnlyUntil);
+    const time = formatChatDayTime(meta.readOnlyUntil);
     return time ? CHAT_COPY.closedUntil(time) : CHAT_COPY.closedNotice;
   }
   if (meta && !meta.otherParty) return CHAT_COPY.notOpenNotice;
@@ -149,7 +150,11 @@ const ChatThreadScreen: React.FC = () => {
   return (
     <Screen testID="chat-thread-screen">
       {header}
-      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.fill}
+        {...chatKeyboardAvoidingProps(Platform.OS, insets.top)}
+        testID="chat-keyboard-avoider"
+      >
         <FlatList
           style={styles.fill}
           data={items}
