@@ -45,4 +45,6 @@ export const layout = {
   smallDeviceSheetMaxRatio: 0.88,
   /** No fixed hero taller than 30% of the screen on small devices. */
   smallDeviceHeroMaxRatio: 0.3,
+  /** Opacity of the `surface` strip behind the status bar on map screens, so map labels never sit under the clock. */
+  statusBarScrimOpacity: 0.92,
 } as const;

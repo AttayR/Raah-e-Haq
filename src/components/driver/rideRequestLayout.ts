@@ -1,3 +1,5 @@
+import { space } from '../../theme';
+
 /**
  * Layout shared by the driver Map screen's control column and the ride request panel
  * (RideRequestHost, T-408), so the panel never covers the Map controls.
@@ -5,10 +7,10 @@
 
 /** The Map screen's bottom-right control column: my-location over Go Online/Offline. */
 export const DRIVER_MAP_CONTROLS = {
-  bottom: 30,
-  locationButtonSize: 50,
-  locationButtonGap: 15,
-  onlineButtonSize: 60,
+  bottom: space[4],
+  locationButtonSize: 48,
+  locationButtonGap: space[3],
+  onlineButtonSize: 56,
 } as const;
 
 /** Height of the control column above the bottom of the Map tab's content. */

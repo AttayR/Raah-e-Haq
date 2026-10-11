@@ -1,18 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Alert, 
-  Linking,
-  StatusBar
-} from 'react-native';
+import { View, StyleSheet, Alert, Linking } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Marker } from 'react-native-maps';
-import SafeMapView from '../../components/SafeMapView';
+import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { BrandColors } from '../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { layout, radius, space, type SemanticColorName } from '../../theme';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { AppText, Icon, IconButton, Screen } from '../../components/ui';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../app/providers/ReduxProvider';
@@ -24,7 +18,7 @@ import { useDriverStatusToggle } from '../../features/driver-status/hooks';
 import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { OpenRideCard } from '../../components/driver/OpenRideCard';
-import { DRIVER_MAP_CONTROLS } from '../../components/driver/rideRequestLayout';
+import { DRIVER_MAP_CONTROLS, DRIVER_MAP_CONTROLS_CLEARANCE } from '../../components/driver/rideRequestLayout';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 
 /** RideResource coordinates arrive as decimal strings. */
@@ -50,7 +44,10 @@ interface Location {
 }
 
 const DriverMapScreen = () => {
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<SafeMapViewRef | null>(null);
+  const { theme } = useAppTheme();
+  const { colors } = theme;
+  const insets = useSafeAreaInsets();
   // SafeMapView ignores animateToRegion until the map is ready, so a position that arrives
   // earlier is applied once it is (otherwise the map stays on the default region).
   const [mapReady, setMapReady] = useState(false);
@@ -188,26 +185,44 @@ const DriverMapScreen = () => {
     toggle();
   };
 
+  const statusText = isLoadingLocation
+    ? DRIVER_STATUS_COPY.mapLocating
+    : isChecking
+    ? DRIVER_STATUS_COPY.mapChecking
+    : isOnRide
+    ? DRIVER_STATUS_COPY.mapOnRide
+    : isOnline
+    ? DRIVER_STATUS_COPY.mapOnline
+    : DRIVER_STATUS_COPY.mapOffline;
+  // The pin follows the driver's state (QA: it stayed green while offline).
+  const statusColor: SemanticColorName = isLoadingLocation
+    ? 'warning'
+    : isOnRide
+    ? 'info'
+    : isOnline && !isChecking
+    ? 'success'
+    : 'textMuted';
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      
+    // Map screens own no safe-area padding: overlays place themselves from the insets.
+    <Screen edges={[]} testID="driver-map">
+
       <MapErrorBoundary>
         <SafeMapView
           ref={mapRef}
           style={styles.map}
           initialRegion={getSafeRegion()}
+          customMapStyle={theme.mapStyle}
           showsUserLocation={true}
           showsMyLocationButton={false}
           onMapReady={() => {
             setMapReady(true);
           }}
-          onError={(error) => {
-            logger.error('SafeMapView error:', error);
-          }}
           fallbackComponent={
             <View style={styles.map}>
-              <Text style={styles.fallbackText}>Map loading...</Text>
+              <AppText variant="body" color="primaryText" align="center" style={styles.fallbackText}>
+                {DRIVER_STATUS_COPY.mapLoading}
+              </AppText>
             </View>
           }
         >
@@ -218,8 +233,15 @@ const DriverMapScreen = () => {
             title="Your Location"
             description="You are here"
           >
-            <View style={styles.driverMarker}>
-              <Icon name="local-taxi" size={24} color="white" />
+            <View style={[
+                styles.driverMarker,
+                {
+                  backgroundColor: colors.driverMarker,
+                  borderColor: colors.surface,
+                  borderWidth: theme.borderWidth.focus,
+                },
+              ]}>
+              <Icon name="rides" size={24} color="surface" />
             </View>
           </Marker>
         )}
@@ -229,66 +251,72 @@ const DriverMapScreen = () => {
           <Marker
             coordinate={pickupCoordinate}
             title="Pickup Location"
-            pinColor="green"
+            pinColor={colors.pickupPin}
           />
         )}
         {dropoffCoordinate && (
           <Marker
             coordinate={dropoffCoordinate}
             title="Destination"
-            pinColor="red"
+            pinColor={colors.dropoffPin}
           />
         )}
         </SafeMapView>
       </MapErrorBoundary>
 
-      {/* Status Bar */}
-      <View style={styles.statusBar}>
-        <View style={styles.statusInfo}>
-          <Icon 
-            name={isLoadingLocation ? "location-searching" : "location-on"} 
-            size={20} 
-            color={isLoadingLocation ? BrandColors.warning : BrandColors.success} 
-          />
-          <Text style={styles.statusText}>
-            {isLoadingLocation
-              ? 'Getting your location...'
-              : isChecking
-              ? DRIVER_STATUS_COPY.mapChecking
-              : isOnRide
-              ? DRIVER_STATUS_COPY.mapOnRide
-              : isOnline
-              ? DRIVER_STATUS_COPY.mapOnline
-              : DRIVER_STATUS_COPY.mapOffline}
-          </Text>
-        </View>
+      {/* Scrim under the status bar so map labels never sit behind the clock (QA). */}
+      <View
+        pointerEvents="none"
+        style={[styles.statusBarScrim, { height: insets.top, backgroundColor: colors.surface }]}
+      />
+
+      {/* Status chip: below the status bar / Dynamic Island on every device (QA). */}
+      <View
+        testID="driver-map-status"
+        accessibilityRole="summary"
+        accessibilityLabel={statusText}
+        style={[
+          styles.statusChip,
+          { top: insets.top + space[2], backgroundColor: colors.surface },
+          theme.elevation[2],
+          theme.mode === 'dark' ? { borderWidth: theme.borderWidth.thin, borderColor: colors.border } : null,
+        ]}
+      >
+        <Icon
+          testID="driver-map-status-pin"
+          name={isLoadingLocation ? 'locationOff' : 'pin'}
+          size={20}
+          color={statusColor}
+        />
+        <AppText variant="bodyStrong" numberOfLines={2} style={styles.statusText}>
+          {statusText}
+        </AppText>
       </View>
 
       {/* Control Buttons */}
       <View style={styles.controls}>
-        <TouchableOpacity testID="driver-map-locate" style={styles.locationButton} onPress={centreOnLocation}>
-          <Icon name="my-location" size={24} color={BrandColors.primary} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[
-            styles.onlineButton,
-            isOnline && styles.onlineButtonActive,
-            toggleDisabled && styles.onlineButtonDisabled,
-          ]}
+        <View style={styles.locateGap}>
+          <IconButton
+            testID="driver-map-locate"
+            icon="locate"
+            variant="floating"
+            size={LOCATION_BUTTON_SIZE}
+            iconColor="primaryText"
+            onPress={centreOnLocation}
+            accessibilityLabel={DRIVER_STATUS_COPY.mapLocateLabel}
+          />
+        </View>
+        <IconButton
+          testID="driver-map-online-toggle"
+          icon="power"
+          variant="floating"
+          size={ONLINE_BUTTON_SIZE}
+          // Offline: success "go online". Online: danger "go offline".
+          iconColor={isOnline ? 'danger' : 'success'}
           onPress={toggleOnlineStatus}
           disabled={toggleDisabled}
-          accessibilityRole="button"
           accessibilityLabel={isOnline ? DRIVER_STATUS_COPY.goOffline : DRIVER_STATUS_COPY.goOnline}
-          accessibilityState={{ disabled: toggleDisabled }}
-          testID="driver-map-online-toggle"
-        >
-          <Icon 
-            name={isOnline ? "pause-circle-filled" : "play-circle-filled"} 
-            size={24}
-            color={isOnline ? BrandColors.warning : BrandColors.success}
-          />
-        </TouchableOpacity>
+        />
       </View>
 
       {/* The ride in progress (T-405): its steps live on the DriverRide screen. */}
@@ -297,106 +325,62 @@ const DriverMapScreen = () => {
           <OpenRideCard ride={currentRide} onOpen={() => navigation.navigate('DriverRide')} />
         </View>
       )}
-    </View>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
   map: {
     flex: 1,
   },
   fallbackText: {
-    fontSize: 16,
-    color: BrandColors.primary,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 50,
+    marginTop: space[12],
   },
-  statusBar: {
+  statusBarScrim: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    top: 0,
+    start: 0,
+    end: 0,
+    opacity: layout.statusBarScrimOpacity,
   },
-  statusInfo: {
+  statusChip: {
+    position: 'absolute',
+    start: space[4],
+    end: space[4],
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: space[3],
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    borderRadius: radius.pill,
   },
   statusText: {
-    marginLeft: 10,
-    fontSize: 16,
-    fontWeight: '600',
-    color: BrandColors.text,
+    flex: 1,
+    minWidth: 0,
   },
   controls: {
     position: 'absolute',
     bottom: CONTROLS_BOTTOM,
-    right: 20,
+    end: space[4],
     alignItems: 'center',
   },
-  locationButton: {
-    width: LOCATION_BUTTON_SIZE,
-    height: LOCATION_BUTTON_SIZE,
-    borderRadius: LOCATION_BUTTON_SIZE / 2,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
+  locateGap: {
     marginBottom: LOCATION_BUTTON_GAP,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  onlineButton: {
-    width: ONLINE_BUTTON_SIZE,
-    height: ONLINE_BUTTON_SIZE,
-    borderRadius: ONLINE_BUTTON_SIZE / 2,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  // Keeps the white circle; the ring shows the online state (QA T-107b).
-  onlineButtonActive: {
-    borderWidth: 3,
-    borderColor: BrandColors.warning,
-  },
-  onlineButtonDisabled: {
-    opacity: 0.5,
   },
   driverMarker: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: BrandColors.primary,
+    borderRadius: radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
   },
   // Positions the ride card; the card itself is themed (components/driver/OpenRideCard).
   activeRideCard: {
     position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
+    bottom: DRIVER_MAP_CONTROLS_CLEARANCE + space[3],
+    start: space[4],
+    end: space[4],
   },
 });
 

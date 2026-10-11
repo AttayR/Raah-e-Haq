@@ -77,7 +77,7 @@ it('mounting, using and leaving the Map tab while tracking leaves the tracker wa
   await act(async () => {
     onPosition({ coords: { latitude: 31.52, longitude: 74.35 }, timestamp: Date.now() });
   });
-  expect(screen.queryByText('Getting your location...')).toBeNull();
+  expect(screen.queryByText('Getting your location…')).toBeNull();
 
   fireEvent.press(screen.getByTestId('driver-map-locate'));
   screen.unmount();
@@ -99,7 +99,7 @@ it('while offline the Map tab holds the shared watcher and releases it on unmoun
   );
   await flush();
   expect(geo.watchPosition).toHaveBeenCalledTimes(1);
-  expect(screen.getByText('Getting your location...')).toBeTruthy();
+  expect(screen.getByText('Getting your location…')).toBeTruthy();
 
   screen.unmount();
   expect(geo.clearWatch).toHaveBeenCalledTimes(1);

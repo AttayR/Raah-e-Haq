@@ -61,7 +61,7 @@ describe('DriverHomeScreen online toggle', () => {
 
     await waitFor(() => expect(screen.getByText('Online')).toBeTruthy());
     expect(JSON.parse(mock.history.put[0].data)).toEqual({ status: 'online' });
-    expect(screen.getByText('Go Offline')).toBeTruthy();
+    expect(screen.getByText('Go offline')).toBeTruthy();
   });
 
   it('shows "On a ride" and disables the toggle while on a ride', async () => {

@@ -163,8 +163,8 @@ describe('RideRequestHost layout', () => {
 
   it('sits above the Map tab control column (Go Online/Offline, my-location) and the tab bar', () => {
     // 30 bottom + 60 toggle + 15 gap + 50 my-location.
-    expect(DRIVER_MAP_CONTROLS_CLEARANCE).toBe(155);
-    expect(rideRequestBottomOffset(83, 'Map')).toBe(83 + 155);
+    expect(DRIVER_MAP_CONTROLS_CLEARANCE).toBe(132);
+    expect(rideRequestBottomOffset(83, 'Map')).toBe(83 + 132);
     expect(rideRequestBottomOffset(83, 'Home')).toBe(83);
   });
 
@@ -180,7 +180,7 @@ describe('RideRequestHost layout', () => {
     await flush();
     const style = Object.assign({}, ...[screen.getByTestId('ride-request-host').props.style].flat());
     // + space[4] (16) gap over the controls.
-    expect(style.bottom).toBe(83 + 155 + 16);
+    expect(style.bottom).toBe(83 + 132 + 16);
   });
 });
 

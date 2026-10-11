@@ -278,7 +278,7 @@ Dark mode: all shadow opacities are 0; Android elevation stays (it is rendered a
 All live in `src/components/ui/` and are exported from `src/components/ui/index.ts`. Every component takes `testID` and an `accessibilityLabel` where it is interactive. Sizes are in pt.
 
 ### 5.1 Screen
-- Wraps content with safe-area insets, `background` colour, and sets the status bar from the theme (`statusBar` token). Props: `scroll` (ScrollView with `keyboardShouldPersistTaps="handled"`), `edges` (default top+bottom; map screens pass `[]`), `refreshing/onRefresh` (pull to refresh, tint `primary`), `keyboardAvoiding` (default true when `scroll`; uses `react-native-keyboard-controller` `KeyboardAwareScrollView` so the focused field is ≥16 above the keyboard. Today the keyboard covers the Login email field).
+- Wraps content with safe-area insets, `background` colour, and sets the status bar from the theme (`statusBar` token). Props: `scroll` (ScrollView with `keyboardShouldPersistTaps="handled"`), `edges` (default `top`: tab screens sit above the tab bar, which owns the bottom inset; full-screen pushed screens pass top+bottom; map screens pass `[]` and place overlays from `useSafeAreaInsets()`), `refreshing/onRefresh` (pull to refresh, tint `primary`), `keyboardAvoiding` (default true when `scroll`; uses `react-native-keyboard-controller` `KeyboardAwareScrollView` so the focused field is ≥16 above the keyboard. Today the keyboard covers the Login email field).
 
 ### 5.2 Header
 - Height 56 + top inset. Background `surface`; bottom border hairline `border` appears only after content scrolls 4pt.
@@ -343,7 +343,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Native `Switch` with `trackColor={{false: borderStrong, true: primary}}`, thumb white (iOS default). One switch style app-wide (today: navy oversized custom on passenger, green on driver, invisible off-track in dark mode).
 
 ### 5.10 SegmentedControl
-- Height 40, radius `md`, track `surfaceAlt`, padding 4; thumb `surface` + `elevation.1` (dark: `surfaceRaised`), radius 8; labels `label`, active `textPrimary`, inactive `textSecondary`. Used for Phone/Email on Login, Day/Week/Month on Earnings, Notifications/Messages in Inbox. Replaces the navy-filled pill tabs.
+- Segments min height 44 (the touch-target rule wins; track 52 with padding 4), radius `md`, track `surfaceAlt`, padding 4; labels shrink to 0.85 before truncating; thumb `surface` + `elevation.1` (dark: `surfaceRaised`), radius 8; labels `label`, active `textPrimary`, inactive `textSecondary`. Used for Phone/Email on Login, Day/Week/Month on Earnings, Notifications/Messages in Inbox. Replaces the navy-filled pill tabs.
 
 ### 5.11 Chip
 - Height 32, padding 12 horizontal, radius `pill`, `label` text. Default: fill `surfaceAlt`, text `textSecondary`. Selected: fill `primarySoft`, text `onPrimarySoft`, leading `check` 16. Filter chip rows scroll horizontally on one line (no wrapping; today Notifications filters wrap to two rows). 8 gap; row inset 16.
@@ -354,7 +354,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - **Status pill:** height 24, padding 8 horizontal, radius `pill`, `label` text; tones: success (`successSoft`/`success`), warning, danger, info, neutral (`surfaceAlt`/`textSecondary`). Ride status mapping in 5.24.
 
 ### 5.13 Avatar
-- Sizes 32, 40, 56, 72, 96. Circle. Photo with `surfaceAlt` placeholder while loading; initials fallback (5.4 rules); optional status ring 2pt `success` (driver online) and a 20×20 `surface` circle badge bottom-right for the camera action (profile edit, 96 only).
+- Sizes 32, 40, 48 (header/floating avatar, driver-drive-home), 56, 72, 96. Circle. Photo with `surfaceAlt` placeholder while loading; initials fallback (5.4 rules); optional status ring 2pt `success` (driver online) and a 20×20 `surface` circle badge bottom-right for the camera action (profile edit, 96 only).
 
 ### 5.14 BottomSheet
 - Used for booking, trip states, driver requests, pickers. Library: `@gorhom/bottom-sheet` is not installed; build on Reanimated 4 + Gesture Handler (installed), or the designer adds `@gorhom/bottom-sheet` v5 in T-608 (dependency decision recorded in that task).

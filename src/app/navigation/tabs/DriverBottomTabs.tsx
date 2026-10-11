@@ -57,8 +57,8 @@ const DriverBottomTabs = () => {
           focus: () => setActiveTab(route.name),
         })}
         screenOptions={{
-          tabBarActiveTintColor: theme.colors.primary,
-          tabBarInactiveTintColor: theme.colors.text + '80',
+          tabBarActiveTintColor: theme.colors.primaryText,
+          tabBarInactiveTintColor: theme.colors.textMuted,
           tabBarStyle: {
             backgroundColor: theme.colors.surface,
             borderTopColor: theme.colors.border,
