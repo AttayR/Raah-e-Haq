@@ -1,10 +1,12 @@
 # Raah-e-Haq Design System
 
-**Version:** 1.0 · **Date:** 2026-10-08 · **Owner:** rh-design-director · **Builder:** rh-designer
+**Version:** 1.1 (refresh) · **Date:** 2026-10-11 (v1.0: 2026-10-08) · **Owner:** rh-design-director · **Builder:** rh-designer
 **Applies to:** passenger app, driver app, auth flow (one codebase, `src/`).
 **Status:** source of truth for Phase 6 (T-601 onward). If code and this file disagree, this file wins; if this file is wrong, the design director fixes it here first.
 
 Every value in this file is exact. "≈" never appears. Points (pt) = iOS points = Android dp.
+
+> **v1.1 refresh (2026-10-11).** Owner direction: compete head-on with Uber, inDrive, Yango and Careem, **keep the current brand** (navy `#011C72` + saffron, logo, name). v1.1 refines, it does not rebrand: palette and type scale are unchanged; what changes is how they are applied. Deltas are marked **[v1.1]** in place: buttons become pills (§3.3, §5.4), one Header with three variants (§5.2), a tab bar with an active pill (§5.3), MaterialCommunityIcons actually bundled (§4), map chrome reduced to two controls (§9), haptics map (§6.11) and the screen archetypes, list/card patterns and role-sync rules in **§12**. Execution order: [REFRESH_PLAN.md](REFRESH_PLAN.md) (tasks UI-R1…UI-R19). Current-state evidence: `docs/design/audit/2026-10-11-prod-audit/`.
 
 ---
 
@@ -231,10 +233,10 @@ Allowed exceptions: hairline (`StyleSheet.hairlineWidth`), 1pt and 2pt borders, 
 |---|---|---|
 | `radius.xs` | 4 | badges inside text, progress bars |
 | `radius.sm` | 8 | chips (small), thumbnails, skeleton text lines |
-| `radius.md` | 12 | buttons, text fields, list-group corners, toasts |
+| `radius.md` | 12 | text fields, list-group corners, toasts, icon tiles |
 | `radius.lg` | 16 | cards, vehicle option cards, dialogs |
 | `radius.xl` | 24 | bottom sheet top corners |
-| `radius.pill` | 999 | chips, pills, avatars, FABs, segmented thumb |
+| `radius.pill` | 999 | **[v1.1] all buttons**, chips, pills, avatars, FABs, tab-bar active pill |
 
 ### 3.4 Borders
 
@@ -260,7 +262,7 @@ Dark mode: all shadow opacities are 0; Android elevation stays (it is rendered a
 
 ## 4. Iconography and imagery
 
-- **One family:** `MaterialCommunityIcons` from `react-native-vector-icons` (already installed). It covers ride-hailing glyphs the others lack (`motorbike`, `rickshaw`, `car-side`, `van-passenger`, `steering`, `cash`, `map-marker-radius`). Today the code imports 13 families (MaterialIcons ×34 plus 12 single imports via `src/assets/icons/index.tsx`); all go.
+- **One family:** `MaterialCommunityIcons` (MDI) from `react-native-vector-icons` (installed). It covers ride-hailing glyphs the others lack (`motorbike`, `rickshaw`, `car-side`, `van-passenger`, `steering`, `cash`, `map-marker-radius`). **[v1.1] State on 2026-10-11:** `src/components/ui/Icon.tsx` maps semantic names to **MaterialIcons** because `MaterialCommunityIcons.ttf` is not in `ios/*/Info.plist` `UIAppFonts`; the tab bars and ~25 legacy files import MaterialIcons, FontAwesome, Ionicons, AntDesign, Entypo, Feather, Fontisto, Foundation, Octicons, SimpleLineIcons, EvilIcons and Zocial directly, and the passenger Saved places "Work" row and driver Profile "Earnings" tile render "?" boxes. UI-R1 bundles the MDI font (iOS `UIAppFonts` + Android `fonts.gradle`), points the `Icon` map at MDI, and UI-R19 removes every other font from the bundle once no file imports it. Outline glyphs by default; the back glyph is `chevron-left` on iOS and `arrow-left` on Android (one `back` semantic name).
 - **Style:** outline variants by default (`home-outline`, `bell-outline`); filled variant only for the selected tab and for status glyphs inside badges.
 - **Sizes:** 16 (inline with caption), 20 (inline with body, list trailing chevrons), 24 (default: list leading, header actions, tab bar), 28 (map FABs), 32 (vehicle glyphs in cards), 48 (empty/error state glyph inside a 96 circle).
 - **Colour:** `textSecondary` for neutral icons, `primaryText` for interactive icons, semantic tokens for status. Never colour an icon navy on a dark surface (today: Home stat icons, Account rows in dark mode).
@@ -280,27 +282,27 @@ All live in `src/components/ui/` and are exported from `src/components/ui/index.
 ### 5.1 Screen
 - Wraps content with safe-area insets, `background` colour, and sets the status bar from the theme (`statusBar` token). Props: `scroll` (ScrollView with `keyboardShouldPersistTaps="handled"`), `edges` (default `top`: tab screens sit above the tab bar, which owns the bottom inset; full-screen pushed screens pass top+bottom; map screens pass `[]` and place overlays from `useSafeAreaInsets()`), `refreshing/onRefresh` (pull to refresh, tint `primary`), `keyboardAvoiding` (default true when `scroll`; uses `react-native-keyboard-controller` `KeyboardAwareScrollView` so the focused field is ≥16 above the keyboard. Today the keyboard covers the Login email field).
 
-### 5.2 Header
-- Height 56 + top inset. Background `surface`; bottom border hairline `border` appears only after content scrolls 4pt.
-- Leading: back button (IconButton `chevron-left`, 24 icon, 44 target) at x = 4 (icon optical edge at 16). Never a back button on a tab root (today: Notifications tab).
-- Title: `title`, centered on iOS, left-aligned at x=56 on Android; single line, tail ellipsis; max width leaves 44+8 on each side.
-- Trailing: up to 2 IconButtons or one text action (`buttonSmall`, `primaryText`, single line; today "Mark all" wraps).
-- **Large title variant** (tab roots: Home excluded): `h1` title at x=16, 8 below the 56 bar, collapses into the bar on scroll (iOS-style).
-- No brand-navy hero headers with bubbles. Navy fills appear only in primary actions, selected states, the slide-to-confirm track, and two money hero cards (Wallet balance, Earnings total).
+### 5.2 Header **[v1.1]**
+One `Header` component, three variants. Today four header styles ship (large left title on tab roots; centered title + chevron under a 48pt blank band on Wallet/History/Saved places; left title + arrow on Profile v2/Chat/Documents; navy bubble hero on legacy Profile/Login) — all collapse into these:
+- **`standard`** (every pushed screen): height 56 below the top inset, background `surface` (or `background` when the screen background is `background`; the bar and the screen never differ in colour until scrolled). Leading back IconButton (44 target, 24 glyph `back`) at x=4, so the glyph's optical edge sits at 16. Title `title` (17/22, 600) `textPrimary`, **left-aligned at x=56 on both platforms** (v1.0 said centered on iOS; the newer screens already left-align and it reads better with long Urdu titles), one line, tail ellipsis. Trailing: up to 2 IconButtons or one text action (`buttonSmall`, `primaryText`, one line). Bottom hairline `border` fades in (150 ms) once content scrolls 4pt.
+- **`large`** (tab roots: Activity, Inbox, Account, Earnings): 56 bar with no title until scrolled, then `h1` (28/34, 700) title at x=16, 4 below the bar; on scroll the large title collapses into the bar's `title` (iOS-style; Android: same behaviour via Reanimated). Trailing actions sit in the 56 bar.
+- **`overlay`** (map screens): no bar. Floating controls only: back/close as `IconButton floating` (48 visual, 44+ target) at x=16, y=`insets.top + 8`. Never an opaque band behind the status bar on a map (today: driver Map tab shows a grey strip above the map).
+- No brand-navy hero headers, bubbles or illustrated backgrounds anywhere (Login, Phone verification, Registration, both Profiles today). Navy fills appear only in primary actions, selected states, the slide-to-confirm track and the two money hero cards (Wallet balance, Earnings total).
 
-### 5.3 Tab bar
-- Height 56 + bottom inset; background `surface`; top hairline `border`; `elevation.0`.
-- 4 items (see section 8, IA). Each item: icon 24 (outline; filled when active) above label `caption` (12/16, 500), 4 gap, centered; item min width 64.
-- Colours: active `primaryText` icon + label; inactive `textMuted`. (Today active label is navy on `#1A1A1A` in dark mode, 1.17:1.)
-- Badge: `Badge` dot (8) or count (min 18 high) at icon top-right offset (x +12, y −4).
-- Hidden on full-screen flows (booking, trip, chat thread).
+### 5.3 Tab bar **[v1.1]**
+- Custom `tabBar` component (React Navigation `tabBar` prop) shared by both roles; never the library default (today both tab bars are default bars with MaterialIcons glyphs and an `text + '80'` inactive colour).
+- Height 60 + bottom inset; background `surface`; top hairline `border`; no shadow.
+- **4 items per role** (section 8): passenger Home · Activity · Inbox · Account; driver Drive · Earnings · Inbox · Account. Item: 56×32 indicator pill (radius `pill`) with the 24 icon centered → 4 → label `caption` (12/16) → 6 bottom padding. Item min width 64, equal widths.
+- **Active:** pill fill `primarySoft`, icon filled variant in `onPrimarySoft`, label 600 `primaryText`. **Inactive:** no pill, outline icon `textMuted`, label 500 `textMuted`. Indicator pill animates width 32→56 and opacity 0→1 in `motion.fast` on selection; haptic `selection`.
+- Badge: count Badge (5.12) anchored to the indicator pill's top-right (x +4, y −4 from the pill corner); the Inbox badge = unread notifications + unread chats.
+- Hidden on full-screen flows (booking, finding driver, trip, chat thread, auth).
 
 ### 5.4 Button
 | Size | Height | Horizontal padding | Text | Icon | Radius |
 |---|---|---|---|---|---|
-| `lg` | 56 | 24 | `button` | 24, 8 gap | `md` (12) |
-| `md` | 48 | 20 | `button` | 20, 8 gap | `md` |
-| `sm` | 36 | 16 | `buttonSmall` | 16, 6 gap | `md` |
+| `lg` | 56 | 24 | `button` | 24, 8 gap | `pill` **[v1.1]** |
+| `md` | 48 | 20 | `button` | 20, 8 gap | `pill` |
+| `sm` | 36 | 16 | `buttonSmall` | 16, 6 gap | `pill` |
 
 | Variant | Fill | Text/icon | Border |
 |---|---|---|---|
@@ -359,7 +361,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 ### 5.14 BottomSheet
 - Used for booking, trip states, driver requests, pickers. Library: `@gorhom/bottom-sheet` is not installed; build on Reanimated 4 + Gesture Handler (installed), or the designer adds `@gorhom/bottom-sheet` v5 in T-608 (dependency decision recorded in that task).
 - Top radius `xl` (24); fill `surface`; `elevation.3`; handle 36×5, radius `pill`, `border` colour, 8 from top; content starts 24 from top.
-- **Snap points (map screens):** `peek` = content-defined collapsed height (e.g. 148 for "Where to?"); `half` = 50% of window; `full` = window − top inset − 8. On iPhone SE the max is 88%.
+- **Snap points (map screens):** `peek` = content-defined collapsed height (170 for the passenger Home sheet, 137 for the driver Drive sheet; §8.3); `half` = 50% of window; `full` = window − top inset − 8. On iPhone SE the max is 88%.
 - Backdrop: none for map sheets (map stays interactive above the sheet); `overlay` for modal sheets (pickers, confirmations), tapping it closes.
 - Sheets never cover the whole map on the booking flow: the route must remain visible above the sheet (today the vehicle list covers 95% of the map).
 - Keyboard: the sheet goes to `full` when a field inside is focused.
@@ -466,6 +468,8 @@ Library: Reanimated 4 (installed). All durations in ms.
 8. **Incoming request (driver):** sheet rises with the spring; a 15 s (or server `expires_in`) countdown ring around the Accept button depletes linearly; haptic `notificationWarning` + system sound (respects the "Sound alerts" preference) on arrival.
 9. **Toast:** in = translate y −16→0 + fade, 250 ms standard; out = fade + translate −8, 200 ms accelerate.
 10. **Skeleton shimmer:** 1200 ms linear loop.
+11. **[v1.1] Haptics map** (`src/core/haptics.ts`, wraps `react-native-haptic-feedback`; respects reduced motion only for animation, not haptics; today nothing in `src/` triggers a haptic): `selection` = tab change, chip/segment/vehicle select, rating star change; `impactLight` = primary commit (Request ride, Go online/offline, Accept, I've arrived, Send message); `impactMedium` = slide-to-confirm completes; `notificationSuccess` = driver found, trip complete; `notificationWarning` = incoming request (driver), driver arrived (passenger); `notificationError` = request failed / ride taken (409).
+12. **[v1.1] Sheet content swap:** when the booking/trip state changes, the sheet height springs to the new content height while old content fades out (100 ms) and new content fades + slides up 8pt (250 ms standard). Never a blank frame between states.
 
 **Reduced motion** (`AccessibilityInfo.isReduceMotionEnabled` / Reanimated `useReducedMotion`): no scale on press (colour change only), sheet snaps use a 200 ms timing with no spring overshoot, list appear is a 150 ms fade without translation, the searching pulse is replaced by a static 2-ring halo at 0.2 opacity and the progress bar by an ellipsis label ("Finding a driver…" with no animation), route draw-on and marker interpolation become instant jumps, shimmer off.
 
@@ -501,22 +505,41 @@ Library: Reanimated 4 (installed). All durations in ms.
 
 ---
 
-## 8. Information architecture (navigation shell)
+## 8. Information architecture (navigation shell) **[v1.1, owner decision 2026-10-11]**
 
-Today: both roles have 5 tabs (Home, Map, Notifications, Chat, Settings), Map/Notifications are mounted twice (tab + stack), and Home and Settings duplicate account rows.
+Today (2026-10-11): passenger has 4 default tabs (Home dashboard, Notifications, Chat, Settings) and opens the map as a pushed `PassengerMap` route; driver has 5 tabs (Home dashboard, Map, Notifications, Chat, Settings) where Home and Map duplicate each other. **Owner decision:** no separate Map tab; a map-first Home like Uber/Careem/inDrive/Yango; 4 tabs per role, in sync; during a ride the full-screen map stays as today. Implemented by **UI-R4** (supersedes T-610); exact routes in [screens/shared-navigation-shell.md](screens/shared-navigation-shell.md).
 
-**Passenger tabs (4):** Home · Activity · Inbox · Account
-- **Home:** map-backed home with the "Where to?" sheet (passenger-home spec). Booking (search → vehicle → finding → trip) is a full-screen stack flow pushed from Home; the tab bar hides during it. The separate Map tab is removed.
-- **Activity:** ride history (shared-ride-history) → Ride details.
-- **Inbox:** segmented Notifications | Messages (shared-notifications, shared-chat-list). Unread badge = notifications unread + chat unread.
-- **Account:** profile summary + settings list (shared-settings), with Wallet, Saved places, Support, Invite, Appearance, Logout.
+### 8.1 Tabs (exact labels and MDI glyphs; outline when inactive, filled when active)
+| Slot | Passenger | Driver |
+|---|---|---|
+| 1 | **Home** · `home-outline` / `home` | **Drive** · `steering` / `steering` (no outline variant; active state carried by the pill) |
+| 2 | **Activity** · `receipt-text-outline` / `receipt-text` | **Earnings** · `wallet-outline` / `wallet` |
+| 3 | **Inbox** · `inbox-outline` / `inbox` (badge) | **Inbox** · `inbox-outline` / `inbox` (badge) |
+| 4 | **Account** · `account-circle-outline` / `account-circle` | **Account** · `account-circle-outline` / `account-circle` |
 
-**Driver tabs (4):** Drive · Earnings · Inbox · Account
-- **Drive:** map-first home with online/offline control and today's earnings pill (driver-drive-home). Incoming request and trip screens are states of this screen/stack; tab bar hides while a trip is active.
-- **Earnings:** driver-earnings, with ride history inside.
-- **Inbox, Account:** as passenger, driver variants.
+- **Passenger Home:** full-bleed map + "Where to?" BottomSheet (8.3). Saved places (Home/Work/favourites) and recent destinations live in the sheet; offers and recent rides live lower in the sheet (half/full) only when the API returns them. Stats move to Activity. Tapping "Where to?" pushes the Booking flow (search → choose ride → finding → trip) full-screen, tab bar hidden.
+- **Passenger Activity:** `large` header "Activity"; SegmentedControl **Rides | Wallet**: Rides = ride history → Ride details/receipt; Wallet = balance hero + ledger (cash only, no top-up).
+- **Inbox (both roles):** `large` header "Inbox"; SegmentedControl **Notifications | Messages**; badge = unread notifications + unread chats.
+- **Passenger Account:** profile card (avatar, name, phone, rating or "New") → Profile; groups: Your account (Saved places; ride history and wallet live in Activity), Preferences (Notifications, Appearance), Help (Help & support, Invite friends), Sign out. Delete account sits inside Profile.
+- **Driver Drive:** full-bleed map + Drive sheet (8.3) with the big Online/Offline control, today's earnings pill and approval/document warnings; incoming requests appear as a sheet state on this map; once accepted the full-screen trip map takes over (tab bar hidden).
+- **Driver Earnings:** `large` header "Earnings"; SegmentedControl **Today | Week | Month**; money hero (earnings for the period), commission owed and settlements card (from the wallet/settlement API), trips list → Ride details. Wallet/settlement history is a pushed screen from the commission card.
+- **Driver Account:** profile card (avatar, name, rating, Approved/Pending pill) → Profile; groups: Your account (Vehicle & documents), Preferences (Notifications, Appearance), Help, Sign out.
 
-This is the one structural change in the revamp; it removes the duplicate mounts (PAX-10) and gives each role one obvious home. It is implemented in T-610 (navigation shell) without changing any data flow.
+### 8.2 Headers per surface
+| Surface | Header |
+|---|---|
+| Home, Drive, Booking, Trip | `overlay` (no bar; floating controls; §5.2) |
+| Activity, Inbox, Account, Earnings | `large` (title collapses on scroll; trailing action e.g. "Mark all read" in Inbox › Notifications only) |
+| Every pushed screen | `standard` with back |
+
+### 8.3 Home / Drive sheet behaviour
+- Library and spring per §5.14 and §6.2; handle 36×5 always visible; drag anywhere on the handle area or the sheet header; content scrolls only at the `full` snap.
+- **Passenger Home sheet:** snap points `peek` = 24 (top padding) + greeting `title` 22 + 12 + "Where to?" field 52 + 12 + shortcut chip row 32 + 16 = **170**, plus the tab bar height underneath (sheet sits above the tab bar); `half` = 50% of window; `full` = window − top inset − 8. Opens at `peek`. Map camera padding bottom = current sheet height + 24. At `full` the sheet gets a 1pt `border` top edge and the map controls fade out.
+- **Driver Drive sheet:** `peek` = 24 + status row (dot + "You're offline"/"You're online" `h3` 25) + 16 + Online/Offline button 56 + 16 = **137** above the tab bar; `half` = 50% (today's earnings, account/document warnings, tips); no `full`. Offline: button "Go online" (lg, `primary`); online: "Go offline" (lg, `outline`), a 2pt `success` progress shimmer under the status row while searching for requests. Haptic `impactLight` on toggle.
+- **Incoming request (driver):** replaces the Drive sheet content with the request (§12.5), sheet springs to content height (max 70%); tab bar hides while a request is shown; on decline/timeout the Drive sheet returns at `peek`.
+- Map chrome on Home/Drive: top-start avatar or nothing, top-end bell is NOT shown (Inbox tab has the badge); end-side "locate me" floating button riding 16 above the sheet. Max two floating controls (§9).
+
+This is the one structural change in the revamp; it removes the duplicate mounts (PAX-10) and gives each role one obvious home without changing data flow.
 
 ---
 
@@ -526,7 +549,8 @@ This is the one structural change in the revamp; it removes the duplicate mounts
   - **Light:** land `#F2F2F2`, water `#C9D8EE`, roads white with `#E1E4EB` outlines, arterials `#FFFFFF` width ×1.2, highways `#E8ECF5`; POI icons hidden except transit stations and hospitals; POI labels `#858EA5`; business POIs off; road labels `#626B82`.
   - **Dark:** land `#1D2230`, water `#0F1A2E`, roads `#2B3247`, highways `#343C55`, labels `#9099B0`, POIs off except transit.
 - Bilingual labels stay (Google renders Urdu + English); that is a feature, keep it.
-- Map controls: the native compass and my-location button are disabled; the app's floating IconButtons are used and placed below the status bar inset (today they overlap the status bar and battery).
+- Map controls: the native compass and my-location button are disabled; the app's floating IconButtons are used and placed below the status bar inset. **[v1.1] Max two floating controls per map screen:** back/close at top-start and "locate me" at end, 16 above the sheet's top edge (it rides with the sheet). Today the booking map shows four unlabeled circles (back, locate, refresh, +): refresh is removed (data refreshes itself), "add stop" moves into the sheet as a text row. The driver online/offline control lives in the Drive sheet, not as a red power FAB.
+- **[v1.1] Pins are always custom** (5.21). Today the booking and trip maps still show Google's default green/blue teardrops and the route has no casing.
 - Initial camera: last known device location, else Lahore centre (31.5204, 74.3587) at zoom 13. Never Karachi by default (today the driver map opens on Karachi).
 
 ---
@@ -535,7 +559,7 @@ This is the one structural change in the revamp; it removes the duplicate mounts
 
 - iOS: native stack headers are not used (custom `Header` for consistency); swipe-back enabled on every pushed screen; `contentInsetAdjustmentBehavior="never"` with manual insets.
 - Android: `StatusBar` translucent with the theme bar style; navigation bar colour = `surface` (light icons in dark mode); back button closes sheets/dialogs before navigating back; ripple on pressables (`android_ripple={{ color: surfacePressed }}`) instead of opacity.
-- Haptics: `react-native-haptic-feedback` (installed): `selection`, `impactLight`, `notificationSuccess`, `notificationWarning`, `notificationError` only.
+- Haptics: `react-native-haptic-feedback` (installed): `selection`, `impactLight`, `impactMedium`, `notificationSuccess`, `notificationWarning`, `notificationError` only, called through `src/core/haptics.ts` per the map in §6.11.
 
 ---
 
@@ -549,3 +573,63 @@ This is the one structural change in the revamp; it removes the duplicate mounts
 6. Imports from `src/components/ui` only for UI primitives; no `react-native-vector-icons/*` imports outside `src/components/ui/Icon.tsx`; no `ImageBackground`; no emoji (`grep -P "[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]"`).
 7. VoiceOver: every interactive element has a label; focus order follows the visual order; touch targets ≥44.
 8. Font scale 1.3×: no clipping.
+9. **[v1.1]** No `Alert.alert` for product confirmations (Dialog only); no `react-native-vector-icons/*` import outside `Icon.tsx`; no `BrandColors`; money only through `formatMoney` (grep `PKR`, `\$` in UI strings → FAIL).
+
+---
+
+## 12. Refresh direction (v1.1): patterns that make it feel production-grade
+
+The palette, type scale and spacing grid above were right on 2026-10-08; the app does not feel finished because half the screens never adopted them and the other half adopted them without a shared screen structure. This section fixes structure. It is the bar UI-R tasks are reviewed against.
+
+### 12.1 Brand application (keep, refine)
+- **Navy is the only action colour.** Primary buttons, selected states, active tab, route line, slide-to-confirm. Light mode `#011C72`, dark mode `#3D5FD0` (`primary` token). Nothing else may look like a primary action: the periwinkle CTA and prices on the booking sheet, the green Accept on the driver request, the orange/"Create New Account" and three different button blues on Login all go.
+- **Saffron is the signature, used sparingly:** the brand dot in the logo badge, rating stars, promo tags and the promo card. Max one saffron element per screen region.
+- **Green is status, not action:** `success` for Completed, Approved, Online dot, cash collected. Red is `danger` for errors and destructive actions; "Cancel ride" is a `destructiveSoft` text-style button, never a pink filled slab (today: passenger trip sheet).
+- The logo appears only on splash and auth screens (72/96 badge, §4); never repeated as a pattern. Brand name casing **Raah-e-Haq** (today: "RaaH-E-Haq", "RaaHeHaq" on Login/Registration).
+
+### 12.2 Screen archetypes (every screen is exactly one)
+| Archetype | Structure | Examples |
+|---|---|---|
+| **Map** | `Screen edges={[]}` · full-bleed map with custom style · `Header overlay` (≤2 floating controls) · one `BottomSheet` whose footer holds the single primary action, pinned above the home indicator | Passenger Home, booking, finding driver, trip; Driver Drive, request, to pickup, on trip |
+| **List** | `Header large` (tab roots) or `standard` · grouped `ListGroup`s or a `FlatList` of rows/cards · pull to refresh · skeleton → content → EmptyState/ErrorState | Activity, Inbox, Account, Earnings, Saved places, Notifications |
+| **Detail** | `Header standard` · hero block (avatar or money or map snapshot) · grouped info rows · actions at the bottom (sticky footer if primary) | Ride details/receipt, Profile, Wallet, Vehicle & documents |
+| **Form** | `Header standard` (or none on auth root) · `Screen scroll keyboardAvoiding` · fields 16 apart · sticky footer primary button that rides above the keyboard | Login, Phone/OTP, Registration steps, Edit profile, Add place, Support ticket |
+
+Rules: one primary button per screen, always in the same place for its archetype (sheet footer on Map, sticky footer on Form/Detail). Secondary actions are `secondary`/`ghost` buttons or rows, never a second filled navy button.
+
+### 12.3 Density and rhythm
+- Gutter 16. Section gap 24. Header-to-first-content 8 (standard) / 16 (large). Card internal padding 16. Between stacked cards 12. Inside a sheet: 24 top (below the handle), 16 between blocks, footer 16 top padding + `insets.bottom + 8`.
+- Row heights: settings row 56; content row (ride, chat, notification, place) 72; vehicle option 72; driver/passenger card 88. Never shorter rows to "fit more"; scroll instead.
+- One title per block: block titles use `title` (17/22 600) or `overline` for grouped-list section headers — not both. No bold+uppercase+colour stacking.
+- Copy is sentence case everywhere: "Ride history", "Saved places", "Sign out", "Add a stop" (today: "Ride History", "Favorite Locations", "Add Funds", "Sign Out", "Confirm & Request", notification titles "Driver Assigned").
+
+### 12.4 List and card patterns
+- **Grouped settings list:** `overline` header at x=16 → 8 → Card(radius 16, no padding) of `ListItem`s with 40×40 icon tiles (`surfaceAlt`, radius 12, 24 glyph `textSecondary`), hairline dividers inset to 72. This is what driver Settings / passenger Settings v2 already do; Profile, Wallet, Saved places and History adopt it.
+- **Content card (ride, place):** Card radius 16, padding 16; top row = meta (`caption` `textMuted` date · status pill end-aligned); body = AddressPair; footer row = money `numeric` start + one ghost action end. The whole card is the tap target (no "Details" filled button; today History shows a navy "Details >" slab on every card).
+- **Notification row:** leading 40 icon tile whose glyph and tone depend on `type` (ride → `car-side` info; chat → `message-text-outline` primary; payment → `cash` success; promo → `tag-outline` accent; system → `bell-outline` neutral) — today every ride notification uses the same taxi glyph. Unread = 8pt `primary` dot at the end + title 600; read = title 400.
+- **Chat row:** Avatar 48 (initials fallback always; today passenger sees solid periwinkle blobs) · name `title` · last message `bodySmall` 1 line · time `caption` end · status chip only when the chat is closed ("Ended", neutral), not "Read-only".
+- **Money:** `formatMoney()` everywhere — `Rs 1,250`. Today the driver side prints `PKR 150`, passenger `Rs 150`, wallet `Rs 1200`, driver profile `$2.4k`.
+
+### 12.5 Ride-flow components (both roles share them)
+- **Booking sheet states replace the stage chips.** "1. Pickup · 2. Destination · 3. Vehicle · 4. Fare" reads like a developer stepper; the sheet itself shows the step: *Where to* → *Choose a ride* → *Finding driver* → *Driver on the way* → *On trip* → *Receipt*. The back button goes back one sheet state and never leaves a half-cleared route on the map.
+- **Choose a ride:** half sheet; route visible above it; AddressPair summary row (tap to edit); vehicle list (VehicleOptionCard, 72 high, MDI vehicle glyph in a 56 `surfaceAlt` tile, name + "{capacity} seats · {eta} min", fare `numericL` `textPrimary` end); selected card = 2pt `primary` border + `primarySoft`; a "Fare details" row that expands the FareBreakdown in place; sticky footer button **"Choose {vehicle}"** (lg, primary) with the fare inside the label ("Choose Rickshaw · Rs 104"). No separate fare step, no emoji, no bell.
+- **Person card** (driver card on passenger side, passenger card on driver side): one component, two data shapes. Avatar 56 · name `h3` · rating display or "New" · vehicle line / plate pill (passenger side only) · action row of three equal tonal IconButtons with labels (Call, Message with unread badge, and Safety on passenger side / Navigate on driver side). Today the driver side has an icon trio and the passenger side has a full-width Call inside the card plus stacked full-width Message and pink Cancel — that difference is the most visible "not in sync" problem.
+- **Ride progress:** a 4-segment progress bar at the top of the trip sheet (Requested → On the way → Arrived → On trip), same component on both roles; the sheet title is the status sentence (`h2`: "Driver arrives in 4 min", "Head to pickup · 4 min").
+- **Incoming request (driver):** a map-screen sheet, not a card floating over the Home dashboard (today). Fare `numericXL` first, then pickup ETA + distance, AddressPair, rider name + rating; Accept = lg primary with a depleting countdown ring; Decline = ghost. 
+- **Receipt (both roles):** money hero (`numericXL`), "Paid in cash" / "Collect cash" pill, FareBreakdown, rating input, Done. Driver adds "Your earnings" row from the API.
+
+### 12.6 Empty, loading, error
+- Loading = Skeleton mirroring the layout (no centered spinners on content screens; spinners only inside buttons and the finding-driver pulse).
+- Empty = EmptyState with a duotone illustration (navy-800 + saffron-500 on navy-50, 120×120) or icon circle, a one-line title and a next step button. Today empty areas are a stray sentence ("Your recent places will appear here.", "Today's numbers aren't available yet.") or dashes in stat tiles; stat tiles with no data are hidden, not dashed.
+- Error = ErrorState with "Try again"; with cached data, keep the data and show a Banner.
+
+### 12.7 Role sync rules (passenger ↔ driver)
+1. Same tab bar component, same 4-slot structure, same Inbox and Account screens (role-specific rows only).
+2. Same Header variants, same back glyph, same ListItem/Card/Avatar, same Settings layout (already true for Settings v2).
+3. Same ride components: AddressPair, PersonCard, progress bar, FareBreakdown, receipt layout, status pills, money format.
+4. Driving screens differ only by density: 56 primary buttons, 20pt minimum address text, slide-to-confirm for Start/Complete.
+5. Each UI-R screen task is reviewed with a side-by-side screenshot pair (passenger vs driver) where a counterpart exists.
+
+### 12.8 Urdu / RTL readiness (built in now, translated later)
+- Strings through `src/i18n/en.ts` with `t()` (UI-R1 scaffolds it; each UI-R task moves the strings of the screens it touches).
+- `start`/`end` only; direction glyphs flip; AddressPair rail moves to the end side; no fixed-width text containers; line heights survive the Nastaliq 1.6× multiplier (min-height, never fixed height on text rows).
