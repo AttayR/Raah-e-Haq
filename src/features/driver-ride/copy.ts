@@ -27,6 +27,8 @@ export const DRIVER_RIDE_COPY = {
   nextStop: 'Next stop',
   call: 'Call',
   callA11y: 'Call the passenger',
+  message: 'Message',
+  messageA11y: 'Message the passenger',
   navigate: 'Navigate',
   navigateA11y: 'Open directions in the maps app',
   // Actions.

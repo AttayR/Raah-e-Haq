@@ -26,10 +26,10 @@ function mockScreen(name: string) {
 jest.mock('../../src/screens/Passenger/PassengerHomeScreen', () => mockScreen('Home'));
 jest.mock('../../src/screens/Passenger/PassengerMapScreen', () => mockScreen('PassengerMap'));
 jest.mock('../../src/screens/Passenger/PassengerNotificationsScreen', () => mockScreen('Notifications'));
-jest.mock('../../src/screens/Passenger/chat/PassengerChatScreen', () => mockScreen('Chat'));
+jest.mock('../../src/features/chat/screens/ChatListScreen', () => mockScreen('Chat'));
 jest.mock('../../src/screens/Passenger/PassengerSettingsScreen', () => mockScreen('Settings'));
 jest.mock('../../src/screens/Passenger/Passengerprofile', () => mockScreen('Profile'));
-jest.mock('../../src/screens/Passenger/chat/MessagesScreen', () => mockScreen('Messages'));
+jest.mock('../../src/features/chat/screens/ChatThreadScreen', () => mockScreen('RideChat'));
 jest.mock('../../src/screens/Passenger/PassengerRideTrackingScreen', () => mockScreen('Tracking'));
 jest.mock('../../src/screens/Passenger/RideHistoryScreen', () => mockScreen('History'));
 jest.mock('../../src/screens/Passenger/FavoriteLocationsScreen', () => mockScreen('Favorites'));

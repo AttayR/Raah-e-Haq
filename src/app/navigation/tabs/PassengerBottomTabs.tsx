@@ -4,7 +4,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppTheme } from '../../providers/ThemeProvider';
 import PassengerHomeScreen from 'src/screens/Passenger/PassengerHomeScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
-import PassengerChatScreen from 'src/screens/Passenger/chat/PassengerChatScreen';
+import ChatListScreen from '../../../features/chat/screens/ChatListScreen';
 import PassengerSettingsScreen from 'src/screens/Passenger/PassengerSettingsScreen';
 
 export type PassengerTabParamList = {
@@ -63,7 +63,7 @@ const PassengerBottomTabs = () => {
       />
       <Tab.Screen
         name="Chat"
-        component={PassengerChatScreen}
+        component={ChatListScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="chat" color={color} size={size} />

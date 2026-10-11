@@ -2,27 +2,19 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DriverBottomTabs from '../tabs/DriverBottomTabs';
 import DriverProfile from 'src/screens/Driver/DriverProfile';
-import DriverMessagesScreen from 'src/screens/Driver/DriverMessagesScreen';
 import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
 import DriverRideScreen from 'src/screens/Driver/DriverRideScreen';
 import { useDriverStatusSync } from '../../../features/driver-status/hooks';
 import { useDriverRideRestore } from '../../../features/driver-ride/hooks';
 import { useDriverLocationTracking } from '../../../features/driver-location/hooks';
+import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
+import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
   DriverProfile: undefined;
-  DriverMessagesScreen: {
-    chatData: {
-      id: string;
-      name: string;
-      avatar: string;
-      lastMessage: string;
-      time: string;
-      unreadCount: number;
-      isPassenger: boolean;
-    };
-  };
+  /** One ride's chat thread (T-510). */
+  RideChat: RideChatParams;
   DriverMap: undefined;
   /** The driver's current ride (T-405); it reads the ride from the driverRide slice. */
   DriverRide: undefined;
@@ -50,11 +42,8 @@ const DriverStack = () => {
         component={DriverProfile} 
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="DriverMessagesScreen" 
-        component={DriverMessagesScreen} 
-        options={{ headerShown: false }}
-      />
+      {/* One screen per ride: another ride's thread never reuses this one's state. */}
+      <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       <Stack.Screen 
         name="DriverMap" 
         component={DriverMapScreen} 

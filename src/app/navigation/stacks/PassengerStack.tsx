@@ -5,7 +5,6 @@ import {
 } from '@react-navigation/native-stack';
 import PassengerBottomTabs from '../tabs/PassengerBottomTabs';
 import PassengerProfile from 'src/screens/Passenger/Passengerprofile';
-import MessagesScreen from 'src/screens/Passenger/chat/MessagesScreen';
 import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import PassengerRideTrackingScreen from 'src/screens/Passenger/PassengerRideTrackingScreen';
 import RideHistoryScreen from 'src/screens/Passenger/RideHistoryScreen';
@@ -13,12 +12,15 @@ import FavoriteLocationsScreen from 'src/screens/Passenger/FavoriteLocationsScre
 import WalletScreen from 'src/screens/Passenger/WalletScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
+import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
+import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
   PassengerTabs: undefined;
   PassengerPofile: undefined;
-  MessagesScreen: { chatData: any };
+  /** One ride's chat thread (T-510). */
+  RideChat: RideChatParams;
   PassengerMap: undefined;
   PassengerRideTracking: { passengerId: string; rideId?: string };
   RideHistory: undefined;
@@ -47,7 +49,8 @@ const PassengerStack = ({ navigation }: Props) => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
       <Stack.Screen name="PassengerPofile" component={PassengerProfile} />
-      <Stack.Screen name="MessagesScreen" component={MessagesScreen} />
+      {/* One screen per ride: another ride's thread never reuses this one's state. */}
+      <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       <Stack.Screen name="PassengerMap" component={PassengerMapScreen} />
       <Stack.Screen name="PassengerRideTracking" component={PassengerRideTrackingScreen} />
       <Stack.Screen name="RideHistory" component={RideHistoryScreen} />

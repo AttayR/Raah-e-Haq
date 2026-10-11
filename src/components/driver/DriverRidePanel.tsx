@@ -17,6 +17,8 @@ type Props = {
   /** True when there is somewhere to navigate to (a usable coordinate). */
   canNavigate: boolean;
   onCall: () => void;
+  /** Opens the ride's chat (T-510); no button without it. */
+  onMessage?: () => void;
   onNavigate: () => void;
   onArrived: () => void;
   onStart: () => void;
@@ -43,6 +45,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   phone,
   canNavigate,
   onCall,
+  onMessage,
   onNavigate,
   onArrived,
   onStart,
@@ -98,6 +101,18 @@ export const DriverRidePanel: React.FC<Props> = ({
           >
             <Icon name="phone" size={20} color={theme.colors.primaryText} />
             <Text style={styles.iconButtonText}>{COPY.call}</Text>
+          </TouchableOpacity>
+        )}
+        {onMessage && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onMessage}
+            accessibilityRole="button"
+            accessibilityLabel={COPY.messageA11y}
+            testID="driver-ride-message"
+          >
+            <Icon name="chat-bubble-outline" size={20} color={theme.colors.primaryText} />
+            <Text style={styles.iconButtonText}>{COPY.message}</Text>
           </TouchableOpacity>
         )}
         {canNavigate && (

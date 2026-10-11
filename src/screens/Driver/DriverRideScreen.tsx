@@ -13,6 +13,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import { toast } from '../../core/toast';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
+import { openRideChat } from '../../features/chat/navigation';
 import { DRIVER_RIDE_TOAST_OPTIONS, useDriverRideFlow } from '../../features/driver-ride/hooks';
 import {
   activeStops,
@@ -79,6 +80,11 @@ const DriverRideScreen: React.FC = () => {
     if (!phone) return;
     Linking.openURL(`tel:${encodeURIComponent(phone)}`).catch(() => toast.error(COPY.callFailed, undefined, DRIVER_RIDE_TOAST_OPTIONS));
   }, [phone]);
+
+  const rideId = ride?.id;
+  const onMessage = useCallback(() => {
+    if (rideId !== undefined) openRideChat(navigation, rideId);
+  }, [navigation, rideId]);
 
   const onNavigate = useCallback(() => {
     if (!target) return;
@@ -164,6 +170,7 @@ const DriverRideScreen: React.FC = () => {
             phone={phone}
             canNavigate={target !== null}
             onCall={onCall}
+            onMessage={onMessage}
             onNavigate={onNavigate}
             onArrived={flow.arrived}
             onStart={flow.start}

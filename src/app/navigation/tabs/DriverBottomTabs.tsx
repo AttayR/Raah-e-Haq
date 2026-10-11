@@ -11,7 +11,7 @@ import { useAppTheme } from '../../providers/ThemeProvider';
 import DriverHomeScreen from 'src/screens/Driver/DriverHomeScreen';
 import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
 import DriverNotificationsScreen from 'src/screens/Driver/DriverNotificationsScreen';
-import DriverChatScreen from 'src/screens/Driver/DriverChatScreen'
+import ChatListScreen from '../../../features/chat/screens/ChatListScreen';
 import DriverSettingsScreen from 'src/screens/Driver/DriverSettingsScreen';
 import { RideRequestHost } from '../../../components/driver/RideRequestHost';
 import { rideRequestBottomOffset } from '../../../components/driver/rideRequestLayout';
@@ -89,7 +89,7 @@ const DriverBottomTabs = () => {
         />
         <Tab.Screen
           name="Chat"
-          component={DriverChatScreen}
+          component={ChatListScreen}
           options={{
             tabBarIcon: ({ color, size }) => <Icon name="chat" color={color} size={size} />,
           }}

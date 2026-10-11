@@ -8,6 +8,7 @@ import type { DriverLocation, RideResource } from '../../../services/rideService
 import { formatFare } from '../../ride-booking/vehicleOptions';
 import { BOOKING_COPY } from '../../ride-booking/copy';
 import { ACTIVE_RIDE_COPY } from '../copy';
+import { RideChatButton } from '../../chat/components/RideChatButton';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -84,6 +85,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       </View>
 
       {hasDriver && ride && <DriverAssignedCard driver={driverCardOf(ride)} onCall={onCall} />}
+      {/* In-ride chat (T-510) while the driver is assigned, arrived or on the trip. */}
+      {hasDriver && ride && <RideChatButton rideId={ride.id} name={driverCardOf(ride).name} />}
 
       {fare && (
         <View testID="ride-fare-summary" style={[styles.fare, { borderColor: c.border }]}>
