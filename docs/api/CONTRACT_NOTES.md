@@ -238,3 +238,135 @@ Owner decisions 2026-10-11. Passengers are unaffected by all three.
 **Drivers must be 18+.** For `user_type=driver`, `date_of_birth` must be on or before today − 18 years (server date; the 18th birthday passes). Otherwise 422 with `errors.date_of_birth[0] = "Drivers must be at least 18 years old."`. Applies to POST `/auth/register` (and the web register form), admin create/edit (web admin and `POST/PUT /api/users`, also when the driver role is added to an account whose stored date is under 18), and PUT `/profile` for a driver changing their own `date_of_birth`. Passengers: only the existing `before:today` rule.
 
 **Driving licence required.** POST `/auth/register` for a driver now requires `license_image` (image, jpeg/png/jpg/gif, ≤ 5 MB) in addition to `license_number`: missing either → 422 `errors.license_image` / `errors.license_number` (the request must be multipart, `registerWithImages`). The other driver images stay optional on the API. `license` is in the default `DRIVER_REQUIRED_DOCUMENTS` (`profile,cnic_front,cnic_back,license`), so an account is approved only once its licence item is approved; already-approved drivers are not affected.
+
+## BE-09 / BE-08: wallet ledger, settlements, personal stats, driver earnings (2026-10-11, for T-508 / T-506 / T-507)
+
+Backend `fix/production-hardening` (uncommitted at time of writing). All routes: `auth:sanctum` + `active`. Everything is scoped to the token user: no id in a path or body selects someone else's wallet; another user's entry or request is a **404 `NOT_FOUND`** (never 403). Envelope `{ success, message, data, pagination? }`; errors `{ success:false, message, error:{ code }, errors? }` (validation: 422 `VALIDATION_ERROR` with `errors`). Money is **PKR as JSON numbers** (at most 2 decimals; `58` and `58.5` both occur, never strings). Throttles: wallet reads 60/min, settlement create 10/min, cancel 10/min, stats 30/min (429 `rate_limited`).
+
+**Cash only (B-08).** There is no top-up, no card and no gateway route; `can_top_up` is always `false` and `payment_methods` is `["cash"]`. Show "Rides are paid in cash to the driver". A passenger's balance only moves with referral rewards and admin credits/refunds; it is shown, it cannot pay for a ride.
+
+**Driver commission.** Each completed cash ride writes three ledger entries: the passenger's `ride_payment` (no balance change), the driver's `driver_earning` (no balance change: the driver already holds the cash) and the driver's `commission_due` (the platform commission, **taken off the balance**). So a driver's `balance` goes negative; `commission_owed = max(0, -balance)`. The driver settles by paying the platform (cash at the office or bank transfer) and reporting it with POST `/wallet/settlements`; an admin approves it and a `commission_payment` entry brings the balance back up.
+
+### GET `/wallet`
+
+200 `data`:
+
+```json
+{ "balance": -116, "currency": "PKR", "status": "active|suspended|blocked",
+  "commission_owed": 116, "available_balance": 0,
+  "total_spent": 0, "total_earnings": 464,
+  "pending_settlements": [S],
+  "payment_methods": ["cash"], "can_top_up": false,
+  "can_request_payout": false, "can_settle_commission": true,
+  "updated_at": "2026-10-11T09:00:00+00:00" }
+```
+
+- Created (zero) on first call if missing; also created at registration.
+- `total_spent` = cash ride payments (passenger), `total_earnings` = driver's share of completed cash rides; both exclude reversed entries.
+- `available_balance` = `max(0, balance)` minus pending payout requests (what a payout request may ask for).
+- `can_request_payout`: driver, payouts enabled, wallet active. `can_settle_commission`: driver with `commission_owed > 0`. Passengers: both false.
+
+### GET `/wallet/transactions`
+
+Query (all optional): `page` (≥1), `per_page` (1–50, default 20), `type` (one type or a comma list from the table below), `direction` (`credit|debit|none`), `from` / `to` (`YYYY-MM-DD`, UTC dates, `to` ≥ `from`), `ride_id`. Newest first. 200 `data: [T]`, `pagination: {current_page, last_page, per_page, total}`. 422 for an unknown type, bad date or per_page.
+
+Entry (`T`):
+
+```json
+{ "id": 812, "reference": "TXN-01JA…", "type": "commission_due", "label": "Platform Commission",
+  "direction": "debit", "amount": 58, "gross_amount": 58, "fee": 0, "net_amount": 58,
+  "balance_change": -58, "balance_after": -116, "currency": "PKR", "status": "completed",
+  "payment_method": "cash|wallet|bank_transfer", "description": "Platform commission for ride RH…",
+  "ride": { "id": 7, "ride_id": "RH…", "status": "completed", "vehicle_type": "car", "completed_at": "…" } | null,
+  "settlement_id": null, "reverses_id": null, "reversed": false, "created_at": "2026-10-11T09:00:00+00:00" }
+```
+
+- Show `amount` on the row. `direction` `credit` (green, +), `debit` (red, −), `none` (informational, neutral: a cash payment or cash earning that did not change the balance). `balance_change` is signed. `balance_after` is null on entries written before BE-09.
+- `driver_earning`: `gross_amount` = fare, `fee` = platform commission, `net_amount` = `amount` = the driver's share.
+- `reversed: true` means a later `reversal` entry cancelled this one (strike it through); a `reversal` carries `reverses_id` and the original's `ride`.
+- No names, phones, admin ids or admin notes are ever returned; `description` is display text.
+
+| `type` | Who | Balance | Meaning |
+|---|---|---|---|
+| `ride_payment` | passenger | none | Cash paid for a ride |
+| `driver_earning` | driver | none | Cash collected; `amount` = driver share |
+| `commission_due` | driver | − | Platform commission of a ride |
+| `commission_payment` | driver | + | Admin-approved "I paid the commission" |
+| `payout` | driver | − | Admin-approved payout of a positive balance |
+| `referral_reward` | any | + | Referral reward credited |
+| `refund` | any | + | Refund by support |
+| `adjustment_credit` / `adjustment_debit` | any | + / − | Balance adjustment by support |
+| `reversal` | any | ∓ | Cancels the entry `reverses_id` |
+| `wallet_topup`, `wallet_withdrawal`, `bonus`, `commission`, `penalty` | legacy | +/− | Written before BE-09; show with `label` |
+
+Treat an unknown `type` as generic and use `label`.
+
+### GET `/wallet/transactions/{id}`
+
+200 `data: T`. 404 `NOT_FOUND` when it is not the caller's (or not numeric).
+
+### Driver settlements (role driver; passengers 403)
+
+Settlement (`S`):
+
+```json
+{ "id": 3, "kind": "commission_payment|payout", "amount": 116, "currency": "PKR",
+  "method": "cash|bank_transfer", "reference": "IBFT-123"|null, "note": "…"|null,
+  "status": "pending|approved|rejected|cancelled", "review_note": "…"|null,
+  "reviewed_at": "…"|null, "transaction_id": 901|null, "created_at": "…" }
+```
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| GET `/wallet/settlements` | `status?`, `page`, `per_page` (1–50) | 200 `data: [S]` + `pagination` | 403 |
+| POST `/wallet/settlements` | `{ kind?: "commission_payment" (default) \| "payout", amount: number (1–500000, ≤2 decimals), method: "cash"\|"bank_transfer", reference?: string ≤100 [A-Za-z0-9 ._:/#-] (required for bank_transfer), note?: string ≤500 }` | 201 `data: S` (status `pending`, nothing posted yet) | 409 `NOTHING_OWED`, 422 `AMOUNT_EXCEEDS_OWED` (commission > owed now), 422 `AMOUNT_EXCEEDS_BALANCE` (payout > balance), 409 `SETTLEMENT_ALREADY_PENDING` (one pending per kind), 403 `PAYOUTS_DISABLED`, 409 `WALLET_INACTIVE` (payout from a suspended wallet), 422 `VALIDATION_ERROR`, 429 |
+| DELETE `/wallet/settlements/{id}` | — | 200 `data: S` (status `cancelled`) | 404 (not yours), 409 `SETTLEMENT_NOT_PENDING` |
+
+- Pre-fill the amount with `commission_owed`. After 201 show "waiting for review"; `GET /wallet` lists it under `pending_settlements`. On approval the balance changes and a `commission_payment` / `payout` entry appears (`settlement_id` = S.id). On rejection `review_note` holds the admin's reason (show it).
+- Approval is re-checked against the balance at that moment; an admin cannot approve more than is owed.
+
+### GET `/me/stats` (BE-08)
+
+Role-aware, from completed rides, cached up to 5 min per user (cleared when the user's ride completes or their wallet changes). Zeros, never nulls, for counts and money. `rating` is `null` until the user has been rated (show "New").
+
+Passenger:
+
+```json
+{ "role": "passenger", "currency": "PKR", "total_rides": 48, "total_distance_km": 312.4,
+  "total_spent": 15230, "rating": null, "member_since": "2025-01-02T08:00:00+00:00" }
+```
+
+Driver:
+
+```json
+{ "role": "driver", "currency": "PKR", "total_rides": 33, "total_earnings": 9800, "total_distance_km": 410.2,
+  "rating": 4.75, "member_since": "…",
+  "earnings_today": 400, "trips_today": 2, "earnings_week": 480, "trips_week": 3,
+  "earnings_month": 2468, "trips_month": 12,
+  "commission_owed": 116, "online_minutes_today": null, "acceptance_rate": null }
+```
+
+- Day / week (Monday–Sunday) / month are calendar periods in **Asia/Karachi**.
+- `online_minutes_today` and `acceptance_rate` are always `null` for now (not tracked server-side): hide those tiles rather than showing 0.
+
+### GET `/driver/earnings?period=day|week|month` (role driver; passengers 403)
+
+Query: `period` (default `day`), `page`, `per_page` (1–50, default 20; pages the `rides` list only). 422 for any other period.
+
+```json
+{ "period": "week", "timezone": "Asia/Karachi",
+  "from": "2026-10-12T00:00:00+05:00", "to": "2026-10-18T23:59:59+05:00", "currency": "PKR",
+  "totals": { "trips": 2, "gross_fares": 400, "commission": 80, "earnings": 320, "distance_km": 5, "duration_minutes": 30 },
+  "series": [ { "date": "2026-10-12", "trips": 0, "gross_fares": 0, "earnings": 0 }, … ],
+  "rides": [ { "id": 7, "ride_id": "RH…", "vehicle_type": "car", "completed_at": "…", "distance_km": 3,
+               "duration_minutes": 15, "total_fare": 300, "platform_commission": 60, "driver_earnings": 240,
+               "payment_method": "cash" } ],
+  "pagination": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 2 } }
+```
+
+- `series` has one item per local day of the period (1, 7 or 28–31), zero-filled: chart it directly.
+- `rides` has no passenger data.
+
+### Admin API (role admin; for the panel and tooling, not the app)
+
+`GET /payments/settlements?status=&kind=&user_id=`, `POST /payments/settlements/{id}/approve {note?}`, `POST /payments/settlements/{id}/reject {note}` (required), `POST /payments/transactions/{id}/reverse {reason}` (required; 409 `ALREADY_REVERSED`, `CANNOT_REVERSE_REVERSAL`), `POST /payments/wallets/{id}/adjust {amount, direction: credit|debit|refund, reason}` (reason now **required**; 422 `INSUFFICIENT_BALANCE` for a debit below zero). Every one writes an `audit_logs` row. The old panel action that edited a transaction's status is removed (ledger entries are immutable).
