@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppDispatch, RootState } from '../../store';
 import { getUserProfile } from '../../store/thunks/apiThunks';
@@ -46,8 +46,14 @@ export default function PassengerHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
-  const { currentLocation, permissionStatus, requestLocationPermission } = useNativeLocation();
-  const location = useHomeLocation(currentLocation, permissionStatus);
+  // T-315: no lookups while another screen covers Home; failures show in the header, no alerts.
+  const isFocused = useIsFocused();
+  const { currentLocation, permissionStatus, error: locationError, requestLocationPermission, openSettings } =
+    useNativeLocation({ active: isFocused });
+  const location = useHomeLocation(currentLocation, permissionStatus, locationError);
+  // Services off, or access refused for good, can only be turned back on in Settings.
+  const needsSettings = locationError === 'disabled' || (locationError === 'denied' && !permissionStatus.canAskAgain);
+  const enableLocation = needsSettings ? openSettings : requestLocationPermission;
 
   const {
     isInitialized: notificationsInitialized,
@@ -97,7 +103,9 @@ export default function PassengerHomeScreen() {
           location={location}
           onOpenProfile={() => navigation.navigate('PassengerPofile')}
           onOpenNotifications={() => navigation.navigate('PassengerNotifications')}
-          onEnableLocation={() => requestLocationPermission()}
+          onEnableLocation={() => {
+            enableLocation();
+          }}
         />
       </View>
 

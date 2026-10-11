@@ -7,6 +7,8 @@ import { Icon } from '../../../components/ui/Icon';
 import { IconButton } from '../../../components/ui/IconButton';
 import { Screen } from '../../../components/ui/Screen';
 import { radius, space } from '../../../theme';
+import type { LocationErrorKind } from '../../../hooks/useNativeLocation';
+import { BOOKING_COPY } from '../copy';
 
 /** Inline danger banner (DESIGN_SYSTEM 5.17) for a booking error, dismissible. */
 export const BookingErrorBanner: React.FC<{ message: string; onDismiss: () => void }> = ({ message, onDismiss }) => {
@@ -26,22 +28,50 @@ export const BookingErrorBanner: React.FC<{ message: string; onDismiss: () => vo
   );
 };
 
-/** Full-screen state while the booking map waits for (or is refused) the device location. */
-export const LocationWaitState: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
+const waitCopy = (reason: LocationErrorKind | null | undefined): { title: string; body: string } => {
+  if (reason === 'denied' || reason === 'disabled') {
+    return { title: BOOKING_COPY.locationOffTitle, body: BOOKING_COPY.locationOffBody };
+  }
+  if (reason === 'unavailable') {
+    return { title: BOOKING_COPY.locationUnavailableTitle, body: BOOKING_COPY.locationUnavailableBody };
+  }
+  return { title: BOOKING_COPY.locationWaitTitle, body: BOOKING_COPY.locationWaitBody };
+};
+
+/**
+ * Full-screen state while the booking map waits for (or is refused) the device location.
+ * T-315: the reason comes from useNativeLocation and is shown here instead of an alert;
+ * access that was refused or switched off offers the Settings page.
+ */
+export const LocationWaitState: React.FC<{
+  onRetry?: () => void;
+  reason?: LocationErrorKind | null;
+  onOpenSettings?: () => void;
+}> = ({ onRetry, reason, onOpenSettings }) => {
   const { theme } = useAppTheme();
+  const { title, body } = waitCopy(reason);
+  const settingsAction = reason === 'denied' || reason === 'disabled' ? onOpenSettings : undefined;
   return (
-    <Screen edges={['top', 'bottom']} contentStyle={styles.wait}>
+    <Screen edges={['top', 'bottom']} contentStyle={styles.wait} testID="location-wait">
       <View style={[styles.iconCircle, { backgroundColor: theme.colors.primarySoft }]}>
         <Icon name="locationOff" size={48} color="primaryText" />
       </View>
-      <AppText variant="h3" align="center">
-        Finding your location
+      <AppText variant="h3" align="center" accessibilityRole="header">
+        {title}
       </AppText>
-      <AppText variant="bodySmall" color="textSecondary" align="center">
-        Allow location access so drivers can find your pickup.
+      <AppText variant="bodySmall" color="textSecondary" align="center" accessibilityLiveRegion="polite">
+        {body}
       </AppText>
+      {settingsAction ? (
+        <Button
+          label={BOOKING_COPY.locationOpenSettings}
+          fullWidth={false}
+          onPress={settingsAction}
+          testID="location-open-settings"
+        />
+      ) : null}
       {onRetry ? (
-        <Button label="Try again" variant="secondary" fullWidth={false} onPress={onRetry} testID="location-retry" />
+        <Button label={BOOKING_COPY.locationRetry} variant="secondary" fullWidth={false} onPress={onRetry} testID="location-retry" />
       ) : null}
     </Screen>
   );

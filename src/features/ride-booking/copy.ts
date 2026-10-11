@@ -39,4 +39,13 @@ export const BOOKING_COPY = {
   mapPickHint: (target: 'pickup' | 'destination' | 'stop') =>
     target === 'pickup' ? 'Tap the map to set your pickup' : target === 'destination' ? 'Tap the map to set your destination' : 'Tap the map to add a stop',
   mapPickCancel: 'Cancel',
+  // T-315: the booking map's inline "no location" state (no blocking alerts).
+  locationWaitTitle: 'Finding your location',
+  locationWaitBody: 'Allow location access so drivers can find your pickup.',
+  locationOffTitle: 'Location is off',
+  locationOffBody: 'Turn on location for Raah-e-Haq in Settings so drivers can find your pickup.',
+  locationUnavailableTitle: "Can't find your location",
+  locationUnavailableBody: 'Move to an open area or check your connection, then try again.',
+  locationRetry: 'Try again',
+  locationOpenSettings: 'Open settings',
 } as const;

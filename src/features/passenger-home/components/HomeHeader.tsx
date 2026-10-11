@@ -10,7 +10,15 @@ import { layout, space } from '../../../theme';
 export type HomeLocationState =
   | { kind: 'address'; text: string }
   | { kind: 'locating' }
-  | { kind: 'denied' };
+  | { kind: 'denied' }
+  /** T-315: the lookup failed (no fix in time); the passenger can retry. */
+  | { kind: 'unavailable' };
+
+const LOCATION_TEXT: Record<Exclude<HomeLocationState['kind'], 'address'>, string> = {
+  locating: 'Finding your location…',
+  denied: 'Location is off',
+  unavailable: 'Location unavailable',
+};
 
 type Props = {
   greeting: string;
@@ -19,6 +27,7 @@ type Props = {
   location: HomeLocationState;
   onOpenProfile: () => void;
   onOpenNotifications: () => void;
+  /** "Turn on" (access off) or "Retry" (no fix): asks for the location again. */
   onEnableLocation: () => void;
 };
 
@@ -32,6 +41,7 @@ export const HomeHeader: React.FC<Props> = ({
   onOpenNotifications,
   onEnableLocation,
 }) => {
+  const problem = location.kind === 'denied' || location.kind === 'unavailable';
   return (
     <View style={styles.wrap}>
       <View style={styles.topRow}>
@@ -60,15 +70,18 @@ export const HomeHeader: React.FC<Props> = ({
 
       <View style={styles.locationRow} testID="home-location">
         <Icon
-          name={location.kind === 'denied' ? 'locationOff' : 'pin'}
+          name={problem ? 'locationOff' : 'pin'}
           size={16}
-          color={location.kind === 'denied' ? 'warning' : 'textSecondary'}
+          color={problem ? 'warning' : 'textSecondary'}
         />
         <AppText variant="bodySmall" color="textSecondary" numberOfLines={1} style={styles.locationText}>
-          {location.kind === 'address' ? location.text : location.kind === 'locating' ? 'Finding your location…' : 'Location is off'}
+          {location.kind === 'address' ? location.text : LOCATION_TEXT[location.kind]}
         </AppText>
         {location.kind === 'denied' ? (
           <Chip label="Turn on" tone="primary" onPress={onEnableLocation} accessibilityLabel="Turn on location" />
+        ) : null}
+        {location.kind === 'unavailable' ? (
+          <Chip label="Retry" tone="primary" onPress={onEnableLocation} accessibilityLabel="Retry location" />
         ) : null}
       </View>
     </View>

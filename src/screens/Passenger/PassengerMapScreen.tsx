@@ -42,6 +42,7 @@ import { MapTopControls, MAP_TOP_CONTROLS_HEIGHT } from '../../features/ride-boo
 import { BookingMapLayers } from '../../features/ride-booking/components/BookingMapLayers';
 import { BookingErrorBanner, LocationWaitState, MapPlaceholder } from '../../features/ride-booking/components/BookingNotices';
 import { FareStage, MAX_STOPS, VehicleStage } from '../../features/ride-booking/components/BookingStages';
+import { bookingInitialRegion, showLocationWait } from '../../features/ride-booking/locationGate';
 import { space } from '../../theme';
 import { displayAddress } from '../../features/passenger-home/greeting';
 
@@ -60,7 +61,16 @@ const PassengerMapScreen = () => {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
 
-  const { currentLocation, isLoading: locationLoading, requestLocationPermission } = useNativeLocation();
+  const isFocused = useIsFocused();
+  // T-315: no lookups (and so nothing to show) while another screen covers this one; a
+  // failure is rendered inline below, never as an alert.
+  const {
+    currentLocation,
+    isLoading: locationLoading,
+    error: locationError,
+    requestLocationPermission,
+    openSettings: openLocationSettings,
+  } = useNativeLocation({ active: isFocused });
 
   usePassengerNotifications();
   // The active ride lives in Redux (T-301): one copy for every screen, restored on launch.
@@ -96,7 +106,6 @@ const PassengerMapScreen = () => {
     mapHeight > 0 ? { mapHeight, bottom: sheetHeight, top: insets.top + MAP_TOP_CONTROLS_HEIGHT } : null;
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
-  const isFocused = useIsFocused();
   // Status poll (and the assigned driver's position) while the ride is in progress and this
   // screen is focused; cleaned up on unmount.
   const { driverLocation } = useActiveRidePolling(isFocused);
@@ -418,13 +427,18 @@ const PassengerMapScreen = () => {
     fetchRouteWithWaypoints(pickup, ns, destination);
   }, [pickup, destination, fetchRouteWithWaypoints]);
 
-  if (!currentLocation && !locationLoading) {
-    return <LocationWaitState onRetry={() => requestLocationPermission()} />;
+  // T-315: a ride (its completed summary above all) always wins over the location wait.
+  if (showLocationWait({ hasLocation: !!currentLocation, locationLoading, rideShown })) {
+    return (
+      <LocationWaitState
+        reason={locationError}
+        onRetry={() => requestLocationPermission()}
+        onOpenSettings={openLocationSettings}
+      />
+    );
   }
 
-  const initialRegion = currentLocation
-    ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }
-    : MAPS_CONFIG.DEFAULT_REGION;
+  const initialRegion = bookingInitialRegion(currentLocation, currentRide, MAPS_CONFIG.DEFAULT_REGION);
   const compact = searchFocused;
   // Vehicle, fare and the ride itself: half the window (60% on short phones) so the route and
   // the driver stay visible above the sheet; longer content scrolls.

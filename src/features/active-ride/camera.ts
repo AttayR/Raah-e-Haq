@@ -46,6 +46,40 @@ export const driverApproachCoordinates = (
   return driver && pickup ? [driver, pickup] : null;
 };
 
+/**
+ * T-315: the smallest span (degrees, ~900 m of latitude) the driver-approach fit may show.
+ * With the driver a few metres from the pickup, fitting the two points alone zoomed in to
+ * building level and the street around the pickup was lost.
+ */
+export const MIN_DRIVER_APPROACH_DELTA = 0.008;
+
+/**
+ * `coordinates` plus two corner points around their centre when they span less than
+ * `minDelta` in latitude or longitude, so a fit to the result never zooms in further than
+ * that. Points that already span enough are returned as they are.
+ */
+export const withMinimumSpan = (
+  coordinates: LatLng[] | null,
+  minDelta: number = MIN_DRIVER_APPROACH_DELTA,
+): LatLng[] | null => {
+  if (!coordinates || coordinates.length === 0) return coordinates;
+  const lats = coordinates.map((c) => c.latitude);
+  const lngs = coordinates.map((c) => c.longitude);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  if (maxLat - minLat >= minDelta && maxLng - minLng >= minDelta) return coordinates;
+  const centre = { latitude: (minLat + maxLat) / 2, longitude: (minLng + maxLng) / 2 };
+  const halfLat = Math.max(maxLat - minLat, minDelta) / 2;
+  const halfLng = Math.max(maxLng - minLng, minDelta) / 2;
+  return [
+    ...coordinates,
+    { latitude: centre.latitude - halfLat, longitude: centre.longitude - halfLng },
+    { latitude: centre.latitude + halfLat, longitude: centre.longitude + halfLng },
+  ];
+};
+
 /** The part of the map ref this needs (SafeMapView and MapView both have it). */
 export interface FitToCoordinatesMap {
   fitToCoordinates: (coordinates: LatLng[], options?: { edgePadding?: EdgePadding; animated?: boolean }) => void;
@@ -215,7 +249,8 @@ export const usePassengerRideCamera = (
     mapRef.current?.animateToRegion(regionInViewport(point, latestViewport.current));
   }, [current, mapRef]);
 
-  useFitCoordinates(mapRef, paused ? null : driverApproachCoordinates(current, driverLocation, ride), {
+  // T-315: never closer than MIN_DRIVER_APPROACH_DELTA, so the street around the pickup stays.
+  useFitCoordinates(mapRef, paused ? null : withMinimumSpan(driverApproachCoordinates(current, driverLocation, ride)), {
     ready: mapReady,
     edgePadding: viewportEdgePadding(viewport),
   });

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Alert, Platform, Linking, PermissionsAndroid } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus, Platform, Linking, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { isAndroidEmulator, getDefaultLocation } from '../utils/locationUtils';
 import { logger } from '../core/logging/logger';
@@ -15,14 +15,59 @@ export interface LocationPermissionStatus {
   isLocationEnabled: boolean;
 }
 
-export const useNativeLocation = () => {
+/**
+ * Why there is no location (T-315), for the screen to render inline:
+ * - `denied`: the passenger refused location access (Settings is the way back);
+ * - `disabled`: location services are off for the device (or for the app on iOS);
+ * - `unavailable`: no fix in time (timeout, no signal), worth a retry.
+ */
+export type LocationErrorKind = 'denied' | 'disabled' | 'unavailable';
+
+export interface UseNativeLocationOptions {
+  /**
+   * False while the screen is not focused. The first lookup waits until it is true, and a
+   * screen that comes back without a location tries once more. Nothing here ever shows an
+   * alert: failures are returned as `error` for the screen to render (T-315).
+   */
+  active?: boolean;
+}
+
+/** Foreground only (B-08): a backgrounded app does not ask for the position. */
+const useAppInForeground = (): boolean => {
+  const [state, setState] = useState<AppStateStatus>(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setState);
+    return () => subscription.remove();
+  }, []);
+  // 'inactive' is also reported while a system dialog (the permission prompt) is up.
+  return state !== 'background';
+};
+
+/** Geolocation error codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT. */
+const errorKindOf = (code: number): LocationErrorKind =>
+  code === 1 ? 'denied' : code === 2 ? 'disabled' : 'unavailable';
+
+export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = {}) => {
+  const appInForeground = useAppInForeground();
+  const enabled = active && appInForeground;
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Loading from the start while enabled, so a screen does not flash its "no location" state
+  // before the first lookup has begun.
+  const [isLoading, setIsLoading] = useState(enabled);
+  const [error, setError] = useState<LocationErrorKind | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<LocationPermissionStatus>({
     isGranted: false,
     canAskAgain: true,
     isLocationEnabled: false,
   });
+  // A late callback after unmount must not set state.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Check location services status
   const checkLocationServices = useCallback((): Promise<boolean> => {
@@ -33,12 +78,12 @@ export const useNativeLocation = () => {
         resolve(true);
         return;
       }
-      
+
       Geolocation.getCurrentPosition(
         () => resolve(true),
-        (error) => {
+        (positionError) => {
           // Error codes 1 and 2 usually indicate location services are disabled
-          resolve(error.code !== 1 && error.code !== 2);
+          resolve(positionError.code !== 1 && positionError.code !== 2);
         },
         { timeout: 5000, maximumAge: 60000 }
       );
@@ -55,10 +100,10 @@ export const useNativeLocation = () => {
         const coarseLocation = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
         );
-        
+
         const isGranted = fineLocation || coarseLocation;
         const isLocationEnabled = await checkLocationServices();
-        
+
         // For Android emulator, always return granted and enabled
         if (isAndroidEmulator()) {
           return {
@@ -67,14 +112,14 @@ export const useNativeLocation = () => {
             isLocationEnabled: true,
           };
         }
-        
+
         return {
           isGranted,
           canAskAgain: !isGranted,
           isLocationEnabled,
         };
-      } catch (error) {
-        logger.warn('Error checking Android permissions:', error);
+      } catch (permissionError) {
+        logger.warn('Error checking Android permissions:', permissionError);
         return {
           isGranted: false,
           canAskAgain: true,
@@ -92,51 +137,82 @@ export const useNativeLocation = () => {
     }
   }, [checkLocationServices]);
 
-  // Request location permission
+  // Get current location; a failure is kept in `error` (no alert).
+  const getCurrentLocation = useCallback((): Promise<Coordinates | null> => {
+    return new Promise((resolve) => {
+      // For Android emulator, use a default location if real location fails
+      const isEmulator = Platform.OS === 'android' && __DEV__;
+
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          if (mounted.current) {
+            setCurrentLocation(location);
+            setError(null);
+          }
+          resolve(location);
+        },
+        (positionError) => {
+          logger.warn('Location error:', positionError);
+
+          // For Android emulator, use default location
+          if (isEmulator && positionError.code === 3) { // TIMEOUT
+            logger.debug('Using default location for Android emulator');
+            const defaultLocation = getDefaultLocation();
+            if (mounted.current) {
+              setCurrentLocation(defaultLocation);
+              setError(null);
+            }
+            resolve(defaultLocation);
+            return;
+          }
+
+          if (mounted.current) setError(errorKindOf(positionError.code));
+          resolve(null);
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 60000,
+        }
+      );
+    });
+  }, []);
+
+  // Request location permission (from a button the passenger pressed), then read the position.
   const requestLocationPermission = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
-    
+
     try {
       // For Android emulator, skip permission request and use default location
       if (isAndroidEmulator()) {
         logger.debug('Android emulator detected, using default location');
         const defaultLocation = getDefaultLocation();
         setCurrentLocation(defaultLocation);
+        setError(null);
         setPermissionStatus({
           isGranted: true,
           canAskAgain: false,
           isLocationEnabled: true,
         });
-        setIsLoading(false);
         return true;
       }
-      
+
       if (Platform.OS === 'android') {
         // Check current status first
         const currentStatus = await checkPermissionStatus();
-        
+
         if (currentStatus.isGranted) {
+          if (mounted.current) setPermissionStatus(currentStatus);
           // Permission already granted, check if location services are enabled
           if (!currentStatus.isLocationEnabled) {
-            Alert.alert(
-              'Location Services Disabled',
-              'Please enable location services in your device settings to use this feature.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Open Settings', 
-                  onPress: () => Linking.openSettings() 
-                }
-              ]
-            );
-            setIsLoading(false);
+            if (mounted.current) setError('disabled');
             return false;
           }
-          
-          // Get location
-          await getCurrentLocation();
-          setIsLoading(false);
-          return true;
+          return (await getCurrentLocation()) !== null;
         }
 
         // Request permission
@@ -151,153 +227,64 @@ export const useNativeLocation = () => {
           }
         );
 
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          // Permission granted, now check location services
-          const isLocationEnabled = await checkLocationServices();
-          
-          if (!isLocationEnabled) {
-            Alert.alert(
-              'Location Services Disabled',
-              'Location permission granted but location services are disabled. Please enable location services in settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Open Settings', 
-                  onPress: () => Linking.openSettings() 
-                }
-              ]
-            );
-            setIsLoading(false);
-            return false;
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          if (mounted.current) {
+            setPermissionStatus({
+              isGranted: false,
+              canAskAgain: granted !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
+              isLocationEnabled: currentStatus.isLocationEnabled,
+            });
+            setError('denied');
           }
-          
-          // Get location
-          await getCurrentLocation();
-          setIsLoading(false);
-          return true;
-        } else {
-          // Permission denied
-          Alert.alert(
-            'Location Permission Required',
-            'Location access is required to use this feature. You can enable it later in app settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Open Settings', 
-                onPress: () => Linking.openSettings() 
-              }
-            ]
-          );
-          setIsLoading(false);
           return false;
         }
-      } else {
-        // iOS - Just get location, iOS handles permissions automatically
-        await getCurrentLocation();
-        setIsLoading(false);
-        return true;
-      }
-    } catch (error) {
-      logger.warn('Error requesting location permission:', error);
-      setIsLoading(false);
-      return false;
-    }
-  }, [checkPermissionStatus, checkLocationServices]);
 
-  // Get current location
-  const getCurrentLocation = useCallback((): Promise<Coordinates | null> => {
-    return new Promise((resolve) => {
-      // For Android emulator, use a default location if real location fails
-      const isEmulator = Platform.OS === 'android' && __DEV__;
-      
-      Geolocation.getCurrentPosition(
-        (position) => {
-          const location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          };
-          setCurrentLocation(location);
-          resolve(location);
-        },
-        (error) => {
-          logger.warn('Location error:', error);
-          
-          // For Android emulator, use default location
-          if (isEmulator && error.code === 3) { // TIMEOUT
-            logger.debug('Using default location for Android emulator');
-            const defaultLocation = getDefaultLocation();
-            setCurrentLocation(defaultLocation);
-            resolve(defaultLocation);
-            return;
-          }
-          
-          if (error.code === 1) {
-            // Permission denied
-            Alert.alert(
-              'Location Permission Required',
-              'Please allow location access to use this feature.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Enable Location', 
-                  onPress: () => requestLocationPermission() 
-                }
-              ]
-            );
-          } else if (error.code === 2) {
-            // Location services disabled
-            Alert.alert(
-              'Location Services Disabled',
-              'Please enable location services in your device settings.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Open Settings', 
-                  onPress: () => Linking.openSettings() 
-                }
-              ]
-            );
-          } else {
-            // Other error
-            Alert.alert(
-              'Location Error',
-              'Unable to get your current location. Please try again.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Retry', 
-                  onPress: () => getCurrentLocation() 
-                }
-              ]
-            );
-          }
-          
-          resolve(null);
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 60000,
+        // Permission granted, now check location services
+        const isLocationEnabled = await checkLocationServices();
+        if (mounted.current) setPermissionStatus({ isGranted: true, canAskAgain: false, isLocationEnabled });
+        if (!isLocationEnabled) {
+          if (mounted.current) setError('disabled');
+          return false;
         }
-      );
-    });
-  }, [requestLocationPermission]);
+        return (await getCurrentLocation()) !== null;
+      }
+
+      // iOS - Just get location, iOS handles permissions automatically
+      const location = await getCurrentLocation();
+      if (location && mounted.current) {
+        setPermissionStatus({ isGranted: true, canAskAgain: false, isLocationEnabled: true });
+      }
+      return location !== null;
+    } catch (requestError) {
+      logger.warn('Error requesting location permission:', requestError);
+      if (mounted.current) setError('unavailable');
+      return false;
+    } finally {
+      if (mounted.current) setIsLoading(false);
+    }
+  }, [checkPermissionStatus, checkLocationServices, getCurrentLocation]);
 
   // Initialize location
   const initializeLocation = useCallback(async () => {
     setIsLoading(true);
-    
+
     try {
       const status = await checkPermissionStatus();
+      if (!mounted.current) return;
       setPermissionStatus(status);
-      
+
       if (status.isGranted && status.isLocationEnabled) {
         await getCurrentLocation();
+      } else if (status.isGranted) {
+        // Granted (always on iOS) but no position allowed: services or app access are off.
+        setError('disabled');
       }
-    } catch (error) {
-      logger.warn('Error initializing location:', error);
+      // Not granted yet on Android: the screen offers "Turn on", which asks.
+    } catch (initError) {
+      logger.warn('Error initializing location:', initError);
+      if (mounted.current) setError('unavailable');
     } finally {
-      setIsLoading(false);
+      if (mounted.current) setIsLoading(false);
     }
   }, [checkPermissionStatus, getCurrentLocation]);
 
@@ -310,18 +297,28 @@ export const useNativeLocation = () => {
     }
   }, [permissionStatus, getCurrentLocation, requestLocationPermission]);
 
-  // Initialize on mount
+  /** The app's page in the device Settings (location access is turned back on there). */
+  const openSettings = useCallback(() => {
+    Linking.openSettings().catch((settingsError) => logger.warn('Could not open settings:', settingsError));
+  }, []);
+
+  // First lookup once the screen is focused and the app is in the foreground; a screen that
+  // comes back (or an app that returns) without a location tries once more. Never on a loop.
+  const hasLocation = currentLocation !== null;
   useEffect(() => {
+    if (!enabled || hasLocation) return;
     initializeLocation();
-  }, [initializeLocation]);
+  }, [enabled, hasLocation, initializeLocation]);
 
   return {
     currentLocation,
     isLoading,
+    error,
     permissionStatus,
     requestLocationPermission,
     refreshLocation,
     getCurrentLocation,
+    openSettings,
   };
 };
 
