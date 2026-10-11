@@ -7,6 +7,7 @@ import type { RideResource } from '../../services/rideService';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverRideAction } from '../../features/driver-ride/slice';
 import { activeStops, type DriverRideStep } from '../../features/driver-ride/steps';
+import { riderRating } from '../../features/driver-requests/rating';
 
 type Props = {
   ride: RideResource;
@@ -60,7 +61,8 @@ export const DriverRidePanel: React.FC<Props> = ({
   const stops = activeStops(ride);
   const nextStop = step === 'on_trip' ? stops[0] ?? null : null;
   const passengerName = ride.passenger?.name || COPY.passengerFallback;
-  const rating = typeof ride.passenger?.rating === 'number' ? ride.passenger.rating : null;
+  // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
+  const rating = riderRating(ride.passenger?.rating);
 
   let primary: { label: string; onPress: () => void; testID: string } | null = null;
   if (step === 'to_pickup') primary = { label: COPY.arrived, onPress: onArrived, testID: 'driver-ride-arrived' };

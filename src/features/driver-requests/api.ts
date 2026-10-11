@@ -1,5 +1,6 @@
 import { apiService, unwrap } from '../../services/api';
 import type { RideResource } from '../../services/rideService';
+import { riderRating } from './rating';
 
 /**
  * Incoming ride requests for the signed-in driver (T-403/T-404, docs/api/CONTRACT_NOTES.md).
@@ -112,7 +113,7 @@ export const toPendingRideRequest = (
     pickup: toLatLng(raw.pickup_latitude, raw.pickup_longitude),
     dropoff: toLatLng(raw.dropoff_latitude, raw.dropoff_longitude),
     passengerFirstName: toText(passenger.first_name) ?? toText(passenger.name),
-    passengerRating: toNumber(passenger.rating),
+    passengerRating: riderRating(passenger.rating),
     estimatedDistanceKm: toNumber(raw.estimated_distance),
     estimatedPickupMin: toNumber(raw.estimated_pickup_min),
     estimatedFare: toNumber(raw.estimated_fare),
