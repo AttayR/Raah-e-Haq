@@ -16,10 +16,23 @@ import type { WalletTransaction } from '../types';
 
 type Row = { label: string; value: string; testID?: string };
 
-const methodLabel = (method: string | null): string | null => {
+/** Ledger types of a ride: their cash went from the passenger to the driver. */
+const RIDE_TYPES: ReadonlySet<string> = new Set(['ride_payment', 'driver_earning', 'commission_due']);
+/** Ledger types written by an approved settlement: "Cash at office" / "Bank transfer". */
+const SETTLEMENT_TYPES: ReadonlySet<string> = new Set(['commission_payment', 'payout']);
+
+/** "Payment method" row: settlement wording only for settlements, never for ride rows (T-509). */
+export const methodLabel = (t: Pick<WalletTransaction, 'type' | 'paymentMethod' | 'settlementId'>): string | null => {
+  const method = t.paymentMethod;
   if (!method) return null;
-  if (method === 'cash' || method === 'bank_transfer') return SETTLEMENT_METHOD_LABEL[method];
-  return method === 'wallet' ? WALLET_COPY.title : method;
+  if (method === 'wallet') return WALLET_COPY.title;
+  if (RIDE_TYPES.has(t.type)) return method === 'cash' ? WALLET_COPY.methodRideCash : null;
+  if (method === 'cash' || method === 'bank_transfer') {
+    const settlement = SETTLEMENT_TYPES.has(t.type) || t.settlementId !== null;
+    if (settlement) return SETTLEMENT_METHOD_LABEL[method];
+    return method === 'cash' ? WALLET_COPY.methodCashGeneric : SETTLEMENT_METHOD_LABEL.bank_transfer;
+  }
+  return method;
 };
 
 const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
@@ -27,12 +40,13 @@ const titleCase = (value: string): string => value.charAt(0).toUpperCase() + val
 /** The detail rows that apply to this entry; absent fields are left out, never shown as "null". */
 export const transactionDetailRows = (t: WalletTransaction): Row[] => {
   const money = (n: number) => formatMoney(n, { currency: t.currency });
+  const method = methodLabel(t);
   const rows: Array<Row | null> = [
     { label: WALLET_COPY.detailType, value: t.label },
     { label: WALLET_COPY.detailStatus, value: titleCase(t.status) },
     t.createdAt ? { label: WALLET_COPY.detailDate, value: formatDateTime(t.createdAt) } : null,
     t.ride?.rideCode ? { label: WALLET_COPY.detailRide, value: t.ride.rideCode } : null,
-    methodLabel(t.paymentMethod) ? { label: WALLET_COPY.detailMethod, value: methodLabel(t.paymentMethod) ?? '' } : null,
+    method ? { label: WALLET_COPY.detailMethod, value: method } : null,
   ];
   // Driver earning: fare, the platform's commission and the driver's share.
   if (t.type === 'driver_earning' && t.grossAmount !== null) {

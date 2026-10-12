@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type ParamListBase, type RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, Button, Card, Screen, SegmentedControl } from '../../../components/ui';
 import { firstFieldMessages, toApiError } from '../../../core/api/errors';
 import { formatMoney, moneyInputText } from '../../../core/format/money';
@@ -8,9 +9,11 @@ import { toast } from '../../../core/toast';
 import { layout, space } from '../../../theme';
 import { FormField } from '../components/FormField';
 import { InfoNote } from '../components/InfoNote';
+import { KeyboardDoneBar } from '../components/KeyboardDoneBar';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { WALLET_COPY } from '../copy';
 import { submitSettlement } from '../hooks';
+import { formKeyboardAvoidingProps, PAY_COMMISSION_KEYBOARD_DONE_ID } from '../keyboard';
 import type { DriverWalletRoutes } from '../navigation';
 import {
   SETTLEMENT_NOTE_MAX,
@@ -40,6 +43,7 @@ export default function PayCommissionScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const { params } = useRoute<RouteProp<DriverWalletRoutes, 'PayCommission'>>();
   const { owed, currency } = params;
+  const insets = useSafeAreaInsets();
   const [values, setValues] = useState<SettlementFormValues>({
     amount: moneyInputText(owed),
     method: 'cash',
@@ -67,6 +71,8 @@ export default function PayCommissionScreen() {
 
   const onSubmit = async () => {
     if (inFlight.current) return;
+    // The first tap submits; the keypad closes so errors and the result are not hidden by it.
+    Keyboard.dismiss();
     const result = validateSettlementForm(values, owed, currency);
     if (!result.ok) {
       setErrors(result.errors);
@@ -107,11 +113,16 @@ export default function PayCommissionScreen() {
         onBack={() => navigation.goBack()}
         testID="pay-commission"
       />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        {...formKeyboardAvoidingProps(Platform.OS, insets.top)}
+        testID="pay-commission-keyboard-avoider"
+      >
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
         >
           <Card>
@@ -129,6 +140,7 @@ export default function PayCommissionScreen() {
             onChangeText={update('amount')}
             keyboardType="decimal-pad"
             inputMode="decimal"
+            inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
             error={errors.amount}
             testID="pay-commission-amount"
           />
@@ -155,6 +167,7 @@ export default function PayCommissionScreen() {
             onChangeText={update('reference')}
             autoCapitalize="characters"
             autoCorrect={false}
+            returnKeyType="done"
             maxLength={SETTLEMENT_REFERENCE_MAX}
             hint={WALLET_COPY.formReferenceHint}
             error={errors.reference}
@@ -167,6 +180,7 @@ export default function PayCommissionScreen() {
             onChangeText={update('note')}
             multiline
             maxLength={SETTLEMENT_NOTE_MAX}
+            inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
             error={errors.note}
             testID="pay-commission-note"
           />
@@ -189,6 +203,11 @@ export default function PayCommissionScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+      <KeyboardDoneBar
+        nativeID={PAY_COMMISSION_KEYBOARD_DONE_ID}
+        label={WALLET_COPY.keyboardDone}
+        testID="pay-commission-keyboard-done"
+      />
     </Screen>
   );
 }

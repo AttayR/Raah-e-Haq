@@ -30,7 +30,7 @@ const STATUSES = ['active', 'suspended', 'blocked'] as const;
 const DIRECTIONS = ['credit', 'debit', 'none'] as const;
 const KINDS = ['commission_payment', 'payout'] as const;
 const METHODS = ['cash', 'bank_transfer'] as const;
-const SETTLEMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled'] as const;
+const SETTLEMENT_STATUSES = ['pending', 'approved', 'rejected', 'cancelled', 'reversed'] as const;
 
 const currencyOf = (value: unknown): string => readText(value) ?? 'PKR';
 

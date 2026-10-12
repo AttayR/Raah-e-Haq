@@ -12,7 +12,11 @@ const STATUS_TONE: Record<SettlementStatus, BadgeTone> = {
   approved: 'success',
   rejected: 'danger',
   cancelled: 'neutral',
+  reversed: 'danger',
 };
+
+/** Statuses whose reviewer note explains a refusal (shown in the danger colour). */
+const REFUSED: ReadonlySet<SettlementStatus> = new Set(['rejected', 'reversed']);
 
 type Props = {
   settlement: Settlement;
@@ -48,7 +52,7 @@ export function SettlementRow({ settlement, onCancel, cancelling = false }: Prop
       {settlement.reviewNote ? (
         <AppText
           variant="bodySmall"
-          color={settlement.status === 'rejected' ? 'danger' : 'textSecondary'}
+          color={REFUSED.has(settlement.status) ? 'danger' : 'textSecondary'}
           testID={`wallet-settlement-${settlement.id}-note`}
         >
           {`${WALLET_COPY.reviewNote}: ${settlement.reviewNote}`}

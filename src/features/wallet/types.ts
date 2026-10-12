@@ -10,7 +10,8 @@ export type TransactionDirection = 'credit' | 'debit' | 'none';
 
 export type SettlementKind = 'commission_payment' | 'payout';
 export type SettlementMethod = 'cash' | 'bank_transfer';
-export type SettlementStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+/** BE-70: `reversed` = approved, then its ledger entry was reversed by support. */
+export type SettlementStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'reversed';
 
 export interface Settlement {
   id: number;

@@ -55,6 +55,9 @@ export const WALLET_COPY = {
   detailReversalNote: 'This entry cancels an earlier one.',
   detailFailed: "Couldn't load this transaction",
   detailNotFound: 'This transaction was not found.',
+  // Payment method of a ledger entry; settlement wording only on settlements.
+  methodRideCash: 'Cash (paid to driver)',
+  methodCashGeneric: 'Cash',
   // Settlement form.
   formTitle: 'Pay commission',
   formOwed: 'You owe',
@@ -70,6 +73,7 @@ export const WALLET_COPY = {
   formSubmitted: 'Payment reported. It is waiting for review.',
   formFailed: "Couldn't report the payment. Please try again.",
   formInfo: 'An admin checks your payment and then updates your balance.',
+  keyboardDone: 'Done',
   // Settlement list.
   settlementsTitle: 'Payment reports',
   settlementsEmptyTitle: 'No payment reports yet',
@@ -83,6 +87,7 @@ export const SETTLEMENT_STATUS_LABEL = {
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+  reversed: 'Reversed by support',
 } as const;
 
 export const SETTLEMENT_METHOD_LABEL = {
