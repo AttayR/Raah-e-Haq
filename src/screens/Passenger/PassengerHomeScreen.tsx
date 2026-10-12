@@ -20,12 +20,13 @@ import { StatGrid } from '../../features/passenger-home/components/StatGrid';
 import { RecentRidesCard } from '../../features/passenger-home/components/RecentRidesCard';
 import { greetingFor } from '../../features/passenger-home/greeting';
 import { useHomeLocation } from '../../features/passenger-home/useHomeLocation';
-import type { HomeOffer, HomeRecentRide, HomeStat } from '../../features/passenger-home/types';
+import type { HomeOffer, HomeRecentRide } from '../../features/passenger-home/types';
 import { AppText } from '../../components/ui/AppText';
+import { useMyStats } from '../../features/stats/hooks';
+import { toPassengerHomeStats } from '../../features/stats/format';
 
 // No invented numbers (DESIGN_SYSTEM §0.3): these sections stay hidden until T-506 loads
-// stats (BE-08), banners (BE-10) and recent rides (BE-01).
-const NO_STATS: HomeStat[] = [];
+// banners (BE-10) and recent rides (BE-01). Stats come from GET /me/stats (BE-08).
 const NO_OFFERS: HomeOffer[] = [];
 const NO_RECENT_RIDES: HomeRecentRide[] = [];
 
@@ -36,7 +37,8 @@ const GREETING_REFRESH_MS = 60_000;
  * Passenger Home (docs/design/screens/passenger-home.md, T-604 visual pass): greeting and
  * location, the "Where to?" entry into booking, shortcuts, offers, ride stats and recent
  * rides. Account rows, weather and quick-action tiles moved out (Settings has them).
- * Stats, offers and recent rides render nothing until T-506 wires the API (no fake data).
+ * Stats come from GET /me/stats and stay hidden until the first ride; offers and recent rides
+ * render nothing until T-506 wires them (no fake data).
  */
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
@@ -54,6 +56,11 @@ export default function PassengerHomeScreen() {
   // Services off, or access refused for good, can only be turned back on in Settings.
   const needsSettings = locationError === 'disabled' || (locationError === 'denied' && !permissionStatus.canAskAgain);
   const enableLocation = needsSettings ? openSettings : requestLocationPermission;
+
+  // Ride stats (BE-08): read when Home is focused and on pull to refresh.
+  const stats = useMyStats(isFocused);
+  const homeStats = toPassengerHomeStats(stats.data?.role === 'passenger' ? stats.data : null);
+  const { refresh: refreshStats } = stats;
 
   const {
     isInitialized: notificationsInitialized,
@@ -79,11 +86,11 @@ export default function PassengerHomeScreen() {
     setRefreshing(true);
     try {
       // Re-read the signed-in user from GET /auth/profile (the old Firebase session refresh is gone).
-      await dispatch(getUserProfile());
+      await Promise.all([dispatch(getUserProfile()), refreshStats()]);
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch]);
+  }, [dispatch, refreshStats]);
 
   return (
     <Screen testID="passenger-home">
@@ -140,7 +147,12 @@ export default function PassengerHomeScreen() {
       <OffersRow offers={NO_OFFERS} />
 
       <View style={styles.gutter}>
-        <StatGrid stats={NO_STATS} />
+        <StatGrid stats={homeStats} />
+        {!stats.data && stats.status === 'failed' ? (
+          <AppText variant="bodySmall" color="textSecondary" testID="home-stats-error">
+            {stats.error}
+          </AppText>
+        ) : null}
       </View>
 
       <View style={styles.gutter}>

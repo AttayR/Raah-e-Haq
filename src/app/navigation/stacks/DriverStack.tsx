@@ -13,6 +13,12 @@ import { useNotificationsSync } from '../../../features/notifications/hooks';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
 import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
 import { DriverDocumentsScreen } from '../../../features/driverDocuments/screens/DriverDocumentsScreen';
+import WalletScreen from '../../../features/wallet/screens/WalletScreen';
+import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
+import PayCommissionScreen from '../../../features/wallet/screens/PayCommissionScreen';
+import SettlementsScreen from '../../../features/wallet/screens/SettlementsScreen';
+import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
+import DriverEarningsScreen from '../../../features/stats/screens/DriverEarningsScreen';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -26,6 +32,13 @@ export type DriverStackParamList = {
   NotificationPreferences: undefined;
   /** Settings → Vehicle & documents: review state + re-upload (T-203, BE-66). */
   DriverDocuments: undefined;
+  /** Wallet: balance, commission owed and its payment reports, ledger (T-508, BE-09). */
+  Wallet: DriverWalletRoutes['Wallet'];
+  WalletTransaction: DriverWalletRoutes['WalletTransaction'];
+  PayCommission: DriverWalletRoutes['PayCommission'];
+  WalletSettlements: DriverWalletRoutes['WalletSettlements'];
+  /** Earnings per day / week / month (T-507, BE-08). */
+  DriverEarnings: undefined;
 };
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
@@ -67,6 +80,11 @@ const DriverStack = () => {
       />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
       <Stack.Screen name="DriverDocuments" component={DriverDocumentsScreen} />
+      <Stack.Screen name="Wallet" component={WalletScreen} />
+      <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
+      <Stack.Screen name="PayCommission" component={PayCommissionScreen} />
+      <Stack.Screen name="WalletSettlements" component={SettlementsScreen} />
+      <Stack.Screen name="DriverEarnings" component={DriverEarningsScreen} />
     </Stack.Navigator>
   );
 };

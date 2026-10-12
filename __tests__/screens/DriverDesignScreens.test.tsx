@@ -19,6 +19,7 @@ import DriverSettingsScreen from '../../src/screens/Driver/DriverSettingsScreen'
 import DriverMapScreen from '../../src/screens/Driver/DriverMapScreen';
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
 import { driverRideApi } from '../../src/features/driver-ride/api';
+import { statsApi, toMyStats } from '../../src/features/stats/api';
 import { initialDriverRideState } from '../../src/features/driver-ride/slice';
 import type { RideResource } from '../../src/services/rideService';
 import { makeRide } from '../../test-utils/rideFixtures';
@@ -58,6 +59,22 @@ const renderScreen = async (
   jest
     .spyOn(driverStatusApi, 'get')
     .mockResolvedValue({ status: driverStatus as 'offline', activeRideId: null, changedAt: null });
+  // GET /me/stats (BE-08) as the backend sends it for a driver (fake local figures).
+  jest.spyOn(statsApi, 'getMyStats').mockResolvedValue(
+    toMyStats({
+      role: 'driver',
+      currency: 'PKR',
+      total_rides: 33,
+      rating: null,
+      earnings_today: 1250,
+      trips_today: 2,
+      earnings_week: 4800,
+      trips_week: 9,
+      commission_owed: 116,
+      online_minutes_today: null,
+      acceptance_rate: null,
+    }),
+  );
   const initial = rootReducer(undefined, { type: '@@init' });
   const store = configureStore({
     reducer: rootReducer,
@@ -91,7 +108,7 @@ afterEach(() => {
 });
 
 describe('DriverHomeScreen', () => {
-  it('light: background token, offline grey dot, Go online primary, no invented stats', async () => {
+  it('light: background token, offline grey dot, Go online primary, stats from GET /me/stats', async () => {
     await renderScreen(DriverHomeScreen);
     expect(flat(screen.getByTestId('driver-home').props.style).backgroundColor).toBe(LightTheme.colors.background);
     expect(screen.getByText('Offline')).toBeTruthy();
@@ -104,7 +121,19 @@ describe('DriverHomeScreen', () => {
     // No demo figures (156 rides, PKR 24k, $25.50) and no demo recent rides.
     expect(screen.queryByText(/156|PKR|\$/)).toBeNull();
     expect(screen.queryByText('Sarah Ahmed')).toBeNull();
-    expect(screen.getAllByText('—')).toHaveLength(3);
+    // T-507: Today's tiles from GET /me/stats; untracked online time / acceptance are hidden.
+    expect(screen.getByText('Rs 1,250')).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByText('New')).toBeTruthy();
+    expect(screen.queryByTestId('driver-home-stat-online')).toBeNull();
+    expect(screen.queryByTestId('driver-home-stat-acceptance')).toBeNull();
+    expect(screen.queryByText('—')).toBeNull();
+    expect(screen.getByText('This week: Rs 4,800 · 9 trips')).toBeTruthy();
+    expect(screen.getByText('Commission owed: Rs 116')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('driver-home-earnings'));
+    expect(mockNavigate).toHaveBeenCalledWith('DriverEarnings');
+    fireEvent.press(screen.getByTestId('driver-home-wallet'));
+    expect(mockNavigate).toHaveBeenCalledWith('Wallet');
     expect(screen.getByText('Approved')).toBeTruthy();
     expect(screen.queryByTestId('driver-home-pending-banner')).toBeNull();
     // Sign out and the profile row live in Settings; the avatar opens the profile.
@@ -169,6 +198,11 @@ describe('DriverSettingsScreen', () => {
     // T-203: Vehicle & documents opens the documents list.
     fireEvent.press(screen.getByTestId('driver-settings-documents'));
     expect(mockNavigate).toHaveBeenCalledWith('DriverDocuments');
+    // T-507 / T-508: Earnings and Wallet are reachable from Settings.
+    fireEvent.press(screen.getByTestId('driver-settings-earnings'));
+    expect(mockNavigate).toHaveBeenCalledWith('DriverEarnings');
+    fireEvent.press(screen.getByTestId('driver-settings-wallet'));
+    expect(mockNavigate).toHaveBeenCalledWith('Wallet');
     expect(openSettings).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('driver-settings-phone-notifications'));
     expect(openSettings).toHaveBeenCalledTimes(1);

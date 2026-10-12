@@ -89,6 +89,14 @@ export const iconGlyphs = {
   logout: 'logout',
   power: 'power',
   theme: 'theme-light-dark',
+  // Wallet and earnings (T-508/T-507).
+  moneyIn: 'arrow-bottom-left',
+  moneyOut: 'arrow-top-right',
+  receipt: 'receipt',
+  bank: 'bank-outline',
+  chart: 'chart-bar',
+  refund: 'cash-refund',
+  pending: 'clock-outline',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

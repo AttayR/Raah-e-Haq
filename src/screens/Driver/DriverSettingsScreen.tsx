@@ -13,7 +13,8 @@ import { space } from '../../theme';
 
 /**
  * Driver Settings tab (T-618 driver side, shared-settings spec). Every row leads somewhere:
- * Edit profile opens DriverProfile, Vehicle & documents opens the documents list (T-203), Notifications opens the push preferences (BE-11, T-502)
+ * Edit profile opens DriverProfile, Vehicle & documents opens the documents list (T-203), Earnings
+ * and Wallet open their screens (T-507, T-508), Notifications opens the push preferences (BE-11, T-502)
  * with the phone's own settings as a second row, Sign out is the shared confirm flow (T-102).
  * Help & support and Privacy come back with T-511.
  */
@@ -84,6 +85,23 @@ const DriverSettingsScreen = () => {
             Linking.openSettings();
           }}
           testID="driver-settings-phone-notifications"
+        />
+      </ListGroup>
+
+      <ListGroup title={DRIVER_SETTINGS_COPY.moneyGroup}>
+        <ListItem
+          icon="chart"
+          title={DRIVER_SETTINGS_COPY.earnings}
+          subtitle={DRIVER_SETTINGS_COPY.earningsSubtitle}
+          onPress={() => navigation.navigate('DriverEarnings')}
+          testID="driver-settings-earnings"
+        />
+        <ListItem
+          icon="wallet"
+          title={DRIVER_SETTINGS_COPY.wallet}
+          subtitle={DRIVER_SETTINGS_COPY.walletSubtitle}
+          onPress={() => navigation.navigate('Wallet')}
+          testID="driver-settings-wallet"
         />
       </ListGroup>
 

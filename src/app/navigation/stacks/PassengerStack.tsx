@@ -9,7 +9,6 @@ import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import PassengerRideTrackingScreen from 'src/screens/Passenger/PassengerRideTrackingScreen';
 import RideHistoryScreen from 'src/screens/Passenger/RideHistoryScreen';
 import FavoriteLocationsScreen from 'src/screens/Passenger/FavoriteLocationsScreen';
-import WalletScreen from 'src/screens/Passenger/WalletScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
@@ -17,6 +16,9 @@ import { rideChatScreenId, type RideChatParams } from '../../../features/chat/na
 import { useNotificationsSync } from '../../../features/notifications/hooks';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
 import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
+import WalletScreen from '../../../features/wallet/screens/WalletScreen';
+import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
+import type { WalletRoutes } from '../../../features/wallet/navigation';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
@@ -28,7 +30,9 @@ export type PassengerStackParamList = {
   PassengerRideTracking: { passengerId: string; rideId?: string };
   RideHistory: undefined;
   FavoriteLocations: undefined;
-  Wallet: undefined;
+  /** Cash-only wallet: balance and ledger (T-508, BE-09). */
+  Wallet: WalletRoutes['Wallet'];
+  WalletTransaction: WalletRoutes['WalletTransaction'];
   PassengerNotifications: undefined;
   /** Settings → Notifications: push preferences (T-502, BE-11). */
   NotificationPreferences: undefined;
@@ -64,6 +68,7 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="RideHistory" component={RideHistoryScreen} />
       <Stack.Screen name="FavoriteLocations" component={FavoriteLocationsScreen} />
       <Stack.Screen name="Wallet" component={WalletScreen} />
+      <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
       <Stack.Screen name="PassengerNotifications" component={PassengerNotificationsScreen} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     </Stack.Navigator>

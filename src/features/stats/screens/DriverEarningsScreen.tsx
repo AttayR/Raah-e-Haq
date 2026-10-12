@@ -1,0 +1,181 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
+import { useAppTheme } from '../../../app/providers/ThemeProvider';
+import { AppText, Button, Screen, SegmentedControl } from '../../../components/ui';
+import { formatMoney } from '../../../core/format/money';
+import { layout, space } from '../../../theme';
+import { ScreenHeader } from '../../wallet/components/ScreenHeader';
+import { StateView } from '../../wallet/components/StateView';
+import { formatDateTime } from '../../wallet/format';
+import { EarningsChart } from '../components/EarningsChart';
+import { EarningsHero } from '../components/EarningsHero';
+import { STATS_COPY } from '../copy';
+import { useDriverEarnings } from '../hooks';
+import type { EarningsPeriod, EarningsRide } from '../types';
+
+const PERIODS = [
+  { value: 'day', label: STATS_COPY.periodDay },
+  { value: 'week', label: STATS_COPY.periodWeek },
+  { value: 'month', label: STATS_COPY.periodMonth },
+] as const;
+
+/**
+ * Driver Earnings (T-507, BE-08): GET /driver/earnings for Today / This week / This month with
+ * the period total, trips, fares and commission, a per-day bar chart (week and month) and the
+ * period's completed rides, paged on scroll. Pull to refresh; loading, error and empty states.
+ */
+export default function DriverEarningsScreen() {
+  const { theme } = useAppTheme();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const isFocused = useIsFocused();
+  const [period, setPeriod] = useState<EarningsPeriod>('day');
+  const earnings = useDriverEarnings(period, isFocused);
+  const { data, status, error, rides, refresh, reload } = earnings;
+
+  const [pulling, setPulling] = useState(false);
+  useEffect(() => {
+    if (pulling && status !== 'refreshing') setPulling(false);
+  }, [pulling, status]);
+  const onRefresh = useCallback(() => {
+    setPulling(true);
+    refresh();
+  }, [refresh]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: EarningsRide }) => {
+      const money = (n: number) => formatMoney(n, { currency: data?.currency });
+      return (
+        <View style={styles.ride} testID={`earnings-ride-${item.id}`}>
+          <View style={styles.rideText}>
+            <AppText variant="bodyStrong" numberOfLines={1}>
+              {item.rideCode ?? `#${item.id}`}
+            </AppText>
+            <AppText variant="caption" color="textMuted" numberOfLines={2}>
+              {[item.completedAt ? formatDateTime(item.completedAt) : null, STATS_COPY.rideFare(money(item.totalFare), money(item.platformCommission))]
+                .filter(Boolean)
+                .join(' · ')}
+            </AppText>
+          </View>
+          <AppText variant="numeric" style={styles.rideAmount}>
+            {money(item.driverEarnings)}
+          </AppText>
+        </View>
+      );
+    },
+    [data?.currency],
+  );
+
+  const separator = useCallback(
+    () => <View style={[styles.separator, { backgroundColor: theme.colors.border }]} />,
+    [theme.colors.border],
+  );
+
+  const periodControl = (
+    <SegmentedControl<EarningsPeriod>
+      options={PERIODS}
+      value={period}
+      onChange={setPeriod}
+      accessibilityLabel={STATS_COPY.periodLabel}
+      testID="earnings-period"
+    />
+  );
+
+  const header = (
+    <ScreenHeader title={STATS_COPY.earningsTitle} backLabel={STATS_COPY.back} onBack={() => navigation.goBack()} testID="earnings" />
+  );
+
+  if (!data) {
+    return (
+      <Screen testID="earnings-screen">
+        {header}
+        <View style={styles.controls}>{periodControl}</View>
+        {status === 'failed' ? (
+          <StateView
+            kind="error"
+            message={error ?? STATS_COPY.loadFailed}
+            retryLabel={STATS_COPY.retry}
+            onRetry={reload}
+            testID="earnings-error"
+          />
+        ) : (
+          <StateView kind="loading" testID="earnings-loading" />
+        )}
+      </Screen>
+    );
+  }
+
+  const listHeader = (
+    <View style={styles.headerBlock}>
+      {periodControl}
+      <EarningsHero earnings={data} />
+      {error ? (
+        <AppText variant="bodySmall" color="danger" testID="earnings-refresh-error">
+          {error}
+        </AppText>
+      ) : null}
+      {data.period !== 'day' ? <EarningsChart series={data.series} period={data.period} currency={data.currency} /> : null}
+      <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
+        {STATS_COPY.ridesTitle}
+      </AppText>
+    </View>
+  );
+
+  const renderFooter = () => {
+    if (earnings.loadingMore) {
+      return (
+        <View style={styles.footer}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      );
+    }
+    if (earnings.loadMoreError) {
+      return (
+        <View style={styles.footer}>
+          <AppText variant="bodySmall" color="textSecondary" align="center">
+            {earnings.loadMoreError}
+          </AppText>
+          <Button label={STATS_COPY.retry} variant="ghost" size="sm" fullWidth={false} onPress={earnings.loadMore} />
+        </View>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <Screen testID="earnings-screen">
+      {header}
+      <FlatList
+        testID="earnings-rides"
+        data={rides}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        ItemSeparatorComponent={separator}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <StateView kind="empty" icon="rides" title={STATS_COPY.emptyTitle[data.period]} body={STATS_COPY.emptyBody} testID="earnings-empty" />
+        }
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={[styles.content, rides.length === 0 && styles.contentEmpty]}
+        onEndReached={earnings.hasMore && !earnings.loadMoreError ? earnings.loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl refreshing={pulling} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
+        }
+      />
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
+  contentEmpty: { flexGrow: 1 },
+  controls: { paddingHorizontal: space[4], paddingTop: space[2] },
+  headerBlock: { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[2], gap: space[4] },
+  sectionTitle: { marginTop: space[2] },
+  ride: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 64 },
+  rideText: { flex: 1, minWidth: 0 },
+  rideAmount: { flexShrink: 0 },
+  separator: { height: StyleSheet.hairlineWidth, marginStart: space[4] },
+  footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },
+});

@@ -31,3 +31,11 @@ export interface ApiResponse<T = unknown> {
   error?: ApiErrorDetail;
   retry_after?: number;
 }
+
+/** One page of a paginated list, mapped to app models (`pagination` read with defaults). */
+export interface Page<T> {
+  items: T[];
+  page: number;
+  lastPage: number;
+  total: number;
+}

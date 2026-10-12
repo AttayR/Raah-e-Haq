@@ -33,7 +33,7 @@ jest.mock('../../src/features/chat/screens/ChatThreadScreen', () => mockScreen('
 jest.mock('../../src/screens/Passenger/PassengerRideTrackingScreen', () => mockScreen('Tracking'));
 jest.mock('../../src/screens/Passenger/RideHistoryScreen', () => mockScreen('History'));
 jest.mock('../../src/screens/Passenger/FavoriteLocationsScreen', () => mockScreen('Favorites'));
-jest.mock('../../src/screens/Passenger/WalletScreen', () => mockScreen('Wallet'));
+jest.mock('../../src/features/wallet/screens/WalletScreen', () => mockScreen('Wallet'));
 
 const Root = createNativeStackNavigator<RootStackParamList>();
 

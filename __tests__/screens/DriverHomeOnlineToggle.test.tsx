@@ -14,6 +14,8 @@ import DriverHomeScreen from '../../src/screens/Driver/DriverHomeScreen';
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => ({ navigate: jest.fn() }),
+  // Home reads GET /me/stats while focused (T-507).
+  useIsFocused: () => true,
 }));
 
 const statusBody = (status: string) => ({
@@ -42,6 +44,7 @@ let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(apiClient);
+  mock.onGet('/me/stats').reply(200, { success: true, data: { role: 'driver', currency: 'PKR' } });
 });
 
 afterEach(() => {
@@ -55,7 +58,8 @@ describe('DriverHomeScreen online toggle', () => {
     const { screen } = renderHome();
 
     await waitFor(() => expect(screen.getByText('Offline')).toBeTruthy());
-    expect(mock.history.get).toHaveLength(1);
+    // One status read (the other GET is the Today stats, T-507).
+    expect(mock.history.get.filter((request) => request.url === '/driver/status')).toHaveLength(1);
 
     fireEvent.press(screen.getByTestId('driver-home-action-online'));
 
