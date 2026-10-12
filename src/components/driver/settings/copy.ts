@@ -12,6 +12,8 @@ export const DRIVER_SETTINGS_COPY = {
   moneyGroup: 'Money',
   earnings: 'Earnings',
   earningsSubtitle: 'Today, this week and this month',
+  rideHistory: 'Ride history',
+  rideHistorySubtitle: 'Your trips, receipts and cancellations',
   wallet: 'Wallet',
   walletSubtitle: 'Balance, commission and history',
   notifications: 'Notifications',

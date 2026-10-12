@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, Screen, SegmentedControl } from '../../../components/ui';
+import { AppText, Button, Icon, Screen, SegmentedControl } from '../../../components/ui';
 import { formatMoney } from '../../../core/format/money';
 import { layout, space } from '../../../theme';
 import { ScreenHeader } from '../../wallet/components/ScreenHeader';
@@ -12,6 +12,7 @@ import { EarningsChart } from '../components/EarningsChart';
 import { EarningsHero } from '../components/EarningsHero';
 import { STATS_COPY } from '../copy';
 import { useDriverEarnings } from '../hooks';
+import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
 import type { EarningsPeriod, EarningsRide } from '../types';
 
 const PERIODS = [
@@ -23,7 +24,7 @@ const PERIODS = [
 /**
  * Driver Earnings (T-507, BE-08): GET /driver/earnings for Today / This week / This month with
  * the period total, trips, fares and commission, a per-day bar chart (week and month) and the
- * period's completed rides, paged on scroll. Pull to refresh; loading, error and empty states.
+ * period's completed rides, paged on scroll; a ride opens RideDetails (T-501). Pull to refresh; loading, error and empty states.
  */
 export default function DriverEarningsScreen() {
   const { theme } = useAppTheme();
@@ -46,7 +47,13 @@ export default function DriverEarningsScreen() {
     ({ item }: { item: EarningsRide }) => {
       const money = (n: number) => formatMoney(n, { currency: data?.currency });
       return (
-        <View style={styles.ride} testID={`earnings-ride-${item.id}`}>
+        <Pressable
+          onPress={() => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: item.id })}
+          accessibilityRole="button"
+          accessibilityHint={STATS_COPY.openRideHint}
+          style={({ pressed }) => [styles.ride, pressed ? { backgroundColor: theme.colors.surfacePressed } : null]}
+          testID={`earnings-ride-${item.id}`}
+        >
           <View style={styles.rideText}>
             <AppText variant="bodyStrong" numberOfLines={1}>
               {item.rideCode ?? `#${item.id}`}
@@ -60,10 +67,11 @@ export default function DriverEarningsScreen() {
           <AppText variant="numeric" style={styles.rideAmount}>
             {money(item.driverEarnings)}
           </AppText>
-        </View>
+          <Icon name="chevronEnd" size={20} color="textMuted" />
+        </Pressable>
       );
     },
-    [data?.currency],
+    [data?.currency, navigation, theme.colors.surfacePressed],
   );
 
   const separator = useCallback(

@@ -289,6 +289,24 @@ describe('TransactionDetailScreen', () => {
     expect(screen.getByTestId('transaction-amount').props.children).toBe('+Rs 250');
   });
 
+  it('a ride entry links to its RideDetails (T-501)', async () => {
+    const raw = rawTransaction({ id: 812, type: 'commission_due' });
+    mockParams = { id: 812, transaction: toTransaction(raw) };
+    mock.onGet('/wallet/transactions/812').reply(200, envelope(raw));
+    show(TransactionDetailScreen);
+    fireEvent.press(await screen.findByTestId('transaction-view-ride'));
+    expect(mockNavigate).toHaveBeenCalledWith('RideDetails', { rideId: 7 });
+  });
+
+  it('an entry without a ride has no "View ride" link', async () => {
+    const raw = rawTransaction({ id: 2, type: 'refund', ride: null });
+    mockParams = { id: 2, transaction: toTransaction(raw) };
+    mock.onGet('/wallet/transactions/2').reply(200, envelope(raw));
+    show(TransactionDetailScreen);
+    expect(await screen.findByTestId('transaction-amount')).toBeTruthy();
+    expect(screen.queryByTestId('transaction-view-ride')).toBeNull();
+  });
+
   it('shows an error state when the entry is not found', async () => {
     mockParams = { id: 5 };
     mock.onGet('/wallet/transactions/5').reply(404, { success: false, message: 'Transaction not found', error: { code: 'NOT_FOUND' } });

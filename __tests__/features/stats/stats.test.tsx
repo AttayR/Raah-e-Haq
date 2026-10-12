@@ -211,6 +211,13 @@ describe('DriverEarningsScreen', () => {
     expect(screen.getByText('Rs 240')).toBeTruthy();
   });
 
+  it('a ride row opens its RideDetails (T-501)', async () => {
+    mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
+    showEarnings();
+    fireEvent.press(await screen.findByTestId('earnings-ride-7'));
+    expect(mockNavigate).toHaveBeenCalledWith('RideDetails', { rideId: 7 });
+  });
+
   it('shows an error with retry', async () => {
     mock.onGet('/driver/earnings').replyOnce(500, {});
     mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));

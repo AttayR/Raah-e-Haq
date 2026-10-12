@@ -22,6 +22,7 @@ export const WALLET_COPY = {
   emptyFilteredTitle: 'Nothing here',
   emptyFilteredBody: 'No transactions match this filter.',
   reversed: 'Reversed',
+  viewRide: 'View ride',
   pending: 'Pending',
   // Driver commission.
   commissionTitle: 'Commission owed',

@@ -43,4 +43,5 @@ export const STATS_COPY = {
   loadFailed: "Couldn't load earnings",
   retry: 'Try again',
   rideFare: (fare: string, commission: string) => `Fare ${fare} · commission ${commission}`,
+  openRideHint: 'Opens the ride details',
 } as const;

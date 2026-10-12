@@ -7,7 +7,6 @@ import PassengerBottomTabs from '../tabs/PassengerBottomTabs';
 import PassengerProfile from 'src/screens/Passenger/Passengerprofile';
 import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import PassengerRideTrackingScreen from 'src/screens/Passenger/PassengerRideTrackingScreen';
-import RideHistoryScreen from 'src/screens/Passenger/RideHistoryScreen';
 import FavoriteLocationsScreen from 'src/screens/Passenger/FavoriteLocationsScreen';
 import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
@@ -19,6 +18,9 @@ import { NotificationPreferencesScreen } from '../../../features/notifications/s
 import WalletScreen from '../../../features/wallet/screens/WalletScreen';
 import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
 import type { WalletRoutes } from '../../../features/wallet/navigation';
+import RideHistoryScreen from '../../../features/ride-history/screens/RideHistoryScreen';
+import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
+import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
@@ -28,7 +30,9 @@ export type PassengerStackParamList = {
   RideChat: RideChatParams;
   PassengerMap: undefined;
   PassengerRideTracking: { passengerId: string; rideId?: string };
-  RideHistory: undefined;
+  /** Ride history from GET /rides and one ride's details/receipt (T-501). */
+  RideHistory: RideHistoryRoutes['RideHistory'];
+  RideDetails: RideHistoryRoutes['RideDetails'];
   FavoriteLocations: undefined;
   /** Cash-only wallet: balance and ledger (T-508, BE-09). */
   Wallet: WalletRoutes['Wallet'];
@@ -66,6 +70,7 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="PassengerMap" component={PassengerMapScreen} />
       <Stack.Screen name="PassengerRideTracking" component={PassengerRideTrackingScreen} />
       <Stack.Screen name="RideHistory" component={RideHistoryScreen} />
+      <Stack.Screen name="RideDetails" component={RideDetailsScreen} getId={rideDetailsScreenId} />
       <Stack.Screen name="FavoriteLocations" component={FavoriteLocationsScreen} />
       <Stack.Screen name="Wallet" component={WalletScreen} />
       <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />

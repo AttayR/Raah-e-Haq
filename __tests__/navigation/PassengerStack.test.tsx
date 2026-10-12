@@ -31,7 +31,7 @@ jest.mock('../../src/screens/Passenger/PassengerSettingsScreen', () => mockScree
 jest.mock('../../src/screens/Passenger/Passengerprofile', () => mockScreen('Profile'));
 jest.mock('../../src/features/chat/screens/ChatThreadScreen', () => mockScreen('RideChat'));
 jest.mock('../../src/screens/Passenger/PassengerRideTrackingScreen', () => mockScreen('Tracking'));
-jest.mock('../../src/screens/Passenger/RideHistoryScreen', () => mockScreen('History'));
+jest.mock('../../src/features/ride-history/screens/RideHistoryScreen', () => mockScreen('History'));
 jest.mock('../../src/screens/Passenger/FavoriteLocationsScreen', () => mockScreen('Favorites'));
 jest.mock('../../src/features/wallet/screens/WalletScreen', () => mockScreen('Wallet'));
 

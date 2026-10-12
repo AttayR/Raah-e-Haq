@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type ParamListBase, type RouteProp } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Badge, Card, Icon, Screen } from '../../../components/ui';
+import { AppText, Badge, Card, Icon, ListItem, Screen } from '../../../components/ui';
 import { formatMoney } from '../../../core/format/money';
 import { layout, radius, space } from '../../../theme';
 import { InfoNote } from '../components/InfoNote';
@@ -13,6 +13,7 @@ import { formatDateTime, transactionAmountColor, transactionAmountText, transact
 import { useTransactionDetail } from '../hooks';
 import type { WalletRoutes } from '../navigation';
 import type { WalletTransaction } from '../types';
+import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
 
 type Row = { label: string; value: string; testID?: string };
 
@@ -61,7 +62,10 @@ export const transactionDetailRows = (t: WalletTransaction): Row[] => {
   return rows.filter((row): row is Row => row !== null);
 };
 
-/** One ledger entry (T-508): GET /wallet/transactions/{id}, opened from the Wallet list. */
+/**
+ * One ledger entry (T-508): GET /wallet/transactions/{id}, opened from the Wallet list. An entry
+ * for a ride links to its RideDetails (T-501).
+ */
 export default function TransactionDetailScreen() {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -98,6 +102,7 @@ export default function TransactionDetailScreen() {
 
   const struck = transaction.reversed ? styles.struck : null;
   const rows = transactionDetailRows(transaction);
+  const ride = transaction.ride;
 
   return (
     <Screen scroll testID="transaction-screen" contentStyle={styles.content}>
@@ -153,6 +158,18 @@ export default function TransactionDetailScreen() {
             </View>
           ))}
         </Card>
+
+        {ride ? (
+          <Card padding="none">
+            <ListItem
+              icon="rides"
+              title={WALLET_COPY.viewRide}
+              subtitle={ride.rideCode ?? undefined}
+              onPress={() => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: ride.id })}
+              testID="transaction-view-ride"
+            />
+          </Card>
+        ) : null}
       </View>
     </Screen>
   );

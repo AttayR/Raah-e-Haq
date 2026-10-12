@@ -19,6 +19,9 @@ import PayCommissionScreen from '../../../features/wallet/screens/PayCommissionS
 import SettlementsScreen from '../../../features/wallet/screens/SettlementsScreen';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
 import DriverEarningsScreen from '../../../features/stats/screens/DriverEarningsScreen';
+import RideHistoryScreen from '../../../features/ride-history/screens/RideHistoryScreen';
+import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
+import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
 
 export type DriverStackParamList = {
   DriverTabs: undefined;
@@ -39,6 +42,9 @@ export type DriverStackParamList = {
   WalletSettlements: DriverWalletRoutes['WalletSettlements'];
   /** Earnings per day / week / month (T-507, BE-08). */
   DriverEarnings: undefined;
+  /** Settings → Ride history and one ride's details/receipt (T-501). */
+  RideHistory: RideHistoryRoutes['RideHistory'];
+  RideDetails: RideHistoryRoutes['RideDetails'];
 };
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
@@ -85,6 +91,8 @@ const DriverStack = () => {
       <Stack.Screen name="PayCommission" component={PayCommissionScreen} />
       <Stack.Screen name="WalletSettlements" component={SettlementsScreen} />
       <Stack.Screen name="DriverEarnings" component={DriverEarningsScreen} />
+      <Stack.Screen name="RideHistory" component={RideHistoryScreen} />
+      <Stack.Screen name="RideDetails" component={RideDetailsScreen} getId={rideDetailsScreenId} />
     </Stack.Navigator>
   );
 };
