@@ -4,17 +4,21 @@ QA runs against the **production** backend (the owner's choice, 2026-10-03). Rea
 
 ## Local test accounts (default for all agent QA; owner approved 2026-10-08)
 
-Local backend only (`http://localhost:8000`, Debug build). Fake seeded data from `~/My-Projects/Raah-e-Haq-backend/database/seeders/UserSeeder.php`. Password: the Laravel factory default in `database/factories/UserFactory.php` (agents read it there; never copy it into docs or reports).
+Local backend only (`http://localhost:8000`, Debug build). Fake seeded data from `~/My-Projects/Raah-e-Haq-backend/database/seeders/UserSeeder.php` (`QA_PHONES`).
 
-| Role | Email | Simulator |
-|---|---|---|
-| Passenger | passenger@raah-e-haq.com | iPhone 17 (iOS 26.5) |
-| Driver | driver@raah-e-haq.com | second simulator (e.g. iPhone 17 Pro) |
-| Pending user | pending@raah-e-haq.com | for T-106 |
-| Pending driver (rejected items) | pending-driver@raah-e-haq.com | driver role, status `pending`. One `driver_documents` row (driving_license) rejected with reason "Photo is blurry, please re-upload" and one vehicle (plate QA-REJ-001) rejected with a reason. For the pending/onboarding screen and the re-upload flow (BE-32, `POST /api/profile/documents/{id}`, `POST /api/profile/vehicles/{id}/documents`). A successful re-upload moves the item to `pending`; reseed to get the rejected state back. Needs `AUTH_PENDING_LOGIN_TOKENS=true` in the local backend .env to get a token (BE-25). |
-| Rejected user | rejected@raah-e-haq.com | passenger, status `rejected`, reason "QA: documents did not match". Login and every authed request return 403 `ACCOUNT_REJECTED` with `data.rejection_reason` (account-status screen). |
-| Suspended user | suspended@raah-e-haq.com | passenger, status `suspended`. Login and every authed request return 403 `ACCOUNT_SUSPENDED` (account-status screen). |
-| Admin (web panel) | admin@raah-e-haq.com | browser, http://localhost:8000 |
+**Sign-in by phone OTP (preferred, BE-71):** enter the account's phone below, tap Send OTP, then type the BE-61 local test code **246810**. The local backend .env must have `APP_ENV=local`, `OTP_LOCAL_TEST_CODE=246810` and `OTP_LOCAL_TEST_NUMBERS=+92300999` (production ignores the code). The app accepts the local form (`03009990001`) or E.164 (`+923009990001`). Email + password sign-in also works: the password is the Laravel factory default in `database/factories/UserFactory.php` (agents read it there; never copy it into docs or reports).
+
+| Role | Email | Phone (OTP 246810) | Simulator / notes |
+|---|---|---|---|
+| Passenger | passenger@raah-e-haq.com | +923009990001 (03009990001) | iPhone 17 (iOS 26.5) |
+| Driver | driver@raah-e-haq.com | +923009990002 (03009990002) | second simulator (e.g. iPhone 17 Pro) |
+| Admin | admin@raah-e-haq.com | +923009990003 (03009990003) | web panel in the browser at http://localhost:8000 (email + password). An OTP login with this number also returns an API token with role `admin`, which opens the `role:admin` API routes (e.g. `GET /api/users`). |
+| Pending user | pending@raah-e-haq.com | +923009990004 (03009990004) | passenger, status `pending`, for T-106 |
+| Pending driver (rejected items) | pending-driver@raah-e-haq.com | +923009990005 (03009990005) | driver role, status `pending`. One `driver_documents` row (driving_license) rejected with reason "Photo is blurry, please re-upload" and one vehicle (plate QA-REJ-001) rejected with a reason. For the pending/onboarding screen and the re-upload flow (BE-32, `POST /api/profile/documents/{id}`, `POST /api/profile/vehicles/{id}/documents`). A successful re-upload moves the item to `pending`; reseed to get the rejected state back. Pending accounts get a token only with `AUTH_PENDING_LOGIN_TOKENS=true` in the local backend .env (BE-25); otherwise verify-otp returns 403 `ACCOUNT_PENDING`. |
+| Rejected user | rejected@raah-e-haq.com | +923009990006 (03009990006) | passenger, status `rejected`, reason "QA: documents did not match". Email + password login and every authed request return 403 `ACCOUNT_REJECTED` with `data.rejection_reason` (account-status screen). By OTP no code is issued (BE-32), so verify-otp returns 401 "Invalid or expired OTP": use email + password to reach the account-status screen. |
+| Suspended user | suspended@raah-e-haq.com | +923009990007 (03009990007) | passenger, status `suspended`. Email + password login and every authed request return 403 `ACCOUNT_SUSPENDED`. By OTP, 401 as for the rejected user. |
+| Demo drivers 1-3 (not for QA rides) | demo-driver-N@raah-e-haq.com | +92300999010N (e.g. +923009990101) | carry the demo active rides in the admin panel; don't use them for booking scenarios |
+| Demo passengers 1-3 (not for QA rides) | demo-passenger-N@raah-e-haq.com | +92300999020N (e.g. +923009990201) | same |
 
 Every seeded account has a verified phone (`phone_verified_at` set, BE-37), so booking, accepting and referral flows are not blocked by phone verification. The pending driver and its rejected vehicle are kept out of the demo rides and driver locations.
 
