@@ -170,21 +170,27 @@ export type PreferencesStatus = 'loading' | 'ready' | 'failed';
 export interface NotificationPreferencesState {
   preferences: NotificationPreferences | null;
   status: PreferencesStatus;
-  /** The key whose PUT is in flight. */
-  saving: NotificationPreferenceKey | null;
+  /** True while any change is waiting to be saved (switches stay usable). */
+  saving: boolean;
   reload: () => void;
   toggle: (key: NotificationPreferenceKey, value: boolean) => Promise<void>;
 }
 
 /**
- * GET/PUT /notifications/preferences for the settings screen. A switch moves at once and
- * goes back (with a toast) if the server refuses; one change is saved at a time.
+ * GET/PUT /notifications/preferences for the settings screen. A switch moves at once; changes are
+ * saved one PUT at a time in tap order, so rapid taps queue instead of being dropped. A refused
+ * change puts back only its own switch (to the last saved value) with a toast.
  */
 export const useNotificationPreferences = (): NotificationPreferencesState => {
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [status, setStatus] = useState<PreferencesStatus>('loading');
-  const [saving, setSaving] = useState<NotificationPreferenceKey | null>(null);
+  const [inFlight, setInFlight] = useState(0);
   const mounted = useRef(true);
+  /** Last values the server confirmed (the rollback target). */
+  const confirmed = useRef<NotificationPreferences | null>(null);
+  /** Queued changes per key; a key with queued changes keeps its on-screen (optimistic) value. */
+  const queued = useRef<Partial<Record<NotificationPreferenceKey, number>>>({});
+  const queue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     mounted.current = true;
@@ -199,6 +205,7 @@ export const useNotificationPreferences = (): NotificationPreferencesState => {
       .getPreferences()
       .then((loaded) => {
         if (!mounted.current) return;
+        confirmed.current = loaded;
         setPreferences(loaded);
         setStatus('ready');
       })
@@ -211,30 +218,58 @@ export const useNotificationPreferences = (): NotificationPreferencesState => {
     reload();
   }, [reload]);
 
+  /** Server values for every key without a newer queued tap; queued keys keep what the user sees. */
+  const mergeServer = useCallback((current: NotificationPreferences | null, server: NotificationPreferences) => {
+    if (!current) return server;
+    const next = { ...server };
+    (Object.keys(queued.current) as NotificationPreferenceKey[]).forEach((k) => {
+      if ((queued.current[k] ?? 0) > 0) next[k] = current[k];
+    });
+    return next;
+  }, []);
+
   const toggle = useCallback(
-    async (key: NotificationPreferenceKey, value: boolean) => {
-      if (!preferences || saving) return;
-      const previous = preferences;
-      setPreferences({ ...previous, [key]: value });
-      setSaving(key);
-      try {
-        const saved = await notificationsApi.updatePreferences({ [key]: value });
-        if (mounted.current) setPreferences(saved);
-      } catch (error) {
+    (key: NotificationPreferenceKey, value: boolean): Promise<void> => {
+      if (!confirmed.current) return Promise.resolve();
+      setPreferences((current) => (current ? { ...current, [key]: value } : current));
+      queued.current[key] = (queued.current[key] ?? 0) + 1;
+      setInFlight((n) => n + 1);
+
+      const run = async () => {
+        let saved: NotificationPreferences | null = null;
+        let failure: unknown = null;
+        try {
+          saved = await notificationsApi.updatePreferences({ [key]: value });
+        } catch (error) {
+          failure = error;
+        }
+        queued.current[key] = (queued.current[key] ?? 1) - 1;
+        if (saved) confirmed.current = saved;
         if (!mounted.current) return;
-        setPreferences(previous);
-        const apiError = toApiError(error);
+        setInFlight((n) => n - 1);
+        if (saved) {
+          const server = saved;
+          setPreferences((current) => mergeServer(current, server));
+          return;
+        }
+        const base = confirmed.current;
+        if (base && (queued.current[key] ?? 0) === 0) {
+          setPreferences((current) => (current ? { ...current, [key]: base[key] } : current));
+        }
+        const apiError = toApiError(failure);
         if (apiError.kind !== 'cancelled') {
           toast.error(apiError.kind === 'rate_limited' ? apiError.message : NOTIFICATIONS_COPY.preferencesSaveFailed);
         }
-      } finally {
-        if (mounted.current) setSaving(null);
-      }
+      };
+
+      const next = queue.current.then(run);
+      queue.current = next;
+      return next;
     },
-    [preferences, saving],
+    [mergeServer],
   );
 
-  return { preferences, status, saving, reload, toggle };
+  return { preferences, status, saving: inFlight > 0, reload, toggle };
 };
 
 export interface PushPermissionState {

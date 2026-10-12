@@ -277,6 +277,99 @@ describe('NotificationPreferencesScreen', () => {
     expect(screen.getByTestId('notification-pref-chat').props.value).toBe(true);
   });
 
+  it('tapping the whole row (not only the switch) toggles it and sends PUT', async () => {
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: prefs });
+    mock.onPut('/notifications/preferences').reply(200, { success: true, data: { ...prefs, ride_updates: false } });
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    fireEvent.press(screen.getByTestId('notification-pref-rideUpdates-row'));
+    await flush();
+
+    expect(mock.history.put).toHaveLength(1);
+    expect(JSON.parse(mock.history.put[0].data)).toEqual({ ride_updates: false });
+    expect(screen.getByTestId('notification-pref-rideUpdates').props.value).toBe(false);
+  });
+
+  it('rapid taps while a save is in flight are queued, not ignored', async () => {
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: prefs });
+    const pending: Array<() => void> = [];
+    let server = { ...prefs };
+    mock.onPut('/notifications/preferences').reply(
+      (config) =>
+        new Promise((resolve) => {
+          pending.push(() => {
+            server = { ...server, ...JSON.parse(config.data) };
+            resolve([200, { success: true, data: server }]);
+          });
+        }),
+    );
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    // Three taps before the first PUT answers: two rows, then the first one back on.
+    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', false);
+    await flush();
+    expect(screen.getByTestId('notification-pref-chat').props.disabled).toBe(false);
+    fireEvent(screen.getByTestId('notification-pref-chat'), 'valueChange', false);
+    await flush();
+    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', true);
+    await flush();
+
+    // Every tap shows at once.
+    expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(true);
+    expect(screen.getByTestId('notification-pref-chat').props.value).toBe(false);
+
+    // Saved one at a time, in order; an earlier answer never flips a later tap back.
+    for (let i = 0; i < 3; i += 1) {
+      await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+      const next = pending.shift();
+      await act(async () => {
+        next?.();
+      });
+      await flush();
+      expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(true);
+      expect(screen.getByTestId('notification-pref-chat').props.value).toBe(false);
+    }
+    expect(mock.history.put.map((r) => JSON.parse(r.data))).toEqual([
+      { promotions: false },
+      { chat: false },
+      { promotions: true },
+    ]);
+  });
+
+  it('a refused save in a queue puts back only that switch', async () => {
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: prefs });
+    mock
+      .onPut('/notifications/preferences')
+      .replyOnce(500, { success: false, message: 'Server error' })
+      .onPut('/notifications/preferences')
+      .replyOnce(200, { success: true, data: { ...prefs, chat: false } });
+    const error = jest.spyOn(toast, 'error');
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', false);
+    fireEvent(screen.getByTestId('notification-pref-chat'), 'valueChange', false);
+    await waitFor(() => expect(mock.history.put).toHaveLength(2));
+    await flush();
+
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(true);
+    expect(screen.getByTestId('notification-pref-chat').props.value).toBe(false);
+  });
+
+  it('the phone notification settings row opens the phone settings', async () => {
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: prefs });
+    const { Linking } = jest.requireActual<typeof import('react-native')>('react-native');
+    const open = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    fireEvent.press(screen.getByTestId('notification-preferences-phone-settings'));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
   it('a failed load offers Try again', async () => {
     mock.onGet('/notifications/preferences').networkErrorOnce();
     renderWith(<NotificationPreferencesScreen />);

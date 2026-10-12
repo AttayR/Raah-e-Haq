@@ -1,8 +1,8 @@
 import React from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, IconButton, ListGroup, ListItem, Screen } from '../../../components/ui';
+import { AppText, Button, IconButton, ListGroup, ListItem, Screen, Switch } from '../../../components/ui';
 import { space } from '../../../theme';
 import { NOTIFICATIONS_COPY } from '../copy';
 import { useNotificationPreferences } from '../hooks';
@@ -25,21 +25,42 @@ const CATEGORY_ROWS: readonly Row[] = [
 export function NotificationPreferencesScreen() {
   const { theme } = useAppTheme();
   const navigation = useNavigation();
-  const { preferences, status, saving, reload, toggle } = useNotificationPreferences();
+  const { preferences, status, reload, toggle } = useNotificationPreferences();
 
-  const renderSwitch = (key: NotificationPreferenceKey, disabled: boolean) => (
-    <Switch
-      testID={`notification-pref-${key}`}
-      value={preferences ? preferences[key] : false}
-      onValueChange={(value) => {
-        toggle(key, value);
-      }}
-      disabled={disabled || saving !== null}
-      trackColor={{ true: theme.colors.primary, false: theme.colors.borderStrong }}
-      ios_backgroundColor={theme.colors.borderStrong}
-      thumbColor={theme.colors.surface}
-    />
-  );
+  /**
+   * One switch row: the whole row toggles (not only the thumb), and the kit Switch's 64x44 slot
+   * keeps the drawn iOS 26 switch inside its touch target. Never locked while a save is in flight:
+   * the hook queues changes.
+   */
+  const renderRow = (key: NotificationPreferenceKey, title: string, disabled: boolean, subtitle?: string, icon?: 'bell') => {
+    const value = preferences ? preferences[key] : false;
+    return (
+      <ListItem
+        key={key}
+        icon={icon}
+        title={title}
+        subtitle={subtitle}
+        disabled={disabled}
+        onPress={() => {
+          toggle(key, !value);
+        }}
+        accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+        checked={value}
+        trailing={
+          <Switch
+            testID={`notification-pref-${key}`}
+            value={value}
+            onValueChange={(next) => {
+              toggle(key, next);
+            }}
+            accessibilityLabel={title}
+            disabled={disabled}
+          />
+        }
+        testID={`notification-pref-${key}-row`}
+      />
+    );
+  };
 
   const pushOff = !preferences?.pushEnabled;
 
@@ -75,20 +96,8 @@ export function NotificationPreferencesScreen() {
       {preferences ? (
         <>
           <ListGroup title={NOTIFICATIONS_COPY.preferencesPushGroup}>
-            <ListItem
-              icon="bell"
-              title={NOTIFICATIONS_COPY.prefPushEnabled}
-              trailing={renderSwitch('pushEnabled', false)}
-            />
-            {CATEGORY_ROWS.map((row) => (
-              <ListItem
-                key={row.key}
-                title={row.title}
-                subtitle={row.subtitle}
-                trailing={renderSwitch(row.key, pushOff)}
-                disabled={pushOff}
-              />
-            ))}
+            {renderRow('pushEnabled', NOTIFICATIONS_COPY.prefPushEnabled, false, undefined, 'bell')}
+            {CATEGORY_ROWS.map((row) => renderRow(row.key, row.title, pushOff, row.subtitle))}
           </ListGroup>
           <AppText variant="bodySmall" color="textSecondary" style={styles.hint}>
             {NOTIFICATIONS_COPY.preferencesHint}

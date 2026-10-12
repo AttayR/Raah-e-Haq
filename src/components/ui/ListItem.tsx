@@ -22,6 +22,8 @@ export type ListItemProps = {
   disabled?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  /** For a row that toggles its trailing Switch: announced as a switch with this on/off state. */
+  checked?: boolean;
   testID?: string;
 };
 
@@ -42,6 +44,7 @@ export function ListItem({
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
+  checked,
   testID,
 }: ListItemProps) {
   const { theme } = useAppTheme();
@@ -90,10 +93,10 @@ export function ListItem({
       testID={testID}
       onPress={onPress}
       disabled={disabled}
-      accessibilityRole="button"
+      accessibilityRole={checked === undefined ? 'button' : 'switch'}
       accessibilityLabel={accessibilityLabel ?? (subtitle ? `${title}, ${subtitle}` : title)}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={checked === undefined ? { disabled } : { disabled, checked }}
       style={({ pressed }) => [...rowStyle, pressed && !disabled ? { backgroundColor: theme.colors.surfacePressed } : null]}
     >
       {body}
