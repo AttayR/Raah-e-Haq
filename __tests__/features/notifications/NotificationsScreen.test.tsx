@@ -13,12 +13,14 @@ import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { NotificationsScreen } from '../../../src/features/notifications/screens/NotificationsScreen';
 import { NotificationPreferencesScreen } from '../../../src/features/notifications/screens/NotificationPreferencesScreen';
 import { toast } from '../../../src/core/toast';
+import { fetchUnreadCount } from '../../../src/features/notifications/slice';
 
 const mockNavDispatch = jest.fn();
 const mockGoBack = jest.fn();
+let mockFocused = true;
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useIsFocused: () => true,
+  useIsFocused: () => mockFocused,
   useNavigation: () => ({
     dispatch: mockNavDispatch,
     goBack: mockGoBack,
@@ -70,6 +72,7 @@ let mock: MockAdapter;
 beforeEach(() => {
   mock = new MockAdapter(apiClient);
   mockNavDispatch.mockClear();
+  mockFocused = true;
 });
 
 afterEach(() => {
@@ -161,6 +164,88 @@ describe('NotificationsScreen', () => {
     fireEvent.press(screen.getByRole('radio', { name: 'Show notifications, Unread' }));
     await flush();
     expect(mock.history.get[mock.history.get.length - 1].params).toEqual({ page: 1, per_page: 20, unread: 1 });
+  });
+});
+
+describe('NotificationsScreen reloads (T-513)', () => {
+  const listGets = () => mock.history.get.filter((r) => r.url === '/notifications');
+
+  const mount = () => {
+    const store = configureStore({ reducer: rootReducer });
+    const ui = () => (
+      <Provider store={store}>
+        <ThemeProvider>
+          <NotificationsScreen role="passenger" />
+        </ThemeProvider>
+      </Provider>
+    );
+    const view = render(ui());
+    return { store, rerender: () => view.rerender(ui()) };
+  };
+
+  it('reloads page 1 once each time the tab gains focus, not while it is hidden', async () => {
+    mock.onGet('/notifications').replyOnce(200, listBody([]));
+    const { rerender } = mount();
+    await flush();
+    expect(screen.getByTestId('notifications-empty')).toBeTruthy();
+    expect(listGets()).toHaveLength(1);
+
+    mockFocused = false;
+    rerender();
+    await flush();
+    expect(listGets()).toHaveLength(1);
+
+    mock.onGet('/notifications').replyOnce(200, listBody([row(7)]));
+    mockFocused = true;
+    rerender();
+    await flush();
+    expect(screen.getByText('Offer 7')).toBeTruthy();
+    expect(listGets()).toHaveLength(2);
+
+    // Re-renders while focused send nothing more.
+    rerender();
+    await flush();
+    expect(listGets()).toHaveLength(2);
+  });
+
+  it('reloads once when the unread count goes up while the list is shown', async () => {
+    mock.onGet('/notifications').replyOnce(200, listBody([]));
+    const { store } = mount();
+    await flush();
+    expect(listGets()).toHaveLength(1);
+
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 4 } });
+    mock.onGet('/notifications').replyOnce(200, listBody([row(1), row(2), row(3), row(4)]));
+    await act(async () => {
+      await store.dispatch(fetchUnreadCount());
+    });
+    await flush();
+    expect(screen.getByText('Offer 4')).toBeTruthy();
+    expect(listGets()).toHaveLength(2);
+
+    // The same count again is not new: no reload.
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 4 } });
+    await act(async () => {
+      await store.dispatch(fetchUnreadCount());
+    });
+    await flush();
+    expect(listGets()).toHaveLength(2);
+  });
+
+  it('a failed reload is not retried in a loop', async () => {
+    mock.onGet('/notifications').replyOnce(200, listBody([row(1)]));
+    const { store } = mount();
+    await flush();
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 2 } });
+    mock.onGet('/notifications').networkError();
+    await act(async () => {
+      await store.dispatch(fetchUnreadCount());
+    });
+    await flush();
+    await flush();
+    expect(listGets()).toHaveLength(2);
+    expect(screen.getByText('Offer 1')).toBeTruthy();
+    expect(screen.getByTestId('notifications-refresh-error')).toBeTruthy();
   });
 });
 

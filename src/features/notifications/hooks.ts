@@ -89,21 +89,28 @@ export interface NotificationsList {
 }
 
 /**
- * The list screen's state and actions. Loads page 1 when the screen mounts with nothing
- * loaded, and again when a push made the list stale; the caller passes `isFocused` so a
- * hidden tab does not fetch.
+ * The list screen's state and actions; the caller passes `isFocused` so a hidden tab does not
+ * fetch. Page 1 loads when the screen is shown with nothing loaded, again each time it gains
+ * focus (T-513: the badge could show 4 while the list stayed empty), and while it is shown
+ * whenever the list went stale (a push, or the unread count went up). A reload is skipped
+ * while one runs (`fetchNotifications` refresh condition), so this never sends two at once.
  */
 export const useNotificationsList = (isFocused: boolean): NotificationsList => {
   const dispatch = useDispatch<NotificationsDispatch>();
   const state = useSelector(selectNotificationsState);
   const hasMore = useSelector(selectHasMoreNotifications);
   const { status, stale } = state;
+  const wasFocused = useRef(false);
 
   useEffect(() => {
+    const gainedFocus = isFocused && !wasFocused.current;
+    wasFocused.current = isFocused;
     if (!isFocused) return;
     if (status === 'idle') {
       dispatch(fetchNotifications({ mode: 'initial' }));
-    } else if (stale && status === 'ready') {
+    } else if (gainedFocus && status === 'failed') {
+      dispatch(fetchNotifications({ mode: 'initial' }));
+    } else if ((gainedFocus || stale) && status === 'ready') {
       dispatch(fetchNotifications({ mode: 'refresh' }));
     }
   }, [dispatch, isFocused, status, stale]);

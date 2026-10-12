@@ -28,7 +28,10 @@ export interface NotificationsState {
   loadMoreError: string | null;
   /** requestId of the newest list request; older answers are dropped. */
   listRequestId: string | null;
-  /** A push arrived since the list was loaded: reload it the next time it is shown. */
+  /**
+   * The list may be missing rows: a push arrived or the unread count went up since it was
+   * loaded (T-513). The screen reloads it while it is shown, or the next time it is.
+   */
   stale: boolean;
   unreadCount: number;
   unreadInFlight: boolean;
@@ -60,9 +63,10 @@ export interface FetchNotificationsArg {
 }
 
 /**
- * GET /notifications for the current filter. `initial`/`refresh` load page 1 (the newest
- * request wins); `more` loads the next page and is skipped while any list request runs or
- * when the last page is loaded.
+ * GET /notifications for the current filter. `initial` loads page 1 (the newest request
+ * wins); `refresh` loads page 1 too but is skipped while a page-1 load already runs (focus,
+ * a rising count and pull-to-refresh at once send one request); `more` loads the next page
+ * and is skipped while any list request runs or when the last page is loaded.
  */
 export const fetchNotifications = createAsyncThunk<
   NotificationPage,
@@ -83,8 +87,9 @@ export const fetchNotifications = createAsyncThunk<
   },
   {
     condition: ({ mode }, { getState }) => {
-      if (mode !== 'more') return true;
+      if (mode === 'initial') return true;
       const { status, page, lastPage } = getState().notifications;
+      if (mode === 'refresh') return status !== 'loading' && status !== 'refreshing';
       const busy = status === 'loading' || status === 'refreshing' || status === 'loadingMore';
       return !busy && page > 0 && page < lastPage;
     },
@@ -199,6 +204,9 @@ const notificationsSlice = createSlice({
       .addCase(fetchNotifications.rejected, (state, action) => {
         if (action.meta.condition || action.meta.requestId !== state.listRequestId) return;
         state.listRequestId = null;
+        // Not stale any more: the error is shown and pull-to-refresh retries; staying stale
+        // would make the screen reload again at once, in a loop while the server fails.
+        if (action.meta.arg.mode !== 'more') state.stale = false;
         const message = action.payload?.message ?? NOTIFICATIONS_COPY.loadFailed;
         if (action.meta.arg.mode === 'more') {
           state.status = 'ready';
@@ -214,6 +222,8 @@ const notificationsSlice = createSlice({
       })
       .addCase(fetchUnreadCount.fulfilled, (state, action) => {
         state.unreadInFlight = false;
+        // More unread than before: new rows exist that a loaded list does not show (T-513).
+        if (action.payload > state.unreadCount && state.status !== 'idle') state.stale = true;
         state.unreadCount = action.payload;
       })
       .addCase(fetchUnreadCount.rejected, (state, action) => {

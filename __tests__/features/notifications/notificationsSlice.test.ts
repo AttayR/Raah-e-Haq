@@ -111,6 +111,29 @@ describe('list', () => {
     await store.dispatch(fetchNotifications({ mode: 'refresh' }));
     expect(store.getState().notifications.stale).toBe(false);
   });
+
+  it('T-513: a refresh is skipped while a page-1 load runs (one request)', async () => {
+    const store = makeStore();
+    mock.onGet('/notifications').reply(200, pageBody([1], 1, 1));
+    await store.dispatch(fetchNotifications({ mode: 'initial' }));
+    mock.resetHistory();
+    await Promise.all([
+      store.dispatch(fetchNotifications({ mode: 'refresh' })),
+      store.dispatch(fetchNotifications({ mode: 'refresh' })),
+    ]);
+    expect(mock.history.get).toHaveLength(1);
+  });
+
+  it('T-513: a failed refresh clears the stale flag, so the screen does not retry in a loop', async () => {
+    const store = makeStore();
+    mock.onGet('/notifications').replyOnce(200, pageBody([1], 1, 1));
+    await store.dispatch(fetchNotifications({ mode: 'initial' }));
+    store.dispatch(notificationsStale());
+    mock.onGet('/notifications').networkErrorOnce();
+    await store.dispatch(fetchNotifications({ mode: 'refresh' }));
+    expect(store.getState().notifications).toMatchObject({ stale: false, status: 'ready' });
+    expect(store.getState().notifications.error).not.toBeNull();
+  });
 });
 
 describe('unread count', () => {
@@ -130,6 +153,23 @@ describe('unread count', () => {
     // Once settled, the next call asks again.
     await store.dispatch(fetchUnreadCount());
     expect(mock.history.get).toHaveLength(2);
+  });
+
+  it('T-513: a higher count marks a loaded list stale; a lower one or an unloaded list does not', async () => {
+    const store = makeStore();
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 2 } });
+    await store.dispatch(fetchUnreadCount());
+    expect(store.getState().notifications.stale).toBe(false); // nothing loaded yet
+
+    mock.onGet('/notifications').reply(200, pageBody([1], 1, 1));
+    await store.dispatch(fetchNotifications({ mode: 'initial' }));
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 1 } });
+    await store.dispatch(fetchUnreadCount());
+    expect(store.getState().notifications.stale).toBe(false);
+
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 4 } });
+    await store.dispatch(fetchUnreadCount());
+    expect(store.getState().notifications).toMatchObject({ stale: true, unreadCount: 4 });
   });
 
   it('a failure keeps the last known count', async () => {
