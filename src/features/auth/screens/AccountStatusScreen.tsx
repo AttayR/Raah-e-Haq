@@ -102,10 +102,10 @@ export default function AccountStatusScreen() {
             accessibilityState={{ disabled: isLoggingOut, busy: isLoggingOut }}
             disabled={isLoggingOut}
             onPress={confirmLogout}
-            style={[styles.secondaryButton, { borderColor: colors.accent, backgroundColor: colors.surface }]}
+            style={[styles.secondaryButton, { borderColor: colors.primaryText, backgroundColor: colors.surface }]}
           >
-            <Icon name="logout" size={20} color={colors.accent} />
-            <Text style={[styles.secondaryText, { color: colors.accent }]}>
+            <Icon name="logout" size={20} color={colors.primaryText} />
+            <Text style={[styles.secondaryText, { color: colors.primaryText }]}>
               {isLoggingOut ? ACCOUNT_STATUS_COPY.signingOut : ACCOUNT_STATUS_COPY.signOut}
             </Text>
           </TouchableOpacity>

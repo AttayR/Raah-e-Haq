@@ -34,21 +34,14 @@ export type LegacyColors = {
    * Saffron is not a button or status colour (§1.2); T-602 Button uses `primarySoft`.
    */
   secondary: string;
-  /**
-   * @deprecated Legacy meaning (T-106): brand text/icon/border colour of outline controls,
-   * i.e. the value of `primaryText`. Use `primaryText`. While this alias exists, the spec's
-   * saffron `accent` token is shadowed in `theme.colors`; read it from `semanticColors` /
-   * `palette.saffron[500]` if needed. T-602 moves the six consumers to `primaryText` and
-   * `accent` then takes the spec value.
-   */
-  accent: string;
   /** @deprecated disabled filled button fill; T-602 Button uses 0.4 opacity instead. */
   disabledFill: string;
   /** @deprecated disabled filled button label. */
   disabledText: string;
 };
 
-export type ThemeColors = Omit<SemanticColors, 'accent'> & LegacyColors;
+/** UI-R2 retired the legacy `accent` alias: `accent` is the spec saffron (§1.2, §1.4). */
+export type ThemeColors = SemanticColors & LegacyColors;
 
 export type AppTheme = {
   mode: ColorMode;
@@ -73,7 +66,6 @@ const legacyColors = (c: SemanticColors): LegacyColors => ({
   text: c.textPrimary,
   mutedText: c.textSecondary,
   secondary: saffron[500],
-  accent: c.primaryText,
   disabledFill: c.surfaceAlt,
   disabledText: c.textSecondary,
 });

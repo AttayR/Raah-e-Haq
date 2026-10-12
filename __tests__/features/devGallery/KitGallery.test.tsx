@@ -40,6 +40,40 @@ describe('KitGalleryScreen', () => {
     expect(screen.getByTestId('gallery-format-formatMoney(null)')).toHaveTextContent('""');
   });
 
+  it('shows the UI-R2 controls: every button variant, fields, OTP, selection, badges, avatars', async () => {
+    await renderThemed(<KitGalleryScreen onClose={jest.fn()} />);
+    ['primary', 'secondary', 'outline', 'ghost', 'destructive', 'destructiveSoft'].forEach(variant =>
+      expect(screen.getByTestId(`gallery-button-${variant}`)).toBeTruthy(),
+    );
+    ['lg', 'md', 'sm'].forEach(size => expect(screen.getByTestId(`gallery-button-size-${size}`)).toBeTruthy());
+    [
+      'gallery-field-default',
+      'gallery-field-phone',
+      'gallery-field-phone-error',
+      'gallery-field-password',
+      'gallery-field-search',
+      'gallery-field-disabled',
+      'gallery-field-multiline',
+      'gallery-otp',
+      'gallery-otp-error',
+      'gallery-switch',
+      'gallery-checkbox',
+      'gallery-radio-cash',
+      'gallery-segmented',
+      'gallery-badge-count',
+      'gallery-avatar-broken',
+    ].forEach(id => expect(screen.getByTestId(id)).toBeTruthy());
+    expect(screen.getByText('99+')).toBeTruthy();
+    ['primary', 'secondary', 'outline', 'ghost', 'destructive', 'destructiveSoft'].forEach(variant =>
+      expect(screen.getByTestId(`gallery-button-lg-${variant}`)).toBeTruthy(),
+    );
+    expect(screen.getByTestId('gallery-button-loading-full').props.accessibilityState).toMatchObject({ busy: true });
+    expect(screen.getByLabelText('3 unread')).toBeTruthy();
+    ['surfaceAltPressed', 'primarySoftPressed', 'dangerPressed', 'dangerSoftPressed'].forEach(token =>
+      expect(screen.getByTestId(`gallery-color-${token}`)).toBeTruthy(),
+    );
+  });
+
   it('shows only the requested sections', async () => {
     await renderThemed(<KitGalleryScreen onClose={jest.fn()} only="colors1,format" />);
     expect(screen.getByTestId('gallery-color-background')).toBeTruthy();

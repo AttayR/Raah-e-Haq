@@ -7,7 +7,10 @@ import { layout, space } from '../../theme';
 import { COLOR_PART_COUNT, ColorSection } from './sections/ColorSection';
 import { FormatSection, HapticsSection } from './sections/FormatSection';
 import { ICON_PART_COUNT, IconSection } from './sections/IconSection';
+import { ButtonSection } from './sections/ButtonSection';
+import { FieldSection } from './sections/FieldSection';
 import { KitSection } from './sections/KitSection';
+import { BadgeSection, SelectionSection } from './sections/SelectionSection';
 import { ComponentTokenSection, ElevationSection, RadiusSection, SpacingSection } from './sections/ScaleSections';
 import { TYPE_PART_COUNT, TypeSection } from './sections/TypeSection';
 
@@ -22,12 +25,19 @@ const SECTIONS: Section[] = [
   ...parts('type', TYPE_PART_COUNT, i => <TypeSection part={i} />),
   ...parts('icons', ICON_PART_COUNT, i => <IconSection part={i} />),
   ['format', () => <FormatSection />],
-  ['kit1', () => <KitSection part="controls" />],
-  ['kit2', () => <KitSection part="lists" />],
+  ['buttons1', () => <ButtonSection part={1} />],
+  ['buttons2', () => <ButtonSection part={2} />],
+  ['buttons3', () => <ButtonSection part={3} />],
+  ['fields1', () => <FieldSection part={1} />],
+  ['fields2', () => <FieldSection part={2} />],
+  ['selection', () => <SelectionSection />],
+  ['badges', () => <BadgeSection />],
+  ['kit', () => <KitSection />],
   ['spacing', () => <SpacingSection />],
   ['radius', () => <RadiusSection />],
   ['elevation', () => <ElevationSection />],
   ['components1', () => <ComponentTokenSection groups={['button', 'iconButton']} />],
+  ['components3', () => <ComponentTokenSection groups={['textField', 'otp', 'segmented', 'chip', 'badge', 'selectionControl']} />],
   ['components2', () => <ComponentTokenSection groups={['header', 'tabBar']} />],
   ['haptics', () => <HapticsSection />],
 ];

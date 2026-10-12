@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from './AppText';
+import { Icon, type IconProps } from './Icon';
+
+/** Person glyph size for an avatar with no name (§4 icon sizes). */
+const glyphSize = (size: AvatarSize): NonNullable<IconProps['size']> =>
+  size >= 72 ? 48 : size >= 56 ? 32 : size >= 48 ? 28 : size >= 40 ? 24 : 20;
 
 export type AvatarSize = 32 | 40 | 48 | 56 | 72 | 96;
 
@@ -32,8 +37,11 @@ export const initialsOf = (name?: string | null): string => {
 export function Avatar({ name, uri, size = 40, online = false, testID }: AvatarProps) {
   const { theme } = useAppTheme();
   const [failed, setFailed] = useState(false);
+  // A new photo URL gets a fresh attempt; a URL that failed keeps the initials (UI-R2: no blobs).
+  useEffect(() => setFailed(false), [uri]);
+  const initials = initialsOf(name);
   const circle = { width: size, height: size, borderRadius: size / 2 };
-  const showPhoto = !!uri && !failed;
+  const showPhoto = !!uri && uri.trim().length > 0 && !failed;
   return (
     <View
       testID={testID}
@@ -46,11 +54,18 @@ export function Avatar({ name, uri, size = 40, online = false, testID }: AvatarP
       ]}
     >
       {showPhoto ? (
-        <Image source={{ uri: uri as string }} style={[styles.photo, circle]} onError={() => setFailed(true)} />
-      ) : (
-        <AppText variant={size >= 56 ? 'title' : 'label'} color="onPrimarySoft">
-          {initialsOf(name)}
+        <Image
+          source={{ uri: uri as string }}
+          style={[styles.photo, circle]}
+          onError={() => setFailed(true)}
+          testID={testID ? `${testID}-photo` : undefined}
+        />
+      ) : initials ? (
+        <AppText variant={size >= 96 ? 'h2' : size >= 56 ? 'title' : 'label'} color="onPrimarySoft" testID={testID ? `${testID}-initials` : undefined}>
+          {initials}
         </AppText>
+      ) : (
+        <Icon name="account" size={glyphSize(size)} color="onPrimarySoft" />
       )}
     </View>
   );

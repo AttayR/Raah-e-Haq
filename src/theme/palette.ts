@@ -74,6 +74,11 @@ export const extra = {
   dangerSoft: '#FDEBEC',
   dangerSoftDark: '#3A1517',
   dangerFillDark: '#D23A40',
+  /** [UI-R2] pressed destructive fills. */
+  dangerPressed: '#9E1F25',
+  dangerPressedDark: '#B3262C',
+  dangerSoftPressed: '#FBDDDF',
+  dangerSoftPressedDark: '#4D1B1E',
   info: '#1D58C4',
   infoDark: '#7FA8F5',
   infoSoft: '#E7EFFD',

@@ -17,11 +17,11 @@ export const BookingStatusLine: React.FC<StatusLineProps> = ({ status, text, onR
   const color = status === 'error' ? theme.colors.danger : theme.colors.textSecondary;
   return (
     <View testID={`booking-status-${status}`} accessibilityLiveRegion="polite" style={styles.row}>
-      {status === 'loading' && <ActivityIndicator size="small" color={theme.colors.accent} />}
+      {status === 'loading' && <ActivityIndicator size="small" color={theme.colors.primaryText} />}
       <Text style={[styles.text, { color }]}>{text}</Text>
       {status === 'error' && onRetry && (
         <TouchableOpacity accessibilityRole="button" onPress={onRetry} style={styles.retry}>
-          <Text style={[styles.retryText, { color: theme.colors.accent }]}>{BOOKING_COPY.retry}</Text>
+          <Text style={[styles.retryText, { color: theme.colors.primaryText }]}>{BOOKING_COPY.retry}</Text>
         </TouchableOpacity>
       )}
     </View>

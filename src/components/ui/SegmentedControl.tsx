@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { radius, space } from '../../theme';
+import { haptics } from '../../core/haptics';
+import { componentTokens, radius, space } from '../../theme';
 import { AppText } from './AppText';
 
 export type SegmentOption<T extends string> = { value: T; label: string };
@@ -19,6 +20,7 @@ export type SegmentedControlProps<T extends string> = {
 /**
  * Segmented control (DESIGN_SYSTEM §5.10): `surfaceAlt` track, padding 4, `surface` thumb
  * (dark: `surfaceRaised`). Each segment is a 44pt-high radio target; labels shrink, never clip.
+ * Changing the selection fires the `selection` haptic (§6.11); re-tapping the current one is a no-op.
  */
 export function SegmentedControl<T extends string>({
   options,
@@ -43,7 +45,12 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={option.value}
             testID={testID ? `${testID}-${option.value}` : undefined}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              if (option.value !== value) {
+                haptics.selection();
+                onChange(option.value);
+              }
+            }}
             disabled={disabled}
             accessibilityRole="radio"
             accessibilityLabel={`${accessibilityLabel}, ${option.label}`}
@@ -55,7 +62,7 @@ export function SegmentedControl<T extends string>({
               color={selected ? 'textPrimary' : 'textSecondary'}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.85}
+              minimumFontScale={seg.minimumFontScale}
             >
               {option.label}
             </AppText>
@@ -66,12 +73,14 @@ export function SegmentedControl<T extends string>({
   );
 }
 
+const seg = componentTokens.segmented;
+
 const styles = StyleSheet.create({
-  track: { flexDirection: 'row', borderRadius: radius.md, padding: space[1] },
+  track: { flexDirection: 'row', borderRadius: radius.md, padding: seg.trackPadding },
   segment: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: radius.sm,
+    minHeight: seg.segmentMinHeight,
+    borderRadius: seg.thumbRadius,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space[2],

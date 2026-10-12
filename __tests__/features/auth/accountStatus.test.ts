@@ -128,17 +128,18 @@ describe('theme tokens for outline / disabled controls (QA T-106 dark mode)', ()
   it.each([
     ['light', LightTheme],
     ['dark', DarkTheme],
-  ])('%s: accent text >= 4.5:1 on surface and background; disabled label >= 4.5:1', (_mode, theme) => {
+  ])('%s: primaryText >= 4.5:1 on surface and background; disabled label >= 4.5:1', (_mode, theme) => {
     const { colors } = theme;
-    expect(contrast(colors.accent, colors.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(colors.accent, colors.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.primaryText, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.primaryText, colors.background)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.disabledText, colors.disabledFill)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('dark mode outline controls use primaryText, not the primary fill', () => {
     // T-601: the dark primary fill (navy-500) is only 3.09:1 on surface, below text contrast.
     expect(contrast(DarkTheme.colors.primary, DarkTheme.colors.surface)).toBeLessThan(4.5);
-    expect(DarkTheme.colors.accent).toBe(DarkTheme.colors.primaryText);
-    expect(DarkTheme.colors.accent).not.toBe(DarkTheme.colors.primary);
+    expect(DarkTheme.colors.primaryText).not.toBe(DarkTheme.colors.primary);
+    // UI-R2: the legacy alias is gone; `accent` is the spec saffron, never a text colour.
+    expect(DarkTheme.colors.accent).toBe('#F59A23');
   });
 });

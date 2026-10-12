@@ -68,6 +68,8 @@ export const iconGlyphs = {
   savings: 'piggy-bank-outline',
   // Status and feedback.
   check: 'check-circle',
+  // UI-R2: bare tick for selected chips and checkboxes (§5.11).
+  checkMark: 'check',
   info: 'information-outline',
   warning: 'alert-circle-outline',
   help: 'help-circle-outline',

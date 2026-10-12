@@ -18,7 +18,7 @@ export function KeyboardDoneBar() {
     <InputAccessoryView nativeID={KEYBOARD_DONE_ID}>
       <View style={[styles.doneBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
         <Pressable onPress={Keyboard.dismiss} accessibilityRole="button" hitSlop={8} style={styles.doneButton}>
-          <Text style={[styles.doneText, { color: theme.colors.accent }]}>{COPY.keyboard.done}</Text>
+          <Text style={[styles.doneText, { color: theme.colors.primaryText }]}>{COPY.keyboard.done}</Text>
         </Pressable>
       </View>
     </InputAccessoryView>

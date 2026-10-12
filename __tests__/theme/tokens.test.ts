@@ -64,6 +64,10 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   danger: ['#C0262D', '#FF7A7F'],
   dangerSoft: ['#FDEBEC', '#3A1517'],
   dangerFill: ['#C0262D', '#D23A40'],
+  dangerPressed: ['#9E1F25', '#B3262C'],
+  dangerSoftPressed: ['#FBDDDF', '#4D1B1E'],
+  surfaceAltPressed: ['#DADFEA', '#2B3450'],
+  primarySoftPressed: ['#DCE4F8', '#1A3496'],
   info: ['#1D58C4', '#7FA8F5'],
   infoSoft: ['#E7EFFD', '#15264A'],
   accent: ['#F59A23', '#F59A23'],
@@ -102,14 +106,12 @@ describe('semantic colours (§1.4)', () => {
     expect(darkColors[key]).toBe(darkValue);
   });
 
-  it('theme.colors carries every semantic token (accent is the legacy alias until T-602)', () => {
+  it('theme.colors carries every semantic token; accent is the spec saffron (legacy alias retired in UI-R2)', () => {
     for (const [theme, source] of [[LightTheme, lightColors], [DarkTheme, darkColors]] as const) {
       for (const key of Object.keys(SPEC) as SemanticColorName[]) {
-        if (key !== 'accent') {
-          expect(theme.colors[key]).toBe(source[key]);
-        }
+        expect(theme.colors[key]).toBe(source[key]);
       }
-      expect(theme.colors.accent).toBe(source.primaryText);
+      expect(theme.colors.accent).toBe('#F59A23');
       expect(theme.colors.text).toBe(source.textPrimary);
       expect(theme.colors.mutedText).toBe(source.textSecondary);
     }
@@ -167,9 +169,9 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
     expect(contrast(darkColors.routeLine, '#1D2230')).toBeCloseTo(6.71, 1);
   });
 
-  it('legacy aliases still meet AA: accent text and disabled button label', () => {
+  it('former accent consumers (now primaryText) and the legacy disabled label meet AA', () => {
     for (const theme of [LightTheme, DarkTheme]) {
-      expect(contrast(theme.colors.accent, theme.colors.surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(theme.colors.primaryText, theme.colors.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(theme.colors.disabledText, theme.colors.disabledFill)).toBeGreaterThanOrEqual(4.5);
     }
   });

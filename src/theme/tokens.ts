@@ -13,6 +13,8 @@ export type SemanticColors = {
   surfaceAlt: string;
   surfaceRaised: string;
   surfacePressed: string;
+  /** [UI-R2] pressed state of things resting on `surfaceAlt` (default chips, tonal IconButton). */
+  surfaceAltPressed: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
@@ -24,6 +26,8 @@ export type SemanticColors = {
   primaryText: string;
   onPrimary: string;
   primarySoft: string;
+  /** [UI-R2] pressed `secondary` button and selected chip. */
+  primarySoftPressed: string;
   onPrimarySoft: string;
   focusRing: string;
   success: string;
@@ -34,6 +38,9 @@ export type SemanticColors = {
   danger: string;
   dangerSoft: string;
   dangerFill: string;
+  /** [UI-R2] pressed `destructive` / `destructiveSoft` buttons. */
+  dangerPressed: string;
+  dangerSoftPressed: string;
   info: string;
   infoSoft: string;
   accent: string;
@@ -60,6 +67,7 @@ export const lightColors: SemanticColors = {
   surfaceAlt: neutral[100],
   surfaceRaised: neutral[0],
   surfacePressed: neutral[100],
+  surfaceAltPressed: neutral[200],
   textPrimary: neutral[900],
   textSecondary: neutral[600],
   textMuted: neutral[500],
@@ -71,6 +79,7 @@ export const lightColors: SemanticColors = {
   primaryText: navy[800],
   onPrimary: extra.white,
   primarySoft: navy[50],
+  primarySoftPressed: navy[100],
   onPrimarySoft: navy[800],
   focusRing: navy[800],
   success: extra.success,
@@ -81,6 +90,8 @@ export const lightColors: SemanticColors = {
   danger: extra.danger,
   dangerSoft: extra.dangerSoft,
   dangerFill: extra.danger,
+  dangerPressed: extra.dangerPressed,
+  dangerSoftPressed: extra.dangerSoftPressed,
   info: extra.info,
   infoSoft: extra.infoSoft,
   accent: saffron[500],
@@ -105,6 +116,7 @@ export const darkColors: SemanticColors = {
   surfaceAlt: dark[850],
   surfaceRaised: dark[800],
   surfacePressed: dark[800],
+  surfaceAltPressed: dark[700],
   textPrimary: dark[50],
   textSecondary: dark[300],
   textMuted: dark[500],
@@ -116,6 +128,7 @@ export const darkColors: SemanticColors = {
   primaryText: navy[300],
   onPrimary: extra.white,
   primarySoft: extra.primarySoftDark,
+  primarySoftPressed: navy[700],
   onPrimarySoft: navy[200],
   focusRing: navy[400],
   success: extra.successDark,
@@ -126,6 +139,8 @@ export const darkColors: SemanticColors = {
   danger: extra.dangerDark,
   dangerSoft: extra.dangerSoftDark,
   dangerFill: extra.dangerFillDark,
+  dangerPressed: extra.dangerPressedDark,
+  dangerSoftPressed: extra.dangerSoftPressedDark,
   info: extra.infoDark,
   infoSoft: extra.infoSoftDark,
   accent: saffron[500],

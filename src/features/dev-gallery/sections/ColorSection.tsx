@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { contrastRatio, radius, semanticColors, space, type SemanticColors } from '../../../theme';
+import { contrastRatio, radius, space, type SemanticColors } from '../../../theme';
 import { CONTRAST_PAIRS, thresholdFor, type ContrastPair } from '../contrastPairs';
 import { GallerySection } from './GallerySection';
 
@@ -18,8 +18,7 @@ const describe = (pair: ContrastPair, colors: SemanticColors): { ratio: string; 
 
 function ColorRow({ pair }: { pair: ContrastPair }) {
   const { theme } = useAppTheme();
-  // Spec tokens, not `theme.colors`: there the legacy `accent` alias still shadows the saffron token.
-  const colors = semanticColors[theme.mode];
+  const colors = theme.colors;
   const { ratio, ok } = describe(pair, colors);
   const verdict = ok === null ? pair.kind : ok ? t('kitGallery.pass') : t('kitGallery.fail');
   const label = `${pair.token} ${colors[pair.token]}, ${pair.fg} ${t('kitGallery.contrastOn', {

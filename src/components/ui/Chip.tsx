@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { layout, radius, space } from '../../theme';
+import { haptics } from '../../core/haptics';
+import { componentTokens, layout, radius, space } from '../../theme';
 import { AppText, type TextColor } from './AppText';
 import { Icon, type IconName } from './Icon';
 
@@ -11,7 +12,10 @@ export type ChipProps = {
   label: string;
   /** Glyph shown before the label (16 pt). */
   icon?: IconName;
-  /** Selected chips use the soft primary fill. */
+  /**
+   * Selected chips use the soft primary fill and a leading tick. Passing `selected` (true or
+   * false) marks the chip as selectable: presses then fire the `selection` haptic (§6.11).
+   */
   selected?: boolean;
   tone?: ChipTone;
   onPress?: () => void;
@@ -21,7 +25,8 @@ export type ChipProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-const CHIP_HEIGHT = 32;
+const CHIP_HEIGHT = componentTokens.chip.height;
+const ICON = componentTokens.chip.iconSize;
 
 /**
  * Compact pill (DESIGN_SYSTEM 5.11): 32 high, with hit slop so the touch target is 44.
@@ -30,7 +35,7 @@ const CHIP_HEIGHT = 32;
 export const Chip: React.FC<ChipProps> = ({
   label,
   icon,
-  selected = false,
+  selected: selectedProp,
   tone = 'neutral',
   onPress,
   disabled = false,
@@ -40,11 +45,16 @@ export const Chip: React.FC<ChipProps> = ({
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
+  const [pressed, setPressed] = useState(false);
+  const selected = selectedProp === true;
+  const selectable = selectedProp !== undefined;
   const fill = selected ? c.primarySoft : tone === 'danger' ? c.dangerSoft : c.surfaceAlt;
+  // [UI-R2] pressed fill per rest fill (§5.11).
+  const pressedFill = selected ? c.primarySoftPressed : tone === 'danger' ? c.dangerSoftPressed : c.surfaceAltPressed;
   const fg: TextColor = selected ? 'onPrimarySoft' : tone === 'danger' ? 'danger' : tone === 'primary' ? 'primaryText' : 'textSecondary';
   const content = (
     <>
-      {selected ? <Icon name="check" size={16} color={fg} /> : icon ? <Icon name={icon} size={16} color={fg} /> : null}
+      {selected ? <Icon name="checkMark" size={ICON} color={fg} /> : icon ? <Icon name={icon} size={ICON} color={fg} /> : null}
       <AppText variant="label" numberOfLines={1} color={fg}>
         {label}
       </AppText>
@@ -71,11 +81,18 @@ export const Chip: React.FC<ChipProps> = ({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => {
+        if (selectable) {
+          haptics.selection();
+        }
+        onPress();
+      }}
       hitSlop={{ top: (layout.touchTargetIOS - CHIP_HEIGHT) / 2, bottom: (layout.touchTargetIOS - CHIP_HEIGHT) / 2 }}
-      style={({ pressed }) => [
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={[
         styles.base,
-        { backgroundColor: pressed ? c.surfacePressed : fill },
+        { backgroundColor: pressed && !disabled ? pressedFill : fill },
         disabled ? styles.disabled : null,
         style,
       ]}
@@ -88,14 +105,14 @@ export const Chip: React.FC<ChipProps> = ({
 const styles = StyleSheet.create({
   base: {
     minHeight: CHIP_HEIGHT,
-    paddingHorizontal: space[3],
+    paddingHorizontal: componentTokens.chip.paddingHorizontal,
     borderRadius: radius.pill,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[1],
     flexShrink: 1,
   },
-  disabled: { opacity: 0.4 },
+  disabled: { opacity: componentTokens.state.disabledOpacity },
 });
 
 export default Chip;

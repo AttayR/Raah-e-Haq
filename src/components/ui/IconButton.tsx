@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import type { SemanticColorName } from '../../theme';
+import { componentTokens, type SemanticColorName } from '../../theme';
 import { Icon, type IconName } from './Icon';
 
 export type IconButtonProps = {
@@ -15,8 +15,11 @@ export type IconButtonProps = {
   size?: number;
   iconColor?: SemanticColorName;
   disabled?: boolean;
+  accessibilityHint?: string;
   testID?: string;
 };
+
+const t = componentTokens.iconButton;
 
 /** Icon button (DESIGN_SYSTEM §5.5): 44pt minimum target, round visual. */
 export function IconButton({
@@ -27,14 +30,16 @@ export function IconButton({
   size,
   iconColor = 'textPrimary',
   disabled = false,
+  accessibilityHint,
   testID,
 }: IconButtonProps) {
   const { theme } = useAppTheme();
-  const diameter = size ?? (variant === 'floating' ? 48 : 40);
+  const [pressed, setPressed] = useState(false);
+  const diameter = size ?? (variant === 'floating' ? t.floatingVisual : t.visual);
   const fill =
     variant === 'floating' ? theme.colors.surface : variant === 'tonal' ? theme.colors.surfaceAlt : 'transparent';
   // Touch slop that brings a 40pt visual up to the 44pt target.
-  const slop = Math.max(0, (44 - diameter) / 2);
+  const slop = Math.max(0, (t.target - diameter) / 2);
   return (
     <Pressable
       testID={testID}
@@ -43,11 +48,19 @@ export function IconButton({
       hitSlop={slop}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
-      style={({ pressed }) => [
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={[
         styles.base,
         { width: diameter, height: diameter, borderRadius: diameter / 2 },
-        { backgroundColor: pressed && !disabled ? theme.colors.surfacePressed : fill },
+        {
+          backgroundColor:
+            pressed && !disabled
+              ? theme.colors[variant === 'tonal' ? 'surfaceAltPressed' : 'surfacePressed']
+              : fill,
+        },
         variant === 'floating' ? theme.elevation[2] : null,
         variant === 'floating' && theme.mode === 'dark'
           ? { borderWidth: theme.borderWidth.thin, borderColor: theme.colors.border }
@@ -55,12 +68,12 @@ export function IconButton({
         disabled && styles.disabled,
       ]}
     >
-      <Icon name={icon} size={variant === 'floating' ? 28 : 24} color={iconColor} />
+      <Icon name={icon} size={variant === 'floating' ? t.floatingIconSize : 24} color={iconColor} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: { alignItems: 'center', justifyContent: 'center' },
-  disabled: { opacity: 0.4 },
+  disabled: { opacity: componentTokens.state.disabledOpacity },
 });

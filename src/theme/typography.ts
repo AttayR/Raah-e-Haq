@@ -49,6 +49,18 @@ export const textStyles: Record<TextStyleName, ScaleStyle> = {
   numericSmall: { fontSize: 13, lineHeight: 16, fontWeight: '600', letterSpacing: 0, fontVariant: tabular },
 };
 
+/**
+ * A text style without its line height, for single-line `TextInput`s (§5.6 [UI-R2]): iOS pushes
+ * the glyphs down when an input sets `lineHeight`, so single-line fields centre on size alone.
+ */
+export const singleLineInputStyle = (style: ScaleStyle): Omit<ScaleStyle, 'lineHeight'> => ({
+  fontSize: style.fontSize,
+  fontWeight: style.fontWeight,
+  letterSpacing: style.letterSpacing,
+  fontVariant: style.fontVariant,
+  textTransform: style.textTransform,
+});
+
 /** Dynamic Type / font scale cap applied by the `Text` component (§2). */
 export const MAX_FONT_SIZE_MULTIPLIER = 1.3;
 

@@ -57,6 +57,37 @@ export const componentTokens = {
     floatingVisual: 48,
     floatingIconSize: 28,
   },
+  /** §5.6 TextField (UI-R2). */
+  textField: {
+    height: 52,
+    searchHeight: 40,
+    /** [UI-R2] clear button inside the 40pt search pill: 32 visual + 6 slop = 44 target. */
+    searchClearVisual: 32,
+    multilineMinHeight: 96,
+    multilineMaxLines: 5,
+    paddingHorizontal: space[4],
+    labelGap: 6,
+    helperGap: space[1],
+    leadingIconSize: 20,
+    helperIconSize: 16,
+    /** Trailing slot (clear, show/hide password): a full 44pt target. */
+    trailingSlot: 44,
+    /** Fixed `+92` prefix block for the phone variant. */
+    phonePrefixWidth: 56,
+    disabledOpacity: 0.5,
+  },
+  /** §5.6 OTP variant: 6 boxes, 48×56, 8 gap. */
+  otp: { length: 6, boxWidth: 48, boxHeight: 56, gap: space[2] },
+  /** §5.10 SegmentedControl. */
+  segmented: { segmentMinHeight: 44, trackPadding: space[1], thumbRadius: radius.sm, minimumFontScale: 0.85 },
+  /** §5.11 Chip: 32 visual, padding 12, a 16 leading glyph. */
+  chip: { height: 32, paddingHorizontal: space[3], iconSize: 16 },
+  /** §5.12 Badge. */
+  badge: { countMin: 18, countPaddingHorizontal: 6, countCap: 99, dot: 8, dotRing: 2, statusHeight: 24 },
+  /** Checkbox / Radio: 24 control, 2pt `borderStrong` boundary (§1.4), row ≥ 44. */
+  selectionControl: { size: 24, radioDot: 12, checkRadius: radius.xs, glyph: 16 },
+  /** Shared state values. */
+  state: { disabledOpacity: 0.4 },
 } as const;
 
 export type ComponentTokens = typeof componentTokens;
