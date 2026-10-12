@@ -10,6 +10,8 @@ Every value in this file is exact. "≈" never appears. Points (pt) = iOS points
 
 > **UI-R2 review rulings (2026-10-12).** Text fields and OTP boxes get an idle 1pt `borderStrong` boundary (fill-only fails WCAG 1.4.11) and centred text (§5.6); per-variant pressed tokens `surfaceAltPressed`, `primarySoftPressed`, `dangerPressed`, `dangerSoftPressed` (§1.4, §5.4, §5.5, §5.11); Button loading keeps its width (§5.4); Switch 64×44 slot (§5.9); Checkbox/Radio added (§5.9.1); count Badge on `dangerFill` (§5.12); Avatar fallback sizes (§5.13). Values marked **[UI-R2]**.
 
+> **UI-R3 review rulings (2026-10-12).** Keyboard avoidance stays on RN `KeyboardAvoidingView` (iOS padding + top-inset offset; Android `adjustResize`) instead of `react-native-keyboard-controller` (§5.1); BottomSheet snaps never cover the header with the sticky footer (§5.14); Dialog action order (§5.15); Toast line limits (§5.16); network ErrorState glyph `cloud-off-outline` (the bundled MDI has no `cloud-alert-outline`) (§5.20). Values marked **[UI-R3]**.
+
 ---
 
 ## 0. Principles
@@ -294,7 +296,7 @@ Dark mode: all shadow opacities are 0; Android elevation stays (it is rendered a
 All live in `src/components/ui/` and are exported from `src/components/ui/index.ts`. Every component takes `testID` and an `accessibilityLabel` where it is interactive. Sizes are in pt.
 
 ### 5.1 Screen
-- Wraps content with safe-area insets, `background` colour, and sets the status bar from the theme (`statusBar` token). Props: `scroll` (ScrollView with `keyboardShouldPersistTaps="handled"`), `edges` (default `top`: tab screens sit above the tab bar, which owns the bottom inset; full-screen pushed screens pass top+bottom; map screens pass `[]` and place overlays from `useSafeAreaInsets()`), `refreshing/onRefresh` (pull to refresh, tint `primary`), `keyboardAvoiding` (default true when `scroll`; uses `react-native-keyboard-controller` `KeyboardAwareScrollView` so the focused field is ≥16 above the keyboard. Today the keyboard covers the Login email field).
+- Wraps content with safe-area insets, `background` colour, and sets the status bar from the theme (`statusBar` token). Props: `scroll` (ScrollView with `keyboardShouldPersistTaps="handled"`), `edges` (default `top`: tab screens sit above the tab bar, which owns the bottom inset; full-screen pushed screens pass top+bottom; map screens pass `[]` and place overlays from `useSafeAreaInsets()`), `refreshing/onRefresh` (pull to refresh, tint `primary`), `keyboardAvoiding` (default true when `scroll`; also opt-in for non-scroll screens with a bottom input or sticky action). **[UI-R3]** Implementation: RN `KeyboardAvoidingView` (`behavior="padding"`, `keyboardVerticalOffset` = the top inset `Screen` pads) on iOS, off on Android (`adjustResize`), from one helper `src/components/ui/keyboard.ts`; `react-native-keyboard-controller` (installed, no `KeyboardProvider`) is not used for now, because the KAV fix is already proven on Chat (T-512) and Pay commission (T-509) and needs no root provider. Acceptance stays: the focused field and the primary action sit ≥16 above the keyboard on iPhone SE. Each form task (UI-R6/R7, Saved places, Support) checks this; if a field low in a long form is still covered, that screen switches to `KeyboardAwareScrollView` through a `Screen` prop rather than adding a per-screen workaround.
 
 ### 5.2 Header **[v1.1]**
 One `Header` component, three variants. Today four header styles ship (large left title on tab roots; centered title + chevron under a 48pt blank band on Wallet/History/Saved places; left title + arrow on Profile v2/Chat/Documents; navy bubble hero on legacy Profile/Login) — all collapse into these:
@@ -387,16 +389,20 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Backdrop: none for map sheets (map stays interactive above the sheet); `overlay` for modal sheets (pickers, confirmations), tapping it closes.
 - Sheets never cover the whole map on the booking flow: the route must remain visible above the sheet (today the vehicle list covers 95% of the map).
 - Keyboard: the sheet goes to `full` when a field inside is focused.
+- **[UI-R3] Sticky footer and snap heights.** The footer (16 top padding + content + `max(insets.bottom + 8, 16)`; just 8 above the keyboard while it is up) is pinned to the container bottom. No snap may be shorter than handle area 24 + header + footer block: a `peek` (or any snap) below that minimum resolves to the minimum, so the header is never drawn under the footer. `peekHeight` values in §8.3 (170 / 137) are for sheets without a footer.
+- **[UI-R3] Implementation ruling:** built on Reanimated 4 + Gesture Handler (no `@gorhom/bottom-sheet`); `GestureHandlerRootView` at the app root and inside every native Modal (`ModalRoot`). Drag on handle + header only; inner scroll only at the highest snap; Android back collapses a raised map sheet before navigating; the handle is an `adjustable` element (increment/decrement = next/previous snap) for screen readers. Map controls hide at `full` (fade, `motion.fast`).
 
 ### 5.15 Dialog (Modal)
 - Centered, width `min(window − 48, 340)`, radius `lg`, padding 24, `surfaceRaised`, `elevation.4`, scrim `overlay`.
 - Title `h3`, body `bodySmall` `textSecondary` 8 below, actions 24 below: stacked full-width `md` buttons (primary on top) or side-by-side when both labels fit in one line.
+- **[UI-R3] Action order.** Side by side (exactly two actions whose labels total ≤20 characters): equal-width columns, 8 gap, **cancel at the start, primary at the end** (reading order "cancel, then confirm"; mirrors in RTL). Stacked (longer labels, three actions, or font scale >1.3): **primary on top**, 8 gap, cancel below. Cancel is a `ghost` button; the primary is `primary`, or `destructive` when the action deletes, cancels a ride/request or signs out. Single-action notices (`alert()`) show one `primary` button. Scrim tap and Android back answer "cancel". API: `confirm({ title, body, confirmLabel, cancelLabel?, destructive? }) → Promise<boolean>` and `alert({ title, body, confirmLabel? })` from `src/core/dialog`, rendered once by `DialogHost`.
 - Destructive confirm uses `destructive` button. Copy rules in section 7 (today the booking reset says "Cancel Ride" when no ride exists).
 - Native `Alert` is allowed only for OS-level confirmations; all product dialogs use this component so they theme correctly.
 
 ### 5.16 Toast
 - Top-anchored at `insets.top + 8`, horizontal 16, min height 48, radius `md`, fill `textPrimary` (inverse) with `textInverse` text in light; in dark `surfaceRaised` with `textPrimary`, `elevation.4`.
 - Leading 20 icon tinted by tone (success `#4ACB7E`, error `#FF7A7F`, info `#7FA8F5` — the dark-tone values, which pass on the inverse surface); text `bodySmall`, max 2 lines; optional action `buttonSmall` in `navy-300`.
+- **[UI-R3] Line limits:** title max 2 lines; optional message max 2 lines (4 lines in total at most). Anything longer is a Banner or a Dialog, not a toast. Tap or swipe up dismisses; a loading toast (spinner, no timer) cannot be dismissed by tap.
 - Duration 3 s (4 s with action); swipe up to dismiss; one at a time (queue). Replaces the three toast systems (T-008).
 
 ### 5.17 Banner (inline)
@@ -412,7 +418,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Placed 64 from the top of the content area (not vertically centered in long screens).
 
 ### 5.20 ErrorState
-- Same layout as EmptyState; icon circle `dangerSoft`, glyph `cloud-alert-outline` (network) or `alert-circle-outline` (server) in `danger`; title "Couldn't load {thing}"; body explains in one sentence; primary `md` button "Try again" (loading state while retrying). If cached data exists, show the data plus an error Toast or Banner instead of replacing content.
+- Same layout as EmptyState; icon circle `dangerSoft`, glyph **[UI-R3]** `cloud-off-outline` (network; the bundled MDI has no `cloud-alert-outline`) or `alert-circle-outline` (server) in `danger`; title "Couldn't load {thing}"; body explains in one sentence; primary `md` button "Try again" (loading state while retrying). If cached data exists, show the data plus an error Toast or Banner instead of replacing content.
 
 ### 5.21 Map pins and route
 - **Pickup pin:** 20×20 circle `pickupPin` with 4pt white ring (dark: `#0B0F1A` ring) and `elevation.2`; label bubble above (optional) radius `sm`, `surface`, `caption`.
