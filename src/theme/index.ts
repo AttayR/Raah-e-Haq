@@ -3,6 +3,7 @@
  * ThemeProvider.tsx) returns one of the two `AppTheme` objects below.
  */
 import { borderWidth } from './borders';
+import { componentTokens, type ComponentTokens } from './components';
 import { createElevation, type ElevationScale } from './elevation';
 import { mapStyles, type MapStyleRule } from './mapStyles';
 import { motion, motionPatterns, reducedMotion, springs } from './motion';
@@ -58,6 +59,8 @@ export type AppTheme = {
   radius: typeof radius;
   borderWidth: typeof borderWidth;
   elevation: ElevationScale;
+  /** v1.1 component dimensions (button radius, header, tab bar, IconButton). */
+  components: ComponentTokens;
   motion: typeof motion;
   springs: typeof springs;
   motionPatterns: typeof motionPatterns;
@@ -86,6 +89,7 @@ export const createTheme = (mode: ColorMode): AppTheme => {
     radius,
     borderWidth,
     elevation: createElevation(mode),
+    components: componentTokens,
     motion,
     springs,
     motionPatterns,
@@ -109,3 +113,5 @@ export * from './borders';
 export * from './elevation';
 export * from './motion';
 export * from './mapStyles';
+export * from './components';
+export * from './contrast';

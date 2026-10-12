@@ -51,7 +51,6 @@ export const DRIVER_RIDE_COPY = {
   minFareAdjustment: 'Minimum fare adjustment',
   km: 'km',
   minutes: 'min',
-  currency: 'PKR',
   // Cancel sheet.
   cancelTitle: 'Why are you cancelling?',
   cancelHint: 'The passenger will see this reason.',

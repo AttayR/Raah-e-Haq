@@ -30,6 +30,8 @@ export type ScreenProps = React.PropsWithChildren<{
 /**
  * Screen root (DESIGN_SYSTEM §5.1): safe-area insets, the `background` colour and the status
  * bar style from the theme, so no screen sets StatusBar itself.
+ * Modals and sheets presented in a native Modal are a separate window: they must render their
+ * own `<StatusBar barStyle={theme.statusBarStyle} />` and `SafeAreaProvider`.
  * Keyboard avoidance (react-native-keyboard-controller) comes with T-602 for form screens.
  */
 export function Screen({

@@ -121,9 +121,9 @@ describe('DriverRideScreen', () => {
     ]);
     posted.forEach((r) => expect(r.data).toBeUndefined());
 
-    expect(screen.getByTestId('driver-ride-total').props.children).toBe('PKR 435');
+    expect(screen.getByTestId('driver-ride-total').props.children).toBe('Rs 435');
     expect(screen.getByTestId('driver-ride-collect').props.children).toBe('Collect in cash');
-    expect(screen.getByTestId('driver-ride-earnings').props.children).toBe('PKR 348');
+    expect(screen.getByTestId('driver-ride-earnings').props.children).toBe('Rs 348');
     screen.getByTestId('driver-ride-breakdown-stops');
     expect(screen.queryByTestId('driver-ride-breakdown-min')).toBeNull();
 

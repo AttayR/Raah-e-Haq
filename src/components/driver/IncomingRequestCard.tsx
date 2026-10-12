@@ -6,9 +6,7 @@ import type { AppTheme } from '../../theme';
 import type { PendingRideRequest } from '../../features/driver-requests/api';
 import { DRIVER_REQUESTS_COPY as COPY } from '../../features/driver-requests/copy';
 import type { RideRequestFeedView } from '../../features/driver-requests/hooks';
-
-const formatAmount = (value: number): string =>
-  Number.isInteger(value) ? String(value) : value.toFixed(2);
+import { formatMoney } from '../../utils/format';
 
 const formatKm = (value: number): string => (value < 10 ? value.toFixed(1) : String(Math.round(value)));
 
@@ -91,7 +89,7 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
         {request.estimatedFare !== null && (
           <View>
             <Text style={styles.fare} testID="incoming-request-fare">
-              {`${COPY.currency} ${formatAmount(request.estimatedFare)}`}
+              {formatMoney(request.estimatedFare)}
             </Text>
             {payment && <Text style={styles.metricLabel}>{payment}</Text>}
           </View>

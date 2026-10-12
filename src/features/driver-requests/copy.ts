@@ -16,7 +16,6 @@ export const DRIVER_REQUESTS_COPY = {
   away: 'away',
   minutesShort: 'min',
   km: 'km',
-  currency: 'PKR',
   cash: 'Cash',
   accept: 'Accept',
   accepting: 'Accepting…',

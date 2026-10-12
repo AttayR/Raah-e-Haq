@@ -12,6 +12,7 @@ import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
 import ReduxProvider from './src/app/providers/ReduxProvider';
 import NotificationManager from './src/components/NotificationManager';
+import { DevKitGalleryHost } from './src/features/dev-gallery/DevKitGalleryHost';
 
 function ThemedNav() {
   const { theme } = useAppTheme();
@@ -58,7 +59,9 @@ export default function App() {
       <ReduxProvider>
         <ThemeProvider>
           <NotificationManager>
-            <ThemedNav />
+            <DevKitGalleryHost>
+              <ThemedNav />
+            </DevKitGalleryHost>
           </NotificationManager>
         </ThemeProvider>
       </ReduxProvider>

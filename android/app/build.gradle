@@ -192,6 +192,7 @@ dependencies {
 }
 project.ext.vectoricons = [
     iconFontNames: [ 
+        'MaterialCommunityIcons.ttf',
         'MaterialIcons.ttf', 
         'EvilIcons.ttf', 
         'FontAwesome6_Solid.ttf',

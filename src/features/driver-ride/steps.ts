@@ -158,7 +158,3 @@ export const toRideSummary = (ride: RideResource): DriverRideSummary => {
     paymentMethod: typeof ride.payment_method === 'string' && ride.payment_method ? ride.payment_method : null,
   };
 };
-
-/** "350" or "350.50". */
-export const formatAmount = (value: number): string =>
-  Number.isInteger(value) ? String(value) : value.toFixed(2);

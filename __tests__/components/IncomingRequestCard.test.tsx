@@ -21,7 +21,7 @@ describe('IncomingRequestCard', () => {
     expect(getByTestId('incoming-request-rating').props.children).toBe('4.8');
     expect(getByTestId('incoming-request-pickup').props.children).toBe('Fake Pickup Street');
     expect(getByTestId('incoming-request-dropoff').props.children).toBe('Fake Dropoff Road');
-    expect(getByTestId('incoming-request-fare').props.children).toBe('PKR 412.50');
+    expect(getByTestId('incoming-request-fare').props.children).toBe('Rs 412.50');
     expect(getByTestId('incoming-request-distance').props.children).toBe('2.4 km');
     expect(getByTestId('incoming-request-eta').props.children).toBe('6 min');
     getByText('Cash');

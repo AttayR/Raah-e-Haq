@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { radius, space, type SemanticColorName } from '../../theme';
+import { componentTokens, space, type SemanticColorName } from '../../theme';
 import { AppText, type TextColor } from './AppText';
 import { Icon, type IconName } from './Icon';
 
@@ -35,13 +35,14 @@ const tones: Record<ButtonVariant, Tone> = {
 };
 
 /** Height and padding per size (§5.4); `lg` is the 56pt driving-screen action. */
+const b = componentTokens.button;
 const sizes = {
-  lg: { height: 56, paddingHorizontal: space[6], icon: 24, text: 'button' },
-  md: { height: 48, paddingHorizontal: space[5], icon: 20, text: 'button' },
-  sm: { height: 36, paddingHorizontal: space[4], icon: 16, text: 'buttonSmall' },
+  lg: { height: b.height.lg, paddingHorizontal: b.paddingHorizontal.lg, icon: b.iconSize.lg, text: 'button' },
+  md: { height: b.height.md, paddingHorizontal: b.paddingHorizontal.md, icon: b.iconSize.md, text: 'button' },
+  sm: { height: b.height.sm, paddingHorizontal: b.paddingHorizontal.sm, icon: b.iconSize.sm, text: 'buttonSmall' },
 } as const;
 
-/** Button (DESIGN_SYSTEM §5.4). Disabled = 0.4 opacity, no press feedback. */
+/** Button (DESIGN_SYSTEM §5.4, v1.1 pill radius). Disabled = 0.4 opacity, no press feedback. */
 export function Button({
   label,
   onPress,
@@ -96,7 +97,7 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radius.md,
+    borderRadius: componentTokens.button.radius,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: space[2],

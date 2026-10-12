@@ -4,14 +4,15 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import type { RideResource } from '../../services/rideService';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
-import { formatAmount, toRideSummary } from '../../features/driver-ride/steps';
+import { toRideSummary } from '../../features/driver-ride/steps';
+import { formatMoney } from '../../utils/format';
 
 type Props = {
   ride: RideResource;
   onDone: () => void;
 };
 
-const money = (value: number): string => `${COPY.currency} ${formatAmount(value)}`;
+const money = (value: number): string => formatMoney(value);
 
 /**
  * The completed trip (T-405): the fare, its parts and the driver's earnings exactly as the

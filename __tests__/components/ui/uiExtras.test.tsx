@@ -73,6 +73,6 @@ describe.each([
 
   it('Icon renders the glyphs added for the passenger screens', () => {
     const { getByText } = render(<Icon name="swap" />);
-    expect(getByText('swap-vert')).toBeTruthy();
+    expect(getByText('swap-vertical')).toBeTruthy();
   });
 });

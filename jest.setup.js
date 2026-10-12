@@ -284,6 +284,12 @@ iconSets.forEach(set => {
   });
 });
 
+// Haptics (src/core/haptics.ts): no native module in Node.
+jest.mock('react-native-haptic-feedback', () => {
+  const trigger = jest.fn();
+  return {__esModule: true, default: {trigger}, trigger};
+});
+
 // Keyboard controller (pulled in by react-native-gifted-chat), official mock
 jest.mock('react-native-keyboard-controller', () =>
   require('react-native-keyboard-controller/jest'),

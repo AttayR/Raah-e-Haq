@@ -297,6 +297,7 @@ Entry (`T`):
 | `refund` | any | + | Refund by support |
 | `adjustment_credit` / `adjustment_debit` | any | + / − | Balance adjustment by support |
 | `reversal` | any | ∓ | Cancels the entry `reverses_id` |
+| `opening_balance` | any | + / − | BE-70: the balance the wallet had before the ledger (at most one per wallet, dated before its first entry). Label "Opening Balance" |
 | `wallet_topup`, `wallet_withdrawal`, `bonus`, `commission`, `penalty` | legacy | +/− | Written before BE-09; show with `label` |
 
 Treat an unknown `type` as generic and use `label`.
@@ -312,9 +313,11 @@ Settlement (`S`):
 ```json
 { "id": 3, "kind": "commission_payment|payout", "amount": 116, "currency": "PKR",
   "method": "cash|bank_transfer", "reference": "IBFT-123"|null, "note": "…"|null,
-  "status": "pending|approved|rejected|cancelled", "review_note": "…"|null,
-  "reviewed_at": "…"|null, "transaction_id": 901|null, "created_at": "…" }
+  "status": "pending|approved|rejected|cancelled|reversed", "review_note": "…"|null,
+  "reviewed_at": "…"|null, "transaction_id": 901|null, "reversed_at": "…"|null, "created_at": "…" }
 ```
+
+- BE-70: `reversed` = an approved settlement whose ledger entry support later reversed (`reversed_at` set; the matching `reversal` entry is in the history and the balance is back where it was). Show it like `rejected` ("Reversed by support"). Treat any other unknown status as generic.
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
@@ -369,4 +372,4 @@ Query: `period` (default `day`), `page`, `per_page` (1–50, default 20; pages t
 
 ### Admin API (role admin; for the panel and tooling, not the app)
 
-`GET /payments/settlements?status=&kind=&user_id=`, `POST /payments/settlements/{id}/approve {note?}`, `POST /payments/settlements/{id}/reject {note}` (required), `POST /payments/transactions/{id}/reverse {reason}` (required; 409 `ALREADY_REVERSED`, `CANNOT_REVERSE_REVERSAL`), `POST /payments/wallets/{id}/adjust {amount, direction: credit|debit|refund, reason}` (reason now **required**; 422 `INSUFFICIENT_BALANCE` for a debit below zero). Every one writes an `audit_logs` row. The old panel action that edited a transaction's status is removed (ledger entries are immutable).
+`GET /payments/settlements?status=&kind=&user_id=`, `POST /payments/settlements/{id}/approve {note?}`, `POST /payments/settlements/{id}/reject {note}` (required), `POST /payments/transactions/{id}/reverse {reason}` (required; 409 `ALREADY_REVERSED`, `CANNOT_REVERSE_REVERSAL`, BE-70: 409 `NOT_REVERSIBLE` for `opening_balance`, 422 `REVERSAL_NEGATIVE_BALANCE` when it would take a non-driver below zero), `POST /payments/wallets/{id}/adjust {amount, direction: credit|debit|refund, reason}` (reason now **required**; 422 `INSUFFICIENT_BALANCE` for a debit below zero; BE-70: optional header `Idempotency-Key` (8–100 of `A-Za-z0-9._:-`), a retry with the same key returns the first entry with header `Idempotent-Replayed: true`, same key with another amount/direction 409 `IDEMPOTENCY_KEY_REUSED`). BE-70: `DELETE /users/{id}` answers 409 `USER_HAS_WALLET_HISTORY` (wallet entries, settlements or a non-zero balance) or `USER_HAS_LINKED_RECORDS`; deactivate such accounts instead. Every one writes an `audit_logs` row. The old panel action that edited a transaction's status is removed (ledger entries are immutable).

@@ -2,6 +2,7 @@ import type { VehicleOption } from '../../components/passenger/VehicleOptions';
 import type { VehicleTypeKey } from '../../services/rideService';
 import type { FareEstimate, FareEstimates, VehicleType } from './api';
 import { BOOKING_COPY } from './copy';
+import { formatMoney } from '../../utils/format';
 
 /** Artwork per catalogue key (the server's `icon` is the key itself, BE-05). */
 const VEHICLE_ICONS: Record<VehicleTypeKey, string> = {
@@ -13,9 +14,8 @@ const VEHICLE_ICONS: Record<VehicleTypeKey, string> = {
 
 export const vehicleIcon = (key: VehicleTypeKey): string => VEHICLE_ICONS[key];
 
-/** "Rs 250" for PKR, otherwise the currency code. Whole units, as the server quotes them. */
-export const formatFare = (amount: number, currency = 'PKR'): string =>
-  `${currency === 'PKR' ? 'Rs' : currency} ${Math.round(amount)}`;
+/** The app-wide money format (`Rs 1,250`, src/utils/format); kept as the booking flow's name. */
+export const formatFare = (amount: number, currency = 'PKR'): string => formatMoney(amount, currency);
 
 /**
  * The vehicle list: one option per catalogue entry, priced from the matching estimate (by

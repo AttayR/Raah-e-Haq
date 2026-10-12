@@ -4,13 +4,13 @@ export const radius = {
   xs: 4,
   /** Small chips, thumbnails, skeleton text lines. */
   sm: 8,
-  /** Buttons, text fields, list-group corners, toasts. */
+  /** Text fields, list-group corners, toasts, icon tiles. */
   md: 12,
   /** Cards, vehicle option cards, dialogs. */
   lg: 16,
   /** Bottom sheet top corners. */
   xl: 24,
-  /** Chips, pills, avatars, FABs, segmented thumb. */
+  /** [v1.1] All buttons, chips, pills, avatars, FABs, tab-bar active pill. */
   pill: 999,
 } as const;
 
