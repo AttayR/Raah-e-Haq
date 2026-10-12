@@ -9,7 +9,7 @@
 PassengerRoot (native stack)
 ├─ PassengerTabs (bottom tabs, 4)
 │  ├─ Home            icon home-outline / home          → passenger-home
-│  ├─ Activity        icon receipt-text-outline / receipt-text → segmented Rides (shared-ride-history) | Wallet (passenger-wallet)
+│  ├─ Activity        icon clipboard-text-clock-outline / clipboard-text-clock → segmented Rides (shared-ride-history) | Wallet (passenger-wallet)
 │  ├─ Inbox           icon inbox-outline / inbox        → shared-notifications | shared-chat-list (segmented)
 │  └─ Account         icon account-circle-outline / account-circle → shared-settings
 ├─ Booking (stack, tab bar hidden): Search → ChooseRide → Trip (states: requested, accepted, arrived, ongoing, completed)

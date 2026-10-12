@@ -191,8 +191,8 @@ All `numeric*` styles set `fontVariant: ['tabular-nums']`.
 - Max two weights per card (e.g. 600 title + 400 body).
 - Text colour comes only from `textPrimary`, `textSecondary`, `textMuted`, `primaryText`, a semantic colour, or `on*` tokens.
 - Truncation: single-line addresses use `numberOfLines={1}` + `ellipsizeMode="tail"`; two-line where the spec says so. Never let text overflow the screen edge (today: Home address, Vehicle sheet "Swap").
-- Money format: `Rs 1,250` (prefix `Rs`, a space, thousands separator, no decimals unless the API returns a non-zero fraction; then two decimals). Never `$`, never `PKR 24` truncated, never `₨`. Use one helper `formatMoney(amount)`; currency label comes from the API `currency` when present, else `Rs`.
-- Distance: `3.4 km` (one decimal under 10 km, none above). Duration: `7 min`, `1 h 05 min`. Time: device locale, 12-hour in `en-PK` (`2:30 PM`). Dates: `Today`, `Yesterday`, then `Mon, 28 Sep`; with year only if not the current year.
+- Money format: `Rs 1,250` (prefix `Rs`, a space, thousands separator, no decimals unless the API returns a non-zero fraction; then two decimals). Never `$`, never `PKR 24` truncated, never `₨`. Use one helper `formatMoney(amount)`; currency label comes from the API `currency` when present, else `Rs`. Canonical helpers live in `src/utils/format.ts` (ruled in UI-R1 review): `formatMoney(amount, currency?)` and, for wallet/ledger rows only, `formatSignedMoney(amount, currency?)` → `+Rs 500` (credit, `success`), `−Rs 50` (debit, `textPrimary`), `Rs 0` for zero. Negatives use the true minus `−` (U+2212) before the label in both helpers, never a hyphen and never `Rs -50`. No other money formatter may exist in `src/` (a duplicate such as `src/core/format/money.ts` re-exports or is removed).
+- Distance: `3.4 km` (one decimal under 10 km, none above). Under 1 km stays in kilometres (`0.4 km`, not metres; ruled in UI-R1 review), floored at `0.1 km` for any positive value so nothing reads `0.0 km`. Duration: `7 min`, `1 h 05 min`. Time: device locale, 12-hour in `en-PK` (`2:30 PM`). Dates: `Today`, `Yesterday`, then `Mon, 28 Sep`; with year only if not the current year.
 
 ---
 
@@ -513,7 +513,7 @@ Today (2026-10-11): passenger has 4 default tabs (Home dashboard, Notifications,
 | Slot | Passenger | Driver |
 |---|---|---|
 | 1 | **Home** · `home-outline` / `home` | **Drive** · `steering` / `steering` (no outline variant; active state carried by the pill) |
-| 2 | **Activity** · `receipt-text-outline` / `receipt-text` | **Earnings** · `wallet-outline` / `wallet` |
+| 2 | **Activity** · `clipboard-text-clock-outline` / `clipboard-text-clock` (the bundled MDI has no `receipt-text`; ruled in UI-R1 review) | **Earnings** · `wallet-outline` / `wallet` |
 | 3 | **Inbox** · `inbox-outline` / `inbox` (badge) | **Inbox** · `inbox-outline` / `inbox` (badge) |
 | 4 | **Account** · `account-circle-outline` / `account-circle` | **Account** · `account-circle-outline` / `account-circle` |
 

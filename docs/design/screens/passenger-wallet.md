@@ -22,6 +22,6 @@
 | State | Spec |
 |---|---|
 | Loading | Balance card skeleton (same size, `surfaceAlt`), 5 skeleton rows. |
-| Empty (new account) | Balance shows `Rs 0`; EmptyState under the header: icon `receipt-text-outline`, "No transactions yet", "Your ride payments will show up here." |
+| Empty (new account) | Balance shows `Rs 0`; EmptyState under the header: icon `clipboard-text-clock-outline`, "No transactions yet", "Your ride payments will show up here." |
 | Error | No cache: ErrorState "Couldn't load your wallet" + Try again. With cache: Toast + cached data. |
 | Offline | Offline banner, cached data. |
