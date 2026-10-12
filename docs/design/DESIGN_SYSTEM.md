@@ -8,6 +8,8 @@ Every value in this file is exact. "≈" never appears. Points (pt) = iOS points
 
 > **v1.1 refresh (2026-10-11).** Owner direction: compete head-on with Uber, inDrive, Yango and Careem, **keep the current brand** (navy `#011C72` + saffron, logo, name). v1.1 refines, it does not rebrand: palette and type scale are unchanged; what changes is how they are applied. Deltas are marked **[v1.1]** in place: buttons become pills (§3.3, §5.4), one Header with three variants (§5.2), a tab bar with an active pill (§5.3), MaterialCommunityIcons actually bundled (§4), map chrome reduced to two controls (§9), haptics map (§6.11) and the screen archetypes, list/card patterns and role-sync rules in **§12**. Execution order: [REFRESH_PLAN.md](REFRESH_PLAN.md) (tasks UI-R1…UI-R19). Current-state evidence: `docs/design/audit/2026-10-11-prod-audit/`.
 
+> **UI-R2 review rulings (2026-10-12).** Text fields and OTP boxes get an idle 1pt `borderStrong` boundary (fill-only fails WCAG 1.4.11) and centred text (§5.6); per-variant pressed tokens `surfaceAltPressed`, `primarySoftPressed`, `dangerPressed`, `dangerSoftPressed` (§1.4, §5.4, §5.5, §5.11); Button loading keeps its width (§5.4); Switch 64×44 slot (§5.9); Checkbox/Radio added (§5.9.1); count Badge on `dangerFill` (§5.12); Avatar fallback sizes (§5.13). Values marked **[UI-R2]**.
+
 ---
 
 ## 0. Principles
@@ -79,13 +81,17 @@ Code only ever uses these names (`theme.colors.<token>`). Raw palette names are 
 | `surface` | `#FFFFFF` | `#141A2A` | cards, sheets, headers, tab bar |
 | `surfaceAlt` | `#EBEEF5` | `#1D2438` | text-field fill, chips, segmented control track, skeleton base |
 | `surfaceRaised` | `#FFFFFF` | `#252D44` | modals, toasts, popovers (dark mode lifts by colour, not shadow) |
-| `surfacePressed` | `#EBEEF5` | `#252D44` | pressed state of list items and cards |
+| `surfacePressed` | `#EBEEF5` | `#252D44` | pressed state of things whose rest fill is `surface`, `background` or transparent: list items, cards, `ghost`/`outline` buttons, `plain` IconButton |
+| `surfaceAltPressed` **[UI-R2]** | `#DADFEA` | `#2B3450` | pressed state of things whose rest fill is `surfaceAlt`: default chips, `tonal` IconButton (in light `surfacePressed` = `surfaceAlt`, so it showed no feedback) |
+| `primarySoftPressed` **[UI-R2]** | `#DCE4F8` | `#1A3496` | pressed `secondary` button, pressed selected chip (navy-100 / navy-700) |
+| `dangerPressed` **[UI-R2]** | `#9E1F25` | `#B3262C` | pressed `destructive` button (white text 7.85 / 6.50) |
+| `dangerSoftPressed` **[UI-R2]** | `#FBDDDF` | `#4D1B1E` | pressed `destructiveSoft` button (`danger` text 4.64 / 5.59) |
 | `textPrimary` | `#0F1422` | `#F2F4F9` | titles, body, values |
 | `textSecondary` | `#4C556C` | `#B7BFD0` | supporting text, subtitles, labels |
 | `textMuted` | `#626B82` | `#9099B0` | captions, timestamps, placeholders, disabled labels |
 | `textInverse` | `#FFFFFF` | `#0F1422` | text on inverse surfaces (toast) |
 | `border` | `#DADFEA` | `#2B3450` | dividers, card outlines (decorative, not a boundary) |
-| `borderStrong` | `#858EA5` | `#626E90` | text-field and checkbox boundaries (≥3:1) |
+| `borderStrong` | `#858EA5` | `#626E90` | text-field, OTP-box, checkbox, radio and outline-button boundaries (≥3:1 against `surface` and `background`, WCAG 1.4.11) |
 | `primary` | `#011C72` | `#3D5FD0` | primary button fill, selected states, active tab |
 | `primaryPressed` | `#01155A` | `#2E4FBF` | pressed primary |
 | `primaryText` | `#011C72` | `#9DB2F0` | links, ghost buttons, icons that mean "primary" |
@@ -142,6 +148,14 @@ Text must be ≥4.5:1 (large text ≥3:1); UI boundaries/icons ≥3:1.
 | white on `dangerFill` | 5.90 | 4.75 |
 | `onAccent` on `accent` | 8.33 | 8.33 |
 | `borderStrong` on `surface` (non-text) | 3.28 | 3.43 |
+| `borderStrong` on `background` (non-text) **[UI-R2]** | 3.03 | 3.78 |
+| `surfaceAlt` vs `surface` / vs `background` (field fill alone) **[UI-R2]** | 1.16 / 1.07 | 1.12 / 1.24 → **fails 1.4.11**, so a fill-only field is not allowed (§5.6) |
+| `primary` on `surface` (switch on, checkbox fill, non-text) **[UI-R2]** | 14.89 | 3.09 |
+| `onPrimarySoft` on `primarySoftPressed` **[UI-R2]** | 11.70 | 7.26 |
+| white on `dangerPressed` **[UI-R2]** | 7.85 | 6.50 |
+| `danger` on `dangerSoftPressed` **[UI-R2]** | 4.64 | 5.59 |
+| `textSecondary` on `surfaceAltPressed` **[UI-R2]** | 5.57 | 6.65 |
+| white on `danger` (dark) **[UI-R2, banned]** | — | 2.52 → never put white text on `danger`; filled danger shapes with text use `dangerFill` |
 | `ratingStar` on `surface` (non-text) | 3.46 | 8.50 |
 | `pickupPin` on light map land `#F2F2F2` | 4.48 | 8.01 (on `#1D2230`) |
 | `routeLine` on map land | 13.30 | 6.71 |
@@ -313,20 +327,21 @@ One `Header` component, three variants. Today four header styles ship (large lef
 | `destructive` | `dangerFill` | white | none |
 | `destructiveSoft` | `dangerSoft` | `danger` | none |
 
-States: **pressed** fill → `primaryPressed` (primary) or `surfacePressed`/`navy-100` (others), scale 0.98 (see motion); **disabled** opacity 0.4 on the whole button, no press feedback (today disabled "Next" is grey `#9CA3AF` with white text, 2.54:1); **loading** replaces the label with a 20pt `ActivityIndicator` in the text colour, keeps width, sets `accessibilityState.busy`, ignores taps (prevents double-submit). Full-width by default inside forms and sheets; `fullWidth={false}` hugs content.
+States: **pressed** fill per variant **[ruled in UI-R2 review]**: `primary` → `primaryPressed`; `secondary` → `primarySoftPressed`; `outline` and `ghost` → `surfacePressed`; `destructive` → `dangerPressed`; `destructiveSoft` → `dangerSoftPressed`. Text/icon colour never changes on press. Scale 0.98 (see motion; none with reduced motion). **disabled** opacity 0.4 on the whole button, no press feedback (today disabled "Next" is grey `#9CA3AF` with white text, 2.54:1); **loading** shows a 20pt `ActivityIndicator` in the text colour centred over the content, **keeps the exact width and height of the label state** (the label row stays laid out at opacity 0 and the spinner is absolutely centred, so a `fullWidth={false}` button never shrinks or jumps), sets `accessibilityState.busy`, ignores taps (prevents double-submit). Full-width by default inside forms and sheets; `fullWidth={false}` hugs content. `sm` (36 visual) gets 4pt vertical hit slop so its target is 44. Optional `trailingIcon` (same size and gap as leading; `chevron-right` for "continue" actions). **Haptic is opt-in** via a `haptic` prop: only primary commits listed in §6.11 pass `impactLight`; buttons never buzz by default.
 Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Account" orange, "Confirm & Request" `#667EEA`, quick action tiles blue/green/purple).
 
 ### 5.5 IconButton
-- 44×44 target; visual 40×40 circle. Variants: `plain` (transparent, icon `textPrimary`), `tonal` (`surfaceAlt`), `floating` (`surface` + `elevation.2`, used on the map, 48×48 visual, 28 icon). Requires `accessibilityLabel`.
+- 44×44 target; visual 40×40 circle. Variants: `plain` (transparent, icon `textPrimary`), `tonal` (`surfaceAlt`), `floating` (`surface` + `elevation.2`, used on the map, 48×48 visual, 28 icon). Requires `accessibilityLabel`. Pressed: `plain` and `floating` → `surfacePressed`, `tonal` → `surfaceAltPressed` [UI-R2]. A smaller visual (e.g. 32 inside a 40-high search field) is allowed only with hit slop that keeps the target at 44.
 
 ### 5.6 TextField
 - Anatomy top→bottom: label (`label`, `textSecondary`, 6 below → field), field, helper/error (`caption`, 4 below field).
-- Field: height 52 (single line), radius `md`, fill `surfaceAlt`, border 1pt transparent; padding 16 horizontal; text `body` `textPrimary`; placeholder `textMuted`.
+- Field: height 52 (single line), radius `md`, fill `surfaceAlt`, **idle border 1pt `borderStrong`** [ruled in UI-R2 review: the fill alone is 1.07–1.24:1 against `surface`/`background` and fails WCAG 1.4.11; the 1pt `borderStrong` boundary is 3.03–3.78:1]; padding 16 horizontal measured from the field's outer edge (content inset = 16 − current border width, so 1pt → 2pt never shifts text); text `body` `textPrimary`; placeholder `textMuted`.
+- Text, placeholder and the `+92` prefix are **vertically centred in the field on one shared baseline (±1pt)**, at 1.0× and 1.3× font scale. Single-line inputs do not set `lineHeight` on the `TextInput` (iOS pushes the glyphs down when it is set); multiline inputs keep `body` line height.
 - Leading icon 20 at x=16 (text starts at 48); trailing slot 44×44 (clear, show/hide password, search spinner).
-- **Focus:** border 2pt `focusRing`, fill `surface`. (Today focus has no visible state.)
+- **Focus:** border 2pt `focusRing`, fill `surface` (`search` keeps `surfaceAlt` so it stays visible on a `surface` sheet). (Today focus has no visible state.)
 - **Error:** border 2pt `danger`, helper text in `danger` with a 16 `alert-circle-outline` icon; `accessibilityLabel` includes the error. (Today the error text shows but the border doesn't change.)
 - **Disabled:** opacity 0.5. **Multiline:** min height 96, padding 12 vertical, max 5 lines then scroll.
-- Variants: `phone` (fixed `+92` prefix block, 56 wide, separated by a 1pt `border` divider; digits keypad; formats `3xx xxxxxxx`), `password` (eye toggle), `search` (40 high, radius `pill`, leading `magnify`), `otp` (6 boxes, 48×56 each, 8 gap, `numericL`, auto-advance, paste support, `textContentType="oneTimeCode"`).
+- Variants: `phone` (fixed `+92` prefix block, 56 wide, separated by a 1pt `border` divider; digits keypad; formats `3xx xxxxxxx`), `password` (eye toggle), `search` (**exactly 40 high**, radius `pill`, leading `magnify`; its clear button is a 32 visual `close-circle` IconButton with 6pt slop so the field does not grow), `otp` (6 boxes, 48×56 each, 8 gap, `numericL`, auto-advance, paste support, `textContentType="oneTimeCode"`; box borders follow the field rules: idle and filled 1pt `borderStrong`, the active box 2pt `focusRing` + `surface` fill, error 2pt `danger` on every box; the capture input that sits over the row must render no visible glyphs: text colour transparent, caret hidden).
 - Dark mode uses the same tokens (today inputs turn black `#1A1A1A` on white cards in dark mode and stay black in light mode in the registration wizard).
 
 ### 5.7 Card
@@ -343,20 +358,27 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 
 ### 5.9 Switch
 - Native `Switch` with `trackColor={{false: borderStrong, true: primary}}`, thumb white (iOS default). One switch style app-wide (today: navy oversized custom on passenger, green on driver, invisible off-track in dark mode).
+- **Slot [ruled in UI-R2 review]:** the switch sits in a fixed 64×44 slot (full touch target; the whole ListItem row also toggles it). RN lays the switch out at 51×31 but iOS 26 draws a 63-wide control from the frame's leading edge, so: iOS aligns the switch to the slot's leading edge (drawn control then ends within 1pt of the slot's trailing edge); Android aligns it to the slot's trailing edge. On both platforms the visible trailing edge of the switch sits on the 16pt gutter in a ListItem, aligned with chevrons and value text above/below. Label gap: the 8 ListItem trailing gap, measured from the slot.
+
+### 5.9.1 Checkbox and Radio **[UI-R2]**
+- **Checkbox:** 24×24, radius `xs` (4), 2pt `borderStrong` border, transparent fill. Checked: fill and border `primary`, 16 `check` glyph `onPrimary`. **Radio:** 24 circle, 2pt `borderStrong` ring. Selected: ring `primary` + 12 centred `primary` dot. Pressing a selected radio is a no-op.
+- Row: control → 12 gap → label `body` `textPrimary` (+ optional second line `bodySmall` `textSecondary`); min height 44, 8 vertical padding; the whole row is the target with `accessibilityRole` `checkbox`/`radio` and `accessibilityState.checked`. A bare control (no label) gets 10pt slop to reach 44 and must have `accessibilityLabel`.
+- Disabled: 0.4 opacity, no press. Contrast: `borderStrong` 3.03–3.78:1, `primary` 3.09:1 (dark) / 14.89:1 (light) against `surface`.
+- Use: consent ("I agree to the terms"), multi-select filters (checkbox); single choice lists such as payment method or cancel reason (radio). Never a Switch for a one-off consent.
 
 ### 5.10 SegmentedControl
 - Segments min height 44 (the touch-target rule wins; track 52 with padding 4), radius `md`, track `surfaceAlt`, padding 4; labels shrink to 0.85 before truncating; thumb `surface` + `elevation.1` (dark: `surfaceRaised`), radius 8; labels `label`, active `textPrimary`, inactive `textSecondary`. Used for Phone/Email on Login, Day/Week/Month on Earnings, Notifications/Messages in Inbox. Replaces the navy-filled pill tabs.
 
 ### 5.11 Chip
-- Height 32, padding 12 horizontal, radius `pill`, `label` text. Default: fill `surfaceAlt`, text `textSecondary`. Selected: fill `primarySoft`, text `onPrimarySoft`, leading `check` 16. Filter chip rows scroll horizontally on one line (no wrapping; today Notifications filters wrap to two rows). 8 gap; row inset 16.
+- Height 32, padding 12 horizontal, radius `pill`, `label` text. Default: fill `surfaceAlt`, text `textSecondary`. Selected: fill `primarySoft`, text `onPrimarySoft`, leading `check` 16 (the bare tick, not `check-circle`). Pressed: default → `surfaceAltPressed`, selected → `primarySoftPressed`, danger tone → `dangerSoftPressed` [UI-R2]. Selectable chips fire the `selection` haptic; action chips do not. Filter chip rows scroll horizontally on one line (no wrapping; today Notifications filters wrap to two rows). 8 gap; row inset 16.
 
 ### 5.12 Badge
-- **Count:** min 18×18, padding 6 horizontal, radius `pill`, fill `danger`, text `numericSmall` white (11 for 3 digits); `99+` cap.
+- **Count:** min 18×18, padding 6 horizontal, radius `pill`, fill **`dangerFill`** (corrected in UI-R2 review: white on dark `danger` `#FF7A7F` is 2.52:1; on `dangerFill` it is 5.90 / 4.75), text `numericSmall` (13/16) `onPrimary` white at every digit count; `99+` cap; zero renders nothing. Its accessibility label is supplied by the host ("3 unread"), never the bare number.
 - **Dot:** 8×8 `danger` with 2pt `surface` ring.
 - **Status pill:** height 24, padding 8 horizontal, radius `pill`, `label` text; tones: success (`successSoft`/`success`), warning, danger, info, neutral (`surfaceAlt`/`textSecondary`). Ride status mapping in 5.24.
 
 ### 5.13 Avatar
-- Sizes 32, 40, 48 (header/floating avatar, driver-drive-home), 56, 72, 96. Circle. Photo with `surfaceAlt` placeholder while loading; initials fallback (5.4 rules); optional status ring 2pt `success` (driver online) and a 20×20 `surface` circle badge bottom-right for the camera action (profile edit, 96 only).
+- Sizes 32, 40, 48 (header/floating avatar, driver-drive-home), 56, 72, 96. Circle. Photo with `surfaceAlt` placeholder while loading; **fallback [UI-R2]** whenever the URL is missing, blank or fails to load (a new URL retries): `primarySoft` circle with initials in `onPrimarySoft` (first letters of the first and last word, max 2, uppercase) sized 32/40/48 → `label` (13), 56/72 → `title` (17), 96 → `h2` (22); with no name, the `account` glyph at 20/24/28/32/48/48 for 32/40/48/56/72/96; optional status ring 2pt `success` (driver online) and a 20×20 `surface` circle badge bottom-right for the camera action (profile edit, 96 only).
 
 ### 5.14 BottomSheet
 - Used for booking, trip states, driver requests, pickers. Library: `@gorhom/bottom-sheet` is not installed; build on Reanimated 4 + Gesture Handler (installed), or the designer adds `@gorhom/bottom-sheet` v5 in T-608 (dependency decision recorded in that task).
