@@ -38,11 +38,18 @@ const SETTLEMENT_TYPES: ReadonlySet<string> = new Set(['commission_payment', 'pa
 const TOP_UP_TYPE = 'topup';
 
 /** "Payment method" row: settlement wording only for settlements, never for ride rows (T-509). */
-export const methodLabel = (t: Pick<WalletTransaction, 'type' | 'paymentMethod' | 'settlementId'>): string | null => {
+export const methodLabel = (
+  t: Pick<WalletTransaction, 'type' | 'paymentMethod' | 'settlementId' | 'topupId'>,
+): string | null => {
   const method = t.paymentMethod;
   if (!method) return null;
+  if (t.type === TOP_UP_TYPE) {
+    // The top-up card below names the gateway and the method (card / mobile account); the
+    // ledger's `wallet` (the fake gateway's booking) would misread as "paid from the wallet".
+    if (t.topupId || method === 'wallet') return null;
+    return providerDisplayName(method);
+  }
   if (method === 'wallet') return WALLET_COPY.title;
-  if (t.type === TOP_UP_TYPE) return providerDisplayName(method);
   if (RIDE_TYPES.has(t.type)) return method === 'cash' ? WALLET_COPY.methodRideCash : null;
   if (method === 'cash' || method === 'bank_transfer') {
     const settlement = SETTLEMENT_TYPES.has(t.type) || t.settlementId !== null;
@@ -75,7 +82,7 @@ export const transactionDetailRows = (t: WalletTransaction): Row[] => {
     rows.push({ label: WALLET_COPY.detailBalanceAfter, value: money(t.balanceAfter), testID: 'transaction-balance-after' });
   }
   if (t.reference) rows.push({ label: WALLET_COPY.detailReference, value: t.reference });
-  if (t.topupId) rows.push({ label: translate('topUp.detailTopUp'), value: t.topupId, testID: 'transaction-topup-id' });
+  // The top-up id is a single-line caption under the top-up card, not a row (it wrapped).
   return rows.filter((row): row is Row => row !== null);
 };
 
@@ -184,7 +191,23 @@ export default function TransactionDetailScreen() {
           ))}
         </Card>
 
-        {transaction.topupId ? <TopUpDetailCard id={transaction.topupId} /> : null}
+        {transaction.topupId ? (
+          <View style={styles.topUp}>
+            <TopUpDetailCard id={transaction.topupId} />
+            {/* Long opaque id: one line, truncated in the middle; long-press copies it whole. */}
+            <AppText
+              variant="caption"
+              color="textMuted"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+              selectable
+              style={styles.topUpId}
+              testID="transaction-topup-id"
+            >
+              {translate('topUp.detailTopUpId', { id: transaction.topupId })}
+            </AppText>
+          </View>
+        ) : null}
 
         {ride ? (
           <Card padding="none">
@@ -211,4 +234,6 @@ const styles = StyleSheet.create({
   rowLabel: { flexShrink: 0, maxWidth: '45%' },
   rowValue: { flex: 1, minWidth: 0 },
   struck: { textDecorationLine: 'line-through' },
+  topUp: { gap: space[2] },
+  topUpId: { paddingHorizontal: space[4] },
 });

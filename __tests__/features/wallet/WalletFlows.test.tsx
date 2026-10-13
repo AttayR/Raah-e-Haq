@@ -291,6 +291,10 @@ describe('TransactionDetailScreen', () => {
     expect(methodLabel(t({ type: 'refund', payment_method: 'cash', ride: null }))).toBe('Cash');
     expect(methodLabel(t({ type: 'adjustment_credit', payment_method: 'wallet', ride: null }))).toBe('Wallet');
     expect(methodLabel(t({ type: 'ride_payment', payment_method: null }))).toBeNull();
+    // T-518: a top-up's method comes from its top-up card; the fake gateway books as `wallet`.
+    expect(methodLabel(t({ type: 'topup', payment_method: 'wallet', ride: null, topup_id: 'top_1' }))).toBeNull();
+    expect(methodLabel(t({ type: 'topup', payment_method: 'wallet', ride: null, topup_id: null }))).toBeNull();
+    expect(methodLabel(t({ type: 'topup', payment_method: 'jazzcash', ride: null, topup_id: null }))).toBe('JazzCash');
   });
 
   it('a commission row shows "Cash (paid to driver)", never "Cash at office"', async () => {

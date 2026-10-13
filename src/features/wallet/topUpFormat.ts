@@ -4,15 +4,29 @@ import { formatMoney } from '../../core/format/money';
 import { t } from '../../i18n';
 import type { TopUp, TopUpMethod, TopUpProvider } from './types';
 
-/** Brand spelling for the known gateways when GET /wallet's provider list is not at hand. */
-const KNOWN_PROVIDER_NAMES: Readonly<Record<string, string>> = { jazzcash: 'JazzCash', easypaisa: 'Easypaisa' };
+/**
+ * Name for a known gateway when GET /wallet's provider list is not at hand (a deep link, a ledger
+ * entry): the top-up payload carries only the id. `fake` is the local test gateway (BE-74) and
+ * reads the same as the "Test gateway" name the local backend lists.
+ */
+const knownProviderName = (id: string): string | null => {
+  switch (id) {
+    case 'jazzcash':
+      return 'JazzCash';
+    case 'easypaisa':
+      return 'Easypaisa';
+    case 'fake':
+      return t('topUp.providerTest');
+    default:
+      return null;
+  }
+};
 
-/** The provider's display name: from GET /wallet `top_up.providers`, else the brand spelling, else the id. */
+/** The provider's display name: from GET /wallet `top_up.providers`, else the known name, else the id. */
 export const providerDisplayName = (id: string, providers: ReadonlyArray<TopUpProvider> = []): string => {
   const listed = providers.find((provider) => provider.id === id)?.name;
   if (listed) return listed;
-  if (KNOWN_PROVIDER_NAMES[id]) return KNOWN_PROVIDER_NAMES[id];
-  return id ? id.charAt(0).toUpperCase() + id.slice(1) : '';
+  return knownProviderName(id) ?? id;
 };
 
 export const topUpMethodLabel = (method: TopUpMethod): string =>

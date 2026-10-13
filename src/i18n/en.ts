@@ -375,12 +375,14 @@ export const en = {
     done: 'Done',
     // Ledger / detail.
     historyLabel: 'Wallet Top-up',
-    detailTopUp: 'Top-up',
+    detailTopUpId: 'Top-up ID {id}',
     detailProvider: 'Paid with',
     detailAccount: 'Account',
     detailMethod: 'Method',
     methodCardShort: 'Card / checkout',
     methodMwalletShort: 'Mobile account',
+    /** BE-74 `fake` provider (local/testing backend only); the same name GET /wallet lists for it. */
+    providerTest: 'Test gateway',
   },
 } as const;
 

@@ -23,7 +23,10 @@ export interface PagedList<T> {
 /**
  * Page-numbered list with pull to refresh and infinite scroll. A new `queryKey` (a filter)
  * restarts from page 1; a response for an older key or after unmount is dropped. Nothing is
- * fetched until `enabled` is true (a hidden screen).
+ * fetched until `enabled` is true (a hidden screen). Turning `enabled` true again (screen
+ * focus) refreshes page 1 quietly: no loading state, and nothing is sent while another request
+ * for the list is in flight. The fresh page 1 is merged into the rows already loaded (see
+ * `mergeFirstPage`), so deeper pages and the scroll position are kept.
  */
 export interface PagedListOptions<T> {
   fetchPage: (page: number) => Promise<Page<T>>;
@@ -34,6 +37,21 @@ export interface PagedListOptions<T> {
   /** Message when the failure has no user-facing text. */
   fallbackError: string;
   enabled?: boolean;
+}
+
+/**
+ * A fresh page 1 over the rows already loaded: rows it contains are updated in place, rows not
+ * shown yet go on top in server order, and deeper rows stay. `null` when the two share no row
+ * (the list changed too much to merge), so the caller starts over from page 1.
+ */
+export function mergeFirstPage<T>(current: T[], fresh: T[], keyOf: (item: T) => number | string): T[] | null {
+  const freshByKey = new Map(fresh.map((item) => [keyOf(item), item] as const));
+  const currentKeys = new Set(current.map(keyOf));
+  const overlaps = fresh.some((item) => currentKeys.has(keyOf(item)));
+  if (!overlaps) return null;
+  const added = fresh.filter((item) => !currentKeys.has(keyOf(item)));
+  const updated = current.map((item) => freshByKey.get(keyOf(item)) ?? item);
+  return [...added, ...updated];
 }
 
 export function usePagedList<T>({
@@ -53,10 +71,13 @@ export function usePagedList<T>({
   const generation = useRef(0);
   const busy = useRef(false);
   const loadedKey = useRef<string | null>(null);
+  const hasItems = useRef(false);
   const fetchRef = useRef(fetchPage);
   fetchRef.current = fetchPage;
   const keyRef = useRef(keyOf);
   keyRef.current = keyOf;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   useEffect(
     () => () => {
@@ -75,19 +96,30 @@ export function usePagedList<T>({
   );
 
   const loadFirst = useCallback(
-    (mode: 'loading' | 'refreshing') => {
+    (mode: 'loading' | 'refreshing' | 'quiet') => {
       generation.current += 1;
       const mine = generation.current;
       busy.current = true;
-      setStatus(mode);
-      setLoadMoreError(null);
+      if (mode !== 'quiet') {
+        setStatus(mode);
+        setLoadMoreError(null);
+      }
       if (mode === 'loading') setError(null);
       fetchRef
         .current(1)
         .then((result) => {
           if (mine !== generation.current) return;
-          setItems(result.items);
-          setPage(result.page);
+          hasItems.current = true;
+          // Back on screen: merge page 1 over the loaded pages so the scroll position holds.
+          const merged = mode === 'quiet' ? mergeFirstPage(itemsRef.current, result.items, keyRef.current) : null;
+          if (merged) {
+            setItems(merged);
+          } else {
+            // A pull, a first load, or a page 1 that shares no row: start over from page 1.
+            setItems(result.items);
+            setPage(result.page);
+          }
+          setLoadMoreError(null);
           setLastPage(result.lastPage);
           setTotal(result.total);
           setError(null);
@@ -95,6 +127,8 @@ export function usePagedList<T>({
         })
         .catch((cause: unknown) => {
           if (mine !== generation.current) return;
+          // A quiet refresh that fails keeps the rows on screen without an error line.
+          if (mode === 'quiet') return;
           setError(messageOf(cause));
           setStatus('failed');
         })
@@ -107,10 +141,18 @@ export function usePagedList<T>({
 
   useEffect(() => {
     if (!enabled) return;
-    if (loadedKey.current === queryKey) return;
+    if (loadedKey.current === queryKey) {
+      // Back on screen (after a top-up, for example): refresh page 1 over the shown rows.
+      if (busy.current) return;
+      loadFirst(hasItems.current ? 'quiet' : 'loading');
+      return;
+    }
     const first = loadedKey.current === null;
     loadedKey.current = queryKey;
-    if (!first) setItems([]);
+    if (!first) {
+      hasItems.current = false;
+      setItems([]);
+    }
     loadFirst('loading');
   }, [enabled, queryKey, loadFirst]);
 

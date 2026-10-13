@@ -13,6 +13,7 @@ import { isForegroundState, newIdempotencyKey, useCreateTopUp, useTopUpStatus } 
 import { Linking } from 'react-native';
 import { isAllowedCheckoutUrl, isTopUpReturnUrl, topUpIdFromPath, topUpIdFromUrl } from '../../../src/features/wallet/topUpLinks';
 import { transactionIcon } from '../../../src/features/wallet/format';
+import { providerDisplayName } from '../../../src/features/wallet/topUpFormat';
 import { createLinking, stateForPath, type AuthSnapshot } from '../../../src/app/navigation/linking';
 import { CHECKOUT_ORIGIN_WHITELIST, checkoutDecision } from '../../../src/features/wallet/screens/TopUpCheckoutScreen';
 import type { TopUpConfig } from '../../../src/features/wallet/types';
@@ -37,6 +38,18 @@ const config = (overrides: Record<string, unknown> = {}): TopUpConfig => {
   if (!wallet.topUp) throw new Error('fixture has no top-up config');
   return wallet.topUp;
 };
+
+// T-518: the same gateway reads the same everywhere (flow, deep link, ledger entry).
+describe('providerDisplayName', () => {
+  it('uses the listed name, then the known name, then the id', () => {
+    const providers = [{ id: 'fake', name: 'Sandbox', methods: ['card' as const] }];
+    expect(providerDisplayName('fake', providers)).toBe('Sandbox');
+    expect(providerDisplayName('fake')).toBe('Test gateway');
+    expect(providerDisplayName('jazzcash')).toBe('JazzCash');
+    expect(providerDisplayName('easypaisa')).toBe('Easypaisa');
+    expect(providerDisplayName('newpay')).toBe('newpay');
+  });
+});
 
 describe('mappers', () => {
   it('reads can_top_up and the provider list from GET /wallet; hides it without providers', () => {

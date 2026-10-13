@@ -280,6 +280,9 @@ describe('TopUpStatusScreen', () => {
     expect(await screen.findByText('Money added')).toBeTruthy();
     expect(screen.getByText('Rs 500 was added to your wallet.')).toBeTruthy();
     expect(screen.getByText('TXN-01K7TEST')).toBeTruthy();
+    // T-518: opened from a link (no provider name passed), the fake gateway still reads as in the flow.
+    expect(screen.getByText('Test gateway')).toBeTruthy();
+    expect(screen.queryByText('Fake')).toBeNull();
     fireEvent.press(screen.getByTestId('top-up-status-done'));
     expect(mockDispatch.mock.calls[0][0]).toMatchObject({
       type: 'POP_TO',
@@ -335,11 +338,39 @@ describe('TransactionDetailScreen (top-up entry)', () => {
     mock.onGet(`/wallet/topups/${TOP_UP_ID}`).reply(200, envelope(rawTopUp({ provider: 'jazzcash', status: 'succeeded' })));
     mockParams = { id: 900 };
     show(TransactionDetailScreen);
-    expect(await screen.findByTestId('transaction-topup-id')).toBeTruthy();
-    expect(screen.getByText(TOP_UP_ID)).toBeTruthy();
+    const caption = await screen.findByTestId('transaction-topup-id');
+    expect(caption.props.children).toBe(`Top-up ID ${TOP_UP_ID}`);
+    // T-518: one line, truncated in the middle, copyable.
+    expect(caption.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'middle', selectable: true });
     expect(await screen.findByTestId('transaction-topup')).toBeTruthy();
     expect(screen.getAllByText('JazzCash').length).toBeGreaterThan(0);
     expect(screen.getByText('Mobile account')).toBeTruthy();
     expect(screen.getByText('0300*****67')).toBeTruthy();
+  });
+
+  it('a card top-up on the test gateway shows its method, never "Payment method: Wallet" (T-518)', async () => {
+    const raw = rawTransaction({
+      id: 901,
+      type: 'topup',
+      label: 'Wallet Top-up',
+      direction: 'credit',
+      amount: 500,
+      payment_method: 'wallet',
+      ride: null,
+      topup_id: TOP_UP_ID,
+    });
+    mock.onGet('/wallet/transactions/901').reply(200, envelope(raw));
+    mock.onGet(`/wallet/topups/${TOP_UP_ID}`).reply(
+      200,
+      envelope(rawTopUp({ provider: 'fake', method: 'card', mobile_number: null, status: 'succeeded' })),
+    );
+    mockParams = { id: 901 };
+    show(TransactionDetailScreen);
+    expect(await screen.findByTestId('transaction-topup')).toBeTruthy();
+    expect(screen.getByText('Test gateway')).toBeTruthy();
+    expect(screen.getByText('Card / checkout')).toBeTruthy();
+    expect(screen.queryByText('Payment method')).toBeNull();
+    expect(screen.queryByText('Wallet')).toBeNull();
+    expect(screen.queryByText('Fake')).toBeNull();
   });
 });
