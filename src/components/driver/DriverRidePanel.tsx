@@ -4,6 +4,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AddressPair, AppText, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
 import { space } from '../../theme';
 import type { RideResource } from '../../services/rideService';
+import { firstNameOf } from '../../utils/format';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverRideAction } from '../../features/driver-ride/slice';
 import { activeStops, type DriverRideStep } from '../../features/driver-ride/steps';
@@ -111,7 +112,7 @@ export const DriverRidePanel: React.FC<Props> = ({
         <PersonCard
           variant="plain"
           // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
-          name={ride.passenger?.name}
+          name={firstNameOf(ride.passenger?.name)}
           fallbackName={COPY.passengerFallback}
           rating={riderRating(ride.passenger?.rating)}
           newRatingLabel={COPY.noRating}

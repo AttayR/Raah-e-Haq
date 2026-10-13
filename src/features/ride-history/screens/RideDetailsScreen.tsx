@@ -130,7 +130,7 @@ export default function RideDetailsScreen() {
           role={viewer}
           myRating={ride.myRating}
           canRate={ride.canRate}
-          personName={rated?.firstName ?? null}
+          personName={rated?.name ?? null}
           photoUri={rated?.profileImageUrl ?? null}
           onChange={onRatingChange}
         />

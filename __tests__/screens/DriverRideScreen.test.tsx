@@ -250,6 +250,32 @@ describe('DriverRideScreen', () => {
     }
   });
 
+  it('[T-519] Back from the summary is Done: the completed ride is cleared and the screen leaves', async () => {
+    const { store, screen } = renderScreen(makeRide({ status: 'completed', passenger, can_rate: false }));
+    await settle(store);
+    screen.getByTestId('driver-ride-summary');
+    fireEvent.press(screen.getByTestId('driver-ride-back'));
+    expect(selectDriverActiveRide(store.getState())).toBeNull();
+    await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+  });
+
+  it('[T-519] a swipe-back off the summary (unmount) also clears the completed ride', async () => {
+    const { store, screen } = renderScreen(makeRide({ status: 'completed', passenger, can_rate: false }));
+    await settle(store);
+    screen.getByTestId('driver-ride-summary');
+    screen.unmount();
+    expect(selectDriverActiveRide(store.getState())).toBeNull();
+  });
+
+  it('[T-519] Back during a live ride keeps the ride (Resume ride stays on Home)', async () => {
+    const { store, screen } = renderScreen(makeRide({ status: 'started', passenger }));
+    await settle(store);
+    fireEvent.press(screen.getByTestId('driver-ride-back'));
+    expect(mockGoBack).toHaveBeenCalled();
+    screen.unmount();
+    expect(selectDriverActiveRide(store.getState())?.status).toBe('started');
+  });
+
   it('shows an empty state without a ride', () => {
     const store = configureStore({ reducer: rootReducer });
     const screen = render(

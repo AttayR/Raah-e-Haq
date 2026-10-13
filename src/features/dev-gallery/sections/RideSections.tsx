@@ -178,7 +178,7 @@ export function RidePersonSection() {
     <GallerySection title={t('kitGallery.sectionRidePerson')} testID="gallery-ride-person">
       <Caption>{t('kitGallery.ridePersonDriver')}</Caption>
       <PersonCard
-        name={r.driver?.firstName}
+        name={r.driver?.name}
         fallbackName={t('ride.driverMarker')}
         rating={r.driver?.rating}
         vehicleLine={v ? `${v.make} ${v.model} · ${v.color}` : null}

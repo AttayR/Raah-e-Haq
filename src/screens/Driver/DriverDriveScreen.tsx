@@ -19,6 +19,7 @@ import { logger } from '../../core/logging/logger';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
+import { isRestorableDriverRide } from '../../features/driver-ride/steps';
 import { useIncomingRequestShown } from '../../features/driver-requests/overlay';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
 import { useMyStats } from '../../features/stats/hooks';
@@ -197,7 +198,7 @@ export default function DriverDriveScreen() {
             busy={isBusy}
             disabled={disabled}
             onToggle={onToggle}
-            hasRide={currentRide !== null}
+            hasRide={isRestorableDriverRide(currentRide)}
             onResume={() => navigation.navigate('DriverRide')}
             todayEarnings={
               driverStats ? formatMoney(driverStats.earningsToday, { currency: driverStats.currency }) : null

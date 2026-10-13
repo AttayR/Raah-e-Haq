@@ -153,3 +153,17 @@ export function formatTime(value: Dateish): string {
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return `${h12}:${String(d.getMinutes()).padStart(2, '0')} ${h24 < 12 ? f.am : f.pm}`;
 }
+
+/**
+ * [T-519] The name a person is shown by to the other side of a ride: the first word of the name
+ * the server sent ("Bilal Ahmed" -> "Bilal"), or null without one (the caller shows its fallback).
+ * Used by the live ride card, the after-ride rating sheet and ride details alike, so a person
+ * reads the same everywhere and a full name is never shown (DESIGN_SYSTEM §5, privacy).
+ */
+export function firstNameOf(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const first = value.trim().split(/\s+/)[0];
+  return first ? first : null;
+}

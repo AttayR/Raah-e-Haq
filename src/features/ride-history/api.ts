@@ -2,6 +2,7 @@ import { apiService, unwrap } from '../../services/api';
 import { isRecord, readId, readNumber, readNumberOrNull, readOneOf, readText } from '../../core/api/read';
 import type { Pagination } from '../../core/api/types';
 import { toRideRatingState } from '../rating/api';
+import { firstNameOf } from '../../utils/format';
 import type {
   CancellationReason,
   Page,
@@ -29,21 +30,18 @@ const REASONS: ReadonlyArray<CancellationReason> = ['passenger', 'driver', 'syst
 /** API status words to app statuses; legacy `ongoing` reads as `started`. */
 const toStatus = (value: unknown): RideStatus => (value === 'ongoing' ? 'started' : readOneOf(value, STATUSES, 'requested'));
 
-/** "Bilal Ahmed" -> "Bilal": the history shows first names only. */
-export const firstNameOf = (value: unknown): string | null => {
-  const text = readText(value);
-  if (!text) return null;
-  return text.trim().split(/\s+/)[0] ?? null;
-};
-
-/** The other party's card. The phone the server may add is deliberately not read. */
+/**
+ * The other party's card. The phone the server may add is deliberately not read.
+ * [T-519] The name goes through the shared `firstNameOf`, like the live ride card and the
+ * after-ride sheet, so a person reads the same (first name only) everywhere.
+ */
 const toPerson = (raw: unknown): RidePerson | null => {
   if (!isRecord(raw)) return null;
   const id = readId(raw.id);
   if (id === null) return null;
   return {
     id,
-    firstName: firstNameOf(raw.first_name) ?? firstNameOf(raw.name),
+    name: firstNameOf(readText(raw.first_name) ?? readText(raw.name)),
     profileImageUrl: readText(raw.profile_image_url),
     rating: readNumberOrNull(raw.rating),
   };

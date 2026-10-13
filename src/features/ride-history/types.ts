@@ -33,10 +33,10 @@ export interface RideFareBreakdown {
   total: number;
 }
 
-/** The other party as the history may show them: first name and car, never a phone. */
+/** The other party as the history may show them: first name (`name`) and car, never a phone. */
 export interface RidePerson {
   id: number;
-  firstName: string | null;
+  name: string | null;
   profileImageUrl: string | null;
   rating: number | null;
 }

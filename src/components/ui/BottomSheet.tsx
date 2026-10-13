@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -131,7 +132,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   const footerBottom = Math.max(insets.bottom + layout.bottomActionOffset, layout.bottomActionMinOffset);
   const footerBlock = footer ? footerHeight : 0;
-  const contentHeight = k.contentTop + headerHeight + bodyHeight + (footer ? footerBlock : footerBottom);
+  // [T-519] While the keyboard is up (iOS) it covers the bottom of the sheet, so a `content`
+  // sheet grows by its height (capped at `full`) instead of hiding its body under the keyboard.
+  const contentHeight = k.contentTop + headerHeight + bodyHeight + (footer ? footerBlock : footerBottom) + keyboardHeight;
 
   const resolved = useMemo(
     () =>
@@ -240,6 +243,39 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     animateTo(target.height, 0, undefined, containerHeight);
     settle(target);
   }, [animateTo, container, containerHeight, mounted, resolved, settle, top]);
+
+  // [T-519] Visible body height (between the header and the footer / keyboard) for the
+  // focused-field scroll below; a ref so the keyboard listeners need not re-subscribe.
+  const scrollRef = useRef<ScrollView>(null);
+  const bodyContentRef = useRef<View>(null);
+  const visibleBody = useRef(0);
+  const bodyHeightRef = useRef(0);
+  bodyHeightRef.current = bodyHeight;
+  visibleBody.current =
+    (resolved[resolved.length - 1]?.height ?? 0) - k.contentTop - headerHeight - (footer ? footerBlock : footerBottom) - keyboardHeight;
+
+  // [T-519] Once the keyboard is up and the sheet has grown, scroll the focused field inside the
+  // body into view (its bottom just above the footer; its top first when it is taller than that).
+  const revealFocusedField = useCallback(() => {
+    const input = TextInput.State?.currentlyFocusedInput?.();
+    const content = bodyContentRef.current;
+    if (!input || !content) return;
+    input.measureLayout(
+      content,
+      (_x, y, _width, height) => {
+        if (y < 0 || y > bodyHeightRef.current) return; // Not a field of this sheet.
+        const margin = space[2];
+        const target = Math.max(0, Math.min(y - margin, y + height + margin - visibleBody.current));
+        scrollRef.current?.scrollTo({ y: target, animated: !reduce });
+      },
+      () => {},
+    );
+  }, [reduce]);
+  useEffect(() => {
+    if (!mounted || !active) return undefined;
+    const sub = Keyboard.addListener('keyboardDidShow', revealFocusedField);
+    return () => sub.remove();
+  }, [active, mounted, revealFocusedField]);
 
   // Keyboard: go `full` while a field inside is focused; the footer rides above the keyboard.
   useEffect(() => {
@@ -387,6 +423,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         </View>
       </GestureDetector>
       <ScrollView
+        ref={scrollRef}
         style={styles.body}
         scrollEnabled={scrollable}
         keyboardShouldPersistTaps="handled"
@@ -394,7 +431,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         contentContainerStyle={{ paddingBottom: (footer ? footerBlock : footerBottom) + keyboardHeight }}
         testID={testID ? `${testID}-scroll` : undefined}
       >
-        <View onLayout={e => setBodyHeight(e.nativeEvent.layout.height)}>
+        <View
+          ref={bodyContentRef}
+          onLayout={e => setBodyHeight(e.nativeEvent.layout.height)}
+          testID={testID ? `${testID}-body` : undefined}
+        >
           {contentKey !== undefined ? (
             <Animated.View key={contentKey} entering={swapIn} exiting={swapOut}>
               {children}

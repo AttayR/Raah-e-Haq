@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import MockAdapter from 'axios-mock-adapter';
+import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -204,6 +205,57 @@ describe('RateRideSheet', () => {
     expect(mock.history.post).toHaveLength(0);
   });
 
+  it('[T-519] with the keyboard up: compact header, the sheet grows, the comment is scrolled into view', async () => {
+    type KeyboardHandler = (e: { endCoordinates: { height: number } }) => void;
+    const handlers: Record<string, KeyboardHandler[]> = {};
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: KeyboardHandler) => {
+      (handlers[event] ??= []).push(handler);
+      return { remove: () => undefined };
+    }) as unknown as typeof Keyboard.addListener);
+    const emit = (event: string, height: number) =>
+      act(() => (handlers[event] ?? []).forEach((handler) => handler({ endCoordinates: { height } })));
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    const layout = (testID: string, height: number) =>
+      act(() => {
+        fireEvent(screen.getByTestId(testID), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height } } });
+      });
+
+    await renderSheet({ role: 'driver', personName: 'Test' });
+    rate(5);
+    act(() => {
+      fireEvent(screen.getByTestId('rate-ride-sheet').parent!.parent!, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 874 } } });
+    });
+    layout('rate-ride-sheet-header', 150);
+    layout('rate-ride-sheet-footer', 132);
+    layout('rate-ride-sheet-body', 420);
+    // Keyboard down: the full header (avatar, "Your passenger", name, question).
+    expect(screen.getByTestId('rate-ride-avatar')).toBeTruthy();
+    expect(screen.queryByTestId('rate-ride-header-compact')).toBeNull();
+
+    fireEvent(screen.getByTestId('rate-ride-comment'), 'focus');
+    emit('keyboardWillShow', 336);
+    // Keyboard up: the header is the name only, so the body keeps room for the comment.
+    expect(screen.getByTestId('rate-ride-header-compact')).toBeTruthy();
+    expect(screen.queryByTestId('rate-ride-avatar')).toBeNull();
+    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Test');
+    expect(screen.getByTestId('rate-ride-comment')).toBeTruthy();
+    expect(screen.getByTestId('rate-ride-submit')).toBeTruthy();
+    expect(screen.getByTestId('rate-ride-skip')).toBeTruthy();
+    layout('rate-ride-sheet-header', 50);
+
+    // Once it is up, the focused comment box is scrolled into the visible part of the body.
+    const field = { measureLayout: (_: unknown, ok: (x: number, y: number, w: number, h: number) => void) => ok(0, 260, 358, 140) };
+    jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(field as unknown as ReturnType<typeof TextInput.State.currentlyFocusedInput>);
+    emit('keyboardDidShow', 336);
+    // Sheet at full (866): visible body = 866 − 24 handle − 50 header − 132 footer − 336 keyboard
+    // = 324, so the box (y 260, 140 tall) ends 8 above the footer at y = 260 + 140 + 8 − 324.
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ y: 84 }));
+
+    emit('keyboardWillHide', 0);
+    expect(screen.getByTestId('rate-ride-avatar')).toBeTruthy();
+    jest.restoreAllMocks();
+  });
+
   it('loads no tags while hidden', async () => {
     await renderSheet({ visible: false });
     expect(mock.history.get).toHaveLength(0);
@@ -214,8 +266,8 @@ const completedRide = (overrides: Partial<RideResource> = {}): RideResource =>
   ({
     id: 12,
     status: 'completed',
-    driver: { id: 4, name: 'Bilal A.', profile_image_url: null, rating: null },
-    passenger: { id: 2, name: 'Sara', phone: '', rating: null },
+    driver: { id: 4, name: 'Bilal Ahmed', profile_image_url: null, rating: null },
+    passenger: { id: 2, name: 'Sara Khan', phone: '', rating: null },
     my_rating: null,
     can_rate: true,
     ...overrides,
@@ -245,7 +297,8 @@ describe('after-ride prompt', () => {
     mock.onPost('/rides/12/rate').reply(201, { success: true, data: { my_rating: RATED, can_rate: false } });
     const store = makeStore(completedRide());
     await renderPrompt(store, <PassengerRideRatingPrompt active />);
-    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Bilal A.');
+    // T-519: first name only, like the live ride card and ride details.
+    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Bilal');
     rate(5);
     await press('rate-ride-submit');
     expect(store.getState().activeRide.ride?.can_rate).toBe(false);

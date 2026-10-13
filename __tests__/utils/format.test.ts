@@ -1,6 +1,7 @@
 /** UI-R1: one money/distance/duration/date format for both roles (DESIGN_SYSTEM §2, §7). */
 import {
   MINUS,
+  firstNameOf,
   formatSignedMoney,
   formatDistance,
   formatDuration,
@@ -136,5 +137,20 @@ describe('formatRelativeDate and formatTime', () => {
     expect(formatTime(new Date(2026, 9, 11, 0, 7))).toBe('12:07 AM');
     expect(formatTime(new Date(2026, 9, 11, 12, 0))).toBe('12:00 PM');
     expect(formatTime(undefined)).toBe('');
+  });
+});
+
+describe('firstNameOf (T-519)', () => {
+  it('shows a person by the first word of the server name, everywhere', () => {
+    expect(firstNameOf('Test Driver')).toBe('Test');
+    expect(firstNameOf('  Bilal   Ahmed Khan ')).toBe('Bilal');
+    expect(firstNameOf('Ayesha')).toBe('Ayesha');
+  });
+
+  it('is null without a usable name (the caller shows its fallback)', () => {
+    expect(firstNameOf('')).toBeNull();
+    expect(firstNameOf('   ')).toBeNull();
+    expect(firstNameOf(null)).toBeNull();
+    expect(firstNameOf(42)).toBeNull();
   });
 });

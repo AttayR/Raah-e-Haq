@@ -1,5 +1,6 @@
 import type { RideFareBreakdown, RideResource } from '../../services/rideService';
 import type { RideStatus } from './status';
+import { firstNameOf } from '../../utils/format';
 
 /**
  * The passenger's ride stage machine (T-304, PAX-05). The stage is derived from the server's
@@ -110,7 +111,8 @@ export const driverCardOf = (ride: Pick<RideResource, 'driver' | 'vehicle'>): Dr
   const vehicle = ride.vehicle ?? null;
   const vehicleName = [text(vehicle?.make), text(vehicle?.model)].filter((p): p is string => p !== null).join(' ');
   return {
-    name: text(ride.driver?.name),
+    // [T-519] First name only, the same as ride details and the rating sheet.
+    name: firstNameOf(text(ride.driver?.name)),
     rating: rating !== null && rating > 0 ? rating : null,
     vehicleName: vehicleName || null,
     color: text(vehicle?.color),

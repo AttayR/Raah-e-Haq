@@ -1,12 +1,10 @@
+import { firstNameOf } from '../../utils/format';
 /**
  * Passenger Home copy helpers (docs/design/screens/passenger-home.md, DESIGN_SYSTEM §7).
  */
 
 /** First word of the name, or null when there is none. */
-export const firstNameOf = (name?: string | null): string | null => {
-  const first = (name ?? '').trim().split(/\s+/)[0];
-  return first ? first : null;
-};
+export { firstNameOf };
 
 /**
  * "Good morning|afternoon|evening, {first name}"; "Hello, {first name}" between 22:00 and

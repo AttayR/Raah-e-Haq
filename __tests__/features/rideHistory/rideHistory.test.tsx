@@ -140,8 +140,9 @@ describe('GET /rides mapping', () => {
       vehicle: { make: 'Toyota', model: 'Corolla', color: 'White', licensePlate: 'LEA-1234' },
     });
     expect(r.stops.map((s) => s.address)).toEqual(['First stop', 'Second stop']);
-    expect(r.driver?.firstName).toBe('Bilal');
-    expect(r.passenger?.firstName).toBe('Ayesha');
+    // T-519: first name only, through the same helper as the live ride card and the rating sheet.
+    expect(r.driver?.name).toBe('Bilal');
+    expect(r.passenger?.name).toBe('Ayesha');
     expect(JSON.stringify(r)).not.toContain(DRIVER_PHONE);
     expect(JSON.stringify(r)).not.toContain(PASSENGER_PHONE);
   });

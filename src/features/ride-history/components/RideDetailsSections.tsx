@@ -134,7 +134,7 @@ export function PersonCard({ ride, viewer, canMessage, onMessage }: SectionProps
       <CardTitle>{fallback}</CardTitle>
       <KitPersonCard
         variant="plain"
-        name={person.firstName}
+        name={person.name}
         fallbackName={fallback}
         photoUri={person.profileImageUrl}
         rating={person.rating}

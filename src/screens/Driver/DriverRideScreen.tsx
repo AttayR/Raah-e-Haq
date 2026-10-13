@@ -99,9 +99,28 @@ const DriverRideScreen: React.FC = () => {
     }
   }, [ride, navigation]);
 
+  // [T-519] Leaving the summary (or the cancellation) is "Done", like Uber/Careem: the ride is
+  // over, so Back clears it (the effect above then leaves) and Home never offers "Resume ride"
+  // for it. A swipe-back or Android back that removes the screen does the same on unmount.
+  const finished = step === 'summary' || step === 'cancelled';
+  const finishedRef = useRef(finished);
+  finishedRef.current = finished;
+  const finishRef = useRef(flow.finish);
+  finishRef.current = flow.finish;
+  useEffect(
+    () => () => {
+      if (finishedRef.current) finishRef.current();
+    },
+    [],
+  );
+
   const goBack = useCallback(() => {
+    if (finished) {
+      flow.finish();
+      return;
+    }
     if (navigation.canGoBack()) navigation.goBack();
-  }, [navigation]);
+  }, [finished, flow, navigation]);
 
   const onCall = useCallback(() => {
     if (!phone) return;

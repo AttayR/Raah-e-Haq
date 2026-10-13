@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppText, Avatar, BottomSheet, Button, Chip, RatingInput, TextField } from '../../../components/ui';
 import { toast } from '../../../core/toast';
+import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { t } from '../../../i18n';
 import { space } from '../../../theme';
 import { RATING_DEFAULTS, toRateBody } from '../api';
@@ -41,6 +42,9 @@ const tagsTitle = (config: RatingConfig, stars: number): string => {
  */
 export function RateRideSheet({ visible, rideId, role, personName, photoUri, onRated, onStale, onSkip }: RateRideSheetProps) {
   const { config, status, reload } = useRatingConfig(visible);
+  // [T-519] While the comment is being typed the header shrinks to the name, so the comment box
+  // and Submit / Skip stay visible above the keyboard (the kit grows the sheet and scrolls to it).
+  const keyboardUp = useKeyboardVisible();
   const [stars, setStars] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [comment, setComment] = useState('');
@@ -87,18 +91,26 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, onR
       accessibilityLabel={t('rating.sheetA11y')}
       testID="rate-ride-sheet"
       header={
-        <View style={styles.header}>
-          <Avatar name={name} uri={photoUri} size={56} testID="rate-ride-avatar" />
-          <AppText variant="caption" color="textSecondary">
-            {fallbackName}
-          </AppText>
-          <AppText variant="h3" align="center" numberOfLines={1} testID="rate-ride-name">
-            {name}
-          </AppText>
-          <AppText variant="bodySmall" color="textSecondary" align="center" accessibilityRole="header">
-            {t('rating.title')}
-          </AppText>
-        </View>
+        keyboardUp ? (
+          <View style={[styles.header, styles.headerCompact]} testID="rate-ride-header-compact">
+            <AppText variant="h3" align="center" numberOfLines={1} testID="rate-ride-name">
+              {name}
+            </AppText>
+          </View>
+        ) : (
+          <View style={styles.header}>
+            <Avatar name={name} uri={photoUri} size={56} testID="rate-ride-avatar" />
+            <AppText variant="caption" color="textSecondary">
+              {fallbackName}
+            </AppText>
+            <AppText variant="h3" align="center" numberOfLines={1} testID="rate-ride-name">
+              {name}
+            </AppText>
+            <AppText variant="bodySmall" color="textSecondary" align="center" accessibilityRole="header">
+              {t('rating.title')}
+            </AppText>
+          </View>
+        )
       }
       footer={
         <View style={styles.footer}>
@@ -182,6 +194,7 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, onR
 
 const styles = StyleSheet.create({
   header: { alignItems: 'center', gap: space[1], paddingHorizontal: space[4], paddingBottom: space[3] },
+  headerCompact: { paddingBottom: space[2] },
   body: { paddingHorizontal: space[4], gap: space[4], paddingBottom: space[2] },
   section: { gap: space[2] },
   sectionTitle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space[2] },

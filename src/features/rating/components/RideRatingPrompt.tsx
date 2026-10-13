@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { readText } from '../../../core/api/read';
 import type { RideResource } from '../../../services/rideService';
+import { firstNameOf } from '../../../utils/format';
 import { NOT_RATABLE, toRideRatingFields } from '../api';
 import { useRatingPrompt } from '../hooks';
 import type { RaterRole, RideRatingFields, RideRatingState } from '../types';
@@ -19,11 +20,14 @@ type Props = {
   onRatingChange: (rideId: number, fields: RideRatingFields) => void;
 };
 
-/** The person being rated, from the ride card: the driver for a passenger, the passenger for a driver. */
+/**
+ * The person being rated, from the ride card: the driver for a passenger, the passenger for a
+ * driver. [T-519] First name only, like the live ride card and ride details.
+ */
 const ratedPerson = (ride: RideResource, role: RaterRole): { name: string | null; photoUri: string | null } =>
   role === 'passenger'
-    ? { name: readText(ride.driver?.name), photoUri: readText(ride.driver?.profile_image_url) }
-    : { name: readText(ride.passenger?.name), photoUri: null };
+    ? { name: firstNameOf(readText(ride.driver?.name)), photoUri: readText(ride.driver?.profile_image_url) }
+    : { name: firstNameOf(readText(ride.passenger?.name)), photoUri: null };
 
 /**
  * The after-ride rating prompt (T-505) for the passenger map and the driver ride screen: opens the

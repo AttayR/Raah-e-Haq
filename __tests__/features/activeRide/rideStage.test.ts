@@ -84,9 +84,10 @@ describe('cancelledByOf', () => {
 describe('driverCardOf', () => {
   it('uses the server driver and vehicle (make, model, colour, plate)', () => {
     const ride = makeRide({
-      driver: { id: 5, name: 'Ali', rating: 4.5 },
+      driver: { id: 5, name: 'Ali Raza Khan', rating: 4.5 },
       vehicle: { id: 3, make: 'Suzuki', model: 'Alto', color: 'Silver', license_plate: 'LEB-77' },
     });
+    // T-519: first name only, the same as ride details and the rating sheet.
     expect(driverCardOf(ride)).toEqual({ name: 'Ali', rating: 4.5, vehicleName: 'Suzuki Alto', color: 'Silver', plate: 'LEB-77' });
   });
 

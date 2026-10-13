@@ -3,7 +3,7 @@
  * modal modes, programmatic snaps, keyboard → full, a11y on the handle, light/dark.
  */
 import React, { createRef } from 'react';
-import { AccessibilityInfo, BackHandler, Keyboard, StyleSheet, Text, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, BackHandler, Keyboard, ScrollView, StyleSheet, Text, TextInput, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme } from '../../../src/theme';
@@ -260,5 +260,63 @@ describe('BottomSheet (modal mode)', () => {
     expect(scrim.props.accessibilityLabel).toBe('Close');
     act(() => fireEvent.press(scrim));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('[T-519] a content sheet grows above the keyboard and scrolls the focused field into view', async () => {
+    const handlers: Record<string, (e: { endCoordinates: { height: number } }) => void> = {};
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: (e: { endCoordinates: { height: number } }) => void) => {
+      handlers[event] = handler;
+      return { remove: noop };
+    }) as unknown as typeof Keyboard.addListener);
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    const onSnapChange = jest.fn();
+    await renderThemed(
+      <BottomSheet mode="modal" visible onSnapChange={onSnapChange} header={<Text>Rate</Text>} footer={<Button label="Submit" onPress={noop} />} testID="m">
+        <Text>Stars and comment</Text>
+      </BottomSheet>,
+    );
+    await layout(containerOf('m'), 874);
+    await layout(screen.getByTestId('m-header'), 60);
+    await layout(screen.getByTestId('m-footer'), 132);
+    await layout(screen.getByTestId('m-body'), 500);
+    // 24 handle + 60 header + 500 body + 132 footer = 716.
+    expect(onSnapChange).toHaveBeenLastCalledWith('content', 716);
+
+    // The keyboard covers 336 of it: the sheet grows by that much, capped at full (866).
+    act(() => handlers.keyboardWillShow({ endCoordinates: { height: 336 } }));
+    expect(onSnapChange).toHaveBeenLastCalledWith('content', FULL);
+
+    // The focused field (y 300, 120 tall) is scrolled so its bottom sits above the footer:
+    // visible body = 866 − 24 − 60 − 132 − 336 = 314, so y = 300 + 120 + 8 − 314 = 114.
+    const field = { measureLayout: (_: unknown, ok: (x: number, y: number, w: number, h: number) => void) => ok(0, 300, 358, 120) };
+    jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(field as unknown as ReturnType<typeof TextInput.State.currentlyFocusedInput>);
+    act(() => handlers.keyboardDidShow({ endCoordinates: { height: 336 } }));
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ y: 114 }));
+
+    act(() => handlers.keyboardWillHide({ endCoordinates: { height: 0 } }));
+    expect(onSnapChange).toHaveBeenLastCalledWith('content', 716);
+    jest.restoreAllMocks();
+  });
+
+  it('[T-519] ignores a focused field outside the sheet', async () => {
+    const handlers: Record<string, (e: { endCoordinates: { height: number } }) => void> = {};
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: (e: { endCoordinates: { height: number } }) => void) => {
+      handlers[event] = handler;
+      return { remove: noop };
+    }) as unknown as typeof Keyboard.addListener);
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    scrollTo.mockClear();
+    await renderThemed(
+      <BottomSheet mode="modal" visible testID="m">
+        <Text>Body</Text>
+      </BottomSheet>,
+    );
+    await layout(containerOf('m'), 874);
+    await layout(screen.getByTestId('m-body'), 200);
+    const field = { measureLayout: (_: unknown, ok: (x: number, y: number, w: number, h: number) => void) => ok(0, -400, 358, 48) };
+    jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(field as unknown as ReturnType<typeof TextInput.State.currentlyFocusedInput>);
+    act(() => handlers.keyboardDidShow({ endCoordinates: { height: 336 } }));
+    expect(scrollTo).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
   });
 });

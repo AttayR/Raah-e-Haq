@@ -147,6 +147,13 @@ describe('DriverDriveScreen (UI-R4)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('DriverRide');
   });
 
+  it('[T-519] a completed ride still in the store is not offered as Resume ride', async () => {
+    const ride = makeRide({ status: 'completed', passenger: { id: 9, name: 'Ayesha', phone: '' } });
+    await renderScreen(DriverDriveScreen, { driverStatus: 'available' }, ride);
+    expect(screen.queryByTestId('drive-resume-ride')).toBeNull();
+    expect(screen.getByText('Go offline')).toBeTruthy();
+  });
+
   it('dark + online: dark surfaces, green dot, outline Go offline', async () => {
     await renderScreen(DriverDriveScreen, { mode: 'dark', driverStatus: 'available' });
     expect(flat(screen.getByTestId('driver-drive').props.style).backgroundColor).toBe(DarkTheme.colors.background);
