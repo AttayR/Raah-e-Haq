@@ -1,28 +1,28 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import VehicleOptions from '../../../components/passenger/VehicleOptions';
-import FareDetails from '../../../components/passenger/FareDetails';
+import { AppText, Button, FareBreakdown, VehicleOptionCard, VehicleOptionSkeleton } from '../../../components/ui';
+import { formatDistance, formatDuration } from '../../../utils/format';
 import type { FareEstimates, VehicleType } from '../api';
 import type { LoadStatus } from '../hooks';
 import { estimateFor } from '../hooks';
 import { BOOKING_COPY } from '../copy';
-import { fareBreakdownRows, formatFare, toVehicleOptions } from '../vehicleOptions';
+import { space } from '../../../theme';
+import { formatFare, quoteBreakdown, toVehicleOptions } from '../vehicleOptions';
 
 type StatusLineProps = { status: 'loading' | 'error' | 'empty'; text: string; onRetry?: () => void };
 
-/** One loading / error (with Retry) / empty line. */
+/** One loading / error (with Retry) / empty line, on the kit (UI-R5). */
 export const BookingStatusLine: React.FC<StatusLineProps> = ({ status, text, onRetry }) => {
   const { theme } = useAppTheme();
-  const color = status === 'error' ? theme.colors.danger : theme.colors.textSecondary;
   return (
     <View testID={`booking-status-${status}`} accessibilityLiveRegion="polite" style={styles.row}>
       {status === 'loading' && <ActivityIndicator size="small" color={theme.colors.primaryText} />}
-      <Text style={[styles.text, { color }]}>{text}</Text>
+      <AppText variant="bodySmall" color={status === 'error' ? 'danger' : 'textSecondary'} style={styles.text}>
+        {text}
+      </AppText>
       {status === 'error' && onRetry && (
-        <TouchableOpacity accessibilityRole="button" onPress={onRetry} style={styles.retry}>
-          <Text style={[styles.retryText, { color: theme.colors.primaryText }]}>{BOOKING_COPY.retry}</Text>
-        </TouchableOpacity>
+        <Button label={BOOKING_COPY.retry} variant="ghost" size="sm" fullWidth={false} onPress={onRetry} />
       )}
     </View>
   );
@@ -38,12 +38,18 @@ type VehicleChoiceProps = {
 };
 
 /**
- * The vehicle list from GET /public/vehicle-types, priced by one POST /rides/estimate.
- * Loading, error (Retry) and empty states for both; a type can only be picked once priced.
+ * The vehicle list from GET /public/vehicle-types, priced by one POST /rides/estimate, as kit
+ * VehicleOptionCards (UI-R5, §5.25: MDI glyphs, no emoji). Skeleton while the catalogue loads,
+ * error (Retry) and empty states; a type can only be picked once priced.
  */
 export const VehicleChoice: React.FC<VehicleChoiceProps> = ({ vehicleTypes, estimates, selectedId, onSelect }) => {
   if (vehicleTypes.status === 'loading' || vehicleTypes.status === 'idle') {
-    return <BookingStatusLine status="loading" text={BOOKING_COPY.vehicleTypesLoading} />;
+    return (
+      <View style={styles.list}>
+        <BookingStatusLine status="loading" text={BOOKING_COPY.vehicleTypesLoading} />
+        <VehicleOptionSkeleton testID="vehicle-options-loading" />
+      </View>
+    );
   }
   if (vehicleTypes.status === 'error') {
     return (
@@ -59,7 +65,7 @@ export const VehicleChoice: React.FC<VehicleChoiceProps> = ({ vehicleTypes, esti
     return <BookingStatusLine status="empty" text={BOOKING_COPY.vehicleTypesEmpty} />;
   }
   return (
-    <View>
+    <View style={styles.list}>
       {estimates.status === 'loading' && <BookingStatusLine status="loading" text={BOOKING_COPY.estimateLoading} />}
       {estimates.status === 'error' && (
         <BookingStatusLine
@@ -68,13 +74,21 @@ export const VehicleChoice: React.FC<VehicleChoiceProps> = ({ vehicleTypes, esti
           onRetry={estimates.retry}
         />
       )}
-      <VehicleOptions
-        options={toVehicleOptions(types, estimates.data)}
-        selectedId={selectedId}
-        onSelect={(key) => {
-          if (estimateFor(estimates.data, key)) onSelect(key);
-        }}
-      />
+      {toVehicleOptions(types, estimates.data).map((option) => (
+        <VehicleOptionCard
+          key={option.id}
+          vehicleKey={option.id}
+          name={option.name}
+          meta={option.meta}
+          fare={option.fare}
+          unavailable={option.unavailable}
+          selected={selectedId === option.id}
+          onPress={() => {
+            if (estimateFor(estimates.data, option.id)) onSelect(option.id);
+          }}
+          testID={`vehicle-option-${option.id}`}
+        />
+      ))}
     </View>
   );
 };
@@ -85,7 +99,10 @@ type FareReviewProps = {
   onConfirm: () => void;
 };
 
-/** The selected type's server quote and breakdown (BE-05), or its loading/error state. */
+/**
+ * The selected type's server quote (BE-05) as a money hero and the kit FareBreakdown (§5.26), with
+ * one primary "Request {vehicle}" (no emoji), or the quote's loading/error state.
+ */
 export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, onConfirm }) => {
   if (estimates.status === 'error') {
     return (
@@ -96,20 +113,45 @@ export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, 
   if (!vehicleType || !estimates.data || !quote) {
     return <BookingStatusLine status="loading" text={BOOKING_COPY.estimateLoading} />;
   }
+  const route = estimates.data;
   return (
-    <FareDetails
-      vehicleName={vehicleType.label}
-      distanceKm={`${estimates.data.distance_km} km`}
-      estimate={formatFare(quote.fare, quote.currency)}
-      breakdown={fareBreakdownRows(quote, estimates.data)}
-      onConfirm={onConfirm}
-    />
+    <View style={styles.review}>
+      <View style={styles.hero}>
+        <AppText variant="caption" color="textSecondary" testID="fare-estimate-title">
+          {BOOKING_COPY.estimatedFareTitle}
+        </AppText>
+        <AppText variant="numericXL" testID="fare-estimate-amount">
+          {formatFare(quote.fare, quote.currency)}
+        </AppText>
+        <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
+          {[vehicleType.label, formatDistance(route.distance_km), formatDuration(route.duration_min)].filter(Boolean).join(' · ')}
+        </AppText>
+      </View>
+      <FareBreakdown
+        breakdown={quoteBreakdown(quote)}
+        total={quote.fare}
+        currency={quote.currency}
+        distanceKm={route.distance_km}
+        durationMin={route.duration_min}
+        totalLabel={BOOKING_COPY.estimatedTotal}
+        footnote={BOOKING_COPY.estimateNote}
+        testID="fare-breakdown"
+      />
+      <Button
+        label={BOOKING_COPY.request(vehicleType.label)}
+        size="lg"
+        haptic="impactLight"
+        onPress={onConfirm}
+        testID="fare-request"
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
-  text: { fontSize: 13, flexShrink: 1 },
-  retry: { paddingHorizontal: 8, paddingVertical: 4 },
-  retryText: { fontSize: 13, fontWeight: '700' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingVertical: space[2] },
+  text: { flexShrink: 1 },
+  list: { gap: space[2] },
+  review: { gap: space[4] },
+  hero: { alignItems: 'center', gap: space[1] },
 });

@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import React from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import type { AppTheme } from '../../theme';
+import { AddressPair, AppText, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
+import { space } from '../../theme';
 import type { RideResource } from '../../services/rideService';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverRideAction } from '../../features/driver-ride/slice';
@@ -26,6 +26,8 @@ type Props = {
   onComplete: () => void;
   onCompleteStop: (stopId: number) => void;
   onCancel: () => void;
+  /** Bottom safe-area inset: the fixed footer sits `bottomInset + 16` above the screen edge. */
+  bottomInset?: number;
 };
 
 const TITLES: Partial<Record<DriverRideStep, string>> = {
@@ -35,9 +37,12 @@ const TITLES: Partial<Record<DriverRideStep, string>> = {
 };
 
 /**
- * The live part of the driver ride screen (T-405): passenger, where to go, the stops and the
- * one next action for the current step (I've arrived → Start trip → Stop done… → Complete
- * trip). Cancel is offered only before the trip starts (BE-04).
+ * The live part of the driver ride screen (T-405) on the UI-R5 ride kit: RideProgress, the
+ * passenger as a PersonCard (Call / Message / Navigate), the route as an AddressPair at driving
+ * size (20pt), and the one next action for the current step (I've arrived → Start trip → Stop
+ * done… → Complete trip). Cancel is offered only before the trip starts (BE-04). [UI-R5] The
+ * actions sit in a fixed footer within thumb reach; only the passenger and route scroll. The
+ * sheet redesign with slide-to-confirm is UI-R13.
  */
 export const DriverRidePanel: React.FC<Props> = ({
   ride,
@@ -53,16 +58,14 @@ export const DriverRidePanel: React.FC<Props> = ({
   onComplete,
   onCompleteStop,
   onCancel,
+  bottomInset = 0,
 }) => {
   const { theme } = useAppTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const busy = pendingAction !== null;
   const userAction = pendingAction !== null && pendingAction !== 'refresh' && pendingAction !== 'restore';
   const stops = activeStops(ride);
   const nextStop = step === 'on_trip' ? stops[0] ?? null : null;
-  const passengerName = ride.passenger?.name || COPY.passengerFallback;
-  // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
-  const rating = riderRating(ride.passenger?.rating);
+  const progress = rideProgressStep(ride.status);
 
   let primary: { label: string; onPress: () => void; testID: string } | null = null;
   if (step === 'to_pickup') primary = { label: COPY.arrived, onPress: onArrived, testID: 'driver-ride-arrived' };
@@ -73,212 +76,95 @@ export const DriverRidePanel: React.FC<Props> = ({
       : { label: COPY.complete, onPress: onComplete, testID: 'driver-ride-complete' };
   }
 
+  const actions: PersonAction[] = [];
+  if (phone) actions.push({ key: 'call', icon: 'phone', label: COPY.call, accessibilityLabel: COPY.callA11y, onPress: onCall, testID: 'driver-ride-call' });
+  if (onMessage) {
+    actions.push({ key: 'message', icon: 'chat', label: COPY.message, accessibilityLabel: COPY.messageA11y, onPress: onMessage, testID: 'driver-ride-message' });
+  }
+  if (canNavigate) {
+    actions.push({ key: 'navigate', icon: 'navigate', label: COPY.navigate, accessibilityLabel: COPY.navigateA11y, onPress: onNavigate, testID: 'driver-ride-navigate' });
+  }
+
+  const cancellable = step === 'to_pickup' || step === 'at_pickup';
+  const hasFooter = !!primary || cancellable;
+  const footerPad = { paddingBottom: bottomInset + space[4] };
+
   return (
-    <View style={styles.card} testID="driver-ride-panel">
-      <Text style={styles.title} accessibilityRole="header" testID="driver-ride-title">
-        {TITLES[step] ?? COPY.unknown}
-      </Text>
+    <View
+      style={[
+        styles.sheet,
+        { backgroundColor: theme.colors.surface, borderTopStartRadius: theme.radius.lg, borderTopEndRadius: theme.radius.lg },
+        theme.elevation[3],
+      ]}
+      testID="driver-ride-panel"
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, hasFooter ? null : footerPad]}
+        testID="driver-ride-panel-scroll"
+      >
+        <AppText variant="h3" accessibilityRole="header" testID="driver-ride-title">
+          {TITLES[step] ?? COPY.unknown}
+        </AppText>
+        {progress !== null ? <RideProgress step={progress} testID="driver-ride-progress" /> : null}
 
-      <View style={styles.passengerRow}>
-        <View style={styles.passengerInfo}>
-          <Text style={styles.passengerName} testID="driver-ride-passenger">{passengerName}</Text>
-          <View style={styles.ratingRow}>
-            {rating !== null ? (
-              <>
-                <Icon name="star" size={14} color={theme.colors.ratingStar} />
-                <Text style={styles.rating}>{rating.toFixed(1)}</Text>
-              </>
-            ) : (
-              <Text style={styles.rating}>{COPY.noRating}</Text>
-            )}
-          </View>
-        </View>
-        {phone && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={onCall}
-            accessibilityRole="button"
-            accessibilityLabel={COPY.callA11y}
-            testID="driver-ride-call"
-          >
-            <Icon name="phone" size={20} color={theme.colors.primaryText} />
-            <Text style={styles.iconButtonText}>{COPY.call}</Text>
-          </TouchableOpacity>
-        )}
-        {onMessage && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={onMessage}
-            accessibilityRole="button"
-            accessibilityLabel={COPY.messageA11y}
-            testID="driver-ride-message"
-          >
-            <Icon name="chat-bubble-outline" size={20} color={theme.colors.primaryText} />
-            <Text style={styles.iconButtonText}>{COPY.message}</Text>
-          </TouchableOpacity>
-        )}
-        {canNavigate && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={onNavigate}
-            accessibilityRole="button"
-            accessibilityLabel={COPY.navigateA11y}
-            testID="driver-ride-navigate"
-          >
-            <Icon name="navigation" size={20} color={theme.colors.primaryText} />
-            <Text style={styles.iconButtonText}>{COPY.navigate}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+        <PersonCard
+          variant="plain"
+          // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
+          name={ride.passenger?.name}
+          fallbackName={COPY.passengerFallback}
+          rating={riderRating(ride.passenger?.rating)}
+          newRatingLabel={COPY.noRating}
+          actions={actions}
+          nameTestID="driver-ride-passenger"
+        />
 
-      <View style={styles.addressRow}>
-        <Icon name="trip-origin" size={16} color={theme.colors.pickupPin} />
-        <View style={styles.addressText}>
-          <Text style={styles.addressLabel}>{COPY.pickup}</Text>
-          <Text style={styles.address} numberOfLines={2} testID="driver-ride-pickup">{ride.pickup_address}</Text>
-        </View>
-      </View>
-      {stops.map((stop) => (
-        <View key={stop.id} style={styles.addressRow} testID={`driver-ride-stop-${stop.id}`}>
-          <Icon name="more-vert" size={16} color={theme.colors.stopPin} />
-          <View style={styles.addressText}>
-            <Text style={styles.addressLabel}>{nextStop?.id === stop.id ? COPY.nextStop : COPY.stop}</Text>
-            <Text style={styles.address} numberOfLines={2}>{stop.address}</Text>
-          </View>
-        </View>
-      ))}
-      <View style={styles.addressRow}>
-        <Icon name="place" size={16} color={theme.colors.dropoffPin} />
-        <View style={styles.addressText}>
-          <Text style={styles.addressLabel}>{COPY.dropoff}</Text>
-          <Text style={styles.address} numberOfLines={2} testID="driver-ride-dropoff">{ride.dropoff_address}</Text>
-        </View>
-      </View>
+        <AddressPair
+          size="lg"
+          labels
+          numberOfLines={2}
+          pickup={ride.pickup_address}
+          dropoff={ride.dropoff_address}
+          stops={stops.map(stop => ({
+            key: stop.id,
+            address: stop.address,
+            label: nextStop?.id === stop.id ? COPY.nextStop : COPY.stop,
+            testID: `driver-ride-stop-${stop.id}`,
+          }))}
+          pickupTestID="driver-ride-pickup"
+          dropoffTestID="driver-ride-dropoff"
+        />
+      </ScrollView>
 
-      {primary && (
-        <TouchableOpacity
-          style={[styles.primaryButton, busy && styles.disabled]}
-          onPress={primary.onPress}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy, busy: userAction }}
-          testID={primary.testID}
-        >
-          {userAction && <ActivityIndicator size="small" color={theme.colors.onPrimary} style={styles.spinner} />}
-          <Text style={styles.primaryText}>{userAction ? COPY.working : primary.label}</Text>
-        </TouchableOpacity>
-      )}
-
-      {(step === 'to_pickup' || step === 'at_pickup') && (
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={onCancel}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy }}
-          testID="driver-ride-cancel"
-        >
-          <Text style={[styles.cancelText, busy && styles.disabled]}>{COPY.cancel}</Text>
-        </TouchableOpacity>
-      )}
+      {hasFooter ? (
+        <View style={[styles.footer, footerPad, { borderTopColor: theme.colors.border }]} testID="driver-ride-footer">
+          {primary ? (
+            <Button
+              label={primary.label}
+              size="lg"
+              haptic="impactLight"
+              onPress={primary.onPress}
+              disabled={busy && !userAction}
+              loading={userAction}
+              accessibilityLabel={userAction ? COPY.working : primary.label}
+              testID={primary.testID}
+            />
+          ) : null}
+          {cancellable ? (
+            <Button label={COPY.cancel} variant="destructiveSoft" size="lg" onPress={onCancel} disabled={busy} testID="driver-ride-cancel" />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 };
 
-const createStyles = (theme: AppTheme) =>
-  StyleSheet.create({
-    card: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.radius.lg,
-      padding: theme.space[5],
-      ...theme.elevation[3],
-    },
-    title: {
-      ...theme.typography.title,
-      color: theme.colors.textPrimary,
-      marginBottom: theme.space[3],
-    },
-    passengerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.space[2],
-      marginBottom: theme.space[3],
-    },
-    passengerInfo: {
-      flex: 1,
-    },
-    passengerName: {
-      ...theme.typography.bodyStrong,
-      color: theme.colors.textPrimary,
-    },
-    ratingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.space[1],
-    },
-    rating: {
-      ...theme.typography.caption,
-      color: theme.colors.textSecondary,
-    },
-    iconButton: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      minWidth: theme.layout.touchTargetDriving,
-      minHeight: theme.layout.touchTargetDriving,
-      paddingHorizontal: theme.space[2],
-      borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.primarySoft,
-    },
-    iconButtonText: {
-      ...theme.typography.caption,
-      color: theme.colors.onPrimarySoft,
-    },
-    addressRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: theme.space[2],
-      marginBottom: theme.space[2],
-    },
-    addressText: {
-      flex: 1,
-    },
-    addressLabel: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted,
-    },
-    address: {
-      ...theme.typography.bodySmall,
-      color: theme.colors.textPrimary,
-    },
-    primaryButton: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: theme.layout.touchTargetDriving,
-      borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.primary,
-      marginTop: theme.space[3],
-    },
-    primaryText: {
-      ...theme.typography.button,
-      color: theme.colors.onPrimary,
-    },
-    spinner: {
-      marginRight: theme.space[2],
-    },
-    cancelButton: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: theme.layout.touchTargetDriving,
-      marginTop: theme.space[2],
-    },
-    cancelText: {
-      ...theme.typography.buttonSmall,
-      color: theme.colors.danger,
-    },
-    disabled: {
-      opacity: 0.4,
-    },
-  });
+const styles = StyleSheet.create({
+  // The screen docks the sheet at the bottom and caps its height; the content shrinks and scrolls.
+  sheet: { flexShrink: 1 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
+  content: { padding: space[5], gap: space[4] },
+  footer: { paddingHorizontal: space[5], paddingTop: space[3], gap: space[3], borderTopWidth: StyleSheet.hairlineWidth },
+});
 
 export default DriverRidePanel;

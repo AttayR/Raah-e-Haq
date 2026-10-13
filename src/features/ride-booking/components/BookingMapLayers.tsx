@@ -1,8 +1,6 @@
 import React from 'react';
-import { Marker, type LatLng } from 'react-native-maps';
-import MAPS_CONFIG from '../../../config/mapsConfig';
-import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import AnimatedPolyline from '../../../components/AnimatedPolyline';
+import type { LatLng } from 'react-native-maps';
+import { RideMarker, RouteLine } from '../../../components/ui';
 
 type Props = {
   pickup: LatLng | null;
@@ -12,36 +10,19 @@ type Props = {
 };
 
 /**
- * Pickup, stops, destination and the route on the booking map, in the theme's map colours
- * (DESIGN_SYSTEM 5.21: `pickupPin`, `stopPin`, `dropoffPin`, `routeLine`).
+ * Pickup, stops, destination and the route on the booking map with the kit's custom pins and
+ * cased route line (DESIGN_SYSTEM §5.21, UI-R5): pickup circle, numbered stops, drop-off square;
+ * no Google teardrops.
  */
-export const BookingMapLayers: React.FC<Props> = ({ pickup, stops, destination, route }) => {
-  const { theme } = useAppTheme();
-  const c = theme.colors;
-  return (
-    <>
-      {pickup && (
-        <Marker
-          testID="pickup-marker"
-          coordinate={pickup}
-          title={MAPS_CONFIG.MARKERS.pickup.title}
-          pinColor={c.pickupPin}
-        />
-      )}
-      {stops.map((stop, index) => (
-        <Marker key={`stop-${index}`} coordinate={stop} title={`Stop ${index + 1}`} pinColor={c.stopPin} />
-      ))}
-      {destination && (
-        <Marker
-          testID="destination-marker"
-          coordinate={destination}
-          title={MAPS_CONFIG.MARKERS.destination.title}
-          pinColor={c.dropoffPin}
-        />
-      )}
-      {route.length > 0 && <AnimatedPolyline coordinates={route} strokeWidth={5} strokeColor={c.routeLine} durationMs={1200} />}
-    </>
-  );
-};
+export const BookingMapLayers: React.FC<Props> = ({ pickup, stops, destination, route }) => (
+  <>
+    {route.length > 1 && <RouteLine coordinates={route} testID="booking-route" />}
+    {pickup && <RideMarker kind="pickup" coordinate={pickup} testID="pickup-marker" />}
+    {stops.map((stop, index) => (
+      <RideMarker key={`stop-${index}`} kind="stop" index={index + 1} coordinate={stop} testID={`stop-marker-${index + 1}`} />
+    ))}
+    {destination && <RideMarker kind="dropoff" coordinate={destination} testID="destination-marker" />}
+  </>
+);
 
 export default BookingMapLayers;

@@ -54,7 +54,7 @@ describe('IncomingRequestCard', () => {
     const onAccept = jest.fn();
     const onReject = jest.fn();
     const request = makePendingRequest({ id: 41 });
-    const { getByTestId, rerender, getByText } = render(
+    const { getByTestId, rerender, getByLabelText } = render(
       <IncomingRequestCard request={request} accepting={false} disabled={false} onAccept={onAccept} onReject={onReject} />,
     );
     fireEvent.press(getByTestId('incoming-request-accept'));
@@ -63,7 +63,8 @@ describe('IncomingRequestCard', () => {
     expect(onReject).toHaveBeenCalledWith(41);
 
     rerender(<IncomingRequestCard request={request} accepting disabled onAccept={onAccept} onReject={onReject} />);
-    getByText('Accepting…');
+    // UI-R5: the kit Button keeps its width and shows a spinner; the label stays the accessible name.
+    getByLabelText('Accepting…');
     fireEvent.press(getByTestId('incoming-request-accept'));
     fireEvent.press(getByTestId('incoming-request-reject'));
     expect(onAccept).toHaveBeenCalledTimes(1);

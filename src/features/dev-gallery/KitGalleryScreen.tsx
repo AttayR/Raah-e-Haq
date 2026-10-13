@@ -12,6 +12,17 @@ import { FieldSection } from './sections/FieldSection';
 import { DialogSection, FeedbackSection, StatesSection } from './sections/FeedbackSections';
 import { SheetSection } from './sections/SheetSection';
 import {
+  RideAddressSection,
+  RideFareSection,
+  RideMapSection,
+  RidePersonSection,
+  RidePinsSection,
+  RideProgressSection,
+  RideRatingSection,
+  RideVehiclesSection,
+} from './sections/RideSections';
+import { DriverRidePreview, TripAssignedPreview } from './sections/RideScreenPreviews';
+import {
   LargeTitlePreview,
   PayCommissionPreview,
   SettlementsPreview,
@@ -52,6 +63,15 @@ const SECTIONS: Section[] = [
   ['states', () => <StatesSection />],
   ['dialog', () => <DialogSection />],
   ['sheet', () => <SheetSection />],
+  // UI-R5 ride components.
+  ['ride-map', () => <RideMapSection />],
+  ['ride-pins', () => <RidePinsSection />],
+  ['ride-address', () => <RideAddressSection />],
+  ['ride-vehicles', () => <RideVehiclesSection />],
+  ['ride-fare', () => <RideFareSection />],
+  ['ride-person', () => <RidePersonSection />],
+  ['ride-progress', () => <RideProgressSection />],
+  ['ride-rating', () => <RideRatingSection />],
   ['spacing', () => <SpacingSection />],
   ['radius', () => <RadiusSection />],
   ['elevation', () => <ElevationSection />],
@@ -59,6 +79,7 @@ const SECTIONS: Section[] = [
   ['components3', () => <ComponentTokenSection groups={['textField', 'otp', 'segmented', 'chip', 'badge', 'selectionControl']} />],
   ['components2', () => <ComponentTokenSection groups={['header', 'tabBar']} />],
   ['components4', () => <ComponentTokenSection groups={['listItem', 'sheet', 'dialog', 'toast', 'emptyState', 'skeleton', 'mapControls']} />],
+  ['components5', () => <ComponentTokenSection groups={['ride']} />],
   ['haptics', () => <HapticsSection />],
 ];
 
@@ -67,6 +88,8 @@ const SECTIONS: Section[] = [
  * when `-RHKitGallerySection` names exactly one of them.
  */
 const SCREEN_PREVIEWS: Section[] = [
+  ['screen-trip-assigned', () => <TripAssignedPreview />],
+  ['screen-driver-ride', () => <DriverRidePreview />],
   ['screen-wallet', () => <WalletLoadedPreview />],
   ['screen-wallet-skeleton', () => <WalletSkeletonPreview />],
   ['screen-wallet-error', () => <WalletErrorPreview />],

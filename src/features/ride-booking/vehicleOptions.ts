@@ -1,18 +1,20 @@
-import type { VehicleOption } from '../../components/passenger/VehicleOptions';
+import type { FareBreakdownInput } from '../../components/ui';
+import { vehicleMeta } from '../../components/ui';
 import type { VehicleTypeKey } from '../../services/rideService';
 import type { FareEstimate, FareEstimates, VehicleType } from './api';
-import { BOOKING_COPY } from './copy';
 import { formatMoney } from '../../utils/format';
 
-/** Artwork per catalogue key (the server's `icon` is the key itself, BE-05). */
-const VEHICLE_ICONS: Record<VehicleTypeKey, string> = {
-  car: '🚗',
-  bike: '🏍️',
-  rickshaw: '🛺',
-  van: '🚐',
+/** One row of the vehicle list (VehicleOptionCard props), built only from server data. */
+export type VehicleOption = {
+  id: VehicleTypeKey;
+  name: string;
+  /** "4 seats" (a pickup ETA joins it once the server sends one, T-310). */
+  meta: string | null;
+  /** The quoted fare, or null while there is no quote. */
+  fare: string | null;
+  /** The estimate is in but has no quote for this type: it cannot be booked. */
+  unavailable: boolean;
 };
-
-export const vehicleIcon = (key: VehicleTypeKey): string => VEHICLE_ICONS[key];
 
 /** The app-wide money format (`Rs 1,250`, src/utils/format); kept as the booking flow's name. */
 export const formatFare = (amount: number, currency = 'PKR'): string => formatMoney(amount, currency);
@@ -27,24 +29,17 @@ export const toVehicleOptions = (types: ReadonlyArray<VehicleType>, estimates: F
     return {
       id: type.key,
       name: type.label,
-      desc: BOOKING_COPY.seats(type.capacity),
-      price: quote ? formatFare(quote.fare, quote.currency) : BOOKING_COPY.fareUnavailable,
-      icon: vehicleIcon(type.key),
+      meta: vehicleMeta(type.capacity),
+      fare: quote ? formatFare(quote.fare, quote.currency) : null,
+      unavailable: !!estimates && !quote,
     };
   });
 
-/** FareDetails rows from the server breakdown (they add up to the quoted fare). */
-export const fareBreakdownRows = (
-  quote: FareEstimate,
-  route: Pick<FareEstimates, 'distance_km' | 'duration_min'>,
-): { label: string; value: string }[] => {
-  const money = (n: number) => formatFare(n, quote.currency);
-  const b = quote.breakdown;
-  return [
-    { label: BOOKING_COPY.breakdownBase, value: money(b.base) },
-    { label: BOOKING_COPY.breakdownDistance(route.distance_km), value: money(b.distance) },
-    { label: BOOKING_COPY.breakdownTime(route.duration_min), value: money(b.time) },
-    ...(b.stops > 0 ? [{ label: BOOKING_COPY.breakdownStops, value: money(b.stops) }] : []),
-    ...(b.min_fare_adjustment > 0 ? [{ label: BOOKING_COPY.breakdownMinimum, value: money(b.min_fare_adjustment) }] : []),
-  ];
-};
+/** The quote's server breakdown in the kit FareBreakdown shape (it adds up to the quoted fare). */
+export const quoteBreakdown = (quote: FareEstimate): FareBreakdownInput => ({
+  base: quote.breakdown.base,
+  distance: quote.breakdown.distance,
+  time: quote.breakdown.time,
+  stops: quote.breakdown.stops,
+  minFareAdjustment: quote.breakdown.min_fare_adjustment,
+});

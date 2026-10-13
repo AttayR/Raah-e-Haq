@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import type { PendingRideRequest } from '../../features/driver-requests/api';
 import { DRIVER_REQUESTS_COPY as COPY } from '../../features/driver-requests/copy';
 import type { RideRequestFeedView } from '../../features/driver-requests/hooks';
 import { formatMoney } from '../../utils/format';
+import { AddressPair, AppText, Button, IconButton, PersonCard } from '../ui';
 
 const formatKm = (value: number): string => (value < 10 ? value.toFixed(1) : String(Math.round(value)));
 
@@ -26,7 +26,12 @@ type CardProps = {
   onReject: (rideId: number) => void;
 };
 
-/** One incoming request from GET /rides/pending (T-403). Only fields the server sent are shown. */
+/**
+ * One incoming request from GET /rides/pending (T-403) on the UI-R5 ride kit: rider PersonCard
+ * (name + rating or "New rider"), the route as an AddressPair at driving size, fare and pickup
+ * metrics, and a primary Accept (navy, not green). Only fields the server sent are shown. The
+ * sheet redesign with the countdown ring is UI-R11.
+ */
 export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, disabled, onAccept, onReject }) => {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -35,94 +40,83 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
   return (
     <View style={styles.card} testID="incoming-request-card">
       <View style={styles.header}>
-        <Text style={styles.title}>{COPY.title}</Text>
-        <TouchableOpacity
+        <AppText variant="h3" accessibilityRole="header" style={styles.flex}>
+          {COPY.title}
+        </AppText>
+        <IconButton
+          icon="close"
+          variant="tonal"
           onPress={() => onReject(request.id)}
           disabled={disabled}
-          accessibilityRole="button"
           accessibilityLabel={COPY.rejectA11y}
           testID="incoming-request-reject"
-          hitSlop={8}
-        >
-          <Icon name="close" size={24} color={theme.colors.danger} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.passengerRow}>
-        <Text style={styles.passengerName} testID="incoming-request-passenger">
-          {request.passengerFirstName ?? COPY.passengerFallback}
-        </Text>
-        <View style={styles.ratingRow}>
-          {request.passengerRating !== null ? (
-            <>
-              <Icon name="star" size={16} color={theme.colors.ratingStar} />
-              <Text style={styles.rating} testID="incoming-request-rating">
-                {request.passengerRating.toFixed(1)}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.rating}>{COPY.noRating}</Text>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.addressRow}>
-        <Icon name="trip-origin" size={16} color={theme.colors.pickupPin} />
-        <View style={styles.addressText}>
-          <Text style={styles.addressLabel}>{COPY.pickup}</Text>
-          <Text style={styles.address} numberOfLines={2} testID="incoming-request-pickup">
-            {request.pickupAddress}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.addressRow}>
-        <Icon name="place" size={16} color={theme.colors.dropoffPin} />
-        <View style={styles.addressText}>
-          <Text style={styles.addressLabel}>{COPY.dropoff}</Text>
-          <Text style={styles.address} numberOfLines={2} testID="incoming-request-dropoff">
-            {request.dropoffAddress}
-          </Text>
-        </View>
+        />
       </View>
 
       <View style={styles.metrics}>
         {request.estimatedFare !== null && (
-          <View>
-            <Text style={styles.fare} testID="incoming-request-fare">
+          <View style={styles.metric}>
+            <AppText variant="numericL" testID="incoming-request-fare">
               {formatMoney(request.estimatedFare)}
-            </Text>
-            {payment && <Text style={styles.metricLabel}>{payment}</Text>}
+            </AppText>
+            {payment && (
+              <AppText variant="caption" color="textSecondary">
+                {payment}
+              </AppText>
+            )}
           </View>
         )}
         {request.estimatedDistanceKm !== null && (
-          <View>
-            <Text style={styles.metric} testID="incoming-request-distance">
+          <View style={styles.metric}>
+            <AppText variant="numeric" testID="incoming-request-distance">
               {`${formatKm(request.estimatedDistanceKm)} ${COPY.km}`}
-            </Text>
-            <Text style={styles.metricLabel}>{COPY.away}</Text>
+            </AppText>
+            <AppText variant="caption" color="textSecondary">
+              {COPY.away}
+            </AppText>
           </View>
         )}
         {request.estimatedPickupMin !== null && (
-          <View>
-            <Text style={styles.metric} testID="incoming-request-eta">
+          <View style={styles.metric}>
+            <AppText variant="numeric" testID="incoming-request-eta">
               {`${request.estimatedPickupMin} ${COPY.minutesShort}`}
-            </Text>
-            <Text style={styles.metricLabel}>{COPY.toPickup}</Text>
+            </AppText>
+            <AppText variant="caption" color="textSecondary">
+              {COPY.toPickup}
+            </AppText>
           </View>
         )}
       </View>
 
-      <TouchableOpacity
-        style={[styles.acceptButton, disabled && styles.acceptButtonDisabled]}
+      <AddressPair
+        size="lg"
+        labels
+        numberOfLines={2}
+        pickup={request.pickupAddress}
+        dropoff={request.dropoffAddress}
+        pickupTestID="incoming-request-pickup"
+        dropoffTestID="incoming-request-dropoff"
+      />
+
+      <PersonCard
+        variant="plain"
+        name={request.passengerFirstName}
+        fallbackName={COPY.passengerFallback}
+        rating={request.passengerRating}
+        newRatingLabel={COPY.noRating}
+        nameTestID="incoming-request-passenger"
+        ratingTestID="incoming-request-rating"
+      />
+
+      <Button
+        label={accepting ? COPY.accepting : COPY.accept}
+        size="lg"
+        haptic="impactLight"
         onPress={() => onAccept(request.id)}
         disabled={disabled}
-        accessibilityRole="button"
-        accessibilityState={{ disabled, busy: accepting }}
+        loading={accepting}
         testID="incoming-request-accept"
-      >
-        {accepting && <ActivityIndicator size="small" color={theme.colors.onSuccess} style={styles.spinner} />}
-        <Text style={styles.acceptText}>{accepting ? COPY.accepting : COPY.accept}</Text>
-      </TouchableOpacity>
+      />
     </View>
   );
 };
@@ -175,6 +169,7 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surface,
       borderRadius: theme.radius.lg,
       padding: theme.space[5],
+      gap: theme.space[4],
       ...theme.elevation[3],
     },
     stateCard: {
@@ -194,85 +189,21 @@ const createStyles = (theme: AppTheme) =>
     },
     header: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: theme.space[3],
+      gap: theme.space[3],
     },
-    title: {
-      ...theme.typography.title,
-      color: theme.colors.textPrimary,
-    },
-    passengerRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: theme.space[3],
-    },
-    passengerName: {
-      ...theme.typography.bodyStrong,
-      color: theme.colors.textPrimary,
-    },
-    ratingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.space[1],
-    },
-    rating: {
-      ...theme.typography.label,
-      color: theme.colors.textSecondary,
-    },
-    addressRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: theme.space[2],
-      marginBottom: theme.space[2],
-    },
-    addressText: {
+    flex: {
       flex: 1,
-    },
-    addressLabel: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted,
-    },
-    address: {
-      ...theme.typography.bodySmall,
-      color: theme.colors.textPrimary,
+      minWidth: 0,
     },
     metrics: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: theme.space[2],
-      marginBottom: theme.space[4],
-    },
-    fare: {
-      ...theme.typography.numericL,
-      color: theme.colors.success,
+      flexWrap: 'wrap',
+      alignItems: 'flex-end',
+      gap: theme.space[6],
     },
     metric: {
-      ...theme.typography.numeric,
-      color: theme.colors.textPrimary,
-    },
-    metricLabel: {
-      ...theme.typography.caption,
-      color: theme.colors.textSecondary,
-    },
-    acceptButton: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: theme.layout.touchTargetDriving,
-      borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.success,
-    },
-    acceptButtonDisabled: {
-      opacity: 0.4,
-    },
-    spinner: {
-      marginRight: theme.space[2],
-    },
-    acceptText: {
-      ...theme.typography.button,
-      color: theme.colors.onSuccess,
+      gap: 2,
     },
   });
 

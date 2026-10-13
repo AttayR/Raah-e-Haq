@@ -58,12 +58,12 @@ describe.each([
     expect(queryByRole('button')).toBeNull();
   });
 
-  it('car marker: driverMarker body with a surface ring, centred anchor, muted variant', () => {
+  it('car marker: driverMarker body with a casing ring, 40pt, centred anchor, muted variant', () => {
     const { getByTestId, rerender } = render(<CarMarkerGlyph testID="car" />);
     expect(flat(getByTestId('car').props.style)).toMatchObject({
       backgroundColor: theme.colors.driverMarker,
-      borderColor: theme.colors.surface,
-      width: 32,
+      borderColor: theme.colors.routeLineCasing,
+      width: 40,
     });
     rerender(<CarMarkerGlyph testID="car" muted />);
     expect(flat(getByTestId('car').props.style)).toMatchObject({ opacity: 0.6 });

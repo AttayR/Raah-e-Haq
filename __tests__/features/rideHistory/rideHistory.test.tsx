@@ -14,7 +14,8 @@ import { apiClient, type User } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { rideHistoryApi, toRide } from '../../../src/features/ride-history/api';
-import { canOpenChat, CHAT_READ_WINDOW_HOURS, fareRows, rideAmountText } from '../../../src/features/ride-history/format';
+import { canOpenChat, CHAT_READ_WINDOW_HOURS, rideAmountText } from '../../../src/features/ride-history/format';
+import { ReceiptCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import RideHistoryScreen from '../../../src/features/ride-history/screens/RideHistoryScreen';
 import RideDetailsScreen from '../../../src/features/ride-history/screens/RideDetailsScreen';
 import type { Ride } from '../../../src/features/ride-history/types';
@@ -169,22 +170,40 @@ describe('ride format', () => {
     expect(rideAmountText(ride({ status: 'cancelled' }), 'passenger')).toBe('No charge');
   });
 
-  it('builds the receipt from the server breakdown; the driver also sees fee and earnings', () => {
-    expect(fareRows(ride(), 'passenger').map((r) => [r.label, r.value])).toEqual([
-      ['Base fare', 'Rs 100'],
-      ['Distance', 'Rs 250'],
-      ['Time', 'Rs 70'],
-      ['Stops', 'Rs 50'],
-      ['Total', 'Rs 470'],
-    ]);
-    expect(fareRows(ride(), 'driver').slice(-2).map((r) => [r.label, r.value])).toEqual([
-      ['Raah-e-Haq fee', '−Rs 94'],
-      ['You earned', 'Rs 376'],
-    ]);
-    expect(fareRows(ride({ fare_breakdown: null }), 'passenger')).toEqual([
-      { key: 'total', label: 'Total', value: 'Rs 470', strong: true },
-    ]);
-    expect(fareRows(ride({ status: 'cancelled' }), 'passenger')).toEqual([]);
+  it('builds the receipt from the server breakdown; the driver also sees fee and earnings', async () => {
+    const receipt = async (r: Ride, viewer: 'passenger' | 'driver') => {
+      render(
+        <ThemeProvider>
+          <ReceiptCard ride={r} viewer={viewer} />
+        </ThemeProvider>,
+      );
+      await waitFor(() => expect(screen.getByTestId('ride-details-receipt-card')).toBeTruthy());
+    };
+    await receipt(ride(), 'passenger');
+    for (const text of ['Base fare', 'Rs 100', 'Rs 250', 'Rs 70', 'Stops', 'Rs 50', 'Total', 'Rs 470']) {
+      expect(screen.getByText(text)).toBeTruthy();
+    }
+    expect(screen.getByText(/^Distance/)).toBeTruthy();
+    expect(screen.getByText(/^Time/)).toBeTruthy();
+    expect(screen.queryByText('Your earnings')).toBeNull();
+    screen.unmount();
+
+    await receipt(ride(), 'driver');
+    expect(screen.getByText('Raah-e-Haq fee')).toBeTruthy();
+    expect(screen.getByText('−Rs 94')).toBeTruthy();
+    expect(screen.getByText('Your earnings')).toBeTruthy();
+    expect(screen.getByText('Rs 376')).toBeTruthy();
+    screen.unmount();
+
+    await receipt(ride({ fare_breakdown: null }), 'passenger');
+    expect(screen.getByText('Total')).toBeTruthy();
+    expect(screen.getByText('Rs 470')).toBeTruthy();
+    expect(screen.queryByText('Base fare')).toBeNull();
+    screen.unmount();
+
+    await receipt(ride({ status: 'cancelled' }), 'passenger');
+    expect(screen.queryByText('Total')).toBeNull();
+    expect(screen.queryByText('Base fare')).toBeNull();
   });
 
   it('the chat can be opened while active and for the read window after the ride ends', () => {
@@ -273,7 +292,9 @@ describe('RideDetailsScreen', () => {
       respond([200, envelope(rawRide())]);
       expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs 470');
       expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Bilal');
-      expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Toyota Corolla · White · LEA-1234');
+      expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Toyota Corolla · White');
+      // UI-R5: the plate sits in the PersonCard plate pill.
+      expect(screen.getByTestId('ride-details-person-plate').props.children).toBe('LEA-1234');
       expect(screen.getByText('First stop')).toBeTruthy();
       expect(screen.getByTestId('ride-details-metrics').props.children).toBe('6.4 km · 18 min');
       expect(screen.getByTestId('ride-details-receipt-total')).toBeTruthy();
@@ -298,7 +319,9 @@ describe('RideDetailsScreen', () => {
     show(RideDetailsScreen, 'driver');
     expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs 376');
     expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Ayesha');
-    expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Rider');
+    // UI-R5 PersonCard: the passenger shape has no vehicle line (the card title says "Your passenger").
+    expect(screen.queryByTestId('ride-details-person-subtitle')).toBeNull();
+    expect(screen.queryByTestId('ride-details-person-plate')).toBeNull();
     expect(screen.getByTestId('ride-details-receipt-fee')).toBeTruthy();
     expect(screen.getByTestId('ride-details-receipt-earned')).toBeTruthy();
     expect(screen.queryByTestId('ride-details-message')).toBeNull();

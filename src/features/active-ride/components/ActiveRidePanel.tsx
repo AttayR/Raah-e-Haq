@@ -1,14 +1,22 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Marker } from 'react-native-maps';
-import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { radius, space, textStyles } from '../../../theme';
-import DriverAssignedCard from '../../../components/passenger/DriverAssignedCard';
+import React, { useContext } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { NavigationContext } from '@react-navigation/native';
+import {
+  AppText,
+  Button,
+  CarMarker,
+  FareBreakdown,
+  IndeterminateBar,
+  PersonCard,
+  RideProgress,
+  rideProgressStep,
+  type PersonAction,
+} from '../../../components/ui';
+import { space } from '../../../theme';
 import type { DriverLocation, RideResource } from '../../../services/rideService';
-import { formatFare } from '../../ride-booking/vehicleOptions';
-import { BOOKING_COPY } from '../../ride-booking/copy';
 import { ACTIVE_RIDE_COPY } from '../copy';
-import { RideChatButton } from '../../chat/components/RideChatButton';
+import { CHAT_COPY } from '../../chat/copy';
+import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -25,6 +33,14 @@ const STAGE_TITLES: Record<PassengerRideStage, string> = {
   in_trip: ACTIVE_RIDE_COPY.inTripTitle,
   completed: ACTIVE_RIDE_COPY.completedTitle,
   cancelled: ACTIVE_RIDE_COPY.cancelledTitle,
+};
+
+/** The RideProgress step per stage (§5.24); none once the ride has ended. */
+const STAGE_STEP: Partial<Record<PassengerRideStage, number>> = {
+  searching: 0,
+  driver_en_route: 1,
+  driver_arrived: 2,
+  in_trip: 3,
 };
 
 const CANCELLED_BY_TEXT = {
@@ -59,119 +75,115 @@ type Props = {
   busy?: boolean;
 };
 
-/** The bottom panel while a ride exists: one view per server stage (T-304). */
+/**
+ * The bottom panel while a ride exists: one view per server stage (T-304), on the UI-R5 ride kit
+ * (RideProgress, PersonCard with Call/Message, FareBreakdown). The full trip-sheet redesign is
+ * UI-R12.
+ */
 const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, onCall, busy = false }) => {
-  const { theme } = useAppTheme();
-  const c = theme.colors;
+  // Read from context (not useNavigation, which throws outside a navigator): without one there is
+  // simply no Message action.
+  const navigation: RideChatNavigator | undefined = useContext(NavigationContext);
   const { stage } = stageState;
   const subtitle = subtitleOf(stageState, ride);
   const hasDriver = !!ride?.driver && (stage === 'driver_en_route' || stage === 'driver_arrived' || stage === 'in_trip');
   const fare = stage === 'completed' && ride ? fareSummaryOf(ride) : null;
   const finished = stage === 'completed' || stage === 'cancelled';
   const warn = stage === 'searching' && stageState.notice === 'driver_cancelled';
+  const step = STAGE_STEP[stage] ?? (ride ? rideProgressStep(ride.status) : null);
+
+  const driver = hasDriver && ride ? driverCardOf(ride) : null;
+  const actions: PersonAction[] = [];
+  if (driver && onCall) {
+    actions.push({ key: 'call', icon: 'phone', label: ACTIVE_RIDE_COPY.call, onPress: onCall, testID: 'driver-call-button' });
+  }
+  if (driver && ride && navigation) {
+    actions.push({
+      key: 'message',
+      icon: 'chat',
+      label: CHAT_COPY.message,
+      accessibilityLabel: CHAT_COPY.messageA11y(driver.name ?? ACTIVE_RIDE_COPY.driverFallbackName),
+      onPress: () => openRideChat(navigation, ride.id),
+      testID: 'ride-chat-button',
+    });
+  }
 
   return (
     <View testID={`active-ride-${stage}`} style={styles.wrap}>
-      <View style={[styles.header, { backgroundColor: c.surfaceAlt }]} accessibilityLiveRegion="polite">
-        <View style={styles.headerText}>
-          <Text style={[styles.title, { color: c.textPrimary }]}>{STAGE_TITLES[stage]}</Text>
-          {subtitle && (
-            <Text testID="active-ride-subtitle" style={[styles.sub, { color: warn ? c.warning : c.textSecondary }]}>
-              {subtitle}
-            </Text>
-          )}
-        </View>
-        {stage === 'searching' && <ActivityIndicator size="small" color={c.primary} />}
+      {stage === 'searching' ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
+      <View style={styles.header} accessibilityLiveRegion="polite">
+        <AppText variant="h3" accessibilityRole="header">
+          {STAGE_TITLES[stage]}
+        </AppText>
+        {subtitle ? (
+          <AppText variant="bodySmall" color={warn ? 'warning' : 'textSecondary'} testID="active-ride-subtitle">
+            {subtitle}
+          </AppText>
+        ) : null}
       </View>
 
-      {hasDriver && ride && <DriverAssignedCard driver={driverCardOf(ride)} onCall={onCall} />}
-      {/* In-ride chat (T-510) while the driver is assigned, arrived or on the trip. */}
-      {hasDriver && ride && <RideChatButton rideId={ride.id} name={driverCardOf(ride).name} />}
+      {!finished && step !== null ? <RideProgress step={step} testID="active-ride-progress" /> : null}
 
-      {fare && (
-        <View testID="ride-fare-summary" style={[styles.fare, { borderColor: c.border }]}>
-          {fare.breakdown && (
-            <>
-              <FareRow label={BOOKING_COPY.breakdownBase} value={formatFare(fare.breakdown.base)} />
-              <FareRow label={ride?.distance_km != null ? BOOKING_COPY.breakdownDistance(ride.distance_km) : ACTIVE_RIDE_COPY.breakdownDistance} value={formatFare(fare.breakdown.distance)} />
-              <FareRow label={ride?.duration_minutes != null ? BOOKING_COPY.breakdownTime(ride.duration_minutes) : ACTIVE_RIDE_COPY.breakdownTime} value={formatFare(fare.breakdown.time)} />
-              {fare.breakdown.stops > 0 && <FareRow label={BOOKING_COPY.breakdownStops} value={formatFare(fare.breakdown.stops)} />}
-              {fare.breakdown.minFareAdjustment > 0 && (
-                <FareRow label={BOOKING_COPY.breakdownMinimum} value={formatFare(fare.breakdown.minFareAdjustment)} />
-              )}
-            </>
-          )}
-          <FareRow label={ACTIVE_RIDE_COPY.finalFareLabel} value={formatFare(fare.total)} strong />
-          {fare.paymentMethod && (
-            <Text style={[styles.sub, { color: c.textSecondary }]}>{ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod)}</Text>
-          )}
-        </View>
-      )}
+      {driver ? (
+        <PersonCard
+          name={driver.name}
+          fallbackName={ACTIVE_RIDE_COPY.driverFallbackName}
+          rating={driver.rating}
+          vehicleLine={[driver.vehicleName, driver.color].filter((p): p is string => !!p).join(' · ') || null}
+          plate={driver.plate}
+          plateHighlighted={stage === 'driver_arrived'}
+          actions={actions}
+          testID="driver-assigned-card"
+          ratingTestID="driver-rating"
+          vehicleTestID="driver-vehicle"
+          plateTestID="driver-plate"
+        />
+      ) : null}
 
-      {canPassengerCancel(stage) && (
-        <TouchableOpacity
-          testID="active-ride-cancel"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy }}
-          disabled={busy}
+      {fare ? (
+        <FareBreakdown
+          testID="ride-fare-summary"
+          breakdown={fare.breakdown}
+          total={fare.total}
+          distanceKm={ride?.distance_km ?? null}
+          durationMin={ride?.duration_minutes ?? null}
+          totalLabel={ACTIVE_RIDE_COPY.finalFareLabel}
+          footnote={fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
+        />
+      ) : null}
+
+      {canPassengerCancel(stage) ? (
+        <Button
+          label={ACTIVE_RIDE_COPY.cancelRide}
+          variant="destructiveSoft"
           onPress={onCancel}
-          style={[styles.button, { backgroundColor: c.dangerSoft }]}
-        >
-          <Text style={[styles.buttonText, { color: c.danger }]}>{ACTIVE_RIDE_COPY.cancelRide}</Text>
-        </TouchableOpacity>
-      )}
-      {finished && (
-        <TouchableOpacity
-          testID="active-ride-done"
-          accessibilityRole="button"
-          onPress={onDone}
-          style={[styles.button, { backgroundColor: c.primary }]}
-        >
-          <Text style={[styles.buttonText, { color: c.onPrimary }]}>{ACTIVE_RIDE_COPY.done}</Text>
-        </TouchableOpacity>
-      )}
+          disabled={busy}
+          testID="active-ride-cancel"
+        />
+      ) : null}
+      {finished ? <Button label={ACTIVE_RIDE_COPY.done} size="lg" onPress={onDone} testID="active-ride-done" /> : null}
     </View>
   );
 };
 
-const FareRow: React.FC<{ label: string; value: string; strong?: boolean }> = ({ label, value, strong }) => {
-  const { theme } = useAppTheme();
-  const style = [strong ? styles.fareStrong : styles.fareText, { color: theme.colors.textPrimary }];
-  return (
-    <View style={styles.fareRow}>
-      <Text style={style}>{label}</Text>
-      <Text style={style}>{value}</Text>
-    </View>
-  );
-};
-
-/** The assigned driver's position (GET /rides/{id}/driver-location) on the passenger map. */
+/**
+ * The assigned driver's position (GET /rides/{id}/driver-location) on the passenger map: the kit
+ * CarMarker (full colour, position interpolated, drawn upright per §5.21 c).
+ */
 export const AssignedDriverMarker: React.FC<{ location: DriverLocation | null }> = ({ location }) => {
-  const { theme } = useAppTheme();
   if (!location) return null;
   return (
-    <Marker
+    <CarMarker
       testID="assigned-driver-marker"
       coordinate={{ latitude: location.latitude, longitude: location.longitude }}
       title={ACTIVE_RIDE_COPY.driverMarkerTitle}
-      pinColor={theme.colors.driverMarker}
-      rotation={typeof location.heading === 'number' ? location.heading : undefined}
     />
   );
 };
 
 const styles = StyleSheet.create({
-  wrap: { gap: space[2] },
-  header: { borderRadius: radius.md, padding: space[3], flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  headerText: { flex: 1 },
-  title: { ...textStyles.bodyStrong },
-  sub: { ...textStyles.caption, marginTop: space[1] },
-  fare: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, padding: space[3], gap: space[1] },
-  fareRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  fareText: { ...textStyles.bodySmall },
-  fareStrong: { ...textStyles.bodyStrong },
-  button: { borderRadius: radius.md, paddingVertical: space[3], alignItems: 'center' },
-  buttonText: { ...textStyles.button },
+  wrap: { gap: space[4] },
+  header: { gap: space[1] },
 });
 
 export default ActiveRidePanel;

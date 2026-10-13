@@ -1,10 +1,10 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Badge, Card, Icon } from '../../../components/ui';
+import { AddressPair, AppText, Card, Icon, RideStatusPill } from '../../../components/ui';
 import { space } from '../../../theme';
 import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
-import { formatDateTime, rideAmountText, rideTime, STATUS_TONE } from '../format';
+import { formatDateTime, rideAmountText, rideTime } from '../format';
 import type { Ride, RideViewer } from '../types';
 
 type Props = { ride: Ride; viewer: RideViewer; onPress: (ride: Ride) => void };
@@ -35,22 +35,12 @@ export const RideHistoryRow = memo(function RideHistoryRow({ ride, viewer, onPre
           <AppText variant="caption" color="textMuted" numberOfLines={1} style={styles.flex}>
             {when}
           </AppText>
-          <Badge tone={STATUS_TONE[ride.status]} label={status} testID={`ride-history-row-${ride.id}-status`} />
+          <RideStatusPill status={ride.status} label={status} testID={`ride-history-row-${ride.id}-status`} />
         </View>
 
         <View style={styles.route}>
-          <View style={styles.place}>
-            <Icon name="origin" size={16} color="primary" />
-            <AppText variant="body" numberOfLines={1} style={styles.flex}>
-              {ride.pickupAddress}
-            </AppText>
-          </View>
-          <View style={styles.place}>
-            <Icon name="pin" size={16} color="danger" />
-            <AppText variant="body" numberOfLines={1} style={styles.flex}>
-              {ride.dropoffAddress}
-            </AppText>
-          </View>
+          {/* The kit "Raah line" (§5.23, UI-R5): the same glyphs as booking, details and trip. */}
+          <AddressPair pickup={ride.pickupAddress} dropoff={ride.dropoffAddress} density="compact" />
           {ride.stops.length > 0 ? (
             <AppText variant="caption" color="textMuted" style={styles.stops}>
               {RIDE_HISTORY_COPY.stops(ride.stops.length)}
@@ -87,9 +77,10 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85 },
   flex: { flex: 1, minWidth: 0 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  route: { marginTop: space[3], gap: space[1] },
+  route: { marginTop: space[2] },
   place: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  stops: { marginStart: space[6] },
+  // Text start of the AddressPair rows (20pt rail + 12).
+  stops: { marginStart: space[8] },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -133,6 +133,58 @@ export const componentTokens = {
      */
     heights: { walletHero: 152, earningsHero: 132, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
   },
+  /** UI-R5 ride components (§5.21–5.31, §6.5/§6.7, §12.5). */
+  ride: {
+    /** §5.21 map pins: 20 pickup circle / drop-off square with a 4pt ring, 22 numbered stop. */
+    pin: { size: 20, ring: 4, dropoffRadius: 4, dropoffInner: 6, stopSize: 22, stopRing: 2, labelGap: space[1], labelMaxWidth: 200 },
+    /** §5.21 route: 5pt line over a 7pt casing. */
+    route: { width: 5, casingWidth: 7 },
+    /** §5.21 car marker: 40 badge, 2pt ring; nearby (muted) drivers at 60%. */
+    carMarker: { size: 40, glyph: 24, ring: 2, mutedOpacity: 0.6 },
+    /** §6.5 searching pulse: rings start at the pickup pin size; 2pt progress bar. */
+    pulse: { ring: 20, progressHeight: 2, progressBandRatio: 0.35 },
+    /** §5.23 address pair: 20pt rail, 10pt pickup/drop-off glyphs, 8pt stops, 2/3 dotted line. */
+    addressPair: {
+      railWidth: 20,
+      pickup: 10,
+      dropoff: 10,
+      dropoffRadius: 2,
+      stop: 8,
+      dot: 2,
+      dotGap: 3,
+      rowMinHeight: { regular: 48, compact: 32 },
+    },
+    /** §5.25 vehicle option card. */
+    vehicle: {
+      minHeight: 72,
+      tile: 56,
+      tileRadius: radius.lg,
+      glyph: 32,
+      paddingVertical: space[2],
+      paddingHorizontal: space[4],
+      listGap: space[2],
+      unavailableOpacity: 0.4,
+      skeletonCount: 3,
+    },
+    /** §5.26 fare breakdown rows. */
+    fare: { rowMinHeight: 32 },
+    /** §5.27/§5.28/§12.5 person card. */
+    person: { avatar: 56, plateHeight: 28, plateLetterSpacing: 0.5, actionHeight: 56, actionIcon: 24, actionGap: space[2] },
+    /** §5.24 progress: 4pt track, 4 segments 4 apart. */
+    progress: { track: 4, segmentGap: space[1], timelineDot: 10 },
+    /** §5.22 rating stars. */
+    rating: { input: 40, inputGap: space[2], inputTarget: 48, display: 16, displayGap: 2 },
+    /** §5.31 slide-to-confirm. */
+    slide: {
+      height: 64,
+      knob: 56,
+      inset: 4,
+      glyph: 28,
+      completeAt: 0.85,
+      /** [UI-R5] After a confirm, the knob goes home if the screen has not switched to `loading` by then. */
+      resetAfterMs: 600,
+    },
+  },
   /** §9 [v1.1] map floating controls: at most two, locate rides 16 above the sheet. */
   mapControls: { sheetGap: space[4], edge: space[4] },
 } as const;

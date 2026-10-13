@@ -45,7 +45,7 @@ export const RIDE_HISTORY_COPY = {
   fareMinimum: 'Minimum fare adjustment',
   total: 'Total',
   platformFee: 'Raah-e-Haq fee',
-  youEarned: 'You earned',
+  youEarned: 'Your earnings',
   paymentMethod: 'Payment',
   paymentCash: { passenger: 'Cash (paid to driver)', driver: 'Cash (collected by you)' } as Record<RideViewer, string>,
   paymentStatus: 'Payment status',

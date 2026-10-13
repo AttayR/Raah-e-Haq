@@ -12,6 +12,8 @@ Every value in this file is exact. "≈" never appears. Points (pt) = iOS points
 
 > **UI-R3 review rulings (2026-10-12).** Keyboard avoidance stays on RN `KeyboardAvoidingView` (iOS padding + top-inset offset; Android `adjustResize`) instead of `react-native-keyboard-controller` (§5.1); BottomSheet snaps never cover the header with the sticky footer (§5.14); Dialog action order (§5.15); Toast line limits (§5.16); network ErrorState glyph `cloud-off-outline` (the bundled MDI has no `cloud-alert-outline`) (§5.20). Values marked **[UI-R3]**.
 
+> **UI-R5 review rulings (2026-10-13).** Pin sizes include the ring; map markers carry no shadow (§5.21); the driver marker is the MDI `car` badge drawn upright, with heading rotation deferred until a top-down asset exists (§5.21, §6.7); the RatingInput empty star uses `borderStrong` (§5.22); AddressPair has three densities (§5.23); the VehicleOptionCard is 72 high with 8/16 padding and shows the ETA only when the server sends one (§5.25); person-card actions follow §12.5, not the older two-button row (§5.27/§5.28); passenger side has no Safety action until it does something real (§12.5); the booking CTA reads "Request {vehicle} · {fare}" (§12.5). Values marked **[UI-R5]**.
+
 ---
 
 ## 0. Principles
@@ -427,6 +429,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - **Dropoff pin:** 20×20 square radius 4 `dropoffPin` with 4pt ring; inner 6×6 square in ring colour.
 - **Stop pin:** 22×22 circle `stopPin` with white `numericSmall` index.
 - **Driver marker:** 40×40 top-down car glyph (`car` MDI rendered to bitmap, or a 2-colour PNG asset at 1x/2x/3x) rotated to `heading`; body `driverMarker`, 2pt white outline; animate position over 1000 ms linear between updates.
+- **[UI-R5] Ruled in review:** (a) the 20 / 22 pin sizes are the **outer** size, ring included (pickup = 12pt `pickupPin` fill inside a 4pt ring; stop = 22 outer with a 2pt ring), so the pickup pin and the numbered stop read as one family. (b) No map marker has `elevation`/shadow: iOS Google Maps snapshots the marker view and clips the shadow into an opaque grey square, so the `routeLineCasing` ring does the separating. Label bubbles get a hairline `border` instead. (c) MDI has no top-down car, and rotating the front-view `car` glyph makes it look tilted or upside down. Until a top-down 2-colour asset is added (follow-up in UI-R12), the driver marker is a 40 circle in `driverMarker` with a 2pt `routeLineCasing` ring and the MDI `car` glyph at 24 in `textInverse`, drawn **upright** (no `rotation`, no `flat`). Position interpolation (§6.7) stays. (d) Nearby (unassigned) drivers use the same badge at 60% opacity, z-index below the assigned car, and are not interpolated.
 - **User location:** native blue dot (`showsUserLocation`), tinted `userLocation` on Android.
 - **Center pin (choose on map):** 32 tall stem pin in `primary`, lifts 8pt with a shadow while the map moves (motion 6.5).
 - **Route line:** width 5, colour `routeLine`, casing width 7 `routeLineCasing` drawn underneath; traveled part `routeLineTraveled`; line cap/join round. Draw-on animation 600 ms ease-out when a new route appears (reduced motion: instant).
@@ -435,12 +438,14 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 ### 5.22 Rating stars
 - 5 stars, MDI `star` / `star-outline`; sizes: input 40 (gap 8, target 48), display 16 (gap 2).
 - Input: tap or drag to select; selected stars `ratingStar`, empty `ratingStarEmpty`; label under the row (`bodySmall` `textSecondary`): 1 "Very bad", 2 "Bad", 3 "Okay", 4 "Good", 5 "Excellent". Haptic `selection` per change.
+- **[UI-R5]** Input empty stars use `borderStrong` (3.03–3.78:1, WCAG 1.4.11), because in the input the outline is the control boundary. `ratingStarEmpty` (decorative) stays for display only.
 - Display: always star + numeric `numeric` value (e.g. `{user.rating}` to one decimal). If `rating` is null show "New" (`caption` `textMuted`), never four hardcoded stars (today: Settings header).
 
 ### 5.23 Address pair ("Raah line", brand signature)
 - Vertical stack of pickup and dropoff (and stops) rows. Leading rail at x=16..36: pickup 10×10 circle `pickupPin`, dropoff 10×10 square `dropoffPin`, stops 8×8 circle `stopPin`; connected by a 2pt dotted line (`borderStrong`, dash 2 / gap 3) through the vertical centres.
 - Row: min height 48; text `body` `textPrimary` 1 line (ellipsis), optional label above in `caption` `textMuted` ("Pickup", "Drop-off"). Divider hairline inset to text start (x=48) between rows when the rows are editable fields.
 - Used in: booking, history cards, ride details, incoming request, trip screens. One component, one look everywhere.
+- **[UI-R5] Densities (one component):** `density="regular"` (rows min 48, optional `caption` labels, divider when editable: booking, ride details, passenger trip); `density="compact"` (rows min 32, no labels, `body` 1 line: history cards, booking summary row, Home recent rides); plus `size="lg"` for the driver's moving screens (incoming request, driver trip): labels + `h3` (20pt) text up to 2 lines. Rail, glyphs and dotted line are identical in every variant.
 
 ### 5.24 Ride status timeline + status pill mapping
 - Horizontal 4-step progress for the passenger trip sheet: Requested → Driver on the way → Arrived → On trip. Track 4pt `surfaceAlt`, filled `primary`; current step label `label` `textPrimary`; others `caption` `textMuted`. Vertical variant in Ride details with timestamps from `requested_at`, `accepted_at`, `arrived_at`, `started_at`, `completed_at`/`cancelled_at`.
@@ -451,6 +456,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Selected: `Card selected` (2pt `primary` border, `primarySoft` fill). Unavailable: opacity 0.4, trailing "Unavailable" `caption`.
 - Loading: skeleton of 3 cards. List gap 8.
 - Today's emoji tiles on navy squares and periwinkle prices are replaced.
+- **[UI-R5] Corrected:** 12 vertical padding around a 56 tile gives 80, not 72. The card is **min height 72 = 8 + 56 + 8**, padding **8 vertical / 16 horizontal** (minus the border width so selection never shifts content). The second line is "{capacity} seats · {eta} min" with `eta` the server's per-vehicle pickup ETA. When the API sends no ETA it reads "{capacity} seats" only. Never show the trip `duration_min` here: it is the same on every row and belongs in the route summary.
 
 ### 5.26 Fare breakdown
 - Card `outlined`; rows 32 high: label `bodySmall` `textSecondary` left, value `numeric` `textPrimary` right (tabular). Rows: Base fare (`breakdown.base`), Distance (`breakdown.distance`, label "Distance · {distance_km} km"), Time (`breakdown.time`, "Time · {duration_min} min"), Stops (`breakdown.stops`, only if > 0), Discount (only if present, value in `success` with a minus sign). Divider hairline. Total row: `title` label "Total" + `numericL` value.
@@ -461,9 +467,11 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Avatar 56 + online ring none; name `h3`; under it rating display (5.22) `{driver.rating}` and `caption` "{vehicle.make} {vehicle.model} · {vehicle.color}"; right column: plate in a 28-high pill (`surfaceAlt`, `numeric`, letter-spacing 0.5) = `vehicle.license_plate`.
 - Actions row 16 below: two `md` `secondary` buttons side by side, 12 gap: "Call" (`phone-outline`) and "Message" (`message-text-outline`, Badge for unread). Optional third IconButton `dots-horizontal` (Share trip, Cancel ride).
 - ETA line above the card in `h2`: "{eta} min away" while `accepted`; "Your driver has arrived" while `arrived`.
+- **[UI-R5] Superseded by §12.5:** the actions row is the PersonCard row of equal tonal actions: 56 high, radius `md`, `surfaceAlt`, glyph 24 `primaryText` over a `label`, 8 apart, 16 below the identity row. Two actions (Call, Message) split the width equally; there is no `dots-horizontal` menu. The plate pill fills with `surfaceAlt`, and while `arrived` it gets a 2pt `primary` ring so the passenger can spot the car. The vehicle line ("{make} {model} · {color}") wraps to **2 lines** before it ellipsizes, because the colour is what the passenger looks for.
 
 ### 5.28 Passenger card (driver side)
 - Avatar 56; name `h3` (first name only + initial, per BE-20 privacy); rating display; actions: IconButton tonal 56 "Call", "Message". No phone number shown as text.
+- **[UI-R5]** Same PersonCard and action row as §5.27/§12.5: Call, Message, Navigate (when there is a target). An unrated rider reads "New rider".
 
 ### 5.29 Stat tile
 - Card (not outlined), padding 16, min height 96: icon 20 in a 32×32 `primarySoft` circle → 12 → value `numericL` `textPrimary` (1 line, `adjustsFontSizeToFit` min scale 0.8) → 2 → label `caption` `textSecondary`. No trend chips unless the API returns a delta (today "+12%" is invented).
@@ -494,7 +502,7 @@ Library: Reanimated 4 (installed). All durations in ms.
 4. **List appear:** first render after loading: items fade 0→1 and translate y 8→0, 250 ms, staggered 30 ms per item, max 8 items staggered (rest appear with the 8th). No animation on pull-to-refresh updates or pagination.
 5. **Searching-for-driver pulse:** around the pickup pin, 3 concentric rings, each scales 1 → 3.2 and fades opacity 0.35 → 0 over 2000 ms, `Easing.out(Easing.quad)`, staggered 666 ms, infinite; ring colour `primary` (dark: `navy-400`). Plus a 2pt indeterminate progress bar at the sheet top (`primary` on `surfaceAlt`, 1500 ms loop).
 6. **Center pin lift:** pin translates y −8 and its shadow scales 0.8 on map drag start, 150 ms; drops back with a spring on drag end.
-7. **Driver marker:** position interpolates over 1000 ms linear; rotation takes the shortest path over 300 ms.
+7. **Driver marker:** position interpolates over 1000 ms linear; rotation takes the shortest path over 300 ms. **[UI-R5]** Rotation applies only once the top-down asset exists (§5.21 c); the upright MDI badge only interpolates position.
 8. **Incoming request (driver):** sheet rises with the spring; a 15 s (or server `expires_in`) countdown ring around the Accept button depletes linearly; haptic `notificationWarning` + system sound (respects the "Sound alerts" preference) on arrival.
 9. **Toast:** in = translate y −16→0 + fade, 250 ms standard; out = fade + translate −8, 200 ms accelerate.
 10. **Skeleton shimmer:** 1200 ms linear loop.
@@ -645,6 +653,7 @@ Rules: one primary button per screen, always in the same place for its archetype
 - **Booking sheet states replace the stage chips.** "1. Pickup · 2. Destination · 3. Vehicle · 4. Fare" reads like a developer stepper; the sheet itself shows the step: *Where to* → *Choose a ride* → *Finding driver* → *Driver on the way* → *On trip* → *Receipt*. The back button goes back one sheet state and never leaves a half-cleared route on the map.
 - **Choose a ride:** half sheet; route visible above it; AddressPair summary row (tap to edit); vehicle list (VehicleOptionCard, 72 high, MDI vehicle glyph in a 56 `surfaceAlt` tile, name + "{capacity} seats · {eta} min", fare `numericL` `textPrimary` end); selected card = 2pt `primary` border + `primarySoft`; a "Fare details" row that expands the FareBreakdown in place; sticky footer button **"Choose {vehicle}"** (lg, primary) with the fare inside the label ("Choose Rickshaw · Rs 104"). No separate fare step, no emoji, no bell.
 - **Person card** (driver card on passenger side, passenger card on driver side): one component, two data shapes. Avatar 56 · name `h3` · rating display or "New" · vehicle line / plate pill (passenger side only) · action row of three equal tonal IconButtons with labels (Call, Message with unread badge, and Safety on passenger side / Navigate on driver side). Today the driver side has an icon trio and the passenger side has a full-width Call inside the card plus stacked full-width Message and pink Cancel — that difference is the most visible "not in sync" problem.
+- **[UI-R5] Rulings:** (1) **No Safety action on the passenger side until it does something real.** A button that opens nothing is a fake. Until then the passenger PersonCard shows Call + Message at equal width. UI-R12 adds a real Safety sheet that needs no new backend: "Call emergency (15)" and "Call Rescue (1122)" via `tel:`, and "Share trip" through the native share sheet with driver name, car, plate and route text from the ride resource. The third action slot comes back with it. (2) **Booking CTA copy:** the one footer button commits the request, so it says so: **"Request {vehicle label} · {fare}"** (for example "Request Rickshaw · Rs 104"; `vehicle label` is the catalogue name exactly as the API returns it, not lower-cased). This replaces "Choose {vehicle}" above, which promised a selection and not a request. The legacy "Request Car" on the separate fare step is accepted until UI-R10 removes that step.
 - **Ride progress:** a 4-segment progress bar at the top of the trip sheet (Requested → On the way → Arrived → On trip), same component on both roles; the sheet title is the status sentence (`h2`: "Driver arrives in 4 min", "Head to pickup · 4 min").
 - **Incoming request (driver):** a map-screen sheet, not a card floating over the Home dashboard (today). Fare `numericXL` first, then pickup ETA + distance, AddressPair, rider name + rating; Accept = lg primary with a depleting countdown ring; Decline = ghost. 
 - **Receipt (both roles):** money hero (`numericXL`), "Paid in cash" / "Collect cash" pill, FareBreakdown, rating input, Done. Driver adds "Your earnings" row from the API.

@@ -176,6 +176,15 @@ describe('Badge, Avatar, StatTile', () => {
     expect(initialsOf(null)).toBe('');
     await renderThemed(<Avatar name="Test Driver" size={56} />);
     expect(screen.getByText('TD')).toBeTruthy();
+    screen.unmount();
+    // A photo that fails to load falls back to the initials, not an empty circle.
+    await renderThemed(<Avatar name="Test Driver" uri="https://example.test/missing.png" size={56} testID="av" />);
+    expect(screen.queryByText('TD')).toBeNull();
+    await act(async () => {
+      screen.getByTestId('av-photo').props.onError();
+    });
+    expect(screen.queryByTestId('av-photo')).toBeNull();
+    expect(screen.getByText('TD')).toBeTruthy();
   });
 
   it('stat tile: value shrinks to fit, null shows a dash with an honest label, flex width', async () => {

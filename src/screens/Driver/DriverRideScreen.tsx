@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Marker } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { Screen } from '../../components/ui';
+import { RideMarker, Screen } from '../../components/ui';
 import { CancelReasonSheet } from '../../components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../components/driver/DriverRidePanel';
 import { DriverRideSummary } from '../../components/driver/DriverRideSummary';
@@ -143,14 +142,14 @@ const DriverRideScreen: React.FC = () => {
             initialRegion={toRegion(region)}
             customMapStyle={theme.mapStyle}
           >
-            {pickup && <Marker coordinate={pickup} title={COPY.pickup} pinColor={theme.colors.pickupPin} />}
-            {activeStops(ride).map((stop) => {
+            {pickup && <RideMarker kind="pickup" coordinate={pickup} title={COPY.pickup} testID="driver-ride-pickup-marker" />}
+            {activeStops(ride).map((stop, index) => {
               const coordinate = toLatLng(stop.latitude, stop.longitude);
               return coordinate ? (
-                <Marker key={stop.id} coordinate={coordinate} title={COPY.stop} pinColor={theme.colors.stopPin} />
+                <RideMarker key={stop.id} kind="stop" index={index + 1} coordinate={coordinate} title={COPY.stop} />
               ) : null;
             })}
-            {dropoff && <Marker coordinate={dropoff} title={COPY.dropoff} pinColor={theme.colors.dropoffPin} />}
+            {dropoff && <RideMarker kind="dropoff" coordinate={dropoff} title={COPY.dropoff} testID="driver-ride-dropoff-marker" />}
           </SafeMapView>
         </MapErrorBoundary>
 
@@ -171,21 +170,26 @@ const DriverRideScreen: React.FC = () => {
           <Icon name="arrow-back" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
 
-        <ScrollView
-          style={styles.sheet}
-          contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + theme.space[4] }]}
-        >
-          {step === 'summary' ? (
-            <DriverRideSummary ride={ride} onDone={onDone} />
-          ) : step === 'cancelled' ? (
-            <View style={styles.card} testID="driver-ride-cancelled">
-              <Text style={styles.cardTitle}>{COPY.cancelled}</Text>
-              <Text style={styles.emptyText}>{COPY.cancelledBody}</Text>
-              <TouchableOpacity style={styles.doneButton} onPress={onDone} accessibilityRole="button" testID="driver-ride-done">
-                <Text style={styles.doneText}>{COPY.done}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
+        {step === 'summary' || step === 'cancelled' ? (
+          <ScrollView
+            style={styles.sheet}
+            contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + theme.space[4] }]}
+          >
+            {step === 'summary' ? (
+              <DriverRideSummary ride={ride} onDone={onDone} />
+            ) : (
+              <View style={styles.card} testID="driver-ride-cancelled">
+                <Text style={styles.cardTitle}>{COPY.cancelled}</Text>
+                <Text style={styles.emptyText}>{COPY.cancelledBody}</Text>
+                <TouchableOpacity style={styles.doneButton} onPress={onDone} accessibilityRole="button" testID="driver-ride-done">
+                  <Text style={styles.doneText}>{COPY.done}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          // [UI-R5] The live panel is a docked sheet: its actions stay in a fixed footer.
+          <View style={styles.dock}>
             <DriverRidePanel
               ride={ride}
               step={step}
@@ -200,9 +204,10 @@ const DriverRideScreen: React.FC = () => {
               onComplete={flow.complete}
               onCompleteStop={flow.completeStop}
               onCancel={() => setCancelOpen(true)}
+              bottomInset={insets.bottom}
             />
-          )}
-        </ScrollView>
+          </View>
+        )}
 
         <CancelReasonSheet
           visible={cancelOpen}
@@ -258,6 +263,13 @@ const createStyles = (theme: AppTheme) =>
     },
     sheetContent: {
       paddingHorizontal: theme.layout.gutter,
+    },
+    dock: {
+      position: 'absolute',
+      start: 0,
+      end: 0,
+      bottom: 0,
+      maxHeight: '65%',
     },
     card: {
       backgroundColor: theme.colors.surface,

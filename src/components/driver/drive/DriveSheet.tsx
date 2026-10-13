@@ -11,7 +11,7 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { useReducedMotion } from '../../../hooks/useReducedMotion';
 import { t } from '../../../i18n';
 import { borderWidth, layout, motionPatterns, radius, space } from '../../../theme';
-import { AppText, Badge, Banner, Button, Card, Chip, ListItem, type IconName } from '../../ui';
+import { AppText, Badge, Banner, Button, Card, Chip, ListItem, vehicleIconName } from '../../ui';
 import { DRIVER_HOME_COPY } from '../home/copy';
 import { DriverTodayStats, type DriverTodayStatsValues } from '../home/DriverTodayStats';
 
@@ -102,9 +102,6 @@ type BodyProps = {
   vehicleType: string | undefined;
 };
 
-const vehicleIcon = (type: string | undefined): IconName =>
-  type === 'bike' ? 'bike' : type === 'van' || type === 'truck' ? 'van' : 'car';
-
 const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
 
 /**
@@ -175,7 +172,7 @@ export function DriveSheetBody({
         <DriverTodayStats values={today} error={statsError} />
         <Card padding="none" testID="driver-home-account-card">
           <ListItem
-            icon={vehicleIcon(vehicleType)}
+            icon={vehicleIconName(vehicleType)}
             title={DRIVER_HOME_COPY.accountCardTitle}
             subtitle={
               vehicleType

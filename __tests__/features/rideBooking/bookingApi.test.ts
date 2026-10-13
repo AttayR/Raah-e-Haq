@@ -12,7 +12,8 @@ import {
   fetchVehicleTypes,
   type FareEstimates,
 } from '../../../src/features/ride-booking/api';
-import { fareBreakdownRows, formatFare, toVehicleOptions } from '../../../src/features/ride-booking/vehicleOptions';
+import { formatFare, quoteBreakdown, toVehicleOptions } from '../../../src/features/ride-booking/vehicleOptions';
+import { fareBreakdownRows } from '../../../src/components/ui/ride/FareBreakdown';
 import { envelope } from '../../../test-utils/rideFixtures';
 
 let mock: MockAdapter;
@@ -114,31 +115,32 @@ describe('vehicle options and fare breakdown', () => {
   };
   const types = catalogue.map(({ key, label, capacity }) => ({ key: key as 'car', label, capacity }));
 
-  it('prices each catalogue option from its own estimate; a type without a quote shows no price', () => {
+  it('prices each catalogue option from its own estimate; a type without a quote is unavailable', () => {
     const options = toVehicleOptions(types, estimates);
 
-    expect(options.map((o) => [o.id, o.name, o.price])).toEqual([
-      ['car', 'Car', 'Rs 260'],
-      ['bike', 'Bike', 'Rs 120'],
-      ['rickshaw', 'Rickshaw', '—'],
-      ['van', 'Van', 'Rs 410'],
+    expect(options.map((o) => [o.id, o.name, o.fare, o.unavailable])).toEqual([
+      ['car', 'Car', 'Rs 260', false],
+      ['bike', 'Bike', 'Rs 120', false],
+      ['rickshaw', 'Rickshaw', null, true],
+      ['van', 'Van', 'Rs 410', false],
     ]);
-    expect(options.find((o) => o.id === 'bike')?.icon).toBe('🏍️');
+    // UI-R5: no emoji artwork; the card picks an MDI glyph from the key.
+    expect(JSON.stringify(options)).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
     expect(options.map((o) => o.id)).not.toContain('economy');
   });
 
-  it('shows no prices while the estimate is not in', () => {
-    expect(toVehicleOptions(types, null).every((o) => o.price === '—')).toBe(true);
+  it('shows no prices (and nothing "unavailable") while the estimate is not in', () => {
+    expect(toVehicleOptions(types, null).every((o) => o.fare === null && !o.unavailable)).toBe(true);
   });
 
   it('the breakdown is the server one and adds up to the quoted fare', () => {
     const car = estimates.estimates[0];
-    const rows = fareBreakdownRows(car, estimates);
+    const rows = fareBreakdownRows(quoteBreakdown(car), { distanceKm: estimates.distance_km, durationMin: estimates.duration_min });
 
-    expect(rows).toEqual([
+    expect(rows.map(({ label, value }) => ({ label, value }))).toEqual([
       { label: 'Base fare', value: 'Rs 50' },
-      { label: 'Distance (6.4 km)', value: 'Rs 182' },
-      { label: 'Time (14 min)', value: 'Rs 28' },
+      { label: 'Distance · 6.4 km', value: 'Rs 182' },
+      { label: 'Time · 14 min', value: 'Rs 28' },
     ]);
     expect(50 + 182 + 28).toBe(car.fare);
     expect(formatFare(car.fare, car.currency)).toBe('Rs 260');
@@ -146,9 +148,9 @@ describe('vehicle options and fare breakdown', () => {
 
   it('lists stops and a minimum-fare top-up only when the server charged them', () => {
     const rows = fareBreakdownRows(
-      { vehicle_type: 'bike', fare: 100, currency: 'PKR', breakdown: { base: 30, distance: 20, time: 10, stops: 20, min_fare_adjustment: 20 } },
-      estimates,
+      quoteBreakdown({ vehicle_type: 'bike', fare: 100, currency: 'PKR', breakdown: { base: 30, distance: 20, time: 10, stops: 20, min_fare_adjustment: 20 } }),
+      { distanceKm: estimates.distance_km, durationMin: estimates.duration_min },
     );
-    expect(rows.map((r) => r.label)).toEqual(['Base fare', 'Distance (6.4 km)', 'Time (14 min)', 'Stops', 'Minimum fare adjustment']);
+    expect(rows.map((r) => r.label)).toEqual(['Base fare', 'Distance · 6.4 km', 'Time · 14 min', 'Stops', 'Minimum fare adjustment']);
   });
 });

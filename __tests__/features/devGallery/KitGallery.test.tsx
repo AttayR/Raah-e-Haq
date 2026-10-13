@@ -74,6 +74,18 @@ describe('KitGalleryScreen', () => {
     );
   });
 
+  it('UI-R5: shows the ride components from API-shaped fixtures (no emoji, money via formatMoney)', async () => {
+    await renderThemed(<KitGalleryScreen onClose={jest.fn()} only="ride-map,ride-pins,ride-address,ride-vehicles,ride-fare,ride-person,ride-progress,ride-rating" />);
+    ['map', 'pins', 'address', 'vehicles', 'fare', 'person', 'progress', 'rating'].forEach(part =>
+      expect(screen.getByTestId(`gallery-ride-${part}`)).toBeTruthy(),
+    );
+    expect(screen.getAllByText('Liberty Market, Gulberg III, Lahore').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Rs 1,250').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unavailable')).toBeTruthy();
+    expect(screen.getByText('LEA-1234')).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+  });
+
   it('shows only the requested sections', async () => {
     await renderThemed(<KitGalleryScreen onClose={jest.fn()} only="colors1,format" />);
     expect(screen.getByTestId('gallery-color-background')).toBeTruthy();

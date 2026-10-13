@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import { Marker } from 'react-native-maps';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -8,7 +7,7 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { AppText, BottomSheet, Icon, MapControls, Screen } from '../../components/ui';
+import { AppText, BottomSheet, CarMarker, MapControls, RideMarker, Screen } from '../../components/ui';
 import { confirm } from '../../core/dialog';
 import { DriveSheetBody, DriveStatusHeader, type DriveStatus } from '../../components/driver/drive/DriveSheet';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
@@ -26,7 +25,7 @@ import { useMyStats } from '../../features/stats/hooks';
 import { toDriverTodayValues } from '../../features/stats/format';
 import { formatMoney } from '../../core/format/money';
 import { t } from '../../i18n';
-import { componentTokens, radius, space } from '../../theme';
+import { space } from '../../theme';
 
 /** §8.3: 24 handle area + status row 25 + 16 + 56 action + 16. */
 export const DRIVE_PEEK_HEIGHT = 137;
@@ -147,24 +146,9 @@ export default function DriverDriveScreen() {
               </View>
             }
           >
-            {location ? (
-              <Marker coordinate={location} accessibilityLabel={t('kit.locateA11y')} testID="drive-driver-marker">
-                <View
-                  style={[
-                    styles.driverMarker,
-                    {
-                      backgroundColor: theme.colors.driverMarker,
-                      borderColor: theme.colors.surface,
-                      borderWidth: theme.borderWidth.focus,
-                    },
-                  ]}
-                >
-                  <Icon name="rides" size={20} color="surface" />
-                </View>
-              </Marker>
-            ) : null}
-            {pickup ? <Marker coordinate={pickup} pinColor={theme.colors.pickupPin} /> : null}
-            {dropoff ? <Marker coordinate={dropoff} pinColor={theme.colors.dropoffPin} /> : null}
+            {location ? <CarMarker coordinate={location} title={t('ride.selfMarker')} testID="drive-driver-marker" /> : null}
+            {pickup ? <RideMarker kind="pickup" coordinate={pickup} /> : null}
+            {dropoff ? <RideMarker kind="dropoff" coordinate={dropoff} /> : null}
           </SafeMapView>
         </MapErrorBoundary>
       </View>
@@ -217,11 +201,4 @@ export default function DriverDriveScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   fallback: { marginTop: space[12] },
-  driverMarker: {
-    width: componentTokens.iconButton.visual,
-    height: componentTokens.iconButton.visual,
-    borderRadius: radius.pill,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 });

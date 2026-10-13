@@ -1,21 +1,21 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Avatar, Badge, Button, Card, Icon, type IconName } from '../../../components/ui';
+import {
+  AddressPair,
+  AppText,
+  Card,
+  FareBreakdown,
+  PersonCard as KitPersonCard,
+  RideStatusPill,
+  RideTimeline,
+  type FareRow,
+} from '../../../components/ui';
 import { formatDistance, formatDuration } from '../../../utils/format';
 import { space } from '../../../theme';
 import { cancellationText, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL } from '../copy';
-import {
-  fareRows,
-  formatDateTime,
-  otherParty,
-  rideAmountText,
-  rideTime,
-  STATUS_TONE,
-  timelineSteps,
-  titleCase,
-  vehicleText,
-} from '../format';
+import { formatMoney } from '../../../utils/format';
+import { formatDateTime, otherParty, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
 import type { Ride, RideViewer } from '../types';
 
 type SectionProps = { ride: Ride; viewer: RideViewer };
@@ -55,7 +55,7 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
   return (
     <Card testID="ride-details-summary">
       <View style={styles.topRow}>
-        <Badge tone={STATUS_TONE[ride.status]} label={RIDE_STATUS_LABEL[ride.status]} testID="ride-details-status" />
+        <RideStatusPill status={ride.status} label={RIDE_STATUS_LABEL[ride.status]} testID="ride-details-status" />
         <AppText variant="caption" color="textMuted" numberOfLines={1} style={styles.flex} align="end">
           {formatDateTime(rideTime(ride))}
         </AppText>
@@ -65,8 +65,6 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
         color={cancelled ? 'textMuted' : 'textPrimary'}
         style={styles.amount}
         numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
         testID="ride-details-amount"
       >
         {rideAmountText(ride, viewer)}
@@ -104,34 +102,19 @@ export function CancellationCard({ ride, viewer }: SectionProps) {
   );
 }
 
-function Place({ icon, color, label, address }: { icon: IconName; color: 'primary' | 'danger' | 'textSecondary'; label: string; address: string }) {
-  return (
-    <View style={styles.place}>
-      <Icon name={icon} size={20} color={color} />
-      <View style={styles.flex}>
-        <AppText variant="caption" color="textMuted">
-          {label}
-        </AppText>
-        <AppText variant="body" selectable>
-          {address}
-        </AppText>
-      </View>
-    </View>
-  );
-}
-
-/** Pickup, the stops in order, drop-off. */
+/** Pickup, the stops in order, drop-off: the kit "Raah line" (UI-R5, §5.23), full addresses. */
 export function RouteCard({ ride }: { ride: Ride }) {
   return (
     <Card testID="ride-details-route">
       <CardTitle>{C.route}</CardTitle>
-      <View style={styles.places}>
-        <Place icon="origin" color="primary" label={C.pickup} address={ride.pickupAddress} />
-        {ride.stops.map((stop, index) => (
-          <Place key={stop.id} icon="pin" color="textSecondary" label={C.stop(index + 1)} address={stop.address} />
-        ))}
-        <Place icon="pin" color="danger" label={C.dropoff} address={ride.dropoffAddress} />
-      </View>
+      <AddressPair
+        labels
+        numberOfLines={0}
+        selectable
+        pickup={ride.pickupAddress}
+        dropoff={ride.dropoffAddress}
+        stops={ride.stops.map(stop => ({ key: stop.id, address: stop.address }))}
+      />
     </Card>
   );
 }
@@ -143,74 +126,97 @@ export function RouteCard({ ride }: { ride: Ride }) {
 export function PersonCard({ ride, viewer, canMessage, onMessage }: SectionProps & { canMessage: boolean; onMessage: () => void }) {
   const person = otherParty(ride, viewer);
   if (!person) return null;
-  const subtitle = viewer === 'passenger' ? vehicleText(ride.vehicle) : C.rider;
+  const vehicle = viewer === 'passenger' ? ride.vehicle : null;
+  const vehicleLine = vehicle ? [[vehicle.make, vehicle.model].filter(Boolean).join(' '), vehicle.color].filter(Boolean).join(' · ') : '';
+  const fallback = viewer === 'passenger' ? C.yourDriver : C.yourPassenger;
   return (
     <Card testID="ride-details-person">
-      <CardTitle>{viewer === 'passenger' ? C.yourDriver : C.yourPassenger}</CardTitle>
-      <View style={styles.person}>
-        <Avatar name={person.firstName} uri={person.profileImageUrl} size={48} />
-        <View style={styles.flex}>
-          <AppText variant="title" numberOfLines={1} testID="ride-details-person-name">
-            {person.firstName ?? (viewer === 'passenger' ? C.yourDriver : C.yourPassenger)}
-          </AppText>
-          {subtitle ? (
-            <AppText variant="bodySmall" color="textSecondary" numberOfLines={2} testID="ride-details-person-subtitle">
-              {subtitle}
-            </AppText>
-          ) : null}
-        </View>
-        {canMessage ? (
-          <Button
-            label={C.message}
-            variant="secondary"
-            size="sm"
-            fullWidth={false}
-            leadingIcon="chat"
-            onPress={onMessage}
-            accessibilityHint={C.messageHint}
-            testID="ride-details-message"
-          />
-        ) : null}
-      </View>
+      <CardTitle>{fallback}</CardTitle>
+      <KitPersonCard
+        variant="plain"
+        name={person.firstName}
+        fallbackName={fallback}
+        photoUri={person.profileImageUrl}
+        rating={person.rating}
+        vehicleLine={vehicleLine || null}
+        plate={vehicle?.licensePlate ?? null}
+        actions={
+          canMessage
+            ? [{ key: 'message', icon: 'chat', label: C.message, accessibilityHint: C.messageHint, onPress: onMessage, testID: 'ride-details-message' }]
+            : []
+        }
+        nameTestID="ride-details-person-name"
+        vehicleTestID="ride-details-person-subtitle"
+        plateTestID="ride-details-person-plate"
+      />
     </Card>
   );
 }
 
-/** The receipt: the server's fare lines and total, payment and the ride code. */
+/**
+ * The receipt: the server's fare lines and total as the kit FareBreakdown (§5.26; the driver also
+ * sees the platform fee and their earnings), then payment and the ride code. A cancelled ride has
+ * no fare lines.
+ */
 export function ReceiptCard({ ride, viewer }: SectionProps) {
-  const rows = [
-    ...fareRows(ride, viewer),
+  const info: FareRow[] = [
     { key: 'method', label: C.paymentMethod, value: C.paymentCash[viewer] },
     ...(ride.paymentStatus ? [{ key: 'status', label: C.paymentStatus, value: titleCase(ride.paymentStatus) ?? '' }] : []),
     ...(ride.rideCode ? [{ key: 'code', label: C.rideCode, value: ride.rideCode }] : []),
   ];
+  if (ride.status === 'cancelled') {
+    return (
+      <Card testID="ride-details-receipt-card">
+        <CardTitle>{C.receipt}</CardTitle>
+        {info.map((row, index) => (
+          <Row key={row.key} label={row.label} value={row.value} first={index === 0} testID={`ride-details-receipt-${row.key}`} />
+        ))}
+      </Card>
+    );
+  }
+  const driverRows: FareRow[] =
+    viewer === 'driver'
+      ? [
+          ...(ride.platformCommission !== null
+            ? [{ key: 'fee', label: C.platformFee, value: formatMoney(-Math.abs(ride.platformCommission)) }]
+            : []),
+          ...(ride.driverEarnings !== null ? [{ key: 'earned', label: C.youEarned, value: formatMoney(ride.driverEarnings), strong: true }] : []),
+        ]
+      : [];
+  const b = ride.fareBreakdown;
   return (
-    <Card testID="ride-details-receipt">
+    <Card testID="ride-details-receipt-card">
       <CardTitle>{C.receipt}</CardTitle>
-      {rows.map((row, index) => (
-        <Row
-          key={row.key}
-          label={row.label}
-          value={row.value}
-          strong={'strong' in row ? row.strong : false}
-          first={index === 0}
-          testID={`ride-details-receipt-${row.key}`}
-        />
-      ))}
+      <FareBreakdown
+        variant="plain"
+        testID="ride-details-receipt"
+        breakdown={b ? { base: b.base, distance: b.distance, time: b.time, stops: b.stops, minFareAdjustment: b.minFareAdjustment } : null}
+        total={b ? b.total : ride.totalFare}
+        distanceKm={ride.distanceKm}
+        durationMin={ride.durationMinutes}
+        totalLabel={C.total}
+        extraRows={[...driverRows, ...info]}
+      />
     </Card>
   );
 }
 
-/** Requested, accepted, arrived, started, completed or cancelled, with their times. */
+/** Requested, accepted, arrived, started, completed or cancelled, with their times (§5.24 vertical). */
 export function TimelineCard({ ride }: { ride: Ride }) {
   const steps = timelineSteps(ride);
   if (steps.length === 0) return null;
   return (
     <Card testID="ride-details-timeline">
       <CardTitle>{C.timeline}</CardTitle>
-      {steps.map((step, index) => (
-        <Row key={step.key} label={step.label} value={formatDateTime(step.at)} first={index === 0} testID={`ride-details-step-${step.key}`} />
-      ))}
+      <RideTimeline
+        cancelled={ride.status === 'cancelled'}
+        entries={steps.map(step => ({
+          key: step.key,
+          label: step.label,
+          time: formatDateTime(step.at),
+          testID: `ride-details-step-${step.key}`,
+        }))}
+      />
     </Card>
   );
 }
@@ -221,9 +227,6 @@ const styles = StyleSheet.create({
   amount: { marginTop: space[3], marginBottom: space[1] },
   metrics: { marginTop: space[2] },
   cardTitle: { marginBottom: space[2] },
-  places: { gap: space[3] },
-  place: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
-  person: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[2] },
   rowLabel: { flexShrink: 0, maxWidth: '55%' },
   rowValue: { flex: 1, minWidth: 0 },

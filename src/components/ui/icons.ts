@@ -51,6 +51,8 @@ export const iconGlyphs = {
   rickshaw: 'rickshaw',
   van: 'van-passenger',
   rides: 'car-side',
+  // UI-R5: map car marker (§5.21 names MDI `car`).
+  carMarker: 'car',
   // Map and places.
   pin: 'map-marker',
   origin: 'radiobox-marked',
@@ -83,6 +85,8 @@ export const iconGlyphs = {
   starOutline: 'star-outline',
   clock: 'clock-outline',
   calendar: 'calendar-blank-outline',
+  // Ride flow (UI-R5): slide-to-confirm knob (§5.31).
+  slideConfirm: 'chevron-double-right',
   // Actions.
   add: 'plus',
   edit: 'pencil-outline',
@@ -115,7 +119,7 @@ export const iconGlyphs = {
 export type IconName = keyof typeof iconGlyphs;
 
 /** Glyphs that point along the reading direction and mirror in RTL (§7, §12.8). */
-export const directionalIcons: ReadonlySet<IconName> = new Set<IconName>(['back', 'chevronEnd', 'send']);
+export const directionalIcons: ReadonlySet<IconName> = new Set<IconName>(['back', 'chevronEnd', 'send', 'slideConfirm']);
 
 /** Whether `name` should render mirrored for the given layout direction. */
 export const shouldMirrorIcon = (name: IconName, isRTL: boolean = I18nManager.isRTL): boolean =>

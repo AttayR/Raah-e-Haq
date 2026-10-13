@@ -53,8 +53,54 @@ describe('ActiveRidePanel', () => {
     expect(getByText(title)).toBeTruthy();
     expect(getByTestId('driver-assigned-card')).toBeTruthy();
     expect(getByText('Honda City · Grey')).toBeTruthy();
-    expect(getByText('Plate LEC-9')).toBeTruthy();
+    // UI-R5 PersonCard: the plate in its pill.
+    expect(getByText('LEC-9')).toBeTruthy();
     expect(!!queryByTestId('active-ride-cancel')).toBe(cancellable);
+  });
+
+  describe('driver card (ported from the deleted DriverAssignedCard test, T-110 / BE-20 / T-304)', () => {
+    const accepted = (overrides: Partial<RideResource> = {}) =>
+      makeRide({
+        status: 'accepted',
+        driver_id: 5,
+        driver: { id: 5, name: 'Ali', rating: 4.8 },
+        vehicle: { id: 2, make: 'Toyota', model: 'Corolla', color: 'White', license_plate: 'LEA-1234' },
+        ...overrides,
+      });
+
+    it('hides Call without a phone handler', () => {
+      const ride = accepted();
+      const { queryByTestId } = renderPanel(ride, stateOf(ride));
+      expect(queryByTestId('driver-call-button')).toBeNull();
+    });
+
+    it('shows Call and calls the handler once when given', () => {
+      const ride = accepted();
+      const onCall = jest.fn();
+      const { getByTestId } = render(
+        <ActiveRidePanel stageState={stateOf(ride)} ride={ride} onCancel={jest.fn()} onDone={jest.fn()} onCall={onCall} />,
+      );
+      fireEvent.press(getByTestId('driver-call-button'));
+      expect(onCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves out what the server did not send: no vehicle, plate or invented "Car"; unrated reads "New"', () => {
+      const ride = accepted({ driver: { id: 5, name: 'Ali', rating: null }, vehicle: null });
+      const { queryByTestId, queryByText, getByText } = renderPanel(ride, stateOf(ride));
+      expect(getByText('Ali')).toBeTruthy();
+      expect(queryByTestId('driver-vehicle')).toBeNull();
+      expect(queryByTestId('driver-plate')).toBeNull();
+      expect(getByText('New')).toBeTruthy();
+      expect(queryByText(/Car/)).toBeNull();
+      expect(queryByText(/ETA|\d+ min/)).toBeNull();
+    });
+
+    it('has no Message action outside a navigator', () => {
+      const ride = accepted();
+      const { queryByTestId, queryByText } = renderPanel(ride, stateOf(ride));
+      expect(queryByTestId('ride-chat-button')).toBeNull();
+      expect(queryByText('Message')).toBeNull();
+    });
   });
 
   it('completed: the server total and breakdown, cash, and Done', () => {
@@ -69,7 +115,7 @@ describe('ActiveRidePanel', () => {
     const { getByText, getByTestId, queryByTestId, onDone } = renderPanel(ride, stateOf(ride));
     expect(getByText('Ride completed')).toBeTruthy();
     expect(getByText('Rs 310')).toBeTruthy();
-    expect(getByText('Distance (8.4 km)')).toBeTruthy();
+    expect(getByText('Distance · 8.4 km')).toBeTruthy();
     expect(getByText('Rs 200')).toBeTruthy();
     expect(getByText('Stops')).toBeTruthy();
     expect(getByText('Pay your driver in cash')).toBeTruthy();

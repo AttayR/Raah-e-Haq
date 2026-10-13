@@ -8,19 +8,14 @@ export const BOOKING_COPY = {
   vehicleTypesEmpty: 'No vehicle types are available right now.',
   estimateLoading: 'Calculating fare…',
   estimateFailed: 'Could not calculate the fare.',
-  fareUnavailable: '—',
   retry: 'Retry',
-  seats: (n: number) => (n === 1 ? '1 seat' : `${n} seats`),
-  breakdownBase: 'Base fare',
-  breakdownDistance: (km: number) => `Distance (${km} km)`,
-  breakdownTime: (min: number) => `Time (${min} min)`,
-  breakdownStops: 'Stops',
-  breakdownMinimum: 'Minimum fare adjustment',
   // T-311: the booking price is the server's quote; the final fare is set when the trip ends.
+  // The footnote is DESIGN_SYSTEM §5.26's estimate note (UI-R5).
   estimatedFareTitle: 'Estimated fare',
-  fareBreakdownTitle: 'Fare breakdown',
   estimatedTotal: 'Estimated total',
-  estimateNote: 'Your final fare is calculated when the trip ends.',
+  estimateNote: 'Estimated fare. Final fare is calculated at the end of the trip. Pay cash to your driver.',
+  /** §7: the button names the action and the choice ("Request Rickshaw"). */
+  request: (vehicle: string) => `Request ${vehicle}`,
   tripSummary: (km: number, min: number) => `${km} km • ${min} min`,
   phoneNotVerifiedTitle: 'Verify your phone number',
   phoneNotVerifiedAction: 'Verify number',

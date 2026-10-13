@@ -76,7 +76,7 @@ describe('FareReview', () => {
       <FareReview vehicleType={types[0]} estimates={loaded(estimates)} onConfirm={onConfirm} />,
     );
     expect(getAllByText('Rs 230').length).toBeGreaterThan(0);
-    getByText('Distance (5 km)');
+    getByText('Distance · 5.0 km');
     getByText('Rs 150');
   });
 
@@ -86,7 +86,9 @@ describe('FareReview', () => {
     );
     getByText('Estimated fare');
     getByText('Estimated total');
-    getByText('Your final fare is calculated when the trip ends.');
+    getByText('Estimated fare. Final fare is calculated at the end of the trip. Pay cash to your driver.');
+    // UI-R5: one primary that names the action and the vehicle, no emoji.
+    getByText('Request Car');
     expect(queryByText('Total')).toBeNull();
   });
 
