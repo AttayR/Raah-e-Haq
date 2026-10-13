@@ -540,3 +540,19 @@ The other side's rating of the caller is never returned per ride (only the aggre
 App use (T-505): after the ride turns `completed` (poll or the driver's complete response), show the rating sheet when `can_rate` is true; in ride details / history show `my_rating` or a "Rate this trip" action while `can_rate` is true. Treat 409 `ALREADY_RATED` and 422 `RATING_WINDOW_CLOSED` as "close the sheet and refresh the ride", not as an error toast.
 
 Admin web: the ride detail page lists both ratings (stars, tags, comment). No notification is sent; no tip.
+
+## BE-75: top-up late-success hardening (2026-10-13)
+
+No app-facing change. Server rules only:
+
+- A failed or expired top-up (within `TOPUP_LATE_RECHECK_HOURS`, default 24 h, and not `AMOUNT_MISMATCH`) is re-asked from the provider at most once per `TOPUP_LATE_RECHECK_MIN_SECONDS` (60 s) when an Easypaisa return / IPN arrives, and at most `TOPUP_LATE_RECHECK_MAX` (10) times per top-up (`meta.late_inquiries`). Open top-ups keep the old 5 s floor.
+- A signed success (JazzCash return / IPN, or any verified success) for a failed/expired top-up follows the same rule: inside it, credited (`meta.late_success`); outside it, **not credited**, the top-up keeps its status and gets `meta.needs_review` (+ `review_reason`: `success_after_late_window` or `success_after_amount_mismatch`). The provider still gets its normal signed acknowledgement; the browser return goes to the app with the unchanged status (`failed` / `expired`).
+- Admin: `GET /payments/topups?needs_review=1` and a "Needs review" filter and badge on the admin top-ups page. The owner settles these by hand (manual credit or provider refund).
+
+## BE-76: heading on nearby drivers (2026-10-13, for T-517)
+
+`GET /rides/nearby-drivers` items gain `heading`: integer degrees `0..345` in 15° steps (0 = north, clockwise), from the same bucketed ping as `location`. `null` when the driver's device sent no heading, the speed is unknown or below 1 m/s (standing still), or the ping is older than 5 min. Speed itself is never sent. App: rotate the vehicle marker by `heading`; when `null`, keep the marker's last rotation (or 0 for a new marker).
+
+## BE-77: driver first name only (2026-10-13, found in T-519)
+
+The ride `driver` card (`GET /rides`, `GET /rides/{id}`, lifecycle responses) now carries `name` = the driver's **first name** and a new `first_name` (same value), like the `passenger` card. The `driver_assigned` notification reads "Your ride has been accepted by <first name>" and its `data.driver_name` is the first name and `data.driver_rating` is the public rating (one decimal, `null` below `ratings.min_public_count`, as in the ride resources; it was the raw rating, `0` when unrated). The same applies to admin-panel assignments. Chat `other_party.first_name` was already first-name only. Admin API callers still get the full driver record. App: no change needed if it already shows `driver.name`; prefer `driver.first_name`.
