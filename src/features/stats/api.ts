@@ -88,6 +88,8 @@ const toEarningsRide = (raw: unknown): EarningsRide | null => {
   return {
     id,
     rideCode: readText(raw.ride_id),
+    pickupAddress: readText(raw.pickup_address),
+    dropoffAddress: readText(raw.dropoff_address),
     vehicleType: readText(raw.vehicle_type),
     completedAt: readText(raw.completed_at),
     distanceKm: readNumberOrNull(raw.distance_km),

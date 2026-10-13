@@ -102,27 +102,39 @@ export const useNotificationsList = (isFocused: boolean): NotificationsList => {
   const { status, stale } = state;
   const wasFocused = useRef(false);
 
+  /**
+   * Page 1, then the unread count (T-514): the badge is re-read whenever the list changes, so
+   * it matches the unread dots instead of waiting up to a minute for the next poll.
+   */
+  const loadFirstPage = useCallback(
+    (mode: 'initial' | 'refresh') => {
+      dispatch(fetchNotifications({ mode })).then((action) => {
+        if (fetchNotifications.fulfilled.match(action)) dispatch(fetchUnreadCount({ afterList: true }));
+      });
+    },
+    [dispatch],
+  );
+
   useEffect(() => {
     const gainedFocus = isFocused && !wasFocused.current;
     wasFocused.current = isFocused;
     if (!isFocused) return;
     if (status === 'idle') {
-      dispatch(fetchNotifications({ mode: 'initial' }));
+      loadFirstPage('initial');
     } else if (gainedFocus && status === 'failed') {
-      dispatch(fetchNotifications({ mode: 'initial' }));
+      loadFirstPage('initial');
     } else if ((gainedFocus || stale) && status === 'ready') {
-      dispatch(fetchNotifications({ mode: 'refresh' }));
+      loadFirstPage('refresh');
     }
-  }, [dispatch, isFocused, status, stale]);
+  }, [loadFirstPage, isFocused, status, stale]);
 
   const refresh = useCallback(() => {
-    dispatch(fetchNotifications({ mode: 'refresh' }));
-    dispatch(fetchUnreadCount());
-  }, [dispatch]);
+    loadFirstPage('refresh');
+  }, [loadFirstPage]);
 
   const reload = useCallback(() => {
-    dispatch(fetchNotifications({ mode: 'initial' }));
-  }, [dispatch]);
+    loadFirstPage('initial');
+  }, [loadFirstPage]);
 
   const loadMore = useCallback(() => {
     dispatch(fetchNotifications({ mode: 'more' }));

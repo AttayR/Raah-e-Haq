@@ -172,6 +172,20 @@ describe('unread count', () => {
     expect(store.getState().notifications).toMatchObject({ stale: true, unreadCount: 4 });
   });
 
+  it('T-514: page 1 lifts the count to the unread rows it shows; the count read after it does not mark it stale', async () => {
+    const store = makeStore();
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 3 } });
+    await store.dispatch(fetchUnreadCount());
+    mock.onGet('/notifications').reply(200, pageBody([4, 3, 2, 1], 1, 1));
+    await store.dispatch(fetchNotifications({ mode: 'initial' }));
+    // Four unread dots on screen: the badge never says fewer.
+    expect(store.getState().notifications.unreadCount).toBe(4);
+
+    mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 5 } });
+    await store.dispatch(fetchUnreadCount({ afterList: true }));
+    expect(store.getState().notifications).toMatchObject({ unreadCount: 5, stale: false });
+  });
+
   it('a failure keeps the last known count', async () => {
     const store = makeStore();
     mock.onGet('/notifications/unread-count').replyOnce(200, { success: true, data: { unread_count: 2 } });

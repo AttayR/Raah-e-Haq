@@ -25,6 +25,17 @@ import { advanceRideStage, isDriverTrackable, type PassengerRideStageState } fro
 export const ACTIVE_RIDE_POLL_MS = 10_000;
 
 /**
+ * T-514: while the ride is still `requested` (searching), the status is read this often, so
+ * "Your driver is on the way" shows within ~3 s of the driver's Accept instead of up to 10 s
+ * later. Never faster (the backend allows 120 requests a minute per user across all routes).
+ */
+export const SEARCHING_POLL_MS = 3_000;
+
+/** The status poll interval for a ride in this status. */
+export const activeRidePollMs = (status: RideResource['status'] | undefined): number =>
+  status === 'requested' ? SEARCHING_POLL_MS : ACTIVE_RIDE_POLL_MS;
+
+/**
  * T-517: how often the assigned driver's position is read while the ride screen is focused and a
  * driver is assigned (accepted → started). Matches the driver app's ride cadence
  * (DRIVER_LOCATION_RIDE_CONFIG.minPostIntervalMs), so each read can bring a new position for the
@@ -50,8 +61,9 @@ type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
 /**
  * Polls GET /rides/{id} while the active ride is in progress and `enabled` (the screen is
  * focused). It reads the ride at once when it starts (focus, a new ride), then every
- * interval. One interval keyed on the ride id: it stops on a final status, when the ride
- * changes, when disabled, and on unmount.
+ * SEARCHING_POLL_MS while searching and ACTIVE_RIDE_POLL_MS once a driver is assigned (T-514).
+ * One interval at a time: it stops on a final status, when the ride changes, when disabled,
+ * and on unmount.
  *
  * T-304 / T-517: while a driver is assigned (accepted, arrived, started) and `enabled`, it reads
  * GET /rides/{id}/driver-location every DRIVER_LOCATION_POLL_MS (its own interval, one request
@@ -65,6 +77,7 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
   const ride = useSelector(selectActiveRide);
   const rideId = ride?.id;
   const inProgress = isRideInProgress(ride);
+  const pollMs = activeRidePollMs(ride?.status);
   const trackable = isDriverTrackable(ride);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
   // T-517: the 4 s driver-location reads run only while the app is in front (as DriverRide).
@@ -102,18 +115,26 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
       });
   }, []);
 
+  // The ride the status poll last read at once; null while the poll is off.
+  const readAtOnceFor = useRef<number | null>(null);
   useEffect(() => {
     if (!enabled || rideId === undefined || !inProgress) {
+      readAtOnceFor.current = null;
       return undefined;
     }
     const poll = () => {
       dispatch(refreshActiveRide(rideId));
     };
-    // Back on the screen: show the current status now, not up to one interval later.
-    poll();
-    const timer = setInterval(poll, ACTIVE_RIDE_POLL_MS);
+    // Back on the screen or a new ride: show the current status now, not up to one interval
+    // later. A cadence change alone (searching -> driver assigned, learned from a read that just
+    // landed) restarts the interval without reading again.
+    if (readAtOnceFor.current !== rideId) {
+      readAtOnceFor.current = rideId;
+      poll();
+    }
+    const timer = setInterval(poll, pollMs);
     return () => clearInterval(timer);
-  }, [dispatch, enabled, rideId, inProgress]);
+  }, [dispatch, enabled, rideId, inProgress, pollMs]);
 
   // A driver was just assigned (or the screen is back in focus): show them now, then follow them
   // every DRIVER_LOCATION_POLL_MS. No driver any more: hide the marker.

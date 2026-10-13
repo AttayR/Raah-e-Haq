@@ -11,7 +11,7 @@ import { HomeHeader } from '../../../src/features/passenger-home/components/Home
 import { WhereToBar } from '../../../src/features/passenger-home/components/WhereToBar';
 import { OffersRow } from '../../../src/features/passenger-home/components/OffersRow';
 import { StatGrid } from '../../../src/features/passenger-home/components/StatGrid';
-import { RecentRidesCard } from '../../../src/features/passenger-home/components/RecentRidesCard';
+import { RecentRidesCard } from '../../../src/components/ui/ride/RecentRidesCard';
 import type { HomeOffer, HomeRecentRide, HomeStat } from '../../../src/features/passenger-home/types';
 
 // Test fixtures only (the screen renders [] until T-506).

@@ -5,6 +5,9 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MockAdapter from 'axios-mock-adapter';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import { rootReducer } from '../../../src/store/rootReducer';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { apiClient, __resetUnauthorizedStateForTests } from '../../../src/services/api';
@@ -15,6 +18,7 @@ const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => ({ goBack: mockGoBack, navigate: jest.fn() }),
+  useIsFocused: () => true,
 }));
 
 let mock: MockAdapter;
@@ -38,14 +42,23 @@ const body = (documents: unknown[], allApproved: boolean) => ({
 
 const renderScreen = () =>
   render(
-    <ThemeProvider>
-      <DriverDocumentsScreen />
-    </ThemeProvider>,
+    <Provider store={configureStore({ reducer: rootReducer })}>
+      <ThemeProvider>
+        <DriverDocumentsScreen />
+      </ThemeProvider>
+    </Provider>,
   );
+
+/** GET /profile/documents (BE-42): the vehicles plus signed identity links the app ignores. */
+const profileDocuments = (vehicles: unknown[]) => ({
+  success: true,
+  data: { cnic_front_image: 'https://signed.example/cnic', vehicles, documents: [], expires_in: 600 },
+});
 
 beforeEach(() => {
   __resetUnauthorizedStateForTests();
   mock = new MockAdapter(apiClient);
+  mock.onGet('/profile/documents').reply(200, profileDocuments([]));
 });
 
 afterEach(() => {
@@ -108,5 +121,33 @@ describe('DriverDocumentsScreen', () => {
     mock.onGet('/driver/documents').replyOnce(200, body([], false));
     renderScreen();
     expect(await screen.findByTestId('driver-documents-empty')).toBeTruthy();
+  });
+
+  it('T-514: shows the registered vehicle (make, model, plate, review status) above the documents', async () => {
+    mock.onGet('/driver/documents').replyOnce(200, body([doc('license', 'approved')], true));
+    mock.onGet('/profile/documents').reply(
+      200,
+      profileDocuments([
+        { id: 4, make: 'Mitsubishi', model: 'Outlander', license_plate: 'Z-0001-19', verification_status: 'approved' },
+      ]),
+    );
+    renderScreen();
+    expect(await screen.findByTestId('driver-documents-vehicle-4')).toBeTruthy();
+    expect(screen.getByText('Mitsubishi Outlander')).toBeTruthy();
+    expect(screen.getByText('Plate Z-0001-19')).toBeTruthy();
+    expect(screen.getByTestId('driver-documents-vehicle-4')).toHaveTextContent(/Approved/);
+    // The signed identity links in the same body are never shown.
+    expect(screen.queryByText(/signed\.example/)).toBeNull();
+  });
+
+  it('T-514: no vehicle on file says so; a failed read offers a retry', async () => {
+    mock.resetHandlers();
+    mock.onGet('/driver/documents').reply(200, body([doc('license', 'approved')], true));
+    mock.onGet('/profile/documents').replyOnce(500, { success: false, message: 'Server error' });
+    mock.onGet('/profile/documents').replyOnce(200, profileDocuments([]));
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('driver-documents-vehicle-error'));
+    expect(await screen.findByTestId('driver-documents-vehicle-empty')).toBeTruthy();
+    expect(screen.getByText('No vehicle on file yet')).toBeTruthy();
   });
 });

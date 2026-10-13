@@ -19,14 +19,21 @@ import DriverSettingsScreen from '../../src/screens/Driver/DriverSettingsScreen'
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
 import { driverRideApi } from '../../src/features/driver-ride/api';
 import { statsApi, toMyStats } from '../../src/features/stats/api';
+import { rideHistoryApi, toRide } from '../../src/features/ride-history/api';
+import type { Ride } from '../../src/features/ride-history/types';
+import { driverProfileApi } from '../../src/features/driver-profile/api';
+import DriverProfile from '../../src/screens/Driver/DriverProfile';
 import { initialDriverRideState } from '../../src/features/driver-ride/slice';
 import type { RideResource } from '../../src/services/rideService';
 import { makeRide } from '../../test-utils/rideFixtures';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn(), canGoBack: () => true }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn(), canGoBack: () => true, addListener: () => () => undefined }),
   useIsFocused: () => true,
+  // T-514 useTabScrollReset: no navigator here; the hook has its own test.
+  useRoute: () => ({ key: 'Account-test', name: 'Account' }),
+  useScrollToTop: jest.fn(),
 }));
 const mockNavigate = jest.fn();
 
@@ -53,13 +60,15 @@ const renderScreen = async (
   Screen: React.ComponentType,
   { mode = 'light', status = 'active', driverStatus = 'offline' }: Record<string, string> = {},
   ride: RideResource | null = null,
+  extraUser: Partial<User> = {},
 ) => {
   mockScheme.mockReturnValue(mode as 'light' | 'dark');
   jest
     .spyOn(driverStatusApi, 'get')
     .mockResolvedValue({ status: driverStatus as 'offline', activeRideId: null, changedAt: null });
-  // GET /me/stats (BE-08) as the backend sends it for a driver (fake local figures).
-  jest.spyOn(statsApi, 'getMyStats').mockResolvedValue(
+  // GET /me/stats (BE-08) as the backend sends it for a driver (fake local figures), unless the
+  // test set its own.
+  if (!jest.isMockFunction(statsApi.getMyStats)) jest.spyOn(statsApi, 'getMyStats').mockResolvedValue(
     toMyStats({
       role: 'driver',
       currency: 'PKR',
@@ -74,12 +83,16 @@ const renderScreen = async (
       acceptance_rate: null,
     }),
   );
+  // GET /rides?per_page=3 (T-507): nothing by default; tests that need trips spy again.
+  if (!jest.isMockFunction(rideHistoryApi.listRides)) {
+    jest.spyOn(rideHistoryApi, 'listRides').mockResolvedValue({ items: [], page: 1, lastPage: 1, total: 0 });
+  }
   const initial = rootReducer(undefined, { type: '@@init' });
   const store = configureStore({
     reducer: rootReducer,
     preloadedState: {
       ...initial,
-      apiAuth: { ...initial.apiAuth, user: user(status as User['status']) },
+      apiAuth: { ...initial.apiAuth, user: { ...user(status as User['status']), ...extraUser } },
       driverRide: { ...initialDriverRideState, ride },
     },
   });
@@ -169,6 +182,79 @@ describe('DriverDriveScreen (UI-R4)', () => {
     expect(screen.getByText('Pending')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Open your profile' }));
     expect(mockNavigate).toHaveBeenCalledWith('Profile');
+  });
+});
+
+const finishedTrip = (id: number, overrides: Record<string, unknown> = {}): Ride => {
+  const ride = toRide({
+    id,
+    ride_id: `RH-${id}`,
+    status: 'completed',
+    pickup_address: 'Liberty Market, Gulberg III, Lahore',
+    dropoff_address: 'Emporium Mall, Johar Town, Lahore',
+    total_fare: '300.00',
+    driver_earnings: '240.00',
+    completed_at: '2026-10-13T10:00:00+05:00',
+    ...overrides,
+  });
+  if (!ride) throw new Error('fixture');
+  return ride;
+};
+
+describe('DriverDriveScreen recent trips (T-507)', () => {
+  it('lists the last trips from GET /rides?per_page=3 with the driver earnings; See all and a row navigate', async () => {
+    const list = jest
+      .spyOn(rideHistoryApi, 'listRides')
+      .mockResolvedValue({ items: [finishedTrip(31), finishedTrip(30, { status: 'cancelled' })], page: 1, lastPage: 1, total: 2 });
+    await renderScreen(DriverDriveScreen);
+    expect(list).toHaveBeenCalledWith({ page: 1, perPage: 3 });
+    expect(screen.getByTestId('home-recent-ride-31')).toBeTruthy();
+    // Shared kit card (components/ui/ride), driver title from i18n.
+    expect(screen.getByText('Recent trips')).toBeTruthy();
+    // The driver sees what they earned (Rs 240), not the passenger fare (Rs 300).
+    expect(screen.getByText('Rs 240')).toBeTruthy();
+    expect(screen.getByText('No charge')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('home-recent-ride-31'));
+    expect(mockNavigate).toHaveBeenCalledWith('RideDetails', { rideId: 31 });
+    fireEvent.press(screen.getByRole('button', { name: 'See all rides' }));
+    expect(mockNavigate).toHaveBeenCalledWith('RideHistory');
+  });
+
+  it('no trips yet: no card', async () => {
+    await renderScreen(DriverDriveScreen);
+    expect(screen.queryByTestId('home-recent-rides')).toBeNull();
+  });
+});
+
+describe('DriverProfile (T-507)', () => {
+  it('shows stats from GET /me/stats (rating "New", PKR), the vehicle and the licence; no demo values', async () => {
+    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([
+      { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved' },
+    ]);
+    jest.spyOn(statsApi, 'getMyStats').mockResolvedValue(
+      toMyStats({ role: 'driver', currency: 'PKR', total_rides: 33, total_earnings: 15230, rating: null }),
+    );
+    await renderScreen(DriverProfile, {}, null, { license_number: 'LHR-55821', license_expiry_date: '2028-03-31' });
+    expect(screen.getByTestId('driver-profile-rating')).toHaveTextContent(/New/);
+    expect(screen.getByTestId('driver-profile-rides')).toHaveTextContent(/33/);
+    expect(screen.getByTestId('driver-profile-earnings')).toHaveTextContent(/Rs 15,230/);
+    expect(screen.getByText('Mitsubishi Outlander')).toBeTruthy();
+    expect(screen.getByText('Plate Z-0001-19')).toBeTruthy();
+    expect(screen.getByText('LHR-55821')).toBeTruthy();
+    expect(screen.getByText('31 Mar 2028')).toBeTruthy();
+    expect(screen.queryByText(/4\.9|156|\$|Toyota Corolla|DL-123456789/)).toBeNull();
+    // Initials when there is no photo (T-514).
+    expect(screen.getByTestId('driver-profile-avatar-initials')).toHaveTextContent('TD');
+  });
+
+  it('a failed stats read shows dashes and a note, never a number; no vehicle or licence says so', async () => {
+    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
+    jest.spyOn(statsApi, 'getMyStats').mockRejectedValue(new Error('offline'));
+    await renderScreen(DriverProfile);
+    expect(screen.getByTestId('driver-profile-stats-error')).toBeTruthy();
+    expect(screen.getByTestId('driver-profile-rating')).toHaveTextContent(/—/);
+    expect(screen.getByTestId('driver-vehicle-empty')).toBeTruthy();
+    expect(screen.getByTestId('driver-profile-licence-empty')).toBeTruthy();
   });
 });
 

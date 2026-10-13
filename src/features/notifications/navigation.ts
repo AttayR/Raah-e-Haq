@@ -73,6 +73,9 @@ export const routeForTarget = (
       return role === 'passenger'
         ? tab(role, 'Activity', { segment: 'wallet' })
         : { screen: 'Wallet', initial: false };
+    case 'earnings':
+      // Drivers only (routing.ts); a passenger has no Earnings tab, so they land on Activity.
+      return role === 'driver' ? tab(role, 'Earnings') : tab(role, 'Activity', { segment: 'rides' });
     case 'rideRequests':
     case 'home':
       return tab(role, HOME_TAB[role]);

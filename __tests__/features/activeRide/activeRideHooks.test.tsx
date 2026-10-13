@@ -13,6 +13,8 @@ import { createActiveRide } from '../../../src/features/active-ride/slice';
 import {
   ACTIVE_RIDE_POLL_MS,
   DRIVER_LOCATION_POLL_MS,
+  SEARCHING_POLL_MS,
+  activeRidePollMs,
   useActiveRideActions,
   useActiveRidePolling,
   usePassengerRideStage,
@@ -121,6 +123,49 @@ describe('useActiveRidePolling', () => {
     await tick();
 
     expect(mock.history.get).toHaveLength(0);
+  });
+
+  it('T-514: reads every 3 s while searching, so an Accept shows within one short interval', async () => {
+    jest.useFakeTimers();
+    const store = withRide('requested');
+    mock
+      .onGet('/rides/21')
+      .replyOnce(200, envelope(makeRide({ id: 21, status: 'requested' })))
+      .onGet('/rides/21')
+      .replyOnce(200, envelope(makeRide({ id: 21, status: 'accepted', driver_id: 5 })))
+      .onGet('/rides/21')
+      .reply(200, envelope(makeRide({ id: 21, status: 'accepted', driver_id: 5 })));
+    mock.onGet('/rides/21/driver-location').reply(200, envelope(null));
+    const rideGets = () => mock.history.get.filter((r) => r.url === '/rides/21');
+
+    renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(store) });
+    await settle();
+    expect(rideGets()).toHaveLength(1);
+
+    // The driver accepted between reads: the next read is 3 s later, not 10 s.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS);
+    });
+    expect(rideGets()).toHaveLength(2);
+    expect(store.getState().activeRide.ride?.status).toBe('accepted');
+
+    // Driver assigned: back to the 10 s cadence, with no extra read for the cadence change.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(ACTIVE_RIDE_POLL_MS - 1);
+    });
+    expect(rideGets()).toHaveLength(2);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1);
+    });
+    expect(rideGets()).toHaveLength(3);
+  });
+
+  it('T-514: the cadence is 3 s only while searching', () => {
+    expect(SEARCHING_POLL_MS).toBeGreaterThanOrEqual(3_000);
+    expect(activeRidePollMs('requested')).toBe(SEARCHING_POLL_MS);
+    expect(activeRidePollMs('accepted')).toBe(ACTIVE_RIDE_POLL_MS);
+    expect(activeRidePollMs('started')).toBe(ACTIVE_RIDE_POLL_MS);
+    expect(activeRidePollMs(undefined)).toBe(ACTIVE_RIDE_POLL_MS);
   });
 
   it('clears its interval on unmount', async () => {

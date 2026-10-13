@@ -296,6 +296,12 @@ export const en = {
     // Slide to confirm (§5.31).
     slideHint: 'Slide to the end, or double tap, to confirm',
     slideWorking: 'Working…',
+    // Recent rides card (Home / Drive sheet, both roles; T-507, T-514).
+    recentRides: 'Recent rides',
+    recentTrips: 'Recent trips',
+    recentSeeAll: 'See all',
+    recentSeeAllA11y: 'See all rides',
+    recentRowA11y: '{from} to {to}, {date}, {amount}',
   },
   /** Navigation shell (UI-R4, DESIGN_SYSTEM §8.1): tab labels and their accessibility text. */
   nav: {

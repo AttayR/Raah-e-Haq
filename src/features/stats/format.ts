@@ -2,7 +2,8 @@ import { formatMoney } from '../../core/format/money';
 import type { DriverTodayStatsValues } from '../../components/driver/home/DriverTodayStats';
 import type { HomeStat } from '../passenger-home/types';
 import { STATS_COPY } from './copy';
-import type { DriverStats, EarningsDay, EarningsPeriod, PassengerStats } from './types';
+import { formatDateTime } from '../ride-history/format';
+import type { DriverStats, EarningsDay, EarningsPeriod, EarningsRide, PassengerStats } from './types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = [
@@ -97,4 +98,35 @@ export const periodCaption = (period: EarningsPeriod, from: string | null, to: s
 export const barRatios = (series: ReadonlyArray<EarningsDay>): number[] => {
   const max = series.reduce((best, day) => Math.max(best, day.earnings), 0);
   return series.map((day) => (max > 0 ? Math.max(0, day.earnings) / max : 0));
+};
+
+/** "Liberty Market" from "Liberty Market, Gulberg III, Lahore": the place, not the full address. */
+export const shortPlace = (address: string | null): string | null => {
+  const first = address?.split(',')[0]?.trim();
+  return first ? first : null;
+};
+
+/**
+ * One trip on the Earnings list (T-514): the title is the route ("Gulberg → Liberty Market")
+ * when the server sends the addresses, otherwise when it ended ("Today · 7:55 PM"); never the
+ * raw ride code, which stays on the ride details. The second line has the time (under a route),
+ * the distance and the fare with its commission.
+ */
+export const earningsRideText = (
+  ride: EarningsRide,
+  money: (amount: number) => string,
+): { title: string; subtitle: string } => {
+  const from = shortPlace(ride.pickupAddress);
+  const to = shortPlace(ride.dropoffAddress);
+  const route = from && to ? `${from} → ${to}` : null;
+  const when = formatDateTime(ride.completedAt) || null;
+  const title = route ?? when ?? STATS_COPY.tripFallback;
+  const subtitle = [
+    route ? when : null,
+    ride.distanceKm !== null && ride.distanceKm > 0 ? formatDistanceKm(ride.distanceKm) : null,
+    STATS_COPY.rideFare(money(ride.totalFare), money(ride.platformCommission)),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return { title, subtitle };
 };

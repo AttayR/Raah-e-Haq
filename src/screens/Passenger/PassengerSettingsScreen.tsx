@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { Linking, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
@@ -9,6 +9,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { RootState, useAppDispatch } from '../../store';
 import { getUserProfile } from '../../store/thunks/apiThunks';
 import { useLogout } from '../../hooks/useLogout';
+import { useTabScrollReset } from '../../hooks/useTabScrollReset';
 import { Header, HeaderLargeTitle, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
@@ -32,6 +33,8 @@ const PassengerSettingsScreen = () => {
   const { confirmLogout, isLoggingOut } = useLogout();
   const [refreshing, setRefreshing] = useState(false);
   const { scrollY, onScroll } = useHeaderScroll();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useTabScrollReset(scrollRef);
   const title = t('nav.account');
 
   // Pull to refresh re-reads GET /auth/profile (the thunk drops a stale-session result).
@@ -48,6 +51,7 @@ const PassengerSettingsScreen = () => {
     <Screen testID="passenger-settings">
       <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="passenger-settings-header" />
       <Animated.ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         onScroll={onScroll}

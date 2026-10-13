@@ -12,7 +12,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import { apiClient } from '../../src/services/api';
 import PassengerHomeScreen from '../../src/screens/Passenger/PassengerHomeScreen';
-import { toHomeRecentRides } from '../../src/features/passenger-home/recentRides';
+import { toHomeRecentRides } from '../../src/features/ride-history/recentRides';
 import { makeRide, makeStore, page } from '../../test-utils/rideFixtures';
 
 const mockNavigate = jest.fn();

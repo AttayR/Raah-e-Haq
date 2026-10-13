@@ -17,6 +17,8 @@ export type NotificationTarget =
   | { kind: 'rideRequests' }
   /** The role's home tab. */
   | { kind: 'home' }
+  /** The driver's Earnings tab (BE-73 "Trip completed. Collect Rs X in cash", T-514). */
+  | { kind: 'earnings' }
   /** The wallet (category `wallet`: top-ups, settlements, adjustments; T-515/T-514). */
   | { kind: 'wallet' }
   /** Nothing more specific: the notifications list. */
@@ -47,6 +49,8 @@ export const resolveNotificationTarget = (
   }
   if (role === 'driver') {
     if (type === 'new_ride_request') return { kind: 'rideRequests' };
+    // BE-73: the driver's "Trip completed. Collect Rs X" opens what the trip earned.
+    if (type === 'ride_completed') return { kind: 'earnings' };
     if (type !== null && ENDED_RIDE_TYPES.has(type)) return { kind: 'home' };
     return { kind: 'ride', rideId };
   }

@@ -19,11 +19,11 @@ import {
 import { t } from '../../../i18n';
 import { formatMoney } from '../../../core/format/money';
 import { componentTokens, layout, space } from '../../../theme';
-import { formatDateTime } from '../../wallet/format';
 import { EarningsChart } from '../components/EarningsChart';
 import { EarningsHero } from '../components/EarningsHero';
 import { EarningsWalletCard } from '../components/EarningsWalletCard';
 import { STATS_COPY } from '../copy';
+import { earningsRideText } from '../format';
 import { useDriverEarnings } from '../hooks';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
 import type { EarningsPeriod, EarningsRide } from '../types';
@@ -63,22 +63,22 @@ export default function DriverEarningsScreen() {
   const renderItem = useCallback(
     ({ item }: { item: EarningsRide }) => {
       const money = (n: number) => formatMoney(n, { currency: data?.currency });
+      const text = earningsRideText(item, money);
       return (
         <Pressable
           onPress={() => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: item.id })}
           accessibilityRole="button"
+          accessibilityLabel={`${text.title}, ${text.subtitle}, ${money(item.driverEarnings)}`}
           accessibilityHint={STATS_COPY.openRideHint}
           style={({ pressed }) => [styles.ride, pressed ? { backgroundColor: theme.colors.surfacePressed } : null]}
           testID={`earnings-ride-${item.id}`}
         >
           <View style={styles.rideText}>
-            <AppText variant="bodyStrong" numberOfLines={1}>
-              {item.rideCode ?? `#${item.id}`}
+            <AppText variant="bodyStrong" numberOfLines={1} testID={`earnings-ride-${item.id}-title`}>
+              {text.title}
             </AppText>
             <AppText variant="caption" color="textMuted" numberOfLines={2}>
-              {[item.completedAt ? formatDateTime(item.completedAt) : null, STATS_COPY.rideFare(money(item.totalFare), money(item.platformCommission))]
-                .filter(Boolean)
-                .join(' · ')}
+              {text.subtitle}
             </AppText>
           </View>
           <AppText variant="numeric" style={styles.rideAmount}>

@@ -36,4 +36,5 @@ export const STATS_COPY = {
   retry: 'Try again',
   rideFare: (fare: string, commission: string) => `Fare ${fare} · commission ${commission}`,
   openRideHint: 'Opens the ride details',
+  tripFallback: 'Trip',
 } as const;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { RootState } from '../../store';
 import { useLogout } from '../../hooks/useLogout';
+import { useTabScrollReset } from '../../hooks/useTabScrollReset';
 import { AppText, Avatar, Badge, Card, Header, HeaderLargeTitle, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
@@ -29,12 +30,15 @@ const DriverSettingsScreen = () => {
   const name = user?.name?.trim() || DRIVER_SETTINGS_COPY.driverFallbackName;
   const contact = user?.email || user?.phone || null;
   const { scrollY, onScroll } = useHeaderScroll();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useTabScrollReset(scrollRef);
   const title = t('nav.account');
 
   return (
     <Screen testID="driver-settings">
       <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="driver-settings-header" />
       <Animated.ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         onScroll={onScroll}

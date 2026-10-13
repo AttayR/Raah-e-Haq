@@ -19,7 +19,7 @@ import { logger } from '../../core/logging/logger';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
 import { HOME_PEEK_HEIGHT, HomeSheetBody, HomeSheetHeader } from '../../features/passenger-home/components/HomeSheet';
 import { greetingFor } from '../../features/passenger-home/greeting';
-import { toHomeRecentRides } from '../../features/passenger-home/recentRides';
+import { toHomeRecentRides } from '../../features/ride-history/recentRides';
 import { useRideHistory } from '../../features/ride-history/hooks';
 import { openRideDetails } from '../../features/ride-history/navigation';
 import { useSavedPlaces } from '../../features/saved-places/hooks';

@@ -6,6 +6,7 @@ export * from './AddressPair';
 export * from './FareBreakdown';
 export * from './MapPins';
 export * from './PersonCard';
+export * from './RecentRidesCard';
 export * from './RatingStars';
 export * from './RideProgress';
 export * from './RouteLine';

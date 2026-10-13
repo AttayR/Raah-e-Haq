@@ -56,7 +56,11 @@ export interface EarningsDay {
 
 export interface EarningsRide {
   id: number;
+  /** Public ride code: shown on the ride details only, never as the row title (T-514). */
   rideCode: string | null;
+  /** Not sent by GET /driver/earnings yet (BE-15 follow-up); the row shows the time instead. */
+  pickupAddress: string | null;
+  dropoffAddress: string | null;
   vehicleType: string | null;
   completedAt: string | null;
   distanceKm: number | null;

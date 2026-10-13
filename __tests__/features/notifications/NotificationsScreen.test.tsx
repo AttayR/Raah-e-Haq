@@ -168,7 +168,22 @@ describe('NotificationsScreen', () => {
     await flush();
     fireEvent.press(screen.getByRole('radio', { name: 'Show notifications, Unread' }));
     await flush();
-    expect(mock.history.get[mock.history.get.length - 1].params).toEqual({ page: 1, per_page: 20, unread: 1 });
+    // The last list read (the unread count is re-read after each list load, T-514).
+    const listGets = mock.history.get.filter((r) => r.url === '/notifications');
+    expect(listGets[listGets.length - 1].params).toEqual({ page: 1, per_page: 20, unread: 1 });
+  });
+
+  it('T-514: the badge count is re-read after the list loads, and never shows fewer than the unread rows', async () => {
+    // The count polled earlier said 3; a fourth unread row arrived since.
+    mock.onGet('/notifications').reply(200, listBody([row(1), row(2), row(3), row(4)]));
+    mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 4 } });
+    const store = renderWith(<InboxScreen role="passenger" />);
+    await flush();
+    const urls = mock.history.get.map((r) => r.url);
+    expect(urls.indexOf('/notifications/unread-count')).toBeGreaterThan(urls.indexOf('/notifications'));
+    expect(store.getState().notifications.unreadCount).toBe(4);
+    // The count that follows the list does not mark it stale (no second list load).
+    expect(mock.history.get.filter((r) => r.url === '/notifications')).toHaveLength(1);
   });
 });
 

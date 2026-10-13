@@ -11,7 +11,7 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { useReducedMotion } from '../../../hooks/useReducedMotion';
 import { t } from '../../../i18n';
 import { borderWidth, layout, motionPatterns, radius, space } from '../../../theme';
-import { AppText, Badge, Banner, Button, Card, Chip, ListItem, vehicleIconName } from '../../ui';
+import { AppText, Badge, Banner, Button, Card, Chip, ListItem, RecentRidesCard, vehicleIconName, type RecentRideRow } from '../../ui';
 import { DRIVER_HOME_COPY } from '../home/copy';
 import { DriverTodayStats, type DriverTodayStatsValues } from '../home/DriverTodayStats';
 
@@ -100,6 +100,10 @@ type BodyProps = {
   statsError: string | null;
   isApproved: boolean;
   vehicleType: string | undefined;
+  /** T-507: the last finished trips (GET /rides?per_page=3); the card hides while empty. */
+  recentRides?: RecentRideRow[];
+  onSeeAllRides?: () => void;
+  onOpenRide?: (id: string) => void;
 };
 
 const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
@@ -107,8 +111,8 @@ const titleCase = (value: string): string => value.charAt(0).toUpperCase() + val
 /**
  * Drive sheet body (§8.3): the 56pt Go online (primary) / Go offline (outline) action (or
  * "Resume ride" while a ride is open), then at `half`: the status hint, today's earnings pill,
- * the approval warning, today's figures and the driver account card. Nothing is shown that the
- * API did not return.
+ * the approval warning, today's figures, the recent trips (T-507) and the driver account card.
+ * Nothing is shown that the API did not return.
  */
 export function DriveSheetBody({
   status,
@@ -122,6 +126,9 @@ export function DriveSheetBody({
   statsError,
   isApproved,
   vehicleType,
+  recentRides = [],
+  onSeeAllRides,
+  onOpenRide,
 }: BodyProps) {
   const online = status === 'online';
   return (
@@ -170,6 +177,14 @@ export function DriveSheetBody({
           />
         ) : null}
         <DriverTodayStats values={today} error={statsError} />
+        {onSeeAllRides ? (
+          <RecentRidesCard
+            rides={recentRides}
+            title={t('ride.recentTrips')}
+            onSeeAll={onSeeAllRides}
+            onOpen={onOpenRide}
+          />
+        ) : null}
         <Card padding="none" testID="driver-home-account-card">
           <ListItem
             icon={vehicleIconName(vehicleType)}

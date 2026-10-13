@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme } from '../../../src/theme';
+import { AA_NON_TEXT, AA_TEXT, contrastRatio } from '../../../src/theme/contrast';
 import {
   Banner,
   DialogHost,
@@ -176,6 +177,22 @@ describe('Toast (restyle)', () => {
     await renderThemed(<ToastView config={config()} onHide={noop} />, mode);
     expect(flat(screen.getByTestId('toast').props.style).backgroundColor).toBe(fill);
   });
+
+  it.each([
+    ['light', LightTheme.colors.textPrimary, LightTheme.colors.textInverse],
+    ['dark', DarkTheme.colors.surfaceRaised, DarkTheme.colors.textPrimary],
+  ] as const)(
+    '[T-514] the driver "Trip complete." success toast passes AA on its opaque fill (%s)',
+    async (mode, fill, text) => {
+      await renderThemed(<ToastView config={config({ title: 'Trip complete.' })} onHide={noop} />, mode);
+      const toastStyle = flat(screen.getByTestId('toast').props.style);
+      expect(toastStyle.backgroundColor).toBe(fill);
+      expect(flat(screen.getByText('Trip complete.').props.style).color).toBe(text);
+      expect(contrastRatio(text, fill)).toBeGreaterThanOrEqual(AA_TEXT);
+      // The success glyph uses the inverse (dark-mode) success token, readable on the fill.
+      expect(contrastRatio(DarkTheme.colors.success, fill)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    },
+  );
 
   it('the action runs and the toast hides', async () => {
     jest.useFakeTimers();

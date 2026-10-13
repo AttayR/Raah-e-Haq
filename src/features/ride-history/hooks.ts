@@ -26,6 +26,18 @@ export const useRideHistory = (filter: RideHistoryFilter, enabled: boolean): Pag
   });
 };
 
+/**
+ * T-507: the latest `count` rides (GET /rides?page=1&per_page={count}) for a Home card. Read
+ * when `enabled` turns true (screen focus); the card hides while loading or empty.
+ */
+export const useRecentRides = (count: number, enabled: boolean): RemoteData<Ride[]> => {
+  const fetch = useCallback(
+    async () => (await rideHistoryApi.listRides({ page: 1, perPage: count })).items,
+    [count],
+  );
+  return useRemoteData({ fetch, key: String(count), fallbackError: RIDE_HISTORY_COPY.loadFailed, enabled });
+};
+
 /** What the details screen shows: the ride, or `unavailable` (403/404: not the caller's ride). */
 export type RideDetail = { kind: 'ride'; ride: Ride } | { kind: 'unavailable' };
 

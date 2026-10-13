@@ -1,4 +1,5 @@
 import type { IconName } from '../../components/ui/Icon';
+import type { RecentRideRow } from '../../components/ui/ride/RecentRidesCard';
 
 /**
  * Shapes the passenger Home sections render. T-506 maps the API onto them: stats from
@@ -7,11 +8,5 @@ import type { IconName } from '../../components/ui/Icon';
  */
 export type HomeStat = { label: string; value: string; icon: IconName };
 export type HomeOffer = { id: string; title: string; description: string; validUntil: string };
-export type HomeRecentRide = {
-  id: string;
-  from: string;
-  to: string;
-  date: string;
-  fare: string;
-  status: 'completed' | 'cancelled';
-};
+/** A recent-rides row; the card is shared with the driver (components/ui/ride/RecentRidesCard). */
+export type HomeRecentRide = RecentRideRow;

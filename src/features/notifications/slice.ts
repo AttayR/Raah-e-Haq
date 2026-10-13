@@ -96,8 +96,17 @@ export const fetchNotifications = createAsyncThunk<
   },
 );
 
+export interface FetchUnreadCountArg {
+  /**
+   * T-514: read right after page 1 of the list loaded, so the badge matches the rows just shown.
+   * A higher count then does not mark the list stale (it is the list's own rows), which would
+   * load the list again for nothing.
+   */
+  afterList?: boolean;
+}
+
 /** GET /notifications/unread-count. Never two at once (dedupe for every caller). */
-export const fetchUnreadCount = createAsyncThunk<number, void, ThunkConfig>(
+export const fetchUnreadCount = createAsyncThunk<number, FetchUnreadCountArg | void, ThunkConfig>(
   'notifications/unreadCount',
   async (_, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
@@ -200,6 +209,10 @@ const notificationsSlice = createSlice({
         state.loadMoreError = null;
         state.listRequestId = null;
         if (action.meta.arg.mode !== 'more') state.stale = false;
+        // T-514: the badge never shows fewer than the unread rows on screen (the count may be
+        // up to a poll old); the count read that follows page 1 makes it exact.
+        const unreadShown = state.items.filter((n) => n.readAt === null).length;
+        if (unreadShown > state.unreadCount) state.unreadCount = unreadShown;
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
         if (action.meta.condition || action.meta.requestId !== state.listRequestId) return;
@@ -223,7 +236,8 @@ const notificationsSlice = createSlice({
       .addCase(fetchUnreadCount.fulfilled, (state, action) => {
         state.unreadInFlight = false;
         // More unread than before: new rows exist that a loaded list does not show (T-513).
-        if (action.payload > state.unreadCount && state.status !== 'idle') state.stale = true;
+        const afterList = !!action.meta.arg && action.meta.arg.afterList === true;
+        if (!afterList && action.payload > state.unreadCount && state.status !== 'idle') state.stale = true;
         state.unreadCount = action.payload;
       })
       .addCase(fetchUnreadCount.rejected, (state, action) => {

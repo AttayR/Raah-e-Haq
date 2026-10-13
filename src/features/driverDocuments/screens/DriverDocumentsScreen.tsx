@@ -1,20 +1,27 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../store';
 import { AppText, IconButton, Screen } from '../../../components/ui';
 import { space } from '../../../theme';
 import { DRIVER_DOCUMENTS_COPY } from '../copy';
 import { useDriverDocuments } from '../hooks';
 import { DriverDocumentsList } from '../components/DriverDocumentsList';
+import { VehicleCard } from '../../driver-profile/components/VehicleCard';
+import { useMyVehicles } from '../../driver-profile/hooks';
 
 /**
  * Driver Settings → Vehicle & documents (T-203): the same list as the pending-driver screen.
  * Approved and in-review items are read-only; Upload / Re-upload appears only where the server
- * allows it (a rejected or missing item).
+ * allows it (a rejected or missing item). T-514: the registered vehicle (make, model, plate and
+ * its review status, GET /profile/documents) heads the list.
  */
 export function DriverDocumentsScreen() {
   const navigation = useNavigation();
   const { documents, allRequiredApproved, loading, error, uploadingType, reload, upload } = useDriverDocuments();
+  const vehicleType = useSelector((state: RootState) => state.apiAuth.user?.vehicle_type);
+  const vehicles = useMyVehicles(useIsFocused());
 
   return (
     <Screen scroll contentStyle={styles.content} testID="driver-documents-screen">
@@ -29,6 +36,7 @@ export function DriverDocumentsScreen() {
           {DRIVER_DOCUMENTS_COPY.screenTitle}
         </AppText>
       </View>
+      <VehicleCard vehicles={vehicles} vehicleType={vehicleType} testID="driver-documents-vehicle" />
       <DriverDocumentsList
         documents={documents}
         allRequiredApproved={allRequiredApproved}

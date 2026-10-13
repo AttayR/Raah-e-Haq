@@ -6,7 +6,7 @@ import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import type { HomeRecentRide } from '../types';
-import { RecentRidesCard } from './RecentRidesCard';
+import { RecentRidesCard } from '../../../components/ui/ride/RecentRidesCard';
 import { WhereToBar } from './WhereToBar';
 
 /**

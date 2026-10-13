@@ -42,6 +42,17 @@ describe('resolveNotificationTarget', () => {
     expect(resolveNotificationTarget({ category: 'ride', type: 'stop_added', rideId: 3 }, 'driver').kind).toBe('ride');
   });
 
+  it('T-514: the driver\'s "Trip completed. Collect Rs X" (BE-73) opens the Earnings tab', () => {
+    const target = resolveNotificationTarget({ category: 'ride', type: 'ride_completed', rideId: 3 }, 'driver');
+    expect(target).toEqual({ kind: 'earnings' });
+    expect(routeForTarget('driver', target, true)).toEqual({ screen: 'DriverTabs', params: { screen: 'Earnings' } });
+    // BE-73 wallet events (settlement decisions, admin adjustments) open the driver wallet.
+    (['settlement_rejected', 'wallet_adjusted'] as const).forEach((type) => {
+      const wallet = resolveNotificationTarget({ category: 'wallet', type, rideId: null }, 'driver');
+      expect(routeForTarget('driver', wallet, true)).toEqual({ screen: 'Wallet', initial: false });
+    });
+  });
+
   it('T-515: wallet notifications (top-up results, settlements) open the wallet for both roles', () => {
     (['passenger', 'driver'] as const).forEach((role) => {
       expect(resolveNotificationTarget({ category: 'wallet', type: 'topup_succeeded', rideId: null }, role)).toEqual({

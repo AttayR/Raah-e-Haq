@@ -10,6 +10,8 @@ import { apiClient } from '../../../src/services/api';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { statsApi, toDriverEarnings, toMyStats } from '../../../src/features/stats/api';
 import {
+  earningsRideText,
+  shortPlace,
   barRatios,
   chartLabel,
   formatMinutes,
@@ -169,6 +171,24 @@ describe('GET /driver/earnings mapping and format', () => {
     expect(barRatios(toDriverEarnings(rawEarnings('week'), 'week').series)).toEqual([0, 1]);
   });
 
+  it('T-514: a trip reads as its route (or its time), never as the raw ride code', () => {
+    const [ride] = toDriverEarnings(rawEarnings('day'), 'day').rides;
+    const money = (n: number) => `Rs ${n}`;
+    const noRoute = earningsRideText(ride, money);
+    expect(noRoute.title).not.toContain('RH-TEST7');
+    expect(noRoute.title).toMatch(/·/); // "13 Oct · 10:00 AM"-style date and time
+    expect(noRoute.subtitle).toBe('3 km · Fare Rs 300 · commission Rs 60');
+
+    const withRoute = earningsRideText(
+      { ...ride, pickupAddress: 'Liberty Market, Gulberg III, Lahore', dropoffAddress: 'Emporium Mall, Johar Town' },
+      money,
+    );
+    expect(withRoute.title).toBe('Liberty Market → Emporium Mall');
+    expect(withRoute.subtitle).toBe(`${noRoute.title} · 3 km · Fare Rs 300 · commission Rs 60`);
+    expect(shortPlace('  ')).toBeNull();
+    expect(shortPlace(null)).toBeNull();
+  });
+
   it('sends period, page and per_page', async () => {
     mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('month')));
     await statsApi.getDriverEarnings('month');
@@ -216,6 +236,8 @@ describe('DriverEarningsScreen', () => {
     showEarnings();
     fireEvent.press(await screen.findByTestId('earnings-ride-7'));
     expect(mockNavigate).toHaveBeenCalledWith('RideDetails', { rideId: 7 });
+    // T-514: the code is for the details screen only.
+    expect(screen.queryByText('RH-TEST7')).toBeNull();
   });
 
   it('is a tab root (UI-R4): large "Earnings" title, no back; the wallet card shows commission owed and opens Wallet', async () => {

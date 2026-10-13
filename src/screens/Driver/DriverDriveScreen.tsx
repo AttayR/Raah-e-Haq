@@ -23,6 +23,9 @@ import { isRestorableDriverRide } from '../../features/driver-ride/steps';
 import { useIncomingRequestShown } from '../../features/driver-requests/overlay';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
 import { useMyStats } from '../../features/stats/hooks';
+import { useRecentRides } from '../../features/ride-history/hooks';
+import { RIDE_DETAILS_ROUTE } from '../../features/ride-history/navigation';
+import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
 import { toDriverTodayValues } from '../../features/stats/format';
 import { formatMoney } from '../../core/format/money';
 import { t } from '../../i18n';
@@ -49,7 +52,8 @@ const toCoordinate = (lat: unknown, lng: unknown) => {
  * full-bleed map with the avatar top-start and "locate me" riding 16 above the Drive sheet. The
  * sheet (peek 137 → half) holds the status row and the 56pt Go online / Go offline action (same
  * thunks as before: GET/PUT /driver/status, T-401), and at half today's earnings, the approval
- * warning, today's figures and the account card (GET /me/stats). Incoming requests come from
+ * warning, today's figures, the last three trips (GET /rides, T-507) and the account card
+ * (GET /me/stats). Incoming requests come from
  * RideRequestHost (the tabs' single poller): while one shows, this sheet and the map controls
  * step aside and the tab bar hides. An accepted ride opens DriverRide (full-screen trip map).
  */
@@ -75,6 +79,9 @@ export default function DriverDriveScreen() {
 
   const stats = useMyStats(isFocused, DRIVER_HOME_COPY.statsUnavailable);
   const driverStats = stats.data?.role === 'driver' ? stats.data : null;
+  // T-507: the last trips (GET /rides?per_page=3), the driver's earnings on each.
+  const recent = useRecentRides(HOME_RECENT_RIDES, isFocused);
+  const recentRides = useMemo(() => toHomeRecentRides(recent.data ?? [], 'driver'), [recent.data]);
 
   const mapRef = useRef<SafeMapViewRef | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -207,6 +214,9 @@ export default function DriverDriveScreen() {
             statsError={!driverStats && stats.status === 'failed' ? stats.error : null}
             isApproved={user?.status === 'active'}
             vehicleType={user?.vehicle_type}
+            recentRides={recentRides}
+            onSeeAllRides={() => navigation.navigate('RideHistory')}
+            onOpenRide={(id) => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: Number(id) })}
           />
         </BottomSheet>
       )}

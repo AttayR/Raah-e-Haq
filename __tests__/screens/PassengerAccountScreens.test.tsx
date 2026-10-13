@@ -28,8 +28,11 @@ import { dialog, dialogStore } from '../../src/core/dialog';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, canGoBack: () => true }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, canGoBack: () => true, addListener: () => () => undefined }),
   useIsFocused: () => true,
+  // T-514 useTabScrollReset: no navigator here; the hook has its own test.
+  useRoute: () => ({ key: 'Account-test', name: 'Account' }),
+  useScrollToTop: jest.fn(),
 }));
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
