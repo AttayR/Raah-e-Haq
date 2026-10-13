@@ -15,6 +15,7 @@ export type TextStyleName =
   | 'bodyStrong'
   | 'bodySmall'
   | 'caption'
+  | 'captionStrong'
   | 'label'
   | 'overline'
   | 'button'
@@ -39,6 +40,8 @@ export const textStyles: Record<TextStyleName, ScaleStyle> = {
   bodyStrong: { fontSize: 16, lineHeight: 24, fontWeight: '600', letterSpacing: 0 },
   bodySmall: { fontSize: 14, lineHeight: 20, fontWeight: '400', letterSpacing: 0 },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500', letterSpacing: 0.1 },
+  /** Active tab label (§5.3 [v1.1]): caption size at 600. */
+  captionStrong: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.1 },
   label: { fontSize: 13, lineHeight: 18, fontWeight: '600', letterSpacing: 0.1 },
   overline: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase' },
   button: { fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: 0 },

@@ -13,7 +13,7 @@ export type NotificationTarget =
   | { kind: 'ride'; rideId: number | null }
   /** A finished or cancelled ride (passenger history). */
   | { kind: 'rideHistory' }
-  /** The driver's request feed (Map tab). */
+  /** The driver's request feed (the Drive map, UI-R4). */
   | { kind: 'rideRequests' }
   /** The role's home tab. */
   | { kind: 'home' }

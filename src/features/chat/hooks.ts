@@ -211,7 +211,7 @@ export interface ChatList {
 }
 
 /**
- * The Chat tab's list (GET /chats). Loaded when the tab becomes `visible` (focused), again on
+ * Inbox › Messages (GET /chats). Loaded when the list becomes `visible` (focused), again on
  * every return to it and on pull-to-refresh; a stale answer never overwrites a newer one.
  */
 export const useChatList = (visible: boolean): ChatList => {

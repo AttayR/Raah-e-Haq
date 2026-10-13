@@ -1,6 +1,7 @@
 /**
  * T-502: the notifications list (both roles) on GET /notifications: loading, error + retry,
  * empty, rows, mark read on open, mark all read; and the preferences switches on BE-11.
+ * UI-R4: the list lives in the Inbox tab (Notifications | Messages), "Mark all read" in its bar.
  */
 import React from 'react';
 import MockAdapter from 'axios-mock-adapter';
@@ -10,7 +11,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { NotificationsScreen } from '../../../src/features/notifications/screens/NotificationsScreen';
+import InboxScreen from '../../../src/features/inbox/InboxScreen';
+import { chatApi } from '../../../src/features/chat/api';
 import { NotificationPreferencesScreen } from '../../../src/features/notifications/screens/NotificationPreferencesScreen';
 import { toast } from '../../../src/core/toast';
 import { fetchUnreadCount } from '../../../src/features/notifications/slice';
@@ -18,9 +20,11 @@ import { fetchUnreadCount } from '../../../src/features/notifications/slice';
 const mockNavDispatch = jest.fn();
 const mockGoBack = jest.fn();
 let mockFocused = true;
+let mockRouteParams: { segment?: 'notifications' | 'messages' } | undefined;
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useIsFocused: () => mockFocused,
+  useRoute: () => ({ key: 'Inbox-1', name: 'Inbox', params: mockRouteParams }),
   useNavigation: () => ({
     dispatch: mockNavDispatch,
     goBack: mockGoBack,
@@ -73,6 +77,7 @@ beforeEach(() => {
   mock = new MockAdapter(apiClient);
   mockNavDispatch.mockClear();
   mockFocused = true;
+  mockRouteParams = undefined;
 });
 
 afterEach(() => {
@@ -86,7 +91,7 @@ describe('NotificationsScreen', () => {
     mock.onGet('/notifications').replyOnce(
       () => new Promise<[number, unknown]>((resolve) => { release = resolve; }),
     );
-    renderWith(<NotificationsScreen role="driver" />);
+    renderWith(<InboxScreen role="driver" />);
     await flush();
     expect(screen.getByTestId('notifications-loading')).toBeTruthy();
     release([200, listBody([row(1), row(2, { read_at: '2026-10-11T12:00:00+00:00' })])]);
@@ -100,7 +105,7 @@ describe('NotificationsScreen', () => {
 
   it('an empty list says so', async () => {
     mock.onGet('/notifications').reply(200, listBody([]));
-    renderWith(<NotificationsScreen role="passenger" />);
+    renderWith(<InboxScreen role="passenger" />);
     await flush();
     expect(screen.getByTestId('notifications-empty')).toBeTruthy();
     expect(screen.getByText('No notifications yet')).toBeTruthy();
@@ -108,7 +113,7 @@ describe('NotificationsScreen', () => {
 
   it('a failed load shows an error with Try again, which reloads', async () => {
     mock.onGet('/notifications').networkErrorOnce();
-    renderWith(<NotificationsScreen role="driver" />);
+    renderWith(<InboxScreen role="driver" />);
     await flush();
     expect(screen.getByTestId('notifications-error')).toBeTruthy();
 
@@ -121,7 +126,7 @@ describe('NotificationsScreen', () => {
   it('opening an unread row marks it read on the server', async () => {
     mock.onGet('/notifications').reply(200, listBody([row(1)]));
     mock.onPost('/notifications/1/read').reply(200, { success: true, data: row(1, { read_at: '2026-10-11T12:05:00+00:00' }) });
-    renderWith(<NotificationsScreen role="driver" />);
+    renderWith(<InboxScreen role="driver" />);
     await flush();
 
     fireEvent.press(screen.getByTestId('notification-row-1'));
@@ -135,7 +140,7 @@ describe('NotificationsScreen', () => {
 
   it('a ride row opens the driver ride screen', async () => {
     mock.onGet('/notifications').reply(200, listBody([row(4, { category: 'ride', type: 'stop_added', data: { ride_id: 9 }, read_at: 'x' })]));
-    renderWith(<NotificationsScreen role="driver" />);
+    renderWith(<InboxScreen role="driver" />);
     await flush();
     fireEvent.press(screen.getByTestId('notification-row-4'));
     expect(mockNavDispatch).toHaveBeenCalledTimes(1);
@@ -145,7 +150,7 @@ describe('NotificationsScreen', () => {
   it('Mark all read posts read-all and clears the dots', async () => {
     mock.onGet('/notifications').reply(200, listBody([row(1), row(2)]));
     mock.onPost('/notifications/read-all').reply(200, { success: true, data: { unread_count: 0 } });
-    const store = renderWith(<NotificationsScreen role="passenger" />);
+    const store = renderWith(<InboxScreen role="passenger" />);
     store.dispatch({ type: 'notifications/unreadCount/fulfilled', payload: 2, meta: {} });
     await flush();
 
@@ -159,11 +164,46 @@ describe('NotificationsScreen', () => {
 
   it('the Unread filter asks the server for unread rows only', async () => {
     mock.onGet('/notifications').reply(200, listBody([row(1)]));
-    renderWith(<NotificationsScreen role="passenger" />);
+    renderWith(<InboxScreen role="passenger" />);
     await flush();
     fireEvent.press(screen.getByRole('radio', { name: 'Show notifications, Unread' }));
     await flush();
     expect(mock.history.get[mock.history.get.length - 1].params).toEqual({ page: 1, per_page: 20, unread: 1 });
+  });
+});
+
+describe('Inbox tab (UI-R4)', () => {
+  it('shows the large title and the Notifications | Messages segments; Messages lists chats and never loads notifications', async () => {
+    mock.onGet('/notifications').reply(200, listBody([row(1)]));
+    const chats = jest.spyOn(chatApi, 'listChats').mockResolvedValue([]);
+    renderWith(<InboxScreen role="passenger" />);
+    await flush();
+    expect(screen.getAllByText('Inbox').length).toBeGreaterThan(0);
+    expect(screen.getByText('Offer 1')).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('radio', { name: 'Inbox, Messages' }));
+    await flush();
+    expect(chats).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('chat-list-empty')).toBeTruthy();
+    expect(screen.queryByText('Offer 1')).toBeNull();
+    // Mark all read belongs to Notifications only.
+    expect(screen.queryByTestId('notifications-mark-all')).toBeNull();
+  });
+
+  it('opens on Messages when navigated with segment=messages (chat push fallback)', async () => {
+    mockRouteParams = { segment: 'messages' };
+    const chats = jest.spyOn(chatApi, 'listChats').mockResolvedValue([]);
+    renderWith(<InboxScreen role="driver" />);
+    await flush();
+    expect(chats).toHaveBeenCalledTimes(1);
+    expect(mock.history.get.filter((r) => r.url === '/notifications')).toHaveLength(0);
+  });
+
+  it('hides "Mark all read" while nothing is unread', async () => {
+    mock.onGet('/notifications').reply(200, listBody([row(1, { read_at: 'x' })]));
+    renderWith(<InboxScreen role="passenger" />);
+    await flush();
+    expect(screen.queryByTestId('notifications-mark-all')).toBeNull();
   });
 });
 
@@ -175,7 +215,7 @@ describe('NotificationsScreen reloads (T-513)', () => {
     const ui = () => (
       <Provider store={store}>
         <ThemeProvider>
-          <NotificationsScreen role="passenger" />
+          <InboxScreen role="passenger" />
         </ThemeProvider>
       </Provider>
     );

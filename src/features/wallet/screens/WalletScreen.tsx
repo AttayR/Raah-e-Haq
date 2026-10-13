@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -10,9 +11,9 @@ import {
   Button,
   EmptyState,
   ErrorState,
+  FilterChips,
   Header,
   Screen,
-  SegmentedControl,
   SkeletonList,
 } from '../../../components/ui';
 import { componentTokens, layout, space } from '../../../theme';
@@ -30,21 +31,32 @@ const FILTERS = [
   { value: 'debit', label: WALLET_COPY.filterOut },
 ] as const;
 
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<WalletTransaction, TransactionSection>);
+
+export type WalletBodyProps = {
+  /** True while the wallet is on screen (loads then, quietly again on each return). */
+  visible: boolean;
+  /** Rendered above the balance (Activity's large title and segments); scrolls with the list. */
+  header?: React.ReactElement;
+  /** `useHeaderScroll().onScroll`, so a large title collapses into the bar. */
+  onScroll?: React.ComponentProps<typeof Animated.FlatList>['onScroll'];
+};
+
 /**
  * Wallet for both roles (T-508, BE-09): balance and totals from GET /wallet, the cash-only
  * note, and the ledger from GET /wallet/transactions grouped by day with a direction filter,
  * pull to refresh and infinite scroll. Drivers also get the commission owed, "Pay commission"
- * and their payment reports. Cash only: no top-up, no payment methods.
+ * and their payment reports. Cash only: no top-up, no payment methods. The body is also the
+ * passenger's Activity › Wallet (UI-R4); the driver opens the screen from Earnings.
  */
-export default function WalletScreen() {
+export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
-  const isFocused = useIsFocused();
   const isDriver = useSelector((state: RootState) => state.apiAuth.user?.role === 'driver');
   const [filter, setFilter] = useState<TransactionFilter>('all');
 
-  const wallet = useWallet(isFocused);
-  const list = useWalletTransactions(filter, isFocused);
+  const wallet = useWallet(visible);
+  const list = useWalletTransactions(filter, visible);
   const { cancel, cancellingId } = useCancelSettlement();
   const sections = useMemo(() => groupByDay(list.items), [list.items]);
 
@@ -92,21 +104,11 @@ export default function WalletScreen() {
     [theme.colors.background],
   );
 
-  const header = (
-    <Header
-      title={WALLET_COPY.title}
-      backLabel={WALLET_COPY.back}
-      onBack={() => navigation.goBack()}
-      tone="background"
-      testID="wallet"
-    />
-  );
-
   // No wallet yet: the whole body is the loading or error state.
   if (!walletData) {
     const failed = wallet.status === 'failed';
     return (
-      <Screen testID="wallet-screen">
+      <View style={styles.fill}>
         {header}
         {failed ? (
           <ErrorState
@@ -122,54 +124,57 @@ export default function WalletScreen() {
         ) : (
           <SkeletonList heroHeight={componentTokens.skeleton.heights.walletHero} rows={5} testID="wallet-loading" />
         )}
-      </Screen>
+      </View>
     );
   }
 
   const listHeader = (
-    <View style={styles.headerBlock}>
-      <BalanceCard wallet={walletData} isDriver={isDriver} />
-      {walletData.status !== 'active' ? (
-        <Banner tone="warning" text={WALLET_COPY.walletSuspended} testID="wallet-suspended" />
-      ) : null}
-      <Banner
-        tone="info"
-        icon="cash"
-        title={WALLET_COPY.cashOnlyTitle}
-        text={isDriver ? WALLET_COPY.cashOnlyDriver : WALLET_COPY.cashOnlyPassenger}
-        testID="wallet-cash-only"
-      />
-      {isDriver ? (
-        <CommissionCard
-          wallet={walletData}
-          onPay={() =>
-            navigation.navigate('PayCommission', { owed: walletData.commissionOwed, currency: walletData.currency })
-          }
-          onOpenReports={() => navigation.navigate('WalletSettlements')}
-          onCancel={onCancel}
-          cancellingId={cancellingId}
+    <View>
+      {header}
+      <View style={styles.headerBlock}>
+        <BalanceCard wallet={walletData} isDriver={isDriver} />
+        {walletData.status !== 'active' ? (
+          <Banner tone="warning" text={WALLET_COPY.walletSuspended} testID="wallet-suspended" />
+        ) : null}
+        <Banner
+          tone="info"
+          icon="cash"
+          title={WALLET_COPY.cashOnlyTitle}
+          text={isDriver ? WALLET_COPY.cashOnlyDriver : WALLET_COPY.cashOnlyPassenger}
+          testID="wallet-cash-only"
         />
-      ) : null}
-      {wallet.error ? (
-        <AppText variant="bodySmall" color="danger" testID="wallet-refresh-error">
-          {wallet.error}
+        {isDriver ? (
+          <CommissionCard
+            wallet={walletData}
+            onPay={() =>
+              navigation.navigate('PayCommission', { owed: walletData.commissionOwed, currency: walletData.currency })
+            }
+            onOpenReports={() => navigation.navigate('WalletSettlements')}
+            onCancel={onCancel}
+            cancellingId={cancellingId}
+          />
+        ) : null}
+        {wallet.error ? (
+          <AppText variant="bodySmall" color="danger" testID="wallet-refresh-error">
+            {wallet.error}
+          </AppText>
+        ) : null}
+        <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
+          {WALLET_COPY.transactions}
         </AppText>
-      ) : null}
-      <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
-        {WALLET_COPY.transactions}
-      </AppText>
-      <SegmentedControl<TransactionFilter>
-        options={FILTERS}
-        value={filter}
-        onChange={setFilter}
-        accessibilityLabel={WALLET_COPY.filterLabel}
-        testID="wallet-filter"
-      />
-      {list.error && list.items.length > 0 ? (
-        <AppText variant="bodySmall" color="danger" testID="wallet-transactions-refresh-error">
-          {list.error}
-        </AppText>
-      ) : null}
+        <FilterChips<TransactionFilter>
+          options={FILTERS}
+          value={filter}
+          onChange={setFilter}
+          accessibilityLabel={WALLET_COPY.filterLabel}
+          testID="wallet-filter"
+        />
+        {list.error && list.items.length > 0 ? (
+          <AppText variant="bodySmall" color="danger" testID="wallet-transactions-refresh-error">
+            {list.error}
+          </AppText>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -221,38 +226,57 @@ export default function WalletScreen() {
   };
 
   return (
+    <AnimatedSectionList
+      testID="wallet-transactions"
+      sections={sections}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={renderItem}
+      renderSectionHeader={renderSectionHeader}
+      stickySectionHeadersEnabled
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      style={styles.fill}
+      ListHeaderComponent={listHeader}
+      ListEmptyComponent={renderEmpty}
+      ListFooterComponent={renderFooter}
+      contentContainerStyle={[styles.content, sections.length === 0 && styles.contentEmpty]}
+      onEndReached={list.hasMore && !list.loadMoreError ? list.loadMore : undefined}
+      onEndReachedThreshold={0.5}
+      refreshControl={
+        <RefreshControl
+          refreshing={pulling}
+          onRefresh={onRefresh}
+          tintColor={theme.colors.primary}
+          colors={[theme.colors.primary]}
+        />
+      }
+    />
+  );
+}
+
+/** The driver's Earnings → Wallet route: a standard Header with back over the body. */
+export default function WalletScreen() {
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const isFocused = useIsFocused();
+  return (
     <Screen testID="wallet-screen">
-      {header}
-      <SectionList
-        testID="wallet-transactions"
-        sections={sections}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        stickySectionHeadersEnabled
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={renderEmpty}
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={[styles.content, sections.length === 0 && styles.contentEmpty]}
-        onEndReached={list.hasMore && !list.loadMoreError ? list.loadMore : undefined}
-        onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl
-            refreshing={pulling}
-            onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
-          />
-        }
+      <Header
+        title={WALLET_COPY.title}
+        backLabel={WALLET_COPY.back}
+        onBack={() => navigation.goBack()}
+        tone="background"
+        testID="wallet"
       />
+      <WalletBody visible={isFocused} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   contentEmpty: { flexGrow: 1 },
-  headerBlock: { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[2], gap: space[3] },
+  headerBlock: { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[3], gap: space[3] },
   sectionTitle: { marginTop: space[3] },
   dayHeader: { minHeight: 32, justifyContent: 'center', paddingHorizontal: space[4] },
   footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },

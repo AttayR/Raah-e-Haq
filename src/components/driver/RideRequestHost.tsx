@@ -18,16 +18,13 @@ import { selectDriverIsOnline, selectDriverIsOnRide } from '../../features/drive
 import { RideRequestPanel } from './IncomingRequestCard';
 
 type Props = {
-  /**
-   * Distance from the bottom of the tab area to the panel: the tab bar's height, plus on the
-   * Map tab the height of its control column so the panel sits above the controls.
-   */
+  /** Distance from the bottom of the tab area to the panel: the tab bar when it shows, else the inset. */
   bottomOffset: number;
   /**
-   * Also show the feed's loading and empty states. Only the Map tab asks for them; on the other
-   * tabs a "no requests" card would only cover the screen, so they show requests and errors.
+   * Called with true while a request (not an error) is on screen and false once it is gone, so
+   * the tabs hide the tab bar and open the Drive map under it (§8.3).
    */
-  showIdleStates: boolean;
+  onRequestShownChange?: (shown: boolean) => void;
 };
 
 /**
@@ -50,10 +47,12 @@ const useConsecutiveFeedFailures = (): number => {
 /**
  * Incoming ride requests for every driver tab (T-408). Mounted once, by DriverBottomTabs, so
  * GET /rides/pending is polled (T-403) whenever the driver is online, has no ride, the app is in
- * the foreground and the tabs are on screen, whichever tab is open. Accepting (T-404) opens the
- * DriverRide screen. The position sent with each poll is the location tracker's (T-402).
+ * the foreground and the tabs are on screen, whichever tab is open. A request takes over the
+ * Drive map (UI-R4, §8.3: the tabs switch to Drive and hide the tab bar through
+ * `onRequestShownChange`). Accepting (T-404) opens the DriverRide screen. The position sent with
+ * each poll is the location tracker's (T-402).
  */
-export const RideRequestHost: React.FC<Props> = ({ bottomOffset, showIdleStates }) => {
+export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownChange }) => {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
@@ -80,14 +79,21 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, showIdleStates 
   );
 
   // The first poll after going online can run before the tracker's first fix (422
-  // LOCATION_REQUIRED); off the Map tab an error waits for a fix or a second failure in a row.
-  const showError = showIdleStates || location !== null || failures >= 2;
-  const visible =
-    isFocused &&
-    isOnline &&
-    !isOnRide &&
-    !hasActiveRide &&
-    (showIdleStates || view.kind === 'request' || (view.kind === 'error' && showError));
+  // LOCATION_REQUIRED); an error waits for a fix or a second failure in a row. Loading and
+  // "no requests" are not shown here: the Drive sheet says "Looking for ride requests".
+  const showError = location !== null || failures >= 2;
+  const eligible = isFocused && isOnline && !isOnRide && !hasActiveRide;
+  const requestShown = eligible && view.kind === 'request';
+  const visible = requestShown || (eligible && view.kind === 'error' && showError);
+
+  const onShownRef = useRef(onRequestShownChange);
+  onShownRef.current = onRequestShownChange;
+  useEffect(() => {
+    onShownRef.current?.(requestShown);
+  }, [requestShown]);
+  // Unmount (sign-out, a ride screen replacing the tabs): the tab bar comes back.
+  useEffect(() => () => onShownRef.current?.(false), []);
+
   if (!visible) {
     return null;
   }

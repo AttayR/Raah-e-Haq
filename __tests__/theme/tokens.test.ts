@@ -189,6 +189,8 @@ describe('typography (§2)', () => {
       bodyStrong: [16, 24, '600', 0],
       bodySmall: [14, 20, '400', 0],
       caption: [12, 16, '500', 0.1],
+      // §5.3 [v1.1] active tab label (UI-R4).
+      captionStrong: [12, 16, '600', 0.1],
       label: [13, 18, '600', 0.1],
       overline: [12, 16, '600', 0.6],
       button: [16, 20, '600', 0],

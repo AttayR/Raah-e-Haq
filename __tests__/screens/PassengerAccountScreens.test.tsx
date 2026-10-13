@@ -137,13 +137,12 @@ describe('PassengerSettingsScreen', () => {
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
     await renderScreen(PassengerSettingsScreen, 'light');
     fireEvent.press(screen.getByTestId('passenger-settings-profile'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('PassengerPofile');
-    fireEvent.press(screen.getByTestId('passenger-settings-wallet'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('Wallet');
+    expect(mockNavigate).toHaveBeenLastCalledWith('Profile');
     fireEvent.press(screen.getByTestId('passenger-settings-saved-places'));
     expect(mockNavigate).toHaveBeenLastCalledWith('FavoriteLocations');
-    fireEvent.press(screen.getByTestId('passenger-settings-ride-history'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('RideHistory');
+    // UI-R4: ride history and the wallet live in Activity, not in Account.
+    expect(screen.queryByTestId('passenger-settings-wallet')).toBeNull();
+    expect(screen.queryByTestId('passenger-settings-ride-history')).toBeNull();
     fireEvent.press(screen.getByTestId('passenger-settings-notifications'));
     expect(mockNavigate).toHaveBeenLastCalledWith('NotificationPreferences');
     fireEvent.press(screen.getByTestId('passenger-settings-phone-notifications'));

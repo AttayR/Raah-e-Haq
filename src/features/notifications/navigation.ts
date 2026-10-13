@@ -8,9 +8,8 @@ import {
 import type { NotificationRole, NotificationTarget } from './routing';
 
 /**
- * Route name of the per-ride chat thread (T-510, in progress). Until a navigator registers a
- * screen with this name, chat notifications open the role's Chat tab instead.
- * T-510: register `RideChat` with params `{ rideId: number }` in PassengerStack and DriverStack.
+ * Route name of the per-ride chat thread (T-510), registered in PassengerStack and DriverStack
+ * with params `{ rideId: number }`. Where it is missing, chat notifications open Inbox › Messages.
  */
 export const CHAT_THREAD_ROUTE = 'RideChat';
 
@@ -40,7 +39,13 @@ type Nested = { screen: string; params?: object; initial?: boolean };
 const ROLE_ROOT: Record<NotificationRole, string> = { passenger: 'Passenger', driver: 'Driver' };
 const ROLE_TABS: Record<NotificationRole, string> = { passenger: 'PassengerTabs', driver: 'DriverTabs' };
 
-const tab = (role: NotificationRole, name: string): Nested => ({ screen: ROLE_TABS[role], params: { screen: name } });
+/** The role's first tab (UI-R4, DESIGN_SYSTEM §8.1): the map-first Home / Drive. */
+const HOME_TAB: Record<NotificationRole, string> = { passenger: 'Home', driver: 'Drive' };
+
+const tab = (role: NotificationRole, name: string, params?: object): Nested => ({
+  screen: ROLE_TABS[role],
+  params: params ? { screen: name, params } : { screen: name },
+});
 
 /** The nested route (inside the role's root stack) for a target. */
 export const routeForTarget = (
@@ -52,21 +57,23 @@ export const routeForTarget = (
     case 'chat':
       return chatThreadAvailable
         ? { screen: CHAT_THREAD_ROUTE, params: { rideId: target.rideId } }
-        : tab(role, 'Chat');
+        : tab(role, 'Inbox', { segment: 'messages' });
     case 'ride':
       // initial: false keeps the tabs underneath, so Back returns to them.
       return role === 'passenger'
-        ? { screen: 'PassengerMap', initial: false }
+        ? { screen: 'Booking', initial: false }
         : { screen: 'DriverRide', initial: false };
     case 'rideHistory':
-      return role === 'passenger' ? { screen: 'RideHistory', initial: false } : tab(role, 'Home');
+      // Passenger ride history is Activity › Rides; the driver's lives under Account.
+      return role === 'passenger'
+        ? tab(role, 'Activity', { segment: 'rides' })
+        : { screen: 'RideHistory', initial: false };
     case 'rideRequests':
-      return tab(role, 'Map');
     case 'home':
-      return tab(role, 'Home');
+      return tab(role, HOME_TAB[role]);
     case 'inbox':
     default:
-      return tab(role, 'Notifications');
+      return tab(role, 'Inbox', { segment: 'notifications' });
   }
 };
 

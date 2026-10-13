@@ -1,7 +1,8 @@
 /**
- * T-408: ride requests arrive on every driver tab. Before, only DriverMapScreen polled
- * GET /rides/pending, so a driver who went online on Home never saw a request. The host is
- * mounted once by DriverBottomTabs and renders without the Map screen.
+ * T-408: ride requests arrive on every driver tab. The host is mounted once by DriverBottomTabs
+ * (the single GET /rides/pending poller). UI-R4: a request reports itself through
+ * `onRequestShownChange` (the tabs switch to Drive and hide the tab bar); loading and "no
+ * requests" are left to the Drive sheet.
  */
 import React from 'react';
 import { AppState } from 'react-native';
@@ -11,10 +12,6 @@ import { configureStore } from '@reduxjs/toolkit';
 import { ApiError } from '../../src/core/api/errors';
 import { rootReducer } from '../../src/store/rootReducer';
 import { RideRequestHost } from '../../src/components/driver/RideRequestHost';
-import {
-  DRIVER_MAP_CONTROLS_CLEARANCE,
-  rideRequestBottomOffset,
-} from '../../src/components/driver/rideRequestLayout';
 import { driverRequestsApi } from '../../src/features/driver-requests/api';
 import { PENDING_POLL_INTERVAL_MS } from '../../src/features/driver-requests/hooks';
 import { driverStatusApi, type DriverAvailability } from '../../src/features/driver-status/api';
@@ -60,13 +57,13 @@ const advance = async (ms: number) => {
 
 let listPending: jest.SpyInstance;
 
-const renderHost = async (status: DriverAvailability, showIdleStates = false) => {
+const renderHost = async (status: DriverAvailability, onRequestShownChange?: (shown: boolean) => void) => {
   const store = configureStore({ reducer: rootReducer });
   jest.spyOn(driverStatusApi, 'get').mockResolvedValue(statusInfo(status));
   await store.dispatch(loadDriverStatus());
   const screen = render(
     <Provider store={store}>
-      <RideRequestHost bottomOffset={49} showIdleStates={showIdleStates} />
+      <RideRequestHost bottomOffset={49} onRequestShownChange={onRequestShownChange} />
     </Provider>,
   );
   await flush();
@@ -136,14 +133,31 @@ describe('RideRequestHost', () => {
     expect(mockNavigate).toHaveBeenCalledWith('DriverRide');
   });
 
-  it('shows the empty state only where asked (the Map tab)', async () => {
+  it('shows no card while there are no requests (the Drive sheet says it is looking)', async () => {
     listPending.mockResolvedValue({ requests: [] });
-    const home = await renderHost('available', false);
-    expect(home.screen.queryByTestId('ride-request-host')).toBeNull();
-    home.screen.unmount();
+    const { screen } = await renderHost('available');
+    expect(screen.queryByTestId('ride-request-host')).toBeNull();
+    expect(screen.queryByTestId('ride-requests-empty')).toBeNull();
+  });
 
-    const map = await renderHost('available', true);
-    map.screen.getByTestId('ride-requests-empty');
+  it('reports a shown request so the tabs hide the tab bar, and its end so they bring it back (UI-R4)', async () => {
+    const shown = jest.fn();
+    const { store } = await renderHost('available', shown);
+    expect(shown).toHaveBeenLastCalledWith(true);
+
+    act(() => {
+      store.dispatch(setDriverActiveRide(makeRide({ id: 7, status: 'accepted' })));
+    });
+    await flush();
+    expect(shown).toHaveBeenLastCalledWith(false);
+  });
+
+  it('an error card is not a request: the tab bar stays', async () => {
+    listPending.mockRejectedValue(new ApiError({ kind: 'server', status: 500, message: 'Server error' }));
+    const shown = jest.fn();
+    const { screen } = await renderHost('available', shown);
+    screen.getByTestId('ride-requests-error');
+    expect(shown).not.toHaveBeenCalledWith(true);
   });
 
   it('does not poll while the tabs are covered by another driver screen', async () => {
@@ -161,26 +175,19 @@ describe('RideRequestHost layout', () => {
     expect(screen.getByTestId('ride-request-host').props.pointerEvents).toBe('box-none');
   });
 
-  it('sits above the Map tab control column (Go Online/Offline, my-location) and the tab bar', () => {
-    // 30 bottom + 60 toggle + 15 gap + 50 my-location.
-    expect(DRIVER_MAP_CONTROLS_CLEARANCE).toBe(132);
-    expect(rideRequestBottomOffset(83, 'Map')).toBe(83 + 132);
-    expect(rideRequestBottomOffset(83, 'Home')).toBe(83);
-  });
-
   it('applies the offset to the panel position', async () => {
     const store = configureStore({ reducer: rootReducer });
     jest.spyOn(driverStatusApi, 'get').mockResolvedValue(statusInfo('available'));
     await store.dispatch(loadDriverStatus());
     const screen = render(
       <Provider store={store}>
-        <RideRequestHost bottomOffset={rideRequestBottomOffset(83, 'Map')} showIdleStates />
+        <RideRequestHost bottomOffset={34} />
       </Provider>,
     );
     await flush();
     const style = Object.assign({}, ...[screen.getByTestId('ride-request-host').props.style].flat());
-    // + space[4] (16) gap over the controls.
-    expect(style.bottom).toBe(83 + 132 + 16);
+    // The home-indicator inset (tab bar hidden) + space[4] (16).
+    expect(style.bottom).toBe(34 + 16);
   });
 });
 
@@ -188,7 +195,7 @@ describe('RideRequestHost error before the first fix', () => {
   const locationRequired = () =>
     new ApiError({ kind: 'validation', status: 422, code: 'LOCATION_REQUIRED', message: 'Location required' });
 
-  it('off the Map tab, waits for a second failure in a row when there is no fix yet', async () => {
+  it('waits for a second failure in a row when there is no fix yet', async () => {
     jest.spyOn(locationTrackingService, 'getLastLocation').mockReturnValue(null);
     listPending.mockRejectedValue(locationRequired());
     const { screen } = await renderHost('available');
@@ -210,15 +217,10 @@ describe('RideRequestHost error before the first fix', () => {
     screen.getByTestId('incoming-request-card');
   });
 
-  it('on the Map tab, or once there is a fix, the error shows at once', async () => {
+  it('once there is a fix, the error shows at once', async () => {
     listPending.mockRejectedValue(locationRequired());
     const withFix = await renderHost('available');
     withFix.screen.getByTestId('ride-requests-error');
-    withFix.screen.unmount();
-
-    jest.spyOn(locationTrackingService, 'getLastLocation').mockReturnValue(null);
-    const map = await renderHost('available', true);
-    map.screen.getByTestId('ride-requests-error');
   });
 });
 

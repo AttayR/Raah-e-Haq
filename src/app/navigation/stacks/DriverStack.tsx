@@ -1,8 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import DriverBottomTabs from '../tabs/DriverBottomTabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
+import DriverBottomTabs, { type DriverTabParamList } from '../tabs/DriverBottomTabs';
 import DriverProfile from 'src/screens/Driver/DriverProfile';
-import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
 import DriverRideScreen from 'src/screens/Driver/DriverRideScreen';
 import { useDriverStatusSync } from '../../../features/driver-status/hooks';
 import { useDriverRideRestore } from '../../../features/driver-ride/hooks';
@@ -18,17 +18,16 @@ import TransactionDetailScreen from '../../../features/wallet/screens/Transactio
 import PayCommissionScreen from '../../../features/wallet/screens/PayCommissionScreen';
 import SettlementsScreen from '../../../features/wallet/screens/SettlementsScreen';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
-import DriverEarningsScreen from '../../../features/stats/screens/DriverEarningsScreen';
 import RideHistoryScreen from '../../../features/ride-history/screens/RideHistoryScreen';
 import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
 
 export type DriverStackParamList = {
-  DriverTabs: undefined;
-  DriverProfile: undefined;
+  /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
+  DriverTabs: NavigatorScreenParams<DriverTabParamList> | undefined;
+  Profile: undefined;
   /** One ride's chat thread (T-510). */
   RideChat: RideChatParams;
-  DriverMap: undefined;
   /** The driver's current ride (T-405); it reads the ride from the driverRide slice. */
   DriverRide: undefined;
   /** Settings → Notifications: push preferences (T-502, BE-11). */
@@ -40,9 +39,7 @@ export type DriverStackParamList = {
   WalletTransaction: DriverWalletRoutes['WalletTransaction'];
   PayCommission: DriverWalletRoutes['PayCommission'];
   WalletSettlements: DriverWalletRoutes['WalletSettlements'];
-  /** Earnings per day / week / month (T-507, BE-08). */
-  DriverEarnings: undefined;
-  /** Settings → Ride history and one ride's details/receipt (T-501). */
+  /** Account → Ride history and one ride's details/receipt (T-501). Earnings is a tab (UI-R4). */
   RideHistory: RideHistoryRoutes['RideHistory'];
   RideDetails: RideHistoryRoutes['RideDetails'];
 };
@@ -62,35 +59,18 @@ const DriverStack = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen 
-        name="DriverTabs" 
-        component={DriverBottomTabs} 
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen 
-        name="DriverProfile" 
-        component={DriverProfile} 
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
+      <Stack.Screen name="Profile" component={DriverProfile} />
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
-      <Stack.Screen 
-        name="DriverMap" 
-        component={DriverMapScreen} 
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="DriverRide"
-        component={DriverRideScreen}
-        options={{ headerShown: false }}
-      />
+      {/* The full-screen trip map (T-405): pushed over the tabs, so no tab bar. */}
+      <Stack.Screen name="DriverRide" component={DriverRideScreen} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
       <Stack.Screen name="DriverDocuments" component={DriverDocumentsScreen} />
       <Stack.Screen name="Wallet" component={WalletScreen} />
       <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
       <Stack.Screen name="PayCommission" component={PayCommissionScreen} />
       <Stack.Screen name="WalletSettlements" component={SettlementsScreen} />
-      <Stack.Screen name="DriverEarnings" component={DriverEarningsScreen} />
       <Stack.Screen name="RideHistory" component={RideHistoryScreen} />
       <Stack.Screen name="RideDetails" component={RideDetailsScreen} getId={rideDetailsScreenId} />
     </Stack.Navigator>

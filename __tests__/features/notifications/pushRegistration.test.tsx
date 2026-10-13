@@ -178,7 +178,7 @@ describe('usePushNotifications', () => {
     expect(store.getState().notifications.stale).toBe(true);
   });
 
-  it('a tapped chat push marks its row read and opens the chat (Chat tab until RideChat exists)', async () => {
+  it('a tapped chat push marks its row read and opens the chat (Inbox › Messages where RideChat is missing)', async () => {
     mock.onPost('/notifications/15/read').reply(200, { success: true, data: { id: 15, read_at: 'now' } });
     mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 0 } });
     renderPush();
@@ -191,7 +191,10 @@ describe('usePushNotifications', () => {
 
     await waitFor(() => expect(mock.history.post.some((r) => r.url === '/notifications/15/read')).toBe(true));
     expect(mockDispatchNav).toHaveBeenCalledWith(
-      CommonActions.navigate({ name: 'Passenger', params: { screen: 'PassengerTabs', params: { screen: 'Chat' } } }),
+      CommonActions.navigate({
+        name: 'Passenger',
+        params: { screen: 'PassengerTabs', params: { screen: 'Inbox', params: { segment: 'messages' } } },
+      }),
     );
   });
 
@@ -202,7 +205,10 @@ describe('usePushNotifications', () => {
     const first = renderPush();
     await waitFor(() =>
       expect(mockDispatchNav).toHaveBeenCalledWith(
-        CommonActions.navigate({ name: 'Passenger', params: { screen: 'RideHistory', initial: false } }),
+        CommonActions.navigate({
+          name: 'Passenger',
+          params: { screen: 'PassengerTabs', params: { screen: 'Activity', params: { segment: 'rides' } } },
+        }),
       ),
     );
     first.unmount();

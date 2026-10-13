@@ -1,91 +1,46 @@
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useAppTheme } from '../../providers/ThemeProvider';
+import React, { useCallback } from 'react';
+import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import PassengerHomeScreen from 'src/screens/Passenger/PassengerHomeScreen';
-import PassengerNotificationsScreen from 'src/screens/Passenger/PassengerNotificationsScreen';
-import ChatListScreen from '../../../features/chat/screens/ChatListScreen';
 import PassengerSettingsScreen from 'src/screens/Passenger/PassengerSettingsScreen';
-import { unreadBadgeLabel, useUnreadNotificationCount } from '../../../features/notifications/hooks';
+import ActivityScreen, { type ActivityParams } from '../../../features/activity/ActivityScreen';
+import InboxScreen, { type InboxParams } from '../../../features/inbox/InboxScreen';
+import { useUnreadNotificationCount } from '../../../features/notifications/hooks';
+import { PASSENGER_TABS, RoleTabBar } from './RoleTabBar';
 
+/** DESIGN_SYSTEM §8.1: Home · Activity · Inbox · Account (no Map tab, UI-R4). */
 export type PassengerTabParamList = {
   Home: undefined;
-  Notifications: undefined;
-  Chat: undefined;
-  Settings: undefined;
+  Activity: ActivityParams | undefined;
+  Inbox: InboxParams | undefined;
+  Account: undefined;
 };
 
 const Tab = createBottomTabNavigator<PassengerTabParamList>();
 
-// No Map tab: booking is the PassengerMap stack route, opened from Home (T-301, PAX-10;
-// DESIGN_SYSTEM §8 IA). A second mount had its own copy of the ride state.
-
+/**
+ * The passenger's four tabs with the shared tab bar (§5.3). Home is the map-first screen;
+ * "Where to?" pushes the Booking stack route (tab bar hidden). The Inbox badge reads the store
+ * only: PassengerStack owns the unread-count poll (T-502).
+ */
 const PassengerBottomTabs = () => {
-  const { theme } = useAppTheme();
-  // Unread badge from the notifications slice; useNotificationsSync (role stack) keeps it fresh (T-502).
-  const unreadBadge = unreadBadgeLabel(useUnreadNotificationCount());
+  const inboxUnread = useUnreadNotificationCount();
+  const renderTabBar = useCallback(
+    (props: BottomTabBarProps) => <RoleTabBar {...props} specs={PASSENGER_TABS} inboxUnread={inboxUnread} />,
+    [inboxUnread],
+  );
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.text + '80',
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-        },
-        headerStyle: {
-          backgroundColor: theme.colors.surface,
-        },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        headerShown: false
-      }}
-    >
-      <Tab.Screen
-  name="Home"
-  component={PassengerHomeScreen}
-  options={{
-    headerShown: false, // 👈 This hides the header for Home screen
-    tabBarIcon: ({ color, size }) => (
-      <Icon name="home" color={color} size={size} />
-    ),
-  }}
-/>
-
-      <Tab.Screen
-        name="Notifications"
-        component={PassengerNotificationsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="notifications" color={color} size={size} />
-          ),
-          tabBarBadge: unreadBadge,
-          tabBarBadgeStyle: { backgroundColor: theme.colors.dangerFill, color: theme.colors.onPrimary },
-        }}
-      />
-      <Tab.Screen
-        name="Chat"
-        component={ChatListScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="chat" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={PassengerSettingsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="settings" color={color} size={size} />
-          ),
-        }}
-      />
+    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false, animation: 'none' }}>
+      <Tab.Screen name="Home" component={PassengerHomeScreen} />
+      <Tab.Screen name="Activity" component={ActivityScreen} />
+      <Tab.Screen name="Inbox" component={PassengerInboxTab} />
+      <Tab.Screen name="Account" component={PassengerSettingsScreen} />
     </Tab.Navigator>
   );
 };
+
+function PassengerInboxTab() {
+  return <InboxScreen role="passenger" />;
+}
 
 export default PassengerBottomTabs;

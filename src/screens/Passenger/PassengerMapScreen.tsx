@@ -79,7 +79,7 @@ const PassengerMapScreen = () => {
   // BE-37: a refused booking for an unverified phone opens the profile, where the number is
   // verified (T-504 builds that flow).
   const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
-    onPhoneNotVerified: () => navigation.navigate('PassengerPofile'),
+    onPhoneNotVerified: () => navigation.navigate('Profile'),
   });
 
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;

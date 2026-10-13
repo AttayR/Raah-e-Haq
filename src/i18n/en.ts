@@ -192,6 +192,73 @@ export const en = {
     reasonPlans: 'Changed my plans',
     reasonMistake: 'Booked by mistake',
   },
+  /** Navigation shell (UI-R4, DESIGN_SYSTEM §8.1): tab labels and their accessibility text. */
+  nav: {
+    home: 'Home',
+    activity: 'Activity',
+    inbox: 'Inbox',
+    account: 'Account',
+    drive: 'Drive',
+    earnings: 'Earnings',
+    tabsA11y: 'Main tabs',
+    inboxBadgeA11y: 'Inbox, {count} unread',
+  },
+  /** Passenger map-first Home (UI-R4 structure; UI-R9 refines the sheet content). */
+  home: {
+    sheetA11y: 'Where to sheet',
+    openProfile: 'Open your profile',
+    savedPlaces: 'Saved places',
+    savedPlacesA11y: 'Open saved places',
+    locationOffTitle: 'Location is off',
+    locationOffBody: 'Turn on location so drivers can find your pickup.',
+    turnOnLocation: 'Turn on location',
+    mapLoading: 'Map loading…',
+  },
+  /** Driver map-first Drive tab (UI-R4 structure; UI-R11 refines the request state). */
+  drive: {
+    sheetA11y: 'Drive sheet',
+    youAreOffline: "You're offline",
+    youAreOnline: "You're online",
+    onRide: "You're on a ride",
+    checking: 'Checking your status…',
+    offlineHint: 'Go online to start getting ride requests.',
+    onlineHint: 'Looking for ride requests near you.',
+    onRideHint: 'Finish your ride to go offline.',
+    goOnline: 'Go online',
+    goOffline: 'Go offline',
+    resumeRide: 'Resume ride',
+    todayEarnings: 'Today · {amount}',
+    todayEarningsA11y: 'Earned today, {amount}',
+    locationTitle: 'Location required',
+    locationBody: 'Please enable location services to go online.',
+    openSettings: 'Open settings',
+    searchingA11y: 'Searching for ride requests',
+  },
+  /** Inbox tab, both roles (UI-R4): notifications and messages in one place. */
+  inbox: {
+    title: 'Inbox',
+    segmentLabel: 'Inbox',
+    notifications: 'Notifications',
+    messages: 'Messages',
+    markAllRead: 'Mark all read',
+  },
+  /** Passenger Activity tab (UI-R4): rides and wallet. */
+  activity: {
+    title: 'Activity',
+    segmentLabel: 'Activity',
+    rides: 'Rides',
+    wallet: 'Wallet',
+  },
+  /** Driver Earnings tab (UI-R4): the earnings screen plus the wallet/commission entry. */
+  earnings: {
+    title: 'Earnings',
+    walletTitle: 'Wallet & commission',
+    walletOwed: 'Commission owed: {amount}',
+    walletClear: 'No commission owed',
+    walletLoading: 'Balance and payment reports',
+    walletUnavailable: "Couldn't load your wallet. Open it to try again.",
+    walletOpenA11y: 'Open wallet and commission',
+  },
 } as const;
 
 export type Strings = typeof en;

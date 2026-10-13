@@ -1,7 +1,7 @@
 /**
  * T-510: the shared thread screen (header name/photo/call, empty state, "Seen", failed bubble
  * with retry, composer hidden with a read-only notice once the ride ended, 410 expired) and
- * the Chat tab list from GET /chats (rows, unread, empty, error, tap opens the thread). The
+ * the Inbox › Messages list from GET /chats (rows, unread, empty, error, tap opens the thread). The
  * "Message" entry points on both ride panels open RideChat with the ride id.
  */
 import React from 'react';
@@ -15,7 +15,7 @@ import { rootReducer } from '../../../src/store/rootReducer';
 import { ApiError } from '../../../src/core/api/errors';
 import { chatApi } from '../../../src/features/chat/api';
 import ChatThreadScreen from '../../../src/features/chat/screens/ChatThreadScreen';
-import ChatListScreen from '../../../src/features/chat/screens/ChatListScreen';
+import { ChatList } from '../../../src/features/chat/components/ChatList';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage } from '../../../src/features/active-ride/stage';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
@@ -201,7 +201,7 @@ describe('ChatThreadScreen', () => {
   });
 });
 
-describe('ChatListScreen', () => {
+describe('ChatList (Inbox › Messages)', () => {
   it('lists chats from GET /chats with unread counts and opens the thread on tap', async () => {
     jest.spyOn(chatApi, 'listChats').mockResolvedValue([
       {
@@ -223,7 +223,7 @@ describe('ChatListScreen', () => {
         unreadCount: 0,
       },
     ]);
-    await renderWithStore(<ChatListScreen />);
+    await renderWithStore(<ChatList visible />);
 
     expect(screen.getByText('Bilal')).toBeTruthy();
     expect(screen.getByText(/At the gate/)).toBeTruthy();
@@ -238,7 +238,7 @@ describe('ChatListScreen', () => {
 
   it('empty: "Chats appear here during a ride"', async () => {
     jest.spyOn(chatApi, 'listChats').mockResolvedValue([]);
-    await renderWithStore(<ChatListScreen />);
+    await renderWithStore(<ChatList visible />);
     expect(screen.getByText('Chats appear here during a ride.')).toBeTruthy();
   });
 
@@ -247,7 +247,7 @@ describe('ChatListScreen', () => {
       .spyOn(chatApi, 'listChats')
       .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
       .mockResolvedValue([]);
-    await renderWithStore(<ChatListScreen />);
+    await renderWithStore(<ChatList visible />);
     expect(screen.getByTestId('chat-list-error')).toBeTruthy();
     fireEvent.press(screen.getByTestId('chat-list-retry'));
     await flush();

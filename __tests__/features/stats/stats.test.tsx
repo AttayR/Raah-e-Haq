@@ -20,7 +20,7 @@ import {
 import type { DriverStats, PassengerStats } from '../../../src/features/stats/types';
 import { StatGrid } from '../../../src/features/passenger-home/components/StatGrid';
 import DriverEarningsScreen from '../../../src/features/stats/screens/DriverEarningsScreen';
-import { envelope } from '../../../test-utils/walletFixtures';
+import { envelope, rawWallet } from '../../../test-utils/walletFixtures';
 
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
@@ -216,6 +216,27 @@ describe('DriverEarningsScreen', () => {
     showEarnings();
     fireEvent.press(await screen.findByTestId('earnings-ride-7'));
     expect(mockNavigate).toHaveBeenCalledWith('RideDetails', { rideId: 7 });
+  });
+
+  it('is a tab root (UI-R4): large "Earnings" title, no back; the wallet card shows commission owed and opens Wallet', async () => {
+    mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
+    mock.onGet('/wallet').reply(200, envelope(rawWallet({ commission_owed: 116 })));
+    showEarnings();
+    await waitFor(() => expect(screen.getByText('Commission owed: Rs 116')).toBeTruthy());
+    expect(screen.getAllByText('Earnings').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('earnings-back')).toBeNull();
+    fireEvent.press(screen.getByTestId('earnings-wallet'));
+    expect(mockNavigate).toHaveBeenCalledWith('Wallet');
+  });
+
+  it('the wallet card says the wallet could not load when GET /wallet fails (never "loading" forever)', async () => {
+    mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
+    mock.onGet('/wallet').reply(500, {});
+    showEarnings();
+    await waitFor(() => expect(screen.getByText("Couldn't load your wallet. Open it to try again.")).toBeTruthy());
+    expect(screen.queryByText('Balance and payment reports')).toBeNull();
+    fireEvent.press(screen.getByTestId('earnings-wallet'));
+    expect(mockNavigate).toHaveBeenCalledWith('Wallet');
   });
 
   it('shows an error with retry', async () => {

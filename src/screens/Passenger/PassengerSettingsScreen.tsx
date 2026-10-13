@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { Linking, RefreshControl, StyleSheet } from 'react-native';
+import { Linking, RefreshControl, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,18 +9,20 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { RootState, useAppDispatch } from '../../store';
 import { getUserProfile } from '../../store/thunks/apiThunks';
 import { useLogout } from '../../hooks/useLogout';
-import { AppText, ListGroup, ListItem, Screen } from '../../components/ui';
+import { Header, HeaderLargeTitle, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
+import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { ProfileSummaryCard } from '../../components/passenger/settings/ProfileSummaryCard';
 import { PASSENGER_SETTINGS_COPY as COPY } from '../../components/passenger/settings/copy';
-import { space } from '../../theme';
+import { layout, space } from '../../theme';
 
 /**
- * Passenger Settings tab (T-618 passenger side, shared-settings spec). Every row leads somewhere:
- * the profile card opens the Profile view, Notifications opens the push preferences (BE-11,
- * T-502) with the phone's own settings as a second row, Appearance is the T-601 override and
- * Sign out is the shared confirm flow (T-102). Help & support and Invite friends come back
- * with T-619; the notification inbox is its own tab, so it is not repeated here.
+ * Passenger Account tab (T-618 passenger side, shared-settings spec; UI-R4: `large` Header that
+ * collapses on scroll, DESIGN_SYSTEM §8.1). Every row leads somewhere: the profile card opens the
+ * Profile view, Saved places its screen, Notifications the push preferences (BE-11, T-502) with
+ * the phone's own settings as a second row, Appearance is the T-601 override and Sign out is the
+ * shared confirm flow (T-102). Ride history and Wallet live in Activity and the inbox is its own
+ * tab, so none of them is repeated here. Help & support and Invite friends come with T-619.
  */
 const PassengerSettingsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
@@ -28,6 +31,8 @@ const PassengerSettingsScreen = () => {
   const { user } = useSelector((state: RootState) => state.apiAuth);
   const { confirmLogout, isLoggingOut } = useLogout();
   const [refreshing, setRefreshing] = useState(false);
+  const { scrollY, onScroll } = useHeaderScroll();
+  const title = t('nav.account');
 
   // Pull to refresh re-reads GET /auth/profile (the thunk drops a stale-session result).
   const onRefresh = useCallback(async () => {
@@ -40,88 +45,76 @@ const PassengerSettingsScreen = () => {
   }, [dispatch]);
 
   return (
-    <Screen
-      scroll
-      contentStyle={styles.content}
-      testID="passenger-settings"
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-      }
-    >
-      <AppText variant="h1" accessibilityRole="header">
-        {COPY.title}
-      </AppText>
+    <Screen testID="passenger-settings">
+      <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="passenger-settings-header" />
+      <Animated.ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        testID="passenger-settings-scroll"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+        }
+      >
+        <HeaderLargeTitle title={title} scrollY={scrollY} />
+        <View style={styles.body}>
+          <ProfileSummaryCard user={user} onPress={() => navigation.navigate('Profile')} />
 
-      <ProfileSummaryCard user={user} onPress={() => navigation.navigate('PassengerPofile')} />
+          <ListGroup title={COPY.accountGroup}>
+            <ListItem
+              icon="bookmark"
+              title={COPY.savedPlaces}
+              subtitle={COPY.savedPlacesSubtitle}
+              onPress={() => navigation.navigate('FavoriteLocations')}
+              testID="passenger-settings-saved-places"
+            />
+          </ListGroup>
 
-      <ListGroup title={COPY.accountGroup}>
-        <ListItem
-          icon="wallet"
-          title={COPY.wallet}
-          subtitle={COPY.walletSubtitle}
-          onPress={() => navigation.navigate('Wallet')}
-          testID="passenger-settings-wallet"
-        />
-        <ListItem
-          icon="bookmark"
-          title={COPY.savedPlaces}
-          subtitle={COPY.savedPlacesSubtitle}
-          onPress={() => navigation.navigate('FavoriteLocations')}
-          testID="passenger-settings-saved-places"
-        />
-        <ListItem
-          icon="history"
-          title={COPY.rideHistory}
-          subtitle={COPY.rideHistorySubtitle}
-          onPress={() => navigation.navigate('RideHistory')}
-          testID="passenger-settings-ride-history"
-        />
-      </ListGroup>
+          <ListGroup title={COPY.notificationsGroup}>
+            <ListItem
+              icon="bell"
+              title={COPY.notifications}
+              subtitle={COPY.notificationsSubtitle}
+              onPress={() => navigation.navigate('NotificationPreferences')}
+              testID="passenger-settings-notifications"
+            />
+            <ListItem
+              icon="settings"
+              title={COPY.phoneNotifications}
+              subtitle={COPY.phoneNotificationsSubtitle}
+              onPress={() => {
+                Linking.openSettings();
+              }}
+              testID="passenger-settings-phone-notifications"
+            />
+          </ListGroup>
 
-      <ListGroup title={COPY.notificationsGroup}>
-        <ListItem
-          icon="bell"
-          title={COPY.notifications}
-          subtitle={COPY.notificationsSubtitle}
-          onPress={() => navigation.navigate('NotificationPreferences')}
-          testID="passenger-settings-notifications"
-        />
-        <ListItem
-          icon="settings"
-          title={COPY.phoneNotifications}
-          subtitle={COPY.phoneNotificationsSubtitle}
-          onPress={() => {
-            Linking.openSettings();
-          }}
-          testID="passenger-settings-phone-notifications"
-        />
-      </ListGroup>
+          <ListGroup title={COPY.appGroup}>
+            <AppearanceRow />
+          </ListGroup>
 
-      <ListGroup title={COPY.appGroup}>
-        <AppearanceRow />
-      </ListGroup>
-
-      <ListGroup>
-        <ListItem
-          icon="logout"
-          title={isLoggingOut ? COPY.signingOut : COPY.signOut}
-          destructive
-          onPress={confirmLogout}
-          disabled={isLoggingOut}
-          testID="passenger-settings-sign-out"
-        />
-      </ListGroup>
+          <ListGroup>
+            <ListItem
+              icon="logout"
+              title={isLoggingOut ? COPY.signingOut : COPY.signOut}
+              destructive
+              onPress={confirmLogout}
+              disabled={isLoggingOut}
+              testID="passenger-settings-sign-out"
+            />
+          </ListGroup>
+        </View>
+      </Animated.ScrollView>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: space[4],
-    paddingTop: space[2],
-    paddingBottom: space[6],
-    gap: space[6],
-  },
+  scroll: { flex: 1 },
+  content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[6] },
+  body: { paddingHorizontal: layout.gutter, paddingTop: space[2], gap: space[6] },
 });
 
 export default PassengerSettingsScreen;

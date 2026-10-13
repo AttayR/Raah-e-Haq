@@ -3,7 +3,7 @@
  * modal modes, programmatic snaps, keyboard → full, a11y on the handle, light/dark.
  */
 import React, { createRef } from 'react';
-import { AccessibilityInfo, Keyboard, StyleSheet, Text, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, BackHandler, Keyboard, StyleSheet, Text, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme } from '../../../src/theme';
@@ -181,6 +181,47 @@ describe('BottomSheet (map mode)', () => {
       mode,
     );
     expect(flat(screen.getByTestId('sheet').props.style).backgroundColor).toBe(fill);
+  });
+
+  it('[UI-R4] Android back collapses a raised sheet only while its screen is active', async () => {
+    let backHandler: (() => boolean) | null = null;
+    const addBack = jest.spyOn(BackHandler, 'addEventListener').mockImplementation(((_event: string, handler: () => boolean) => {
+      backHandler = handler;
+      return { remove: () => { backHandler = null; } };
+    }) as unknown as typeof BackHandler.addEventListener);
+    const addKeyboard = jest.spyOn(Keyboard, 'addListener');
+    const ref = createRef<BottomSheetHandle>();
+    const onSnapChange = jest.fn();
+    const sheet = (active: boolean) => (
+      <ThemeProvider>
+        <BottomSheet ref={ref} peekHeight={170} active={active} onSnapChange={onSnapChange} testID="sheet">
+          <Text>Body</Text>
+        </BottomSheet>
+      </ThemeProvider>
+    );
+    mockScheme.mockReturnValue('light');
+    const view = render(sheet(true));
+    await act(async () => {});
+    await layout(containerOf('sheet'), 874);
+    act(() => ref.current?.snapTo('half'));
+    expect(backHandler).not.toBeNull();
+    let handled = false;
+    act(() => {
+      handled = backHandler ? backHandler() : false;
+    });
+    expect(handled).toBe(true);
+    expect(onSnapChange).toHaveBeenLastCalledWith('peek', 170);
+
+    // Another tab or a pushed screen covers it: no back handler, no keyboard listeners.
+    act(() => ref.current?.snapTo('half'));
+    addBack.mockClear();
+    addKeyboard.mockClear();
+    view.rerender(sheet(false));
+    await act(async () => {});
+    expect(backHandler).toBeNull();
+    expect(addBack).not.toHaveBeenCalled();
+    expect(addKeyboard).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
   });
 
   it('respects reduced motion (still settles at the snap)', async () => {

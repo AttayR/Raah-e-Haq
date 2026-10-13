@@ -1,18 +1,13 @@
 import type { AccountStatus } from '../../../services/api';
 
-/** Static copy for the passenger Settings tab and Profile view (T-618, passenger side). */
+/** Static copy for the passenger Account tab and Profile view (T-618; the tab title is `nav.account`, UI-R4). */
 export const PASSENGER_SETTINGS_COPY = {
-  title: 'Settings',
   passengerFallbackName: 'Rider',
   roleLabel: 'Rider',
   openProfileHint: 'Opens your profile',
   accountGroup: 'Your account',
-  wallet: 'Wallet',
-  walletSubtitle: 'Balance and history',
   savedPlaces: 'Saved places',
   savedPlacesSubtitle: 'Home, work and favourites',
-  rideHistory: 'Ride history',
-  rideHistorySubtitle: 'Your past trips and receipts',
   notificationsGroup: 'Notifications',
   notifications: 'Notifications',
   notificationsSubtitle: 'Choose which alerts you get',

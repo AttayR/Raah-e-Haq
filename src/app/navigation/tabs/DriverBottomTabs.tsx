@@ -1,122 +1,88 @@
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import {
-  BottomTabBar,
-  createBottomTabNavigator,
-  type BottomTabBarProps,
-} from '@react-navigation/bottom-tabs';
+import { StyleSheet, View } from 'react-native';
+import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useAppTheme } from '../../providers/ThemeProvider';
-import DriverHomeScreen from 'src/screens/Driver/DriverHomeScreen';
-import DriverMapScreen from 'src/screens/Driver/DriverMapScreen';
-import DriverNotificationsScreen from 'src/screens/Driver/DriverNotificationsScreen';
-import ChatListScreen from '../../../features/chat/screens/ChatListScreen';
+import DriverDriveScreen from 'src/screens/Driver/DriverDriveScreen';
 import DriverSettingsScreen from 'src/screens/Driver/DriverSettingsScreen';
-import { unreadBadgeLabel, useUnreadNotificationCount } from '../../../features/notifications/hooks';
+import DriverEarningsScreen from '../../../features/stats/screens/DriverEarningsScreen';
+import InboxScreen, { type InboxParams } from '../../../features/inbox/InboxScreen';
+import { useUnreadNotificationCount } from '../../../features/notifications/hooks';
 import { RideRequestHost } from '../../../components/driver/RideRequestHost';
-import { rideRequestBottomOffset } from '../../../components/driver/rideRequestLayout';
+import { IncomingRequestShownContext } from '../../../features/driver-requests/overlay';
+import { componentTokens } from '../../../theme';
+import type { DriverStackParamList } from '../stacks/DriverStack';
+import { DRIVER_TABS, RoleTabBar } from './RoleTabBar';
 
+/** DESIGN_SYSTEM §8.1: Drive · Earnings · Inbox · Account (no Map tab, UI-R4). */
 export type DriverTabParamList = {
-  Home: undefined;
-  Map: undefined;
-  Notifications: undefined;
-  Chat: undefined;
-  Settings: undefined;
+  Drive: undefined;
+  Earnings: undefined;
+  Inbox: InboxParams | undefined;
+  Account: undefined;
 };
 
 const Tab = createBottomTabNavigator<DriverTabParamList>();
 
-/** The default iOS tab bar height, used until the real bar has been measured. */
-const DEFAULT_TAB_BAR_HEIGHT = 49;
+type Props = NativeStackScreenProps<DriverStackParamList, 'DriverTabs'>;
 
-const DriverBottomTabs = () => {
-  const { theme } = useAppTheme();
-  // Unread badge from the notifications slice; useNotificationsSync (role stack) keeps it fresh (T-502).
-  const unreadBadge = unreadBadgeLabel(useUnreadNotificationCount());
+/**
+ * The driver's four tabs with the shared tab bar (§5.3). RideRequestHost is mounted once here
+ * (the single GET /rides/pending poller, T-408): a request switches to the Drive tab and hides
+ * the tab bar so it sits on the Drive map (§8.3); declining or a timeout brings the bar back.
+ */
+const DriverBottomTabs = ({ navigation }: Props) => {
   const insets = useSafeAreaInsets();
-  // Ride requests (T-408) sit above the tab bar on every tab: its measured height, and the open
-  // tab (the Map tab also shows the feed's loading and empty states).
-  const [tabBarHeight, setTabBarHeight] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<keyof DriverTabParamList>('Home');
+  const inboxUnread = useUnreadNotificationCount();
+  const [requestShown, setRequestShown] = useState(false);
+  const [activeTab, setActiveTab] = useState<keyof DriverTabParamList>('Drive');
 
-  const onTabBarLayout = useCallback((event: LayoutChangeEvent) => {
-    setTabBarHeight(event.nativeEvent.layout.height);
-  }, []);
+  const onRequestShownChange = useCallback(
+    (shown: boolean) => {
+      setRequestShown(shown);
+      if (shown && activeTab !== 'Drive') {
+        navigation.navigate('DriverTabs', { screen: 'Drive' });
+      }
+    },
+    [activeTab, navigation],
+  );
+
   const renderTabBar = useCallback(
     (props: BottomTabBarProps) => (
-      <View onLayout={onTabBarLayout}>
-        <BottomTabBar {...props} />
-      </View>
+      <RoleTabBar {...props} specs={DRIVER_TABS} inboxUnread={inboxUnread} hidden={requestShown} />
     ),
-    [onTabBarLayout],
+    [inboxUnread, requestShown],
   );
 
   return (
-    <View style={styles.container}>
-      <Tab.Navigator
-        tabBar={renderTabBar}
-        screenListeners={({ route }) => ({
-          focus: () => setActiveTab(route.name),
-        })}
-        screenOptions={{
-          tabBarActiveTintColor: theme.colors.primaryText,
-          tabBarInactiveTintColor: theme.colors.textMuted,
-          tabBarStyle: {
-            backgroundColor: theme.colors.surface,
-            borderTopColor: theme.colors.border,
-          },
-          headerShown: false,
-        }}
-      >
-        <Tab.Screen
-          name="Home"
-          component={DriverHomeScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => <Icon name="home" color={color} size={size} />,
-          }}
+    <IncomingRequestShownContext.Provider value={requestShown}>
+      <View style={styles.container}>
+        <Tab.Navigator
+          tabBar={renderTabBar}
+          screenListeners={({ route }) => ({
+            focus: () => setActiveTab(route.name),
+          })}
+          screenOptions={{ headerShown: false, animation: 'none' }}
+        >
+          <Tab.Screen name="Drive" component={DriverDriveScreen} />
+          <Tab.Screen name="Earnings" component={DriverEarningsScreen} />
+          <Tab.Screen name="Inbox" component={DriverInboxTab} />
+          <Tab.Screen name="Account" component={DriverSettingsScreen} />
+        </Tab.Navigator>
+        <RideRequestHost
+          // With the bar hidden the request sits on the home indicator inset; an error card
+          // (bar still shown) sits above the bar.
+          bottomOffset={requestShown ? insets.bottom : componentTokens.tabBar.height + insets.bottom}
+          onRequestShownChange={onRequestShownChange}
         />
-        <Tab.Screen
-          name="Map"
-          component={DriverMapScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => <Icon name="map" color={color} size={size} />,
-          }}
-        />
-        <Tab.Screen
-          name="Notifications"
-          component={DriverNotificationsScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => <Icon name="notifications" color={color} size={size} />,
-            tabBarBadge: unreadBadge,
-            tabBarBadgeStyle: { backgroundColor: theme.colors.dangerFill, color: theme.colors.onPrimary },
-          }}
-        />
-        <Tab.Screen
-          name="Chat"
-          component={ChatListScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => <Icon name="chat" color={color} size={size} />,
-          }}
-        />
-        <Tab.Screen
-          name="Settings"
-          component={DriverSettingsScreen}
-          options={{
-            tabBarIcon: ({ color, size }) => <Icon name="settings" color={color} size={size} />,
-          }}
-        />
-      </Tab.Navigator>
-      <RideRequestHost
-        bottomOffset={rideRequestBottomOffset(
-          tabBarHeight ?? DEFAULT_TAB_BAR_HEIGHT + insets.bottom,
-          activeTab,
-        )}
-        showIdleStates={activeTab === 'Map'}
-      />
-    </View>
+      </View>
+    </IncomingRequestShownContext.Provider>
   );
 };
+
+function DriverInboxTab() {
+  return <InboxScreen role="driver" />;
+}
 
 const styles = StyleSheet.create({
   container: {

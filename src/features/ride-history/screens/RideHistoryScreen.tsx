@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, EmptyState, ErrorState, Header, Screen, SegmentedControl, SkeletonList } from '../../../components/ui';
+import { AppText, Button, EmptyState, ErrorState, FilterChips, Header, Screen, SkeletonList } from '../../../components/ui';
 import { layout, space } from '../../../theme';
 import { RideHistoryRow } from '../components/RideHistoryRow';
 import { RIDE_HISTORY_COPY } from '../copy';
@@ -16,18 +17,27 @@ const FILTERS = [
   { value: 'cancelled', label: RIDE_HISTORY_COPY.filterCancelled },
 ] as const;
 
+export type RideHistoryListProps = {
+  /** True while the list is on screen (loads then, and again on each return). */
+  visible: boolean;
+  /** Rendered above the filter (Activity's large title, segments and stats); scrolls with the list. */
+  header?: React.ReactElement;
+  /** `useHeaderScroll().onScroll`, so a large title collapses into the bar. */
+  onScroll?: React.ComponentProps<typeof Animated.FlatList>['onScroll'];
+};
+
 /**
  * Ride history for both roles (T-501, BE-01): GET /rides scoped to the signed-in user, newest
  * first, with an All / Completed / Cancelled filter, pull to refresh and infinite scroll.
- * Passengers see the fare, drivers their earnings. Tapping a ride opens RideDetails.
+ * Passengers see the fare, drivers their earnings. Tapping a ride opens RideDetails. The list
+ * is also the passenger's Activity › Rides (UI-R4); the driver opens it from Account.
  */
-export default function RideHistoryScreen() {
+export function RideHistoryList({ visible, header, onScroll }: RideHistoryListProps) {
   const { theme } = useAppTheme();
-  const navigation = useNavigation<RideDetailsNavigator & { goBack(): void }>();
-  const isFocused = useIsFocused();
+  const navigation = useNavigation<RideDetailsNavigator>();
   const viewer = useRideViewer();
   const [filter, setFilter] = useState<RideHistoryFilter>('all');
-  const list = useRideHistory(filter, isFocused);
+  const list = useRideHistory(filter, visible);
   const { refresh, reload, loadMore } = list;
 
   // The spinner shows for a pull only.
@@ -51,19 +61,22 @@ export default function RideHistoryScreen() {
   );
 
   const listHeader = (
-    <View style={styles.headerBlock}>
-      <SegmentedControl<RideHistoryFilter>
-        options={FILTERS}
-        value={filter}
-        onChange={setFilter}
-        accessibilityLabel={RIDE_HISTORY_COPY.filterLabel}
-        testID="ride-history-filter"
-      />
-      {list.error && list.items.length > 0 ? (
-        <AppText variant="bodySmall" color="danger" testID="ride-history-refresh-error">
-          {list.error}
-        </AppText>
-      ) : null}
+    <View>
+      {header}
+      <View style={styles.headerBlock}>
+        <FilterChips<RideHistoryFilter>
+          options={FILTERS}
+          value={filter}
+          onChange={setFilter}
+          accessibilityLabel={RIDE_HISTORY_COPY.filterLabel}
+          testID="ride-history-filter"
+        />
+        {list.error && list.items.length > 0 ? (
+          <AppText variant="bodySmall" color="danger" testID="ride-history-refresh-error">
+            {list.error}
+          </AppText>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -123,6 +136,33 @@ export default function RideHistoryScreen() {
   };
 
   return (
+    <Animated.FlatList
+      testID="ride-history-list"
+      style={styles.list}
+      data={list.items}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={renderItem}
+      ItemSeparatorComponent={Separator}
+      ListHeaderComponent={listHeader}
+      ListEmptyComponent={renderEmpty}
+      ListFooterComponent={renderFooter}
+      contentContainerStyle={[styles.content, list.items.length === 0 && styles.contentEmpty]}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      onEndReached={list.hasMore && !list.loadMoreError ? loadMore : undefined}
+      onEndReachedThreshold={0.5}
+      refreshControl={
+        <RefreshControl refreshing={pulling} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
+      }
+    />
+  );
+}
+
+/** The driver's Account → Ride history route: a standard Header with back over the list. */
+export default function RideHistoryScreen() {
+  const navigation = useNavigation<{ goBack(): void }>();
+  const isFocused = useIsFocused();
+  return (
     <Screen testID="ride-history-screen">
       <Header
         tone="background"
@@ -131,22 +171,7 @@ export default function RideHistoryScreen() {
         onBack={() => navigation.goBack()}
         testID="ride-history"
       />
-      <FlatList
-        testID="ride-history-list"
-        data={list.items}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        ItemSeparatorComponent={Separator}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={renderEmpty}
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={[styles.content, list.items.length === 0 && styles.contentEmpty]}
-        onEndReached={list.hasMore && !list.loadMoreError ? loadMore : undefined}
-        onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl refreshing={pulling} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
-        }
-      />
+      <RideHistoryList visible={isFocused} />
     </Screen>
   );
 }
@@ -156,9 +181,10 @@ function Separator() {
 }
 
 const styles = StyleSheet.create({
+  list: { flex: 1 },
   content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   contentEmpty: { flexGrow: 1 },
-  headerBlock: { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[3], gap: space[3] },
+  headerBlock: { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[3], gap: space[3] },
   separator: { height: space[3] },
   footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },
 });

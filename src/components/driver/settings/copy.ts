@@ -1,6 +1,5 @@
-/** Static copy for the driver Settings tab (T-618, driver side). */
+/** Static copy for the driver Account tab (T-618, driver side; the title is `nav.account`, UI-R4). */
 export const DRIVER_SETTINGS_COPY = {
-  title: 'Settings',
   driverFallbackName: 'Driver',
   statusApproved: 'Approved',
   statusPending: 'Pending',
@@ -9,13 +8,8 @@ export const DRIVER_SETTINGS_COPY = {
   editProfileSubtitle: 'Update your personal information',
   documents: 'Vehicle & documents',
   documentsSubtitle: 'Review status and re-upload rejected photos',
-  moneyGroup: 'Money',
-  earnings: 'Earnings',
-  earningsSubtitle: 'Today, this week and this month',
   rideHistory: 'Ride history',
   rideHistorySubtitle: 'Your trips, receipts and cancellations',
-  wallet: 'Wallet',
-  walletSubtitle: 'Balance, commission and history',
   notifications: 'Notifications',
   notificationsSubtitle: 'Choose which alerts you get',
   phoneNotifications: 'Phone notification settings',

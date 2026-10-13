@@ -5,7 +5,10 @@ import { AppText } from '../../../components/ui/AppText';
 import { Icon } from '../../../components/ui/Icon';
 import { radius, space } from '../../../theme';
 
-/** The "Where to?" entry into booking (passenger-home.md block 3): 56 high, full width. */
+/** The "Where to?" entry into booking (§8.3 Home sheet: 52 high, full width). */
+/** §8.3 peek arithmetic: the field is 52. */
+export const WHERE_TO_HEIGHT = 52;
+
 export const WhereToBar: React.FC<{ onPress: () => void }> = ({ onPress }) => {
   const { theme } = useAppTheme();
   const dark = theme.mode === 'dark';
@@ -32,7 +35,7 @@ export const WhereToBar: React.FC<{ onPress: () => void }> = ({ onPress }) => {
 
 const styles = StyleSheet.create({
   bar: {
-    minHeight: 56,
+    minHeight: WHERE_TO_HEIGHT,
     borderRadius: radius.md,
     paddingHorizontal: space[4],
     flexDirection: 'row',

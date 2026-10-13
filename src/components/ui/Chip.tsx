@@ -21,6 +21,8 @@ export type ChipProps = {
   onPress?: () => void;
   disabled?: boolean;
   accessibilityLabel?: string;
+  /** `radio` inside a FilterChips group; `button` (default) otherwise. */
+  accessibilityRole?: 'button' | 'radio';
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -40,6 +42,7 @@ export const Chip: React.FC<ChipProps> = ({
   onPress,
   disabled = false,
   accessibilityLabel,
+  accessibilityRole = 'button',
   testID,
   style,
 }) => {
@@ -77,9 +80,9 @@ export const Chip: React.FC<ChipProps> = ({
   return (
     <Pressable
       testID={testID}
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={accessibilityRole === 'radio' ? { selected, checked: selected, disabled } : { selected, disabled }}
       disabled={disabled}
       onPress={() => {
         if (selectable) {

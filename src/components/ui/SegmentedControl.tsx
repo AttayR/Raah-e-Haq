@@ -19,7 +19,8 @@ export type SegmentedControlProps<T extends string> = {
 
 /**
  * Segmented control (DESIGN_SYSTEM §5.10): `surfaceAlt` track, padding 4, `surface` thumb
- * (dark: `surfaceRaised`). Each segment is a 44pt-high radio target; labels shrink, never clip.
+ * (dark: `surfaceRaised`). Each segment is a 44pt-high radio target; labels are one line, capped
+ * by AppText's font-scale multiplier (UI-R4: no adjustsFontSizeToFit, see below).
  * Changing the selection fires the `selection` haptic (§6.11); re-tapping the current one is a no-op.
  */
 export function SegmentedControl<T extends string>({
@@ -57,13 +58,10 @@ export function SegmentedControl<T extends string>({
             accessibilityState={{ selected, checked: selected, disabled }}
             style={[styles.segment, selected ? [{ backgroundColor: thumb }, theme.elevation[1]] : null]}
           >
-            <AppText
-              variant="label"
-              color={selected ? 'textPrimary' : 'textSecondary'}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={seg.minimumFontScale}
-            >
+            {/* [UI-R4] No adjustsFontSizeToFit: iOS fitted the label at the first (0-wide) layout
+                inside list headers and it stayed ~3pt. Font scaling is capped by AppText's
+                maxFontSizeMultiplier instead; the ruled labels fit at 1.3x on SE. */}
+            <AppText variant="label" color={selected ? 'textPrimary' : 'textSecondary'} numberOfLines={1}>
               {option.label}
             </AppText>
           </Pressable>

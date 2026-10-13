@@ -14,7 +14,6 @@ import { rootReducer } from '../../src/store/rootReducer';
 import { selectDriverActiveRide, setDriverActiveRide } from '../../src/features/driver-ride/slice';
 import type { RideResource, RideStopResource } from '../../src/services/rideService';
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
-import { OpenRideCard } from '../../src/components/driver/OpenRideCard';
 import { envelope, makeRide } from '../../test-utils/rideFixtures';
 import { toast } from '../../src/core/toast';
 import locationTrackingService from '../../src/services/locationTrackingService';
@@ -261,15 +260,5 @@ describe('DriverRideScreen', () => {
     screen.getByTestId('driver-ride-empty');
     act(() => fireEvent.press(screen.getByTestId('driver-ride-back-to-map')));
     expect(mockGoBack).toHaveBeenCalled();
-  });
-});
-
-describe('OpenRideCard', () => {
-  it('shows the step and opens the ride', () => {
-    const onOpen = jest.fn();
-    const screen = render(<OpenRideCard ride={makeRide({ status: 'started', passenger })} onOpen={onOpen} />);
-    expect(screen.getByTestId('open-ride-step').props.children).toBe('On trip');
-    fireEvent.press(screen.getByTestId('open-ride-button'));
-    expect(onOpen).toHaveBeenCalled();
   });
 });

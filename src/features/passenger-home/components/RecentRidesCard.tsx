@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
 import { Card } from '../../../components/ui/Card';
@@ -7,7 +7,12 @@ import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { radius, space } from '../../../theme';
 import type { HomeRecentRide } from '../types';
 
-type Props = { rides: HomeRecentRide[]; onSeeAll: () => void };
+type Props = {
+  rides: HomeRecentRide[];
+  onSeeAll: () => void;
+  /** Opens one ride (RideDetails); without it the rows are static. */
+  onOpen?: (id: string) => void;
+};
 
 /** Pickup dot, dotted rail, drop-off square: the "Raah line" (DESIGN_SYSTEM 5.23), compact. */
 const RaahRail: React.FC = () => {
@@ -22,7 +27,7 @@ const RaahRail: React.FC = () => {
 };
 
 /** Up to 3 recent rides with "See all" → ride history (passenger-home.md block 8). */
-export const RecentRidesCard: React.FC<Props> = ({ rides, onSeeAll }) => {
+export const RecentRidesCard: React.FC<Props> = ({ rides, onSeeAll, onOpen }) => {
   const { theme } = useAppTheme();
   if (rides.length === 0) return null;
   return (
@@ -30,13 +35,18 @@ export const RecentRidesCard: React.FC<Props> = ({ rides, onSeeAll }) => {
       <SectionHeader title="Recent rides" actionLabel="See all" onAction={onSeeAll} actionAccessibilityLabel="See all rides" />
       <Card padding="none">
         {rides.slice(0, 3).map((ride, index) => (
-          <View
+          <Pressable
             key={ride.id}
             accessible
+            accessibilityRole={onOpen ? 'button' : undefined}
             accessibilityLabel={`${ride.from} to ${ride.to}, ${ride.date}, ${ride.fare}`}
-            style={[
+            disabled={!onOpen}
+            onPress={onOpen ? () => onOpen(ride.id) : undefined}
+            testID={`home-recent-ride-${ride.id}`}
+            style={({ pressed }) => [
               styles.row,
               index > 0 ? { borderTopWidth: theme.borderWidth.hairline, borderTopColor: theme.colors.border } : null,
+              pressed ? { backgroundColor: theme.colors.surfacePressed } : null,
             ]}
           >
             <RaahRail />
@@ -56,7 +66,7 @@ export const RecentRidesCard: React.FC<Props> = ({ rides, onSeeAll }) => {
                 {ride.date}
               </AppText>
             </View>
-          </View>
+          </Pressable>
         ))}
       </Card>
     </View>

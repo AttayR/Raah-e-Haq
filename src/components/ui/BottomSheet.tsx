@@ -69,6 +69,12 @@ export type BottomSheetProps = React.PropsWithChildren<{
   contentKey?: string | number;
   /** Springs to `full` while a field inside is focused (§5.14). Default true. */
   expandOnKeyboard?: boolean;
+  /**
+   * False while the host screen is not focused (another tab or a pushed screen covers it): the
+   * sheet then registers no Android back handler and no keyboard listeners, so a hidden tab's
+   * sheet never eats Back or jumps to `full` for someone else's field. Default true.
+   */
+  active?: boolean;
   /** Read by screen readers on the handle. */
   accessibilityLabel?: string;
   testID?: string;
@@ -100,6 +106,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     footer,
     contentKey,
     expandOnKeyboard = true,
+    active = true,
     accessibilityLabel,
     testID,
     children,
@@ -236,7 +243,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   // Keyboard: go `full` while a field inside is focused; the footer rides above the keyboard.
   useEffect(() => {
-    if (!mounted) return undefined;
+    if (!mounted || !active) return undefined;
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const show = Keyboard.addListener(showEvent, event => {
@@ -259,11 +266,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       show.remove();
       hide.remove();
     };
-  }, [current, expandOnKeyboard, mounted, resolved, snapTo, snaps]);
+  }, [active, current, expandOnKeyboard, mounted, resolved, snapTo, snaps]);
 
   // Android back: a modal sheet closes; a raised map sheet collapses before navigation goes back.
   useEffect(() => {
-    if (modal || !mounted) return undefined;
+    if (modal || !mounted || !active) return undefined;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (resolved.length > 1 && current !== resolved[0].snap) {
         snapTo(resolved[0].snap);
@@ -272,7 +279,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       return false;
     });
     return () => sub.remove();
-  }, [current, modal, mounted, resolved, snapTo]);
+  }, [active, current, modal, mounted, resolved, snapTo]);
 
   // Publish the visible height for camera padding and riding controls.
   useAnimatedReaction(

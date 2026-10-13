@@ -1,6 +1,8 @@
 /**
  * T-502: opening a notification (row or push) goes to the right place per role; chat rows
- * open the ride's thread when T-510's `RideChat` route exists and the Chat tab until then.
+ * open the ride's thread when T-510's `RideChat` route exists and Inbox › Messages otherwise.
+ * UI-R4: tab names are Home/Activity/Inbox/Account and Drive/Earnings/Inbox/Account; the booking
+ * route is `Booking`.
  */
 import { CommonActions } from '@react-navigation/native';
 import { resolveNotificationTarget } from '../../../src/features/notifications/routing';
@@ -51,10 +53,10 @@ describe('resolveNotificationTarget', () => {
 });
 
 describe('routeForTarget', () => {
-  it('chat falls back to the Chat tab until RideChat is registered', () => {
+  it('chat falls back to Inbox › Messages where RideChat is not registered', () => {
     expect(routeForTarget('passenger', { kind: 'chat', rideId: 7 }, false)).toEqual({
       screen: 'PassengerTabs',
-      params: { screen: 'Chat' },
+      params: { screen: 'Inbox', params: { segment: 'messages' } },
     });
     expect(routeForTarget('driver', { kind: 'chat', rideId: 7 }, true)).toEqual({
       screen: CHAT_THREAD_ROUTE,
@@ -63,11 +65,25 @@ describe('routeForTarget', () => {
   });
 
   it('maps rides per role', () => {
-    expect(routeForTarget('passenger', { kind: 'ride', rideId: 1 }, false)).toEqual({ screen: 'PassengerMap', initial: false });
+    expect(routeForTarget('passenger', { kind: 'ride', rideId: 1 }, false)).toEqual({ screen: 'Booking', initial: false });
     expect(routeForTarget('driver', { kind: 'ride', rideId: 1 }, false)).toEqual({ screen: 'DriverRide', initial: false });
     expect(routeForTarget('driver', { kind: 'rideRequests' }, false)).toEqual({
       screen: 'DriverTabs',
-      params: { screen: 'Map' },
+      params: { screen: 'Drive' },
+    });
+  });
+
+  it('maps history, home and inbox to the new tabs (UI-R4)', () => {
+    expect(routeForTarget('passenger', { kind: 'rideHistory' }, true)).toEqual({
+      screen: 'PassengerTabs',
+      params: { screen: 'Activity', params: { segment: 'rides' } },
+    });
+    expect(routeForTarget('driver', { kind: 'rideHistory' }, true)).toEqual({ screen: 'RideHistory', initial: false });
+    expect(routeForTarget('passenger', { kind: 'home' }, true)).toEqual({ screen: 'PassengerTabs', params: { screen: 'Home' } });
+    expect(routeForTarget('driver', { kind: 'home' }, true)).toEqual({ screen: 'DriverTabs', params: { screen: 'Drive' } });
+    expect(routeForTarget('driver', { kind: 'inbox' }, true)).toEqual({
+      screen: 'DriverTabs',
+      params: { screen: 'Inbox', params: { segment: 'notifications' } },
     });
   });
 });
@@ -100,13 +116,16 @@ describe('openNotificationTarget', () => {
     );
   });
 
-  it('an inbox target from the list does nothing; from a push it opens the Notifications tab', () => {
+  it('an inbox target from the list does nothing; from a push it opens Inbox › Notifications', () => {
     const { child, dispatch } = makeNavigation(['PassengerTabs']);
     openNotificationTarget(child, 'passenger', { kind: 'inbox' }, 'list');
     expect(dispatch).not.toHaveBeenCalled();
     openNotificationTarget(child, 'passenger', { kind: 'inbox' }, 'push');
     expect(dispatch).toHaveBeenCalledWith(
-      CommonActions.navigate({ name: 'Passenger', params: { screen: 'PassengerTabs', params: { screen: 'Notifications' } } }),
+      CommonActions.navigate({
+        name: 'Passenger',
+        params: { screen: 'PassengerTabs', params: { screen: 'Inbox', params: { segment: 'notifications' } } },
+      }),
     );
   });
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import {
@@ -8,16 +9,20 @@ import {
   EmptyState,
   ErrorState,
   Header,
+  HeaderLargeTitle,
   Icon,
   Screen,
   SegmentedControl,
   SkeletonList,
+  useHeaderScroll,
 } from '../../../components/ui';
+import { t } from '../../../i18n';
 import { formatMoney } from '../../../core/format/money';
 import { componentTokens, layout, space } from '../../../theme';
 import { formatDateTime } from '../../wallet/format';
 import { EarningsChart } from '../components/EarningsChart';
 import { EarningsHero } from '../components/EarningsHero';
+import { EarningsWalletCard } from '../components/EarningsWalletCard';
 import { STATS_COPY } from '../copy';
 import { useDriverEarnings } from '../hooks';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
@@ -30,9 +35,11 @@ const PERIODS = [
 ] as const;
 
 /**
- * Driver Earnings (T-507, BE-08): GET /driver/earnings for Today / This week / This month with
- * the period total, trips, fares and commission, a per-day bar chart (week and month) and the
- * period's completed rides, paged on scroll; a ride opens RideDetails (T-501). Pull to refresh; loading, error and empty states.
+ * Driver Earnings tab (T-507, BE-08; UI-R4 made it a tab root, DESIGN_SYSTEM §8.1): `large`
+ * Header that collapses on scroll, GET /driver/earnings for Today / This week / This month with
+ * the period total, trips, fares and commission, the commission/settlements entry (GET /wallet ->
+ * Wallet screen), a per-day bar chart (week and month) and the period's completed rides, paged
+ * on scroll; a ride opens RideDetails (T-501). Pull to refresh; loading, error and empty states.
  */
 export default function DriverEarningsScreen() {
   const { theme } = useAppTheme();
@@ -41,6 +48,8 @@ export default function DriverEarningsScreen() {
   const [period, setPeriod] = useState<EarningsPeriod>('day');
   const earnings = useDriverEarnings(period, isFocused);
   const { data, status, error, rides, refresh, reload } = earnings;
+  const { scrollY, onScroll } = useHeaderScroll();
+  const title = t('earnings.title');
 
   const [pulling, setPulling] = useState(false);
   useEffect(() => {
@@ -97,20 +106,14 @@ export default function DriverEarningsScreen() {
     />
   );
 
-  const header = (
-    <Header
-      title={STATS_COPY.earningsTitle}
-      backLabel={STATS_COPY.back}
-      onBack={() => navigation.goBack()}
-      tone="background"
-      testID="earnings"
-    />
-  );
+  const header = <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="earnings" />;
+  const walletCard = <EarningsWalletCard visible={isFocused} onOpen={() => navigation.navigate('Wallet')} />;
 
   if (!data) {
     return (
       <Screen testID="earnings-screen">
         {header}
+        <HeaderLargeTitle title={title} />
         <View style={styles.controls}>{periodControl}</View>
         {status === 'failed' ? (
           <ErrorState
@@ -128,18 +131,24 @@ export default function DriverEarningsScreen() {
   }
 
   const listHeader = (
-    <View style={styles.headerBlock}>
-      {periodControl}
-      <EarningsHero earnings={data} />
-      {error ? (
-        <AppText variant="bodySmall" color="danger" testID="earnings-refresh-error">
-          {error}
+    <View>
+      <HeaderLargeTitle title={title} scrollY={scrollY} />
+      <View style={styles.headerBlock}>
+        {periodControl}
+        <EarningsHero earnings={data} />
+        {walletCard}
+        {error ? (
+          <AppText variant="bodySmall" color="danger" testID="earnings-refresh-error">
+            {error}
+          </AppText>
+        ) : null}
+        {data.period !== 'day' ? (
+          <EarningsChart series={data.series} period={data.period} currency={data.currency} />
+        ) : null}
+        <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
+          {STATS_COPY.ridesTitle}
         </AppText>
-      ) : null}
-      {data.period !== 'day' ? <EarningsChart series={data.series} period={data.period} currency={data.currency} /> : null}
-      <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
-        {STATS_COPY.ridesTitle}
-      </AppText>
+      </View>
     </View>
   );
 
@@ -167,8 +176,11 @@ export default function DriverEarningsScreen() {
   return (
     <Screen testID="earnings-screen">
       {header}
-      <FlatList
+      <Animated.FlatList
         testID="earnings-rides"
+        style={styles.list}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         data={rides}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
@@ -190,6 +202,7 @@ export default function DriverEarningsScreen() {
 }
 
 const styles = StyleSheet.create({
+  list: { flex: 1 },
   content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   contentEmpty: { flexGrow: 1 },
   controls: { paddingHorizontal: space[4], paddingTop: space[2] },
