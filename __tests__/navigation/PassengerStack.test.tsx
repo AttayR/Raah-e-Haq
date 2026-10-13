@@ -36,7 +36,8 @@ jest.mock('../../src/features/inbox/InboxScreen', () => mockScreen('Inbox'));
 jest.mock('../../src/screens/Passenger/PassengerSettingsScreen', () => mockScreen('Account'));
 jest.mock('../../src/screens/Passenger/Passengerprofile', () => mockScreen('Profile'));
 jest.mock('../../src/features/chat/screens/ChatThreadScreen', () => mockScreen('RideChat'));
-jest.mock('../../src/screens/Passenger/FavoriteLocationsScreen', () => mockScreen('Favorites'));
+jest.mock('../../src/features/saved-places/screens/SavedPlacesScreen', () => mockScreen('Favorites'));
+jest.mock('../../src/features/saved-places/screens/SavedPlaceEditorScreen', () => mockScreen('SavedPlaceEditor'));
 
 const Root = createNativeStackNavigator<RootStackParamList>();
 const navRef = createNavigationContainerRef<RootStackParamList>();

@@ -97,6 +97,43 @@ describe('map-first Home', () => {
     expect(screen.queryByTestId('home-recent-rides')).toBeNull();
   });
 
+  it('saved places are chips from GET /saved-places: a tap books a ride there, "+ Add" opens the form (T-516)', async () => {
+    mock.onGet('/rides').reply(200, page([]));
+    mock.onGet('/saved-places').reply(200, {
+      success: true,
+      data: {
+        places: [
+          { id: 1, label: 'home', name: null, address: 'House 1, DHA Phase 5, Lahore', lat: 31.46, lng: 74.4, place_id: null, sort_order: 0, updated_at: null },
+          { id: 5, label: 'other', name: 'Gym', address: 'Main Boulevard, Lahore', lat: 31.52, lng: 74.34, place_id: null, sort_order: 1, updated_at: null },
+        ],
+        max_other: 10,
+      },
+    });
+    await renderHome();
+    expect(screen.getByTestId('home-saved-place-1')).toHaveTextContent(/Home/);
+    expect(screen.getByTestId('home-saved-place-5')).toHaveTextContent(/Gym/);
+    expect(screen.queryByText('Work')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('home-saved-place-5'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('Booking', {
+      destination: { latitude: 31.52, longitude: 74.34, address: 'Main Boulevard, Lahore' },
+    });
+    fireEvent.press(screen.getByTestId('home-saved-place-add'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('SavedPlaceEditor', {
+      taken: { home: 'House 1, DHA Phase 5, Lahore' },
+      otherFull: false,
+    });
+  });
+
+  it('without saved places (or when they fail to load) the row still offers "+ Add" and the list', async () => {
+    mock.onGet('/rides').reply(200, page([]));
+    mock.onGet('/saved-places').reply(500, { success: false, message: 'Server error' });
+    await renderHome();
+    expect(screen.queryByTestId(/^home-saved-place-\d+$/)).toBeNull();
+    expect(screen.getByTestId('home-saved-place-add')).toBeTruthy();
+    expect(screen.getByTestId('home-saved-places')).toBeTruthy();
+  });
+
   it('recent rides come from GET /rides; a row opens its details and "See all" opens Activity › Rides', async () => {
     mock
       .onGet('/rides')

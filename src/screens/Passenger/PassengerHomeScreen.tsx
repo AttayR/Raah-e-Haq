@@ -22,6 +22,9 @@ import { greetingFor } from '../../features/passenger-home/greeting';
 import { toHomeRecentRides } from '../../features/passenger-home/recentRides';
 import { useRideHistory } from '../../features/ride-history/hooks';
 import { openRideDetails } from '../../features/ride-history/navigation';
+import { useSavedPlaces } from '../../features/saved-places/hooks';
+import { otherCount, takenLabels } from '../../features/saved-places/format';
+import { bookingParamsFor } from '../../features/saved-places/navigation';
 import { t } from '../../i18n';
 import { radius, space } from '../../theme';
 
@@ -38,6 +41,7 @@ const USER_DOT = space[4];
  * top-start (→ Profile) and "locate me" riding 16 above the "Where to?" sheet (peek 170 → half
  * → full; map controls fade out at full). "Where to?" pushes the Booking route (tab bar hidden).
  * Recent rides come from GET /rides; stats moved to Activity; offers wait for BE-10 (UI-R9).
+ * Saved places (GET /saved-places, T-516) are chips: a tap books a ride to that place.
  */
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
@@ -62,6 +66,16 @@ export default function PassengerHomeScreen() {
 
   const rides = useRideHistory('all', isFocused);
   const recentRides = useMemo(() => toHomeRecentRides(rides.items), [rides.items]);
+  // Saved places as chips (T-516, BE-14); a failed load just leaves the row without them.
+  const saved = useSavedPlaces(isFocused);
+  const addPlace = useCallback(
+    () =>
+      navigation.navigate('SavedPlaceEditor', {
+        taken: takenLabels(saved.places),
+        otherFull: saved.maxOther !== null && otherCount(saved.places) >= saved.maxOther,
+      }),
+    [navigation, saved.places, saved.maxOther],
+  );
 
   const {
     isInitialized: notificationsInitialized,
@@ -189,6 +203,9 @@ export default function PassengerHomeScreen() {
       >
         <HomeSheetBody
           onWhereTo={() => navigation.navigate('Booking')}
+          savedPlaces={saved.places}
+          onSavedPlace={place => navigation.navigate('Booking', bookingParamsFor(place, 'destination'))}
+          onAddPlace={addPlace}
           onSavedPlaces={() => navigation.navigate('FavoriteLocations')}
           locationOff={locationOff}
           onEnableLocation={() => {

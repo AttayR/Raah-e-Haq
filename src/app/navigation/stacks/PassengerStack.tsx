@@ -7,7 +7,6 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import PassengerBottomTabs, { type PassengerTabParamList } from '../tabs/PassengerBottomTabs';
 import PassengerProfile from 'src/screens/Passenger/Passengerprofile';
 import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
-import FavoriteLocationsScreen from 'src/screens/Passenger/FavoriteLocationsScreen';
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
@@ -18,6 +17,10 @@ import TransactionDetailScreen from '../../../features/wallet/screens/Transactio
 import type { WalletRoutes } from '../../../features/wallet/navigation';
 import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
+import SavedPlacesScreen from '../../../features/saved-places/screens/SavedPlacesScreen';
+import SavedPlaceEditorScreen from '../../../features/saved-places/screens/SavedPlaceEditorScreen';
+import type { SavedPlaceEditorParams } from '../../../features/saved-places/navigation';
+import type { BookingParams } from '../../../features/ride-booking/prefill';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
@@ -26,11 +29,17 @@ export type PassengerStackParamList = {
   Profile: undefined;
   /** One ride's chat thread (T-510). */
   RideChat: RideChatParams;
-  /** The booking flow and the ride in progress, full-screen over the tabs (T-301; UI-R4 rename of PassengerMap). */
-  Booking: undefined;
+  /**
+   * The booking flow and the ride in progress, full-screen over the tabs (T-301; UI-R4 rename of
+   * PassengerMap). Optional pickup/destination prefill from a saved place (T-516).
+   */
+  Booking: BookingParams | undefined;
   /** One ride's details/receipt (T-501); the list itself is Activity › Rides. */
   RideDetails: RideHistoryRoutes['RideDetails'];
+  /** Account → Saved places (T-516, BE-14). */
   FavoriteLocations: undefined;
+  /** Add or edit one saved place (T-516). */
+  SavedPlaceEditor: SavedPlaceEditorParams | undefined;
   /** One ledger entry (T-508); the wallet itself is Activity › Wallet. */
   WalletTransaction: WalletRoutes['WalletTransaction'];
   /** Account → Notifications: push preferences (T-502, BE-11). */
@@ -65,7 +74,8 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       <Stack.Screen name="Booking" component={PassengerMapScreen} />
       <Stack.Screen name="RideDetails" component={RideDetailsScreen} getId={rideDetailsScreenId} />
-      <Stack.Screen name="FavoriteLocations" component={FavoriteLocationsScreen} />
+      <Stack.Screen name="FavoriteLocations" component={SavedPlacesScreen} />
+      <Stack.Screen name="SavedPlaceEditor" component={SavedPlaceEditorScreen} />
       <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     </Stack.Navigator>

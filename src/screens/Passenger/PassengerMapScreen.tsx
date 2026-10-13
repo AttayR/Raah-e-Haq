@@ -3,7 +3,7 @@ import { Alert, AppState, Keyboard, Linking, StatusBar, StyleSheet, View, useWin
 import { MapPressEvent } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView from '../../components/SafeMapView';
-import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused, useRoute, type RouteProp } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
@@ -43,6 +43,7 @@ import { BookingMapLayers } from '../../features/ride-booking/components/Booking
 import { BookingErrorBanner, LocationWaitState, MapPlaceholder } from '../../features/ride-booking/components/BookingNotices';
 import { FareStage, MAX_STOPS, VehicleStage } from '../../features/ride-booking/components/BookingStages';
 import { bookingInitialRegion, showLocationWait } from '../../features/ride-booking/locationGate';
+import { bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
 import { space } from '../../theme';
 import { displayAddress } from '../../features/passenger-home/greeting';
 
@@ -55,6 +56,9 @@ type Stage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requestin
 
 const PassengerMapScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
+  // T-516: a saved place can open booking with its pickup and/or destination already chosen.
+  const route = useRoute<RouteProp<PassengerStackParamList, 'Booking'>>();
+  const [prefill] = useState(() => bookingPrefillState(route.params));
   const mapRef = useRef<any>(null);
   const { handleError } = useErrorHandler();
   const { theme } = useAppTheme();
@@ -84,14 +88,14 @@ const PassengerMapScreen = () => {
 
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
 
-  const [pickup, setPickup] = useState<Place | null>(null);
+  const [pickup, setPickup] = useState<Place | null>(prefill.pickup);
   const [stops, setStops] = useState<Place[]>([]);
-  const [destination, setDestination] = useState<Place | null>(null);
+  const [destination, setDestination] = useState<Place | null>(prefill.destination);
   // Map taps set a location only in this explicit mode (T-304, PAX-14).
   const [mapPick, setMapPick] = useState<MapPickTarget | null>(null);
-  const [stage, setStage] = useState<Stage>('home');
-  const [pickupQuery, setPickupQuery] = useState('');
-  const [destQuery, setDestQuery] = useState('');
+  const [stage, setStage] = useState<Stage>(prefill.stage);
+  const [pickupQuery, setPickupQuery] = useState(prefill.pickupQuery);
+  const [destQuery, setDestQuery] = useState(prefill.destQuery);
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -311,6 +315,33 @@ const PassengerMapScreen = () => {
     setPickupQuery(currentRide.pickup_address);
     setDestQuery(currentRide.dropoff_address);
   }, [currentRide]);
+
+  // Saved-place prefill (T-516): new params while open replace the points they carry; the route
+  // is drawn once a prefilled destination has a pickup (the GPS one when none was given).
+  useBookingPrefill({
+    params: route.params,
+    initial: prefill,
+    rideShown,
+    pickup,
+    destination,
+    apply: (next) => {
+      setMapPick(null);
+      setError(null);
+      if (next.pickup) {
+        setPickup(next.pickup);
+        setPickupQuery(next.pickupQuery);
+      }
+      if (next.destination) {
+        setDestination(next.destination);
+        setDestQuery(next.destQuery);
+      }
+      setStage(next.destination || destination ? 'home' : 'destination');
+    },
+    route: (p, d) => {
+      fetchRoute(p, d);
+      setStage('vehicle');
+    },
+  });
 
   // The passenger has seen the outcome (completed / cancelled): start over.
   const finishRide = useCallback(() => {

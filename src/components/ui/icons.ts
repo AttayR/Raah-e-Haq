@@ -86,6 +86,7 @@ export const iconGlyphs = {
   // Actions.
   add: 'plus',
   edit: 'pencil-outline',
+  delete: 'trash-can-outline',
   refresh: 'refresh',
   retry: 'refresh',
   upload: 'file-upload-outline',
