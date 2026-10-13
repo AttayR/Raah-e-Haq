@@ -5,6 +5,7 @@
 export const DRIVER_RIDE_COPY = {
   screenA11y: 'Current ride',
   back: 'Back',
+  recentreA11y: 'Show the route to your next point',
   // Step titles.
   toPickup: 'Head to pickup',
   atPickup: 'Waiting for the passenger',

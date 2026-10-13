@@ -36,7 +36,7 @@ import {
   vehicleMeta,
   displayRating,
 } from '../../../src/components/ui/ride';
-import { shortestTurn } from '../../../src/components/ui/CarMarker';
+import { shortestTurn } from '../../../src/components/ui/VehicleMarker';
 
 let mockTheme: AppTheme = LightTheme;
 jest.mock('../../../src/app/providers/ThemeProvider', () => ({

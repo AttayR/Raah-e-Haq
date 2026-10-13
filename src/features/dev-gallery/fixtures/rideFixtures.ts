@@ -9,6 +9,7 @@ import { toVehicleOptions } from '../../ride-booking/vehicleOptions';
 import { toRide } from '../../ride-history/api';
 import { toPendingRideRequest } from '../../driver-requests/api';
 import type { Ride } from '../../ride-history/types';
+import { cumulativeMeters, pointAlong } from '../../../components/ui/ride/vehicleMotion';
 
 /** Lahore: Liberty Market → Model Town → Emporium Mall (a plausible city route). */
 export const galleryRoute = [
@@ -94,3 +95,48 @@ export const galleryRequest = toPendingRideRequest(
   },
   null,
 );
+
+// ---------- T-517 live vehicle motion (gallery only) ----------
+
+/** A Gulberg block (Lahore) driven clockwise: four right-angle turns, ~2.3 km round. */
+export const galleryBlockLoop = [
+  { latitude: 31.512, longitude: 74.34 },
+  { latitude: 31.512, longitude: 74.346 },
+  { latitude: 31.507, longitude: 74.346 },
+  { latitude: 31.507, longitude: 74.34 },
+  { latitude: 31.512, longitude: 74.34 },
+];
+export const galleryLiveRegion = { latitude: 31.5095, longitude: 74.343, latitudeDelta: 0.0085, longitudeDelta: 0.0085 };
+/** Simulated update interval of the gallery (faster than the real ~4 s, so the demo moves). */
+export const GALLERY_LIVE_INTERVAL_MS = 2_000;
+const GALLERY_LIVE_STEP_M = 40;
+/** GPS-like noise across the road (metres): inside the 30 m snap, so the vehicles stay on it. */
+const GALLERY_LIVE_NOISE_M = 6;
+
+/**
+ * Positions every GALLERY_LIVE_STEP_M metres around the loop, each pushed a few metres off the
+ * road (deterministic, like GPS noise), as a driver's successive location updates.
+ */
+export const galleryLivePositions = (() => {
+  const path = galleryBlockLoop;
+  const cumulative = cumulativeMeters(path);
+  const total = cumulative[cumulative.length - 1];
+  const count = Math.floor(total / GALLERY_LIVE_STEP_M);
+  return Array.from({ length: count }, (_, i) => {
+    const { point, bearing } = pointAlong(path, cumulative, (i * GALLERY_LIVE_STEP_M) / total);
+    const side = Math.sin(i * 1.7) * GALLERY_LIVE_NOISE_M;
+    const across = (((bearing ?? 0) + 90) * Math.PI) / 180;
+    const metresPerDegLat = 111_320;
+    return {
+      latitude: point.latitude + (Math.cos(across) * side) / metresPerDegLat,
+      longitude: point.longitude + (Math.sin(across) * side) / (metresPerDegLat * Math.cos((point.latitude * Math.PI) / 180)),
+    };
+  });
+})();
+
+/** The three vehicle kinds, a third of the loop apart. */
+export const galleryLiveVehicles = [
+  { id: 'bike', vehicleType: 'bike', offset: 0 },
+  { id: 'rickshaw', vehicleType: 'rickshaw', offset: Math.round(galleryLivePositions.length / 3) },
+  { id: 'car', vehicleType: 'car', offset: Math.round((2 * galleryLivePositions.length) / 3) },
+] as const;

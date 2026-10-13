@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
@@ -39,17 +39,8 @@ type SliceRoot = {
 };
 type RequestsDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
 
-/** True while the app is in the foreground. The listener is removed on unmount. */
-export const useAppIsActive = (): boolean => {
-  const [state, setState] = useState<AppStateStatus>(AppState.currentState);
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', setState);
-    return () => subscription.remove();
-  }, []);
-  // iOS `inactive` is a short transition (Control Centre, app switcher) with the app still
-  // visible; only `background` stops the work.
-  return state !== 'background';
-};
+/** True while the app is in the foreground (moved to src/hooks for the passenger side, T-517). */
+export { useAppIsActive };
 
 /** Feed refusals that end polling until the driver's state changes. */
 const STATUS_RELOAD_CODES: ReadonlySet<string> = new Set([

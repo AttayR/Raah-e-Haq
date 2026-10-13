@@ -67,6 +67,13 @@ describe('toLocationBody', () => {
     expect(body).not.toHaveProperty('driver_id');
   });
 
+  it('T-517: leaves out the heading while standing still (Android reports 0 = north)', () => {
+    expect(toLocationBody(fix({ heading: 0, speed: 0.2 }))).toEqual({ latitude: 31.5204, longitude: 74.3587, speed: 0.2 });
+    expect(toLocationBody(fix({ heading: 87, speed: 8 }))).toMatchObject({ heading: 87, speed: 8 });
+    // Unknown speed (null or iOS -1): the heading is sent as the device gave it.
+    expect(toLocationBody(fix({ heading: 87 }))).toMatchObject({ heading: 87 });
+  });
+
   it('leaves out values the device did not give', () => {
     expect(toLocationBody(fix())).toEqual({ latitude: 31.5204, longitude: 74.3587 });
   });

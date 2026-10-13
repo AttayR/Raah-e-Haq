@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { RideMarker, Screen } from '../../components/ui';
+import { IconButton, RideMarker, Screen, VehicleMarker } from '../../components/ui';
 import { CancelReasonSheet } from '../../components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../components/driver/DriverRidePanel';
 import { DriverRideSummary } from '../../components/driver/DriverRideSummary';
@@ -13,9 +13,12 @@ import { DriverRideRatingPrompt } from '../../features/rating/components/RideRat
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import { toast } from '../../core/toast';
+import { t } from '../../i18n';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import { openRideChat } from '../../features/chat/navigation';
 import { useAppIsActive } from '../../features/driver-requests/hooks';
+import { useDriverDevicePosition } from '../../features/driver-location/hooks';
+import { useDriverRideCamera, type DriverRideViewport } from '../../features/driver-ride/camera';
 import {
   DRIVER_RIDE_TOAST_OPTIONS,
   useDriverRideFlow,
@@ -57,6 +60,8 @@ const DriverRideScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const appActive = useAppIsActive();
   useDriverRideStatusPolling(isFocused && appActive);
+  // T-517: the driver's own vehicle from the shared watcher (the tracker posts at ride cadence).
+  const position = useDriverDevicePosition();
 
   const target = navigationTarget(ride);
   const phone = getPassengerPhone(ride);
@@ -64,15 +69,24 @@ const DriverRideScreen: React.FC = () => {
   const dropoff = ride ? toLatLng(ride.dropoff_latitude, ride.dropoff_longitude) : null;
   const region = target?.coordinate ?? pickup;
 
-  // Re-centre on the next point when it changes (pickup → stop → drop-off), not on every render.
+  // T-517: fit the driver and the current target (pickup → stop → drop-off) above the docked
+  // panel; a manual pan pauses it until the recentre button or the next step.
   const mapRef = useRef<SafeMapViewRef>(null);
-  const regionLat = region?.latitude;
-  const regionLng = region?.longitude;
-  useEffect(() => {
-    if (regionLat !== undefined && regionLng !== undefined) {
-      mapRef.current?.animateToRegion(toRegion({ latitude: regionLat, longitude: regionLng }));
-    }
-  }, [regionLat, regionLng]);
+  const [mapHeight, setMapHeight] = useState(0);
+  const [dockHeight, setDockHeight] = useState(0);
+  const viewport = useMemo<DriverRideViewport | null>(
+    () =>
+      mapHeight > 0
+        ? { mapHeight, dockHeight, topInset: insets.top, topControls: theme.layout.touchTargetDriving + theme.space[2] }
+        : null,
+    [mapHeight, dockHeight, insets.top, theme],
+  );
+  const camera = useDriverRideCamera(mapRef, {
+    step,
+    driver: position,
+    target: target?.coordinate ?? null,
+    viewport,
+  });
 
   // The ride went away (cancelled here, or taken away by the server): leave the screen.
   const hadRide = useRef(ride !== null);
@@ -133,15 +147,21 @@ const DriverRideScreen: React.FC = () => {
   return (
     // Map screens own no safe-area padding: overlays place themselves from the insets.
     <Screen edges={[]} testID="driver-ride">
-      <View style={styles.container} accessibilityLabel={COPY.screenA11y}>
+      <View
+        style={styles.container}
+        accessibilityLabel={COPY.screenA11y}
+        onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}
+      >
         <MapErrorBoundary>
           <SafeMapView
             style={styles.map}
-            showsUserLocation
+            showsUserLocation={!position}
             showsMyLocationButton={false}
             ref={mapRef}
             initialRegion={toRegion(region)}
             customMapStyle={theme.mapStyle}
+            onMapReady={camera.onMapReady}
+            onRegionChangeComplete={camera.onRegionChangeComplete}
           >
             {pickup && <RideMarker kind="pickup" coordinate={pickup} title={COPY.pickup} testID="driver-ride-pickup-marker" />}
             {activeStops(ride).map((stop, index) => {
@@ -151,6 +171,15 @@ const DriverRideScreen: React.FC = () => {
               ) : null;
             })}
             {dropoff && <RideMarker kind="dropoff" coordinate={dropoff} title={COPY.dropoff} testID="driver-ride-dropoff-marker" />}
+            {position ? (
+              <VehicleMarker
+                coordinate={position}
+                heading={position.heading}
+                vehicleType={ride.vehicle_type}
+                title={t('ride.selfMarker')}
+                testID="driver-ride-vehicle-marker"
+              />
+            ) : null}
           </SafeMapView>
         </MapErrorBoundary>
 
@@ -171,6 +200,19 @@ const DriverRideScreen: React.FC = () => {
           <Icon name="arrow-back" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
 
+        {camera.paused && target ? (
+          <View style={[styles.recentre, { top: insets.top + theme.space[2] }]}>
+            <IconButton
+              icon="locate"
+              variant="floating"
+              size={theme.layout.touchTargetDriving}
+              onPress={camera.recentre}
+              accessibilityLabel={COPY.recentreA11y}
+              testID="driver-ride-recentre"
+            />
+          </View>
+        ) : null}
+
         {step === 'summary' || step === 'cancelled' ? (
           <ScrollView
             style={styles.sheet}
@@ -190,7 +232,7 @@ const DriverRideScreen: React.FC = () => {
           </ScrollView>
         ) : (
           // [UI-R5] The live panel is a docked sheet: its actions stay in a fixed footer.
-          <View style={styles.dock}>
+          <View style={styles.dock} onLayout={(e: LayoutChangeEvent) => setDockHeight(e.nativeEvent.layout.height)}>
             <DriverRidePanel
               ride={ride}
               step={step}
@@ -249,7 +291,7 @@ const createStyles = (theme: AppTheme) =>
     },
     backButton: {
       position: 'absolute',
-      left: theme.space[4],
+      start: theme.space[4],
       width: theme.layout.touchTargetDriving,
       height: theme.layout.touchTargetDriving,
       borderRadius: theme.layout.touchTargetDriving / 2,
@@ -257,6 +299,10 @@ const createStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       backgroundColor: theme.colors.surface,
       ...theme.elevation[2],
+    },
+    recentre: {
+      position: 'absolute',
+      end: theme.space[4],
     },
     sheet: {
       position: 'absolute',

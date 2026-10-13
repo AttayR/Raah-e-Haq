@@ -29,6 +29,20 @@ export const DRIVER_LOCATION_CONFIG = {
   maxFixAgeMs: 90_000,
 } as const;
 
+/**
+ * T-517: the cadence while the driver has a ride in progress (accepted → started) and the app
+ * is in the foreground, so the passenger's vehicle marker gets a new position about every 4 s
+ * (the passenger reads at the same pace, DRIVER_LOCATION_POLL_MS). 15 posts a minute stay well
+ * inside POST /tracking/update-location's 60/min and the API group's 120/min per user. Outside a
+ * ride the normal cadence above applies.
+ */
+export const DRIVER_LOCATION_RIDE_CONFIG = {
+  ...DRIVER_LOCATION_CONFIG,
+  minPostIntervalMs: 4_000,
+  /** Small moves still count on a ride (stop-and-go traffic), above GPS jitter. */
+  minMoveMeters: 5,
+} as const;
+
 export interface DriverLocationConfig {
   minPostIntervalMs: number;
   heartbeatMs: number;
@@ -43,4 +57,16 @@ export const DRIVER_LOCATION_WATCH_OPTIONS = {
   interval: DRIVER_LOCATION_CONFIG.minPostIntervalMs,
   fastestInterval: DRIVER_LOCATION_CONFIG.minPostIntervalMs,
   maximumAge: DRIVER_LOCATION_CONFIG.minPostIntervalMs,
+} as const;
+
+/**
+ * T-517: the watcher on a ride. Fixes arrive more often than posts (Android every 2 s, iOS per
+ * 5 m), so the driver's own vehicle marker moves smoothly and each post has a fresh fix.
+ */
+export const DRIVER_LOCATION_RIDE_WATCH_OPTIONS = {
+  enableHighAccuracy: true,
+  distanceFilter: DRIVER_LOCATION_RIDE_CONFIG.minMoveMeters,
+  interval: 2_000,
+  fastestInterval: 1_000,
+  maximumAge: 2_000,
 } as const;

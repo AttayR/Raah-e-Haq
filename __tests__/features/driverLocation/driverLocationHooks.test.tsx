@@ -72,6 +72,25 @@ describe('useDriverLocationTracking', () => {
     expect(start).toHaveBeenCalledTimes(1);
   });
 
+  it('T-517: ride cadence while a ride is in progress and the app is in front; normal otherwise', async () => {
+    const cadence = jest.spyOn(locationTrackingService, 'setRideCadence');
+    const { store, unmount } = await renderTracker('available');
+    expect(cadence).toHaveBeenLastCalledWith(false);
+
+    act(() => {
+      store.dispatch(acceptRideRequest.fulfilled(makeRide({ id: 7, status: 'accepted' }), 'req', 7));
+    });
+    expect(cadence).toHaveBeenLastCalledWith(true);
+
+    act(() => appStateChange?.('background'));
+    expect(cadence).toHaveBeenLastCalledWith(false);
+    act(() => appStateChange?.('active'));
+    expect(cadence).toHaveBeenLastCalledWith(true);
+
+    unmount();
+    expect(cadence).toHaveBeenLastCalledWith(false);
+  });
+
   it('stops in the background and starts again in the foreground', async () => {
     await renderTracker('on_ride');
     expect(start).toHaveBeenCalledTimes(1);

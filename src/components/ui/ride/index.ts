@@ -12,4 +12,5 @@ export * from './RouteLine';
 export * from './SearchingPulse';
 export * from './SlideToConfirm';
 export * from './useMarkerTracking';
+export * from './vehicleAssets';
 export * from './VehicleOptionCard';

@@ -141,6 +141,11 @@ export const componentTokens = {
     route: { width: 5, casingWidth: 7 },
     /** §5.21 car marker: 40 badge, 2pt ring; nearby (muted) drivers at 60%. */
     carMarker: { size: 40, glyph: 24, ring: 2, mutedOpacity: 0.6 },
+    /**
+     * [T-517] Top-down vehicle marker (§5.21): a 40pt north-up PNG (src/assets/vehicles, made by
+     * scripts/generate-vehicle-markers.js) rotated to the heading; nearby drivers at 60%.
+     */
+    vehicleMarker: { size: 40, mutedOpacity: 0.6 },
     /** §6.5 searching pulse: rings start at the pickup pin size; 2pt progress bar. */
     pulse: { ring: 20, progressHeight: 2, progressBandRatio: 0.35 },
     /** §5.23 address pair: 20pt rail, 10pt pickup/drop-off glyphs, 8pt stops, 2/3 dotted line. */

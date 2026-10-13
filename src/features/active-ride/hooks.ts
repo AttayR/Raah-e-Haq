@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
 import { rejectionMessage } from '../../core/api/errors';
+import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { toast } from '../../core/toast';
 import { askForPushInContext } from '../notifications/push';
 import { hideModal, showErrorModal } from '../../components/NotificationManager';
@@ -22,6 +23,14 @@ import { advanceRideStage, isDriverTrackable, type PassengerRideStageState } fro
 
 /** How often the passenger's ride status is re-read while it is in progress. */
 export const ACTIVE_RIDE_POLL_MS = 10_000;
+
+/**
+ * T-517: how often the assigned driver's position is read while the ride screen is focused and a
+ * driver is assigned (accepted → started). Matches the driver app's ride cadence
+ * (DRIVER_LOCATION_RIDE_CONFIG.minPostIntervalMs), so each read can bring a new position for the
+ * vehicle marker to drive to; never faster.
+ */
+export const DRIVER_LOCATION_POLL_MS = 4_000;
 
 /** requestRide rejects with this: the feedback was already shown; `failure` says what it was. */
 export class RideRequestRefused extends Error {
@@ -44,10 +53,12 @@ type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
  * interval. One interval keyed on the ride id: it stops on a final status, when the ride
  * changes, when disabled, and on unmount.
  *
- * T-304: on the same ticks, while a driver is assigned (accepted, arrived, started), it reads
- * GET /rides/{id}/driver-location and returns the driver's position (null when the server has
- * none or refuses it). It is read at once when a driver gets assigned, and dropped when the
- * ride leaves those statuses; nothing is set after unmount.
+ * T-304 / T-517: while a driver is assigned (accepted, arrived, started) and `enabled`, it reads
+ * GET /rides/{id}/driver-location every DRIVER_LOCATION_POLL_MS (its own interval, one request
+ * at a time) and returns the driver's position (null when the server has none or refuses it).
+ * Only while the app is in the foreground. It is read at once when a driver gets assigned or the
+ * screen (or app) regains focus, and dropped when
+ * the ride leaves those statuses; nothing is set after unmount.
  */
 export const useActiveRidePolling = (enabled: boolean): { driverLocation: DriverLocation | null } => {
   const dispatch = useDispatch<ActiveRideDispatch>();
@@ -56,6 +67,8 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
   const inProgress = isRideInProgress(ride);
   const trackable = isDriverTrackable(ride);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
+  // T-517: the 4 s driver-location reads run only while the app is in front (as DriverRide).
+  const appActive = useAppIsActive();
 
   // The latest ride for the interval callback, so a status change does not restart the timer.
   const rideRef = useRef(ride);
@@ -95,22 +108,25 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
     }
     const poll = () => {
       dispatch(refreshActiveRide(rideId));
-      readDriverLocation(rideId);
     };
     // Back on the screen: show the current status now, not up to one interval later.
     poll();
     const timer = setInterval(poll, ACTIVE_RIDE_POLL_MS);
     return () => clearInterval(timer);
-  }, [dispatch, enabled, rideId, inProgress, readDriverLocation]);
+  }, [dispatch, enabled, rideId, inProgress]);
 
-  // A driver was just assigned: show them now. No driver any more: hide the marker.
+  // A driver was just assigned (or the screen is back in focus): show them now, then follow them
+  // every DRIVER_LOCATION_POLL_MS. No driver any more: hide the marker.
   useEffect(() => {
     if (!trackable || rideId === undefined) {
       setDriverLocation(null);
-      return;
+      return undefined;
     }
-    if (enabled) readDriverLocation(rideId);
-  }, [enabled, trackable, rideId, readDriverLocation]);
+    if (!enabled || !appActive) return undefined;
+    readDriverLocation(rideId);
+    const timer = setInterval(() => readDriverLocation(rideId), DRIVER_LOCATION_POLL_MS);
+    return () => clearInterval(timer);
+  }, [enabled, appActive, trackable, rideId, readDriverLocation]);
 
   return { driverLocation };
 };

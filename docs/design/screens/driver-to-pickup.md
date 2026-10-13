@@ -5,7 +5,7 @@
 - **Data:** `GET /rides/{id}`: `pickup_address`, `pickup_latitude/longitude`, `dropoff_address`, `stops[]`, `passenger` (first name, `rating`, `profile_image`), `passenger_count`, `special_instructions`, `total_fare`, `payment_method`, `accepted_at`, `arrived_at`. Actions: `POST /rides/{id}/arrived`, `POST /rides/{id}/start`, `POST /rides/{id}/cancel` {reason}.
 
 ## Layout
-Map: driver marker following (heading-up on while moving), route driver→pickup `routeLine`, pickup pin. Camera follow; user drag pauses follow and shows a "Recenter" pill button (Button `sm secondary`, top centre).
+Map: driver's own vehicle marker (§5.21, top-down, rotated with the course, motion §6.7), pickup pin. Camera: north-up overview fitting the driver and the pickup above the docked panel (§6.7 "Camera (DriverRide)"); a pan or zoom pauses it and shows the recentre IconButton `floating` `locate` 56 at the top end, mirroring the back button. *(Corrected in the T-517 review, 2026-10-13: the earlier heading-up follow and top-centre "Recenter" pill did not fit a screen without in-app turn-by-turn and differed from the app's other recentre controls.)*
 
 **Top navigation card** (y = `insets.top + 8`, x 16..386, `surface`, radius `lg`, `elevation.2`, padding 16):
 - `caption` `textSecondary` "Pickup" → `h3` `{pickup_address}` (2 lines max) → 8 → row: `numeric` "{eta} min · {distance} km" + flex + Button `sm secondary` "Navigate" (`navigation-variant-outline`) → opens Google Maps / Waze with the pickup coordinates (`google.navigation:q=lat,lng` / `comgooglemaps://` / Apple Maps fallback).

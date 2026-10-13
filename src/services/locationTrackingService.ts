@@ -6,7 +6,10 @@ import { logger } from '../core/logging/logger';
 import { DRIVER_LOCATION_CODES, driverLocationApi } from '../features/driver-location/api';
 import {
   DRIVER_LOCATION_CONFIG,
+  DRIVER_LOCATION_RIDE_CONFIG,
+  DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
   DRIVER_LOCATION_WATCH_OPTIONS,
+  type DriverLocationConfig,
 } from '../features/driver-location/config';
 import { DRIVER_LOCATION_COPY } from '../features/driver-location/copy';
 import {
@@ -72,6 +75,9 @@ const requestForegroundPermission = async (): Promise<boolean> => {
  *   403: stops. 429: waits `retry_after`. Other failures are retried on the next tick.
  * - Every async answer carries the run's generation, so nothing from a stopped run (or a
  *   previous session, after logout's `reset`) can post or restart anything.
+ * - Ride cadence (T-517, `setRideCadence`): while the driver has a ride in progress the tick is
+ *   DRIVER_LOCATION_RIDE_CONFIG (every 4 s, 5 m) and the watcher reports more often; the timer
+ *   and the watcher are restarted only when the cadence actually changes.
  */
 class LocationTrackingService {
   private active = false;
@@ -97,6 +103,8 @@ class LocationTrackingService {
   private lastSignAt = 0;
   /** When the device last delivered a fix (epoch ms); 0 before the first one. */
   private lastFixAt = 0;
+  /** T-517: a ride is in progress, so post (and watch) at the ride cadence. */
+  private rideCadence = false;
 
   /** Starts the watcher and the post timer. Resolves false when permission was refused or it was stopped meanwhile. */
   async startTracking(options: TrackingOptions = {}): Promise<boolean> {
@@ -120,9 +128,7 @@ class LocationTrackingService {
 
       this.trackingHoldsWatch = true;
       this.syncWatch();
-      this.timer = setInterval(() => {
-        this.tick(generation);
-      }, DRIVER_LOCATION_CONFIG.minPostIntervalMs);
+      this.startTimer(generation);
       // A watcher already held by a screen may have a fix to post now, or be silent already.
       this.tick(generation);
       return true;
@@ -133,6 +139,27 @@ class LocationTrackingService {
       }
       return false;
     }
+  }
+
+  /**
+   * T-517: switch between the normal and the ride cadence (a ride in progress, accepted →
+   * started). A no-op when unchanged; otherwise a running post timer and watcher restart with
+   * the new interval and options.
+   */
+  setRideCadence(onRide: boolean): void {
+    if (this.rideCadence === onRide) return;
+    this.rideCadence = onRide;
+    if (this.active && this.timer !== null) {
+      this.startTimer(this.generation);
+    }
+    if (this.watchId !== null) {
+      this.stopWatch();
+      this.startWatch();
+    }
+  }
+
+  getRideCadence(): boolean {
+    return this.rideCadence;
   }
 
   /** Stops posting and releases tracking's hold on the watcher. The next start posts at once. */
@@ -191,6 +218,7 @@ class LocationTrackingService {
     this.stopTracking();
     this.lastLocation = null;
     this.lastFixAt = 0;
+    this.rideCadence = false;
     this.listeners.clear();
   }
 
@@ -246,6 +274,18 @@ class LocationTrackingService {
     return requestForegroundPermission();
   }
 
+  private config(): DriverLocationConfig {
+    return this.rideCadence ? DRIVER_LOCATION_RIDE_CONFIG : DRIVER_LOCATION_CONFIG;
+  }
+
+  /** (Re)starts the one post timer at the current cadence. */
+  private startTimer(generation: number): void {
+    if (this.timer !== null) clearInterval(this.timer);
+    this.timer = setInterval(() => {
+      this.tick(generation);
+    }, this.config().minPostIntervalMs);
+  }
+
   /** Runs the device watcher exactly while someone holds it. */
   private syncWatch(): void {
     const wanted = this.trackingHoldsWatch || this.watchRefs > 0;
@@ -262,7 +302,7 @@ class LocationTrackingService {
     this.watchId = Geolocation.watchPosition(
       (position) => this.handlePosition(watchGeneration, position),
       (error) => this.handleWatchError(watchGeneration, error),
-      DRIVER_LOCATION_WATCH_OPTIONS,
+      this.rideCadence ? DRIVER_LOCATION_RIDE_WATCH_OPTIONS : DRIVER_LOCATION_WATCH_OPTIONS,
     );
   }
 
@@ -326,7 +366,7 @@ class LocationTrackingService {
     const now = Date.now();
     if (now < this.blockedUntil) return;
     const fix = this.lastLocation;
-    if (!fix || !this.isFixFresh(now) || !shouldPostLocation(fix, this.lastPost, now)) return;
+    if (!fix || !this.isFixFresh(now) || !shouldPostLocation(fix, this.lastPost, now, this.config())) return;
     this.post(generation, fix, now);
   }
 

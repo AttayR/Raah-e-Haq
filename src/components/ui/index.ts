@@ -1,7 +1,8 @@
 /**
  * UI kit (DESIGN_SYSTEM §5). UI-R2 added the v1.1 controls (Button states, TextField, OtpInput,
  * Switch, Checkbox/Radio, Chip, Badge count/dot); UI-R3 adds structure and feedback components;
- * UI-R5 adds the ride-flow components (`./ride`) and exports CarMarker.
+ * UI-R5 adds the ride-flow components (`./ride`) and exports CarMarker; T-517 replaces it with
+ * the top-down VehicleMarker (CarMarker stays as an alias).
  */
 export * from './AppText';
 export * from './Avatar';
@@ -34,6 +35,7 @@ export * from './Skeleton';
 export * from './StatTile';
 export * from './Switch';
 export * from './TextField';
+export * from './VehicleMarker';
 export * from './Toast';
 export * from './TabBar';
 export * from './ride';

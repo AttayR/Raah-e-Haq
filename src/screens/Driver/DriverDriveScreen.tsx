@@ -7,7 +7,7 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { AppText, BottomSheet, CarMarker, MapControls, RideMarker, Screen } from '../../components/ui';
+import { AppText, BottomSheet, MapControls, RideMarker, Screen, VehicleMarker } from '../../components/ui';
 import { confirm } from '../../core/dialog';
 import { DriveSheetBody, DriveStatusHeader, type DriveStatus } from '../../components/driver/drive/DriveSheet';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
@@ -16,7 +16,7 @@ import type { RootState } from '../../store';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { logger } from '../../core/logging/logger';
-import { useDriverDeviceLocation } from '../../features/driver-location/hooks';
+import { useDriverDevicePosition } from '../../features/driver-location/hooks';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { useIncomingRequestShown } from '../../features/driver-requests/overlay';
@@ -64,7 +64,13 @@ export default function DriverDriveScreen() {
   const { isOnline, isOnRide, isBusy, isChecking, disabled, toggle } = useDriverStatusToggle();
   const currentRide = useSelector(selectDriverActiveRide);
   // The tracker's one shared watcher (T-410): asking the device here ended its watch on iOS.
-  const location = useDriverDeviceLocation();
+  const position = useDriverDevicePosition();
+  const lat = position?.latitude;
+  const lng = position?.longitude;
+  const location = useMemo(
+    () => (lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : null),
+    [lat, lng],
+  );
 
   const stats = useMyStats(isFocused, DRIVER_HOME_COPY.statsUnavailable);
   const driverStats = stats.data?.role === 'driver' ? stats.data : null;
@@ -146,7 +152,16 @@ export default function DriverDriveScreen() {
               </View>
             }
           >
-            {location ? <CarMarker coordinate={location} title={t('ride.selfMarker')} testID="drive-driver-marker" /> : null}
+            {location ? (
+              // T-517: the driver's own vehicle, top-down, turning with the device course.
+              <VehicleMarker
+                coordinate={location}
+                heading={position?.heading}
+                vehicleType={currentRide?.vehicle_type ?? user?.vehicle_type}
+                title={t('ride.selfMarker')}
+                testID="drive-driver-marker"
+              />
+            ) : null}
             {pickup ? <RideMarker kind="pickup" coordinate={pickup} /> : null}
             {dropoff ? <RideMarker kind="dropoff" coordinate={dropoff} /> : null}
           </SafeMapView>

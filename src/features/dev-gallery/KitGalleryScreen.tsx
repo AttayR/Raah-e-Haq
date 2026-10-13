@@ -22,6 +22,7 @@ import {
   RideVehiclesSection,
 } from './sections/RideSections';
 import { DriverRidePreview, TripAssignedPreview } from './sections/RideScreenPreviews';
+import { VehicleMotionSection } from './sections/VehicleMotionSection';
 import {
   LargeTitlePreview,
   PayCommissionPreview,
@@ -66,6 +67,8 @@ const SECTIONS: Section[] = [
   // UI-R5 ride components.
   ['ride-map', () => <RideMapSection />],
   ['ride-pins', () => <RidePinsSection />],
+  // T-517 live vehicle markers.
+  ['ride-live', () => <VehicleMotionSection />],
   ['ride-address', () => <RideAddressSection />],
   ['ride-vehicles', () => <RideVehiclesSection />],
   ['ride-fare', () => <RideFareSection />],

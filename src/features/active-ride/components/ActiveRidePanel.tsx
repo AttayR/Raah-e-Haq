@@ -4,17 +4,18 @@ import { NavigationContext } from '@react-navigation/native';
 import {
   AppText,
   Button,
-  CarMarker,
   FareBreakdown,
   IndeterminateBar,
   PersonCard,
   RideProgress,
   rideProgressStep,
   type PersonAction,
+  VehicleMarker,
 } from '../../../components/ui';
 import { space } from '../../../theme';
 import type { DriverLocation, RideResource } from '../../../services/rideService';
 import { ACTIVE_RIDE_COPY } from '../copy';
+import { DRIVER_LOCATION_POLL_MS } from '../hooks';
 import { CHAT_COPY } from '../../chat/copy';
 import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
 import {
@@ -166,16 +167,40 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   );
 };
 
+type LatLng = { latitude: number; longitude: number };
+
 /**
- * The assigned driver's position (GET /rides/{id}/driver-location) on the passenger map: the kit
- * CarMarker (full colour, position interpolated, drawn upright per §5.21 c).
+ * The route the driver's marker may snap to: the booking route (pickup → drop-off) only while
+ * the trip is under way. Heading to the pickup the driver is on some other road, so the marker
+ * interpolates in a straight line instead of being pulled onto the trip route.
  */
-export const AssignedDriverMarker: React.FC<{ location: DriverLocation | null }> = ({ location }) => {
+export const trackingRouteFor = (
+  stage: PassengerRideStage | null | undefined,
+  route: ReadonlyArray<LatLng> | null | undefined,
+): ReadonlyArray<LatLng> | null => (stage === 'in_trip' && route && route.length >= 2 ? route : null);
+
+/**
+ * The assigned driver's position (GET /rides/{id}/driver-location) on the passenger map (T-517):
+ * the booked vehicle type drawn top-down, driving smoothly between the ~4 s reads, turning with
+ * the server heading (else the direction of travel), and following the route polyline on the
+ * trip (`trackingRouteFor`). Reduced motion jumps.
+ */
+export const AssignedDriverMarker: React.FC<{
+  location: DriverLocation | null;
+  vehicleType?: string | null;
+  /** The passenger stage: the route is only snapped to while `in_trip`. */
+  stage?: PassengerRideStage | null;
+  route?: ReadonlyArray<LatLng> | null;
+}> = ({ location, vehicleType, stage, route }) => {
   if (!location) return null;
   return (
-    <CarMarker
+    <VehicleMarker
       testID="assigned-driver-marker"
       coordinate={{ latitude: location.latitude, longitude: location.longitude }}
+      heading={location.heading}
+      vehicleType={vehicleType}
+      route={trackingRouteFor(stage, route)}
+      updateIntervalMs={DRIVER_LOCATION_POLL_MS}
       title={ACTIVE_RIDE_COPY.driverMarkerTitle}
     />
   );

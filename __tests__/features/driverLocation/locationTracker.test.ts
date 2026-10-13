@@ -5,7 +5,11 @@
 import Geolocation from '@react-native-community/geolocation';
 import { ApiError } from '../../../src/core/api/errors';
 import { driverLocationApi } from '../../../src/features/driver-location/api';
-import { DRIVER_LOCATION_CONFIG } from '../../../src/features/driver-location/config';
+import {
+  DRIVER_LOCATION_CONFIG,
+  DRIVER_LOCATION_RIDE_CONFIG,
+  DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
+} from '../../../src/features/driver-location/config';
 import locationTrackingService from '../../../src/services/locationTrackingService';
 
 const { minPostIntervalMs, heartbeatMs } = DRIVER_LOCATION_CONFIG;
@@ -209,6 +213,48 @@ describe('locationTrackingService (T-402)', () => {
       jest.setSystemTime(Date.now() + MAX_AGE + 1_000);
       await expect(locationTrackingService.pingIfStale(MAX_AGE)).resolves.toBeUndefined();
       expect(post).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('ride cadence (T-517)', () => {
+    it('on a ride posts every ~4 s on small moves, with a faster watcher; back to normal after', async () => {
+      await locationTrackingService.startTracking();
+      emit(0);
+      await settle();
+      expect(post).toHaveBeenCalledTimes(1);
+
+      locationTrackingService.setRideCadence(true);
+      // The watcher restarted with the ride options.
+      expect(geo.clearWatch).toHaveBeenCalledTimes(1);
+      expect(geo.watchPosition).toHaveBeenLastCalledWith(expect.any(Function), expect.any(Function), DRIVER_LOCATION_RIDE_WATCH_OPTIONS);
+
+      emit(7); // over the ride's 5 m, under the normal 10 m
+      await advance(DRIVER_LOCATION_RIDE_CONFIG.minPostIntervalMs);
+      expect(post).toHaveBeenCalledTimes(2);
+      emit(14);
+      await advance(DRIVER_LOCATION_RIDE_CONFIG.minPostIntervalMs);
+      expect(post).toHaveBeenCalledTimes(3);
+      // Never faster than the ride interval.
+      emit(30);
+      await advance(DRIVER_LOCATION_RIDE_CONFIG.minPostIntervalMs - 1000);
+      expect(post).toHaveBeenCalledTimes(3);
+
+      locationTrackingService.setRideCadence(false);
+      await advance(1000);
+      emit(20); // 6 m from the last post: enough on a ride, not at the normal cadence
+      await advance(minPostIntervalMs);
+      expect(post).toHaveBeenCalledTimes(3);
+    });
+
+    it('is a no-op when unchanged, and reset() returns to the normal cadence', async () => {
+      await locationTrackingService.startTracking();
+      locationTrackingService.setRideCadence(false);
+      expect(geo.clearWatch).not.toHaveBeenCalled();
+      locationTrackingService.setRideCadence(true);
+      locationTrackingService.setRideCadence(true);
+      expect(geo.clearWatch).toHaveBeenCalledTimes(1);
+      locationTrackingService.reset();
+      expect(locationTrackingService.getRideCadence()).toBe(false);
     });
   });
 });

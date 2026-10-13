@@ -1,0 +1,41 @@
+{
+  "generator": "scripts/generate-vehicle-markers.js",
+  "size": 40,
+  "scales": [
+    1,
+    2,
+    3
+  ],
+  "vehicles": [
+    "car",
+    "bike",
+    "rickshaw"
+  ],
+  "colors": {
+    "body": {
+      "token": "driverMarker",
+      "light": "#0F1422",
+      "dark": "#F2F4F9"
+    },
+    "casing": {
+      "token": "routeLineCasing",
+      "light": "#FFFFFF",
+      "dark": "#0B0F1A"
+    },
+    "glass": {
+      "token": "borderStrong",
+      "light": "#858EA5",
+      "dark": "#626E90"
+    },
+    "lights": {
+      "token": "accent",
+      "light": "#F59A23",
+      "dark": "#F59A23"
+    },
+    "tail": {
+      "token": "danger",
+      "light": "#C0262D",
+      "dark": "#FF7A7F"
+    }
+  }
+}

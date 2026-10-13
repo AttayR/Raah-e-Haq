@@ -60,7 +60,24 @@ export const motionPatterns = {
   },
   searchingProgressLoopMs: 1500,
   centerPinLift: { duration: 150, translateY: -8, shadowScale: 0.8 },
-  driverMarker: { positionMs: 1000, positionEasing: linear, rotationMs: 300 },
+  /**
+   * §6.7 driver marker. [T-517] `positionMs` is only the fallback: position interpolates over the
+   * expected update interval (the gap between the last two updates, clamped to
+   * `minPositionMs`..min(`maxPositionMs`, 2 × the expected interval)), linear, so a steadily driving vehicle never stops between
+   * updates. Rotation eases to the heading with time constant `rotationMs / 3` (≈ settled in
+   * `rotationMs`), always the shortest way round. Moves under `jitterMeters` are ignored; over
+   * `teleportMeters` the marker jumps; within `snapMeters` of the route it drives along it.
+   */
+  driverMarker: {
+    positionMs: 1000,
+    positionEasing: linear,
+    rotationMs: 300,
+    minPositionMs: 300,
+    maxPositionMs: 8000,
+    jitterMeters: 3,
+    teleportMeters: 500,
+    snapMeters: 30,
+  },
   incomingRequestCountdownMs: 15000,
   sheetContentSwap: { duration: 250, translateY: 8 },
   toast: {

@@ -4,12 +4,15 @@
  * server once and hands the ride to the caller (which navigates to it).
  */
 import React from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { Provider } from 'react-redux';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import { createActiveRide } from '../../../src/features/active-ride/slice';
 import {
+  ACTIVE_RIDE_POLL_MS,
+  DRIVER_LOCATION_POLL_MS,
   useActiveRideActions,
   useActiveRidePolling,
   usePassengerRideStage,
@@ -27,6 +30,7 @@ beforeEach(() => {
 afterEach(() => {
   mock.restore();
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 const wrapperFor = (store: TestStore) =>
@@ -192,6 +196,61 @@ describe('useActiveRidePolling: driver location (T-304, BE-06)', () => {
     expect(result.current.driverLocation).toMatchObject({ latitude: 31.6 });
     // Never the generic tracking route.
     expect(mock.history.get.some((r) => r.url?.startsWith('/tracking/'))).toBe(false);
+  });
+
+  it('T-517: reads the driver location every 4 s (ride status stays every 10 s), only while focused', async () => {
+    jest.useFakeTimers();
+    const store = withRide('started', { driver_id: 5 });
+    mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21, status: 'started', driver_id: 5 })));
+    mock.onGet('/rides/21/driver-location').reply(200, locationBody(31.5));
+    const rideGets = () => mock.history.get.filter((r) => r.url === '/rides/21');
+
+    const { rerender } = renderHook(({ on }: { on: boolean }) => useActiveRidePolling(on), {
+      wrapper: wrapperFor(store),
+      initialProps: { on: true },
+    });
+    await settle();
+    expect(driverLocationGets()).toHaveLength(1);
+    expect(rideGets()).toHaveLength(1);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(DRIVER_LOCATION_POLL_MS * 5);
+    });
+    expect(driverLocationGets()).toHaveLength(6);
+    expect(rideGets()).toHaveLength(1 + Math.floor((DRIVER_LOCATION_POLL_MS * 5) / ACTIVE_RIDE_POLL_MS));
+
+    rerender({ on: false });
+    const asked = driverLocationGets().length;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(DRIVER_LOCATION_POLL_MS * 3);
+    });
+    expect(driverLocationGets()).toHaveLength(asked);
+  });
+
+  it('T-517: no driver-location reads while the app is in the background; reads again on return', async () => {
+    jest.useFakeTimers();
+    let onAppState: ((state: AppStateStatus) => void) | undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
+      onAppState = handler as (state: AppStateStatus) => void;
+      return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>;
+    });
+    const store = withRide('started', { driver_id: 5 });
+    mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21, status: 'started', driver_id: 5 })));
+    mock.onGet('/rides/21/driver-location').reply(200, locationBody(31.5));
+
+    renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(store) });
+    await settle();
+    expect(driverLocationGets()).toHaveLength(1);
+
+    act(() => onAppState?.('background'));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(DRIVER_LOCATION_POLL_MS * 4);
+    });
+    expect(driverLocationGets()).toHaveLength(1);
+
+    act(() => onAppState?.('active'));
+    await settle();
+    expect(driverLocationGets()).toHaveLength(2);
   });
 
   it('data null and 403 mean "no marker", not an error', async () => {

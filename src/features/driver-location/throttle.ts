@@ -89,12 +89,23 @@ export const toLocationFix = (position: DevicePosition, now: number): LocationFi
 };
 
 /**
+ * Below this speed (m/s, ~4 km/h) the device course is noise: Android reports 0 (north) for a
+ * standing driver, which would turn the passenger's vehicle marker at every stop (T-517).
+ */
+export const MIN_HEADING_SPEED_MPS = 1;
+
+/** The device reports a speed (not iOS's -1 "unknown") and it is too slow for a real course. */
+const tooSlowForHeading = (fix: LocationFix): boolean =>
+  fix.speed !== null && fix.speed >= 0 && fix.speed < MIN_HEADING_SPEED_MPS;
+
+/**
  * The POST body: numbers only, raw device values (speed in m/s, iOS -1 included); a value the
- * device did not give is left out. Never `driver_id` or `status`.
+ * device did not give is left out, and so is the heading while standing still (T-517). Never
+ * `driver_id` or `status`.
  */
 export const toLocationBody = (fix: LocationFix): DriverLocationBody => {
   const body: DriverLocationBody = { latitude: fix.latitude, longitude: fix.longitude };
-  if (fix.heading !== null) body.heading = fix.heading;
+  if (fix.heading !== null && !tooSlowForHeading(fix)) body.heading = fix.heading;
   if (fix.speed !== null) body.speed = fix.speed;
   if (fix.accuracy !== null) body.accuracy = fix.accuracy;
   return body;

@@ -196,6 +196,13 @@ export const en = {
     rideMapHint: 'Custom pins (no teardrops), 5/7pt cased route with the traveled part, assigned car vs nearby (muted).',
     sectionRidePins: 'Pins, car marker and searching pulse',
     ridePinsHint: 'Pickup circle, drop-off square, numbered stop; car assigned and nearby; pulse (static with Reduce Motion).',
+    // T-517 live vehicle markers (fixture loop; gallery only).
+    sectionLiveVehicles: 'Live vehicles: top-down, turning with the road',
+    liveVehiclesHint: 'Bike, rickshaw and car follow noisy fixture updates every 2 s: snapped to the route, smooth between updates, turning at corners. Reduce Motion: they jump.',
+    liveVehicle_bike: 'Bike',
+    liveVehicle_rickshaw: 'Rickshaw',
+    liveVehicle_car: 'Car',
+    liveVehicleNearby: 'Nearby (60%)',
     sectionRideAddress: 'Address pair (Raah line)',
     rideAddressRegular: 'Regular, labels, a stop',
     rideAddressCompact: 'Compact (list cards)',

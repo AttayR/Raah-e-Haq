@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { CarMarker } from '../ui/CarMarker';
+import { VehicleMarker } from '../ui/VehicleMarker';
 import type { NearbyDriver } from '../../services/rideService';
 import { MAX_FONT_SIZE_MULTIPLIER, radius, space, textStyles } from '../../theme';
 import type { NearbyDriversState } from '../../hooks/useNearbyDrivers';
@@ -18,18 +18,20 @@ export const nearbyDriverDescription = (driver: NearbyDriver): string =>
     .join(' · ');
 
 /**
- * Map markers for GET /rides/nearby-drivers, drawn as car badges (DESIGN_SYSTEM 5.21), not
- * generic pins. Keys are the opaque per-viewer ids (BE-20).
+ * Map markers for GET /rides/nearby-drivers (DESIGN_SYSTEM 5.21): each driver's vehicle type drawn
+ * top-down at 60% (T-517), not generic pins and not animated. Keys are the opaque per-viewer ids
+ * (BE-20). The endpoint sends no heading, so they face north.
  */
 export const NearbyDriverMarkers: React.FC<{ drivers: NearbyDriver[] }> = ({ drivers }) => (
   <>
     {drivers.map(driver => (
-      <CarMarker
+      <VehicleMarker
         key={driver.id}
         testID={`nearby-driver-${driver.id}`}
         coordinate={driver.location}
         title={MAPS_CONFIG.MARKERS.driver.title}
         description={nearbyDriverDescription(driver)}
+        vehicleType={driver.vehicle_type}
         muted
       />
     ))}

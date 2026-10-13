@@ -5,8 +5,6 @@ import SafeMapView from '../../../components/SafeMapView';
 import {
   AddressPair,
   AppText,
-  CarMarker,
-  CarMarkerGlyph,
   FareBreakdown,
   IndeterminateBar,
   PersonCard,
@@ -20,6 +18,8 @@ import {
   RouteLine,
   SearchingPulse,
   SlideToConfirm,
+  VehicleMarker,
+  VehicleMarkerGlyph,
   VehicleOptionCard,
   VehicleOptionSkeleton,
 } from '../../../components/ui';
@@ -65,9 +65,9 @@ export function RideMapSection() {
           <RideMarker kind="pickup" coordinate={galleryRoute[0]} label={t('ride.pickup')} />
           <RideMarker kind="stop" index={1} coordinate={galleryStop} />
           <RideMarker kind="dropoff" coordinate={galleryRoute[galleryRoute.length - 1]} />
-          <CarMarker coordinate={galleryAssignedCar.coordinate} title={t('ride.driverMarker')} />
+          <VehicleMarker coordinate={galleryAssignedCar.coordinate} vehicleType="car" route={galleryRoute} title={t('ride.driverMarker')} />
           {galleryNearbyCars.map(car => (
-            <CarMarker key={car.id} coordinate={car.coordinate} muted title={t('ride.nearbyDriverMarker')} />
+            <VehicleMarker key={car.id} coordinate={car.coordinate} vehicleType="car" muted title={t('ride.nearbyDriverMarker')} />
           ))}
         </SafeMapView>
       </View>
@@ -85,8 +85,8 @@ export function RidePinsSection() {
         <PinGlyph kind="pickup" />
         <PinGlyph kind="dropoff" />
         <PinGlyph kind="stop" index={1} />
-        <CarMarkerGlyph />
-        <CarMarkerGlyph muted />
+        <VehicleMarkerGlyph vehicleType="car" />
+        <VehicleMarkerGlyph vehicleType="car" muted />
       </View>
       <View style={[styles.tile, { backgroundColor: theme.colors.surfaceAlt }]}>
         <SearchingPulse />

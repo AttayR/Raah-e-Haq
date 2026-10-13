@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import SafeMapView from '../../../components/SafeMapView';
 import { DriverRidePanel } from '../../../components/driver/DriverRidePanel';
-import { CarMarker, RideMarker, RouteLine } from '../../../components/ui';
+import { RideMarker, RouteLine, VehicleMarker } from '../../../components/ui';
 import type { RideResource } from '../../../services/rideService';
 import ActiveRidePanel from '../../active-ride/components/ActiveRidePanel';
 import { advanceRideStage } from '../../active-ride/stage';
@@ -64,7 +64,7 @@ function RideMap() {
       <RouteLine coordinates={galleryRoute} />
       <RideMarker kind="pickup" coordinate={galleryRoute[0]} />
       <RideMarker kind="dropoff" coordinate={galleryRoute[galleryRoute.length - 1]} />
-      <CarMarker coordinate={galleryAssignedCar.coordinate} />
+      <VehicleMarker coordinate={galleryAssignedCar.coordinate} vehicleType="car" />
     </SafeMapView>
   );
 }

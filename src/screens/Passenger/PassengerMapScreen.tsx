@@ -517,7 +517,12 @@ const PassengerMapScreen = () => {
               >
                 <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={routeCoordinates} />
                 {!rideShown && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
-                <AssignedDriverMarker location={driverLocation} />
+                <AssignedDriverMarker
+                  location={driverLocation}
+                  vehicleType={currentRide?.vehicle_type}
+                  stage={rideStage?.stage}
+                  route={routeCoordinates}
+                />
               </SafeMapView>
             </MapErrorBoundary>
           </MapErrorBoundary>
