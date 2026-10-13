@@ -45,6 +45,7 @@ The app is being taken from prototype to production through a tracked fix progra
 - **Drivers (2026-10-11).** Logout sets a driver offline. Drivers must be 18 or older and must provide a driving licence at registration.
 - **Priority (2026-10-11).** 1) Wallet, production level (cash only, no gateway): ledger, ride settlement, driver commission/settlements, earnings and stats. 2) A modern, production-grade UI, consistent between passenger and driver. 3) WebSockets (BE-12/T-406) last.
 - **Navigation (2026-10-11).** No separate Map tab. Map-first Home like the competitors, 4 tabs per role, kept in sync. Passenger: Home (map + "Where to?" sheet), Activity, Inbox (notifications + chat), Account. Driver: Drive (map + online toggle + requests), Earnings, Inbox, Account. Design bar: compete with Uber, inDrive, Yango and Careem while keeping the current brand theme.
+- **Wallet top-up (2026-10-13).** Add JazzCash and Easypaisa wallet top-up, like inDrive (BE-74 / T-515). Rides are still paid in cash. A top-up credits the wallet, and for drivers it reduces the commission owed. Build against sandbox and a local fake provider; the real merchant accounts and keys are the owner's.
 - **Still needs the owner:** anything on Hostinger/hPanel or a server, Google Cloud/Firebase consoles (key rotation), Apple/Google store accounts and signing keys, real payment gateways, spending money, and anything touching production data or real users.
 
 ## Branches
