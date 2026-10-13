@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import rideService, { type RideRequest, type RideResource } from '../../services/rideService';
+import type { RideRatingFields } from '../rating/types';
 import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
 import { currentSessionEpoch, isStaleSession, STALE_SESSION_MESSAGE } from '../../store/sessionEpoch';
 import { fetchActiveRide } from './api';
@@ -124,6 +125,19 @@ const activeRideSlice = createSlice({
       state.ride = null;
       state.error = null;
     },
+    /**
+     * T-505: the rating answer (or the re-read after a 409) for the ride on screen. The completed
+     * ride is not polled any more, so its `my_rating` / `can_rate` are patched in place.
+     */
+    activeRideRatingChanged: (
+      state,
+      action: PayloadAction<{ rideId: number } & RideRatingFields>,
+    ) => {
+      if (state.ride && state.ride.id === action.payload.rideId) {
+        state.ride.my_rating = action.payload.my_rating;
+        state.ride.can_rate = action.payload.can_rate;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -190,7 +204,7 @@ const activeRideSlice = createSlice({
   },
 });
 
-export const { clearActiveRide } = activeRideSlice.actions;
+export const { clearActiveRide, activeRideRatingChanged } = activeRideSlice.actions;
 
 export const selectActiveRide = (state: SliceRoot): RideResource | null => state.activeRide.ride;
 export const selectActiveRideRestoreStatus = (state: SliceRoot): ActiveRideRestoreStatus =>

@@ -1,6 +1,7 @@
 import { apiService, unwrap } from '../../services/api';
 import { isRecord, readId, readNumber, readNumberOrNull, readOneOf, readText } from '../../core/api/read';
 import type { Pagination } from '../../core/api/types';
+import { toRideRatingState } from '../rating/api';
 import type {
   CancellationReason,
   Page,
@@ -91,6 +92,7 @@ export const toRide = (raw: unknown): Ride | null => {
   const id = readId(raw.id);
   if (id === null) return null;
   const reason = readText(raw.cancellation_reason);
+  const rating = toRideRatingState(raw);
   return {
     id,
     rideCode: readText(raw.ride_id),
@@ -122,6 +124,8 @@ export const toRide = (raw: unknown): Ride | null => {
     cancellationReason: reason ? readOneOf(reason, REASONS, 'other') : null,
     cancellationNote: readText(raw.cancellation_note),
     createdAt: readText(raw.created_at),
+    myRating: rating.myRating,
+    canRate: rating.canRate,
   };
 };
 

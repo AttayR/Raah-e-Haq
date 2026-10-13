@@ -4,6 +4,8 @@
  * never mapped: the history and receipt never show one.
  */
 
+import type { MyRating } from '../rating/types';
+
 export type RideStatus = 'requested' | 'accepted' | 'arrived' | 'started' | 'completed' | 'cancelled';
 
 /** Who cancelled (`rides.cancellation_reason`). */
@@ -77,6 +79,10 @@ export interface Ride {
   cancellationReason: CancellationReason | null;
   cancellationNote: string | null;
   createdAt: string | null;
+  /** BE-07: the signed-in user's own rating of this ride, or null. */
+  myRating: MyRating | null;
+  /** BE-07: the signed-in user may still rate this ride. */
+  canRate: boolean;
 }
 
 export type { Page } from '../../core/api/types';

@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice, isAnyOf, type PayloadAction } from '@reduxjs/toolkit';
+import type { RideRatingFields } from '../rating/types';
 import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
 import type { RideResource } from '../../services/rideService';
 import locationTrackingService from '../../services/locationTrackingService';
@@ -144,6 +145,16 @@ const driverRideSlice = createSlice({
     clearDriverActiveRide(state) {
       state.ride = null;
     },
+    /** T-505: the rating answer (or the re-read after a 409) for the ride on screen. */
+    driverRideRatingChanged(
+      state,
+      action: PayloadAction<{ rideId: number } & RideRatingFields>,
+    ) {
+      if (state.ride && state.ride.id === action.payload.rideId) {
+        state.ride.my_rating = action.payload.my_rating;
+        state.ride.can_rate = action.payload.can_rate;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -207,7 +218,7 @@ const driverRideSlice = createSlice({
   },
 });
 
-export const { setDriverActiveRide, clearDriverActiveRide } = driverRideSlice.actions;
+export const { setDriverActiveRide, clearDriverActiveRide, driverRideRatingChanged } = driverRideSlice.actions;
 
 export const selectDriverActiveRide = (state: SliceRoot): RideResource | null => state.driverRide.ride;
 

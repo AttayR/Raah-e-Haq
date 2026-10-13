@@ -407,6 +407,36 @@ export const en = {
     walletOpenA11y: 'Open wallet and commission',
   },
   /**
+   * Rating after a ride, both roles (T-505, BE-07). Tag labels come from GET /rating-tags; only
+   * the frame of the sheet is static copy.
+   */
+  rating: {
+    title: 'How was your trip?',
+    sheetA11y: 'Rate your trip',
+    yourDriver: 'Your driver',
+    yourPassenger: 'Your passenger',
+    starsHint: 'Tap a star to rate',
+    tagsGood: 'What went well?',
+    tagsBad: 'What could be better?',
+    tagsMixed: 'Tell us more',
+    tagsLimit: 'Pick up to {n}',
+    tagsLoadFailed: "Couldn't load the options.",
+    commentLabel: 'Add a comment (optional)',
+    commentPlaceholder: 'Anything else to share?',
+    commentCount: '{n}/{max}',
+    submit: 'Submit',
+    skip: 'Skip',
+    retry: 'Try again',
+    thanks: 'Thanks for your rating',
+    errorGeneric: "Couldn't send your rating. Please try again.",
+    errorNotCompleted: 'You can rate this trip once it is complete.',
+    errorNotParticipant: "You can't rate this trip.",
+    rateThisTrip: 'Rate this trip',
+    rateHint: 'Opens the rating sheet',
+    yourRating: 'Your rating',
+    yourRatingA11y: 'You rated this trip {n} out of 5',
+  },
+  /**
    * Wallet top-up (T-515, BE-74): Add money with JazzCash / Easypaisa (the local fake gateway on a
    * dev backend). Provider names come from GET /wallet; rides stay cash.
    */

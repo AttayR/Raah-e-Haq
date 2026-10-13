@@ -9,6 +9,7 @@ import { RideMarker, Screen } from '../../components/ui';
 import { CancelReasonSheet } from '../../components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../components/driver/DriverRidePanel';
 import { DriverRideSummary } from '../../components/driver/DriverRideSummary';
+import { DriverRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import { toast } from '../../core/toast';
@@ -208,6 +209,9 @@ const DriverRideScreen: React.FC = () => {
             />
           </View>
         )}
+
+        {/* T-505: rate the passenger over the trip summary after Complete trip. */}
+        <DriverRideRatingPrompt active={isFocused && step === 'summary'} />
 
         <CancelReasonSheet
           visible={cancelOpen}

@@ -84,7 +84,8 @@ export interface RideResource {
     id: number;
     name: string;
     phone: string;
-    rating?: number;
+    /** BE-07: null until the passenger has 3 ratings (show "New"). */
+    rating?: number | null;
   };
   /**
    * Non-admin viewers get a minimal card (BE-20). `phone` is present only for the passenger of
@@ -95,6 +96,7 @@ export interface RideResource {
     name: string;
     phone?: string | null;
     profile_image_url?: string | null;
+    /** BE-07: null until the driver has 3 ratings (show "New"). */
     rating?: number | null;
     vehicle_type?: string | null;
   };
@@ -119,6 +121,18 @@ export interface RideResource {
   cancellation_reason?: string | null;
   /** The free-text note given on cancel (a driver must give one, BE-04). */
   cancellation_note?: string | null;
+  /** BE-07: the caller's own rating of this ride, or null. Read with features/rating/api. */
+  my_rating?: RideMyRating | null;
+  /** BE-07: the caller may still rate this ride (completed, within the window, not rated yet). */
+  can_rate?: boolean;
+}
+
+/** RideResource.my_rating (BE-07). */
+export interface RideMyRating {
+  stars: number;
+  tags: string[];
+  comment: string | null;
+  created_at: string | null;
 }
 
 /** RideResource.fare_breakdown (BE-05): the same keys as POST /rides/estimate. */

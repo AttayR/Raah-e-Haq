@@ -29,6 +29,7 @@ import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } fro
 import { isRideInProgress } from '../../features/active-ride/status';
 import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
 import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
+import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { regionInViewport, usePassengerRideCamera, viewportEdgePadding, type MapViewport } from '../../features/active-ride/camera';
 import { mapTapTarget, type MapPickTarget } from '../../features/ride-booking/mapTap';
 import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/components/MapPick';
@@ -658,6 +659,9 @@ const PassengerMapScreen = () => {
             />
           )}
         </BookingSheet>
+
+        {/* T-505: rate the driver over the trip summary once the ride completes. */}
+        <PassengerRideRatingPrompt active={isFocused} />
 
         <AdvancedRideRequestPanel
           visible={showAdvancedRidePanel}

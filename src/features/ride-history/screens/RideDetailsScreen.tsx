@@ -16,7 +16,9 @@ import {
   TimelineCard,
 } from '../components/RideDetailsSections';
 import { RIDE_HISTORY_COPY } from '../copy';
-import { canOpenChat } from '../format';
+import { canOpenChat, otherParty } from '../format';
+import { RideRatingSection } from '../../rating/components/RideRatingSection';
+import type { RideRatingState } from '../../rating/types';
 import { useRideDetail, useRideViewer } from '../hooks';
 import type { RideHistoryRoutes } from '../navigation';
 
@@ -32,9 +34,17 @@ export default function RideDetailsScreen() {
   const navigation = useNavigation<RideChatNavigator & { goBack(): void }>();
   const { params } = useRoute<RouteProp<RideHistoryRoutes, 'RideDetails'>>();
   const viewer = useRideViewer();
-  const { data, status, error, reload, refresh } = useRideDetail(params.rideId, params.ride ?? null);
+  const { data, status, error, reload, refresh, setData } = useRideDetail(params.rideId, params.ride ?? null);
 
   const onMessage = useCallback(() => openRideChat(navigation, params.rideId), [navigation, params.rideId]);
+  const shownRide = data?.kind === 'ride' ? data.ride : null;
+  // T-505: a new rating (or the re-read after a 409) updates the ride shown here.
+  const onRatingChange = useCallback(
+    (state: RideRatingState) => {
+      if (shownRide) setData({ kind: 'ride', ride: { ...shownRide, myRating: state.myRating, canRate: state.canRate } });
+    },
+    [setData, shownRide],
+  );
 
   const header = (
     <Header
@@ -88,6 +98,7 @@ export default function RideDetailsScreen() {
   }
 
   const { ride } = data;
+  const rated = otherParty(ride, viewer);
 
   return (
     <Screen
@@ -114,6 +125,15 @@ export default function RideDetailsScreen() {
         <CancellationCard ride={ride} viewer={viewer} />
         <RouteCard ride={ride} />
         <PersonCard ride={ride} viewer={viewer} canMessage={canOpenChat(ride)} onMessage={onMessage} />
+        <RideRatingSection
+          rideId={ride.id}
+          role={viewer}
+          myRating={ride.myRating}
+          canRate={ride.canRate}
+          personName={rated?.firstName ?? null}
+          photoUri={rated?.profileImageUrl ?? null}
+          onChange={onRatingChange}
+        />
         <ReceiptCard ride={ride} viewer={viewer} />
         <TimelineCard ride={ride} />
       </View>
