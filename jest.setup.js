@@ -309,6 +309,18 @@ jest.mock('react-native-linear-gradient', () => {
   return {__esModule: true, default: LinearGradient};
 });
 
+// WebView (T-515 top-up checkout): a View that keeps the props, so tests can call
+// onShouldStartLoadWithRequest / onNavigationStateChange; reload/goBack are spies.
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  const WebView = React.forwardRef((props, ref) => {
+    React.useImperativeHandle(ref, () => ({reload: jest.fn(), goBack: jest.fn(), stopLoading: jest.fn()}));
+    return React.createElement(View, props);
+  });
+  return {__esModule: true, WebView, default: WebView};
+});
+
 // Toast
 jest.mock('react-native-toast-message', () => {
   const Toast = () => null;

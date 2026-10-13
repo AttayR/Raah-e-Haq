@@ -1,6 +1,7 @@
 /**
  * T-508: BE-09 wallet shapes are mapped to app models in one place, and the calls use the
- * contract's paths, params and bodies. Cash only: there is no top-up call at all.
+ * contract's paths, params and bodies. Rides stay cash; the BE-74 top-up calls are covered in
+ * topUp.test.ts.
  */
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
@@ -85,6 +86,7 @@ describe('toTransaction', () => {
       settlementId: null,
       reversesId: null,
       reversed: false,
+      topupId: null,
       createdAt: '2026-10-11T09:00:00+00:00',
     });
   });

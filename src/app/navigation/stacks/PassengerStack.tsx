@@ -14,6 +14,10 @@ import { useNotificationsSync } from '../../../features/notifications/hooks';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
 import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
 import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
+import AddMoneyScreen from '../../../features/wallet/screens/AddMoneyScreen';
+import TopUpCheckoutScreen from '../../../features/wallet/screens/TopUpCheckoutScreen';
+import TopUpStatusScreen from '../../../features/wallet/screens/TopUpStatusScreen';
+import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import type { WalletRoutes } from '../../../features/wallet/navigation';
 import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
@@ -42,6 +46,10 @@ export type PassengerStackParamList = {
   SavedPlaceEditor: SavedPlaceEditorParams | undefined;
   /** One ledger entry (T-508); the wallet itself is Activity › Wallet. */
   WalletTransaction: WalletRoutes['WalletTransaction'];
+  /** Wallet top-up (T-515, BE-74): form, hosted checkout, polled result. */
+  AddMoney: WalletRoutes['AddMoney'];
+  TopUpCheckout: WalletRoutes['TopUpCheckout'];
+  TopUpStatus: WalletRoutes['TopUpStatus'];
   /** Account → Notifications: push preferences (T-502, BE-11). */
   NotificationPreferences: undefined;
 };
@@ -77,6 +85,10 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="FavoriteLocations" component={SavedPlacesScreen} />
       <Stack.Screen name="SavedPlaceEditor" component={SavedPlaceEditorScreen} />
       <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
+      <Stack.Screen name="AddMoney" component={AddMoneyScreen} />
+      {/* No swipe-back: leaving the checkout always goes to the status screen. */}
+      <Stack.Screen name="TopUpCheckout" component={TopUpCheckoutScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="TopUpStatus" component={TopUpStatusScreen} getId={topUpStatusScreenId} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
     </Stack.Navigator>
   );

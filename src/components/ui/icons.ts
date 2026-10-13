@@ -105,6 +105,11 @@ export const iconGlyphs = {
   chart: 'chart-bar',
   refund: 'cash-refund',
   pending: 'clock-outline',
+  // Wallet top-up (T-515).
+  topUp: 'wallet-plus-outline',
+  card: 'credit-card-outline',
+  mobileWallet: 'cellphone',
+  failed: 'close-circle-outline',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

@@ -15,6 +15,10 @@ import { NotificationPreferencesScreen } from '../../../features/notifications/s
 import { DriverDocumentsScreen } from '../../../features/driverDocuments/screens/DriverDocumentsScreen';
 import WalletScreen from '../../../features/wallet/screens/WalletScreen';
 import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
+import AddMoneyScreen from '../../../features/wallet/screens/AddMoneyScreen';
+import TopUpCheckoutScreen from '../../../features/wallet/screens/TopUpCheckoutScreen';
+import TopUpStatusScreen from '../../../features/wallet/screens/TopUpStatusScreen';
+import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import PayCommissionScreen from '../../../features/wallet/screens/PayCommissionScreen';
 import SettlementsScreen from '../../../features/wallet/screens/SettlementsScreen';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
@@ -39,6 +43,10 @@ export type DriverStackParamList = {
   WalletTransaction: DriverWalletRoutes['WalletTransaction'];
   PayCommission: DriverWalletRoutes['PayCommission'];
   WalletSettlements: DriverWalletRoutes['WalletSettlements'];
+  /** Wallet top-up (T-515, BE-74): form, hosted checkout, polled result. */
+  AddMoney: DriverWalletRoutes['AddMoney'];
+  TopUpCheckout: DriverWalletRoutes['TopUpCheckout'];
+  TopUpStatus: DriverWalletRoutes['TopUpStatus'];
   /** Account → Ride history and one ride's details/receipt (T-501). Earnings is a tab (UI-R4). */
   RideHistory: RideHistoryRoutes['RideHistory'];
   RideDetails: RideHistoryRoutes['RideDetails'];
@@ -69,6 +77,10 @@ const DriverStack = () => {
       <Stack.Screen name="DriverDocuments" component={DriverDocumentsScreen} />
       <Stack.Screen name="Wallet" component={WalletScreen} />
       <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
+      <Stack.Screen name="AddMoney" component={AddMoneyScreen} />
+      {/* No swipe-back: leaving the checkout always goes to the status screen. */}
+      <Stack.Screen name="TopUpCheckout" component={TopUpCheckoutScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="TopUpStatus" component={TopUpStatusScreen} getId={topUpStatusScreenId} />
       <Stack.Screen name="PayCommission" component={PayCommissionScreen} />
       <Stack.Screen name="WalletSettlements" component={SettlementsScreen} />
       <Stack.Screen name="RideHistory" component={RideHistoryScreen} />

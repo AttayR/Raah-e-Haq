@@ -22,6 +22,17 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>raahehaq</string>
+			</array>
+		</dict>
+	</array>
 	<key>GMSApiKey</key>
 	<string>MAPS_KEY</string>
 	<key>LSRequiresIPhoneOS</key>

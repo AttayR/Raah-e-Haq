@@ -1,6 +1,7 @@
 /**
- * App models of the BE-09 wallet ledger (docs/api/CONTRACT_NOTES.md "BE-09 / BE-08").
- * Cash only: there is no top-up, card or gateway; the balance is shown, it never pays a ride.
+ * App models of the BE-09 wallet ledger (docs/api/CONTRACT_NOTES.md "BE-09 / BE-08") and the
+ * BE-74 top-up. Rides stay cash-paid: the balance never pays a ride; a top-up (JazzCash /
+ * Easypaisa) only credits the wallet, and for a driver it lowers the commission owed.
  */
 
 export type WalletStatus = 'active' | 'suspended' | 'blocked';
@@ -41,7 +42,75 @@ export interface Wallet {
   pendingSettlements: Settlement[];
   canSettleCommission: boolean;
   canRequestPayout: boolean;
+  /** BE-74: wallet active and at least one top-up provider enabled ("Add money" shown). */
+  canTopUp: boolean;
+  /** BE-74 top-up limits and providers; null when the server sends none. */
+  topUp: TopUpConfig | null;
   updatedAt: string | null;
+}
+
+/** BE-74 top-up methods: the provider's mobile-wallet push, or its hosted checkout page. */
+export type TopUpMethod = 'mwallet' | 'card';
+
+/** `created`/`pending` are open; the rest are terminal (`cancelled` is reserved). */
+export type TopUpStatus = 'created' | 'pending' | 'succeeded' | 'failed' | 'expired' | 'cancelled';
+
+export interface TopUpProvider {
+  /** `jazzcash`, `easypaisa`, or `fake` (local/testing backends only). Never hardcoded in the app. */
+  id: string;
+  name: string;
+  methods: TopUpMethod[];
+}
+
+export interface TopUpConfig {
+  providers: TopUpProvider[];
+  minAmount: number;
+  maxAmount: number;
+  dailyCap: number;
+  /** Cap minus today's succeeded + still-open top-ups (Pakistan day). */
+  dailyRemaining: number;
+  currency: string;
+}
+
+export interface TopUp {
+  /** Opaque (`top_…`). */
+  id: string;
+  provider: string;
+  method: TopUpMethod;
+  amount: number;
+  currency: string;
+  status: TopUpStatus;
+  /** Masked by the server ("0300*****67"); null for card. */
+  mobileNumber: string | null;
+  /** `message` is written for people and shown as is. */
+  failure: { code: string | null; message: string } | null;
+  /** Ledger reference (`TXN-…`) once credited. */
+  transactionId: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+  completedAt: string | null;
+}
+
+/** What the app does next with a top-up (POST and GET /wallet/topups/{id}). */
+export type TopUpNextAction =
+  | { type: 'redirect'; url: string; returnUrl: string | null }
+  | { type: 'poll'; message: string | null; pollIntervalSeconds: number }
+  | { type: 'none' };
+
+export interface TopUpResult {
+  topUp: TopUp;
+  nextAction: TopUpNextAction;
+}
+
+/** POST /wallet/topups. The mobile number and CNIC digits are sent once and never stored or logged. */
+export interface TopUpRequest {
+  amount: number;
+  provider: string;
+  method: TopUpMethod;
+  /** National form "03XXXXXXXXX"; mwallet only. */
+  mobileNumber?: string;
+  /** JazzCash mwallet only. */
+  cnicLast6?: string;
 }
 
 export interface TransactionRide {
@@ -78,6 +147,8 @@ export interface WalletTransaction {
   reversesId: number | null;
   /** A later `reversal` cancelled this entry (struck through). */
   reversed: boolean;
+  /** BE-74: the top-up (`TopUp.id`) a `topup` entry credited; null on other entries. */
+  topupId: string | null;
   createdAt: string;
 }
 

@@ -1,7 +1,8 @@
 /**
  * T-508: the Wallet screen shows GET /wallet and GET /wallet/transactions for both roles, with
  * loading, error (retry), empty and filtered states, infinite scroll, reversed rows struck
- * through, and no top-up or payment methods (cash only). Drivers see the commission owed,
+ * through, and no fake payment methods (rides are cash; "Add money" only when the server allows a
+ * top-up, T-515, covered in topUpScreens.test.tsx). Drivers see the commission owed,
  * "Pay commission" and can cancel a pending report.
  */
 import React from 'react';
@@ -107,8 +108,9 @@ describe('WalletScreen (passenger)', () => {
     expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs 1,500');
     expect(screen.getByTestId('wallet-balance-meta').props.children).toBe('Rs 15,230');
     expect(screen.getByText('Rides are paid in cash to the driver.')).toBeTruthy();
-    // Cash only: no fake top-up or payment methods.
+    // No fake funds or payment methods; can_top_up is false here, so no Add money either.
     expect(screen.queryByText(/Add Funds|Payment Methods|1200/)).toBeNull();
+    expect(screen.queryByTestId('wallet-add-money')).toBeNull();
     // Passengers have no commission card.
     expect(screen.queryByTestId('wallet-commission-card')).toBeNull();
 

@@ -17,6 +17,8 @@ export type NotificationTarget =
   | { kind: 'rideRequests' }
   /** The role's home tab. */
   | { kind: 'home' }
+  /** The wallet (category `wallet`: top-ups, settlements, adjustments; T-515/T-514). */
+  | { kind: 'wallet' }
   /** Nothing more specific: the notifications list. */
   | { kind: 'inbox' };
 
@@ -27,6 +29,8 @@ export interface TargetSource {
 }
 
 const ENDED_RIDE_TYPES = new Set(['ride_completed', 'ride_cancelled']);
+/** BE-74 top-up results; also routed by type in case a push arrives without its category. */
+const WALLET_TYPES = new Set(['topup_succeeded', 'topup_failed']);
 
 export const resolveNotificationTarget = (
   { category, type, rideId }: TargetSource,
@@ -34,6 +38,9 @@ export const resolveNotificationTarget = (
 ): NotificationTarget => {
   if ((category === 'chat' || type === 'chat_message') && rideId !== null) {
     return { kind: 'chat', rideId };
+  }
+  if (category === 'wallet' || (type !== null && WALLET_TYPES.has(type))) {
+    return { kind: 'wallet' };
   }
   if (category !== 'ride') {
     return { kind: 'inbox' };

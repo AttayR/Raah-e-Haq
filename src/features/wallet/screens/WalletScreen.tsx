@@ -16,11 +16,13 @@ import {
   Screen,
   SkeletonList,
 } from '../../../components/ui';
+import { t } from '../../../i18n';
 import { componentTokens, layout, space } from '../../../theme';
 import { BalanceCard } from '../components/BalanceCard';
 import { CommissionCard } from '../components/CommissionCard';
 import { TransactionRow } from '../components/TransactionRow';
 import { WALLET_COPY } from '../copy';
+import { ADD_MONEY_ROUTE } from '../navigation';
 import { groupByDay, type TransactionSection } from '../format';
 import { useCancelSettlement, useWallet, useWalletTransactions } from '../hooks';
 import type { Settlement, TransactionFilter, WalletTransaction } from '../types';
@@ -46,8 +48,9 @@ export type WalletBodyProps = {
  * Wallet for both roles (T-508, BE-09): balance and totals from GET /wallet, the cash-only
  * note, and the ledger from GET /wallet/transactions grouped by day with a direction filter,
  * pull to refresh and infinite scroll. Drivers also get the commission owed, "Pay commission"
- * and their payment reports. Cash only: no top-up, no payment methods. The body is also the
- * passenger's Activity › Wallet (UI-R4); the driver opens the screen from Earnings.
+ * and their payment reports. Rides stay cash; "Add money" (T-515, BE-74) appears when the server
+ * says `can_top_up`. The body is also the passenger's Activity › Wallet (UI-R4); the driver
+ * opens the screen from Earnings.
  */
 export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
   const { theme } = useAppTheme();
@@ -133,6 +136,16 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
       {header}
       <View style={styles.headerBlock}>
         <BalanceCard wallet={walletData} isDriver={isDriver} />
+        {walletData.canTopUp && walletData.topUp ? (
+          <Button
+            label={t('topUp.addMoney')}
+            leadingIcon="topUp"
+            variant="secondary"
+            accessibilityLabel={t('topUp.addMoneyA11y')}
+            onPress={() => navigation.navigate(ADD_MONEY_ROUTE)}
+            testID="wallet-add-money"
+          />
+        ) : null}
         {walletData.status !== 'active' ? (
           <Banner tone="warning" text={WALLET_COPY.walletSuspended} testID="wallet-suspended" />
         ) : null}

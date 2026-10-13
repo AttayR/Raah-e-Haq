@@ -40,9 +40,11 @@ describe('iOS Info.plist', () => {
     ]);
   });
 
-  it('has no Google Sign-In URL scheme', () => {
-    expect(plist).not.toContain('CFBundleURLTypes');
+  it('has no Google Sign-In URL scheme; the only scheme is the app\'s own raahehaq (T-515 top-up return)', () => {
+    expect(plistArray(plist, 'CFBundleURLSchemes')).toEqual(['raahehaq']);
+    expect(plist.match(/<key>CFBundleURLSchemes<\/key>/g)).toHaveLength(1);
     expect(plist).not.toContain('REVERSED_CLIENT_ID');
+    expect(plist).not.toContain('googleusercontent');
   });
 });
 
@@ -65,6 +67,23 @@ describe('Android network security', () => {
     expect(config).toMatch(/<base-config cleartextTrafficPermitted="false">/);
     const domains = [...config.matchAll(/<domain[^>]*>([^<]+)<\/domain>/g)].map((m) => m[1]);
     expect(domains.sort()).toEqual(['10.0.2.2', '127.0.0.1', 'localhost']);
+  });
+});
+
+describe('App URL scheme (T-515)', () => {
+  it('Android opens raahehaq://wallet/topup links in MainActivity (and no other host)', () => {
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    expect(manifest).toMatch(
+      /<intent-filter>\s*<action android:name="android.intent.action.VIEW" \/>\s*<category android:name="android.intent.category.DEFAULT" \/>\s*<category android:name="android.intent.category.BROWSABLE" \/>\s*<data android:scheme="raahehaq" android:host="wallet" android:pathPrefix="\/topup" \/>\s*<\/intent-filter>/,
+    );
+    expect(manifest.match(/android:scheme=/g)).toHaveLength(1);
+  });
+
+  it('iOS forwards scene URLs (running and cold start) to React Native Linking', () => {
+    const appDelegate = read('ios/RaaHeHaq/AppDelegate.swift');
+    expect(appDelegate).toContain('func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>)');
+    expect(appDelegate).toContain('RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])');
+    expect(appDelegate).toContain('connectionOptions.urlContexts.first?.url');
   });
 });
 

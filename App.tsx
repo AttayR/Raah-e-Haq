@@ -1,5 +1,5 @@
 import 'react-native-reanimated';
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   NavigationContainer,
   DefaultTheme as NavLight,
@@ -8,15 +8,28 @@ import {
 
 import { StatusBar, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useStore } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
+import { createLinking } from './src/app/navigation/linking';
+import type { RootState } from './src/store';
 import ReduxProvider from './src/app/providers/ReduxProvider';
 import NotificationManager from './src/components/NotificationManager';
 import { DevKitGalleryHost } from './src/features/dev-gallery/DevKitGalleryHost';
 
 function ThemedNav() {
   const { theme } = useAppTheme();
+  // `raahehaq://wallet/topup?id=…` (T-515): routed by the auth state when a link arrives.
+  const store = useStore<RootState>();
+  const linking = useMemo(
+    () =>
+      createLinking(() => {
+        const { isInitialized, isAuthenticated, user } = store.getState().apiAuth;
+        return { isInitialized, isAuthenticated, user };
+      }),
+    [store],
+  );
   const navTheme =
     theme.mode === 'dark'
       ? {
@@ -47,7 +60,7 @@ function ThemedNav() {
         barStyle={theme.statusBarStyle}
         backgroundColor={theme.colors.background}
       />
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer theme={navTheme} linking={linking}>
         <AuthFlow />
       </NavigationContainer>
     </>

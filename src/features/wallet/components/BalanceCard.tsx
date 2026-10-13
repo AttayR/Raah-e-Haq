@@ -12,7 +12,7 @@ type Props = { wallet: Wallet; isDriver: boolean };
 /**
  * Balance hero (docs/design/screens/passenger-wallet.md): `primary` fill with `onPrimary`
  * text in light, `primarySoft` / `onPrimarySoft` in dark. One meta line: spent (passenger) or
- * cash earnings (driver). No top-up and no payment methods (cash only, B-08).
+ * cash earnings (driver). "Add money" (T-515) sits under the card, on the Wallet screen.
  */
 export function BalanceCard({ wallet, isDriver }: Props) {
   const { theme } = useAppTheme();

@@ -21,6 +21,9 @@ import { componentTokens, layout, radius, space } from '../../../theme';
 import { SETTLEMENT_METHOD_LABEL, WALLET_COPY } from '../copy';
 import { formatDateTime, transactionAmountColor, transactionAmountText, transactionIcon } from '../format';
 import { useTransactionDetail } from '../hooks';
+import { t as translate } from '../../../i18n';
+import { TopUpDetailCard } from '../components/TopUpDetailCard';
+import { providerDisplayName } from '../topUpFormat';
 import type { WalletRoutes } from '../navigation';
 import type { WalletTransaction } from '../types';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
@@ -31,12 +34,15 @@ type Row = { label: string; value: string; testID?: string };
 const RIDE_TYPES: ReadonlySet<string> = new Set(['ride_payment', 'driver_earning', 'commission_due']);
 /** Ledger types written by an approved settlement: "Cash at office" / "Bank transfer". */
 const SETTLEMENT_TYPES: ReadonlySet<string> = new Set(['commission_payment', 'payout']);
+/** BE-74: a top-up's entry names its gateway (`jazzcash|easypaisa`; the local fake books as `wallet`). */
+const TOP_UP_TYPE = 'topup';
 
 /** "Payment method" row: settlement wording only for settlements, never for ride rows (T-509). */
 export const methodLabel = (t: Pick<WalletTransaction, 'type' | 'paymentMethod' | 'settlementId'>): string | null => {
   const method = t.paymentMethod;
   if (!method) return null;
   if (method === 'wallet') return WALLET_COPY.title;
+  if (t.type === TOP_UP_TYPE) return providerDisplayName(method);
   if (RIDE_TYPES.has(t.type)) return method === 'cash' ? WALLET_COPY.methodRideCash : null;
   if (method === 'cash' || method === 'bank_transfer') {
     const settlement = SETTLEMENT_TYPES.has(t.type) || t.settlementId !== null;
@@ -69,12 +75,13 @@ export const transactionDetailRows = (t: WalletTransaction): Row[] => {
     rows.push({ label: WALLET_COPY.detailBalanceAfter, value: money(t.balanceAfter), testID: 'transaction-balance-after' });
   }
   if (t.reference) rows.push({ label: WALLET_COPY.detailReference, value: t.reference });
+  if (t.topupId) rows.push({ label: translate('topUp.detailTopUp'), value: t.topupId, testID: 'transaction-topup-id' });
   return rows.filter((row): row is Row => row !== null);
 };
 
 /**
  * One ledger entry (T-508): GET /wallet/transactions/{id}, opened from the Wallet list. An entry
- * for a ride links to its RideDetails (T-501).
+ * for a ride links to its RideDetails (T-501); a top-up entry (T-515) shows its top-up.
  */
 export default function TransactionDetailScreen() {
   const { theme } = useAppTheme();
@@ -176,6 +183,8 @@ export default function TransactionDetailScreen() {
             </View>
           ))}
         </Card>
+
+        {transaction.topupId ? <TopUpDetailCard id={transaction.topupId} /> : null}
 
         {ride ? (
           <Card padding="none">

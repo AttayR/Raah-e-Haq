@@ -68,6 +68,11 @@ export const routeForTarget = (
       return role === 'passenger'
         ? tab(role, 'Activity', { segment: 'rides' })
         : { screen: 'RideHistory', initial: false };
+    case 'wallet':
+      // Passenger wallet is Activity › Wallet; the driver's is a stack screen (from Earnings).
+      return role === 'passenger'
+        ? tab(role, 'Activity', { segment: 'wallet' })
+        : { screen: 'Wallet', initial: false };
     case 'rideRequests':
     case 'home':
       return tab(role, HOME_TAB[role]);

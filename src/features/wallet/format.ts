@@ -87,6 +87,8 @@ const TYPE_ICONS: Record<string, IconName> = {
   refund: 'refund',
   reversal: 'refund',
   opening_balance: 'wallet',
+  topup: 'topUp',
+  wallet_topup: 'topUp',
 };
 
 /** Leading glyph: by type, then by direction for unknown types. */

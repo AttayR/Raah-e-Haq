@@ -42,8 +42,21 @@ describe('resolveNotificationTarget', () => {
     expect(resolveNotificationTarget({ category: 'ride', type: 'stop_added', rideId: 3 }, 'driver').kind).toBe('ride');
   });
 
-  it('promo, wallet, system and chat without a ride stay on the list', () => {
-    (['promo', 'wallet', 'system'] as const).forEach((category) => {
+  it('T-515: wallet notifications (top-up results, settlements) open the wallet for both roles', () => {
+    (['passenger', 'driver'] as const).forEach((role) => {
+      expect(resolveNotificationTarget({ category: 'wallet', type: 'topup_succeeded', rideId: null }, role)).toEqual({
+        kind: 'wallet',
+      });
+      expect(resolveNotificationTarget({ category: 'wallet', type: 'settlement_approved', rideId: null }, role).kind).toBe(
+        'wallet',
+      );
+      // A top-up push without its category still opens the wallet.
+      expect(resolveNotificationTarget({ category: 'system', type: 'topup_failed', rideId: null }, role).kind).toBe('wallet');
+    });
+  });
+
+  it('promo, system and chat without a ride stay on the list', () => {
+    (['promo', 'system'] as const).forEach((category) => {
       expect(resolveNotificationTarget({ category, type: null, rideId: 1 }, 'passenger').kind).toBe('inbox');
     });
     expect(resolveNotificationTarget({ category: 'chat', type: 'chat_message', rideId: null }, 'passenger').kind).toBe(
@@ -71,6 +84,14 @@ describe('routeForTarget', () => {
       screen: 'DriverTabs',
       params: { screen: 'Drive' },
     });
+  });
+
+  it('T-515: maps the wallet per role (passenger Activity › Wallet, driver Wallet screen)', () => {
+    expect(routeForTarget('passenger', { kind: 'wallet' }, true)).toEqual({
+      screen: 'PassengerTabs',
+      params: { screen: 'Activity', params: { segment: 'wallet' } },
+    });
+    expect(routeForTarget('driver', { kind: 'wallet' }, true)).toEqual({ screen: 'Wallet', initial: false });
   });
 
   it('maps history, home and inbox to the new tabs (UI-R4)', () => {

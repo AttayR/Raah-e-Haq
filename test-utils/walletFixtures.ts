@@ -70,3 +70,36 @@ export const pageInfo = (current: number, last: number, total = last * 20) => ({
   per_page: 20,
   total,
 });
+
+/** BE-74 GET /wallet `top_up` (local fake gateway, fake numbers only). */
+export const rawTopUpConfig = (overrides: Record<string, unknown> = {}) => ({
+  providers: [{ id: 'fake', name: 'Test gateway', methods: ['mwallet', 'card'] }],
+  min_amount: 100,
+  max_amount: 25000,
+  daily_cap: 50000,
+  daily_remaining: 49500,
+  currency: 'PKR',
+  ...overrides,
+});
+
+/** BE-74 top-up (`TU` + next_action). */
+export const rawTopUp = (overrides: Record<string, unknown> = {}) => ({
+  id: 'top_01k7testtesttesttesttestte',
+  provider: 'fake',
+  method: 'mwallet',
+  amount: 500,
+  currency: 'PKR',
+  status: 'pending',
+  mobile_number: '0300*****67',
+  failure: null,
+  transaction_id: null,
+  created_at: '2026-10-13T09:00:00+00:00',
+  expires_at: '2026-10-13T09:15:00+00:00',
+  completed_at: null,
+  next_action: {
+    type: 'poll',
+    poll_interval_seconds: 3,
+    message: 'Approve the payment in your Test gateway app or the prompt on your phone.',
+  },
+  ...overrides,
+});

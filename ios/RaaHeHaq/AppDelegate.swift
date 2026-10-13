@@ -81,7 +81,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       existing.windowScene = windowScene
       self.window = existing
       existing.makeKeyAndVisible()
+      // React is already running: a link that reconnected the scene goes straight to Linking.
+      if let url = connectionOptions.urlContexts.first?.url {
+        RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
+      }
       return
+    }
+
+    // A cold start from a raahehaq:// link (T-515): with scenes the URL arrives here, not in
+    // launchOptions, so hand it to React Native's Linking.getInitialURL the classic way.
+    if let url = connectionOptions.urlContexts.first?.url {
+      var options = appDelegate.launchOptions ?? [:]
+      options[.url] = url
+      appDelegate.launchOptions = options
     }
 
     let window = UIWindow(windowScene: windowScene)
@@ -95,6 +107,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       in: window,
       launchOptions: appDelegate.launchOptions
     )
+  }
+
+  // raahehaq:// links while the app runs (T-515: the top-up checkout's return link). With the
+  // UIScene lifecycle iOS calls this instead of application(_:open:options:).
+  func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    guard let url = URLContexts.first?.url else { return }
+    RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
   }
 }
 
