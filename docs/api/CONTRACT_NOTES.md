@@ -244,7 +244,7 @@ Owner decisions 2026-10-11. Passengers are unaffected by all three.
 
 Backend `fix/production-hardening` (uncommitted at time of writing). All routes: `auth:sanctum` + `active`. Everything is scoped to the token user: no id in a path or body selects someone else's wallet; another user's entry or request is a **404 `NOT_FOUND`** (never 403). Envelope `{ success, message, data, pagination? }`; errors `{ success:false, message, error:{ code }, errors? }` (validation: 422 `VALIDATION_ERROR` with `errors`). Money is **PKR as JSON numbers** (at most 2 decimals; `58` and `58.5` both occur, never strings). Throttles: wallet reads 60/min, settlement create 10/min, cancel 10/min, stats 30/min (429 `rate_limited`).
 
-**Cash only (B-08).** There is no top-up, no card and no gateway route; `can_top_up` is always `false` and `payment_methods` is `["cash"]`. Show "Rides are paid in cash to the driver". A passenger's balance only moves with referral rewards and admin credits/refunds; it is shown, it cannot pay for a ride.
+**Cash only (B-08).** *Updated by BE-74 (2026-10-13): rides stay cash, but wallet top-up through JazzCash / Easypaisa now exists; see "BE-74: wallet top-up" below. `can_top_up` is true when a provider is enabled.* There is no top-up, no card and no gateway route; `can_top_up` is always `false` and `payment_methods` is `["cash"]`. Show "Rides are paid in cash to the driver". A passenger's balance only moves with referral rewards and admin credits/refunds; it is shown, it cannot pay for a ride.
 
 **Driver commission.** Each completed cash ride writes three ledger entries: the passenger's `ride_payment` (no balance change), the driver's `driver_earning` (no balance change: the driver already holds the cash) and the driver's `commission_due` (the platform commission, **taken off the balance**). So a driver's `balance` goes negative; `commission_owed = max(0, -balance)`. The driver settles by paying the platform (cash at the office or bank transfer) and reporting it with POST `/wallet/settlements`; an admin approves it and a `commission_payment` entry brings the balance back up.
 
@@ -374,3 +374,112 @@ Query: `period` (default `day`), `page`, `per_page` (1–50, default 20; pages t
 ### Admin API (role admin; for the panel and tooling, not the app)
 
 `GET /payments/settlements?status=&kind=&user_id=`, `POST /payments/settlements/{id}/approve {note?}`, `POST /payments/settlements/{id}/reject {note}` (required), `POST /payments/transactions/{id}/reverse {reason}` (required; 409 `ALREADY_REVERSED`, `CANNOT_REVERSE_REVERSAL`, BE-70: 409 `NOT_REVERSIBLE` for `opening_balance`, 422 `REVERSAL_NEGATIVE_BALANCE` when it would take a non-driver below zero), `POST /payments/wallets/{id}/adjust {amount, direction: credit|debit|refund, reason}` (reason now **required**; 422 `INSUFFICIENT_BALANCE` for a debit below zero; BE-70: optional header `Idempotency-Key` (8–100 of `A-Za-z0-9._:-`), a retry with the same key returns the first entry with header `Idempotent-Replayed: true`, same key with another amount/direction 409 `IDEMPOTENCY_KEY_REUSED`). BE-70: `DELETE /users/{id}` answers 409 `USER_HAS_WALLET_HISTORY` (wallet entries, settlements or a non-zero balance) or `USER_HAS_LINKED_RECORDS`; deactivate such accounts instead. Every one writes an `audit_logs` row. The old panel action that edited a transaction's status is removed (ledger entries are immutable).
+
+## BE-14: saved places / favourites (2026-10-13, for T-509)
+
+Backend worktree `rh-backend-be-14`, branch `be-14-saved-places` (not merged into `fix/production-hardening` yet). All routes: `auth:sanctum` + `active`. Own rows only: another user's id (or a missing one) answers **404** `{success:false, message:"Not found.", code:"not_found"}`, never 403. `user_id` in a body is ignored.
+
+Place object (`SP`), no owner or user fields:
+
+```json
+{ "id": 3, "label": "home|work|other", "name": "Gym"|null, "address": "House 12, DHA Phase 5, Lahore",
+  "lat": 31.4627, "lng": 74.4085, "place_id": "ChIJ…"|null, "sort_order": 0, "updated_at": "2026-10-13T12:00:00+00:00" }
+```
+
+- `name` is **null for home and work** (show the localised "Home"/"Work"); required for `other`.
+- At most **one home and one work** per user. `POST` with `label: home|work` when one exists **replaces** it in place (same `id`, 200, `data.replaced: true`, `place_id` reset unless sent). Changing another place's label to a taken home/work with `PUT` is a 422 on `label`.
+- At most `max_other` (10) `other` places; the 11th is a 422 on `label`.
+- List order: home, work, then others by `sort_order`, `id`. New others go to the end.
+- `outside_service_area: true` when lat/lng is outside a rough Pakistan box (23.5–37.1 N, 60.8–77.9 E). The place is still saved: show a soft warning if you like.
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| GET `/saved-places` | — | 200 `data: { places: [SP], max_other: 10 }` | 401, 429 (60/min) |
+| POST `/saved-places` | `{ label, name? (required for other, ≤40), address (≤255), lat (−90..90), lng (−180..180), place_id? (≤255, [A-Za-z0-9_-]), sort_order? (0..1000) }` | 201 new / 200 replaced home-work: `data: { place: SP, replaced, outside_service_area }` | 401, 422 `errors.<field>` (control characters in name/address are refused), 429 (30 writes/min) |
+| PUT `/saved-places/{id}` | any subset of the POST fields | 200 `data: { place: SP, replaced: false, outside_service_area }`. Changing `address`/`lat`/`lng` without sending `place_id` clears the stored `place_id` | 401, 404, 422 (`label` taken or cap, `name` null for other), 429 |
+| DELETE `/saved-places/{id}` | — | 200 `data: null` | 401, 404, 429 |
+
+"Set as pickup / destination" is app-side: use `lat`, `lng`, `address` (and `place_id` if present) as the ride point. Local seed: `passenger@raah-e-haq.com` has a Home (DHA Phase 5) and a Work (MM Alam Road, Gulberg III) in Lahore.
+
+## BE-74: wallet top-up via JazzCash / Easypaisa (2026-10-13, for T-515)
+
+Backend `fix/production-hardening` (uncommitted at time of writing). Owner decision 2026-10-13: users add money to their wallet like inDrive. **Rides stay cash-paid** (`payment_methods` stays `["cash"]`); a top-up only credits the wallet. For a driver it lowers `commission_owed` (= `max(0, -balance)`), so a driver with Rs 300 owed who tops up Rs 500 ends at balance 200, owed 0. Passengers and drivers can both top up. Envelope and error shape as BE-09. Amounts in requests are **whole rupees**; in responses PKR JSON numbers.
+
+Providers: `jazzcash`, `easypaisa` (real; off until the owner sets merchant credentials, B-18) and `fake` (a test gateway that exists **only on a local/testing backend**: use it for QA on the simulator). Always build the provider list from GET `/wallet` `data.top_up.providers`; never hardcode it.
+
+Methods:
+- `mwallet`: the customer types their JazzCash / Easypaisa mobile account number; the provider pushes an approval prompt to their phone. No browser. Poll for the result.
+- `card`: the provider's hosted checkout page (card, and on Easypay the wallet too) opened in an **in-app browser**; the backend ends the flow by redirecting the browser to `raahehaq://wallet/topup?id=<id>&status=<status>` (config `PAYMENTS_APP_RETURN_URL`). The app must register the `raahehaq` URL scheme (iOS `CFBundleURLSchemes`, Android intent filter): **there is none today**. With `react-native-inappbrowser-reborn` use `openAuth(url, return_url)`; with a WebView, intercept navigation to `return_url`. Whatever the browser reports, **the status comes from GET `/wallet/topups/{id}`** (the redirect is only a "come back" signal).
+
+### GET `/wallet` additions
+
+```json
+"can_top_up": true,
+"top_up": { "providers": [ { "id": "jazzcash", "name": "JazzCash", "methods": ["mwallet", "card"] } ],
+            "min_amount": 100, "max_amount": 25000, "daily_cap": 50000, "daily_remaining": 49500, "currency": "PKR" }
+```
+
+`can_top_up` = wallet active and at least one provider enabled. `daily_remaining` = cap minus today's (Pakistan day) succeeded + still-open top-ups. Hide "Add money" when `can_top_up` is false. Local backend shows `[{ "id": "fake", "name": "Test gateway", "methods": ["mwallet","card"] }]`.
+
+### Top-up object (`TU`)
+
+```json
+{ "id": "top_01k7…" , "provider": "jazzcash|easypaisa|fake", "method": "mwallet|card",
+  "amount": 500, "currency": "PKR",
+  "status": "created|pending|succeeded|failed|expired|cancelled",
+  "mobile_number": "0300*****67" | null,
+  "failure": null | { "code": "EXPIRED|AMOUNT_MISMATCH|<provider code>", "message": "The payment did not go through. No money was taken from your wallet." },
+  "transaction_id": "TXN-01K7…" | null,
+  "created_at": "…", "expires_at": "…", "completed_at": "…" | null }
+```
+
+- `id` is an opaque string (`top_` + 26 chars). Treat as opaque.
+- Terminal: `succeeded`, `failed`, `expired`, `cancelled` (reserved, not set today). Open: `created`, `pending`. Show `failure.message` as is.
+- A top-up expires 15 minutes after creation (+10 minutes grace before it is marked `expired`). Until then it still counts as open (3 at once) and toward `daily_remaining`.
+- An unknown provider answer keeps it `pending` (only an explicit failure makes it `failed`). A provider "paid" without a confirmed amount is never credited; it stays `pending` until confirmed or expired.
+- Rarely a `failed`/`expired` top-up turns `succeeded` later (the customer paid late; the server re-checks for up to 24 h). The wallet history and a `topup_succeeded` notification show it.
+- `succeeded` means the wallet was credited exactly once; the ledger entry is `transaction_id` and appears in `/wallet/transactions` with `type: "topup"`, `label: "Wallet Top-up"`, `direction: "credit"`, `payment_method: "jazzcash|easypaisa|wallet"` (fake books as wallet) and new field **`topup_id`** (the `TU.id`; null on other entries).
+
+### POST `/wallet/topups`
+
+Request: `{ "amount": 500, "provider": "jazzcash", "method": "mwallet", "mobile_number": "03001234567", "cnic_last6": "123456" }`
+
+- `amount`: integer rupees, `min_amount`..`max_amount` (100..25,000).
+- `mobile_number`: required for `mwallet`; Pakistani mobile in any usual form (`03XX…`, `+92 3XX…`). Never shown back in full.
+- `cnic_last6`: **required for JazzCash `mwallet`** (6 digits; JazzCash API v2.0 needs it). Not stored.
+- Header `Idempotency-Key` (8–100 of `A-Z a-z 0-9 . _ : -`), **recommended**: generate one per "Pay" tap and resend it on retry/timeout. Same key + same body → 200 with the first top-up and header `Idempotent-Replayed: true`; same key, different body → 409 `IDEMPOTENCY_KEY_REUSED`.
+
+201 `data: TU + next_action`:
+
+| `next_action.type` | When | App does |
+|---|---|---|
+| `redirect` | `card`, status `created` | open `next_action.url` (a signed `https` link to our checkout page, valid until `expires_at`) in the in-app browser; close it when it navigates to `next_action.return_url`; then poll |
+| `poll` | `mwallet` (status `pending`), or a card top-up already opened | show `next_action.message` ("Approve the payment in your JazzCash app or the prompt on your phone."), poll GET `/wallet/topups/{id}` every `poll_interval_seconds` (3) until terminal or `expires_at` passes |
+| `none` | terminal | show result |
+
+The MWALLET push is sent **after** the 201 is returned, so POST answers fast; the result arrives by polling (typically 10–60 s while the customer approves).
+
+Errors: 422 `VALIDATION_ERROR` (`errors.amount|provider|method|mobile_number|cnic_last6|idempotency_key`); 422 `PROVIDER_UNAVAILABLE` (provider not enabled); 422 `METHOD_UNAVAILABLE`; 422 `DAILY_LIMIT_REACHED`; 409 `TOO_MANY_OPEN_TOPUPS` (3 open at once); 409 `WALLET_INACTIVE`; 409 `IDEMPOTENCY_KEY_REUSED`; 401; 429 (10 creates/min).
+
+### GET `/wallet/topups/{id}`
+
+200 `data: TU + next_action`. Own top-ups only: anyone else's (or an unknown id) is **404 `NOT_FOUND`**. While open, the server asks the provider at most every 20 s per top-up, so polling every 3 s is fine. 429 above 60/min.
+
+### GET `/wallet/topups`
+
+Query `status?`, `page?`, `per_page?` (1–50, default 20). Newest first. 200 `data: [TU]` (no `next_action`), `pagination`. 422 on a bad status.
+
+### Notifications (category `wallet`)
+
+- `topup_succeeded`: title "Money Added", message "Rs 500 added to your wallet"; `data: { topup_id, provider, amount: "500" }`; push data `{ notification_id, type, topup_id }`.
+- `topup_failed`: title "Top-up Failed", message "Your top-up of Rs 500 did not go through. No money was added."; same data. Not sent for expiry.
+Route both to the wallet screen (T-514 routing of category `wallet`).
+
+### Local QA with the fake gateway (local backend only)
+
+- `card`: the checkout page shows **Pay** / **Decline**; Pay credits the wallet and redirects to `raahehaq://wallet/topup?id=…&status=succeeded`.
+- `mwallet`: the number decides: ending `0000` → declined, ending `9999` → stays pending until it expires, anything else → paid on the first poll.
+
+### Not in this release
+
+Refunds (an admin reverses the ledger entry; the money goes back through the provider's portal); paying rides from the wallet; saved cards.
