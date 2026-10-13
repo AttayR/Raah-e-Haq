@@ -190,7 +190,8 @@ Text must be ≥4.5:1 (large text ≥3:1); UI boundaries/icons ≥3:1.
 | `body` | 16 | 24 | 400 | 0 | Default text, addresses, paragraphs |
 | `bodyStrong` | 16 | 24 | 600 | 0 | Emphasised body |
 | `bodySmall` | 14 | 20 | 400 | 0 | Secondary lines, descriptions |
-| `caption` | 12 | 16 | 500 | 0.1 | Timestamps, meta, helper text, tab labels |
+| `caption` | 12 | 16 | 500 | 0.1 | Timestamps, meta, helper text, inactive tab labels |
+| `captionStrong` **[UI-R4]** | 12 | 16 | 600 | 0.1 | Active tab label only (§5.3); not a general emphasis style |
 | `label` | 13 | 18 | 600 | 0.1 | Field labels, chip text, badge text (sentence case) |
 | `overline` | 12 | 16 | 600 | 0.6 | Section headers in grouped lists, UPPERCASE |
 | `button` | 16 | 20 | 600 | 0 | Button text (lg, md) |
@@ -309,7 +310,7 @@ One `Header` component, three variants. Today four header styles ship (large lef
 - Custom `tabBar` component (React Navigation `tabBar` prop) shared by both roles; never the library default (today both tab bars are default bars with MaterialIcons glyphs and an `text + '80'` inactive colour).
 - Height 60 + bottom inset; background `surface`; top hairline `border`; no shadow.
 - **4 items per role** (section 8): passenger Home · Activity · Inbox · Account; driver Drive · Earnings · Inbox · Account. Item: 56×32 indicator pill (radius `pill`) with the 24 icon centered → 4 → label `caption` (12/16) → 6 bottom padding. Item min width 64, equal widths.
-- **Active:** pill fill `primarySoft`, icon filled variant in `onPrimarySoft`, label 600 `primaryText`. **Inactive:** no pill, outline icon `textMuted`, label 500 `textMuted`. Indicator pill animates width 32→56 and opacity 0→1 in `motion.fast` on selection; haptic `selection`.
+- **Active:** pill fill `primarySoft`, icon filled variant in `onPrimarySoft`, label `captionStrong` (12/16, 600) `primaryText`. **Inactive:** no pill, outline icon `textMuted`, label `caption` (500) `textMuted`. **[UI-R4]** The 600 label is the `captionStrong` text style (§2), never a `fontWeight` override. Indicator pill animates width 32→56 and opacity 0→1 in `motion.fast` on selection; haptic `selection`.
 - Badge: count Badge (5.12) anchored to the indicator pill's top-right (x +4, y −4 from the pill corner); the Inbox badge = unread notifications + unread chats.
 - Hidden on full-screen flows (booking, finding driver, trip, chat thread, auth).
 
@@ -373,6 +374,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 
 ### 5.11 Chip
 - Height 32, padding 12 horizontal, radius `pill`, `label` text. Default: fill `surfaceAlt`, text `textSecondary`. Selected: fill `primarySoft`, text `onPrimarySoft`, leading `check` 16 (the bare tick, not `check-circle`). Pressed: default → `surfaceAltPressed`, selected → `primarySoftPressed`, danger tone → `dangerSoftPressed` [UI-R2]. Selectable chips fire the `selection` haptic; action chips do not. Filter chip rows scroll horizontally on one line (no wrapping; today Notifications filters wrap to two rows). 8 gap; row inset 16.
+- **[UI-R4] FilterChips (list filters).** One SegmentedControl per screen at most, and it switches *views* (Rides | Wallet, Notifications | Messages, Today | This week | This month). A filter *within* a list (All / Completed / Cancelled, All / Unread, All / Money in / Money out) is a `FilterChips` row: single-select radio group of selectable Chips (selected = `primarySoft` + `check` 16), `selection` haptic on change, re-tap is a no-op. The row is a horizontal ScrollView, one line, never `flexWrap` (content inset 16 each side, 8 gap, the scroll bleeds to the screen edges), 12 below the section header or segmented control above it and 12 above the first list item. Two stacked SegmentedControls are not allowed.
 
 ### 5.12 Badge
 - **Count:** min 18×18, padding 6 horizontal, radius `pill`, fill **`dangerFill`** (corrected in UI-R2 review: white on dark `danger` `#FF7A7F` is 2.52:1; on `dangerFill` it is 5.90 / 4.75), text `numericSmall` (13/16) `onPrimary` white at every digit count; `99+` cap; zero renders nothing. Its accessibility label is supplied by the host ("3 unread"), never the bare number.
@@ -550,7 +552,7 @@ Today (2026-10-11): passenger has 4 default tabs (Home dashboard, Notifications,
 - **Inbox (both roles):** `large` header "Inbox"; SegmentedControl **Notifications | Messages**; badge = unread notifications + unread chats.
 - **Passenger Account:** profile card (avatar, name, phone, rating or "New") → Profile; groups: Your account (Saved places; ride history and wallet live in Activity), Preferences (Notifications, Appearance), Help (Help & support, Invite friends), Sign out. Delete account sits inside Profile.
 - **Driver Drive:** full-bleed map + Drive sheet (8.3) with the big Online/Offline control, today's earnings pill and approval/document warnings; incoming requests appear as a sheet state on this map; once accepted the full-screen trip map takes over (tab bar hidden).
-- **Driver Earnings:** `large` header "Earnings"; SegmentedControl **Today | Week | Month**; money hero (earnings for the period), commission owed and settlements card (from the wallet/settlement API), trips list → Ride details. Wallet/settlement history is a pushed screen from the commission card.
+- **Driver Earnings:** `large` header "Earnings"; SegmentedControl **Today | This week | This month** (labels ruled in UI-R4 review; they fit at 1.3× on SE); money hero (earnings for the period), commission owed and settlements card (from the wallet/settlement API), trips list → Ride details. Wallet/settlement history is a pushed screen from the commission card.
 - **Driver Account:** profile card (avatar, name, rating, Approved/Pending pill) → Profile; groups: Your account (Vehicle & documents), Preferences (Notifications, Appearance), Help, Sign out.
 
 ### 8.2 Headers per surface
@@ -635,6 +637,7 @@ Rules: one primary button per screen, always in the same place for its archetype
 - **Grouped settings list:** `overline` header at x=16 → 8 → Card(radius 16, no padding) of `ListItem`s with 40×40 icon tiles (`surfaceAlt`, radius 12, 24 glyph `textSecondary`), hairline dividers inset to 72. This is what driver Settings / passenger Settings v2 already do; Profile, Wallet, Saved places and History adopt it.
 - **Content card (ride, place):** Card radius 16, padding 16; top row = meta (`caption` `textMuted` date · status pill end-aligned); body = AddressPair; footer row = money `numeric` start + one ghost action end. The whole card is the tap target (no "Details" filled button; today History shows a navy "Details >" slab on every card).
 - **Notification row:** leading 40 icon tile whose glyph and tone depend on `type` (ride → `car-side` info; chat → `message-text-outline` primary; payment → `cash` success; promo → `tag-outline` accent; system → `bell-outline` neutral) — today every ride notification uses the same taxi glyph. Unread = 8pt `primary` dot at the end + title 600; read = title 400.
+- **List filters [UI-R4]:** FilterChips row per §5.11 under the screen's SegmentedControl (Activity › Rides, Activity › Wallet, Inbox › Notifications).
 - **Chat row:** Avatar 48 (initials fallback always; today passenger sees solid periwinkle blobs) · name `title` · last message `bodySmall` 1 line · time `caption` end · status chip only when the chat is closed ("Ended", neutral), not "Read-only".
 - **Money:** `formatMoney()` everywhere — `Rs 1,250`. Today the driver side prints `PKR 150`, passenger `Rs 150`, wallet `Rs 1200`, driver profile `$2.4k`.
 

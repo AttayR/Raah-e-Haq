@@ -51,3 +51,8 @@ Map full screen (driver's own position as the driver marker, heading-up off), ta
 
 ## Removed
 - Dashboard with clipped translucent stat tiles, `$` amounts, demo recent rides, quick-action rows with coloured borders, the unlabeled play/pause FAB, the green-pin "Offline" banner, Sign out on Home.
+
+## UI-R4 review rulings (2026-10-13)
+- DESIGN_SYSTEM §8.3 v1.1 wins over the v1.0 overlay above: the top overlay is the avatar (48, top-start) and "locate me" only; the **Today earnings pill lives in the sheet at `half`**, not centred in the overlay. Peek 137 (status row + 56pt button), half 50%, no full.
+- At `half`, the Today Card must not repeat the pill: tiles are Rides (today) · Online time (when the API returns it, else hidden) · Rating, as specified in block 4 — no "Earned" tile next to a "Today · Rs …" pill (UI-R11).
+- Going online with no fix yet is allowed (UI-R4 parity); "Location permission missing" (denied/services off) must replace the control with the denied card, and online-with-no-fix shows "Finding your location…" under the status row (UI-R11).

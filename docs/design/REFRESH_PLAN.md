@@ -81,6 +81,7 @@ Conventions for every task: Builder **rh-designer**, Review **rh-design-director
   - [ ] Matches DESIGN_SYSTEM §5.3/§8 and `shared-navigation-shell` in light and dark on iPhone 17 and iPhone SE; side-by-side passenger/driver screenshots of every tab root.
 - Before: `passenger-home-light.png`, `passenger-home-dark.png` (dashboard Home, 4 default tabs), `driver-home-light.png` + `driver-map-light.png` + `driver-map-dark.png` (5 tabs, duplicate Home/Map, FAB, status-bar band), `passenger-notifications-light.png`, `passenger-chat-list-light.png`, `passenger-settings-v2-light.png`, `driver-settings-light.png`.
 - Absorbs: T-610 (superseded).
+- Review rulings (2026-10-13, DS v1.1 marked **[UI-R4]**): `captionStrong` (12/16/600) for the active tab label; list filters under a screen SegmentedControl are a one-line scrolling `FilterChips` row (§5.11); Earnings segments "Today | This week | This month"; go-online without a GPS fix accepted (denied-permission card is UI-R11); legacy IncomingRequestCard on the Drive map accepted, its sheet redesign and simulator evidence move to UI-R11; screenshots with a system dialog over them must be retaken.
 
 **UI-R5 · Kit ride components: pins, route, CarMarker, searching pulse, AddressPair, VehicleOptionCard, FareBreakdown, PersonCard, RideProgress + status pill, RatingStars, SlideToConfirm**
 - Scope: DS §5.21–5.31, §6 (pulse, marker interpolation), §12.5. PersonCard is one component for the driver-card and passenger-card shapes with the 3-action row.
