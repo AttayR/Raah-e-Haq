@@ -483,3 +483,60 @@ Route both to the wallet screen (T-514 routing of category `wallet`).
 ### Not in this release
 
 Refunds (an admin reverses the ledger entry; the money goes back through the provider's portal); paying rides from the wallet; saved cards.
+
+## BE-07: ride rating (2026-10-13, for T-505)
+
+Two-way rating after a completed ride: the passenger rates the driver, the driver rates the passenger. Backend branch `be-07-rating` (merges into `fix/production-hardening`). Rules and tags live in `config/ratings.php`.
+
+### GET `/rating-tags`
+
+Auth (any active user). 200:
+
+```json
+{ "success": true, "message": "Rating tags", "data": {
+  "window_days": 7, "max_tags": 5, "max_comment_length": 500,
+  "positive_min_stars": 4, "negative_max_stars": 4,
+  "tags": {
+    "passenger": { "positive": [{ "key": "clean_car", "label": "Clean car" }, ...], "negative": [{ "key": "rude", "label": "Rude" }, ...] },
+    "driver":    { "positive": [...], "negative": [...] }
+  } } }
+```
+
+`tags` is keyed by the **rater's** role: `tags.passenger` = what a passenger can say about the driver, `tags.driver` = what a driver can say about the passenger. Show `positive` tags when `stars >= positive_min_stars` and `negative` tags when `stars <= negative_max_stars` (4 stars shows both). Send `key`s, display `label`s. Don't hardcode the lists; fetch once per session. 429 above 60/min.
+
+### POST `/rides/{id}/rate`
+
+Body (JSON only); the rater and ratee come from the token and the ride, nothing else in the body is read:
+- `stars`: required, a JSON integer 1..5 (`integer:strict`). `5.0`, `"5"`, `"+5"` and `" 5"` get 422.
+- `tags`: optional list of keys, at most `max_tags`, distinct, each at most 64 chars, from the band allowed for this role and star count. When `stars` is invalid, every tag is refused too.
+- `comment`: optional, at most 500 chars, line breaks allowed (`\r\n` is stored as `\n` and counts as one character), blank becomes `null`.
+
+201:
+```json
+{ "success": true, "message": "Thanks for your rating",
+  "data": { "my_rating": { "stars": 5, "tags": ["clean_car"], "comment": "Great ride", "created_at": "2026-10-13T12:00:00.000000Z" }, "can_rate": false } }
+```
+
+Errors (`{ success:false, message, error:{code} }`), checked in this order:
+- 401 no token; 404 unknown ride id.
+- 403 `NOT_RIDE_PARTICIPANT`: not the ride's passenger or assigned driver (admins too). Checked before validation.
+- 422 `RIDE_NOT_COMPLETED`: status is not `completed`.
+- 422 `RATING_WINDOW_CLOSED`: more than `window_days` (7) after `completed_at`.
+- 409 `ALREADY_RATED`: this side already rated this ride (one rating per side, no edits).
+- 422 validation (`{ success:false, message, errors }`, no `error.code`; tell it apart from the two coded 422s above by the missing code) with `errors.stars | tags | tags.N | comment` (tag not allowed for this role/star band, duplicate, too many, control characters in comment, ...).
+- 429 above 10/min.
+
+On success the ratee's `users.rating` becomes the mean of their last 500 received ratings (2 decimals) and `users.rating_count` the number received. The aggregate is shown **only once the user has received 3 ratings** (`config ratings.min_public_count`); below that it is `null` on the ride cards (`driver.rating`, `passenger.rating`, 1 decimal), on `GET /profile` (`rating` is now a number or `null`, it was a `"0.00"` string) and in `/me/stats`. Nearby drivers (`rides/nearby-drivers`) show `0` in that case (0.5 steps as before). The app shows "New" for `null` or `0`. `/me/stats` is refreshed right after a new rating (cache dropped).
+
+### Ride resources: `my_rating`, `can_rate`
+
+Every ride object (`GET /rides`, `GET /rides/{id}` which is the status poll, lifecycle responses such as `POST /rides/{id}/complete`, pending feed) now has:
+
+- `my_rating`: the caller's own rating of this ride `{ stars, tags, comment, created_at }` or `null`.
+- `can_rate`: `true` when the caller is the passenger or assigned driver, the ride is `completed`, it is within the window, and the caller hasn't rated it yet.
+
+The other side's rating of the caller is never returned per ride (only the aggregate `rating` on the user). Admin API callers always get `my_rating: null`, `can_rate: false`.
+
+App use (T-505): after the ride turns `completed` (poll or the driver's complete response), show the rating sheet when `can_rate` is true; in ride details / history show `my_rating` or a "Rate this trip" action while `can_rate` is true. Treat 409 `ALREADY_RATED` and 422 `RATING_WINDOW_CLOSED` as "close the sheet and refresh the ride", not as an error toast.
+
+Admin web: the ride detail page lists both ratings (stars, tags, comment). No notification is sent; no tip.
