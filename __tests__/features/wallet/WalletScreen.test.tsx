@@ -5,7 +5,8 @@
  * "Pay commission" and can cancel a pending report.
  */
 import React from 'react';
-import { Alert, StyleSheet, type AlertButton } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { dialog, dialogStore } from '../../../src/core/dialog';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -61,6 +62,19 @@ beforeEach(() => {
 afterEach(() => {
   mock.restore();
   jest.restoreAllMocks();
+});
+
+/** UI-R3: the confirmation is the kit Dialog; this answers every dialog it opens. */
+const autoAnswerDialogs = (confirmed: boolean) =>
+  dialogStore.subscribe(() => {
+    const current = dialogStore.getCurrent();
+    if (current) dialog.answer(current.id, confirmed);
+  });
+let stopAnswering: (() => void) | null = null;
+afterEach(() => {
+  stopAnswering?.();
+  stopAnswering = null;
+  dialog.dismissAll();
 });
 
 describe('WalletScreen (passenger)', () => {
@@ -184,9 +198,7 @@ describe('WalletScreen (driver)', () => {
     mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1, 0)));
     mock.onDelete('/wallet/settlements/3').reply(200, envelope(rawSettlement({ status: 'cancelled' })));
     mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: -116, commission_owed: 116, can_settle_commission: true })));
-    jest.spyOn(Alert, 'alert').mockImplementation((_title, _body, buttons?: AlertButton[]) => {
-      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
-    });
+    stopAnswering = autoAnswerDialogs(true);
     renderWallet('driver');
     await waitFor(() => expect(screen.getByTestId('wallet-settlement-3')).toBeTruthy());
     expect(screen.queryByTestId('wallet-pay-commission')).toBeNull();

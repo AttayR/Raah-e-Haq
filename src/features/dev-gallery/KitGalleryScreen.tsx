@@ -9,7 +9,20 @@ import { FormatSection, HapticsSection } from './sections/FormatSection';
 import { ICON_PART_COUNT, IconSection } from './sections/IconSection';
 import { ButtonSection } from './sections/ButtonSection';
 import { FieldSection } from './sections/FieldSection';
-import { KitSection } from './sections/KitSection';
+import { DialogSection, FeedbackSection, StatesSection } from './sections/FeedbackSections';
+import { SheetSection } from './sections/SheetSection';
+import {
+  LargeTitlePreview,
+  PayCommissionPreview,
+  SettlementsPreview,
+  SignOutDialogPreview,
+  TransactionPreview,
+  WalletEmptyPreview,
+  WalletErrorPreview,
+  WalletLoadedPreview,
+  WalletSkeletonPreview,
+} from './sections/ScreenStatePreviews';
+import { CardSection, HeaderSection, ListSection } from './sections/StructureSections';
 import { BadgeSection, SelectionSection } from './sections/SelectionSection';
 import { ComponentTokenSection, ElevationSection, RadiusSection, SpacingSection } from './sections/ScaleSections';
 import { TYPE_PART_COUNT, TypeSection } from './sections/TypeSection';
@@ -32,17 +45,45 @@ const SECTIONS: Section[] = [
   ['fields2', () => <FieldSection part={2} />],
   ['selection', () => <SelectionSection />],
   ['badges', () => <BadgeSection />],
-  ['kit', () => <KitSection />],
+  ['headers', () => <HeaderSection />],
+  ['cards', () => <CardSection />],
+  ['lists', () => <ListSection />],
+  ['feedback', () => <FeedbackSection />],
+  ['states', () => <StatesSection />],
+  ['dialog', () => <DialogSection />],
+  ['sheet', () => <SheetSection />],
   ['spacing', () => <SpacingSection />],
   ['radius', () => <RadiusSection />],
   ['elevation', () => <ElevationSection />],
   ['components1', () => <ComponentTokenSection groups={['button', 'iconButton']} />],
   ['components3', () => <ComponentTokenSection groups={['textField', 'otp', 'segmented', 'chip', 'badge', 'selectionControl']} />],
   ['components2', () => <ComponentTokenSection groups={['header', 'tabBar']} />],
+  ['components4', () => <ComponentTokenSection groups={['listItem', 'sheet', 'dialog', 'toast', 'emptyState', 'skeleton', 'mapControls']} />],
   ['haptics', () => <HapticsSection />],
 ];
 
-export const GALLERY_SECTION_KEYS = SECTIONS.map(([key]) => key);
+/**
+ * Full-screen screen-state previews (UI-R3 evidence): shown alone, without the gallery heading,
+ * when `-RHKitGallerySection` names exactly one of them.
+ */
+const SCREEN_PREVIEWS: Section[] = [
+  ['screen-wallet', () => <WalletLoadedPreview />],
+  ['screen-wallet-skeleton', () => <WalletSkeletonPreview />],
+  ['screen-wallet-error', () => <WalletErrorPreview />],
+  ['screen-wallet-empty', () => <WalletEmptyPreview />],
+  ['screen-settlements', () => <SettlementsPreview state="loaded" />],
+  ['screen-settlements-skeleton', () => <SettlementsPreview state="skeleton" />],
+  ['screen-settlements-empty', () => <SettlementsPreview state="empty" />],
+  ['screen-settlements-error', () => <SettlementsPreview state="error" />],
+  ['screen-pay', () => <PayCommissionPreview />],
+  ['screen-transaction-skeleton', () => <TransactionPreview state="skeleton" />],
+  ['screen-transaction-error', () => <TransactionPreview state="error" />],
+  ['screen-signout', () => <SignOutDialogPreview />],
+  ['screen-large', () => <LargeTitlePreview scrolled={false} />],
+  ['screen-large-scrolled', () => <LargeTitlePreview scrolled />],
+];
+
+export const GALLERY_SECTION_KEYS = [...SECTIONS, ...SCREEN_PREVIEWS].map(([key]) => key);
 
 type Props = {
   onClose: () => void;
@@ -60,6 +101,10 @@ type Props = {
 export function KitGalleryScreen({ onClose, only }: Props) {
   const { theme } = useAppTheme();
   const wanted = only ? only.split(',').map(k => k.trim()) : null;
+  const preview = wanted?.length === 1 ? SCREEN_PREVIEWS.find(([key]) => key === wanted[0]) : undefined;
+  if (preview) {
+    return <React.Fragment>{preview[1]()}</React.Fragment>;
+  }
   const shown = wanted ? SECTIONS.filter(([key]) => wanted.includes(key)) : SECTIONS;
   return (
     <Screen scroll edges={['top', 'bottom']} contentStyle={styles.content} testID="kit-gallery">

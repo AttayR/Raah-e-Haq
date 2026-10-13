@@ -2,11 +2,19 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, Icon, Screen, SegmentedControl } from '../../../components/ui';
+import {
+  AppText,
+  Button,
+  EmptyState,
+  ErrorState,
+  Header,
+  Icon,
+  Screen,
+  SegmentedControl,
+  SkeletonList,
+} from '../../../components/ui';
 import { formatMoney } from '../../../core/format/money';
-import { layout, space } from '../../../theme';
-import { ScreenHeader } from '../../wallet/components/ScreenHeader';
-import { StateView } from '../../wallet/components/StateView';
+import { componentTokens, layout, space } from '../../../theme';
 import { formatDateTime } from '../../wallet/format';
 import { EarningsChart } from '../components/EarningsChart';
 import { EarningsHero } from '../components/EarningsHero';
@@ -90,7 +98,13 @@ export default function DriverEarningsScreen() {
   );
 
   const header = (
-    <ScreenHeader title={STATS_COPY.earningsTitle} backLabel={STATS_COPY.back} onBack={() => navigation.goBack()} testID="earnings" />
+    <Header
+      title={STATS_COPY.earningsTitle}
+      backLabel={STATS_COPY.back}
+      onBack={() => navigation.goBack()}
+      tone="background"
+      testID="earnings"
+    />
   );
 
   if (!data) {
@@ -99,15 +113,15 @@ export default function DriverEarningsScreen() {
         {header}
         <View style={styles.controls}>{periodControl}</View>
         {status === 'failed' ? (
-          <StateView
-            kind="error"
-            message={error ?? STATS_COPY.loadFailed}
+          <ErrorState
+            title={STATS_COPY.loadFailed}
+            body={error ?? undefined}
             retryLabel={STATS_COPY.retry}
             onRetry={reload}
             testID="earnings-error"
           />
         ) : (
-          <StateView kind="loading" testID="earnings-loading" />
+          <SkeletonList heroHeight={componentTokens.skeleton.heights.earningsHero} rows={5} testID="earnings-loading" />
         )}
       </Screen>
     );
@@ -161,7 +175,7 @@ export default function DriverEarningsScreen() {
         ItemSeparatorComponent={separator}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
-          <StateView kind="empty" icon="rides" title={STATS_COPY.emptyTitle[data.period]} body={STATS_COPY.emptyBody} testID="earnings-empty" />
+          <EmptyState icon="rides" title={STATS_COPY.emptyTitle[data.period]} body={STATS_COPY.emptyBody} testID="earnings-empty" />
         }
         ListFooterComponent={renderFooter}
         contentContainerStyle={[styles.content, rides.length === 0 && styles.contentEmpty]}

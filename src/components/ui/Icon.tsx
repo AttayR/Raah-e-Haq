@@ -12,6 +12,11 @@ export type IconProps = {
   /** 16, 20, 24 (default), 28, 32 or 48 (§4). */
   size?: 16 | 20 | 24 | 28 | 32 | 48;
   color?: SemanticColorName;
+  /**
+   * Raw colour that wins over `color`. Only for surfaces that keep one palette in both modes
+   * (the inverse Toast uses the dark-mode tone values); screens use `color` tokens.
+   */
+  tint?: string;
   testID?: string;
 };
 
@@ -20,13 +25,13 @@ export type IconProps = {
  * (`UIAppFonts`) and Android (`fonts.gradle` `iconFontNames`). Decorative by default: the
  * control or text next to it carries the accessible name. Direction glyphs mirror in RTL.
  */
-export function Icon({ name, size = 24, color = 'textSecondary', testID }: IconProps) {
+export function Icon({ name, size = 24, color = 'textSecondary', tint, testID }: IconProps) {
   const { theme } = useAppTheme();
   return (
     <MaterialCommunityIcons
       name={iconGlyphs[name]}
       size={size}
-      color={theme.colors[color]}
+      color={tint ?? theme.colors[color]}
       testID={testID}
       style={shouldMirrorIcon(name) ? styles.mirrored : undefined}
       accessible={false}

@@ -72,6 +72,11 @@ export const iconGlyphs = {
   checkMark: 'check',
   info: 'information-outline',
   warning: 'alert-circle-outline',
+  // UI-R3 feedback: the bundled MDI has no `cloud-alert-outline` (§5.20), so the network error
+  // uses the outline `cloud-off-outline`; the Toast warning tone uses the triangle.
+  networkError: 'cloud-off-outline',
+  alertTriangle: 'alert-outline',
+  offline: 'wifi-off',
   help: 'help-circle-outline',
   shield: 'shield-check-outline',
   star: 'star',

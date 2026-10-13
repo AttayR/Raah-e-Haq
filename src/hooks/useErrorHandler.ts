@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { alert } from '../core/dialog';
+import { t } from '../i18n';
 import { toast } from '../core/toast';
 import { isApiError } from '../core/api/errors';
 import { logger } from '../core/logging/logger';
@@ -43,17 +44,8 @@ export const useErrorHandler = () => {
 
     // One feedback path per error (PAX-16): the alert when asked for, otherwise a toast.
     if (showAlert) {
-      Alert.alert(
-        'Error',
-        userMessage,
-        [
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ],
-        { cancelable: true }
-      );
+      // Themed kit Dialog (UI-R3) instead of the native alert.
+      alert({ title: t('errors.title'), body: userMessage, confirmLabel: t('errors.ok') });
     } else if (withToast) {
       toast.error(userMessage);
     }

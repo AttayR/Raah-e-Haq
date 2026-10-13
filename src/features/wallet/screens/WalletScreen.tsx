@@ -4,13 +4,20 @@ import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import type { RootState } from '../../../store';
-import { AppText, Button, Screen, SegmentedControl } from '../../../components/ui';
-import { layout, space } from '../../../theme';
+import {
+  AppText,
+  Banner,
+  Button,
+  EmptyState,
+  ErrorState,
+  Header,
+  Screen,
+  SegmentedControl,
+  SkeletonList,
+} from '../../../components/ui';
+import { componentTokens, layout, space } from '../../../theme';
 import { BalanceCard } from '../components/BalanceCard';
 import { CommissionCard } from '../components/CommissionCard';
-import { InfoNote } from '../components/InfoNote';
-import { ScreenHeader } from '../components/ScreenHeader';
-import { StateView } from '../components/StateView';
 import { TransactionRow } from '../components/TransactionRow';
 import { WALLET_COPY } from '../copy';
 import { groupByDay, type TransactionSection } from '../format';
@@ -86,7 +93,13 @@ export default function WalletScreen() {
   );
 
   const header = (
-    <ScreenHeader title={WALLET_COPY.title} backLabel={WALLET_COPY.back} onBack={() => navigation.goBack()} testID="wallet" />
+    <Header
+      title={WALLET_COPY.title}
+      backLabel={WALLET_COPY.back}
+      onBack={() => navigation.goBack()}
+      tone="background"
+      testID="wallet"
+    />
   );
 
   // No wallet yet: the whole body is the loading or error state.
@@ -96,9 +109,9 @@ export default function WalletScreen() {
       <Screen testID="wallet-screen">
         {header}
         {failed ? (
-          <StateView
-            kind="error"
-            message={wallet.error ?? WALLET_COPY.loadFailed}
+          <ErrorState
+            title={WALLET_COPY.loadFailed}
+            body={wallet.error ?? undefined}
             retryLabel={WALLET_COPY.retry}
             onRetry={() => {
               wallet.reload();
@@ -107,7 +120,7 @@ export default function WalletScreen() {
             testID="wallet-error"
           />
         ) : (
-          <StateView kind="loading" testID="wallet-loading" />
+          <SkeletonList heroHeight={componentTokens.skeleton.heights.walletHero} rows={5} testID="wallet-loading" />
         )}
       </Screen>
     );
@@ -117,9 +130,10 @@ export default function WalletScreen() {
     <View style={styles.headerBlock}>
       <BalanceCard wallet={walletData} isDriver={isDriver} />
       {walletData.status !== 'active' ? (
-        <InfoNote icon="warning" tone="warning" text={WALLET_COPY.walletSuspended} testID="wallet-suspended" />
+        <Banner tone="warning" text={WALLET_COPY.walletSuspended} testID="wallet-suspended" />
       ) : null}
-      <InfoNote
+      <Banner
+        tone="info"
         icon="cash"
         title={WALLET_COPY.cashOnlyTitle}
         text={isDriver ? WALLET_COPY.cashOnlyDriver : WALLET_COPY.cashOnlyPassenger}
@@ -160,22 +174,23 @@ export default function WalletScreen() {
   );
 
   const renderEmpty = () => {
-    if (list.status === 'loading') return <StateView kind="loading" testID="wallet-transactions-loading" />;
+    if (list.status === 'loading') return <SkeletonList rows={4} testID="wallet-transactions-loading" />;
     if (list.status === 'failed') {
       return (
-        <StateView
-          kind="error"
-          message={list.error ?? WALLET_COPY.transactionsFailed}
+        <ErrorState
+          title={WALLET_COPY.transactionsFailed}
+          body={list.error ?? undefined}
           retryLabel={WALLET_COPY.retry}
           onRetry={reloadList}
+          placement="center"
           testID="wallet-transactions-error"
         />
       );
     }
     const filtered = filter !== 'all';
     return (
-      <StateView
-        kind="empty"
+      <EmptyState
+        placement="center"
         icon="receipt"
         title={filtered ? WALLET_COPY.emptyFilteredTitle : WALLET_COPY.emptyTitle}
         body={filtered ? WALLET_COPY.emptyFilteredBody : WALLET_COPY.emptyBody}

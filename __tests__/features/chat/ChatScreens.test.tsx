@@ -81,7 +81,7 @@ describe('ChatThreadScreen', () => {
     expect(screen.queryByTestId('chat-closed-notice')).toBeNull();
     // T-512: the composer lives inside the iOS keyboard avoider.
     expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props).toMatchObject({ behavior: 'padding', keyboardVerticalOffset: 0 });
-    expect(screen.getByTestId('chat-keyboard-avoider')).toContainElement(screen.getByTestId('chat-composer'));
+    expect(screen.getByTestId('chat-thread-screen-keyboard-avoider')).toContainElement(screen.getByTestId('chat-composer'));
   });
 
   it('read-only after the ride ended: no composer, an explanation instead', async () => {

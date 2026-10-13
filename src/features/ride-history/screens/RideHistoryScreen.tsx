@@ -2,10 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, Screen, SegmentedControl } from '../../../components/ui';
+import { AppText, Button, EmptyState, ErrorState, Header, Screen, SegmentedControl, SkeletonList } from '../../../components/ui';
 import { layout, space } from '../../../theme';
-import { ScreenHeader } from '../../wallet/components/ScreenHeader';
-import { StateView } from '../../wallet/components/StateView';
 import { RideHistoryRow } from '../components/RideHistoryRow';
 import { RIDE_HISTORY_COPY } from '../copy';
 import { useRideHistory, useRideViewer } from '../hooks';
@@ -70,12 +68,13 @@ export default function RideHistoryScreen() {
   );
 
   const renderEmpty = () => {
-    if (list.status === 'loading') return <StateView kind="loading" testID="ride-history-loading" />;
+    if (list.status === 'loading') return <SkeletonList rows={5} testID="ride-history-loading" />;
     if (list.status === 'failed') {
       return (
-        <StateView
-          kind="error"
-          message={list.error ?? RIDE_HISTORY_COPY.loadFailed}
+        <ErrorState
+          title={RIDE_HISTORY_COPY.loadFailed}
+          body={list.error ?? undefined}
+          placement="center"
           retryLabel={RIDE_HISTORY_COPY.retry}
           onRetry={reload}
           testID="ride-history-error"
@@ -83,8 +82,8 @@ export default function RideHistoryScreen() {
       );
     }
     return (
-      <StateView
-        kind="empty"
+      <EmptyState
+        placement="center"
         icon="rides"
         title={filter === 'all' ? RIDE_HISTORY_COPY.emptyTitle[viewer] : RIDE_HISTORY_COPY.emptyFilteredTitle[filter]}
         body={filter === 'all' ? RIDE_HISTORY_COPY.emptyBody[viewer] : undefined}
@@ -125,7 +124,8 @@ export default function RideHistoryScreen() {
 
   return (
     <Screen testID="ride-history-screen">
-      <ScreenHeader
+      <Header
+        tone="background"
         title={RIDE_HISTORY_COPY.title}
         backLabel={RIDE_HISTORY_COPY.back}
         onBack={() => navigation.goBack()}

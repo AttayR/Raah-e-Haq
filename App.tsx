@@ -6,7 +6,8 @@ import {
   DarkTheme as NavDark,
 } from '@react-navigation/native';
 
-import { StatusBar } from 'react-native';
+import { StatusBar, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useAppTheme } from './src/app/providers/ThemeProvider';
 import AuthFlow from './src/app/navigation/AuthFlow';
@@ -55,6 +56,8 @@ function ThemedNav() {
 
 export default function App() {
   return (
+    // Gesture root for the kit BottomSheet (UI-R3); native Modals add their own (ModalRoot).
+    <GestureHandlerRootView style={styles.root}>
     <SafeAreaProvider>
       <ReduxProvider>
         <ThemeProvider>
@@ -66,5 +69,10 @@ export default function App() {
         </ThemeProvider>
       </ReduxProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

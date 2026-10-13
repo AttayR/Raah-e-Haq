@@ -1,6 +1,3 @@
-import { darkColors, lightColors } from './tokens';
-import { extra, navy } from './palette';
-
 /**
  * @deprecated Pre-T-601 static brand colours. They do not follow the colour scheme and the
  * values predate DESIGN_SYSTEM §1 (`warning` here is a red, `secondary` is CSS 'orange').
@@ -30,21 +27,3 @@ export const BrandColors = {
   },
 } as const;
 
-/**
- * Toast colours (DESIGN_SYSTEM 5.16): inverse surface in light, raised surface in dark;
- * tone icons use the dark-tone values, which pass contrast on both fills. Values now come
- * from the semantic tokens; the shape is kept for ModernToast until T-608 replaces it.
- */
-export const ToastColors = {
-  light: { background: lightColors.textPrimary, text: lightColors.textInverse },
-  dark: { background: darkColors.surfaceRaised, text: darkColors.textPrimary },
-  tone: {
-    success: darkColors.success,
-    error: darkColors.danger,
-    warning: darkColors.warning,
-    info: darkColors.info,
-    loading: navy[300],
-  },
-  action: navy[300],
-  shadow: extra.black,
-} as const;

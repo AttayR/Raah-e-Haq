@@ -1,19 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type ParamListBase, type RouteProp } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppText, Button, Card, Screen, SegmentedControl } from '../../../components/ui';
+import { AppText, Banner, Button, Card, Header, Screen, SegmentedControl, TextField } from '../../../components/ui';
 import { firstFieldMessages, toApiError } from '../../../core/api/errors';
 import { formatMoney, moneyInputText } from '../../../core/format/money';
 import { toast } from '../../../core/toast';
 import { layout, space } from '../../../theme';
-import { FormField } from '../components/FormField';
-import { InfoNote } from '../components/InfoNote';
-import { KeyboardDoneBar } from '../components/KeyboardDoneBar';
-import { ScreenHeader } from '../components/ScreenHeader';
+import { KeyboardDoneBar, PAY_COMMISSION_KEYBOARD_DONE_ID } from '../components/KeyboardDoneBar';
 import { WALLET_COPY } from '../copy';
 import { submitSettlement } from '../hooks';
-import { formKeyboardAvoidingProps, PAY_COMMISSION_KEYBOARD_DONE_ID } from '../keyboard';
 import type { DriverWalletRoutes } from '../navigation';
 import {
   SETTLEMENT_NOTE_MAX,
@@ -43,7 +38,6 @@ export default function PayCommissionScreen() {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const { params } = useRoute<RouteProp<DriverWalletRoutes, 'PayCommission'>>();
   const { owed, currency } = params;
-  const insets = useSafeAreaInsets();
   const [values, setValues] = useState<SettlementFormValues>({
     amount: moneyInputText(owed),
     method: 'cash',
@@ -106,103 +100,99 @@ export default function PayCommissionScreen() {
   const bank = values.method === 'bank_transfer';
 
   return (
-    <Screen testID="pay-commission-screen">
-      <ScreenHeader
+    // Screen's keyboard avoidance (top-inset offset, T-509) keeps "Report payment" above the keypad.
+    <Screen testID="pay-commission-screen" keyboardAvoiding>
+      <Header
         title={WALLET_COPY.formTitle}
         backLabel={WALLET_COPY.back}
         onBack={() => navigation.goBack()}
+        tone="background"
         testID="pay-commission"
       />
-      <KeyboardAvoidingView
+      <ScrollView
         style={styles.flex}
-        {...formKeyboardAvoidingProps(Platform.OS, insets.top)}
-        testID="pay-commission-keyboard-avoider"
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          showsVerticalScrollIndicator={false}
-        >
-          <Card>
-            <AppText variant="caption" color="textSecondary">
-              {WALLET_COPY.formOwed}
-            </AppText>
-            <AppText variant="numericL" testID="pay-commission-owed">
-              {formatMoney(owed, { currency })}
-            </AppText>
-          </Card>
+        <Card>
+          <AppText variant="caption" color="textSecondary">
+            {WALLET_COPY.formOwed}
+          </AppText>
+          <AppText variant="numericL" testID="pay-commission-owed">
+            {formatMoney(owed, { currency })}
+          </AppText>
+        </Card>
 
-          <FormField
-            label={WALLET_COPY.formAmount}
-            value={values.amount}
-            onChangeText={update('amount')}
-            keyboardType="decimal-pad"
-            inputMode="decimal"
-            inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
-            error={errors.amount}
-            testID="pay-commission-amount"
-          />
+        <TextField
+          label={WALLET_COPY.formAmount}
+          value={values.amount}
+          onChangeText={update('amount')}
+          keyboardType="decimal-pad"
+          inputMode="decimal"
+          inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
+          error={errors.amount}
+          testID="pay-commission-amount"
+        />
 
-          <View style={styles.field}>
-            <AppText variant="label" color="textSecondary">
-              {WALLET_COPY.formMethod}
-            </AppText>
-            <SegmentedControl<SettlementMethod>
-              options={METHODS}
-              value={values.method}
-              onChange={(method) => {
-                setValues((current) => ({ ...current, method }));
-                setErrors((current) => ({ ...current, reference: undefined }));
-              }}
-              accessibilityLabel={WALLET_COPY.formMethod}
-              testID="pay-commission-method"
-            />
-          </View>
-
-          <FormField
-            label={bank ? WALLET_COPY.formReference : WALLET_COPY.formReferenceOptional}
-            value={values.reference}
-            onChangeText={update('reference')}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            returnKeyType="done"
-            maxLength={SETTLEMENT_REFERENCE_MAX}
-            hint={WALLET_COPY.formReferenceHint}
-            error={errors.reference}
-            testID="pay-commission-reference"
-          />
-
-          <FormField
-            label={WALLET_COPY.formNote}
-            value={values.note}
-            onChangeText={update('note')}
-            multiline
-            maxLength={SETTLEMENT_NOTE_MAX}
-            inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
-            error={errors.note}
-            testID="pay-commission-note"
-          />
-
-          <InfoNote icon="info" text={WALLET_COPY.formInfo} />
-
-          {formError ? (
-            <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID="pay-commission-error">
-              {formError}
-            </AppText>
-          ) : null}
-
-          <Button
-            label={WALLET_COPY.formSubmit}
-            onPress={() => {
-              onSubmit();
+        <View style={styles.field}>
+          <AppText variant="label" color="textSecondary">
+            {WALLET_COPY.formMethod}
+          </AppText>
+          <SegmentedControl<SettlementMethod>
+            options={METHODS}
+            value={values.method}
+            onChange={(method) => {
+              setValues((current) => ({ ...current, method }));
+              setErrors((current) => ({ ...current, reference: undefined }));
             }}
-            loading={submitting}
-            testID="pay-commission-submit"
+            accessibilityLabel={WALLET_COPY.formMethod}
+            testID="pay-commission-method"
           />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+
+        <TextField
+          label={bank ? WALLET_COPY.formReference : WALLET_COPY.formReferenceOptional}
+          value={values.reference}
+          onChangeText={update('reference')}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          returnKeyType="done"
+          maxLength={SETTLEMENT_REFERENCE_MAX}
+          helper={WALLET_COPY.formReferenceHint}
+          error={errors.reference}
+          testID="pay-commission-reference"
+        />
+
+        <TextField
+          label={WALLET_COPY.formNote}
+          value={values.note}
+          onChangeText={update('note')}
+          multiline
+          maxLength={SETTLEMENT_NOTE_MAX}
+          inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
+          error={errors.note}
+          testID="pay-commission-note"
+        />
+
+        <Banner tone="info" icon="info" text={WALLET_COPY.formInfo} />
+
+        {formError ? (
+          <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID="pay-commission-error">
+            {formError}
+          </AppText>
+        ) : null}
+
+        <Button
+          label={WALLET_COPY.formSubmit}
+          onPress={() => {
+            onSubmit();
+          }}
+          loading={submitting}
+          testID="pay-commission-submit"
+        />
+      </ScrollView>
       <KeyboardDoneBar
         nativeID={PAY_COMMISSION_KEYBOARD_DONE_ID}
         label={WALLET_COPY.keyboardDone}

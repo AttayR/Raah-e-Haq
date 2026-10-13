@@ -2,7 +2,6 @@ import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
   Linking,
   Platform,
   StyleSheet,
@@ -27,7 +26,6 @@ import { ChatThreadHeader } from '../components/ChatThreadHeader';
 import { MessageBubble } from '../components/MessageBubble';
 import { CHAT_COPY, fallbackNameOf, formatChatDayTime, roleLabelOf } from '../copy';
 import { useChatThread } from '../hooks';
-import { chatKeyboardAvoidingProps } from '../keyboard';
 import type { RideChatParams } from '../navigation';
 import { seenMessageId, threadItemsNewestFirst, type ChatThreadState, type ThreadItem } from '../thread';
 
@@ -148,58 +146,53 @@ const ChatThreadScreen: React.FC = () => {
   const canSend = state.meta?.canSend === true;
 
   return (
-    <Screen testID="chat-thread-screen">
+    // Screen's keyboard avoidance (top-inset offset, T-512) keeps the composer above the keyboard.
+    <Screen testID="chat-thread-screen" keyboardAvoiding>
       {header}
-      <KeyboardAvoidingView
+      <FlatList
         style={styles.fill}
-        {...chatKeyboardAvoidingProps(Platform.OS, insets.top)}
-        testID="chat-keyboard-avoider"
-      >
-        <FlatList
-          style={styles.fill}
-          data={items}
-          inverted
-          keyExtractor={(item) => item.key}
-          renderItem={renderItem}
-          onEndReached={loadOlder}
-          onEndReachedThreshold={0.3}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          contentContainerStyle={[styles.listContent, items.length === 0 ? styles.emptyContent : null]}
-          ListFooterComponent={
-            state.loadingOlder ? (
-              <ActivityIndicator style={styles.older} color={theme.colors.textMuted} accessibilityLabel={CHAT_COPY.loadOlder} />
-            ) : null
-          }
-          ListEmptyComponent={
-            // VirtualizedList already turns the empty state upright in an inverted list.
-            <View style={styles.empty} testID="chat-thread-empty">
-              <Icon name="chat" size={48} color="textMuted" />
-              <AppText variant="body" color="textSecondary" align="center">
-                {CHAT_COPY.threadEmpty}
-              </AppText>
-            </View>
-          }
-          testID="chat-thread-list"
-        />
-        {canSend ? (
-          <ChatComposer onSend={send} bottomInset={bottomInset} />
-        ) : (
-          <View
-            style={[
-              styles.notice,
-              { backgroundColor: theme.colors.surfaceAlt, paddingBottom: space[3] + insets.bottom },
-            ]}
-            testID="chat-closed-notice"
-            accessibilityLiveRegion="polite"
-          >
-            <Icon name="lock" size={20} color="textSecondary" />
-            <AppText variant="bodySmall" color="textSecondary" style={styles.noticeText}>
-              {closedNoticeOf(state)}
+        data={items}
+        inverted
+        keyExtractor={(item) => item.key}
+        renderItem={renderItem}
+        onEndReached={loadOlder}
+        onEndReachedThreshold={0.3}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        contentContainerStyle={[styles.listContent, items.length === 0 ? styles.emptyContent : null]}
+        ListFooterComponent={
+          state.loadingOlder ? (
+            <ActivityIndicator style={styles.older} color={theme.colors.textMuted} accessibilityLabel={CHAT_COPY.loadOlder} />
+          ) : null
+        }
+        ListEmptyComponent={
+          // VirtualizedList already turns the empty state upright in an inverted list.
+          <View style={styles.empty} testID="chat-thread-empty">
+            <Icon name="chat" size={48} color="textMuted" />
+            <AppText variant="body" color="textSecondary" align="center">
+              {CHAT_COPY.threadEmpty}
             </AppText>
           </View>
-        )}
-      </KeyboardAvoidingView>
+        }
+        testID="chat-thread-list"
+      />
+      {canSend ? (
+        <ChatComposer onSend={send} bottomInset={bottomInset} />
+      ) : (
+        <View
+          style={[
+            styles.notice,
+            { backgroundColor: theme.colors.surfaceAlt, paddingBottom: space[3] + insets.bottom },
+          ]}
+          testID="chat-closed-notice"
+          accessibilityLiveRegion="polite"
+        >
+          <Icon name="lock" size={20} color="textSecondary" />
+          <AppText variant="bodySmall" color="textSecondary" style={styles.noticeText}>
+            {closedNoticeOf(state)}
+          </AppText>
+        </View>
+      )}
     </Screen>
   );
 };

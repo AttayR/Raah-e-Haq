@@ -2,11 +2,9 @@ import React, { useCallback } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, Screen } from '../../../components/ui';
+import { AppText, Button, EmptyState, ErrorState, Header, Screen, SkeletonList } from '../../../components/ui';
 import { layout, space } from '../../../theme';
-import { ScreenHeader } from '../components/ScreenHeader';
 import { SettlementRow } from '../components/SettlementRow';
-import { StateView } from '../components/StateView';
 import { WALLET_COPY } from '../copy';
 import { useCancelSettlement, useSettlements } from '../hooks';
 import type { Settlement } from '../types';
@@ -44,12 +42,12 @@ export default function SettlementsScreen() {
   );
 
   const renderEmpty = () => {
-    if (list.status === 'loading') return <StateView kind="loading" testID="settlements-loading" />;
+    if (list.status === 'loading') return <SkeletonList rows={6} leading="none" testID="settlements-loading" />;
     if (list.status === 'failed') {
       return (
-        <StateView
-          kind="error"
-          message={list.error ?? WALLET_COPY.settlementsFailed}
+        <ErrorState
+          title={WALLET_COPY.settlementsFailed}
+          body={list.error ?? undefined}
           retryLabel={WALLET_COPY.retry}
           onRetry={list.reload}
           testID="settlements-error"
@@ -57,8 +55,7 @@ export default function SettlementsScreen() {
       );
     }
     return (
-      <StateView
-        kind="empty"
+      <EmptyState
         icon="receipt"
         title={WALLET_COPY.settlementsEmptyTitle}
         body={WALLET_COPY.settlementsEmptyBody}
@@ -90,10 +87,11 @@ export default function SettlementsScreen() {
 
   return (
     <Screen testID="settlements-screen">
-      <ScreenHeader
+      <Header
         title={WALLET_COPY.settlementsTitle}
         backLabel={WALLET_COPY.back}
         onBack={() => navigation.goBack()}
+        tone="background"
         testID="settlements"
       />
       {list.error && list.items.length > 0 ? (

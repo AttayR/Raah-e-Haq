@@ -88,6 +88,53 @@ export const componentTokens = {
   selectionControl: { size: 24, radioDot: 12, checkRadius: radius.xs, glyph: 16 },
   /** Shared state values. */
   state: { disabledOpacity: 0.4 },
+  /** §5.8 ListItem (UI-R3): row heights, leading sizes and divider insets. */
+  listItem: {
+    minHeight: { one: 56, two: 72 },
+    tile: 40,
+    tileIconSize: 24,
+    /** Divider inset to the text start: 16 + 24 + 16 (plain icon), 16 + 40 + 16 (tile/avatar). */
+    dividerInset: { none: space[4], icon: 56, tile: 72 },
+  },
+  /** §5.14 BottomSheet (UI-R3). */
+  sheet: {
+    radius: radius.xl,
+    handleWidth: 36,
+    handleHeight: 5,
+    handleTop: space[2],
+    /** Content starts 24 from the sheet top (handle area included). */
+    contentTop: space[6],
+    /** `half` = 50% of the container; `full` = container − top inset − 8. */
+    halfRatio: 0.5,
+    fullTopGap: space[2],
+    /** iPhone SE and other short screens: the sheet never exceeds 88% (§3.2). */
+    smallScreenMaxRatio: 0.88,
+    smallScreenHeight: 700,
+    /** A release this far past the lowest snap (or this fast downward) closes a modal sheet. */
+    closeDistance: 80,
+    closeVelocity: 1200,
+    /** Fraction of the release velocity added when picking the nearest snap. */
+    velocityProjection: 0.15,
+    footerTopPadding: space[4],
+  },
+  /** §5.15 Dialog. */
+  dialog: { maxWidth: 340, sideMargin: space[6], padding: space[6] },
+  /** §5.16 Toast. */
+  toast: { minHeight: 48, iconSize: 20, swipeDismissDistance: 20 },
+  /** §5.19 / §5.20 EmptyState and ErrorState. */
+  emptyState: { maxWidth: 280, circle: 96, glyph: 48, illustration: 120, topOffset: space[16] },
+  /** §5.18 Skeleton. */
+  skeleton: {
+    /** Text block height = line height − 6. */
+    textInset: 6,
+    /**
+     * Placeholder heights that mirror real blocks at rest (1.0x font) so nothing jumps when data
+     * arrives: wallet BalanceCard, EarningsHero, ride details cards, transaction detail card.
+     */
+    heights: { walletHero: 152, earningsHero: 132, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
+  },
+  /** §9 [v1.1] map floating controls: at most two, locate rides 16 above the sheet. */
+  mapControls: { sheetGap: space[4], edge: space[4] },
 } as const;
 
 export type ComponentTokens = typeof componentTokens;

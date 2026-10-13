@@ -36,7 +36,7 @@ export const WALLET_COPY = {
   cancelRequestTitle: 'Cancel this payment report?',
   cancelRequestBody: 'You can report the payment again afterwards.',
   cancelRequestConfirm: 'Cancel report',
-  keepRequest: 'Keep',
+  keepRequest: 'Keep request',
   cancelFailed: "Couldn't cancel the report. Please try again.",
   cancelled: 'Payment report cancelled',
   // Transaction detail.

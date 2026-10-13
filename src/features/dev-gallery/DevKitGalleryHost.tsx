@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DevSettings, Modal, Platform, Settings, StatusBar, type StatusBarProps } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ModalRoot } from '../../components/ui/ModalRoot';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { logger } from '../../core/logging/logger';
 import { t } from '../../i18n';
@@ -94,12 +94,11 @@ export function DevKitGalleryHost({ enabled = __DEV__, children }: Props) {
       {children}
       {enabled && open ? (
         <Modal visible animationType="slide" presentationStyle="fullScreen" onShow={pushBar} onRequestClose={close}>
-          {/* A Modal is a separate native window: it ignores the app's StatusBar and safe-area
-              provider, so it sets both itself (see the note in src/components/ui/Screen.tsx). */}
-          <StatusBar barStyle={theme.statusBarStyle} />
-          <SafeAreaProvider>
+          {/* A Modal is a separate native window: ModalRoot gives it its own StatusBar, safe-area
+              provider and gesture root (the gallery's BottomSheet needs the last one). */}
+          <ModalRoot>
             <KitGalleryScreen onClose={close} only={only} />
-          </SafeAreaProvider>
+          </ModalRoot>
         </Modal>
       ) : null}
     </>

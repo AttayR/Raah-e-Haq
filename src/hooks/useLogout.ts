@@ -1,19 +1,22 @@
 import { useCallback, useRef, useState } from 'react';
-import { Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
+import { confirm, dialog } from '../core/dialog';
+import { t } from '../i18n';
 import { logout, type SessionThunkExtra } from '../store/thunks/sessionThunks';
 
 // Typed locally (not useAppDispatch) so this hook does not import the store singleton.
 type LogoutDispatch = ThunkDispatch<unknown, SessionThunkExtra, UnknownAction>;
 
-export const LOGOUT_CONFIRM_TITLE = 'Sign Out';
-export const LOGOUT_CONFIRM_MESSAGE = 'Are you sure you want to sign out?';
-export const LOGOUT_CONFIRM_BUTTON = 'Sign Out';
+export const LOGOUT_CONFIRM_TITLE = t('signOut.title');
+export const LOGOUT_CONFIRM_MESSAGE = t('signOut.body');
+export const LOGOUT_CONFIRM_BUTTON = t('signOut.confirm');
 
 /**
- * Every Sign Out / Logout button uses this (T-102). `confirmLogout` asks first, then runs the
- * single `logout` thunk; AuthFlow switches to the auth stack once the session is cleared.
+ * Every Sign Out / Logout button uses this (T-102). `confirmLogout` asks first with the themed
+ * kit Dialog (UI-R3, destructive confirm), then runs the single `logout` thunk; AuthFlow switches
+ * to the auth stack once the session is cleared. Any dialog still queued is dismissed on sign-out
+ * so nothing from the old session shows over the auth screens.
  */
 export const useLogout = () => {
   const dispatch = useDispatch<LogoutDispatch>();
@@ -26,6 +29,7 @@ export const useLogout = () => {
     }
     inFlight.current = true;
     setIsLoggingOut(true);
+    dialog.dismissAll();
     try {
       await dispatch(logout());
     } finally {
@@ -35,14 +39,19 @@ export const useLogout = () => {
     }
   }, [dispatch]);
 
-  const confirmLogout = useCallback(() => {
+  const confirmLogout = useCallback(async () => {
     if (inFlight.current) {
       return;
     }
-    Alert.alert(LOGOUT_CONFIRM_TITLE, LOGOUT_CONFIRM_MESSAGE, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: LOGOUT_CONFIRM_BUTTON, style: 'destructive', onPress: () => { performLogout(); } },
-    ]);
+    const confirmed = await confirm({
+      title: LOGOUT_CONFIRM_TITLE,
+      body: LOGOUT_CONFIRM_MESSAGE,
+      confirmLabel: LOGOUT_CONFIRM_BUTTON,
+      destructive: true,
+    });
+    if (confirmed) {
+      await performLogout();
+    }
   }, [performLogout]);
 
   return { confirmLogout, isLoggingOut };

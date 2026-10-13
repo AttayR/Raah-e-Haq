@@ -2,11 +2,11 @@ import React, { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, Screen } from '../../../components/ui';
-import { layout, space } from '../../../theme';
+import { AppText, Button, EmptyState, ErrorState, Header, Screen, SkeletonCard, SkeletonGroup } from '../../../components/ui';
+import { componentTokens, layout, space } from '../../../theme';
+
+const skeletonHeights = componentTokens.skeleton.heights;
 import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
-import { ScreenHeader } from '../../wallet/components/ScreenHeader';
-import { StateView } from '../../wallet/components/StateView';
 import {
   CancellationCard,
   PersonCard,
@@ -37,7 +37,8 @@ export default function RideDetailsScreen() {
   const onMessage = useCallback(() => openRideChat(navigation, params.rideId), [navigation, params.rideId]);
 
   const header = (
-    <ScreenHeader
+    <Header
+      tone="background"
       title={RIDE_HISTORY_COPY.detailsTitle}
       backLabel={RIDE_HISTORY_COPY.back}
       onBack={() => navigation.goBack()}
@@ -50,8 +51,7 @@ export default function RideDetailsScreen() {
     if (data?.kind === 'unavailable') {
       body = (
         <View style={styles.unavailable}>
-          <StateView
-            kind="empty"
+          <EmptyState
             icon="rides"
             title={RIDE_HISTORY_COPY.unavailableTitle}
             body={RIDE_HISTORY_COPY.unavailableBody}
@@ -62,16 +62,22 @@ export default function RideDetailsScreen() {
       );
     } else if (status === 'failed') {
       body = (
-        <StateView
-          kind="error"
-          message={error ?? RIDE_HISTORY_COPY.detailsFailed}
+        <ErrorState
+          title={RIDE_HISTORY_COPY.detailsFailed}
+          body={error ?? undefined}
           retryLabel={RIDE_HISTORY_COPY.retry}
           onRetry={reload}
           testID="ride-details-error"
         />
       );
     } else {
-      body = <StateView kind="loading" testID="ride-details-loading" />;
+      body = (
+        <SkeletonGroup testID="ride-details-loading" style={styles.skeleton}>
+          <SkeletonCard height={skeletonHeights.rideSummary} />
+          <SkeletonCard height={skeletonHeights.rideRoute} />
+          <SkeletonCard height={skeletonHeights.rideReceipt} />
+        </SkeletonGroup>
+      );
     }
     return (
       <Screen testID="ride-details-screen">
@@ -118,5 +124,6 @@ export default function RideDetailsScreen() {
 const styles = StyleSheet.create({
   content: { paddingBottom: space[8] },
   body: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[3], width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
+  skeleton: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[3] },
   unavailable: { flexGrow: 1, alignItems: 'center', paddingBottom: space[8] },
 });

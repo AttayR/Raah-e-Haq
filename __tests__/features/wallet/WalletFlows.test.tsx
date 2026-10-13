@@ -3,7 +3,8 @@
  * the payment reports list (status, review note, cancel) and the transaction detail screen.
  */
 import React from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, StyleSheet, type AlertButton } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, StyleSheet } from 'react-native';
+import { dialog, dialogStore } from '../../../src/core/dialog';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { apiClient } from '../../../src/services/api';
@@ -11,7 +12,8 @@ import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import PayCommissionScreen from '../../../src/features/wallet/screens/PayCommissionScreen';
 import SettlementsScreen from '../../../src/features/wallet/screens/SettlementsScreen';
 import TransactionDetailScreen, { methodLabel } from '../../../src/features/wallet/screens/TransactionDetailScreen';
-import { formKeyboardAvoidingProps, PAY_COMMISSION_KEYBOARD_DONE_ID } from '../../../src/features/wallet/keyboard';
+import { keyboardAvoidingProps as formKeyboardAvoidingProps } from '../../../src/components/ui/keyboard';
+import { PAY_COMMISSION_KEYBOARD_DONE_ID } from '../../../src/features/wallet/components/KeyboardDoneBar';
 import { toTransaction } from '../../../src/features/wallet/api';
 import { envelope, pageInfo, rawSettlement, rawTransaction } from '../../../test-utils/walletFixtures';
 
@@ -45,6 +47,19 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+/** UI-R3: the confirmation is the kit Dialog; this answers every dialog it opens. */
+const autoAnswerDialogs = (confirmed: boolean) =>
+  dialogStore.subscribe(() => {
+    const current = dialogStore.getCurrent();
+    if (current) dialog.answer(current.id, confirmed);
+  });
+let stopAnswering: (() => void) | null = null;
+afterEach(() => {
+  stopAnswering?.();
+  stopAnswering = null;
+  dialog.dismissAll();
+});
+
 describe('PayCommissionScreen', () => {
   beforeEach(() => {
     mockParams = { owed: 116, currency: 'PKR' };
@@ -53,7 +68,8 @@ describe('PayCommissionScreen', () => {
   it('is prefilled with the commission owed and posts the report', async () => {
     mock.onPost('/wallet/settlements').reply(201, envelope(rawSettlement({ method: 'cash', reference: null })));
     show(PayCommissionScreen);
-    const amount = await screen.findByTestId('pay-commission-amount');
+    // UI-R3: the kit TextField puts the input at `${testID}-input`.
+    const amount = await screen.findByTestId('pay-commission-amount-input');
     expect(amount.props.value).toBe('116');
     expect(screen.getByTestId('pay-commission-owed').props.children).toBe('Rs 116');
 
@@ -87,7 +103,8 @@ describe('PayCommissionScreen', () => {
 
   it('blocks more than owed and a bank transfer without a reference, before any request', async () => {
     show(PayCommissionScreen);
-    const amount = await screen.findByTestId('pay-commission-amount');
+    // UI-R3: the kit TextField puts the input at `${testID}-input`.
+    const amount = await screen.findByTestId('pay-commission-amount-input');
     fireEvent.changeText(amount, '200');
     fireEvent.press(screen.getByRole('radio', { name: 'How did you pay?, Bank transfer' }));
     await act(async () => {
@@ -154,9 +171,10 @@ describe('PayCommissionScreen keyboard (T-509)', () => {
   it('gives the number pad (and the note) a Done bar that closes the keyboard', async () => {
     const dismiss = jest.spyOn(Keyboard, 'dismiss');
     show(PayCommissionScreen);
-    const amount = await screen.findByTestId('pay-commission-amount');
+    // UI-R3: the kit TextField puts the input at `${testID}-input`.
+    const amount = await screen.findByTestId('pay-commission-amount-input');
     expect(amount.props.inputAccessoryViewID).toBe(PAY_COMMISSION_KEYBOARD_DONE_ID);
-    expect(screen.getByTestId('pay-commission-note').props.inputAccessoryViewID).toBe(PAY_COMMISSION_KEYBOARD_DONE_ID);
+    expect(screen.getByTestId('pay-commission-note-input').props.inputAccessoryViewID).toBe(PAY_COMMISSION_KEYBOARD_DONE_ID);
     expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props).toMatchObject({ behavior: 'padding', keyboardVerticalOffset: 0 });
     fireEvent.press(screen.getByTestId('pay-commission-keyboard-done'));
     expect(dismiss).toHaveBeenCalledTimes(1);
@@ -166,7 +184,8 @@ describe('PayCommissionScreen keyboard (T-509)', () => {
     const dismiss = jest.spyOn(Keyboard, 'dismiss');
     mock.onPost('/wallet/settlements').reply(201, envelope(rawSettlement({ method: 'cash', reference: null })));
     show(PayCommissionScreen);
-    const amount = await screen.findByTestId('pay-commission-amount');
+    // UI-R3: the kit TextField puts the input at `${testID}-input`.
+    const amount = await screen.findByTestId('pay-commission-amount-input');
     fireEvent(amount, 'focus');
     fireEvent.changeText(amount, '100');
     await act(async () => {
@@ -189,9 +208,7 @@ describe('SettlementsScreen', () => {
       ),
     );
     mock.onDelete('/wallet/settlements/3').reply(200, envelope(rawSettlement({ id: 3, status: 'cancelled' })));
-    jest.spyOn(Alert, 'alert').mockImplementation((_t, _b, buttons?: AlertButton[]) => {
-      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
-    });
+    stopAnswering = autoAnswerDialogs(true);
     show(SettlementsScreen);
     await waitFor(() => expect(screen.getByTestId('wallet-settlement-2')).toBeTruthy());
     expect(screen.getByTestId('wallet-settlement-2-note').props.children).toBe('Reviewer note: Receipt unreadable');
@@ -202,6 +219,22 @@ describe('SettlementsScreen', () => {
     });
     await waitFor(() => expect(screen.getByTestId('wallet-settlement-3-status')).toBeTruthy());
     await waitFor(() => expect(screen.queryByTestId('wallet-settlement-3-cancel')).toBeNull());
+  });
+
+  it('"Keep request" in the kit dialog leaves the report pending (UI-R3)', async () => {
+    mock.onGet('/wallet/settlements').reply(200, envelope([rawSettlement({ id: 3 })], pageInfo(1, 1, 1)));
+    show(SettlementsScreen);
+    await waitFor(() => expect(screen.getByTestId('wallet-settlement-3-cancel')).toBeTruthy());
+    act(() => {
+      fireEvent.press(screen.getByTestId('wallet-settlement-3-cancel'));
+    });
+    const request = dialogStore.getCurrent();
+    expect(request).toMatchObject({ destructive: true, cancelLabel: 'Keep request', confirmLabel: 'Cancel report' });
+    await act(async () => {
+      if (request) dialog.answer(request.id, false);
+    });
+    expect(mock.history.delete).toHaveLength(0);
+    expect(screen.getByTestId('wallet-settlement-3-cancel')).toBeTruthy();
   });
 
   it('shows a reversed report like a rejected one: "Reversed by support", no Cancel (BE-70)', async () => {

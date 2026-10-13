@@ -2,12 +2,22 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type ParamListBase, type RouteProp } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Badge, Card, Icon, ListItem, Screen } from '../../../components/ui';
+import {
+  AppText,
+  Badge,
+  Banner,
+  Card,
+  ErrorState,
+  Header,
+  Icon,
+  ListItem,
+  Screen,
+  Skeleton,
+  SkeletonCard,
+  SkeletonGroup,
+} from '../../../components/ui';
 import { formatMoney } from '../../../core/format/money';
-import { layout, radius, space } from '../../../theme';
-import { InfoNote } from '../components/InfoNote';
-import { ScreenHeader } from '../components/ScreenHeader';
-import { StateView } from '../components/StateView';
+import { componentTokens, layout, radius, space } from '../../../theme';
 import { SETTLEMENT_METHOD_LABEL, WALLET_COPY } from '../copy';
 import { formatDateTime, transactionAmountColor, transactionAmountText, transactionIcon } from '../format';
 import { useTransactionDetail } from '../hooks';
@@ -73,10 +83,11 @@ export default function TransactionDetailScreen() {
   const { data: transaction, status, error, reload } = useTransactionDetail(params.id, params.transaction ?? null);
 
   const header = (
-    <ScreenHeader
+    <Header
       title={WALLET_COPY.detailTitle}
       backLabel={WALLET_COPY.back}
       onBack={() => navigation.goBack()}
+      tone="background"
       testID="transaction"
     />
   );
@@ -86,15 +97,22 @@ export default function TransactionDetailScreen() {
       <Screen testID="transaction-screen">
         {header}
         {status === 'failed' ? (
-          <StateView
-            kind="error"
-            message={error ?? WALLET_COPY.detailFailed}
+          <ErrorState
+            title={WALLET_COPY.detailFailed}
+            body={error ?? undefined}
             retryLabel={WALLET_COPY.retry}
             onRetry={reload}
             testID="transaction-error"
           />
         ) : (
-          <StateView kind="loading" testID="transaction-loading" />
+          <SkeletonGroup testID="transaction-loading" style={styles.body}>
+            <View style={styles.hero}>
+              <Skeleton width={56} height={56} shape="pill" />
+              <Skeleton width="50%" textVariant="numericXL" />
+              <Skeleton width="35%" textVariant="bodySmall" />
+            </View>
+            <SkeletonCard height={componentTokens.skeleton.heights.detailCard} />
+          </SkeletonGroup>
         )}
       </Screen>
     );
@@ -131,8 +149,8 @@ export default function TransactionDetailScreen() {
           {transaction.reversed ? <Badge tone="neutral" label={WALLET_COPY.reversed} testID="transaction-reversed" /> : null}
         </View>
 
-        {transaction.reversed ? <InfoNote icon="refund" text={WALLET_COPY.detailReversedNote} /> : null}
-        {transaction.reversesId !== null ? <InfoNote icon="refund" text={WALLET_COPY.detailReversalNote} /> : null}
+        {transaction.reversed ? <Banner tone="info" icon="refund" text={WALLET_COPY.detailReversedNote} /> : null}
+        {transaction.reversesId !== null ? <Banner tone="info" icon="refund" text={WALLET_COPY.detailReversalNote} /> : null}
         {status === 'failed' && error ? (
           <AppText variant="bodySmall" color="danger" testID="transaction-refresh-error">
             {error}

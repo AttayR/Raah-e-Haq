@@ -2,10 +2,11 @@
  * T-512: the read-only notice's time carries its day when it isn't today, and the thread's
  * KeyboardAvoidingView offsets by the top safe-area inset on iOS (its onLayout frame is
  * relative to the Screen's SafeAreaView, so without the offset the keyboard covered the
- * composer). Android keeps adjustResize, so the KAV is off there.
+ * composer). Android keeps adjustResize, so the KAV is off there. UI-R3 moved the helper into
+ * the kit (`Screen keyboardAvoiding`), shared with the Pay commission form (T-509).
  */
 import { formatChatDayTime, formatChatTime } from '../../../src/features/chat/copy';
-import { chatKeyboardAvoidingProps } from '../../../src/features/chat/keyboard';
+import { keyboardAvoidingProps as chatKeyboardAvoidingProps } from '../../../src/components/ui/keyboard';
 
 // Local times, so the expectations hold in any time zone.
 const now = new Date(2026, 9, 11, 21, 40);

@@ -4,6 +4,9 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui';
 import { space } from '../../../theme';
 
+/** The iOS "Done" bar above the Pay commission keyboard (InputAccessoryView nativeID). */
+export const PAY_COMMISSION_KEYBOARD_DONE_ID = 'payCommissionKeyboardDone';
+
 type Props = {
   /** Inputs opt in with `inputAccessoryViewID={nativeID}`. */
   nativeID: string;

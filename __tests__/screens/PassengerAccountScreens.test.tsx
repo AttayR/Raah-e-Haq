@@ -5,7 +5,6 @@
  */
 import React from 'react';
 import {
-  Alert,
   Linking,
   StyleSheet,
   useColorScheme,
@@ -25,6 +24,7 @@ import { DarkTheme, LightTheme, type AppTheme } from '../../src/theme';
 import PassengerSettingsScreen from '../../src/screens/Passenger/PassengerSettingsScreen';
 import PassengerProfile from '../../src/screens/Passenger/Passengerprofile';
 import { LOGOUT_CONFIRM_TITLE } from '../../src/hooks/useLogout';
+import { dialog, dialogStore } from '../../src/core/dialog';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -156,10 +156,11 @@ describe('PassengerSettingsScreen', () => {
   });
 
   it('sign out asks for confirmation first (T-102)', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     await renderScreen(PassengerSettingsScreen, 'light');
     fireEvent.press(screen.getByTestId('passenger-settings-sign-out'));
-    expect(alert).toHaveBeenCalledWith(LOGOUT_CONFIRM_TITLE, expect.any(String), expect.any(Array));
+    // UI-R3: the themed kit Dialog, destructive confirm.
+    expect(dialogStore.getCurrent()).toMatchObject({ title: LOGOUT_CONFIRM_TITLE, destructive: true });
+    act(() => dialog.dismissAll());
   });
 
   it('pending account: the card says "Pending approval"', async () => {

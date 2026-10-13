@@ -5,7 +5,6 @@
  * missing or rejected one, and Sign Out uses the single logout (T-102).
  */
 import React from 'react';
-import { Alert } from 'react-native';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import MockAdapter from 'axios-mock-adapter';
@@ -17,6 +16,7 @@ import { authStorage } from '../../src/services/authStorage';
 import { rootReducer } from '../../src/store/rootReducer';
 import { initializeAuth } from '../../src/store/thunks/apiThunks';
 import { LOGOUT_CONFIRM_TITLE } from '../../src/hooks/useLogout';
+import { dialog, dialogStore } from '../../src/core/dialog';
 import { ACCOUNT_STATUS_COPY, ACCOUNT_STATUS_VARIANTS } from '../../src/features/auth/copy/accountStatus';
 import { DRIVER_DOCUMENTS_COPY } from '../../src/features/driverDocuments/copy';
 import { DRIVER_DOCUMENT_TYPES } from '../../src/features/driverDocuments/types';
@@ -346,10 +346,11 @@ describe('AccountStatusScreen', () => {
   });
 
   it('Sign Out asks first (the single logout, T-102)', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const { screen } = await renderAs({ ...base, role: 'passenger', roles: ['passenger'] });
     fireEvent.press(screen.getByTestId('account-status-sign-out'));
-    expect(alert).toHaveBeenCalledWith(LOGOUT_CONFIRM_TITLE, expect.any(String), expect.any(Array));
+    // UI-R3: the themed kit Dialog, destructive confirm.
+    expect(dialogStore.getCurrent()).toMatchObject({ title: LOGOUT_CONFIRM_TITLE, destructive: true });
+    act(() => dialog.dismissAll());
     screen.unmount();
   });
 });

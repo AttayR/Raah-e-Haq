@@ -1,24 +1,26 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { space } from '../../theme';
+import { componentTokens, space } from '../../theme';
 import { AppText } from './AppText';
 import { Card } from './Card';
 
 export type ListGroupProps = React.PropsWithChildren<{
   /** Section header (`overline`, `textMuted`), 8 above the group. */
   title?: string;
+  /**
+   * Divider inset to the rows' text start (§5.8): `tile` (default, 40 tile or Avatar 40 → 72),
+   * `icon` (plain 24 glyph → 56) or `none` (text rows → 16).
+   */
+  inset?: 'tile' | 'icon' | 'none';
   testID?: string;
 }>;
-
-/** Inset of the hairline dividers: 16 padding + 40 tile + 16 gap = the text start (§5.8). */
-const DIVIDER_INSET = space[4] + 40 + space[4];
 
 /**
  * Grouped list (DESIGN_SYSTEM §5.8): rows inside a Card with no padding, hairline dividers
  * inset to the text start, optional section header.
  */
-export function ListGroup({ title, testID, children }: ListGroupProps) {
+export function ListGroup({ title, inset = 'tile', testID, children }: ListGroupProps) {
   const { theme } = useAppTheme();
   const rows = React.Children.toArray(children).filter(Boolean);
   return (
@@ -34,7 +36,7 @@ export function ListGroup({ title, testID, children }: ListGroupProps) {
             {index > 0 ? (
               <View
                 style={[
-                  styles.divider,
+                  { marginStart: componentTokens.listItem.dividerInset[inset] },
                   { backgroundColor: theme.colors.border, height: theme.borderWidth.hairline },
                 ]}
               />
@@ -50,5 +52,4 @@ export function ListGroup({ title, testID, children }: ListGroupProps) {
 const styles = StyleSheet.create({
   header: { marginBottom: space[2], marginStart: space[4] },
   card: { overflow: 'hidden' },
-  divider: { marginStart: DIVIDER_INSET },
 });

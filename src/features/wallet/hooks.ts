@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { confirm } from '../../core/dialog';
 import { toApiError } from '../../core/api/errors';
 import { usePagedList, type PagedList } from '../../core/api/usePagedList';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
@@ -58,44 +58,35 @@ export const useCancelSettlement = () => {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const inFlight = useRef(false);
 
-  const cancel = useCallback(
-    (settlement: Settlement): Promise<Settlement | null> =>
-      new Promise((resolve) => {
-        Alert.alert(WALLET_COPY.cancelRequestTitle, WALLET_COPY.cancelRequestBody, [
-          { text: WALLET_COPY.keepRequest, style: 'cancel', onPress: () => resolve(null) },
-          {
-            text: WALLET_COPY.cancelRequestConfirm,
-            style: 'destructive',
-            onPress: () => {
-              if (inFlight.current) {
-                resolve(null);
-                return;
-              }
-              inFlight.current = true;
-              setCancellingId(settlement.id);
-              walletApi
-                .cancelSettlement(settlement.id)
-                .then((cancelled) => {
-                  toast.success(WALLET_COPY.cancelled);
-                  resolve(cancelled ?? { ...settlement, status: 'cancelled' });
-                })
-                .catch((cause: unknown) => {
-                  const apiError = toApiError(cause);
-                  // 409 SETTLEMENT_NOT_PENDING / 429 carry server text written for people.
-                  const known = apiError.kind === 'conflict' || apiError.kind === 'rate_limited' || apiError.kind === 'not_found';
-                  toast.error(known ? apiError.message : WALLET_COPY.cancelFailed);
-                  resolve(null);
-                })
-                .finally(() => {
-                  inFlight.current = false;
-                  setCancellingId(null);
-                });
-            },
-          },
-        ]);
-      }),
-    [],
-  );
+  const cancel = useCallback(async (settlement: Settlement): Promise<Settlement | null> => {
+    // Themed kit Dialog (UI-R3): destructive confirm, "Keep request" cancels.
+    const confirmed = await confirm({
+      title: WALLET_COPY.cancelRequestTitle,
+      body: WALLET_COPY.cancelRequestBody,
+      confirmLabel: WALLET_COPY.cancelRequestConfirm,
+      cancelLabel: WALLET_COPY.keepRequest,
+      destructive: true,
+    });
+    if (!confirmed || inFlight.current) {
+      return null;
+    }
+    inFlight.current = true;
+    setCancellingId(settlement.id);
+    try {
+      const cancelled = await walletApi.cancelSettlement(settlement.id);
+      toast.success(WALLET_COPY.cancelled);
+      return cancelled ?? { ...settlement, status: 'cancelled' };
+    } catch (cause: unknown) {
+      const apiError = toApiError(cause);
+      // 409 SETTLEMENT_NOT_PENDING / 429 carry server text written for people.
+      const known = apiError.kind === 'conflict' || apiError.kind === 'rate_limited' || apiError.kind === 'not_found';
+      toast.error(known ? apiError.message : WALLET_COPY.cancelFailed);
+      return null;
+    } finally {
+      inFlight.current = false;
+      setCancellingId(null);
+    }
+  }, []);
 
   return { cancel, cancellingId };
 };
