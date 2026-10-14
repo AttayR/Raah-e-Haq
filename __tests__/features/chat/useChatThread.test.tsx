@@ -224,6 +224,50 @@ describe('useChatThread', () => {
     expect(getMessages.mock.calls.some((c) => c[1]?.afterId !== undefined)).toBe(false);
   });
 
+  it('[T-520] 403 CONTACT_CLOSED on send turns the thread read-only (not "forbidden") and reloads', async () => {
+    getMessages
+      .mockResolvedValueOnce(threadPage({ rideStatus: 'completed', contactClosesAt: '2026-10-12T12:00:00+00:00' }))
+      .mockResolvedValue(threadPage({ canSend: false, rideStatus: 'completed', contactClosesAt: '2026-10-12T12:00:00+00:00' }));
+    sendMessage.mockRejectedValueOnce(apiRefusal(403, 'CONTACT_CLOSED', 'forbidden'));
+    const hook = await renderThread(false);
+
+    act(() => {
+      hook.result.current.send('late');
+    });
+    await flush();
+
+    expect(hook.result.current.state.status).toBe('ready');
+    expect(hook.result.current.state.pending[0]).toMatchObject({ status: 'failed', error: 'closed' });
+    expect(hook.result.current.state.meta?.canSend).toBe(false);
+    expect(getMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it('[T-520] 403 CONTACT_CLOSED on the first load ends as closed; on a poll it only closes sending', async () => {
+    getMessages.mockRejectedValueOnce(apiRefusal(403, 'CONTACT_CLOSED', 'forbidden'));
+    const closed = await renderThread();
+    expect(closed.result.current.state.status).toBe('closed');
+    closed.unmount();
+
+    getMessages
+      .mockResolvedValueOnce(threadPage({ messages: [theirs(1)], lastId: 1 }))
+      .mockRejectedValueOnce(apiRefusal(403, 'CONTACT_CLOSED', 'forbidden'));
+    const polled = await renderThread(true);
+    await advance(CHAT_POLL_INTERVAL_MS);
+    expect(polled.result.current.state.status).toBe('ready');
+    expect(polled.result.current.state.messages).toHaveLength(1);
+    expect(polled.result.current.state.meta?.canSend).toBe(false);
+  });
+
+  it('[T-520] keeps polling after the ride ended while sending is still open (30 min window)', async () => {
+    getMessages.mockResolvedValue(
+      threadPage({ rideStatus: 'completed', canSend: true, readOnlyUntil: '2026-10-12T12:00:00+00:00', contactClosesAt: '2026-10-11T12:30:00+00:00' }),
+    );
+    await renderThread(true);
+    const calls = getMessages.mock.calls.length;
+    await advance(CHAT_POLL_INTERVAL_MS);
+    expect(getMessages.mock.calls.length).toBeGreaterThan(calls);
+  });
+
   it('410 chat_expired and 403 not_ride_participant end the thread', async () => {
     getMessages.mockRejectedValueOnce(apiRefusal(410, 'chat_expired', 'unknown'));
     const expired = await renderThread();
@@ -278,6 +322,7 @@ describe('useChatThread', () => {
     expect(sendErrorOf(networkError())).toBe('network');
     expect(sendErrorOf(new ApiError({ kind: 'timeout', message: 't' }))).toBe('network');
     expect(sendErrorOf(apiRefusal(409, 'chat_not_open', 'conflict'))).toBe('not_open');
+    expect(sendErrorOf(apiRefusal(403, 'CONTACT_CLOSED', 'forbidden'))).toBe('closed');
     expect(sendErrorOf(apiRefusal(500, 'x', 'server'))).toBe('unknown');
     expect(sendErrorOf(new Error('x'))).toBe('unknown');
   });

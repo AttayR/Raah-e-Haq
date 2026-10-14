@@ -11,11 +11,22 @@ import { authStorage } from '../../services/authStorage';
 import { withRefusedStatus, type RefusalLike } from '../../core/auth/normalizeUser';
 import type { User } from '../../services/api';
 import { logger } from '../../core/logging/logger';
+import { safetyApi } from '../../features/safety/api';
+import { isRecord, readId } from '../../core/api/read';
 
 /** Injected by the store (thunk extraArgument) so this file never imports the store itself. */
 export interface SessionThunkExtra {
   purgePersistedState: () => Promise<unknown>;
 }
+
+/**
+ * The ride whose live trip link the passenger shared (activeRide.shareLink, T-520), read without
+ * typing the thunk's state, so every dispatcher of `logout` keeps working.
+ */
+export const sharedTripRideIdOf = (state: unknown): number | null => {
+  if (!isRecord(state) || !isRecord(state.activeRide) || !isRecord(state.activeRide.shareLink)) return null;
+  return readId(state.activeRide.shareLink.rideId);
+};
 
 export interface LogoutOptions {
   /** Revoke every token of the user (POST /auth/logout-all) instead of only this device's. */
@@ -39,6 +50,8 @@ const step = async (name: string, fn: () => unknown): Promise<void> => {
 
 /**
  * The one logout (AUTH-09). Always ends signed out, even offline or on a 401:
+ * 0. revoke a live trip link the passenger shared (T-520, BE-80): the next user of this phone
+ *    must not keep someone else's trip public (best effort, needs the token)
  * 1. ask the server to revoke the token (best effort, needs the token, so it goes first),
  *    with this device's push token so it is unregistered too (T-502)
  * 2. stop sockets, location tracking and in-flight requests of this user
@@ -53,13 +66,17 @@ const step = async (name: string, fn: () => unknown): Promise<void> => {
  */
 export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: SessionThunkExtra }>(
   'session/logout',
-  async (options, { dispatch, extra }) => {
+  async (options, { dispatch, extra, getState }) => {
     const allDevices = !!options && options.allDevices === true;
     // Results of requests started before this point belong to the old session (T-103).
     bumpSessionEpoch();
     // This device's FCM token (T-502): sent with the revoke so the server stops pushing to it.
     const deviceToken = getRegisteredDeviceToken();
+    const sharedRideId = sharedTripRideIdOf(getState());
     try {
+      if (sharedRideId !== null) {
+        await step('revoke live trip link', () => safetyApi.stopShare(sharedRideId, LOGOUT_REQUEST_TIMEOUT_MS));
+      }
       await step('server revoke', async () => {
         if (allDevices) {
           // logout-all also removes every device of the user (BE-11).

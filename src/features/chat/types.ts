@@ -34,6 +34,8 @@ export interface ChatSummary {
   canSend: boolean;
   /** Null while the ride is active; else the ISO time the chat disappears. */
   readOnlyUntil: string | null;
+  /** BE-78: when sending (and calling) closes for the caller; null while the ride is active. */
+  contactClosesAt: string | null;
   otherParty: ChatParty | null;
   lastMessage: ChatMessage | null;
   unreadCount: number;
@@ -45,6 +47,8 @@ export interface ChatThreadMeta {
   rideStatus: string;
   canSend: boolean;
   readOnlyUntil: string | null;
+  /** BE-78: sending closes at this time (30 min after the ride ended); null while active. */
+  contactClosesAt: string | null;
   otherParty: ChatParty | null;
   /** Highest id of your messages the other party has read (0 when none). */
   otherPartyReadUpToId: number;

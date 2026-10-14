@@ -51,8 +51,10 @@ const acceptedRide: RideResource = {
   created_at: '2026-10-13T14:02:00+05:00',
   updated_at: '2026-10-13T14:03:00+05:00',
   requested_at: '2026-10-13T14:02:00+05:00',
-  // No phone number in gallery data; the Call action only needs a non-null `phone` prop.
-  passenger: { id: 3, name: 'Ayesha Khan', phone: '', rating: 0 },
+  // No phone numbers anywhere (BE-78); the gallery shows the T-520 PIN card and masked Call.
+  passenger: { id: 3, name: 'Ayesha Khan', rating: 0 },
+  pin: '0427',
+  pin_required: true,
   driver: { id: 7, name: 'Bilal Ahmed', rating: 4.86 },
   vehicle: { id: 2, make: 'Mitsubishi', model: 'Outlander', color: 'Silver Metallic', license_plate: 'LEA-1234' },
 };
@@ -95,7 +97,7 @@ export function DriverRidePreview() {
           ride={acceptedRide}
           step="to_pickup"
           pendingAction={null}
-          phone="call"
+          canCall
           canNavigate
           onCall={noop}
           onMessage={noop}

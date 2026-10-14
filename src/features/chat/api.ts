@@ -19,13 +19,15 @@ import type {
  * - POST /rides/{id}/messages/read {up_to_id}.
  *
  * Refusals (BE-26 envelope, `error.code`): 403 not_ride_participant, 409 chat_not_open (no
- * driver yet) / chat_closed (ride ended), 410 chat_expired, 422 errors.body / errors.client_id,
- * 429 rate_limited (Retry-After).
+ * driver yet), 403 CONTACT_CLOSED (BE-78: sending closes 30 min after the ride ended; it was
+ * 409 chat_closed before, still handled), 410 chat_expired, 422 errors.body / errors.client_id,
+ * 429 rate_limited (Retry-After). Rows and pages carry `contact_closes_at` (BE-78).
  */
 export const CHAT_CODES = {
   notParticipant: 'not_ride_participant',
   notOpen: 'chat_not_open',
   closed: 'chat_closed',
+  contactClosed: 'CONTACT_CLOSED',
   expired: 'chat_expired',
   rateLimited: 'rate_limited',
 } as const;
@@ -99,6 +101,7 @@ export const toChatSummary = (raw: unknown): ChatSummary | null => {
     rideStatus: typeof raw.ride_status === 'string' ? raw.ride_status : '',
     canSend: raw.can_send === true,
     readOnlyUntil: toStringOrNull(raw.read_only_until),
+    contactClosesAt: toStringOrNull(raw.contact_closes_at),
     otherParty: toChatParty(raw.other_party),
     lastMessage: toChatMessage(raw.last_message),
     unreadCount: Math.max(0, toInt(raw.unread_count) ?? 0),
@@ -114,6 +117,7 @@ export const toChatThreadPage = (raw: unknown, rideId: number): ChatThreadPage =
     rideStatus: typeof data.ride_status === 'string' ? data.ride_status : '',
     canSend: data.can_send === true,
     readOnlyUntil: toStringOrNull(data.read_only_until),
+    contactClosesAt: toStringOrNull(data.contact_closes_at),
     otherParty: toChatParty(data.other_party),
     otherPartyReadUpToId: Math.max(0, toInt(data.other_party_read_up_to_id) ?? 0),
     messages,

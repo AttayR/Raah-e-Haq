@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Keyboard, Linking, StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { Alert, AppState, Keyboard, StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { MapPressEvent } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView from '../../components/SafeMapView';
@@ -17,7 +17,6 @@ import LocationSearch, { suggestionAddress } from '../../components/passenger/Lo
 import DualLocationPicker from '../../components/passenger/DualLocationPicker';
 import { NearbyDriverMarkers, NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
-import { getDriverPhone } from '../../services/rideService';
 import { reverseGeocode } from '../../services/placesService';
 import StageChips from '../../components/passenger/StageChips';
 import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
@@ -47,6 +46,10 @@ import { bookingInitialRegion, showLocationWait } from '../../features/ride-book
 import { bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
 import { space } from '../../theme';
 import { displayAddress } from '../../features/passenger-home/greeting';
+import { openRideChat } from '../../features/chat/navigation';
+import { useRideCall } from '../../features/safety/hooks';
+import { canCallOn } from '../../features/safety/rules';
+import { PassengerTripSafety } from '../../features/safety/components/RideSafety';
 
 /** A picked point: coordinates and the address the passenger saw (T-302). */
 type Place = BookingPlace;
@@ -135,14 +138,12 @@ const PassengerMapScreen = () => {
   const { isFollowing: isRideCameraFollowing, ...rideCamera } = usePassengerRideCamera(
     mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation, viewport,
   );
-  // Call button only while the server exposes driver.phone (accepted, still-active ride).
-  const driverPhone = getDriverPhone(currentRide);
-  const callDriver = useCallback(() => {
-    if (!driverPhone) return;
-    Linking.openURL(`tel:${encodeURIComponent(driverPhone)}`).catch(() => {
-      Alert.alert(ACTIVE_RIDE_COPY.callFailedTitle, ACTIVE_RIDE_COPY.callFailedMessage);
-    });
-  }, [driverPhone]);
+  // T-520 (BE-78): a masked call (POST /rides/{id}/call), or the chat when calls are chat only.
+  const rideId = currentRide?.id ?? null;
+  const openChat = useCallback(() => {
+    if (rideId !== null) openRideChat(navigation, rideId);
+  }, [navigation, rideId]);
+  const rideCall = useRideCall(rideId, { onChatOnly: openChat });
 
   // Show the map after a short delay even if onMapReady is slow.
   useEffect(() => {
@@ -661,7 +662,9 @@ const PassengerMapScreen = () => {
               ride={currentRide}
               onCancel={handleCancelRide}
               onDone={finishRide}
-              onCall={driverPhone ? callDriver : undefined}
+              onCall={canCallOn(currentRide) ? rideCall.call : undefined}
+              calling={rideCall.calling}
+              safety={currentRide ? <PassengerTripSafety ride={currentRide} position={currentLocation} /> : null}
               busy={isLoading || rideSubmitting}
             />
           )}

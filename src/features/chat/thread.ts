@@ -25,7 +25,8 @@ export interface PendingMessage {
   error: ChatSendError | null;
 }
 
-export type ChatThreadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'expired';
+/** `closed`: the thread could not be read because contact closed (BE-78 403 CONTACT_CLOSED). */
+export type ChatThreadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'expired' | 'closed';
 
 export interface ChatThreadState {
   status: ChatThreadStatus;
@@ -55,7 +56,7 @@ export type ChatThreadAction =
   | { type: 'loadStarted' }
   | { type: 'loaded'; page: ChatThreadPage }
   | { type: 'loadFailed'; message: string }
-  | { type: 'ended'; status: 'forbidden' | 'expired' }
+  | { type: 'ended'; status: 'forbidden' | 'expired' | 'closed' }
   | { type: 'polled'; page: ChatThreadPage }
   | { type: 'olderStarted' }
   | { type: 'olderLoaded'; page: ChatThreadPage }
@@ -87,6 +88,7 @@ const metaOf = (page: ChatThreadPage, previous: ChatThreadMeta | null): ChatThre
   rideStatus: page.rideStatus,
   canSend: page.canSend,
   readOnlyUntil: page.readOnlyUntil,
+  contactClosesAt: page.contactClosesAt,
   otherParty: page.otherParty ?? previous?.otherParty ?? null,
   // Read receipts only move forward (a stale answer never hides "Seen").
   otherPartyReadUpToId: Math.max(page.otherPartyReadUpToId, previous?.otherPartyReadUpToId ?? 0),

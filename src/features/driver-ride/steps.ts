@@ -107,19 +107,6 @@ export const mapsDirectionsUrl = (target: LatLng, os: string): string => {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
 };
 
-/**
- * The passenger's phone, only while this driver still has the ride (BE-01 sends it to the
- * assigned driver while the ride is active, never after) and only when it looks like a phone
- * number, so `tel:` never gets arbitrary text. Same rules as getDriverPhone.
- */
-export const getPassengerPhone = (ride: RideResource | null | undefined): string | null => {
-  if (!ride || !isRestorableDriverRide(ride)) return null;
-  const phone = ride.passenger?.phone;
-  if (typeof phone !== 'string') return null;
-  const compact = phone.replace(/[\s-]/g, '');
-  return /^\+?[0-9]{7,15}$/.test(compact) ? compact : null;
-};
-
 export interface FareBreakdownSummary {
   base: number | null;
   distance: number | null;

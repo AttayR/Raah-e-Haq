@@ -35,7 +35,7 @@ describe('chatApi', () => {
             last_message: wireMessage(),
             unread_count: 2,
           },
-          { ride_id: 8, ride_status: 'completed', can_send: false, read_only_until: '2026-10-12T12:00:00+00:00', other_party: null, last_message: null, unread_count: 0 },
+          { ride_id: 8, ride_status: 'completed', can_send: false, read_only_until: '2026-10-12T12:00:00+00:00', contact_closes_at: '2026-10-11T12:30:00+00:00', other_party: null, last_message: null, unread_count: 0 },
           { ride_status: 'accepted' },
         ],
       }),
@@ -49,11 +49,12 @@ describe('chatApi', () => {
       rideStatus: 'accepted',
       canSend: true,
       readOnlyUntil: null,
+      contactClosesAt: null,
       otherParty: { id: 12, role: 'driver', firstName: 'Bilal', profileImageUrl: null },
       lastMessage: expect.objectContaining({ id: 41, body: 'On my way', isMine: false, senderRole: 'driver' }),
       unreadCount: 2,
     });
-    expect(chats[1]).toMatchObject({ rideId: 8, canSend: false, otherParty: null, lastMessage: null });
+    expect(chats[1]).toMatchObject({ rideId: 8, canSend: false, contactClosesAt: '2026-10-11T12:30:00+00:00', otherParty: null, lastMessage: null });
   });
 
   it('GET /rides/{id}/messages sends one cursor and the limit, and maps the page', async () => {

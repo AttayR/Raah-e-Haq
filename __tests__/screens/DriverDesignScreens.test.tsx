@@ -152,7 +152,7 @@ describe('DriverDriveScreen (UI-R4)', () => {
   });
 
   it('on a ride: the sheet action is Resume ride, which opens the ride screen (T-413)', async () => {
-    const ride = makeRide({ status: 'accepted', passenger: { id: 9, name: 'Ayesha', phone: '' } });
+    const ride = makeRide({ status: 'accepted', passenger: { id: 9, name: 'Ayesha' } });
     await renderScreen(DriverDriveScreen, { mode: 'dark', driverStatus: 'on_ride' }, ride);
     expect(screen.getByText("You're on a ride")).toBeTruthy();
     expect(screen.queryByTestId('drive-online-toggle')).toBeNull();
@@ -161,7 +161,7 @@ describe('DriverDriveScreen (UI-R4)', () => {
   });
 
   it('[T-519] a completed ride still in the store is not offered as Resume ride', async () => {
-    const ride = makeRide({ status: 'completed', passenger: { id: 9, name: 'Ayesha', phone: '' } });
+    const ride = makeRide({ status: 'completed', passenger: { id: 9, name: 'Ayesha' } });
     await renderScreen(DriverDriveScreen, { driverStatus: 'available' }, ride);
     expect(screen.queryByTestId('drive-resume-ride')).toBeNull();
     expect(screen.getByText('Go offline')).toBeTruthy();

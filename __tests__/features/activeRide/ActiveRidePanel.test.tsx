@@ -70,7 +70,26 @@ describe('ActiveRidePanel', () => {
         ...overrides,
       });
 
-    it('hides Call without a phone handler', () => {
+    it('[T-520] shows the ride PIN with "Share this PIN with your driver" only while the server sends it', () => {
+      const ride = accepted({ pin: '0427', pin_required: true });
+      const { getByTestId, rerender, queryByTestId } = renderPanel(ride, stateOf(ride));
+      expect(getByTestId('ride-pin-card-hint').props.children).toBe('Share this PIN with your driver');
+      const started = accepted({ status: 'started', pin: undefined });
+      rerender(<ActiveRidePanel stageState={stateOf(started)} ride={started} onCancel={jest.fn()} onDone={jest.fn()} />);
+      expect(queryByTestId('ride-pin-card')).toBeNull();
+    });
+
+    it('[T-520] Call waits while the masked call is requested', () => {
+      const ride = accepted();
+      const onCall = jest.fn();
+      const { getByTestId, getByText } = render(
+        <ActiveRidePanel stageState={stateOf(ride)} ride={ride} onCancel={jest.fn()} onDone={jest.fn()} onCall={onCall} calling />,
+      );
+      expect(getByText('Connecting…')).toBeTruthy();
+      expect(getByTestId('driver-call-button').props.accessibilityState).toMatchObject({ disabled: true });
+    });
+
+    it('hides Call without a call handler (no contact.can_call)', () => {
       const ride = accepted();
       const { queryByTestId } = renderPanel(ride, stateOf(ride));
       expect(queryByTestId('driver-call-button')).toBeNull();

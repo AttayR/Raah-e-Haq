@@ -16,6 +16,7 @@ import type { WalletRoutes } from '../../../features/wallet/navigation';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
 import type { SavedPlaceEditorParams } from '../../../features/saved-places/navigation';
 import type { BookingParams } from '../../../features/ride-booking/prefill';
+import type { SafetyRoutes } from '../../../features/safety/navigation';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
@@ -43,6 +44,9 @@ export type PassengerStackParamList = {
   TopUpStatus: WalletRoutes['TopUpStatus'];
   /** Account → Notifications: push preferences (T-502, BE-11). */
   NotificationPreferences: undefined;
+  /** Account → Emergency contacts and its form (T-520, BE-79); the SOS sheet opens it too. */
+  EmergencyContacts: SafetyRoutes['EmergencyContacts'];
+  EmergencyContactEditor: SafetyRoutes['EmergencyContactEditor'];
 };
 
 /*
@@ -58,6 +62,8 @@ const loadTopUpStatusScreen = () => require('../../../features/wallet/screens/To
 const loadRideDetailsScreen = () => require('../../../features/ride-history/screens/RideDetailsScreen').default;
 const loadSavedPlacesScreen = () => require('../../../features/saved-places/screens/SavedPlacesScreen').default;
 const loadSavedPlaceEditorScreen = () => require('../../../features/saved-places/screens/SavedPlaceEditorScreen').default;
+const loadEmergencyContactsScreen = () => require('../../../features/safety/screens/EmergencyContactsScreen').default;
+const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 
@@ -95,6 +101,8 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="TopUpCheckout" getComponent={loadTopUpCheckoutScreen} options={{ gestureEnabled: false }} />
       <Stack.Screen name="TopUpStatus" getComponent={loadTopUpStatusScreen} getId={topUpStatusScreenId} />
       <Stack.Screen name="NotificationPreferences" getComponent={loadNotificationPreferencesScreen} />
+      <Stack.Screen name="EmergencyContacts" getComponent={loadEmergencyContactsScreen} />
+      <Stack.Screen name="EmergencyContactEditor" getComponent={loadEmergencyContactEditorScreen} />
     </Stack.Navigator>
   );
 };

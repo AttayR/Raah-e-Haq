@@ -16,6 +16,11 @@ export type OtpInputProps = {
   error?: string | null;
   disabled?: boolean;
   autoFocus?: boolean;
+  /**
+   * Offer the SMS code autofill (iOS `oneTimeCode`, Android `sms-otp`). Default true; false for a
+   * code that never arrives by SMS (the ride PIN the passenger reads out, T-520).
+   */
+  oneTimeCode?: boolean;
   testID?: string;
 };
 
@@ -36,7 +41,7 @@ export const sanitizeOtp = (text: string, length: number = k.length): string =>
  * field: "Verification code, 6 digits".
  */
 export const OtpInput = forwardRef<TextInput, OtpInputProps>(function OtpInput(
-  { value, onChange, onComplete, length = k.length, label, error, disabled = false, autoFocus = false, testID },
+  { value, onChange, onComplete, length = k.length, label, error, disabled = false, autoFocus = false, oneTimeCode = true, testID },
   ref,
 ) {
   const { theme } = useAppTheme();
@@ -91,8 +96,8 @@ export const OtpInput = forwardRef<TextInput, OtpInputProps>(function OtpInput(
           editable={!disabled}
           autoFocus={autoFocus}
           keyboardType="number-pad"
-          textContentType="oneTimeCode"
-          autoComplete={'sms-otp'}
+          textContentType={oneTimeCode ? 'oneTimeCode' : 'none'}
+          autoComplete={oneTimeCode ? 'sms-otp' : 'off'}
           caretHidden
           contextMenuHidden={false}
           selectTextOnFocus={false}

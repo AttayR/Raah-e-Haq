@@ -73,6 +73,5 @@ export const DRIVER_RIDE_COPY = {
   notNearPickup: 'You are not at the pickup yet.',
   /** Appended to the not-near-pickup message; `{m}` is the server's distance in metres. */
   aboutAway: 'About {m} m away.',
-  callFailed: 'Could not start a call on this device.',
   navigateFailed: 'Could not open the maps app.',
 } as const;

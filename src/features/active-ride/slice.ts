@@ -26,6 +26,17 @@ export interface ActiveRideState {
   isRefreshing: boolean;
   /** Display-safe message of the last failed create/cancel. */
   error: string | null;
+  /**
+   * T-520 (BE-80): the live trip link the passenger shared for `rideId`, kept here so it survives
+   * the trip panel remounting, and so logout can revoke it. Never persisted, never logged.
+   */
+  shareLink: ActiveRideShareLink | null;
+}
+
+export interface ActiveRideShareLink {
+  rideId: number;
+  url: string;
+  expiresAt: string | null;
 }
 
 export const initialActiveRideState: ActiveRideState = {
@@ -34,6 +45,7 @@ export const initialActiveRideState: ActiveRideState = {
   isSubmitting: false,
   isRefreshing: false,
   error: null,
+  shareLink: null,
 };
 
 /**
@@ -124,6 +136,16 @@ const activeRideSlice = createSlice({
     clearActiveRide: (state) => {
       state.ride = null;
       state.error = null;
+      // The ride is over: its link stops 15 min after the end on its own (BE-80).
+      state.shareLink = null;
+    },
+    /** POST /rides/{id}/share answered with the live link. */
+    liveShareStarted: (state, action: PayloadAction<ActiveRideShareLink>) => {
+      state.shareLink = action.payload;
+    },
+    /** DELETE /rides/{id}/share succeeded (or the link is gone): only that ride's link is dropped. */
+    liveShareStopped: (state, action: PayloadAction<number>) => {
+      if (state.shareLink?.rideId === action.payload) state.shareLink = null;
     },
     /**
      * T-505: the rating answer (or the re-read after a 409) for the ride on screen. The completed
@@ -204,7 +226,11 @@ const activeRideSlice = createSlice({
   },
 });
 
-export const { clearActiveRide, activeRideRatingChanged } = activeRideSlice.actions;
+export const { clearActiveRide, activeRideRatingChanged, liveShareStarted, liveShareStopped } = activeRideSlice.actions;
+
+/** The live trip link of `rideId`, or null (another ride's link is never shown). */
+export const selectLiveShareLink = (state: SliceRoot, rideId: number | null): ActiveRideShareLink | null =>
+  rideId !== null && state.activeRide.shareLink?.rideId === rideId ? state.activeRide.shareLink : null;
 
 export const selectActiveRide = (state: SliceRoot): RideResource | null => state.activeRide.ride;
 export const selectActiveRideRestoreStatus = (state: SliceRoot): ActiveRideRestoreStatus =>

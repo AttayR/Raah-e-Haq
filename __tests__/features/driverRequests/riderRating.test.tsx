@@ -56,7 +56,7 @@ describe('driver ride panel', () => {
         ride={makeRide({ id: 41, status: 'accepted', passenger })}
         step="to_pickup"
         pendingAction={null}
-        phone={null}
+        canCall={false}
         canNavigate={false}
         onCall={noop}
         onNavigate={noop}
@@ -69,13 +69,13 @@ describe('driver ride panel', () => {
     );
 
   it('says "New rider" for an unrated passenger, not 0.0', () => {
-    const { getByText, queryByText } = renderPanel({ id: 9, name: 'Ayesha', phone: '+923000000000', rating: 0 });
+    const { getByText, queryByText } = renderPanel({ id: 9, name: 'Ayesha', rating: 0 });
     getByText('New rider');
     expect(queryByText('0.0')).toBeNull();
   });
 
   it('shows a real rating with one decimal', () => {
-    const { getByText, queryByText } = renderPanel({ id: 9, name: 'Ayesha', phone: '+923000000000', rating: 4.8 });
+    const { getByText, queryByText } = renderPanel({ id: 9, name: 'Ayesha', rating: 4.8 });
     getByText('4.8');
     expect(queryByText('New rider')).toBeNull();
   });

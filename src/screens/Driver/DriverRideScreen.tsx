@@ -24,9 +24,11 @@ import {
   useDriverRideFlow,
   useDriverRideStatusPolling,
 } from '../../features/driver-ride/hooks';
+import { useDriverRideSafety } from '../../features/safety/useDriverRideSafety';
+import { PinEntrySheet } from '../../features/safety/components/PinEntrySheet';
+import { DriverRideSafetyButton } from '../../features/safety/components/RideSafety';
 import {
   activeStops,
-  getPassengerPhone,
   mapsDirectionsUrl,
   navigationTarget,
   toLatLng,
@@ -64,7 +66,6 @@ const DriverRideScreen: React.FC = () => {
   const position = useDriverDevicePosition();
 
   const target = navigationTarget(ride);
-  const phone = getPassengerPhone(ride);
   const pickup = ride ? toLatLng(ride.pickup_latitude, ride.pickup_longitude) : null;
   const dropoff = ride ? toLatLng(ride.dropoff_latitude, ride.dropoff_longitude) : null;
   const region = target?.coordinate ?? pickup;
@@ -123,15 +124,19 @@ const DriverRideScreen: React.FC = () => {
     if (navigation.canGoBack()) navigation.goBack();
   }, [finished, flow, navigation]);
 
-  const onCall = useCallback(() => {
-    if (!phone) return;
-    Linking.openURL(`tel:${encodeURIComponent(phone)}`).catch(() => toast.error(COPY.callFailed, undefined, DRIVER_RIDE_TOAST_OPTIONS));
-  }, [phone]);
-
   const rideId = ride?.id;
   const onMessage = useCallback(() => {
     if (rideId !== undefined) openRideChat(navigation, rideId);
   }, [navigation, rideId]);
+  // T-520: masked call (BE-78) and the start PIN (BE-81).
+  const safety = useDriverRideSafety({
+    ride,
+    step,
+    starting: pendingAction === 'start',
+    start: flow.start,
+    onMessage,
+    toast: DRIVER_RIDE_TOAST_OPTIONS,
+  });
 
   const onNavigate = useCallback(() => {
     if (!target) return;
@@ -223,8 +228,15 @@ const DriverRideScreen: React.FC = () => {
           <Icon name="arrow-back" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
 
+        <DriverRideSafetyButton
+          ride={ride}
+          position={position}
+          size={theme.layout.touchTargetDriving}
+          style={[styles.recentre, { top: insets.top + theme.space[2] }]}
+        />
+
         {camera.paused && target ? (
-          <View style={[styles.recentre, { top: insets.top + theme.space[2] }]}>
+          <View style={[styles.recentre, { top: insets.top + theme.space[4] + theme.layout.touchTargetDriving }]}>
             <IconButton
               icon="locate"
               variant="floating"
@@ -260,13 +272,11 @@ const DriverRideScreen: React.FC = () => {
               ride={ride}
               step={step}
               pendingAction={pendingAction}
-              phone={phone}
+              {...safety.panel}
               canNavigate={target !== null}
-              onCall={onCall}
               onMessage={onMessage}
               onNavigate={onNavigate}
               onArrived={flow.arrived}
-              onStart={flow.start}
               onComplete={flow.complete}
               onCompleteStop={flow.completeStop}
               onCancel={() => setCancelOpen(true)}
@@ -277,6 +287,8 @@ const DriverRideScreen: React.FC = () => {
 
         {/* T-505: rate the passenger over the trip summary after Complete trip. */}
         <DriverRideRatingPrompt active={isFocused && step === 'summary'} />
+
+        <PinEntrySheet {...safety.pinSheet} />
 
         <CancelReasonSheet
           visible={cancelOpen}

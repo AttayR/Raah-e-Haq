@@ -2,7 +2,6 @@ import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Linking,
   Platform,
   StyleSheet,
   View,
@@ -14,13 +13,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Button, Icon, Screen } from '../../../components/ui';
 import { layout, space } from '../../../theme';
-import { toast } from '../../../core/toast';
 import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { useAppIsActive } from '../../driver-requests/hooks';
 import { selectActiveRide, type ActiveRideState } from '../../active-ride/slice';
 import { selectDriverActiveRide, type DriverRideState } from '../../driver-ride/slice';
-import { getPassengerPhone } from '../../driver-ride/steps';
-import { getDriverPhone } from '../../../services/rideService';
+import { useRideCall } from '../../safety/hooks';
+import { canCallOn } from '../../safety/rules';
 import { ChatComposer } from '../components/ChatComposer';
 import { ChatThreadHeader } from '../components/ChatThreadHeader';
 import { MessageBubble } from '../components/MessageBubble';
@@ -29,19 +27,19 @@ import { useChatThread } from '../hooks';
 import type { RideChatParams } from '../navigation';
 import { seenMessageId, threadItemsNewestFirst, type ChatThreadState, type ThreadItem } from '../thread';
 
-type PhoneRoot = { activeRide: ActiveRideState; driverRide: DriverRideState };
+type RideRoot = { activeRide: ActiveRideState; driverRide: DriverRideState };
 
 /**
- * The other party's phone for Call, only from this ride while it is active: the driver's on
- * the passenger's active ride, the passenger's on the driver's current ride (BE-20). The chat
- * API itself never carries a phone number. Never logged.
+ * Whether Call is offered: the ride this thread belongs to (the passenger's active ride or the
+ * driver's current one) says `contact.can_call` (BE-78). No phone number is ever involved: the
+ * call goes through POST /rides/{id}/call (a masked proxy number).
  */
-const useRidePhone = (rideId: number): string | null => {
-  const passengerRide = useSelector((s: PhoneRoot) => selectActiveRide(s));
-  const driverRide = useSelector((s: PhoneRoot) => selectDriverActiveRide(s));
-  if (driverRide?.id === rideId) return getPassengerPhone(driverRide);
-  if (passengerRide?.id === rideId) return getDriverPhone(passengerRide);
-  return null;
+const useCanCall = (rideId: number): boolean => {
+  const passengerRide = useSelector((s: RideRoot) => selectActiveRide(s));
+  const driverRide = useSelector((s: RideRoot) => selectDriverActiveRide(s));
+  if (driverRide?.id === rideId) return canCallOn(driverRide);
+  if (passengerRide?.id === rideId) return canCallOn(passengerRide);
+  return false;
 };
 
 /** Why the composer is hidden, as one line under the messages. */
@@ -52,7 +50,7 @@ const closedNoticeOf = (state: ChatThreadState): string => {
     return time ? CHAT_COPY.closedUntil(time) : CHAT_COPY.closedNotice;
   }
   if (meta && !meta.otherParty) return CHAT_COPY.notOpenNotice;
-  if (meta && ['completed', 'cancelled'].includes(meta.rideStatus)) return CHAT_COPY.closedNotice;
+  if (meta && (meta.contactClosesAt || ['completed', 'cancelled'].includes(meta.rideStatus))) return CHAT_COPY.closedNotice;
   return CHAT_COPY.cannotSendNotice;
 };
 
@@ -70,7 +68,9 @@ const ChatThreadScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const appActive = useAppIsActive();
   const { state, reload, loadOlder, send, retry } = useChatThread(rideId, isFocused && appActive);
-  const phone = useRidePhone(rideId);
+  const canCall = useCanCall(rideId);
+  // T-520: a masked call; when calls are chat only the user is already here, so only the note.
+  const rideCall = useRideCall(rideId);
 
   const party = state.meta?.otherParty ?? null;
   const name = party?.firstName ?? fallbackNameOf(party?.role);
@@ -81,11 +81,6 @@ const ChatThreadScreen: React.FC = () => {
   const goBack = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
-
-  const onCall = useCallback(() => {
-    if (!phone) return;
-    Linking.openURL(`tel:${encodeURIComponent(phone)}`).catch(() => toast.error(CHAT_COPY.callFailed));
-  }, [phone]);
 
   const renderItem: ListRenderItem<ThreadItem> = useCallback(
     ({ item }) => (
@@ -100,7 +95,7 @@ const ChatThreadScreen: React.FC = () => {
       subtitle={party ? roleLabelOf(party.role) : ''}
       photoUrl={party?.profileImageUrl ?? null}
       onBack={goBack}
-      onCall={phone && state.meta?.canSend ? onCall : undefined}
+      onCall={canCall && state.meta?.canSend && !rideCall.calling ? rideCall.call : undefined}
     />
   );
 
@@ -115,20 +110,16 @@ const ChatThreadScreen: React.FC = () => {
             <>
               <Icon name={state.status === 'error' ? 'warning' : 'lock'} size={48} color="textMuted" />
               <AppText variant="title" align="center">
-                {state.status === 'error'
-                  ? CHAT_COPY.threadError
-                  : state.status === 'expired'
-                    ? CHAT_COPY.threadExpired
-                    : CHAT_COPY.threadForbidden}
+                {STATUS_TITLES[state.status]}
               </AppText>
               {state.status === 'error' && state.errorMessage ? (
                 <AppText variant="bodySmall" color="textSecondary" align="center">
                   {state.errorMessage}
                 </AppText>
               ) : null}
-              {state.status === 'expired' ? (
+              {state.status === 'expired' || state.status === 'closed' ? (
                 <AppText variant="bodySmall" color="textSecondary" align="center">
-                  {CHAT_COPY.threadExpiredBody}
+                  {state.status === 'expired' ? CHAT_COPY.threadExpiredBody : CHAT_COPY.threadClosedBody}
                 </AppText>
               ) : null}
               {state.status === 'error' ? (
@@ -144,6 +135,8 @@ const ChatThreadScreen: React.FC = () => {
   }
 
   const canSend = state.meta?.canSend === true;
+  // BE-78: after the ride ended both sides may still write for 30 min; say until when.
+  const closesAt = canSend && state.meta?.contactClosesAt ? formatChatDayTime(state.meta.contactClosesAt) : '';
 
   return (
     // Screen's keyboard avoidance (top-inset offset, T-512) keeps the composer above the keyboard.
@@ -176,6 +169,11 @@ const ChatThreadScreen: React.FC = () => {
         }
         testID="chat-thread-list"
       />
+      {closesAt ? (
+        <AppText variant="caption" color="textSecondary" align="center" style={styles.closesAt} testID="chat-closes-at">
+          {CHAT_COPY.closesAt(closesAt)}
+        </AppText>
+      ) : null}
       {canSend ? (
         <ChatComposer onSend={send} bottomInset={bottomInset} />
       ) : (
@@ -197,7 +195,15 @@ const ChatThreadScreen: React.FC = () => {
   );
 };
 
+const STATUS_TITLES: Record<Exclude<ChatThreadState['status'], 'ready' | 'loading'>, string> = {
+  error: CHAT_COPY.threadError,
+  expired: CHAT_COPY.threadExpired,
+  closed: CHAT_COPY.threadClosed,
+  forbidden: CHAT_COPY.threadForbidden,
+};
+
 const styles = StyleSheet.create({
+  closesAt: { paddingHorizontal: layout.gutter, paddingVertical: space[1] },
   fill: { flex: 1 },
   centered: {
     flex: 1,

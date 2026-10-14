@@ -18,6 +18,9 @@ import { ACTIVE_RIDE_COPY } from '../copy';
 import { DRIVER_LOCATION_POLL_MS } from '../hooks';
 import { CHAT_COPY } from '../../chat/copy';
 import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
+import { t } from '../../../i18n';
+import { RidePinCard } from '../../safety/components/RidePinCard';
+import { ridePinOf } from '../../safety/rules';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -71,7 +74,12 @@ type Props = {
   ride: RideResource | null;
   onCancel: () => void;
   onDone: () => void;
+  /** A masked call (T-520, BE-78 `contact.can_call`); no Call action without it. */
   onCall?: () => void;
+  /** POST /rides/{id}/call is in flight. */
+  calling?: boolean;
+  /** The trip's safety row (SOS, share live trip, T-520), under the driver card. */
+  safety?: React.ReactNode;
   /** POST /rides or the cancel is in flight. */
   busy?: boolean;
 };
@@ -81,7 +89,7 @@ type Props = {
  * (RideProgress, PersonCard with Call/Message, FareBreakdown). The full trip-sheet redesign is
  * UI-R12.
  */
-const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, onCall, busy = false }) => {
+const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, onCall, calling = false, safety, busy = false }) => {
   // Read from context (not useNavigation, which throws outside a navigator): without one there is
   // simply no Message action.
   const navigation: RideChatNavigator | undefined = useContext(NavigationContext);
@@ -94,9 +102,19 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const step = STAGE_STEP[stage] ?? (ride ? rideProgressStep(ride.status) : null);
 
   const driver = hasDriver && ride ? driverCardOf(ride) : null;
+  // BE-81: the start PIN, only while the server sends it (accepted / arrived).
+  const pin = driver ? ridePinOf(ride) : null;
   const actions: PersonAction[] = [];
   if (driver && onCall) {
-    actions.push({ key: 'call', icon: 'phone', label: ACTIVE_RIDE_COPY.call, onPress: onCall, testID: 'driver-call-button' });
+    actions.push({
+      key: 'call',
+      icon: 'phone',
+      label: calling ? t('safety.calling') : ACTIVE_RIDE_COPY.call,
+      accessibilityHint: t('safety.callA11yHint'),
+      onPress: onCall,
+      disabled: calling,
+      testID: 'driver-call-button',
+    });
   }
   if (driver && ride && navigation) {
     actions.push({
@@ -141,6 +159,10 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           plateTestID="driver-plate"
         />
       ) : null}
+
+      {pin ? <RidePinCard pin={pin} /> : null}
+
+      {safety}
 
       {fare ? (
         <FareBreakdown

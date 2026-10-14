@@ -144,7 +144,7 @@ describe('useDriverRideFlow', () => {
 
     let ok = true;
     await act(async () => {
-      ok = await result.current.start();
+      ok = (await result.current.start()).ok;
     });
 
     expect(ok).toBe(false);

@@ -10,6 +10,7 @@ import { DRIVER_LOCATION_CONFIG } from '../driver-location/config';
 import { DRIVER_RIDE_CODES, driverRideApi, runTransition, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
 import { isRestorableDriverRide } from './steps';
+import { PIN_CODES } from '../safety/pin';
 
 /**
  * The ride the signed-in driver is on (T-404/T-405): the one source of truth for the driver
@@ -56,7 +57,9 @@ const runGuarded = async <Rejected>(
 };
 
 export type AdvanceDriverRideArg =
-  | { rideId: number; action: DriverRideTransition }
+  | { rideId: number; action: Exclude<DriverRideTransition, 'start'> }
+  /** BE-81: `pin` while the ride says `pin_required`. */
+  | { rideId: number; action: 'start'; pin?: string }
   | { rideId: number; action: 'stop'; stopId: number };
 
 /**
@@ -79,7 +82,7 @@ export const advanceDriverRide = createAsyncThunk<RideResource, AdvanceDriverRid
         if (arg.action === 'arrived') {
           await locationTrackingService.pingIfStale(DRIVER_LOCATION_CONFIG.arrivalPingMaxAgeMs);
         }
-        return runTransition(arg.rideId, arg.action);
+        return runTransition(arg.rideId, arg.action, arg.action === 'start' ? arg.pin : undefined);
       },
       rejectWithValue,
       DRIVER_RIDE_COPY.actionFailed,
@@ -212,6 +215,9 @@ const driverRideSlice = createSlice({
           const rideId = typeof arg === 'number' ? arg : arg.rideId;
           if (isCurrent(state, rideId) && lostRide(payload, refreshDriverRide.rejected.match(action))) {
             state.ride = null;
+          } else if (state.ride && isCurrent(state, rideId) && payload?.code === PIN_CODES.blocked) {
+            // BE-81: the start is blocked until an admin clears it; no PIN entry is offered.
+            state.ride.pin_blocked = true;
           }
         },
       );

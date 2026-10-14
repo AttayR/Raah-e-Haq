@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { AddressPair, AppText, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
+import { AddressPair, AppText, Banner, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
 import { space } from '../../theme';
 import type { RideResource } from '../../services/rideService';
 import { firstNameOf } from '../../utils/format';
@@ -9,13 +9,19 @@ import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverRideAction } from '../../features/driver-ride/slice';
 import { activeStops, type DriverRideStep } from '../../features/driver-ride/steps';
 import { riderRating } from '../../features/driver-requests/rating';
+import { t } from '../../i18n';
 
 type Props = {
   ride: RideResource;
   step: DriverRideStep;
   pendingAction: DriverRideAction | null;
-  /** The validated passenger phone, or null (no call button). */
-  phone: string | null;
+  /** BE-78 `contact.can_call`: a masked call is possible (no phone number is ever shown). */
+  canCall: boolean;
+  /** POST /rides/{id}/call is in flight. */
+  calling?: boolean;
+  /** BE-81 `pin_blocked`: no Start trip, only "Contact support". */
+  startBlocked?: boolean;
+  onContactSupport?: () => void;
   /** True when there is somewhere to navigate to (a usable coordinate). */
   canNavigate: boolean;
   onCall: () => void;
@@ -49,7 +55,10 @@ export const DriverRidePanel: React.FC<Props> = ({
   ride,
   step,
   pendingAction,
-  phone,
+  canCall,
+  calling = false,
+  startBlocked = false,
+  onContactSupport,
   canNavigate,
   onCall,
   onMessage,
@@ -70,7 +79,7 @@ export const DriverRidePanel: React.FC<Props> = ({
 
   let primary: { label: string; onPress: () => void; testID: string } | null = null;
   if (step === 'to_pickup') primary = { label: COPY.arrived, onPress: onArrived, testID: 'driver-ride-arrived' };
-  if (step === 'at_pickup') primary = { label: COPY.start, onPress: onStart, testID: 'driver-ride-start' };
+  if (step === 'at_pickup' && !startBlocked) primary = { label: COPY.start, onPress: onStart, testID: 'driver-ride-start' };
   if (step === 'on_trip') {
     primary = nextStop
       ? { label: COPY.completeStop, onPress: () => onCompleteStop(nextStop.id), testID: 'driver-ride-complete-stop' }
@@ -78,7 +87,18 @@ export const DriverRidePanel: React.FC<Props> = ({
   }
 
   const actions: PersonAction[] = [];
-  if (phone) actions.push({ key: 'call', icon: 'phone', label: COPY.call, accessibilityLabel: COPY.callA11y, onPress: onCall, testID: 'driver-ride-call' });
+  if (canCall) {
+    actions.push({
+      key: 'call',
+      icon: 'phone',
+      label: calling ? t('safety.calling') : COPY.call,
+      accessibilityLabel: COPY.callA11y,
+      accessibilityHint: t('safety.callA11yHint'),
+      onPress: onCall,
+      disabled: calling,
+      testID: 'driver-ride-call',
+    });
+  }
   if (onMessage) {
     actions.push({ key: 'message', icon: 'chat', label: COPY.message, accessibilityLabel: COPY.messageA11y, onPress: onMessage, testID: 'driver-ride-message' });
   }
@@ -87,7 +107,8 @@ export const DriverRidePanel: React.FC<Props> = ({
   }
 
   const cancellable = step === 'to_pickup' || step === 'at_pickup';
-  const hasFooter = !!primary || cancellable;
+  const blockedNotice = step === 'at_pickup' && startBlocked;
+  const hasFooter = !!primary || cancellable || blockedNotice;
   const footerPad = { paddingBottom: bottomInset + space[4] };
 
   return (
@@ -139,6 +160,16 @@ export const DriverRidePanel: React.FC<Props> = ({
 
       {hasFooter ? (
         <View style={[styles.footer, footerPad, { borderTopColor: theme.colors.border }]} testID="driver-ride-footer">
+          {blockedNotice ? (
+            <Banner
+              tone="danger"
+              icon="lock"
+              title={t('safety.pinBlockedTitle')}
+              text={t('safety.pinBlockedBody')}
+              action={onContactSupport ? { label: t('safety.contactSupport'), onPress: onContactSupport, testID: 'driver-ride-support' } : undefined}
+              testID="driver-ride-pin-blocked"
+            />
+          ) : null}
           {primary ? (
             <Button
               label={primary.label}

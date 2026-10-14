@@ -80,21 +80,17 @@ export interface RideResource {
   estimated_arrival?: string;
   created_at: string;
   updated_at: string;
+  /** BE-78: never a phone number (calls go through POST /rides/{id}/call). */
   passenger?: {
     id: number;
     name: string;
-    phone: string;
     /** BE-07: null until the passenger has 3 ratings (show "New"). */
     rating?: number | null;
   };
-  /**
-   * Non-admin viewers get a minimal card (BE-20). `phone` is present only for the passenger of
-   * an accepted, still-active ride (and for the driver themselves); use getDriverPhone().
-   */
+  /** Non-admin viewers get a minimal card (BE-20); BE-78: never a phone number. */
   driver?: {
     id: number;
     name: string;
-    phone?: string | null;
     profile_image_url?: string | null;
     /** BE-07: null until the driver has 3 ratings (show "New"). */
     rating?: number | null;
@@ -125,6 +121,25 @@ export interface RideResource {
   my_rating?: RideMyRating | null;
   /** BE-07: the caller may still rate this ride (completed, within the window, not rated yet). */
   can_rate?: boolean;
+  /**
+   * BE-78: what the caller may do to reach the other party (null for anyone but the ride's
+   * passenger and assigned driver). Read it with features/safety/contact rideContactOf.
+   */
+  contact?: RideContactWire | null;
+  /** BE-81: the 4-digit start PIN, for the passenger only, while accepted/arrived and required. */
+  pin?: string;
+  /** BE-81: the driver's start needs the PIN now. */
+  pin_required?: boolean;
+  /** BE-81: the start is blocked until an admin clears it (the driver contacts support). */
+  pin_blocked?: boolean;
+}
+
+/** RideResource.contact as the server sends it (BE-78). */
+export interface RideContactWire {
+  can_chat?: boolean;
+  can_call?: boolean;
+  call_mode?: string;
+  closes_at?: string | null;
 }
 
 /** RideResource.my_rating (BE-07). */
@@ -263,25 +278,11 @@ export interface NearbyDriversQuery {
   vehicleType?: NearbyVehicleType;
 }
 
-/** Ride statuses during which the passenger may see the driver's phone and position (BE-20). */
+/** Ride statuses during which the passenger may see the driver's position (BE-20). */
 export const ACTIVE_RIDE_STATUSES: ReadonlyArray<string> = ['accepted', 'arrived', 'started', 'ongoing'];
 
 export const isRideActive = (ride: Pick<RideResource, 'status'> | null | undefined): boolean =>
   !!ride && ACTIVE_RIDE_STATUSES.includes(ride.status);
-
-/**
- * The driver's phone for the Call button: only from `ride.driver.phone`, which the server
- * includes only while the ride is active (BE-20). Spaces and dashes are removed; anything
- * that is not 7-15 digits with an optional leading + is rejected. Null hides the button.
- */
-export const getDriverPhone = (ride: RideResource | null | undefined): string | null => {
-  if (!ride || !isRideActive(ride)) return null;
-  const phone = ride.driver?.phone;
-  if (typeof phone !== 'string') return null;
-  // Digits with an optional leading +, so a tel: link can't carry dial codes (; , # * etc.).
-  const compact = phone.replace(/[\s-]/g, '');
-  return /^\+?[0-9]{7,15}$/.test(compact) ? compact : null;
-};
 
 const toNumber = (value: unknown): number | null => {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;

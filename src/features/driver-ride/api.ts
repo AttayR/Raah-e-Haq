@@ -4,7 +4,7 @@ import type { RideResource } from '../../services/rideService';
 /**
  * The assigned driver's ride lifecycle (T-405, BE-04, docs/api/CONTRACT_NOTES.md).
  *
- * - GET /rides/{id}: the ride (the driver sees the passenger's phone while the ride is active).
+ * - GET /rides/{id}: the ride (never a phone number, BE-78; `pin_required` / `pin_blocked`, BE-81).
  * - POST /rides/{id}/arrived (accepted → arrived), /start (arrived → started) and /complete
  *   (started → completed). No body: the server computes the fare, distance, duration and
  *   driver earnings on complete (cash is marked paid). 200 `data: RideResource`.
@@ -17,6 +17,9 @@ import type { RideResource } from '../../services/rideService';
  * - 422 `not_near_pickup` from /arrived (BE-64): the driver's latest location ping is farther
  *   than the server's radius from pickup; `error.distance_m` / `error.radius_m` say how far.
  *   The ride stays `accepted`.
+ *
+ * - BE-81: /start takes `{pin: "0427"}` (a string) while the ride says `pin_required`; the PIN
+ *   refusals (PIN_REQUIRED, PIN_INVALID, PIN_LOCKED, PIN_BLOCKED) are read by features/safety/pin.
  *
  * Refusals: 403 NOT_ASSIGNED_DRIVER / DRIVER_NOT_ACTIVE; 409 INVALID_STATUS_TRANSITION or
  * RIDE_CANNOT_BE_CANCELLED (with `error.current_status`), 409 RIDE_NOT_ACTIVE /
@@ -50,8 +53,11 @@ export const driverRideApi = {
     return unwrap(await apiService.post<RideResource>(`/rides/${rideId}/arrived`));
   },
 
-  async start(rideId: number): Promise<RideResource> {
-    return unwrap(await apiService.post<RideResource>(`/rides/${rideId}/start`));
+  /** `pin` only when the ride needs it (BE-81); always sent as a string of digits. */
+  async start(rideId: number, pin?: string): Promise<RideResource> {
+    return unwrap(
+      await apiService.post<RideResource>(`/rides/${rideId}/start`, pin === undefined ? undefined : { pin: String(pin) }),
+    );
   },
 
   /** No body: the fare is the server's (DRV-05). */
@@ -69,6 +75,6 @@ export const driverRideApi = {
   },
 };
 
-/** The transition's endpoint call. */
-export const runTransition = (rideId: number, transition: DriverRideTransition): Promise<RideResource> =>
-  driverRideApi[transition](rideId);
+/** The transition's endpoint call (`pin` is used by `start` only). */
+export const runTransition = (rideId: number, transition: DriverRideTransition, pin?: string): Promise<RideResource> =>
+  transition === 'start' ? driverRideApi.start(rideId, pin) : driverRideApi[transition](rideId);

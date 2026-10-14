@@ -94,6 +94,13 @@ const DriverSettingsScreen = () => {
               testID="driver-settings-ride-history"
             />
             <ListItem
+              icon="contacts"
+              title={t('safety.contactsRow')}
+              subtitle={t('safety.contactsRowSubtitle')}
+              onPress={() => navigation.navigate('EmergencyContacts')}
+              testID="driver-settings-emergency-contacts"
+            />
+            <ListItem
               icon="bell"
               title={DRIVER_SETTINGS_COPY.notifications}
               subtitle={DRIVER_SETTINGS_COPY.notificationsSubtitle}

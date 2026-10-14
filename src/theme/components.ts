@@ -192,6 +192,8 @@ export const componentTokens = {
   },
   /** §9 [v1.1] map floating controls: at most two, locate rides 16 above the sheet. */
   mapControls: { sheetGap: space[4], edge: space[4] },
+  /** T-520 safety: the SOS sheet's round badge and the passenger's PIN digit tiles. */
+  safety: { sheetBadge: 56, sheetBadgeGlyph: 28, pinDigitWidth: 36, pinDigitHeight: 48 },
 } as const;
 
 export type ComponentTokens = typeof componentTokens;

@@ -36,6 +36,4 @@ export const ACTIVE_RIDE_COPY = {
   cancelConfirmMessage: 'Are you sure you want to cancel this ride?',
   keepRide: 'Keep Ride',
   cancelFailedTitle: 'Error',
-  callFailedTitle: 'Unable to call',
-  callFailedMessage: 'Your device could not start the call.',
 } as const;

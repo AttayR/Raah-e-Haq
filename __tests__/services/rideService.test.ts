@@ -4,7 +4,7 @@
  */
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../src/services/api';
-import rideService, { getDriverPhone, RideResource } from '../../src/services/rideService';
+import rideService, { RideResource } from '../../src/services/rideService';
 import { ApiError } from '../../src/core/api/errors';
 
 const ride = {
@@ -316,25 +316,5 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
   it('getDriverLocationForRide still throws other failures', async () => {
     mock.onGet('/rides/42/driver-location').networkError();
     await expect(rideService.getDriverLocationForRide(ride)).rejects.toMatchObject({ kind: 'network' });
-  });
-
-  it('getDriverPhone: ride.driver.phone only while the ride is active', () => {
-    const withPhone = { ...ride, driver: { id: 9, name: 'D', phone: '+923001234567' } };
-    expect(getDriverPhone(withPhone)).toBe('+923001234567');
-    expect(getDriverPhone({ ...withPhone, status: 'arrived' })).toBe('+923001234567');
-    expect(getDriverPhone({ ...withPhone, status: 'completed' })).toBeNull();
-    expect(getDriverPhone({ ...withPhone, status: 'requested' })).toBeNull();
-    expect(getDriverPhone({ ...ride, driver: { id: 9, name: 'D' } })).toBeNull();
-    expect(getDriverPhone({ ...ride, driver: { id: 9, name: 'D', phone: ' ' } })).toBeNull();
-    expect(getDriverPhone(null)).toBeNull();
-  });
-
-  it('getDriverPhone strips spaces and dashes and rejects anything that is not a plain number', () => {
-    const withPhone = (phone: string) => ({ ...ride, driver: { id: 9, name: 'D', phone } });
-    expect(getDriverPhone(withPhone('+92 300-123 4567'))).toBe('+923001234567');
-    expect(getDriverPhone(withPhone('03001234567'))).toBe('03001234567');
-    for (const bad of ['+923001234567;ext=1', '+923001234567,1', '*123#', '+92300#1234567', '12345', '+1234567890123456', '+92 300 abc 4567']) {
-      expect(getDriverPhone(withPhone(bad))).toBeNull();
-    }
   });
 });

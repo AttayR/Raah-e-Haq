@@ -38,6 +38,7 @@ export const threadPage = (overrides: Partial<ChatThreadPage> = {}): ChatThreadP
   rideStatus: 'accepted',
   canSend: true,
   readOnlyUntil: null,
+  contactClosesAt: null,
   otherParty: { id: 12, role: 'driver', firstName: 'Bilal', profileImageUrl: null },
   otherPartyReadUpToId: 0,
   messages: [],

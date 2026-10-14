@@ -14,6 +14,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { ApiError } from '../../../src/core/api/errors';
 import { chatApi } from '../../../src/features/chat/api';
+import { safetyApi } from '../../../src/features/safety/api';
 import ChatThreadScreen from '../../../src/features/chat/screens/ChatThreadScreen';
 import { ChatList } from '../../../src/features/chat/components/ChatList';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
@@ -98,7 +99,7 @@ describe('ChatThreadScreen', () => {
 
     expect(screen.queryByTestId('chat-composer')).toBeNull();
     expect(screen.queryByTestId('chat-input')).toBeNull();
-    expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(/This ride has ended\. The chat is read-only until/);
+    expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(/Chat closed\. You can read the messages until/);
   });
 
   it('read-only notice says "tomorrow" when the window ends on another day (T-512)', async () => {
@@ -115,7 +116,7 @@ describe('ChatThreadScreen', () => {
     await renderWithStore(<ChatThreadScreen />);
 
     expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(
-      /This ride has ended\. The chat is read-only until tomorrow at 12:16 PM\.$/,
+      /Chat closed\. You can read the messages until tomorrow at 12:16 PM\.$/,
     );
   });
 
@@ -184,20 +185,78 @@ describe('ChatThreadScreen', () => {
     expect(screen.getByTestId('chat-composer')).toBeTruthy();
   });
 
-  it('Call uses the phone from the active ride, only for that ride', async () => {
+  it('[T-520] Call asks POST /call for a masked number (never a phone from the ride), only for that ride', async () => {
     jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage());
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-    const ride = makeRide({ id: 7, status: 'accepted', driver_id: 12, driver: { id: 12, name: 'Bilal', phone: '+923001234567' } });
+    const requestCall = jest
+      .spyOn(safetyApi, 'requestCall')
+      .mockResolvedValue({ mode: 'proxy', number: '+922100000001', expiresAt: null, contactClosesAt: null });
+    const ride = makeRide({
+      id: 7,
+      status: 'accepted',
+      driver_id: 12,
+      driver: { id: 12, name: 'Bilal' },
+      contact: { can_chat: true, can_call: true, call_mode: 'proxy', closes_at: null },
+    });
     await renderWithStore(<ChatThreadScreen />, ride);
     fireEvent.press(screen.getByTestId('chat-call'));
-    expect(openURL).toHaveBeenCalledWith('tel:%2B923001234567');
+    await flush();
+    expect(requestCall).toHaveBeenCalledWith(7);
+    expect(openURL).toHaveBeenCalledWith('tel:%2B922100000001');
   });
 
-  it('no Call button when the ride in the store is a different one', async () => {
+  it('[T-520] no Call button when calls are chat only, or the ride in the store is a different one', async () => {
     jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage());
-    const ride = makeRide({ id: 99, status: 'accepted', driver_id: 12, driver: { id: 12, name: 'Bilal', phone: '+923001234567' } });
-    await renderWithStore(<ChatThreadScreen />, ride);
+    const chatOnly = makeRide({ id: 7, status: 'accepted', driver_id: 12, contact: { can_chat: true, can_call: false, call_mode: 'chat_only' } });
+    const first = await renderWithStore(<ChatThreadScreen />, chatOnly);
     expect(screen.queryByTestId('chat-call')).toBeNull();
+    first.unmount();
+
+    const other = makeRide({ id: 99, status: 'accepted', driver_id: 12, contact: { can_chat: true, can_call: true, call_mode: 'proxy' } });
+    await renderWithStore(<ChatThreadScreen />, other);
+    expect(screen.queryByTestId('chat-call')).toBeNull();
+  });
+
+  it('[T-520] 403 CONTACT_CLOSED on load shows "Chat closed", not "not available to you"', async () => {
+    jest
+      .spyOn(chatApi, 'getMessages')
+      .mockRejectedValue(new ApiError({ kind: 'forbidden', status: 403, code: 'CONTACT_CLOSED', message: 'closed' }));
+    await renderWithStore(<ChatThreadScreen />);
+    expect(screen.getByTestId('chat-thread-closed')).toBeTruthy();
+    expect(screen.getByText('Chat closed')).toBeTruthy();
+    expect(screen.queryByText('This chat is not available to you.')).toBeNull();
+  });
+
+  it('[T-520] a send refused with 403 CONTACT_CLOSED keeps the thread readable with the closed note', async () => {
+    jest
+      .spyOn(chatApi, 'getMessages')
+      .mockResolvedValueOnce(threadPage({ rideStatus: 'completed', messages: [theirs(1, 'Thanks')], lastId: 1 }))
+      .mockResolvedValue(
+        threadPage({ canSend: false, rideStatus: 'completed', contactClosesAt: '2026-10-12T12:00:00+00:00', messages: [theirs(1, 'Thanks')], lastId: 1 }),
+      );
+    jest
+      .spyOn(chatApi, 'sendMessage')
+      .mockRejectedValue(new ApiError({ kind: 'forbidden', status: 403, code: 'CONTACT_CLOSED', message: 'closed' }));
+    await renderWithStore(<ChatThreadScreen />);
+
+    fireEvent.changeText(screen.getByTestId('chat-input'), 'one more thing');
+    fireEvent.press(screen.getByTestId('chat-send'));
+    await flush();
+
+    expect(screen.getByText('Thanks')).toBeTruthy();
+    expect(screen.queryByTestId('chat-thread-forbidden')).toBeNull();
+    expect(screen.queryByTestId('chat-composer')).toBeNull();
+    expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(/Chat closed/);
+  });
+
+  it('[T-520] after the ride ended, sending stays open with "Chat closes at" until contact_closes_at', async () => {
+    jest.setSystemTime(new Date(2026, 9, 12, 11, 40));
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(
+      threadPage({ rideStatus: 'completed', canSend: true, contactClosesAt: new Date(2026, 9, 12, 12, 10).toISOString() }),
+    );
+    await renderWithStore(<ChatThreadScreen />);
+    expect(screen.getByTestId('chat-composer')).toBeTruthy();
+    expect(screen.getByTestId('chat-closes-at')).toHaveTextContent('The ride has ended. Chat closes at 12:10 PM.');
   });
 });
 
@@ -209,6 +268,7 @@ describe('ChatList (Inbox › Messages)', () => {
         rideStatus: 'accepted',
         canSend: true,
         readOnlyUntil: null,
+        contactClosesAt: null,
         otherParty: { id: 12, role: 'driver', firstName: 'Bilal', profileImageUrl: null },
         lastMessage: theirs(3, 'At the gate'),
         unreadCount: 2,
@@ -218,6 +278,7 @@ describe('ChatList (Inbox › Messages)', () => {
         rideStatus: 'completed',
         canSend: false,
         readOnlyUntil: '2026-10-12T12:00:00+00:00',
+        contactClosesAt: '2026-10-11T12:30:00+00:00',
         otherParty: { id: 13, role: 'driver', firstName: null, profileImageUrl: null },
         lastMessage: null,
         unreadCount: 0,
@@ -300,7 +361,7 @@ describe('Message entry points', () => {
         ride={makeRide({ id: 7, status: 'accepted' })}
         step="to_pickup"
         pendingAction={null}
-        phone={null}
+        canCall={false}
         canNavigate={false}
         onCall={jest.fn()}
         onMessage={onMessage}

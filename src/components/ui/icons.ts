@@ -114,6 +114,18 @@ export const iconGlyphs = {
   card: 'credit-card-outline',
   mobileWallet: 'cellphone',
   failed: 'close-circle-outline',
+  // Safety (T-520).
+  sos: 'shield-alert-outline',
+  share: 'share-variant-outline',
+  shareOff: 'share-off-outline',
+  contacts: 'account-group-outline',
+  addContact: 'account-plus-outline',
+  police: 'police-badge-outline',
+  ambulance: 'ambulance',
+  sms: 'message-alert-outline',
+  pinCode: 'dialpad',
+  lockClock: 'lock-clock',
+  support: 'lifebuoy',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

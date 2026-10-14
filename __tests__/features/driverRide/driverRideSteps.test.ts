@@ -1,10 +1,9 @@
 /**
  * T-405: the pure helpers of the driver ride screen (status → step, stops, directions URL,
- * passenger phone, the server's fare summary).
+ * the server's fare summary). BE-78 removed the passenger phone (calls go through POST /call).
  */
 import {
   activeStops,
-  getPassengerPhone,
   isRestorableDriverRide,
   mapsDirectionsUrl,
   navigationTarget,
@@ -29,8 +28,6 @@ const makeStop = (overrides: Partial<RideStopResource>): RideStopResource => ({
   updated_at: '2026-10-09T10:00:00Z',
   ...overrides,
 });
-
-const passenger = (phone: string | undefined) => ({ id: 9, name: 'Fake', phone: phone as string });
 
 describe('rideStep', () => {
   it('maps the BE-04 statuses to the driver steps', () => {
@@ -108,22 +105,6 @@ describe('mapsDirectionsUrl', () => {
     expect(mapsDirectionsUrl(point, 'android')).toBe(
       'https://www.google.com/maps/dir/?api=1&destination=31.52%2C74.35&travelmode=driving',
     );
-  });
-});
-
-describe('getPassengerPhone', () => {
-  it('returns a compact number only while the driver has the ride', () => {
-    expect(getPassengerPhone(makeRide({ status: 'accepted', passenger: passenger('+92 300-0000000') }))).toBe(
-      '+923000000000',
-    );
-    expect(getPassengerPhone(makeRide({ status: 'started', passenger: passenger('03000000000') }))).toBe('03000000000');
-    expect(getPassengerPhone(makeRide({ status: 'completed', passenger: passenger('03000000000') }))).toBeNull();
-    expect(getPassengerPhone(makeRide({ status: 'accepted', passenger: passenger(undefined) }))).toBeNull();
-  });
-
-  it('never returns text that is not a phone number', () => {
-    expect(getPassengerPhone(makeRide({ status: 'accepted', passenger: passenger('call me at noon') }))).toBeNull();
-    expect(getPassengerPhone(makeRide({ status: 'accepted', passenger: passenger('123') }))).toBeNull();
   });
 });
 

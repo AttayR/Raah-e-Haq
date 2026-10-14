@@ -10,7 +10,7 @@ type Props = {
   subtitle: string;
   photoUrl: string | null;
   onBack: () => void;
-  /** Shown only when the ride carries a usable phone number. */
+  /** Shown only when the ride says `contact.can_call` (a masked call, BE-78). */
   onCall?: () => void;
 };
 

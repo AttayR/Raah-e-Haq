@@ -16,7 +16,7 @@ import { getRegisteredDeviceToken, registerDeviceToken, resetPushDevice } from '
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, LOGOUT_REQUEST_TIMEOUT_MS, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { loginUser } from '../../src/store/thunks/apiThunks';
-import { createActiveRide } from '../../src/features/active-ride/slice';
+import { createActiveRide, liveShareStarted } from '../../src/features/active-ride/slice';
 import type { User } from '../../src/services/api';
 import { makeRide, makeRideRequest } from '../../test-utils/rideFixtures';
 
@@ -125,6 +125,36 @@ describe('logout thunk (T-102)', () => {
     expect(closeAll).toHaveBeenCalledTimes(1);
     expect(stopTracking).toHaveBeenCalledTimes(1);
     await expectFullySignedOut(store, extra);
+  });
+
+  it('[T-520] revokes a shared live trip link (with the token, before the session revoke); offline still signs out', async () => {
+    const { store, extra } = makeStore();
+    await signIn(store);
+    store.dispatch(liveShareStarted({ rideId: activeRide.id, url: 'https://raahehaq.com/t/fake', expiresAt: null }));
+    mock.onDelete(`/rides/${activeRide.id}/share`).reply(200, { success: true, data: { revoked: 1 } });
+    mock.onPost('/auth/logout').reply(200, { success: true });
+
+    await store.dispatch(logout());
+
+    expect(mock.history.delete.map((r) => r.url)).toEqual([`/rides/${activeRide.id}/share`]);
+    expect(mock.history.delete[0].headers?.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(mock.history.delete[0].timeout).toBe(LOGOUT_REQUEST_TIMEOUT_MS);
+    expect(store.getState().activeRide.shareLink).toBeNull();
+    await expectFullySignedOut(store, extra);
+
+    // No link shared: no DELETE; a failed DELETE never blocks the sign-out.
+    const second = makeStore();
+    await signIn(second.store);
+    mock.resetHistory();
+    await second.store.dispatch(logout());
+    expect(mock.history.delete).toHaveLength(0);
+
+    const third = makeStore();
+    await signIn(third.store);
+    third.store.dispatch(liveShareStarted({ rideId: activeRide.id, url: 'https://raahehaq.com/t/fake', expiresAt: null }));
+    mock.onDelete(`/rides/${activeRide.id}/share`).networkError();
+    await third.store.dispatch(logout());
+    await expectFullySignedOut(third.store, third.extra);
   });
 
   it('sends the current token to /auth/logout and waits for it (with a timeout) before clearing the token (T-114)', async () => {

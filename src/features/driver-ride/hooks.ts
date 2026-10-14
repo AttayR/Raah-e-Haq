@@ -24,6 +24,7 @@ import {
   type DriverRideState,
 } from './slice';
 import { isRestorableDriverRide, rideStep, type DriverRideStep } from './steps';
+import { PIN_CODES, isPinRefusalCode, pinRefusalOf, type PinRefusal } from '../safety/pin';
 
 // Typed locally (not useAppDispatch) so these hooks never import the store singleton.
 type SliceRoot = { driverRide: DriverRideState; driverStatus: DriverStatusState };
@@ -89,6 +90,13 @@ export const driverRideRefusalToast = (
   return { title: rejectionMessage(payload, fallback) };
 };
 
+/** The start's outcome (BE-81): `pin` says why a PIN start was refused, for the PIN sheet. */
+export type DriverStartResult = { ok: true } | { ok: false; pin: PinRefusal | null };
+
+/** PIN refusals are shown by the PIN sheet, never as a toast. */
+const isPinRefusal = (payload: ThunkRejection | undefined): boolean =>
+  isPinRefusalCode(payload?.code) || pinRefusalOf(payload)?.kind === 'malformed';
+
 export interface DriverRideFlow {
   ride: RideResource | null;
   step: DriverRideStep;
@@ -96,7 +104,8 @@ export interface DriverRideFlow {
   pendingAction: DriverRideAction | null;
   /** Resolve true when the server accepted the step. */
   arrived: () => Promise<boolean>;
-  start: () => Promise<boolean>;
+  /** POST /rides/{id}/start, with the passenger's PIN when the ride needs one (BE-81). */
+  start: (pin?: string) => Promise<DriverStartResult>;
   complete: () => Promise<boolean>;
   completeStop: (stopId: number) => Promise<boolean>;
   cancel: (note: string) => Promise<boolean>;
@@ -135,6 +144,11 @@ export const useDriverRideFlow = (): DriverRideFlow => {
   const handleRefusal = useCallback(
     (payload: ThunkRejection | undefined, skipped: boolean, id: number): void => {
       if (skipped || isStaleSessionRejection(payload)) return;
+      if (isPinRefusal(payload)) {
+        // A ride that now needs (or blocks) the PIN: read its pin_required / pin_blocked again.
+        if (payload?.code === PIN_CODES.required || payload?.code === PIN_CODES.blocked) dispatch(refreshDriverRide(id));
+        return;
+      }
       const { title, message } = driverRideRefusalToast(payload, DRIVER_RIDE_COPY.actionFailed);
       toast.error(title, message, DRIVER_RIDE_TOAST_OPTIONS);
       if (payload?.code && REFETCH_CODES.has(payload.code)) {
@@ -147,18 +161,31 @@ export const useDriverRideFlow = (): DriverRideFlow => {
     [dispatch],
   );
 
-  const advance = useCallback(
-    async (arg: AdvanceDriverRideArg | null): Promise<boolean> => {
-      if (arg === null) return false;
+  const run = useCallback(
+    async (arg: AdvanceDriverRideArg): Promise<{ ok: boolean; payload?: ThunkRejection }> => {
       const action = await dispatch(advanceDriverRide(arg));
       if (advanceDriverRide.fulfilled.match(action)) {
         toast.success(SUCCESS_COPY[arg.action], undefined, DRIVER_RIDE_TOAST_OPTIONS);
-        return true;
+        return { ok: true };
       }
       handleRefusal(action.payload, !!action.meta.condition, arg.rideId);
-      return false;
+      return { ok: false, payload: action.meta.condition ? undefined : action.payload };
     },
     [dispatch, handleRefusal],
+  );
+
+  const advance = useCallback(
+    async (arg: AdvanceDriverRideArg | null): Promise<boolean> => (arg === null ? false : (await run(arg)).ok),
+    [run],
+  );
+
+  const start = useCallback(
+    async (pin?: string): Promise<DriverStartResult> => {
+      if (rideId === null) return { ok: false, pin: null };
+      const result = await run({ rideId, action: 'start', pin });
+      return result.ok ? { ok: true } : { ok: false, pin: pinRefusalOf(result.payload) };
+    },
+    [run, rideId],
   );
 
   const cancel = useCallback(
@@ -191,7 +218,7 @@ export const useDriverRideFlow = (): DriverRideFlow => {
     step: rideStep(ride),
     pendingAction,
     arrived: useCallback(() => advance(rideId === null ? null : { rideId, action: 'arrived' }), [advance, rideId]),
-    start: useCallback(() => advance(rideId === null ? null : { rideId, action: 'start' }), [advance, rideId]),
+    start,
     complete: useCallback(() => advance(rideId === null ? null : { rideId, action: 'complete' }), [advance, rideId]),
     completeStop: useCallback(
       (stopId: number) => advance(rideId === null ? null : { rideId, action: 'stop', stopId }),

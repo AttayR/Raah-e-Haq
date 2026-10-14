@@ -13,6 +13,7 @@ import { usePushNotifications } from '../../../features/notifications/usePushNot
 import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
+import type { SafetyRoutes } from '../../../features/safety/navigation';
 
 export type DriverStackParamList = {
   /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
@@ -38,6 +39,9 @@ export type DriverStackParamList = {
   /** Account → Ride history and one ride's details/receipt (T-501). Earnings is a tab (UI-R4). */
   RideHistory: RideHistoryRoutes['RideHistory'];
   RideDetails: RideHistoryRoutes['RideDetails'];
+  /** Account → Emergency contacts and its form (T-520, BE-79); the SOS sheet opens it too. */
+  EmergencyContacts: SafetyRoutes['EmergencyContacts'];
+  EmergencyContactEditor: SafetyRoutes['EmergencyContactEditor'];
 };
 
 /*
@@ -56,6 +60,8 @@ const loadPayCommissionScreen = () => require('../../../features/wallet/screens/
 const loadSettlementsScreen = () => require('../../../features/wallet/screens/SettlementsScreen').default;
 const loadRideHistoryScreen = () => require('../../../features/ride-history/screens/RideHistoryScreen').default;
 const loadRideDetailsScreen = () => require('../../../features/ride-history/screens/RideDetailsScreen').default;
+const loadEmergencyContactsScreen = () => require('../../../features/safety/screens/EmergencyContactsScreen').default;
+const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
@@ -90,6 +96,8 @@ const DriverStack = () => {
       <Stack.Screen name="WalletSettlements" getComponent={loadSettlementsScreen} />
       <Stack.Screen name="RideHistory" getComponent={loadRideHistoryScreen} />
       <Stack.Screen name="RideDetails" getComponent={loadRideDetailsScreen} getId={rideDetailsScreenId} />
+      <Stack.Screen name="EmergencyContacts" getComponent={loadEmergencyContactsScreen} />
+      <Stack.Screen name="EmergencyContactEditor" getComponent={loadEmergencyContactEditorScreen} />
     </Stack.Navigator>
   );
 };

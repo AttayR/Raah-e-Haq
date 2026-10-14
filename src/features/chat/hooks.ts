@@ -14,7 +14,13 @@ import {
 } from './thread';
 import type { ChatSummary } from './types';
 
-/** 403 (not a participant, e.g. a requeued driver), 404 and 410 end the thread for good. */
+/** BE-78 403 CONTACT_CLOSED: contact closed (not "forbidden"); the thread stays readable. */
+export const isContactClosed = (error: unknown): boolean => isApiError(error) && error.code === CHAT_CODES.contactClosed;
+
+/**
+ * 403 (not a participant, e.g. a requeued driver), 404 and 410 end the thread for good. A 403
+ * CONTACT_CLOSED is never "not available to you": see `useChatThread`'s endIfTerminal.
+ */
 const terminalStatusOf = (error: unknown): 'forbidden' | 'expired' | null => {
   if (!isApiError(error)) return null;
   if (error.status === 410 || error.code === CHAT_CODES.expired) return 'expired';
@@ -22,10 +28,13 @@ const terminalStatusOf = (error: unknown): 'forbidden' | 'expired' | null => {
   return null;
 };
 
+/** Which request failed: the first load, a send, or a background read (poll, older, read receipt). */
+type FailedRequest = 'load' | 'send' | 'background';
+
 /** Why a POST /messages failed, for the failed bubble's text and whether it can be retried. */
 export const sendErrorOf = (error: unknown): ChatSendError => {
   if (!isApiError(error)) return 'unknown';
-  if (error.code === CHAT_CODES.closed) return 'closed';
+  if (error.code === CHAT_CODES.closed || error.code === CHAT_CODES.contactClosed) return 'closed';
   if (error.code === CHAT_CODES.notOpen) return 'not_open';
   switch (error.kind) {
     case 'network':
@@ -68,7 +77,17 @@ export const useChatThread = (rideId: number, visible: boolean): ChatThread => {
   const lastIdRef = useRef(0);
   const lastFetchedAt = useRef(0);
 
-  const endIfTerminal = useCallback((error: unknown): boolean => {
+  /**
+   * Ends the thread for a terminal refusal; true when it did. CONTACT_CLOSED (BE-78): the first
+   * load shows "Chat closed"; a send is handled by the caller (read-only + reload); a background
+   * read keeps the messages on screen and only closes the composer (and stops the poll).
+   */
+  const endIfTerminal = useCallback((error: unknown, request: FailedRequest = 'background'): boolean => {
+    if (isContactClosed(error)) {
+      if (request === 'send') return false;
+      dispatch(request === 'load' ? { type: 'ended', status: 'closed' } : { type: 'closed' });
+      return true;
+    }
     const status = terminalStatusOf(error);
     if (status) dispatch({ type: 'ended', status });
     return status !== null;
@@ -82,7 +101,7 @@ export const useChatThread = (rideId: number, visible: boolean): ChatThread => {
       lastFetchedAt.current = Date.now();
       dispatch({ type: 'loaded', page });
     } catch (error) {
-      if (!endIfTerminal(error)) {
+      if (!endIfTerminal(error, 'load')) {
         dispatch({ type: 'loadFailed', message: errorToastMessage(error, CHAT_COPY.threadError) ?? CHAT_COPY.threadError });
       }
     }
@@ -98,18 +117,18 @@ export const useChatThread = (rideId: number, visible: boolean): ChatThread => {
       lastIdRef.current = Math.max(lastIdRef.current, page.lastId);
       dispatch({ type: 'polled', page });
       if (page.hasMore) return 'again';
-      // An ended ride gets no new messages (the server refuses sends): stop asking.
-      return page.readOnlyUntil ? 'stop' : 'continue';
+      // BE-78: both sides may still write for 30 min after the ride ended; once sending closed
+      // no new messages come: stop asking.
+      return page.canSend ? 'continue' : 'stop';
     } catch (error) {
       if (endIfTerminal(error)) return 'stop';
       throw error;
     }
   }, [rideId, endIfTerminal]);
 
-  // Only an open chat gets new messages: an ended ride (read_only_until set) or a 409
-  // chat_closed (can_send false at once) stops the poll.
-  const pollEnabled =
-    visible && state.status === 'ready' && state.meta !== null && state.meta.canSend && state.meta.readOnlyUntil === null;
+  // Only an open chat gets new messages: once sending closed (can_send false, or a refused
+  // send: 403 CONTACT_CLOSED / the old 409 chat_closed) the poll stops.
+  const pollEnabled = visible && state.status === 'ready' && state.meta !== null && state.meta.canSend;
   usePolling({ enabled: pollEnabled, run: poll, lastFetchedAt });
 
   const loadOlder = useCallback(() => {
@@ -153,7 +172,7 @@ export const useChatThread = (rideId: number, visible: boolean): ChatThread => {
         const message = await chatApi.sendMessage(rideId, body, clientId);
         dispatch({ type: 'sendSucceeded', clientId, message });
       } catch (error) {
-        if (endIfTerminal(error)) {
+        if (endIfTerminal(error, 'send')) {
           dispatch({ type: 'sendFailed', clientId, error: 'unknown' });
           return;
         }

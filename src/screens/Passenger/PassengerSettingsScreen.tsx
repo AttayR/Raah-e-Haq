@@ -74,6 +74,13 @@ const PassengerSettingsScreen = () => {
               onPress={() => navigation.navigate('FavoriteLocations')}
               testID="passenger-settings-saved-places"
             />
+            <ListItem
+              icon="contacts"
+              title={t('safety.contactsRow')}
+              subtitle={t('safety.contactsRowSubtitle')}
+              onPress={() => navigation.navigate('EmergencyContacts')}
+              testID="passenger-settings-emergency-contacts"
+            />
           </ListGroup>
 
           <ListGroup title={COPY.notificationsGroup}>

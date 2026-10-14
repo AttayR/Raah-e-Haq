@@ -19,9 +19,10 @@ import { toast } from '../../src/core/toast';
 import locationTrackingService from '../../src/services/locationTrackingService';
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack, canGoBack: () => true }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, canGoBack: () => true }),
   useIsFocused: () => true,
 }));
 
@@ -40,7 +41,9 @@ const stop = (overrides: Partial<RideStopResource>): RideStopResource => ({
   ...overrides,
 });
 
-const passenger = { id: 9, name: 'Ayesha', phone: '+923001234567', rating: 4.8 };
+const passenger = { id: 9, name: 'Ayesha', rating: 4.8 };
+/** BE-78 contact with a telephony provider (masked calls). */
+const proxyContact = { can_chat: true, can_call: true, call_mode: 'proxy', closes_at: null };
 
 let mock: MockAdapter;
 
@@ -66,6 +69,7 @@ const settle = async (store: ReturnType<typeof configureStore>) =>
 beforeEach(() => {
   mock = new MockAdapter(apiClient);
   mockGoBack.mockReset();
+  mockNavigate.mockReset();
   mock.onGet('/driver/status').reply(200, { success: true, data: { status: 'available', active_ride_id: null } });
 });
 
@@ -209,24 +213,50 @@ describe('DriverRideScreen', () => {
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
   });
 
-  it('calls the passenger and opens directions in the platform maps app', async () => {
+  it('[T-520] Call asks POST /call and dials the masked number; Navigate opens the maps app', async () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger }));
+    openURL.mockClear();
+    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger, contact: proxyContact }));
     await settle(store);
+    mock.onPost('/rides/41/call').reply(200, envelope({ mode: 'proxy', number: '+922100000001', expires_at: 'x', contact_closes_at: null }));
 
     fireEvent.press(screen.getByTestId('driver-ride-call'));
-    expect(openURL).toHaveBeenCalledWith('tel:%2B923001234567');
+    await waitFor(() => expect(openURL).toHaveBeenCalledWith('tel:%2B922100000001'));
+    expect(mock.history.post.filter((r) => r.url === '/rides/41/call')).toHaveLength(1);
+
+    // A failed call is fixed by tapping again: a fresh POST /call (never a cached number).
+    fireEvent.press(screen.getByTestId('driver-ride-call'));
+    await waitFor(() => expect(mock.history.post.filter((r) => r.url === '/rides/41/call')).toHaveLength(2));
 
     fireEvent.press(screen.getByTestId('driver-ride-navigate'));
     const expected = Platform.OS === 'ios' ? 'http://maps.apple.com/' : 'https://www.google.com/maps/dir/';
-    expect(openURL.mock.calls[1][0]).toContain(expected);
-    expect(openURL.mock.calls[1][0]).toContain('31.52%2C74.35');
+    const navigateUrl = openURL.mock.calls.map((c) => c[0]).find((u) => u.includes('31.52%2C74.35'));
+    expect(navigateUrl).toContain(expected);
+    // Never a tel: built from a phone on the ride.
+    openURL.mock.calls.forEach(([url]) => expect(url).not.toContain('923001234567'));
   });
 
-  it('hides the call button when the server sent no phone', async () => {
-    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger: { id: 9, name: 'Ayesha', phone: '' } }));
+  it('[T-520] chat-only calls open the ride chat with a note', async () => {
+    const infoSpy = jest.spyOn(toast, 'info').mockImplementation(() => '');
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    openURL.mockClear();
+    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger, contact: proxyContact }));
+    await settle(store);
+    mock.onPost('/rides/41/call').reply(200, envelope({ mode: 'chat_only', contact_closes_at: null }));
+
+    fireEvent.press(screen.getByTestId('driver-ride-call'));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('RideChat', { rideId: 41 }));
+    expect(infoSpy).toHaveBeenCalledWith("Calls aren't available right now. Send a message instead.", undefined, { topOffset: 64 });
+    expect(openURL).not.toHaveBeenCalled();
+  });
+
+  it('[T-520] no Call button unless the server says contact.can_call', async () => {
+    const { store, screen } = renderScreen(
+      makeRide({ status: 'accepted', passenger, contact: { can_chat: true, can_call: false, call_mode: 'chat_only', closes_at: null } }),
+    );
     await settle(store);
     expect(screen.queryByTestId('driver-ride-call')).toBeNull();
+    screen.getByTestId('driver-ride-message');
   });
 
   it('shows "Ride cancelled" when the passenger cancels, without the driver acting (T-413)', async () => {
