@@ -86,6 +86,8 @@ export const componentTokens = {
   badge: { countMin: 18, countPaddingHorizontal: 6, countCap: 99, dot: 8, dotRing: 2, statusHeight: 24 },
   /** Checkbox / Radio: 24 control, 2pt `borderStrong` boundary (§1.4), row ≥ 44. */
   selectionControl: { size: 24, radioDot: 12, checkRadius: radius.xs, glyph: 16 },
+  /** §5.9 Switch: kit-drawn 51×31 track, 27 thumb inset 2, in a 64-wide (×44) slot. */
+  switch: { trackWidth: 51, trackHeight: 31, thumb: 27, inset: 2, slotWidth: 64 },
   /** Shared state values. */
   state: { disabledOpacity: 0.4 },
   /** §5.8 ListItem (UI-R3): row heights, leading sizes and divider insets. */

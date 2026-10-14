@@ -4,7 +4,7 @@
  * and dark, with roles, labels and 44pt targets.
  */
 import React from 'react';
-import { StyleSheet, useColorScheme, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { StyleSheet, Switch as RNSwitch, useColorScheme, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import HapticFeedback from 'react-native-haptic-feedback';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
@@ -16,6 +16,7 @@ import {
   Checkbox,
   Chip,
   IconButton,
+  ListItem,
   Radio,
   SegmentedControl,
   Switch,
@@ -177,20 +178,70 @@ describe('IconButton', () => {
 });
 
 describe.each(MODES)('Switch, Checkbox, Radio (%s)', (mode, theme) => {
-  it('switch: role, label, borderStrong/primary track, white thumb', async () => {
+  it('switch: kit-drawn (no native UISwitch), role, label, state, 51x31 track in a 64x44 slot', async () => {
     const onValueChange = jest.fn();
     await renderThemed(<Switch value={false} onValueChange={onValueChange} accessibilityLabel="Sound alerts" testID="s" />, mode);
+    // iOS 26 drew the native UISwitch wider than the 51x31 view RN painted behind it (owner bug
+    // 2026-10-14): no native switch host may be rendered.
+    expect(screen.UNSAFE_queryAllByType(RNSwitch)).toHaveLength(0);
+    const sw = screen.getByRole('switch', { name: 'Sound alerts' });
+    expect(sw.props.accessibilityState).toEqual({ checked: false, disabled: false });
+    expect(flat(sw.props.style)).toMatchObject({ minWidth: 64, minHeight: 44, alignItems: 'flex-end' });
+    expect(flat(screen.getByTestId('s-track').props.style)).toMatchObject({ width: 51, height: 31, borderRadius: 999 });
+    const thumb = flat(screen.getByTestId('s-thumb').props.style);
+    expect(thumb).toMatchObject({ width: 27, height: 27, backgroundColor: theme.colors.onPrimary });
+    expect(thumb.backgroundColor).toBe('#FFFFFF');
+  });
+
+  it('switch: track is borderStrong off and primary on, from the theme (no hardcoded colour)', async () => {
+    await renderThemed(<Switch value={false} onValueChange={jest.fn()} accessibilityLabel="Off" testID="off" />, mode);
+    expect(flat(screen.getByTestId('off-track').props.style).backgroundColor).toBe(theme.colors.borderStrong);
+    expect(flat(screen.getByTestId('off-fill').props.style)).toMatchObject({ backgroundColor: theme.colors.primary, opacity: 0 });
+    screen.unmount();
+    await renderThemed(<Switch value onValueChange={jest.fn()} accessibilityLabel="On" testID="on" />, mode);
+    expect(flat(screen.getByTestId('on-fill').props.style)).toMatchObject({ backgroundColor: theme.colors.primary, opacity: 1 });
+    expect(screen.getByTestId('on').props.accessibilityState).toEqual({ checked: true, disabled: false });
+  });
+
+  it('switch source draws every colour from the theme (no hex or rgb literals)', () => {
+    const { readFileSync } = jest.requireActual<{ readFileSync: (file: string, encoding: 'utf8') => string }>('fs');
+    const source = readFileSync('src/components/ui/Switch.tsx', 'utf8');
+    expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+    expect(source).not.toMatch(/(ios_backgroundColor|trackColor|thumbColor)=/);
+  });
+
+  it('switch: a press flips the value once and fires the selection haptic', async () => {
+    const onValueChange = jest.fn();
+    await renderThemed(<Switch value onValueChange={onValueChange} accessibilityLabel="Chat" testID="s" />, mode);
+    fireEvent.press(screen.getByTestId('s'));
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenCalledWith(false);
+    expect(trigger).toHaveBeenCalledWith('selection', expect.anything());
+  });
+
+  it('switch: disabled blocks presses and dims to 0.4, but not twice inside a disabled ListItem', async () => {
+    const onValueChange = jest.fn();
+    await renderThemed(<Switch value onValueChange={onValueChange} accessibilityLabel="Chat" disabled testID="s" />, mode);
     const sw = screen.getByTestId('s');
-    expect(sw.props.accessibilityRole).toBe('switch');
-    expect(sw.props.accessibilityLabel).toBe('Sound alerts');
-    expect(sw.props.accessibilityState).toMatchObject({ checked: false });
-    // iOS host props: tintColor = off track, onTintColor = on track.
-    expect(sw.props.tintColor).toBe(theme.colors.borderStrong);
-    expect(sw.props.onTintColor).toBe(theme.colors.primary);
-    expect(sw.props.thumbTintColor).toBe('#FFFFFF');
-    expect(flat(sw.props.style).backgroundColor).toBe(theme.colors.borderStrong);
-    // 64×44 slot; iOS anchors the frame at the start (iOS 26 draws past its trailing edge).
-    expect(flat(screen.getByTestId('s-slot').props.style)).toMatchObject({ minWidth: 64, minHeight: 44, alignItems: 'flex-start' });
+    expect(sw.props.accessibilityState).toEqual({ checked: true, disabled: true });
+    expect(flat(sw.props.style).opacity).toBe(0.4);
+    fireEvent.press(sw);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(trigger).not.toHaveBeenCalled();
+    screen.unmount();
+
+    await renderThemed(
+      <ListItem
+        title="Chat"
+        disabled
+        onPress={jest.fn()}
+        trailing={<Switch value={false} onValueChange={onValueChange} accessibilityLabel="Chat" disabled testID="row-s" />}
+        testID="row"
+      />,
+      mode,
+    );
+    expect(flat(screen.getByTestId('row').props.style).opacity).toBe(0.4);
+    expect(flat(screen.getByTestId('row-s').props.style).opacity).toBeUndefined();
   });
 
   it('checkbox: role, checked state, toggles, 44pt row, primary fill when checked', async () => {

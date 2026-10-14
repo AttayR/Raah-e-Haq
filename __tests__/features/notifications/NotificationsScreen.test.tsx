@@ -313,11 +313,11 @@ describe('NotificationPreferencesScreen', () => {
     renderWith(<NotificationPreferencesScreen />);
     await flush();
 
-    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', false);
+    fireEvent.press(screen.getByTestId('notification-pref-promotions'));
     await flush();
 
     expect(JSON.parse(mock.history.put[0].data)).toEqual({ promotions: false });
-    expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(false);
+    expect(screen.getByTestId('notification-pref-promotions').props.accessibilityState.checked).toBe(false);
   });
 
   it('a refused save puts the switch back and says so', async () => {
@@ -327,9 +327,9 @@ describe('NotificationPreferencesScreen', () => {
     renderWith(<NotificationPreferencesScreen />);
     await flush();
 
-    fireEvent(screen.getByTestId('notification-pref-chat'), 'valueChange', false);
+    fireEvent.press(screen.getByTestId('notification-pref-chat'));
     await waitFor(() => expect(error).toHaveBeenCalled());
-    expect(screen.getByTestId('notification-pref-chat').props.value).toBe(true);
+    expect(screen.getByTestId('notification-pref-chat').props.accessibilityState.checked).toBe(true);
   });
 
   it('tapping the whole row (not only the switch) toggles it and sends PUT', async () => {
@@ -343,7 +343,7 @@ describe('NotificationPreferencesScreen', () => {
 
     expect(mock.history.put).toHaveLength(1);
     expect(JSON.parse(mock.history.put[0].data)).toEqual({ ride_updates: false });
-    expect(screen.getByTestId('notification-pref-rideUpdates').props.value).toBe(false);
+    expect(screen.getByTestId('notification-pref-rideUpdates').props.accessibilityState.checked).toBe(false);
   });
 
   it('rapid taps while a save is in flight are queued, not ignored', async () => {
@@ -363,17 +363,17 @@ describe('NotificationPreferencesScreen', () => {
     await flush();
 
     // Three taps before the first PUT answers: two rows, then the first one back on.
-    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', false);
+    fireEvent.press(screen.getByTestId('notification-pref-promotions'));
     await flush();
-    expect(screen.getByTestId('notification-pref-chat').props.disabled).toBe(false);
-    fireEvent(screen.getByTestId('notification-pref-chat'), 'valueChange', false);
+    expect(screen.getByTestId('notification-pref-chat').props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(screen.getByTestId('notification-pref-chat'));
     await flush();
-    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', true);
+    fireEvent.press(screen.getByTestId('notification-pref-promotions'));
     await flush();
 
     // Every tap shows at once.
-    expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(true);
-    expect(screen.getByTestId('notification-pref-chat').props.value).toBe(false);
+    expect(screen.getByTestId('notification-pref-promotions').props.accessibilityState.checked).toBe(true);
+    expect(screen.getByTestId('notification-pref-chat').props.accessibilityState.checked).toBe(false);
 
     // Saved one at a time, in order; an earlier answer never flips a later tap back.
     for (let i = 0; i < 3; i += 1) {
@@ -383,8 +383,8 @@ describe('NotificationPreferencesScreen', () => {
         next?.();
       });
       await flush();
-      expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(true);
-      expect(screen.getByTestId('notification-pref-chat').props.value).toBe(false);
+      expect(screen.getByTestId('notification-pref-promotions').props.accessibilityState.checked).toBe(true);
+      expect(screen.getByTestId('notification-pref-chat').props.accessibilityState.checked).toBe(false);
     }
     expect(mock.history.put.map((r) => JSON.parse(r.data))).toEqual([
       { promotions: false },
@@ -404,14 +404,65 @@ describe('NotificationPreferencesScreen', () => {
     renderWith(<NotificationPreferencesScreen />);
     await flush();
 
-    fireEvent(screen.getByTestId('notification-pref-promotions'), 'valueChange', false);
-    fireEvent(screen.getByTestId('notification-pref-chat'), 'valueChange', false);
+    fireEvent.press(screen.getByTestId('notification-pref-promotions'));
+    fireEvent.press(screen.getByTestId('notification-pref-chat'));
     await waitFor(() => expect(mock.history.put).toHaveLength(2));
     await flush();
 
     expect(error).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('notification-pref-promotions').props.value).toBe(true);
-    expect(screen.getByTestId('notification-pref-chat').props.value).toBe(false);
+    expect(screen.getByTestId('notification-pref-promotions').props.accessibilityState.checked).toBe(true);
+    expect(screen.getByTestId('notification-pref-chat').props.accessibilityState.checked).toBe(false);
+  });
+
+  it('push off: categories are disabled, drawn off, and not saved; push on restores their stored values', async () => {
+    const off = { ...prefs, push_enabled: false, chat: false };
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: off });
+    mock.onPut('/notifications/preferences').reply(200, { success: true, data: { ...off, push_enabled: true } });
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    for (const key of ['rideUpdates', 'chat', 'promotions', 'soundAlerts']) {
+      const sw = screen.getByTestId(`notification-pref-${key}`);
+      // Stored true for three of them, but none may look on while push is off.
+      expect(sw.props.accessibilityState).toEqual({ checked: false, disabled: true });
+      expect(screen.getByTestId(`notification-pref-${key}-row`).props.accessibilityState).toEqual({ checked: false, disabled: true });
+    }
+    fireEvent.press(screen.getByTestId('notification-pref-rideUpdates'));
+    fireEvent.press(screen.getByTestId('notification-pref-rideUpdates-row'));
+    await flush();
+    expect(mock.history.put).toHaveLength(0);
+
+    fireEvent.press(screen.getByTestId('notification-pref-pushEnabled'));
+    await flush();
+    expect(mock.history.put.map((r) => JSON.parse(r.data))).toEqual([{ push_enabled: true }]);
+    expect(screen.getByTestId('notification-pref-rideUpdates').props.accessibilityState).toEqual({ checked: true, disabled: false });
+    expect(screen.getByTestId('notification-pref-chat').props.accessibilityState).toEqual({ checked: false, disabled: false });
+    expect(screen.getByTestId('notification-pref-soundAlerts').props.accessibilityState).toEqual({ checked: true, disabled: false });
+  });
+
+  it('turning push off greys and switches off the categories at once, keeping them stored', async () => {
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: prefs });
+    mock.onPut('/notifications/preferences').reply(200, { success: true, data: { ...prefs, push_enabled: false } });
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    fireEvent.press(screen.getByTestId('notification-pref-pushEnabled-row'));
+    expect(screen.getByTestId('notification-pref-promotions').props.accessibilityState).toEqual({ checked: false, disabled: true });
+    await flush();
+    // Only the master flag is sent; the categories keep their stored values on the server.
+    expect(mock.history.put.map((r) => JSON.parse(r.data))).toEqual([{ push_enabled: false }]);
+  });
+
+  it('pressing the switch inside its row toggles once (one PUT, not two)', async () => {
+    mock.onGet('/notifications/preferences').reply(200, { success: true, data: prefs });
+    mock.onPut('/notifications/preferences').reply(200, { success: true, data: { ...prefs, sound_alerts: false } });
+    renderWith(<NotificationPreferencesScreen />);
+    await flush();
+
+    fireEvent.press(screen.getByTestId('notification-pref-soundAlerts'));
+    await flush();
+    expect(mock.history.put.map((r) => JSON.parse(r.data))).toEqual([{ sound_alerts: false }]);
+    expect(screen.getByTestId('notification-pref-soundAlerts').props.accessibilityState.checked).toBe(false);
   });
 
   it('the phone notification settings row opens the phone settings', async () => {

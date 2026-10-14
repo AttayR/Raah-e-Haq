@@ -3,6 +3,7 @@ import { I18nManager, Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { componentTokens, radius, space } from '../../theme';
 import { AppText } from './AppText';
+import { DimmedContext } from './dimmed';
 import { Icon, type IconName } from './Icon';
 
 export type ListItemProps = {
@@ -104,7 +105,8 @@ export function ListItem({
           {value}
         </AppText>
       ) : null}
-      {trailing}
+      {/* The row already draws at the disabled opacity; a trailing Switch must not dim again. */}
+      <DimmedContext.Provider value={disabled}>{trailing}</DimmedContext.Provider>
       {showChevron ? (
         <View style={I18nManager.isRTL ? styles.flip : null}>
           <Icon name="chevronEnd" size={20} color="textMuted" />
