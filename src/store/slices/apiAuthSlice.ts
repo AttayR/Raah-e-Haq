@@ -12,6 +12,7 @@ import {
   getUserProfile,
   updateUserProfile,
   initializeAuth,
+  revalidateSession,
   isStaleSessionRejection,
 } from '../thunks/apiThunks';
 import { logout } from '../thunks/sessionThunks';
@@ -280,6 +281,28 @@ const authSlice = createSlice({
         }
         state.user = action.payload;
         state.statusUnverified = false;
+      });
+
+    // Background check of a session routed from the cache (T-531): only the user and
+    // statusUnverified change, never status/error.
+    builder
+      .addCase(revalidateSession.fulfilled, (state, action) => {
+        if (!state.isAuthenticated) {
+          return;
+        }
+        state.user = action.payload.user;
+        state.statusUnverified = action.payload.statusUnverified === true;
+      })
+      .addCase(revalidateSession.rejected, (state, action) => {
+        if (isStaleSessionRejection(action.payload)) {
+          return;
+        }
+        // 403 ACCOUNT_* (BE-32): AuthFlow routes to account status on the merged status.
+        const refused = state.isAuthenticated && state.user ? withRefusedStatus(state.user, action.payload) : null;
+        if (refused) {
+          state.user = refused;
+          state.statusUnverified = false;
+        }
       });
 
     // Get User Profile

@@ -16,7 +16,7 @@ import {
 import { authStorage } from '../../src/services/authStorage';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, sessionExpired, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
-import { initializeAuth, loginUser, verifyOtp } from '../../src/store/thunks/apiThunks';
+import { bootstrapAuth, loginUser, verifyOtp } from '../../src/store/thunks/apiThunks';
 import { bumpSessionEpoch } from '../../src/store/sessionEpoch';
 import type { User } from '../../src/services/api';
 
@@ -50,7 +50,7 @@ const signedIn = async () => {
   const store = makeStore();
   await authStorage.saveSession({ token: TOKEN, user });
   mock.onGet('/auth/profile').replyOnce(200, { success: true, data: { user } });
-  await store.dispatch(initializeAuth());
+  await store.dispatch(bootstrapAuth());
   expect(store.getState().apiAuth.isAuthenticated).toBe(true);
   return store;
 };
@@ -158,16 +158,31 @@ describe('401 handling (T-104)', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('a 401 during the cold-start check is left to initializeAuth (no extra logout call)', async () => {
+  it('a 401 during the blocking cold-start check is left to initializeAuth (no extra logout call)', async () => {
     const store = makeStore();
-    await authStorage.saveSession({ token: TOKEN, user });
+    // A cached user who is not active waits for the server before routing (T-531).
+    await authStorage.saveSession({ token: TOKEN, user: { ...user, status: 'pending' } });
     mock.onGet('/auth/profile').reply(401, { message: 'Unauthenticated.' });
 
-    await store.dispatch(initializeAuth());
+    await store.dispatch(bootstrapAuth());
     await waitForLogout();
 
     expect(mock.history.post).toHaveLength(0);
     expect(store.getState().apiAuth.isAuthenticated).toBe(false);
+    expect(await authStorage.getToken()).toBeNull();
+  });
+
+  it('a 401 on the background check of a cached active user runs the unified logout once (T-531)', async () => {
+    const store = makeStore();
+    await authStorage.saveSession({ token: TOKEN, user });
+    mock.onGet('/auth/profile').reply(401, { message: 'Unauthenticated.' });
+    mock.onPost('/auth/logout').reply(401, { message: 'Unauthenticated.' });
+
+    await store.dispatch(bootstrapAuth());
+    await waitForLogout();
+
+    expect(mock.history.post.map((r) => r.url)).toEqual(['/auth/logout']);
+    expect(store.getState().apiAuth).toMatchObject({ isInitialized: true, isAuthenticated: false, user: null });
     expect(await authStorage.getToken()).toBeNull();
   });
 
@@ -185,9 +200,9 @@ describe('401 handling (T-104)', () => {
 describe('401 latch across sessions (T-104 retry)', () => {
   it('cold-start 401, then a login: a later 401 still logs out exactly once', async () => {
     const store = makeStore();
-    await authStorage.saveSession({ token: 'expired-token', user });
+    await authStorage.saveSession({ token: 'expired-token', user: { ...user, status: 'pending' } });
     mock.onGet('/auth/profile').replyOnce(401, { message: 'Unauthenticated.' });
-    await store.dispatch(initializeAuth());
+    await store.dispatch(bootstrapAuth());
     expect(store.getState().apiAuth.isAuthenticated).toBe(false);
 
     mock.onPost('/auth/login').replyOnce(200, {
@@ -228,7 +243,7 @@ describe('401 latch across sessions (T-104 retry)', () => {
     await authStorage.saveSession({ token: TOKEN });
     // Offline cold start with a token but no cached user: initialised, signed out, token kept.
     mock.onGet('/auth/profile').networkErrorOnce();
-    await store.dispatch(initializeAuth());
+    await store.dispatch(bootstrapAuth());
     expect(store.getState().apiAuth).toMatchObject({ isInitialized: true, isAuthenticated: false });
     expect(await authStorage.getToken()).toBe(TOKEN);
 

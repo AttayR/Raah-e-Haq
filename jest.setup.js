@@ -88,55 +88,6 @@ jest.mock('@react-native-firebase/auth', () => {
   };
 });
 
-jest.mock('@react-native-firebase/firestore', () => {
-  const docRef = {
-    get: jest.fn(() => Promise.resolve({exists: false, data: () => undefined})),
-    set: jest.fn(() => Promise.resolve()),
-    update: jest.fn(() => Promise.resolve()),
-    delete: jest.fn(() => Promise.resolve()),
-    onSnapshot: jest.fn(() => jest.fn()),
-  };
-  const query = {
-    doc: jest.fn(() => docRef),
-    add: jest.fn(() => Promise.resolve(docRef)),
-    where: jest.fn(() => query),
-    orderBy: jest.fn(() => query),
-    limit: jest.fn(() => query),
-    get: jest.fn(() => Promise.resolve({docs: [], empty: true, forEach: jest.fn()})),
-    onSnapshot: jest.fn(() => jest.fn()),
-  };
-  docRef.collection = jest.fn(() => query);
-  const db = {collection: jest.fn(() => query), doc: jest.fn(() => docRef)};
-  const firestore = Object.assign(jest.fn(() => db), {
-    FieldValue: {
-      serverTimestamp: jest.fn(() => new Date()),
-      arrayUnion: jest.fn(),
-      arrayRemove: jest.fn(),
-      increment: jest.fn(),
-    },
-    Timestamp: {now: jest.fn(() => ({toDate: () => new Date()})), fromDate: jest.fn()},
-  });
-  return {
-    __esModule: true,
-    default: firestore,
-    getFirestore: jest.fn(() => db),
-    collection: jest.fn(() => query),
-    doc: jest.fn(() => docRef),
-    getDoc: jest.fn(() => docRef.get()),
-    getDocs: jest.fn(() => query.get()),
-    setDoc: jest.fn(() => Promise.resolve()),
-    addDoc: jest.fn(() => Promise.resolve(docRef)),
-    updateDoc: jest.fn(() => Promise.resolve()),
-    deleteDoc: jest.fn(() => Promise.resolve()),
-    onSnapshot: jest.fn(() => jest.fn()),
-    query: jest.fn(() => query),
-    where: jest.fn(),
-    orderBy: jest.fn(),
-    limit: jest.fn(),
-    serverTimestamp: jest.fn(() => new Date()),
-  };
-});
-
 jest.mock('@react-native-firebase/messaging', () => {
   const messagingInstance = {
     requestPermission: jest.fn(() => Promise.resolve(1)),
@@ -183,21 +134,6 @@ jest.mock('@react-native-firebase/messaging', () => {
   };
 });
 
-jest.mock('@react-native-firebase/storage', () => {
-  const ref = {
-    putFile: jest.fn(() => Promise.resolve()),
-    put: jest.fn(() => Promise.resolve()),
-    getDownloadURL: jest.fn(() => Promise.resolve('https://example.test/file')),
-    delete: jest.fn(() => Promise.resolve()),
-  };
-  const storageInstance = {ref: jest.fn(() => ref)};
-  return {
-    __esModule: true,
-    default: jest.fn(() => storageInstance),
-    getStorage: jest.fn(() => storageInstance),
-    ref: jest.fn(() => ref),
-  };
-});
 
 // Maps
 jest.mock('react-native-maps', () => {
@@ -290,11 +226,6 @@ jest.mock('react-native-haptic-feedback', () => {
   return {__esModule: true, default: {trigger}, trigger};
 });
 
-// Keyboard controller (pulled in by react-native-gifted-chat), official mock
-jest.mock('react-native-keyboard-controller', () =>
-  require('react-native-keyboard-controller/jest'),
-);
-
 // Image picker
 jest.mock('react-native-image-picker', () => ({
   launchCamera: jest.fn(() => Promise.resolve({didCancel: true})),
@@ -319,14 +250,6 @@ jest.mock('react-native-webview', () => {
     return React.createElement(View, props);
   });
   return {__esModule: true, WebView, default: WebView};
-});
-
-// Toast
-jest.mock('react-native-toast-message', () => {
-  const Toast = () => null;
-  Toast.show = jest.fn();
-  Toast.hide = jest.fn();
-  return {__esModule: true, default: Toast, BaseToast: () => null, ErrorToast: () => null};
 });
 
 // Gesture handler: its official jestSetup is loaded via `setupFiles` in jest.config.js.

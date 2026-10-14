@@ -10,7 +10,7 @@ import {
   resetPassword,
   getUserProfile,
   updateUserProfile,
-  initializeAuth,
+  bootstrapAuth,
 } from '../store/thunks/apiThunks';
 import { logout as logoutThunk } from '../store/thunks/sessionThunks';
 import {
@@ -26,9 +26,9 @@ export const useApiAuth = () => {
   const dispatch = useAppDispatch();
   const authState = useAppSelector((state) => state.apiAuth);
 
-  // Initialize auth on app start
+  // Initialize auth on app start: routes from the cache when it can, checks in the background
   const initialize = useCallback(() => {
-    dispatch(initializeAuth());
+    dispatch(bootstrapAuth());
   }, [dispatch]);
 
   // Login with email and password

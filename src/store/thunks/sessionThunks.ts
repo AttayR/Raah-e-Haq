@@ -155,15 +155,24 @@ export const accountRefused =
       });
     });
     if (wasActive) {
-      try {
-        webSocketService.closeAll();
-        // reset, not stop: the last position and listeners are dropped right away.
-        locationTrackingService.reset();
-      } catch (error) {
-        logger.warn('accountRefused - could not stop live services', {
-          name: error instanceof Error ? error.name : typeof error,
-        });
-      }
+      stopLiveServices('accountRefused');
     }
     return true;
   };
+
+/**
+ * An active user just lost access (blocked by the server, T-106/T-531): live sockets close and
+ * location tracking is reset (last position dropped) right away, instead of waiting for the
+ * home screens to unmount. Never throws.
+ */
+export const stopLiveServices = (caller: string): void => {
+  try {
+    webSocketService.closeAll();
+    // reset, not stop: the last position and listeners are dropped right away.
+    locationTrackingService.reset();
+  } catch (error) {
+    logger.warn(`${caller} - could not stop live services`, {
+      name: error instanceof Error ? error.name : typeof error,
+    });
+  }
+};

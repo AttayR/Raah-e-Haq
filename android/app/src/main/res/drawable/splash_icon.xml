@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ splash icon (T-531): the system draws it on a 288 dp canvas and shows the
+     centre 192 dp circle, so the 120 dp logo is inset by 84 dp to keep the JS splash size. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_logo"
+    android:inset="84dp" />

@@ -118,6 +118,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
+  // T-531: until the JS splash mounts, the React root shows the launch screen (brand colour and
+  // logo) instead of the default white system background, so there is no flash in between.
+  override func customize(_ rootView: RCTRootView) {
+    super.customize(rootView)
+    rootView.backgroundColor = UIColor(named: "SplashBackground") ?? .systemBackground
+    if let launch = UIStoryboard(name: "LaunchScreen", bundle: nil).instantiateInitialViewController()?.view {
+      launch.frame = rootView.bounds
+      launch.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      rootView.loadingView = launch
+    }
+  }
+
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     self.bundleURL()
   }

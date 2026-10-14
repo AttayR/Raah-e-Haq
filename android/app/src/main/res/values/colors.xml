@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Native splash background (T-531): theme `background`, light (src/theme/tokens.ts). -->
+    <color name="splash_background">#F4F6FA</color>
+</resources>

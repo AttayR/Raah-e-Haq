@@ -2,7 +2,8 @@
 /**
  * Quality gate with a ratchet.
  *
- * Runs TypeScript, ESLint, Jest and a release JS bundle for android and ios,
+ * Runs TypeScript, ESLint, Jest and a release JS bundle for android and ios (which must
+ * not contain dev-only modules such as the kit gallery),
  * compares the results with .quality/baseline.json and fails if anything got worse.
  *
  *   node scripts/quality-gate.js            check against the baseline
@@ -72,8 +73,22 @@ function jest() {
   return {passing: code === 0, summary: m ? m[1].trim() : out.split('\n').slice(-6).join(' ')};
 }
 
+// Dev-only modules that must never reach a release bundle (PERF-08, T-531). The host stays:
+// it is the `__DEV__`-gated entry point and renders nothing in release.
+const DEV_ONLY_SOURCE = /(^|\/)src\/features\/dev-gallery\/(?!DevKitGalleryHost\.tsx$)/;
+
+function devOnlySources(sourceMapPath) {
+  try {
+    const map = JSON.parse(fs.readFileSync(sourceMapPath, 'utf8'));
+    return (map.sources || []).filter(s => DEV_ONLY_SOURCE.test(String(s).replace(/\\/g, '/')));
+  } catch (e) {
+    return [`could not read the source map (${e.message})`];
+  }
+}
+
 // Release bundle for both platforms (catches case-sensitive paths and missing modules
-// that tsc and Jest can miss). Output goes to a temp dir that is removed afterwards.
+// that tsc and Jest can miss), and no dev-only module in it. Output goes to a temp dir that
+// is removed afterwards.
 function bundle() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-bundle-'));
   const failures = [];
@@ -90,6 +105,8 @@ function bundle() {
         'index.js',
         '--bundle-output',
         path.join(dir, `rh.${platform}.js`),
+        '--sourcemap-output',
+        path.join(dir, `rh.${platform}.js.map`),
         '--assets-dest',
         path.join(dir, `assets-${platform}`),
         '--reset-cache',
@@ -98,6 +115,11 @@ function bundle() {
         const lines = out.split('\n').filter(Boolean);
         const errLine = lines.find(l => /error/i.test(l)) || lines.slice(-1)[0] || 'unknown error';
         failures.push(`${platform}: ${errLine.trim()}`);
+        continue;
+      }
+      const devOnly = devOnlySources(path.join(dir, `rh.${platform}.js.map`));
+      if (devOnly.length) {
+        failures.push(`${platform}: dev-only modules in the release bundle: ${devOnly.slice(0, 5).join(', ')}`);
       }
     }
   } finally {

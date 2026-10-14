@@ -16,7 +16,7 @@ import {
 import { authStorage } from '../../src/services/authStorage';
 import { rootReducer } from '../../src/store/rootReducer';
 import { accountRefused, logout, sessionExpired, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
-import { initializeAuth } from '../../src/store/thunks/apiThunks';
+import { bootstrapAuth } from '../../src/store/thunks/apiThunks';
 import { bumpSessionEpoch } from '../../src/store/sessionEpoch';
 import { resolveAuthRoute } from '../../src/core/auth/normalizeUser';
 import locationTrackingService from '../../src/services/locationTrackingService';
@@ -54,7 +54,7 @@ const signedIn = async (as: User = user) => {
   const store = makeStore();
   await authStorage.saveSession({ token: TOKEN, user: as });
   mock.onGet('/auth/profile').replyOnce(200, { success: true, data: { user: as } });
-  await store.dispatch(initializeAuth());
+  await store.dispatch(bootstrapAuth());
   expect(store.getState().apiAuth.isAuthenticated).toBe(true);
   return store;
 };

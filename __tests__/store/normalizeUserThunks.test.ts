@@ -12,7 +12,7 @@ import { rootReducer } from '../../src/store/rootReducer';
 import type { SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import {
   getUserProfile,
-  initializeAuth,
+  bootstrapAuth,
   loginUser,
   registerUser,
   registerUserWithImages,
@@ -152,7 +152,7 @@ describe('thunks store the normalised user (T-105)', () => {
     mock.onGet('/auth/profile').networkError();
     const store = makeStore();
 
-    await store.dispatch(initializeAuth());
+    await store.dispatch(bootstrapAuth());
 
     expect(store.getState().apiAuth.user).toMatchObject({ id: 3, role: 'passenger', roles: ['passenger'] });
     expect(resolveAuthRoute(store.getState().apiAuth)).toBe('passenger');
@@ -163,7 +163,7 @@ describe('thunks store the normalised user (T-105)', () => {
     mock.onGet('/auth/profile').reply(200, { success: true, data: { user: { id: 4, status: 'rejected', roles: ['driver'] } } });
     const store = makeStore();
 
-    await store.dispatch(initializeAuth());
+    await store.dispatch(bootstrapAuth());
 
     expect(store.getState().apiAuth.user).toMatchObject({ id: 4, role: 'driver', status: 'rejected' });
     expect(resolveAuthRoute(store.getState().apiAuth)).toBe('account-status');
@@ -189,7 +189,7 @@ describe('thunks store the normalised user (T-105)', () => {
       mock.onGet('/auth/profile').reply(403, { success: false, message: 'Blocked.', code, data });
       const store = makeStore();
 
-      await store.dispatch(initializeAuth());
+      await store.dispatch(bootstrapAuth());
 
       const state = store.getState().apiAuth;
       expect(state.isAuthenticated).toBe(true);
@@ -211,7 +211,7 @@ describe('thunks store the normalised user (T-105)', () => {
       });
       const store = makeStore();
 
-      await store.dispatch(initializeAuth());
+      await store.dispatch(bootstrapAuth());
 
       expect(store.getState().apiAuth.user?.rejection_reason).toBe('Blurry CNIC');
       expect(await AsyncStorage.getItem('user_data')).not.toContain('Blurry CNIC');
@@ -222,7 +222,7 @@ describe('thunks store the normalised user (T-105)', () => {
       mock.onGet('/auth/profile').reply(403, { success: false, message: 'Forbidden.' });
       const store = makeStore();
 
-      await store.dispatch(initializeAuth());
+      await store.dispatch(bootstrapAuth());
 
       expect(resolveAuthRoute(store.getState().apiAuth)).toBe('passenger');
     });
@@ -232,7 +232,7 @@ describe('thunks store the normalised user (T-105)', () => {
       mock.onGet('/auth/profile').reply(200, '<html>captive portal</html>');
       const store = makeStore();
 
-      await store.dispatch(initializeAuth());
+      await store.dispatch(bootstrapAuth());
 
       const state = store.getState().apiAuth;
       expect(state.isAuthenticated).toBe(true);
@@ -247,7 +247,7 @@ describe('thunks store the normalised user (T-105)', () => {
       mock.onGet('/auth/profile').reply(200, { success: true, data: { user: { name: 'no id' } } });
       const store = makeStore();
 
-      await store.dispatch(initializeAuth());
+      await store.dispatch(bootstrapAuth());
 
       expect(resolveAuthRoute(store.getState().apiAuth)).toBe('account-status');
       expect(await authStorage.getToken()).toBe(TOKEN);
@@ -258,7 +258,7 @@ describe('thunks store the normalised user (T-105)', () => {
       mock.onGet('/auth/profile').networkError();
       const store = makeStore();
 
-      await store.dispatch(initializeAuth());
+      await store.dispatch(bootstrapAuth());
 
       expect(resolveAuthRoute(store.getState().apiAuth)).toBe('passenger');
     });

@@ -2,7 +2,6 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import DriverBottomTabs, { type DriverTabParamList } from '../tabs/DriverBottomTabs';
-import DriverProfile from 'src/screens/Driver/DriverProfile';
 import DriverRideScreen from 'src/screens/Driver/DriverRideScreen';
 import { useDriverStatusSync } from '../../../features/driver-status/hooks';
 import { useDriverRideRestore } from '../../../features/driver-ride/hooks';
@@ -11,19 +10,8 @@ import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
 import { useNotificationsSync } from '../../../features/notifications/hooks';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
-import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
-import { DriverDocumentsScreen } from '../../../features/driverDocuments/screens/DriverDocumentsScreen';
-import WalletScreen from '../../../features/wallet/screens/WalletScreen';
-import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
-import AddMoneyScreen from '../../../features/wallet/screens/AddMoneyScreen';
-import TopUpCheckoutScreen from '../../../features/wallet/screens/TopUpCheckoutScreen';
-import TopUpStatusScreen from '../../../features/wallet/screens/TopUpStatusScreen';
 import { topUpStatusScreenId } from '../../../features/wallet/navigation';
-import PayCommissionScreen from '../../../features/wallet/screens/PayCommissionScreen';
-import SettlementsScreen from '../../../features/wallet/screens/SettlementsScreen';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
-import RideHistoryScreen from '../../../features/ride-history/screens/RideHistoryScreen';
-import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
 
 export type DriverStackParamList = {
@@ -52,6 +40,23 @@ export type DriverStackParamList = {
   RideDetails: RideHistoryRoutes['RideDetails'];
 };
 
+/*
+ * Secondary routes are required on first navigation, not when the stack mounts (PERF-03,
+ * T-531): the first screen paints without evaluating these screens and their imports.
+ */
+const loadDriverProfile = () => require('../../../screens/Driver/DriverProfile').default;
+const loadNotificationPreferencesScreen = () => require('../../../features/notifications/screens/NotificationPreferencesScreen').NotificationPreferencesScreen;
+const loadDriverDocumentsScreen = () => require('../../../features/driverDocuments/screens/DriverDocumentsScreen').DriverDocumentsScreen;
+const loadWalletScreen = () => require('../../../features/wallet/screens/WalletScreen').default;
+const loadTransactionDetailScreen = () => require('../../../features/wallet/screens/TransactionDetailScreen').default;
+const loadAddMoneyScreen = () => require('../../../features/wallet/screens/AddMoneyScreen').default;
+const loadTopUpCheckoutScreen = () => require('../../../features/wallet/screens/TopUpCheckoutScreen').default;
+const loadTopUpStatusScreen = () => require('../../../features/wallet/screens/TopUpStatusScreen').default;
+const loadPayCommissionScreen = () => require('../../../features/wallet/screens/PayCommissionScreen').default;
+const loadSettlementsScreen = () => require('../../../features/wallet/screens/SettlementsScreen').default;
+const loadRideHistoryScreen = () => require('../../../features/ride-history/screens/RideHistoryScreen').default;
+const loadRideDetailsScreen = () => require('../../../features/ride-history/screens/RideDetailsScreen').default;
+
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
 const DriverStack = () => {
@@ -68,23 +73,23 @@ const DriverStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
-      <Stack.Screen name="Profile" component={DriverProfile} />
+      <Stack.Screen name="Profile" getComponent={loadDriverProfile} />
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       {/* The full-screen trip map (T-405): pushed over the tabs, so no tab bar. */}
       <Stack.Screen name="DriverRide" component={DriverRideScreen} />
-      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
-      <Stack.Screen name="DriverDocuments" component={DriverDocumentsScreen} />
-      <Stack.Screen name="Wallet" component={WalletScreen} />
-      <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
-      <Stack.Screen name="AddMoney" component={AddMoneyScreen} />
+      <Stack.Screen name="NotificationPreferences" getComponent={loadNotificationPreferencesScreen} />
+      <Stack.Screen name="DriverDocuments" getComponent={loadDriverDocumentsScreen} />
+      <Stack.Screen name="Wallet" getComponent={loadWalletScreen} />
+      <Stack.Screen name="WalletTransaction" getComponent={loadTransactionDetailScreen} />
+      <Stack.Screen name="AddMoney" getComponent={loadAddMoneyScreen} />
       {/* No swipe-back: leaving the checkout always goes to the status screen. */}
-      <Stack.Screen name="TopUpCheckout" component={TopUpCheckoutScreen} options={{ gestureEnabled: false }} />
-      <Stack.Screen name="TopUpStatus" component={TopUpStatusScreen} getId={topUpStatusScreenId} />
-      <Stack.Screen name="PayCommission" component={PayCommissionScreen} />
-      <Stack.Screen name="WalletSettlements" component={SettlementsScreen} />
-      <Stack.Screen name="RideHistory" component={RideHistoryScreen} />
-      <Stack.Screen name="RideDetails" component={RideDetailsScreen} getId={rideDetailsScreenId} />
+      <Stack.Screen name="TopUpCheckout" getComponent={loadTopUpCheckoutScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="TopUpStatus" getComponent={loadTopUpStatusScreen} getId={topUpStatusScreenId} />
+      <Stack.Screen name="PayCommission" getComponent={loadPayCommissionScreen} />
+      <Stack.Screen name="WalletSettlements" getComponent={loadSettlementsScreen} />
+      <Stack.Screen name="RideHistory" getComponent={loadRideHistoryScreen} />
+      <Stack.Screen name="RideDetails" getComponent={loadRideDetailsScreen} getId={rideDetailsScreenId} />
     </Stack.Navigator>
   );
 };

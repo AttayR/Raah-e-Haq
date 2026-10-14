@@ -4,7 +4,16 @@ import { ModalRoot } from '../../components/ui/ModalRoot';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { logger } from '../../core/logging/logger';
 import { t } from '../../i18n';
-import { KitGalleryScreen } from './KitGalleryScreen';
+import type { KitGalleryScreen as KitGalleryScreenComponent } from './KitGalleryScreen';
+
+/**
+ * The gallery, its sections and fixtures are dev-only (PERF-08). Metro folds `__DEV__` to
+ * false in a release bundle, so this require and everything under it is left out of it
+ * (scripts/quality-gate.js checks that `dev-gallery` is absent from the release bundle).
+ */
+const KitGalleryScreen: typeof KitGalleryScreenComponent | null = __DEV__
+  ? require('./KitGalleryScreen').KitGalleryScreen
+  : null;
 
 /**
  * iOS launch argument that opens the gallery on start, for scripted screenshots:
@@ -92,7 +101,7 @@ export function DevKitGalleryHost({ enabled = __DEV__, children }: Props) {
   return (
     <>
       {children}
-      {enabled && open ? (
+      {enabled && open && KitGalleryScreen ? (
         <Modal visible animationType="slide" presentationStyle="fullScreen" onShow={pushBar} onRequestClose={close}>
           {/* A Modal is a separate native window: ModalRoot gives it its own StatusBar, safe-area
               provider and gesture root (the gallery's BottomSheet needs the last one). */}

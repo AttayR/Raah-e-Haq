@@ -26,11 +26,11 @@ target 'RaaHeHaq' do
     :new_arch_enabled => true
   )
 
-  # Firebase pods - pin to 12.3.0 to match @react-native-firebase
+  # Firebase pods - pin to 12.3.0 to match @react-native-firebase. The app uses FCM only;
+  # Firestore and Storage were never used and are gone (T-532, PERF-04). Auth stays for the
+  # one-time legacy sign-out and Analytics stays until the owner decides (PERF-07, PERF-04).
   pod 'Firebase/Core', '12.3.0'
   pod 'Firebase/Auth', '12.3.0'
-  pod 'Firebase/Firestore', '12.3.0'
-  pod 'Firebase/Storage', '12.3.0'
   pod 'Firebase/Messaging', '12.3.0'
   pod 'Firebase/Analytics', '12.3.0'
  # React Native Maps dependencies

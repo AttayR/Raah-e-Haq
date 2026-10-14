@@ -1,4 +1,4 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAsyncThunk, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
 import {
   apiService,
   LoginRequest,
@@ -14,7 +14,13 @@ import {
 } from '../../services/api';
 import { authStorage } from '../../services/authStorage';
 import { unwrap, toApiError, toThunkRejection, ThunkRejection, ApiError } from '../../core/api/errors';
-import { mergeServerUser, normalizeUser, UNKNOWN_STATUS, withRefusedStatus } from '../../core/auth/normalizeUser';
+import {
+  mergeServerUser,
+  normalizeUser,
+  routesHome,
+  UNKNOWN_STATUS,
+  withRefusedStatus,
+} from '../../core/auth/normalizeUser';
 import { logApiFailure } from '../../core/api/logApiFailure';
 import {
   bumpSessionEpoch,
@@ -23,7 +29,7 @@ import {
   STALE_SESSION_MESSAGE,
 } from '../sessionEpoch';
 import { logger } from '../../core/logging/logger';
-import { LOGOUT_REQUEST_TIMEOUT_MS } from './sessionThunks';
+import { LOGOUT_REQUEST_TIMEOUT_MS, stopLiveServices } from './sessionThunks';
 
 /**
  * Every thunk rejects with a ThunkRejection: a display-safe `message` plus `fieldErrors`
@@ -414,10 +420,22 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
   }
 );
 
-// Initialize Auth State (AUTH-04, INF-08)
 /**
- * Restores the stored session on cold start and checks it with GET /auth/profile.
+ * How long the cold-start check waits for GET /auth/profile when it has to wait at all (no
+ * cached user, or one that is not active). A slow or captive network then falls into the
+ * "keep the stored session" path within seconds instead of the 30 s axios default (PERF-01).
+ */
+export const BOOT_PROFILE_TIMEOUT_MS = 5000;
+
+// Initialize Auth State (AUTH-04, INF-08, PERF-01)
+/**
+ * Restores the stored session on cold start.
  * - no stored token: null (signed out)
+ * - a cached user who routes home (status `active`, a role this app serves): that session at
+ *   once, with `revalidate: true` and no request (T-531). bootstrapAuth then checks it with
+ *   revalidateSession in the background; a 401 there ends the session (T-104 logout) and a
+ *   403 ACCOUNT_* or a non-active profile routes to account status (T-106).
+ * Otherwise it checks the session with GET /auth/profile (BOOT_PROFILE_TIMEOUT_MS) first:
  * - 200: the session with the fresh user from the server
  * - 401: the token is invalid, so it is cleared: null
  * - 403 ACCOUNT_* (BE-25/BE-32): the server is authoritative. The session is kept (a blocked
@@ -431,7 +449,7 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
  * reducer leaves the signed-out state alone.
  */
 export const initializeAuth = createAsyncThunk<
-  { user: User; statusUnverified?: boolean } | null,
+  { user: User; statusUnverified?: boolean; revalidate?: boolean } | null,
   void,
   ThunkConfig & { state: { apiAuth: { user: User | null } } }
 >(
@@ -448,10 +466,15 @@ export const initializeAuth = createAsyncThunk<
       const storedUser =
         (await apiService.getUserData()) ?? normalizeUser(getState().apiAuth.user) ?? null;
 
+      if (storedUser && routesHome(storedUser)) {
+        // The server confirmed this account active before; route now and check it after.
+        return { user: storedUser, revalidate: true };
+      }
+
       let session: AuthSession | null;
       let serverAnswered = false;
       try {
-        const body = await apiService.getProfile();
+        const body = await apiService.getProfile({ timeout: BOOT_PROFILE_TIMEOUT_MS });
         serverAnswered = true;
         const user = requireUser(unwrap(body).user);
         if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
@@ -507,3 +530,81 @@ export const initializeAuth = createAsyncThunk<
     }
   }
 );
+
+/**
+ * Background check of a session that initializeAuth routed from the cache (T-531, PERF-01).
+ * The reducer only touches `user` and `statusUnverified` (no loading status, no error), so
+ * the home screens do not flicker while it runs. It uses the short boot timeout: home is
+ * already shown, and an unanswered check keeps the cached session. Same rules as the
+ * cold-start check:
+ * - 200 with a profile: the fresh user replaces the cached one; a previously active user who
+ *   no longer routes home has sockets and location stopped at once (stopLiveServices, as
+ *   accountRefused) and routes to account status.
+ * - 401: the API layer's session-expired handler runs the unified logout (T-104), because the
+ *   app is initialised by now; this thunk only rejects.
+ * - 403 ACCOUNT_*: the refused status is merged into the user and cached (T-106), as the API
+ *   layer's account-refused handler also does.
+ * - a 2xx that is not a profile: nothing confirmed the account is active, so the user routes
+ *   to account status ("couldn't confirm", UNKNOWN_STATUS, `statusUnverified`; T-106). The
+ *   status is not written to user_data.
+ * - offline, timeout, 5xx, other 4xx: the cached session stays, as on an offline cold start.
+ *   Any later request still meets the 401/403 handlers.
+ */
+export const revalidateSession = createAsyncThunk<
+  { user: User; statusUnverified?: boolean },
+  void,
+  ThunkConfig & { state: { apiAuth: { user: User | null } } }
+>('auth/revalidateSession', async (_, { rejectWithValue, getState }) => {
+  const startedIn = currentSessionEpoch();
+  let serverAnswered = false;
+  try {
+    const body = await apiService.getProfile({ timeout: BOOT_PROFILE_TIMEOUT_MS });
+    serverAnswered = true;
+    const user = requireUser(unwrap(body).user);
+    if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
+      return rejectWithValue(staleSessionRejection());
+    }
+    if (getState().apiAuth.user?.status === 'active' && !routesHome(user)) {
+      // Lost access since the cache was written: stop sockets and location now, as a 403
+      // ACCOUNT_* does (accountRefused), instead of waiting for home to unmount.
+      stopLiveServices('revalidateSession');
+    }
+    return { user };
+  } catch (error) {
+    if (isStaleSession(startedIn)) {
+      return rejectWithValue(staleSessionRejection());
+    }
+    const rejection = toThunkRejection(error, 'Failed to check the session');
+    const current = getState().apiAuth.user;
+    const refused = current ? withRefusedStatus(current, rejection) : null;
+    if (refused) {
+      await authStorage.saveUser(refused, startedIn);
+      if (isStaleSession(startedIn)) {
+        return rejectWithValue(staleSessionRejection());
+      }
+      return rejectWithValue(rejection);
+    }
+    if (serverAnswered && current) {
+      logger.warn('revalidateSession - invalid profile response; routing to account status');
+      return { user: { ...current, status: UNKNOWN_STATUS }, statusUnverified: true };
+    }
+    logger.warn('revalidateSession - profile check failed; keeping the cached session', {
+      kind: rejection.kind,
+      status: rejection.status,
+    });
+    return rejectWithValue(rejection);
+  }
+});
+
+/**
+ * App start: initializeAuth, then the background revalidateSession when it routed from the
+ * cache. Resolves once both are done (AuthProvider does not wait; tests do).
+ */
+export const bootstrapAuth =
+  (): ThunkAction<Promise<void>, { apiAuth: { user: User | null } }, unknown, UnknownAction> =>
+  async (dispatch) => {
+    const result = await dispatch(initializeAuth());
+    if (initializeAuth.fulfilled.match(result) && result.payload?.revalidate) {
+      await dispatch(revalidateSession());
+    }
+  };

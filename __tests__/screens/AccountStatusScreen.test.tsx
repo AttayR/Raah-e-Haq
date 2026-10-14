@@ -14,7 +14,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { __resetUnauthorizedStateForTests, apiClient } from '../../src/services/api';
 import { authStorage } from '../../src/services/authStorage';
 import { rootReducer } from '../../src/store/rootReducer';
-import { initializeAuth } from '../../src/store/thunks/apiThunks';
+import { bootstrapAuth } from '../../src/store/thunks/apiThunks';
 import { LOGOUT_CONFIRM_TITLE } from '../../src/hooks/useLogout';
 import { dialog, dialogStore } from '../../src/core/dialog';
 import { ACCOUNT_STATUS_COPY, ACCOUNT_STATUS_VARIANTS } from '../../src/features/auth/copy/accountStatus';
@@ -57,7 +57,7 @@ const renderAs = async (user: User, profile: [number, unknown] = [200, { success
   const store = makeStore();
   await authStorage.saveSession({ token: 'test-token-not-real', user });
   mock.onGet('/auth/profile').replyOnce(profile[0], profile[1]);
-  await store.dispatch(initializeAuth());
+  await store.dispatch(bootstrapAuth());
   const screen = render(
     <Provider store={store}>
       <AuthFlow />

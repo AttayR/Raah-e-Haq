@@ -746,8 +746,8 @@ class ApiService {
   }
 
   // User Profile Methods
-  async getProfile(): Promise<ApiResponse<{ user: ApiUser }>> {
-    const response = await apiClient.get('/auth/profile');
+  async getProfile(config?: AxiosRequestConfig): Promise<ApiResponse<{ user: ApiUser }>> {
+    const response = await apiClient.get('/auth/profile', config);
     return response.data;
   }
 

@@ -5,24 +5,15 @@ import {
 } from '@react-navigation/native-stack';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import PassengerBottomTabs, { type PassengerTabParamList } from '../tabs/PassengerBottomTabs';
-import PassengerProfile from 'src/screens/Passenger/Passengerprofile';
 import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
 import { useNotificationsSync } from '../../../features/notifications/hooks';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
-import { NotificationPreferencesScreen } from '../../../features/notifications/screens/NotificationPreferencesScreen';
-import TransactionDetailScreen from '../../../features/wallet/screens/TransactionDetailScreen';
-import AddMoneyScreen from '../../../features/wallet/screens/AddMoneyScreen';
-import TopUpCheckoutScreen from '../../../features/wallet/screens/TopUpCheckoutScreen';
-import TopUpStatusScreen from '../../../features/wallet/screens/TopUpStatusScreen';
 import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import type { WalletRoutes } from '../../../features/wallet/navigation';
-import RideDetailsScreen from '../../../features/ride-history/screens/RideDetailsScreen';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
-import SavedPlacesScreen from '../../../features/saved-places/screens/SavedPlacesScreen';
-import SavedPlaceEditorScreen from '../../../features/saved-places/screens/SavedPlaceEditorScreen';
 import type { SavedPlaceEditorParams } from '../../../features/saved-places/navigation';
 import type { BookingParams } from '../../../features/ride-booking/prefill';
 import type { RootStackParamList } from '../RootNavigation';
@@ -54,6 +45,20 @@ export type PassengerStackParamList = {
   NotificationPreferences: undefined;
 };
 
+/*
+ * Secondary routes are required on first navigation, not when the stack mounts (PERF-03,
+ * T-531): the first screen paints without evaluating these screens and their imports.
+ */
+const loadPassengerProfile = () => require('../../../screens/Passenger/Passengerprofile').default;
+const loadNotificationPreferencesScreen = () => require('../../../features/notifications/screens/NotificationPreferencesScreen').NotificationPreferencesScreen;
+const loadTransactionDetailScreen = () => require('../../../features/wallet/screens/TransactionDetailScreen').default;
+const loadAddMoneyScreen = () => require('../../../features/wallet/screens/AddMoneyScreen').default;
+const loadTopUpCheckoutScreen = () => require('../../../features/wallet/screens/TopUpCheckoutScreen').default;
+const loadTopUpStatusScreen = () => require('../../../features/wallet/screens/TopUpStatusScreen').default;
+const loadRideDetailsScreen = () => require('../../../features/ride-history/screens/RideDetailsScreen').default;
+const loadSavedPlacesScreen = () => require('../../../features/saved-places/screens/SavedPlacesScreen').default;
+const loadSavedPlaceEditorScreen = () => require('../../../features/saved-places/screens/SavedPlaceEditorScreen').default;
+
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Passenger'>;
@@ -77,19 +82,19 @@ const PassengerStack = ({ navigation }: Props) => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
-      <Stack.Screen name="Profile" component={PassengerProfile} />
+      <Stack.Screen name="Profile" getComponent={loadPassengerProfile} />
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       <Stack.Screen name="Booking" component={PassengerMapScreen} />
-      <Stack.Screen name="RideDetails" component={RideDetailsScreen} getId={rideDetailsScreenId} />
-      <Stack.Screen name="FavoriteLocations" component={SavedPlacesScreen} />
-      <Stack.Screen name="SavedPlaceEditor" component={SavedPlaceEditorScreen} />
-      <Stack.Screen name="WalletTransaction" component={TransactionDetailScreen} />
-      <Stack.Screen name="AddMoney" component={AddMoneyScreen} />
+      <Stack.Screen name="RideDetails" getComponent={loadRideDetailsScreen} getId={rideDetailsScreenId} />
+      <Stack.Screen name="FavoriteLocations" getComponent={loadSavedPlacesScreen} />
+      <Stack.Screen name="SavedPlaceEditor" getComponent={loadSavedPlaceEditorScreen} />
+      <Stack.Screen name="WalletTransaction" getComponent={loadTransactionDetailScreen} />
+      <Stack.Screen name="AddMoney" getComponent={loadAddMoneyScreen} />
       {/* No swipe-back: leaving the checkout always goes to the status screen. */}
-      <Stack.Screen name="TopUpCheckout" component={TopUpCheckoutScreen} options={{ gestureEnabled: false }} />
-      <Stack.Screen name="TopUpStatus" component={TopUpStatusScreen} getId={topUpStatusScreenId} />
-      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
+      <Stack.Screen name="TopUpCheckout" getComponent={loadTopUpCheckoutScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="TopUpStatus" getComponent={loadTopUpStatusScreen} getId={topUpStatusScreenId} />
+      <Stack.Screen name="NotificationPreferences" getComponent={loadNotificationPreferencesScreen} />
     </Stack.Navigator>
   );
 };

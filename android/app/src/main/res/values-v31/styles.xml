@@ -1,0 +1,13 @@
+<resources>
+
+    <!-- Android 12+: same theme as values/styles.xml plus the system SplashScreen API (T-531),
+         so the system splash shows the brand logo on the brand background, not the launcher
+         icon, and hands over to the identical windowBackground and JS SplashScreen. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+    </style>
+
+</resources>
