@@ -127,7 +127,7 @@ export function PersonCard({ ride, viewer, canMessage, onMessage }: SectionProps
   const person = otherParty(ride, viewer);
   if (!person) return null;
   const vehicle = viewer === 'passenger' ? ride.vehicle : null;
-  const vehicleLine = vehicle ? [[vehicle.make, vehicle.model].filter(Boolean).join(' '), vehicle.color].filter(Boolean).join(' · ') : '';
+  const vehicleName = vehicle ? [vehicle.make, vehicle.model].filter(Boolean).join(' ') : '';
   const fallback = viewer === 'passenger' ? C.yourDriver : C.yourPassenger;
   return (
     <Card testID="ride-details-person">
@@ -138,7 +138,8 @@ export function PersonCard({ ride, viewer, canMessage, onMessage }: SectionProps
         fallbackName={fallback}
         photoUri={person.profileImageUrl}
         rating={person.rating}
-        vehicleLine={vehicleLine || null}
+        vehicleName={vehicleName || null}
+        vehicleColor={vehicle?.color || null}
         plate={vehicle?.licensePlate ?? null}
         actions={
           canMessage

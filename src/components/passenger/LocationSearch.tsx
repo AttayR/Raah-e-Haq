@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { fetchAutocomplete, fetchPlaceDetails } from '../../services/placesService';
+import { fetchAutocomplete, fetchPlaceDetails, type PlacesBias } from '../../services/placesService';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
 import { Icon, type IconName } from '../ui/Icon';
@@ -30,6 +30,8 @@ type Props = {
   leadingIcon?: IconName | null;
   /** Shown as a "Set location on map" row after "No places found" or a failed search. */
   onChooseOnMap?: () => void;
+  /** Rank suggestions near this point (the rider or the pickup); results stay in Pakistan anyway. */
+  near?: PlacesBias;
 };
 
 const PLACEHOLDER = { pickup: 'Pickup location', destination: 'Where to?' } as const;
@@ -52,6 +54,7 @@ const LocationSearch: React.FC<Props> = ({
   placeholder,
   leadingIcon,
   onChooseOnMap,
+  near,
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
@@ -61,6 +64,9 @@ const LocationSearch: React.FC<Props> = ({
   // True once the passenger types in this field; prefilled text is not searched.
   const [edited, setEdited] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
+  // Read when a search starts; a new GPS fix must not search again.
+  const nearRef = useRef(near);
+  nearRef.current = near;
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +78,7 @@ const LocationSearch: React.FC<Props> = ({
       }
       setStatus('loading');
       try {
-        const results = await fetchAutocomplete(query);
+        const results = await fetchAutocomplete(query, nearRef.current);
         if (cancelled) return;
         const mapped: Suggestion[] = results.map((r) => ({
           id: r.place_id,

@@ -20,7 +20,8 @@ export const nearbyDriverDescription = (driver: NearbyDriver): string =>
 /**
  * Map markers for GET /rides/nearby-drivers (DESIGN_SYSTEM 5.21): each driver's vehicle type drawn
  * top-down at 60% (T-517), not generic pins and not animated. Keys are the opaque per-viewer ids
- * (BE-20). The endpoint sends no heading, so they face north.
+ * (BE-20). They turn to the BE-76 `heading` when it is sent; a null heading (standing, stale)
+ * keeps the last rotation (north for a new marker), never the bearing of a grid hop (T-524).
  */
 export const NearbyDriverMarkers: React.FC<{ drivers: NearbyDriver[] }> = ({ drivers }) => (
   <>
@@ -32,6 +33,7 @@ export const NearbyDriverMarkers: React.FC<{ drivers: NearbyDriver[] }> = ({ dri
         title={MAPS_CONFIG.MARKERS.driver.title}
         description={nearbyDriverDescription(driver)}
         vehicleType={driver.vehicle_type}
+        heading={driver.heading}
         muted
       />
     ))}

@@ -166,6 +166,7 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
     distance_km: 1.2,
     estimated_arrival_min: 3,
     location: { latitude: 31.52, longitude: 74.355 },
+    heading: 90,
   };
 
   it('calls GET /rides/nearby-drivers (never /tracking/drivers-in-radius) with radius and vehicle_type', async () => {
@@ -200,6 +201,22 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
     expect(drivers).toEqual([nearby]);
     expect(drivers[0]).not.toHaveProperty('name');
     expect(drivers[0]).not.toHaveProperty('phone');
+  });
+
+  it('heading (BE-76) is kept in degrees; null, missing, negative or junk is null (T-524)', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(
+      200,
+      envelope([
+        { ...nearby, id: 'h1', heading: 345 },
+        { ...nearby, id: 'h2', heading: '15' },
+        { ...nearby, id: 'h3', heading: null },
+        { ...nearby, id: 'h4', heading: -1 },
+        { ...nearby, id: 'h5', heading: 'north' },
+        { ...nearby, id: 'h6', heading: undefined },
+      ]),
+    );
+    const drivers = await rideService.getNearbyDrivers({ latitude: 31.5, longitude: 74.3 });
+    expect(drivers.map(d => d.heading)).toEqual([345, 15, null, null, null, null]);
   });
 
   it('a null or unknown vehicle_type stays null; it is never guessed as car (BE-58)', async () => {

@@ -130,7 +130,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           name={driver.name}
           fallbackName={ACTIVE_RIDE_COPY.driverFallbackName}
           rating={driver.rating}
-          vehicleLine={[driver.vehicleName, driver.color].filter((p): p is string => !!p).join(' · ') || null}
+          vehicleName={driver.vehicleName}
+          vehicleColor={driver.color}
           plate={driver.plate}
           plateHighlighted={stage === 'driver_arrived'}
           actions={actions}

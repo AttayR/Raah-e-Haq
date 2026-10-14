@@ -175,6 +175,20 @@ describe('VehicleMarker', () => {
     expect(distanceMeters(markerProps().coordinate, at(0, 100))).toBeLessThan(0.01);
   });
 
+  it('nearby drivers turn to the BE-76 heading; a null heading keeps the last rotation, never a grid hop bearing (T-524)', async () => {
+    const { rerender } = render(<VehicleMarker testID="vm" coordinate={at(0)} heading={null} muted />);
+    await flush();
+    expect(markerProps().rotation).toBe(0);
+    // A 550 m grid hop east with no heading: still facing north (not 90).
+    rerender(<VehicleMarker testID="vm" coordinate={at(0, 400)} heading={null} muted />);
+    expect(markerProps().rotation).toBe(0);
+    rerender(<VehicleMarker testID="vm" coordinate={at(0, 400)} heading={225} muted />);
+    expect(markerProps().rotation).toBe(225);
+    // Standing (heading null again) and another hop: keeps 225.
+    rerender(<VehicleMarker testID="vm" coordinate={at(400, 400)} heading={null} muted />);
+    expect(markerProps().rotation).toBe(225);
+  });
+
   it('stops its animation frame on unmount', async () => {
     jest.useFakeTimers();
     const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame');

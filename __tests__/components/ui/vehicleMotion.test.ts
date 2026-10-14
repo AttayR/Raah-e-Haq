@@ -134,6 +134,32 @@ describe('pointAlong', () => {
   });
 });
 
+describe('lead-in onto the route (T-524)', () => {
+  it('marks a drive that starts off the road as a lead-in; one that starts on it is not', () => {
+    // The raw pickup fix 12 m east of a north-bound road, then 60 m up the road.
+    const fromRaw = planMove(at(100, 12), at(100, 12), at(160), ROAD);
+    expect(fromRaw).toMatchObject({ kind: 'drive', onRoute: true, leadIn: true });
+    const fromRoad = planMove(at(100), at(100), at(160), ROAD);
+    expect(fromRoad).toMatchObject({ kind: 'drive', onRoute: true, leadIn: false });
+    expect(planMove(at(0), at(0), at(0, 80), null)).toMatchObject({ leadIn: false });
+  });
+
+  it('while on the hop onto the road the heading is the road bearing, not sideways', () => {
+    const plan = planMove(at(100, 12), at(100, 12), at(160), ROAD);
+    if (plan.kind !== 'drive') throw new Error('expected a drive');
+    const cum = cumulativeMeters(plan.path);
+    // k = 0.05 is on the 12 m hop westwards onto the road.
+    expect(pointAlong(plan.path, cum, 0.05).bearing).toBeCloseTo(270, 0);
+    expect(pointAlong(plan.path, cum, 0.05, true).bearing).toBeCloseTo(0, 0);
+    expect(pointAlong(plan.path, cum, 0.8, true).bearing).toBeCloseTo(0, 0);
+  });
+
+  it('a lead-in with no road segment gives no bearing (the marker keeps its heading)', () => {
+    const path = [at(100, 12), at(100)];
+    expect(pointAlong(path, cumulativeMeters(path), 0.5, true).bearing).toBeNull();
+  });
+});
+
 describe('timing', () => {
   const { minPositionMs, maxPositionMs, rotationMs } = motionPatterns.driverMarker;
 

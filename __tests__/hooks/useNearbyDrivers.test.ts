@@ -21,6 +21,7 @@ const driver: NearbyDriver = {
   distance_km: 1.2,
   estimated_arrival_min: 3,
   location: { latitude: 31.52, longitude: 74.355 },
+  heading: null,
 };
 
 const lahore = { latitude: 31.5204, longitude: 74.3587 };

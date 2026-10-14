@@ -590,6 +590,7 @@ const PassengerMapScreen = () => {
                 onChangeQuery={setPickupQuery}
                 onFocusChange={setSearchFocused}
                 onChooseOnMap={() => chooseOnMap('pickup')}
+                near={currentLocation}
                 onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }}
               />
               {!compact && <ChooseOnMapButton onPress={() => setMapPick('pickup')} />}
@@ -604,6 +605,7 @@ const PassengerMapScreen = () => {
                 onChangeQuery={setDestQuery}
                 onFocusChange={setSearchFocused}
                 onChooseOnMap={() => chooseOnMap('destination')}
+                near={pickup ?? currentLocation}
                 onSelect={(s) => {
                   if (!pickup && currentLocation) {
                     setPickup({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });

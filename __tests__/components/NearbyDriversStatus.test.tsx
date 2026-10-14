@@ -11,6 +11,7 @@ const driver: NearbyDriver = {
   distance_km: 1,
   estimated_arrival_min: 2,
   location: { latitude: 31.5, longitude: 74.3 },
+  heading: null,
 };
 
 describe('NearbyDriversStatus', () => {

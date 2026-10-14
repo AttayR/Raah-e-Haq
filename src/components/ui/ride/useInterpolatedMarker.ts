@@ -23,6 +23,12 @@ export interface InterpolatedMarkerOptions {
   expectedIntervalMs?: number;
   /** Animate between updates (off: reduced motion, nearby drivers): every update jumps. */
   animate: boolean;
+  /**
+   * Turn toward the bearing of a move when there is no server heading (default true). Off for
+   * nearby drivers (T-524): their positions are snapped to a ~550 m grid, so the bearing of a
+   * hop says nothing; a null heading keeps the last rotation (BE-76).
+   */
+  inferHeading?: boolean;
 }
 
 export interface InterpolatedMarker {
@@ -35,6 +41,8 @@ interface Motion {
   path: LatLng[];
   cumulative: number[];
   onRoute: boolean;
+  /** The first segment is the hop onto the road: it keeps the heading (T-524). */
+  leadIn: boolean;
   start: number;
   duration: number;
   /** The heading to hold for a straight move (server heading or the move's bearing). */
@@ -56,7 +64,7 @@ interface Motion {
  * One requestAnimationFrame loop at a time; it is cancelled on every new update and on unmount.
  */
 export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedMarkerOptions): InterpolatedMarker {
-  const { heading, route = null, animate } = options;
+  const { heading, route = null, animate, inferHeading = true } = options;
   const expected = options.expectedIntervalMs ?? motionPatterns.driverMarker.positionMs;
   const { latitude, longitude } = coordinate;
   const serverHeading = normalizeHeading(heading);
@@ -102,7 +110,9 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     };
 
     lastUpdateAt.current = now;
-    const moveHeading = headingForMove(previous, target, serverHeading, DEFAULT_THRESHOLDS.jitterMeters);
+    const moveHeading = inferHeading
+      ? headingForMove(previous, target, serverHeading, DEFAULT_THRESHOLDS.jitterMeters)
+      : serverHeading;
 
     if (previous === null) {
       // First position: place it (rotation from the server if it sent one).
@@ -144,6 +154,7 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
         path: plan.path,
         cumulative: cumulativeMeters(plan.path),
         onRoute: plan.onRoute,
+        leadIn: plan.leadIn,
         start: now,
         duration: motionDurationMs(gap, expectedRef.current),
         straightHeading: moveHeading,
@@ -160,9 +171,12 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
       let done = true;
       if (motion) {
         const k = Math.min(1, (t - motion.start) / motion.duration);
-        const at = pointAlong(motion.path, motion.cumulative, k);
+        const at = pointAlong(motion.path, motion.cumulative, k, motion.leadIn);
         position = at.point;
-        const wanted = motion.onRoute ? at.bearing ?? motion.straightHeading : motion.straightHeading;
+        // On the road: the road's direction. A lead-in with no road segment keeps the heading
+        // (the raw fix → road hop and the raw move both point across the road).
+        const fallback = motion.leadIn ? null : motion.straightHeading;
+        const wanted = motion.onRoute ? at.bearing ?? fallback : motion.straightHeading;
         if (wanted !== null) targetRotation.current = wanted;
         done = k >= 1;
       }
@@ -173,7 +187,7 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     };
     frame.current = requestAnimationFrame(step);
     // serverHeading is derived from `heading`; listed so a heading-only change runs this.
-  }, [animate, latitude, longitude, serverHeading]);
+  }, [animate, inferHeading, latitude, longitude, serverHeading]);
 
   return state;
 }

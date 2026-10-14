@@ -62,6 +62,11 @@ export type VehicleMarkerProps = {
   muted?: boolean;
   /** Interpolate between updates (default: on for the assigned vehicle). Reduced motion jumps. */
   animate?: boolean;
+  /**
+   * Without a heading, turn along the bearing of each move (default: on, off when `muted`):
+   * nearby drivers are snapped to a coarse grid, so they keep their last rotation instead.
+   */
+  inferHeading?: boolean;
   testID?: string;
 };
 
@@ -85,6 +90,7 @@ export const VehicleMarker: React.FC<VehicleMarkerProps> = ({
   description,
   muted = false,
   animate,
+  inferHeading,
   testID,
 }) => {
   const { theme } = useAppTheme();
@@ -98,6 +104,7 @@ export const VehicleMarker: React.FC<VehicleMarkerProps> = ({
     route,
     expectedIntervalMs: updateIntervalMs,
     animate: (animate ?? !muted) && !reduced,
+    inferHeading: inferHeading ?? !muted,
   });
   return (
     <Marker

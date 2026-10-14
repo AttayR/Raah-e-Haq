@@ -112,7 +112,7 @@ describe.each([
   it('nearby drivers render as car badges, not pins', () => {
     const { getByTestId } = render(
       <NearbyDriverMarkers
-        drivers={[{ id: 'a1', rating: 4.5, vehicle_type: 'car', distance_km: 1, estimated_arrival_min: 2, location: { latitude: 31.5, longitude: 74.3 } }]}
+        drivers={[{ id: 'a1', rating: 4.5, vehicle_type: 'car', distance_km: 1, estimated_arrival_min: 2, location: { latitude: 31.5, longitude: 74.3 }, heading: null }]}
       />,
     );
     const marker = getByTestId('nearby-driver-a1');

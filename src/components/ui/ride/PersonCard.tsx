@@ -68,8 +68,13 @@ export type PersonCardProps = {
   rating?: number | null;
   /** Shown instead of a rating: "New" (default) or "New rider". */
   newRatingLabel?: string;
-  /** Passenger side: "Toyota Corolla · White". Hidden when null. */
-  vehicleLine?: string | null;
+  /**
+   * Passenger side: make and model ("Mitsubishi Outlander"), one line, ellipsized. T-524: the
+   * old single "make model · colour" line broke mid-way ("Mitsubishi Outlander · / Silver").
+   */
+  vehicleName?: string | null;
+  /** Passenger side: the colour on its own line, so it is never cut (what the passenger looks for). */
+  vehicleColor?: string | null;
   /** Passenger side: `vehicle.license_plate` in a 28pt pill. Hidden when null. */
   plate?: string | null;
   /** Driver arrived: a 2pt `primary` ring on the plate helps spot the car. */
@@ -87,7 +92,8 @@ export type PersonCardProps = {
 
 /**
  * Person card (DESIGN_SYSTEM §5.27, §5.28, §12.5): one component for the driver card (passenger
- * side: vehicle line + plate pill) and the passenger card (driver side: name and rating only).
+ * side: make and model, colour under it, plate pill) and the passenger card (driver side: name
+ * and rating only).
  * Avatar 56 (initials fallback) · name `h3` · rating or "New" · then a row of equal tonal actions
  * with labels. No phone number is ever shown as text.
  */
@@ -97,7 +103,8 @@ export function PersonCard({
   photoUri,
   rating,
   newRatingLabel,
-  vehicleLine,
+  vehicleName,
+  vehicleColor,
   plate,
   plateHighlighted = false,
   actions = [],
@@ -119,9 +126,19 @@ export function PersonCard({
             {name || fallbackName}
           </AppText>
           <RatingDisplay rating={rating} newLabel={newRatingLabel} valueTestID={ratingTestID} />
-          {vehicleLine ? (
-            <AppText variant="caption" color="textSecondary" numberOfLines={2} testID={vehicleTestID}>
-              {vehicleLine}
+          {vehicleName ? (
+            <AppText variant="caption" color="textSecondary" numberOfLines={1} testID={vehicleTestID}>
+              {vehicleName}
+            </AppText>
+          ) : null}
+          {vehicleColor ? (
+            <AppText
+              variant="caption"
+              color="textSecondary"
+              numberOfLines={1}
+              testID={vehicleTestID ? `${vehicleTestID}-color` : undefined}
+            >
+              {vehicleColor}
             </AppText>
           ) : null}
         </View>

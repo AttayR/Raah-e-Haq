@@ -556,3 +556,66 @@ No app-facing change. Server rules only:
 ## BE-77: driver first name only (2026-10-13, found in T-519)
 
 The ride `driver` card (`GET /rides`, `GET /rides/{id}`, lifecycle responses) now carries `name` = the driver's **first name** and a new `first_name` (same value), like the `passenger` card. The `driver_assigned` notification reads "Your ride has been accepted by <first name>" and its `data.driver_name` is the first name and `data.driver_rating` is the public rating (one decimal, `null` below `ratings.min_public_count`, as in the ride resources; it was the raw rating, `0` when unrated). The same applies to admin-panel assignments. Chat `other_party.first_name` was already first-name only. Admin API callers still get the full driver record. App: no change needed if it already shows `driver.name`; prefer `driver.first_name`.
+
+## BE-78: no phone numbers between rider and driver; masked call or chat only (2026-10-14, for T-520)
+
+**Breaking for the app:** the ride `driver` and `passenger` cards (`GET /rides`, `GET /rides/{id}`, `POST /rides/{id}/assign-driver`, lifecycle responses, the pending feed) **no longer carry `phone`**, in any status and for either side (the passenger's own card too; the own number is in `GET /profile`). Chat, `GET /chats`, notifications and push data never carried one. Admin API callers still get the full user record. Remove every `tel:` link built from `driver.phone` / `passenger.phone`.
+
+New on every ride object for its passenger and assigned driver (`null` for anyone else, admins included):
+
+```json
+"contact": { "can_chat": true, "can_call": false, "call_mode": "chat_only", "closes_at": null }
+```
+
+- `can_chat`: chat send is open. `can_call`: show a Call button (`call_mode` is `proxy`). `call_mode`: `proxy` when a telephony provider is configured, else `chat_only`.
+- `closes_at`: ISO time contact closes for the caller, `null` while the ride is active. Contact (chat send and call) is open while the ride is `accepted` / `arrived` / `started`, then for **30 min** (`RIDES_CONTACT_WINDOW_MINUTES`):
+  - after `completed`: both sides;
+  - after `cancelled`: **only the passenger**, and only when the driver had reached the pickup (`arrived`/`started`). The driver can never start a chat or call after a cancel. A cancel before arrival closes contact for both at once (`closes_at` = the cancel time).
+
+`POST /rides/{id}/call` (no body; throttle 6/min per user):
+- 200 `{ data: { mode: "proxy", number: "+9221xxxxxxx", expires_at, contact_closes_at } }`: dial `number` with `tel:`. It bridges to the other party; neither side sees the other's real number. Valid until `expires_at` (30 min, never past `contact_closes_at`). Repeat taps return the same number while valid. Sessions are revoked with the provider at once on any cancel, a driver requeue, an admin reassignment, and when the window closes (scheduler `raahehaq:calls-revoke-closed` every 5 min, and on the next refused call). After a revoke the number stops bridging: on a failed call, ask `POST /call` again.
+- 200 `{ data: { mode: "chat_only", contact_closes_at } }`: no provider (the default until owner item B-19); open the chat instead. A provider error also answers `chat_only`.
+- 403 `NOT_RIDE_PARTICIPANT`; 409 `CONTACT_NOT_OPEN` (no driver yet); 403 `CONTACT_CLOSED` (more than 30 min after the end); 429.
+
+Chat send change (BE-13): `POST /rides/{id}/messages` now **works for 30 min after the ride ends** (per the rules above; after a cancel only the passenger, and only past arrival) (it used to close at the end with 409 `chat_closed`). After the window: **403 `CONTACT_CLOSED`** (was 409 `chat_closed`). `GET /rides/{id}/messages` and `GET /chats` rows gain `contact_closes_at`; `can_send` follows the window. Reading stays open for 24 h as before (then 410 `chat_expired`).
+
+Locally `TELEPHONY_DRIVER=fake` hands out made-up `+9221…` numbers (local/testing only, never dials).
+
+## BE-79: SOS and emergency contacts (2026-10-14, for T-520)
+
+Emergency contacts (own rows only; another user's id is 404; max 3):
+- `GET /me/emergency-contacts` → `{ contacts: [{ id, name, phone, created_at, updated_at }], max: 3 }`
+- `POST /me/emergency-contacts {name, phone}` → 201 `{ contact }`. Two parallel saves of the same number: the second gets 422 `errors.phone` (never a 500). `phone`: a Pakistani mobile in any common form (`0300 1234567`, `+923001234567`), stored and returned as E.164. 422 field errors for a bad name (letters only, 2-60), a non-PK-mobile, a duplicate or the user's own number; 422 `EMERGENCY_CONTACTS_LIMIT` at 3.
+- `PUT /me/emergency-contacts/{id} {name?, phone?}` → `{ contact }`; `DELETE /me/emergency-contacts/{id}`.
+- Throttle 20/min for writes.
+
+`POST /rides/{id}/sos {latitude?, longitude?, accuracy?, note?}` by the ride's passenger or assigned driver, while the ride is active or ended less than 30 min ago (throttle 5/min per user). Send the phone's current position when you have it.
+- 201 (new) or 200 (same reporter, same ride, within 2 min: the same incident, no second alert), `data`:
+  - `created` (bool), `incident: { id, status: "open"|"acknowledged"|"resolved", created_at }`
+  - `emergency_numbers: [{ key: "police", label, number: "15" }, { key: "rescue", label, number: "1122" }]` (from config; show in this order)
+  - `emergency_contacts`: the caller's contacts (same shape as above)
+  - `share_url`: for the passenger of an active ride, the live-trip link (BE-80, made or reused); `null` for the driver or after the ride
+  - `share_message`: plain text for the native share sheet / SMS to the contacts (driver first name, vehicle colour + make, plate, a Google Maps link to the sent position, the live link). Contains no phone numbers.
+- 403 `NOT_RIDE_PARTICIPANT`; 409 `SOS_WINDOW_CLOSED`; 422 validation; 429.
+- The other party is never notified. The admin panel shows an "open incidents" badge (polls every 30 s) and a list/detail with acknowledge / resolve.
+
+App flow (T-520): SOS button on the trip screen → POST sos → sheet with "Call 15", "Call 1122", "Alert my contacts" (share `share_message` to `emergency_contacts`), "Share live trip". Keep the call buttons usable even if the request fails (offline).
+
+## BE-80: share live trip (2026-10-14, for T-520)
+
+- `POST /rides/{id}/share` (the ride's passenger; ride not completed/cancelled) → 201 new / 200 the live one: `{ url, token, expires_at, ends_minutes_after_ride: 15 }`. One live link per ride; share `url` with the native share sheet. 403 `NOT_RIDE_PASSENGER` (driver, others, admins); 409 `RIDE_NOT_ACTIVE`; throttle 20/min.
+- `DELETE /rides/{id}/share` → `{ revoked: n }`; the link stops at once. A new POST makes a new link.
+- `expires_at`: the 12 h hard cap while the ride is active; once it ends, end + 15 min.
+- Public page `GET https://raahehaq.com/t/{token}` (no login, no cookies, `Cache-Control: no-store`, `X-Robots-Tag: noindex`, no referrer, no framing; CSP allows only our own files and the pinned Leaflet 1.9.4 build with SRI). It polls `GET /t/{token}/status` every 10 s: `{ status, status_text, driver: {first_name}|null, vehicle: {make, color, plate}|null, position: {latitude, longitude, heading, updated_at}|null, eta_minutes, expires_at, poll_seconds }`. Nothing else is exposed (no passenger data, addresses, ids or phones). Unknown, revoked or expired tokens: 404. Rate limits per IP: page 30/min, status 20/min.
+
+## BE-81: ride PIN (2026-10-14, for T-520)
+
+- A 4-digit PIN is made each time a driver is assigned (a reassigned or requeued ride gets a new one). Ride objects gain:
+  - `pin` (string, e.g. `"0427"`): **passenger only**, while the ride is `accepted` / `arrived` and the PIN is required (`pin_required`). The key is absent for the driver, admins, when the PIN is switched off and once the trip started.
+  - `pin_required` (bool, everyone): the driver's start needs the PIN now.
+- `POST /rides/{id}/start {pin: "0427"}` (send as a **string** of 4 digits; the legacy `PUT /rides/{id} {status: "started", pin}` too):
+  - 422 `PIN_REQUIRED` (missing); 422 `PIN_INVALID` with `error.attempts_left`; 423 `PIN_LOCKED` with `error.retry_after` seconds and a `Retry-After` header; 423 `PIN_BLOCKED` (below). 5 wrong PINs lock the start for 2 min and flag the ride for the admin (security event `ride_pin_locked`). A malformed pin is a plain 422 validation error (`errors.pin`) and does not use an attempt.
+- 423 `PIN_BLOCKED` (no `retry_after`): 3 locks on the same ride, or 5 locks by the same driver within 24 h, block the start until an admin clears it (admin ride page, "Clear PIN block"; security event `ride_pin_blocked`, high). Ride objects gain `pin_blocked` (bool). Driver app: show "Contact support"; don't offer the PIN entry while `pin_blocked` is true.
+- Switches: env `RIDES_PIN_ENABLED` (default on) and `RIDES_PIN_DISABLED_VEHICLE_TYPES` (csv), and on the admin settings page (App tab; rows added by migration) `ride_pin_enabled` and `ride_pin_disabled_vehicle_types`. They combine: the PIN is on only when **both** switches are on, and the disabled types are the **union** of both lists. So env is the deploy-level kill switch and the admin can only narrow it. When off, `pin_required` is false, the passenger gets no `pin`, and start works without it. Settings are read once per request (no per-ride queries in lists). **Per-city switching is out of scope**: there is no city model; revisit when cities exist. Rides assigned before this change have no PIN and start as before. Admin status moves never need it.
+- Local QA note: `.env.example` keeps `RIDES_PIN_ENABLED=true`. Until the app sends the PIN (T-520), the local `.env` may set it to `false` (owner/coordinator). Demo seed rides in `accepted`/`arrived` now carry a PIN.
+- App: passenger trip screen shows the PIN large ("Tell your driver this PIN") while `pin` is present; driver app shows a 4-digit PIN entry when `pin_required` is true before calling start, and handles the three codes.

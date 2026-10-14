@@ -249,6 +249,11 @@ export interface NearbyDriver {
     latitude: number;
     longitude: number;
   };
+  /**
+   * BE-76: degrees clockwise from north (15° steps), or null when the driver is standing, sent
+   * no heading, or the ping is stale. Null keeps the marker's last rotation (T-524).
+   */
+  heading: number | null;
 }
 
 export interface NearbyDriversQuery {
@@ -314,7 +319,14 @@ const normalizeNearbyDriver = (raw: unknown): NearbyDriver | null => {
     distance_km: toNumber(item.distance_km) ?? 0,
     estimated_arrival_min: toNumber(item.estimated_arrival_min) ?? 0,
     location: { latitude, longitude },
+    heading: nearbyHeading(item.heading),
   };
+};
+
+/** BE-76 heading as 0..360, or null (missing, not a number, negative). */
+const nearbyHeading = (value: unknown): number | null => {
+  const n = toNumber(value);
+  return n === null || n < 0 ? null : n % 360;
 };
 
 const clampRadius = (radiusKm: number | undefined): number => {

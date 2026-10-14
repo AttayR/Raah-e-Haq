@@ -203,7 +203,8 @@ describe.each([
         name="Bilal"
         fallbackName="Your driver"
         rating={4.86}
-        vehicleLine="Toyota Corolla · White"
+        vehicleName="Mitsubishi Outlander Sport"
+        vehicleColor="Silver"
         plate="LEA-1234"
         plateHighlighted
         actions={[
@@ -217,8 +218,11 @@ describe.each([
       />,
     );
     expect(screen.getByText('Bilal')).toBeTruthy();
-    // [UI-R5] the colour is what the passenger looks for: the vehicle line wraps to 2 lines.
-    expect(screen.getByTestId('vehicle').props.numberOfLines).toBe(2);
+    // T-524: make + model on one ellipsized line, the colour (what the passenger looks for) on its own.
+    expect(screen.getByTestId('vehicle').props.numberOfLines).toBe(1);
+    expect(screen.getByTestId('vehicle').props.children).toBe('Mitsubishi Outlander Sport');
+    expect(screen.getByTestId('vehicle-color').props.children).toBe('Silver');
+    expect(screen.getByTestId('vehicle-color').props.numberOfLines).toBe(1);
     expect(screen.getByTestId('rating').props.children).toBe('4.9');
     expect(screen.getByLabelText('Number plate LEA-1234')).toBeTruthy();
     expect(flat(screen.getByLabelText('Number plate LEA-1234').props.style)).toMatchObject({ borderColor: theme.colors.primary });

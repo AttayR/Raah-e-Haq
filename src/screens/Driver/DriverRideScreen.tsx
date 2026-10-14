@@ -72,14 +72,15 @@ const DriverRideScreen: React.FC = () => {
   // T-517: fit the driver and the current target (pickup → stop → drop-off) above the docked
   // panel; a manual pan pauses it until the recentre button or the next step.
   const mapRef = useRef<SafeMapViewRef>(null);
-  const [mapHeight, setMapHeight] = useState(0);
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const mapHeight = mapSize.height;
   const [dockHeight, setDockHeight] = useState(0);
   const viewport = useMemo<DriverRideViewport | null>(
     () =>
       mapHeight > 0
-        ? { mapHeight, dockHeight, topInset: insets.top, topControls: theme.layout.touchTargetDriving + theme.space[2] }
+        ? { mapHeight, mapWidth: mapSize.width, dockHeight, topInset: insets.top, topControls: theme.layout.touchTargetDriving + theme.space[2] }
         : null,
-    [mapHeight, dockHeight, insets.top, theme],
+    [mapHeight, mapSize.width, dockHeight, insets.top, theme],
   );
   const camera = useDriverRideCamera(mapRef, {
     step,
@@ -169,7 +170,10 @@ const DriverRideScreen: React.FC = () => {
       <View
         style={styles.container}
         accessibilityLabel={COPY.screenA11y}
-        onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}
+        onLayout={(e: LayoutChangeEvent) => {
+          const { width, height } = e.nativeEvent.layout;
+          setMapSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+        }}
       >
         <MapErrorBoundary>
           <SafeMapView

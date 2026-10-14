@@ -161,14 +161,29 @@ export const routePath = (
   return path.length >= 2 ? path : [from, b.point];
 };
 
+/**
+ * True when `from` is off the route (by more than half a metre): a route path from there starts
+ * with the hop onto the road. T-524: at trip start the marker sits on the raw pickup fix, and
+ * that hop's bearing (across the road) turned the car sideways for a second and a half.
+ */
+const hasLeadIn = (from: LatLng, route: ReadonlyArray<LatLng> | null | undefined): boolean => {
+  if (!route) return false;
+  const p = projectOnRoute(from, route);
+  return p !== null && p.offset > SAME_POINT_M;
+};
+
 /** What the marker does with a new position. */
 export type MovePlan =
   /** Moved less than the jitter threshold: stay (the heading may still change). */
   | { kind: 'hold' }
   /** Too far to animate believably (a GPS jump, a resumed app): jump there. */
   | { kind: 'jump'; to: LatLng }
-  /** Drive along `path` (two points = a straight line; more = along the route). */
-  | { kind: 'drive'; path: LatLng[]; onRoute: boolean };
+  /**
+   * Drive along `path` (two points = a straight line; more = along the route). `leadIn`: the
+   * first segment is the short hop from an off-road position onto the route (T-524), which
+   * must not decide the heading.
+   */
+  | { kind: 'drive'; path: LatLng[]; onRoute: boolean; leadIn: boolean };
 
 /**
  * Plans the move from where the marker is now (`from`, possibly mid-animation) to the new
@@ -187,8 +202,8 @@ export const planMove = (
     return { kind: 'jump', to: snapToRoute(to, route, thresholds.snapMeters) };
   }
   const onRoad = routePath(from, to, route, thresholds.snapMeters);
-  if (onRoad) return { kind: 'drive', path: onRoad, onRoute: true };
-  return { kind: 'drive', path: [from, to], onRoute: false };
+  if (onRoad) return { kind: 'drive', path: onRoad, onRoute: true, leadIn: hasLeadIn(from, route) };
+  return { kind: 'drive', path: [from, to], onRoute: false, leadIn: false };
 };
 
 /** `point` moved onto the route when it is within `snapMeters` of it; otherwise unchanged. */
@@ -214,12 +229,16 @@ const MIN_BEARING_SEGMENT_M = 1;
 
 /**
  * The point at fraction `k` (0..1) of the path's length, and the bearing of the segment it is
- * on (skipping hops shorter than a metre; null when the whole path is shorter).
+ * on (skipping hops shorter than a metre; null when the whole path is shorter). With
+ * `skipLeadIn` the first segment (the hop onto the road) never gives the bearing: while on it
+ * the bearing is the road's at the snapped point, or null (keep the current heading) when the
+ * path has no road segment.
  */
 export const pointAlong = (
   path: ReadonlyArray<LatLng>,
   cumulative: ReadonlyArray<number>,
   k: number,
+  skipLeadIn: boolean = false,
 ): { point: LatLng; bearing: number | null } => {
   const total = cumulative[cumulative.length - 1] ?? 0;
   if (path.length < 2 || total <= 0) return { point: path[path.length - 1], bearing: null };
@@ -229,11 +248,12 @@ export const pointAlong = (
   const segLen = cumulative[i] - cumulative[i - 1];
   const t = segLen > 0 ? (target - cumulative[i - 1]) / segLen : 1;
   const point = lerpLatLng(path[i - 1], path[i], t);
+  const first = skipLeadIn ? 2 : 1;
   let bearing: number | null = null;
-  for (let j = i; j < path.length && bearing === null; j += 1) {
+  for (let j = Math.max(i, first); j < path.length && bearing === null; j += 1) {
     if (cumulative[j] - cumulative[j - 1] >= MIN_BEARING_SEGMENT_M) bearing = bearingDegrees(path[j - 1], path[j]);
   }
-  for (let j = i - 1; j >= 1 && bearing === null; j -= 1) {
+  for (let j = i - 1; j >= first && bearing === null; j -= 1) {
     if (cumulative[j] - cumulative[j - 1] >= MIN_BEARING_SEGMENT_M) bearing = bearingDegrees(path[j - 1], path[j]);
   }
   return { point, bearing };

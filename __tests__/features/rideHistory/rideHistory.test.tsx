@@ -237,6 +237,21 @@ describe('RideHistoryScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('RideDetails', { rideId: 41, ride: expect.objectContaining({ id: 41 }) });
   });
 
+  it('each row shows the icon of its own vehicle type: bike, rickshaw, car (T-524)', async () => {
+    mock.onGet('/rides').reply(
+      200,
+      envelope(
+        [rawRide(), rawRide({ id: 42, vehicle_type: 'bike' }), rawRide({ id: 43, vehicle_type: 'rickshaw' })],
+        pageInfo(1, 1, 3),
+      ),
+    );
+    show(RideHistoryScreen);
+    const glyph = async (id: number) => (await screen.findByTestId(`ride-history-row-${id}-vehicle-icon`)).props.children;
+    expect(await glyph(41)).toBe('car-side');
+    expect(await glyph(42)).toBe('motorbike');
+    expect(await glyph(43)).toBe('rickshaw');
+  });
+
   it('a driver sees their earnings on each ride', async () => {
     mock.onGet('/rides').reply(200, envelope([rawRide()], pageInfo(1, 1, 1)));
     show(RideHistoryScreen, 'driver');
@@ -293,7 +308,8 @@ describe('RideDetailsScreen', () => {
       respond([200, envelope(rawRide())]);
       expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs 470');
       expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Bilal');
-      expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Toyota Corolla · White');
+      expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Toyota Corolla');
+      expect(screen.getByTestId('ride-details-person-subtitle-color').props.children).toBe('White');
       // UI-R5: the plate sits in the PersonCard plate pill.
       expect(screen.getByTestId('ride-details-person-plate').props.children).toBe('LEA-1234');
       expect(screen.getByText('First stop')).toBeTruthy();

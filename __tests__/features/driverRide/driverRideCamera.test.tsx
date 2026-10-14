@@ -2,13 +2,21 @@
  * T-517 (QA t-505 s1-02/s1-04): the DriverRide camera fits the driver and the current target
  * above the docked panel, refits on a step change, and leaves a manually panned map alone until
  * the recentre button.
+ *
+ * T-524 (QA t-517 b3): the region is computed here (not fitToCoordinates + edge padding, which
+ * the Google iOS provider did not honour with a tall panel): both points land in the visible
+ * strip between the back button and the panel, for a pickup 700 m away and one 5 km away.
  */
 import { act, renderHook } from '@testing-library/react-native';
+import type { LatLng, Region } from 'react-native-maps';
 import {
+  DRIVER_RIDE_FIT_MS,
+  FIT_MARGIN_SIDE,
   MIN_DRIVER_RIDE_DELTA,
-  driverRideEdgePadding,
   driverRideFitCoordinates,
   driverRideFitKey,
+  driverRideRegion,
+  driverRideVisibleStrip,
   useDriverRideCamera,
   type DriverRideViewport,
 } from '../../../src/features/driver-ride/camera';
@@ -17,7 +25,43 @@ import type { DriverRideStep } from '../../../src/features/driver-ride/steps';
 const PICKUP = { latitude: 31.51, longitude: 74.34 };
 const DROPOFF = { latitude: 31.47, longitude: 74.27 };
 const DRIVER = { latitude: 31.53, longitude: 74.36 };
-const VIEWPORT: DriverRideViewport = { mapHeight: 800, dockHeight: 300, topInset: 59, topControls: 64 };
+const VIEWPORT: DriverRideViewport = { mapHeight: 800, mapWidth: 390, dockHeight: 300, topInset: 59, topControls: 64 };
+
+/** iPhone 17 (402 × 874 pt) with the docked panel at 65% of the map, as in QA b3. */
+const TALL_PANEL: DriverRideViewport = {
+  mapHeight: 874,
+  mapWidth: 402,
+  dockHeight: Math.round(874 * 0.65),
+  topInset: 62,
+  topControls: 64,
+};
+
+const M_PER_DEG_LAT = 111_195;
+/** A point `north` / `east` metres from `origin`. */
+const offset = (origin: LatLng, north: number, east: number): LatLng => ({
+  latitude: origin.latitude + north / M_PER_DEG_LAT,
+  longitude: origin.longitude + east / (M_PER_DEG_LAT * Math.cos((origin.latitude * Math.PI) / 180)),
+});
+
+/** Where `p` lands on screen (points from the map's top-left) when the map shows `region`. */
+const toScreen = (p: LatLng, region: Region, viewport: DriverRideViewport) => ({
+  x: viewport.mapWidth! / 2 + ((p.longitude - region.longitude) / region.longitudeDelta) * viewport.mapWidth!,
+  y: viewport.mapHeight / 2 - ((p.latitude - region.latitude) / region.latitudeDelta) * viewport.mapHeight,
+});
+
+const expectInVisibleStrip = (points: LatLng[], viewport: DriverRideViewport) => {
+  const region = driverRideRegion(driverRideFitCoordinates(points[0], points[1]), viewport)!;
+  expect(region).not.toBeNull();
+  const covered = { top: viewport.topInset + viewport.topControls, bottom: viewport.mapHeight - viewport.dockHeight };
+  points.forEach((p) => {
+    const { x, y } = toScreen(p, region, viewport);
+    expect(y).toBeGreaterThan(covered.top);
+    expect(y).toBeLessThan(covered.bottom);
+    expect(x).toBeGreaterThanOrEqual(FIT_MARGIN_SIDE - 1e-6);
+    expect(x).toBeLessThanOrEqual(viewport.mapWidth! - FIT_MARGIN_SIDE + 1e-6);
+  });
+  return region;
+};
 
 describe('driver ride fit', () => {
   it('fits the driver and the target (and route points); nothing without a target', () => {
@@ -33,16 +77,6 @@ describe('driver ride fit', () => {
     expect(Math.max(...lats) - Math.min(...lats)).toBeGreaterThanOrEqual(MIN_DRIVER_RIDE_DELTA - 1e-9);
   });
 
-  it('pads for the docked panel at the bottom and the inset + back button on top', () => {
-    const padding = driverRideEdgePadding(VIEWPORT);
-    expect(padding.bottom).toBe(300 + 24);
-    expect(padding.top).toBe(59 + 64 + 24);
-    expect(padding.left).toBeGreaterThan(0);
-    // A very tall panel is clamped so some map stays visible.
-    const tall = driverRideEdgePadding({ ...VIEWPORT, dockHeight: 760 });
-    expect(800 - tall.top - tall.bottom).toBeGreaterThanOrEqual(160 - 1e-9);
-  });
-
   it('the refit key changes with the step and the target, and with ~100 m of driving, not with jitter', () => {
     const base = driverRideFitKey('to_pickup', DRIVER, PICKUP);
     expect(driverRideFitKey('on_trip', DRIVER, PICKUP)).not.toBe(base);
@@ -53,9 +87,58 @@ describe('driver ride fit', () => {
   });
 });
 
+describe('driverRideVisibleStrip', () => {
+  it('is the map between the back button and the panel, less the margins', () => {
+    const strip = driverRideVisibleStrip(VIEWPORT);
+    expect(strip.top).toBeGreaterThan(59 + 64);
+    expect(strip.bottom).toBeLessThan(800 - 300);
+    expect(strip.bottom - strip.top).toBeGreaterThan(200);
+  });
+
+  it('with a panel taller than the map leaves a small strip instead of none', () => {
+    const strip = driverRideVisibleStrip({ ...VIEWPORT, dockHeight: 760 });
+    expect(strip.bottom - strip.top).toBeGreaterThan(0);
+    expect(strip.top).toBeGreaterThanOrEqual(0);
+    expect(strip.bottom).toBeLessThanOrEqual(800);
+  });
+});
+
+describe('driverRideRegion', () => {
+  it('a pickup ~700 m away with the panel at 65%: both points sit above the panel (QA b3)', () => {
+    const driver = offset(PICKUP, 520, 470); // ~700 m north-east
+    const region = expectInVisibleStrip([driver, PICKUP], TALL_PANEL);
+    // The centre is south of both points: the visible strip is in the top third of the map.
+    expect(region.latitude).toBeLessThan(Math.min(driver.latitude, PICKUP.latitude));
+  });
+
+  it('a pickup ~700 m due south (the pickup is the lowest point) still clears the panel', () => {
+    expectInVisibleStrip([offset(PICKUP, 700, 0), PICKUP], TALL_PANEL);
+    expectInVisibleStrip([offset(PICKUP, 0, 700), PICKUP], TALL_PANEL);
+  });
+
+  it('a pickup ~5 km away with a normal panel fits both points', () => {
+    expectInVisibleStrip([offset(PICKUP, -3500, 3500), PICKUP], VIEWPORT);
+    expectInVisibleStrip([offset(PICKUP, -3500, 3500), PICKUP], TALL_PANEL);
+  });
+
+  it('keeps the map aspect, so the native fit shows exactly this region', () => {
+    const region = driverRideRegion(driverRideFitCoordinates(DRIVER, PICKUP), TALL_PANEL)!;
+    const cos = Math.cos((region.latitude * Math.PI) / 180);
+    const latPerPoint = region.latitudeDelta / TALL_PANEL.mapHeight;
+    const lngPerPoint = region.longitudeDelta / TALL_PANEL.mapWidth!;
+    expect(latPerPoint / lngPerPoint).toBeCloseTo(cos, 2);
+  });
+
+  it('nothing without points or a laid-out map', () => {
+    expect(driverRideRegion(null, VIEWPORT)).toBeNull();
+    expect(driverRideRegion([PICKUP], null)).toBeNull();
+    expect(driverRideRegion([PICKUP], { ...VIEWPORT, mapHeight: 0 })).toBeNull();
+  });
+});
+
 describe('useDriverRideCamera', () => {
   const setup = () => {
-    const map = { fitToCoordinates: jest.fn() };
+    const map = { animateToRegion: jest.fn() };
     const ref = { current: map };
     const hook = renderHook(
       (props: { step: DriverRideStep; target: typeof PICKUP; viewport: DriverRideViewport | null }) =>
@@ -65,18 +148,21 @@ describe('useDriverRideCamera', () => {
     return { map, ...hook };
   };
 
-  it('fits once the map and the panel are laid out, with the panel padding', () => {
+  it('moves to the computed region once the map and the panel are laid out', () => {
     const { map, result, rerender } = setup();
-    expect(map.fitToCoordinates).not.toHaveBeenCalled();
+    expect(map.animateToRegion).not.toHaveBeenCalled();
     act(() => result.current.onMapReady());
-    expect(map.fitToCoordinates).toHaveBeenCalledTimes(1);
-    expect(map.fitToCoordinates.mock.calls[0][1]).toEqual({ edgePadding: driverRideEdgePadding(VIEWPORT), animated: true });
+    expect(map.animateToRegion).toHaveBeenCalledTimes(1);
+    expect(map.animateToRegion.mock.calls[0]).toEqual([
+      driverRideRegion(driverRideFitCoordinates(DRIVER, PICKUP), VIEWPORT),
+      DRIVER_RIDE_FIT_MS,
+    ]);
 
     rerender({ step: 'to_pickup', target: PICKUP, viewport: VIEWPORT });
-    expect(map.fitToCoordinates).toHaveBeenCalledTimes(1);
+    expect(map.animateToRegion).toHaveBeenCalledTimes(1);
     rerender({ step: 'on_trip', target: DROPOFF, viewport: VIEWPORT });
-    expect(map.fitToCoordinates).toHaveBeenCalledTimes(2);
-    expect(map.fitToCoordinates.mock.calls[1][0]).toEqual(expect.arrayContaining([DROPOFF, DRIVER]));
+    expect(map.animateToRegion).toHaveBeenCalledTimes(2);
+    expect(map.animateToRegion.mock.calls[1][0]).toEqual(driverRideRegion(driverRideFitCoordinates(DRIVER, DROPOFF), VIEWPORT));
   });
 
   it('a manual pan pauses it until recentre or the next step', () => {
@@ -86,16 +172,20 @@ describe('useDriverRideCamera', () => {
     expect(result.current.paused).toBe(true);
     // A taller panel would normally refit; not while paused.
     rerender({ step: 'to_pickup', target: PICKUP, viewport: { ...VIEWPORT, dockHeight: 400 } });
-    expect(map.fitToCoordinates).toHaveBeenCalledTimes(1);
+    expect(map.animateToRegion).toHaveBeenCalledTimes(1);
 
     act(() => result.current.recentre());
     expect(result.current.paused).toBe(false);
-    expect(map.fitToCoordinates).toHaveBeenCalledTimes(2);
+    expect(map.animateToRegion).toHaveBeenCalledTimes(2);
+    // The recentre uses the same strip-aware region as the fit.
+    expect(map.animateToRegion.mock.calls[1][0]).toEqual(
+      driverRideRegion(driverRideFitCoordinates(DRIVER, PICKUP), { ...VIEWPORT, dockHeight: 400 }),
+    );
 
     act(() => result.current.onRegionChangeComplete({ ...PICKUP, latitudeDelta: 1, longitudeDelta: 1 }, { isGesture: true }));
     rerender({ step: 'at_pickup', target: PICKUP, viewport: { ...VIEWPORT, dockHeight: 400 } });
     expect(result.current.paused).toBe(false);
-    expect(map.fitToCoordinates).toHaveBeenCalledTimes(3);
+    expect(map.animateToRegion).toHaveBeenCalledTimes(3);
   });
 
   it('our own animations (not gestures) do not pause it', () => {

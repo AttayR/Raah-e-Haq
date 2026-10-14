@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AddressPair, AppText, Card, Icon, RideStatusPill } from '../../../components/ui';
+import { AddressPair, AppText, Card, Icon, RideStatusPill, vehicleIconName } from '../../../components/ui';
 import { space } from '../../../theme';
 import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
 import { formatDateTime, rideAmountText, rideTime } from '../format';
@@ -50,7 +50,13 @@ export const RideHistoryRow = memo(function RideHistoryRow({ ride, viewer, onPre
 
         <View style={[styles.bottomRow, { borderTopColor: theme.colors.border }]}>
           <View style={[styles.place, styles.flex]}>
-            <Icon name="rides" size={20} color="textSecondary" />
+            {/* T-524: the ride's own vehicle (bike, rickshaw, car, van), not always a car. */}
+            <Icon
+              name={vehicleIconName(ride.vehicleType)}
+              size={20}
+              color="textSecondary"
+              testID={`ride-history-row-${ride.id}-vehicle-icon`}
+            />
             {vehicle ? (
               <AppText variant="bodySmall" color="textSecondary" numberOfLines={1} style={styles.flex}>
                 {vehicle}

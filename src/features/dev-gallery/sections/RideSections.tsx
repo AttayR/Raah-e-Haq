@@ -181,7 +181,8 @@ export function RidePersonSection() {
         name={r.driver?.name}
         fallbackName={t('ride.driverMarker')}
         rating={r.driver?.rating}
-        vehicleLine={v ? `${v.make} ${v.model} · ${v.color}` : null}
+        vehicleName={v ? `${v.make} ${v.model}` : null}
+        vehicleColor={v ? v.color : null}
         plate={v?.licensePlate}
         plateHighlighted
         actions={[

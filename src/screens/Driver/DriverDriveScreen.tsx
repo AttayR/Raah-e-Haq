@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Linking, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { RootState } from '../../store';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
-import { logger } from '../../core/logging/logger';
+import { useFollowCamera } from '../../hooks/useFollowCamera';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
@@ -94,22 +94,13 @@ export default function DriverDriveScreen() {
     [mapHeight, sheetHeight, insets.top],
   );
 
-  const centre = useCallback(() => {
-    if (!location || !mapReady || !mapRef.current) return;
-    try {
-      mapRef.current.animateToRegion(regionInViewport(location, viewport, LOCATE_DELTA));
-    } catch (error) {
-      logger.debug('Drive map: could not centre', error);
-    }
-  }, [location, mapReady, viewport]);
-
-  // First fix once the map is ready; later fixes move the marker only, so a pan is not undone.
-  const centredOnce = useRef(false);
-  useEffect(() => {
-    if (centredOnce.current || !location || !mapReady) return;
-    centredOnce.current = true;
-    centre();
-  }, [centre, location, mapReady]);
+  // T-524: the map follows the driver's own marker (online or offline) until the driver pans or
+  // zooms it; "locate me" centres again and resumes following (as on DriverRide).
+  const regionFor = useCallback(
+    (point: { latitude: number; longitude: number }) => regionInViewport(point, viewport, LOCATE_DELTA),
+    [viewport],
+  );
+  const follow = useFollowCamera(mapRef, { point: location, ready: mapReady, regionFor });
 
   const promptForLocation = useCallback(async () => {
     const open = await confirm({
@@ -125,8 +116,8 @@ export default function DriverDriveScreen() {
       promptForLocation();
       return;
     }
-    centre();
-  }, [centre, location, promptForLocation]);
+    follow.recentre();
+  }, [follow, location, promptForLocation]);
 
   // The server decides (403 not approved / no vehicle, 409 on a ride) and its message is shown;
   // the location tracker starts posting once online (T-402), as on the old Home tab.
@@ -152,6 +143,7 @@ export default function DriverDriveScreen() {
             }
             customMapStyle={theme.mapStyle}
             onMapReady={() => setMapReady(true)}
+            onRegionChangeComplete={follow.onRegionChangeComplete}
             fallbackComponent={
               <View style={styles.fill}>
                 <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>

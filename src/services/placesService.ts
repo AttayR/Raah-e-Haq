@@ -10,17 +10,45 @@ export type AutocompleteItem = {
   };
 };
 
-export async function fetchAutocomplete(query: string): Promise<AutocompleteItem[]> {
+/**
+ * T-524 (QA t-517: "Lib" suggested Liberia and Libya): every place lookup is limited to Pakistan.
+ * Autocomplete is restricted to `country:pk` and ranked for the `pk` region; with a known
+ * position (the rider, the pickup) it is also biased to ~50 km around it, so "Lib" means
+ * Liberty Market. Geocoding and place details carry `region=pk` too.
+ */
+export const PLACES_COUNTRY = 'pk';
+/** Radius of the location bias around the rider (metres). */
+export const PLACES_BIAS_RADIUS_M = 50_000;
+
+export type PlacesBias = { latitude: number; longitude: number } | null | undefined;
+
+const isFiniteBias = (near: PlacesBias): near is { latitude: number; longitude: number } =>
+  !!near && Number.isFinite(near.latitude) && Number.isFinite(near.longitude) && !(near.latitude === 0 && near.longitude === 0);
+
+/** The Place Autocomplete URL: Pakistan only, biased around `near` when known. */
+export const autocompleteUrl = (query: string, near?: PlacesBias): string => {
+  const params = [
+    `input=${encodeURIComponent(query)}`,
+    `components=country:${PLACES_COUNTRY}`,
+    `region=${PLACES_COUNTRY}`,
+  ];
+  if (isFiniteBias(near)) {
+    params.push(`location=${near.latitude},${near.longitude}`, `radius=${PLACES_BIAS_RADIUS_M}`);
+  }
+  params.push(`key=${MAPS_CONFIG.API_KEY}`);
+  return `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.join('&')}`;
+};
+
+export async function fetchAutocomplete(query: string, near?: PlacesBias): Promise<AutocompleteItem[]> {
   if (!query || query.length < 2) return [];
-  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${MAPS_CONFIG.API_KEY}`;
-  const res = await fetch(url);
+  const res = await fetch(autocompleteUrl(query, near));
   const json = await res.json();
   if (json.status !== 'OK') return [];
   return json.predictions as AutocompleteItem[];
 }
 
 export async function fetchPlaceDetails(placeId: string): Promise<{ latitude: number; longitude: number; address?: string } | null> {
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=geometry/location,formatted_address&key=${MAPS_CONFIG.API_KEY}`;
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=geometry/location,formatted_address&region=${PLACES_COUNTRY}&key=${MAPS_CONFIG.API_KEY}`;
   const res = await fetch(url);
   const json = await res.json();
   if (json.status !== 'OK' || !json.result?.geometry?.location) return null;
@@ -62,7 +90,7 @@ async function fallbackReverseGeocode(lat: number, lng: number): Promise<string 
 
 export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${MAPS_CONFIG.API_KEY}`;
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&region=${PLACES_COUNTRY}&key=${MAPS_CONFIG.API_KEY}`;
     
     const res = await fetch(url);
     logger.debug('Reverse geocoding response status:', res.status);

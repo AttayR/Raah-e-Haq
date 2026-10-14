@@ -12,6 +12,8 @@ import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { AppText, BottomSheet, MapControls, Screen, type SheetSnap } from '../../components/ui';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
+import { NearbyDriverMarkers } from '../../components/passenger/NearbyDrivers';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
@@ -42,6 +44,9 @@ const USER_DOT = space[4];
  * → full; map controls fade out at full). "Where to?" pushes the Booking route (tab bar hidden).
  * Recent rides come from GET /rides; stats moved to Activity; offers wait for BE-10 (UI-R9).
  * Saved places (GET /saved-places, T-516) are chips: a tap books a ride to that place.
+ * T-524 (passenger-home spec, map item 2): nearby drivers (BE-20) around the rider as muted
+ * vehicle markers, polled like the booking map and only while Home is focused and the app is
+ * in the foreground (the hook stops when backgrounded).
  */
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
@@ -63,6 +68,7 @@ export default function PassengerHomeScreen() {
   // Services off, or access refused for good, can only be turned back on in Settings.
   const needsSettings = locationError === 'disabled' || (locationError === 'denied' && !permissionStatus.canAskAgain);
   const enableLocation = needsSettings ? openSettings : requestLocationPermission;
+  const nearbyDrivers = useNearbyDrivers(currentLocation, { enabled: isFocused });
 
   const rides = useRideHistory('all', isFocused);
   const recentRides = useMemo(() => toHomeRecentRides(rides.items), [rides.items]);
@@ -174,6 +180,7 @@ export default function PassengerHomeScreen() {
                 />
               </Marker>
             ) : null}
+            <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />
           </SafeMapView>
         </MapErrorBoundary>
       </View>
