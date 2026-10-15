@@ -3,6 +3,7 @@ import { isRecord, readId, readNumber, readNumberOrNull, readOneOf, readText } f
 import type { Pagination } from '../../core/api/types';
 import { toRideRatingState } from '../rating/api';
 import { firstNameOf } from '../../utils/format';
+import { driverSplitOf, fareExtrasOf, fareLockOf, toOverchargeState } from '../fare/api';
 import type {
   CancellationReason,
   Page,
@@ -26,6 +27,14 @@ export const RIDES_PAGE_SIZE = 20;
 
 const STATUSES: ReadonlyArray<RideStatus> = ['requested', 'accepted', 'arrived', 'started', 'completed', 'cancelled'];
 const REASONS: ReadonlyArray<CancellationReason> = ['passenger', 'driver', 'system', 'weather', 'other'];
+
+const chargeReasonOf = (value: unknown): 'late_cancel' | 'no_show' | null =>
+  value === 'late_cancel' || value === 'no_show' ? value : null;
+
+const positiveOrNull = (value: unknown): number | null => {
+  const n = readNumberOrNull(value);
+  return n !== null && n > 0 ? n : null;
+};
 
 /** API status words to app statuses; legacy `ongoing` reads as `started`. */
 const toStatus = (value: unknown): RideStatus => (value === 'ongoing' ? 'started' : readOneOf(value, STATUSES, 'requested'));
@@ -66,6 +75,7 @@ const toBreakdown = (raw: unknown): RideFareBreakdown | null => {
     time: readNumber(raw.time),
     stops: readNumber(raw.stops),
     minFareAdjustment: readNumber(raw.min_fare_adjustment),
+    ...fareExtrasOf(raw),
     total: readNumber(raw.total),
   };
 };
@@ -124,6 +134,11 @@ export const toRide = (raw: unknown): Ride | null => {
     createdAt: readText(raw.created_at),
     myRating: rating.myRating,
     canRate: rating.canRate,
+    fareLock: fareLockOf(raw),
+    cancellationFee: positiveOrNull(raw.cancellation_fee),
+    cancellationChargeReason: chargeReasonOf(raw.cancellation_charge_reason),
+    overcharge: toOverchargeState(raw.overcharge_report),
+    split: driverSplitOf(raw),
   };
 };
 

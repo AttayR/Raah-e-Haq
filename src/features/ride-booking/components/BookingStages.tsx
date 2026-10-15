@@ -9,6 +9,8 @@ import { TripSummaryCard } from './TripSummaryCard';
 import { FareReview, VehicleChoice } from './BookingChoices';
 import type { BookingPlace } from '../buildRideRequest';
 import type { useFareEstimates, useVehicleTypes } from '../hooks';
+import type { FareOffer } from '../../fare/hooks';
+import type { FareNotice } from '../../fare/types';
 
 type Coords = { latitude: number; longitude: number };
 
@@ -81,6 +83,10 @@ type FareStageProps = {
   tripSummary: string | null;
   vehicleType: Parameters<typeof FareReview>[0]['vehicleType'];
   estimates: ReturnType<typeof useFareEstimates>;
+  /** BE-83 "Offer your fare" for the selected quote. */
+  offer?: FareOffer;
+  /** BE-60 fuel notice from the vehicle catalogue. */
+  catalogueNotice?: FareNotice | null;
   onChangeVehicle: () => void;
   onCancel: () => void;
   onConfirm: () => void;
@@ -98,7 +104,13 @@ export const FareStage: React.FC<FareStageProps> = (p) => (
         { label: 'Cancel', icon: 'close', tone: 'danger', onPress: p.onCancel, testID: 'cancel-booking' },
       ]}
     />
-    <FareReview vehicleType={p.vehicleType} estimates={p.estimates} onConfirm={p.onConfirm} />
+    <FareReview
+      vehicleType={p.vehicleType}
+      estimates={p.estimates}
+      offer={p.offer}
+      catalogueNotice={p.catalogueNotice}
+      onConfirm={p.onConfirm}
+    />
   </View>
 );
 

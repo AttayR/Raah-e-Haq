@@ -3,6 +3,8 @@ import type { DriverTodayStatsValues } from '../../components/driver/home/Driver
 import type { HomeStat } from '../passenger-home/types';
 import { STATS_COPY } from './copy';
 import { formatDateTime } from '../ride-history/format';
+import { t } from '../../i18n';
+import { formatRate } from '../fare/format';
 import type { DriverStats, EarningsDay, EarningsPeriod, EarningsRide, PassengerStats } from './types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -107,6 +109,19 @@ export const shortPlace = (address: string | null): string | null => {
 };
 
 /**
+ * "Fare Rs 300 · commission 20% = Rs 60" (BE-84 rate and amount); older rows without a rate say
+ * "Fare Rs 300 · commission Rs 60" from the stored platform commission.
+ */
+export const fareSplitText = (ride: EarningsRide, money: (amount: number) => string): string =>
+  ride.commissionRate !== null && ride.commissionAmount !== null
+    ? t('driverFare.rideFareSplit', {
+        fare: money(ride.totalFare),
+        rate: formatRate(ride.commissionRate),
+        commission: money(ride.commissionAmount),
+      })
+    : STATS_COPY.rideFare(money(ride.totalFare), money(ride.platformCommission));
+
+/**
  * One trip on the Earnings list (T-514): the title is the route ("Gulberg → Liberty Market")
  * when the server sends the addresses, otherwise when it ended ("Today · 7:55 PM"); never the
  * raw ride code, which stays on the ride details. The second line has the time (under a route),
@@ -124,7 +139,7 @@ export const earningsRideText = (
   const subtitle = [
     route ? when : null,
     ride.distanceKm !== null && ride.distanceKm > 0 ? formatDistanceKm(ride.distanceKm) : null,
-    STATS_COPY.rideFare(money(ride.totalFare), money(ride.platformCommission)),
+    fareSplitText(ride, money),
   ]
     .filter(Boolean)
     .join(' · ');

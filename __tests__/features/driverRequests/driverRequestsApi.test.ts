@@ -28,7 +28,19 @@ describe('toPendingRideRequest', () => {
       paymentMethod: 'cash',
       vehicleType: 'car',
       expiresAt: Date.parse('2026-10-09T10:00:00.000Z') + 10 * 60_000,
+      isOffer: false,
+      serverFare: null,
     });
+  });
+
+  it('T-521 (BE-83): marks a passenger offer and keeps the app fare to compare', () => {
+    const request = toPendingRideRequest(
+      pendingRide({ is_offer: true, offered_fare: '170.00', server_fare: '152.00', estimated_fare: '170.00' }),
+      10,
+    );
+    expect(request).toMatchObject({ isOffer: true, estimatedFare: 170, serverFare: 152 });
+    // An offer flag without an offered fare is not shown as an offer.
+    expect(toPendingRideRequest(pendingRide({ is_offer: true, offered_fare: null }), 10)?.isOffer).toBe(false);
   });
 
   it('leaves unknown numbers null instead of inventing them', () => {

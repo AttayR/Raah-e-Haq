@@ -5,6 +5,7 @@
  */
 
 import type { MyRating } from '../rating/types';
+import type { DriverFareSplit, FareLock, OverchargeState } from '../fare/types';
 
 export type RideStatus = 'requested' | 'accepted' | 'arrived' | 'started' | 'completed' | 'cancelled';
 
@@ -30,6 +31,10 @@ export interface RideFareBreakdown {
   time: number;
   stops: number;
   minFareAdjustment: number;
+  /** BE-60 / BE-83 / BE-85 parts (0 on older rides). */
+  bookingFee: number;
+  offerAdjustment: number;
+  waiting: number;
   total: number;
 }
 
@@ -83,6 +88,15 @@ export interface Ride {
   myRating: MyRating | null;
   /** BE-07: the signed-in user may still rate this ride. */
   canRate: boolean;
+  /** BE-82: the fare locked at accept; null before accept or on older rides. */
+  fareLock: FareLock | null;
+  /** BE-85: what the passenger was charged for a late cancel or no-show (null: nothing). */
+  cancellationFee: number | null;
+  cancellationChargeReason: 'late_cancel' | 'no_show' | null;
+  /** BE-82, passenger only: the "driver asked for more" button and report. */
+  overcharge: OverchargeState | null;
+  /** BE-84, the ride's driver only: fare → commission → earnings. */
+  split: DriverFareSplit | null;
 }
 
 export type { Page } from '../../core/api/types';

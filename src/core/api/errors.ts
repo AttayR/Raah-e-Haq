@@ -28,8 +28,9 @@ export interface AccountRefusal {
 
 /**
  * Numeric fields of the nested `error` object, for refusals that carry numbers the UI shows
- * (BE-64 `not_near_pickup`: `distance_m`, `radius_m`). Numbers only: text from an error body
- * is never carried beyond `message`.
+ * (BE-64 `not_near_pickup`: `distance_m`, `radius_m`; BE-85 `amount_owed`, `limit`; BE-83's
+ * nested `offer_band` as `offer_band.min` …). Numbers only: text from an error body is never
+ * carried beyond `message`.
  */
 export type ApiErrorExtra = Readonly<Record<string, number>>;
 
@@ -161,6 +162,11 @@ const toExtra = (nested: Record<string, unknown> | undefined): ApiErrorExtra | u
   Object.entries(nested).forEach(([key, value]) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
       extra[key] = value;
+    } else if (isObject(value) && key !== 'details') {
+      // One level of numbers inside a nested object, as `key.field` (BE-83 `offer_band.min`).
+      Object.entries(value).forEach(([field, inner]) => {
+        if (typeof inner === 'number' && Number.isFinite(inner)) extra[`${key}.${field}`] = inner;
+      });
     }
   });
   return Object.keys(extra).length > 0 ? extra : undefined;

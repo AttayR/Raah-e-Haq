@@ -18,6 +18,7 @@ import {
 import { RIDE_HISTORY_COPY } from '../copy';
 import { canOpenChat, otherParty } from '../format';
 import { RideRatingSection } from '../../rating/components/RideRatingSection';
+import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
 import type { RideRatingState } from '../../rating/types';
 import { useRideDetail, useRideViewer } from '../hooks';
 import type { RideHistoryRoutes } from '../navigation';
@@ -134,6 +135,18 @@ export default function RideDetailsScreen() {
           photoUri={rated?.profileImageUrl ?? null}
           onChange={onRatingChange}
         />
+        {viewer === 'passenger' ? (
+          // BE-82: "Driver asked for more?" for 24 h after the ride, then the report's status.
+          <OverchargeReportSection
+            rideId={ride.id}
+            state={ride.overcharge}
+            fare={ride.fareLock?.acceptedFare ?? ride.totalFare}
+            onReported={() => {
+              refresh();
+            }}
+            testID="ride-details-overcharge"
+          />
+        ) : null}
         <ReceiptCard ride={ride} viewer={viewer} />
         <TimelineCard ride={ride} />
       </View>

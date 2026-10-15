@@ -10,6 +10,8 @@ import type { DriverRideAction } from '../../features/driver-ride/slice';
 import { activeStops, type DriverRideStep } from '../../features/driver-ride/steps';
 import { riderRating } from '../../features/driver-requests/rating';
 import { t } from '../../i18n';
+import { WaitingTimer } from '../../features/fare/components/FareBits';
+import { toFarePolicy } from '../../features/fare/api';
 
 type Props = {
   ride: RideResource;
@@ -33,6 +35,12 @@ type Props = {
   onComplete: () => void;
   onCompleteStop: (stopId: number) => void;
   onCancel: () => void;
+  /**
+   * BE-85: "Passenger didn't come", offered once `no_show_cancel_at` has passed. It then replaces
+   * Cancel (the server treats any driver cancel after the wait as a no-show, with no strike), so
+   * the pickup footer keeps two buttons on small phones.
+   */
+  onNoShow?: () => void;
   /** Bottom safe-area inset: the fixed footer sits `bottomInset + 16` above the screen edge. */
   bottomInset?: number;
 };
@@ -68,6 +76,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   onComplete,
   onCompleteStop,
   onCancel,
+  onNoShow,
   bottomInset = 0,
 }) => {
   const { theme } = useAppTheme();
@@ -106,9 +115,10 @@ export const DriverRidePanel: React.FC<Props> = ({
     actions.push({ key: 'navigate', icon: 'navigate', label: COPY.navigate, accessibilityLabel: COPY.navigateA11y, onPress: onNavigate, testID: 'driver-ride-navigate' });
   }
 
-  const cancellable = step === 'to_pickup' || step === 'at_pickup';
+  const noShow = step === 'at_pickup' && !!onNoShow;
+  const cancellable = (step === 'to_pickup' || step === 'at_pickup') && !noShow;
   const blockedNotice = step === 'at_pickup' && startBlocked;
-  const hasFooter = !!primary || cancellable || blockedNotice;
+  const hasFooter = !!primary || cancellable || noShow || blockedNotice;
   const footerPad = { paddingBottom: bottomInset + space[4] };
 
   return (
@@ -141,6 +151,16 @@ export const DriverRidePanel: React.FC<Props> = ({
           actions={actions}
           nameTestID="driver-ride-passenger"
         />
+
+        {step === 'at_pickup' ? (
+          // BE-85: the same waiting timer the passenger sees, after a verified arrival.
+          <WaitingTimer
+            arrivedAt={ride.arrived_at}
+            policy={toFarePolicy(ride.fare_policy)}
+            arrivalVerified={ride.arrival_verified === true}
+            testID="driver-ride-waiting"
+          />
+        ) : null}
 
         <AddressPair
           size="lg"
@@ -181,6 +201,16 @@ export const DriverRidePanel: React.FC<Props> = ({
               loading={userAction}
               accessibilityLabel={userAction ? COPY.working : primary.label}
               testID={primary.testID}
+            />
+          ) : null}
+          {noShow && onNoShow ? (
+            <Button
+              label={t('driverFare.noShowButton')}
+              variant="destructiveSoft"
+              size="lg"
+              onPress={onNoShow}
+              disabled={busy}
+              testID="driver-ride-no-show"
             />
           ) : null}
           {cancellable ? (

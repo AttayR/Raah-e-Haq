@@ -48,7 +48,7 @@ describe('toAppNotification', () => {
       category: 'ride',
       title: 'Driver Assigned',
       body: 'Your ride has been accepted by Ali',
-      data: { rideId: 7, stopId: null, messageId: null, fare: null, cancelledBy: null },
+      data: { rideId: 7, stopId: null, messageId: null, fare: null, cancelledBy: null, requeued: false },
       imageUrl: null,
       actionUrl: null,
       actionText: null,
@@ -72,7 +72,7 @@ describe('toAppNotification', () => {
         data: { ride_id: '9', message_id: 3, sender_first_name: 'Ali', fare: 450, cancelled_by: 'driver' },
       }),
     );
-    expect(item?.data).toEqual({ rideId: 9, stopId: null, messageId: 3, fare: '450', cancelledBy: 'driver' });
+    expect(item?.data).toEqual({ rideId: 9, stopId: null, messageId: 3, fare: '450', cancelledBy: 'driver', requeued: false });
     expect(JSON.stringify(item?.data)).not.toContain('Ali');
   });
 

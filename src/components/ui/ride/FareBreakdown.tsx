@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { t } from '../../../i18n';
 import { componentTokens, space } from '../../../theme';
-import { formatDistance, formatDuration, formatMoney } from '../../../utils/format';
+import { formatDistance, formatDuration, formatMoney, formatSignedMoney } from '../../../utils/format';
 import { AppText, type TextColor } from '../AppText';
 import { Card } from '../Card';
 
@@ -16,6 +16,12 @@ export type FareBreakdownInput = {
   time?: number | null;
   stops?: number | null;
   minFareAdjustment?: number | null;
+  /** BE-60 booking fee (shown when > 0). */
+  bookingFee?: number | null;
+  /** BE-83 the passenger's offer less the server fare, signed (shown when not 0). */
+  offerAdjustment?: number | null;
+  /** BE-85 billed waiting (shown when > 0). */
+  waiting?: number | null;
   /** A promotion/discount amount, positive or negative; shown as a minus in `success`. */
   discount?: number | null;
 };
@@ -33,8 +39,9 @@ export type FareRow = {
 const present = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
 
 /**
- * The rows the API returned (§5.26): base, distance, time; stops and the minimum-fare
- * adjustment only when > 0; a discount only when present. Nothing is invented.
+ * The rows the API returned (§5.26): base, distance, time; stops, the minimum-fare adjustment,
+ * the booking fee and waiting only when > 0; the offer (T-521) and a discount only when not 0.
+ * Nothing is invented.
  */
 export function fareBreakdownRows(
   breakdown: FareBreakdownInput | null | undefined,
@@ -65,6 +72,20 @@ export function fareBreakdownRows(
   if (present(breakdown.stops) && breakdown.stops > 0) rows.push({ key: 'stops', label: t('ride.fareStops'), value: money(breakdown.stops) });
   if (present(breakdown.minFareAdjustment) && breakdown.minFareAdjustment > 0) {
     rows.push({ key: 'minimum', label: t('ride.fareMinimum'), value: money(breakdown.minFareAdjustment) });
+  }
+  if (present(breakdown.bookingFee) && breakdown.bookingFee > 0) {
+    rows.push({ key: 'bookingFee', label: t('ride.fareBookingFee'), value: money(breakdown.bookingFee) });
+  }
+  if (present(breakdown.offerAdjustment) && breakdown.offerAdjustment !== 0) {
+    rows.push({
+      key: 'offer',
+      label: t('ride.fareOffer'),
+      value: formatSignedMoney(breakdown.offerAdjustment, context.currency),
+      tone: breakdown.offerAdjustment < 0 ? 'success' : undefined,
+    });
+  }
+  if (present(breakdown.waiting) && breakdown.waiting > 0) {
+    rows.push({ key: 'waiting', label: t('ride.fareWaiting'), value: money(breakdown.waiting) });
   }
   if (present(breakdown.discount) && breakdown.discount !== 0) {
     rows.push({ key: 'discount', label: t('ride.fareDiscount'), value: money(-Math.abs(breakdown.discount)), tone: 'success' });

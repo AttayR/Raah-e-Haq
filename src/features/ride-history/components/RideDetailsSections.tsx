@@ -17,6 +17,9 @@ import { cancellationText, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL } from '../
 import { formatMoney } from '../../../utils/format';
 import { formatDateTime, otherParty, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
 import type { Ride, RideViewer } from '../types';
+import { t } from '../../../i18n';
+import { FareLockBadge } from '../../fare/components/FareBits';
+import { cancellationFeeText, formatRate } from '../../fare/format';
 
 type SectionProps = { ride: Ride; viewer: RideViewer };
 
@@ -79,9 +82,24 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
           {metrics}
         </AppText>
       ) : null}
+      {!cancelled && ride.fareLock ? (
+        <View style={styles.metrics}>
+          <FareLockBadge lock={ride.fareLock} testID="ride-details-fare-locked" />
+        </View>
+      ) : null}
     </Card>
   );
 }
+
+/**
+ * BE-85: what the cancel cost, said from the viewer's side; "Cancelled rides are not charged."
+ * when nothing was charged. The driver hears that their share is credited once the passenger pays.
+ */
+export const cancellationChargeText = (ride: Pick<Ride, 'cancellationFee' | 'cancellationChargeReason'>, viewer: RideViewer): string => {
+  if (ride.cancellationFee === null) return C.noChargeCancelled;
+  if (viewer === 'driver') return t('driverFare.cancelFeeShare', { amount: formatMoney(ride.cancellationFee) });
+  return cancellationFeeText(ride.cancellationFee, ride.cancellationChargeReason) ?? C.noChargeCancelled;
+};
 
 /** Who cancelled and their note (cancelled rides only). */
 export function CancellationCard({ ride, viewer }: SectionProps) {
@@ -95,8 +113,8 @@ export function CancellationCard({ ride, viewer }: SectionProps) {
           {`${C.cancellationNote}: ${ride.cancellationNote}`}
         </AppText>
       ) : null}
-      <AppText variant="caption" color="textMuted" style={styles.metrics}>
-        {C.noChargeCancelled}
+      <AppText variant="caption" color="textMuted" style={styles.metrics} testID="ride-details-cancellation-charge">
+        {cancellationChargeText(ride, viewer)}
       </AppText>
     </Card>
   );
@@ -155,6 +173,31 @@ export function PersonCard({ ride, viewer, canMessage, onMessage }: SectionProps
 }
 
 /**
+ * The driver's split (BE-84): the booking fee the platform keeps, the commission at its rate, and
+ * what the driver earned. Rides without the split fall back to the stored platform fee / earnings.
+ */
+export const driverSplitRows = (ride: Pick<Ride, 'split' | 'platformCommission' | 'driverEarnings'>): FareRow[] => {
+  const split = ride.split;
+  if (split) {
+    return [
+      ...(split.bookingFee > 0 ? [{ key: 'bookingFee', label: t('driverFare.bookingFee'), value: formatMoney(-split.bookingFee) }] : []),
+      {
+        key: 'fee',
+        label: t('driverFare.commission', { rate: formatRate(split.commissionRate) }),
+        value: formatMoney(-Math.abs(split.commissionAmount)),
+      },
+      { key: 'earned', label: C.youEarned, value: formatMoney(split.driverNet), strong: true },
+    ];
+  }
+  return [
+    ...(ride.platformCommission !== null
+      ? [{ key: 'fee', label: C.platformFee, value: formatMoney(-Math.abs(ride.platformCommission)) }]
+      : []),
+    ...(ride.driverEarnings !== null ? [{ key: 'earned', label: C.youEarned, value: formatMoney(ride.driverEarnings), strong: true }] : []),
+  ];
+};
+
+/**
  * The receipt: the server's fare lines and total as the kit FareBreakdown (§5.26; the driver also
  * sees the platform fee and their earnings), then payment and the ride code. A cancelled ride has
  * no fare lines.
@@ -175,15 +218,7 @@ export function ReceiptCard({ ride, viewer }: SectionProps) {
       </Card>
     );
   }
-  const driverRows: FareRow[] =
-    viewer === 'driver'
-      ? [
-          ...(ride.platformCommission !== null
-            ? [{ key: 'fee', label: C.platformFee, value: formatMoney(-Math.abs(ride.platformCommission)) }]
-            : []),
-          ...(ride.driverEarnings !== null ? [{ key: 'earned', label: C.youEarned, value: formatMoney(ride.driverEarnings), strong: true }] : []),
-        ]
-      : [];
+  const driverRows: FareRow[] = viewer === 'driver' ? driverSplitRows(ride) : [];
   const b = ride.fareBreakdown;
   return (
     <Card testID="ride-details-receipt-card">
@@ -191,7 +226,20 @@ export function ReceiptCard({ ride, viewer }: SectionProps) {
       <FareBreakdown
         variant="plain"
         testID="ride-details-receipt"
-        breakdown={b ? { base: b.base, distance: b.distance, time: b.time, stops: b.stops, minFareAdjustment: b.minFareAdjustment } : null}
+        breakdown={
+          b
+            ? {
+                base: b.base,
+                distance: b.distance,
+                time: b.time,
+                stops: b.stops,
+                minFareAdjustment: b.minFareAdjustment,
+                bookingFee: b.bookingFee,
+                offerAdjustment: b.offerAdjustment,
+                waiting: b.waiting,
+              }
+            : null
+        }
         total={b ? b.total : ride.totalFare}
         distanceKm={ride.distanceKm}
         durationMin={ride.durationMinutes}

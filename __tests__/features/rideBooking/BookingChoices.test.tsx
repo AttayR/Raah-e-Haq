@@ -9,6 +9,9 @@ import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import { FareReview, VehicleChoice } from '../../../src/features/ride-booking/components/BookingChoices';
 import { useFareEstimates, useVehicleTypes } from '../../../src/features/ride-booking/hooks';
+import { Text } from 'react-native';
+import { useFareOffer } from '../../../src/features/fare/hooks';
+import type { FarePolicy, FareNotice } from '../../../src/features/fare/types';
 import type { FareEstimates, VehicleType } from '../../../src/features/ride-booking/api';
 import { envelope, makeStore } from '../../../test-utils/rideFixtures';
 import { __resetConnectivityForTests } from '../../../src/core/api/connectivity';
@@ -31,7 +34,17 @@ const types: VehicleType[] = [
 const estimates: FareEstimates = {
   distance_km: 5,
   duration_min: 12,
-  estimates: [{ vehicle_type: 'car', fare: 230, currency: 'PKR', breakdown: { base: 50, distance: 150, time: 30, stops: 0, min_fare_adjustment: 0 } }],
+  estimates: [
+    {
+      vehicle_type: 'car',
+      fare: 230,
+      currency: 'PKR',
+      breakdown: { base: 50, distance: 150, time: 30, stops: 0, min_fare_adjustment: 0, booking_fee: 0 },
+      offer_band: null,
+      fare_policy: null,
+    },
+  ],
+  fare_notice: null,
 };
 const loaded = <T,>(data: T | null, status: 'loading' | 'ready' | 'error' | 'idle' = 'ready', error: string | null = null) => ({
   status,
@@ -88,7 +101,8 @@ describe('FareReview', () => {
     );
     getByText('Estimated fare');
     getByText('Estimated total');
-    getByText('Estimated fare. Final fare is calculated at the end of the trip. Pay cash to your driver.');
+    // T-521 (BE-82): the fare is locked when a driver accepts.
+    getByText('Your fare is locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.');
     // UI-R5: one primary that names the action and the vehicle, no emoji.
     getByText('Request Car');
     expect(queryByText('Total')).toBeNull();
@@ -99,6 +113,81 @@ describe('FareReview', () => {
     const { getByText, queryByText } = render(<FareReview vehicleType={types[0]} estimates={failed} onConfirm={jest.fn()} />);
     getByText('Could not calculate the fare.');
     expect(queryByText(/Rs \d/)).toBeNull();
+  });
+});
+
+describe('FareReview: T-521 offer your fare, fuel notice and terms', () => {
+  const band = { min: 190, max: 270, step: 10, serverFare: 230 };
+  const policy: FarePolicy = {
+    feesEnabled: true,
+    freeWaitMin: 3,
+    waitPerMin: 3,
+    maxWaitBilledMinutes: 15,
+    cancelFee: 50,
+    freeCancelMinutes: 5,
+    noShowWaitMinutes: 5,
+  };
+  const quoted = (overrides: Partial<FareEstimates['estimates'][number]> = {}, notice: FareNotice | null = null): FareEstimates => ({
+    ...estimates,
+    estimates: [{ ...estimates.estimates[0], offer_band: band, ...overrides }],
+    fare_notice: notice,
+  });
+
+  function WithOffer({ data, onConfirm = jest.fn() }: { data: FareEstimates; onConfirm?: () => void }) {
+    const offer = useFareOffer(data.estimates[0].offer_band);
+    return (
+      <>
+        <FareReview vehicleType={types[0]} estimates={loaded(data)} offer={offer} onConfirm={onConfirm} />
+        {/* What POST /rides would send as offered_fare. */}
+        <OfferedFare value={offer.offeredFare} />
+      </>
+    );
+  }
+  const OfferedFare = ({ value }: { value: number | null }) => (
+    <Text testID="offered-fare">{value === null ? 'none' : String(value)}</Text>
+  );
+
+  it('starts at the server fare (no offered_fare), steps by the band step and stops at the edges', () => {
+    const { getByTestId, getAllByText } = render(<WithOffer data={quoted()} />);
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 230');
+    expect(getByTestId('offered-fare').props.children).toBe('none');
+    getByTestId('offer-stepper-recommended');
+
+    fireEvent.press(getByTestId('offer-stepper-up'));
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 240');
+    expect(getByTestId('offered-fare').props.children).toBe('240');
+    // The hero and the total follow the offer; the breakdown shows the difference.
+    expect(getByTestId('fare-estimate-amount').props.children).toBe('Rs 240');
+    expect(getAllByText('+Rs 10').length).toBe(1);
+
+    for (let i = 0; i < 10; i += 1) fireEvent.press(getByTestId('offer-stepper-up'));
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 270');
+    expect(getByTestId('offer-stepper-up').props.accessibilityState).toMatchObject({ disabled: true });
+
+    fireEvent.press(getByTestId('offer-stepper-reset'));
+    expect(getByTestId('offered-fare').props.children).toBe('none');
+    for (let i = 0; i < 10; i += 1) fireEvent.press(getByTestId('offer-stepper-down'));
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 190');
+    expect(getByTestId('offer-stepper-down').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+
+  it('shows no stepper when offers are off (no band)', () => {
+    const { queryByTestId } = render(<WithOffer data={quoted({ offer_band: null })} />);
+    expect(queryByTestId('offer-stepper')).toBeNull();
+    expect(queryByTestId('offered-fare')?.props.children).toBe('none');
+  });
+
+  it('shows the fuel notice and, only while fees are on, the waiting and cancel terms', () => {
+    const notice = { percent: 10, note: 'Fares updated for fuel prices', effectiveFrom: null };
+    const { getByText, getByTestId, rerender, queryByTestId } = render(<WithOffer data={quoted({ fare_policy: policy }, notice)} />);
+    getByText('Fares updated for fuel prices');
+    expect(getByTestId('fare-policy')).toBeTruthy();
+    getByText('3 min free waiting at the pickup, then Rs 3 a minute.');
+    getByText('Free to cancel for 5 min after a driver accepts, then Rs 50.');
+
+    rerender(<WithOffer data={quoted({ fare_policy: { ...policy, feesEnabled: false, waitPerMin: 0, cancelFee: 0 } })} />);
+    expect(queryByTestId('fare-policy')).toBeNull();
+    expect(queryByTestId('fare-notice')).toBeNull();
   });
 });
 

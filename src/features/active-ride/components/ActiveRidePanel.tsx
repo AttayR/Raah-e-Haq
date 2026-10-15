@@ -21,6 +21,10 @@ import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
 import { t } from '../../../i18n';
 import { RidePinCard } from '../../safety/components/RidePinCard';
 import { ridePinOf } from '../../safety/rules';
+import { FareLockBadge, WaitingTimer } from '../../fare/components/FareBits';
+import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
+import { fareLockOf, toFarePolicy, toOverchargeState } from '../../fare/api';
+import { cancellationFeeText } from '../../fare/format';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -53,6 +57,11 @@ const CANCELLED_BY_TEXT = {
   system: ACTIVE_RIDE_COPY.cancelledBySystem,
 } as const;
 
+const toNumberOrNull = (value: unknown): number | null => {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+};
+
 const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null): string | null => {
   switch (state.stage) {
     case 'searching':
@@ -61,8 +70,12 @@ const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null): 
       return ACTIVE_RIDE_COPY.driverArrivedMessage;
     case 'completed':
       return ACTIVE_RIDE_COPY.completedMessage;
-    case 'cancelled':
-      return ride ? CANCELLED_BY_TEXT[cancelledByOf(ride)] : ACTIVE_RIDE_COPY.cancelledBySystem;
+    case 'cancelled': {
+      if (!ride) return ACTIVE_RIDE_COPY.cancelledBySystem;
+      // BE-85: a late-cancel or no-show fee the passenger was charged is said with the outcome.
+      const fee = cancellationFeeText(toNumberOrNull(ride.cancellation_fee), ride.cancellation_charge_reason ?? null);
+      return fee ? `${CANCELLED_BY_TEXT[cancelledByOf(ride)]} ${fee}` : CANCELLED_BY_TEXT[cancelledByOf(ride)];
+    }
     default:
       return null;
   }
@@ -102,6 +115,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const step = STAGE_STEP[stage] ?? (ride ? rideProgressStep(ride.status) : null);
 
   const driver = hasDriver && ride ? driverCardOf(ride) : null;
+  // BE-82: the fare is final once a driver accepted; BE-85: the waiting timer after a verified arrival.
+  const lock = hasDriver ? fareLockOf(ride) : null;
+  const overcharge = ride ? toOverchargeState(ride.overcharge_report) : null;
   // BE-81: the start PIN, only while the server sends it (accepted / arrived).
   const pin = driver ? ridePinOf(ride) : null;
   const actions: PersonAction[] = [];
@@ -132,7 +148,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       {stage === 'searching' ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
       <View style={styles.header} accessibilityLiveRegion="polite">
         <AppText variant="h3" accessibilityRole="header">
-          {STAGE_TITLES[stage]}
+          {warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage]}
         </AppText>
         {subtitle ? (
           <AppText variant="bodySmall" color={warn ? 'warning' : 'textSecondary'} testID="active-ride-subtitle">
@@ -161,6 +177,12 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
         />
       ) : null}
 
+      <FareLockBadge lock={lock} />
+
+      {stage === 'driver_arrived' && ride ? (
+        <WaitingTimer arrivedAt={ride.arrived_at} policy={toFarePolicy(ride.fare_policy)} arrivalVerified={ride.arrival_verified === true} />
+      ) : null}
+
       {pin ? <RidePinCard pin={pin} /> : null}
 
       {safety}
@@ -174,6 +196,15 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           durationMin={ride?.duration_minutes ?? null}
           totalLabel={ACTIVE_RIDE_COPY.finalFareLabel}
           footnote={fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
+        />
+      ) : null}
+
+      {ride ? (
+        <OverchargeReportSection
+          rideId={ride.id}
+          state={overcharge}
+          fare={lock?.acceptedFare ?? fare?.total ?? null}
+          testID="active-ride-overcharge"
         />
       ) : null}
 

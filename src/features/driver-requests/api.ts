@@ -57,6 +57,12 @@ export interface PendingRideRequest {
   vehicleType: string | null;
   /** Epoch ms after which the server stops listing it; null when the server gave no time. */
   expiresAt: number | null;
+  /**
+   * BE-83: the passenger offered their own fare (`estimatedFare` is then the offer); `serverFare`
+   * is what the app would have charged. No counter-offers: the driver takes it or leaves it.
+   */
+  isOffer: boolean;
+  serverFare: number | null;
 }
 
 export interface PendingRidesPage {
@@ -123,6 +129,8 @@ export const toPendingRideRequest = (
     vehicleType: toText(raw.vehicle_type),
     expiresAt:
       requestedAt !== null && maxAgeMinutes !== null ? requestedAt + maxAgeMinutes * 60_000 : null,
+    isOffer: raw.is_offer === true && toNumber(raw.offered_fare) !== null,
+    serverFare: toNumber(raw.server_fare),
   };
 };
 

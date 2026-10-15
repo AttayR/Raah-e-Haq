@@ -5,7 +5,10 @@ import type { AppTheme } from '../../theme';
 import type { RideResource } from '../../services/rideService';
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import { toRideSummary } from '../../features/driver-ride/steps';
-import { formatMoney } from '../../utils/format';
+import { formatMoney, formatSignedMoney } from '../../utils/format';
+import { driverSplitOf } from '../../features/fare/api';
+import { formatRate } from '../../features/fare/format';
+import { t } from '../../i18n';
 
 type Props = {
   ride: RideResource;
@@ -31,8 +34,13 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
         { key: 'time', label: COPY.time, value: summary.breakdown.time },
         { key: 'stops', label: COPY.stopsFare, value: summary.breakdown.stops },
         { key: 'min', label: COPY.minFareAdjustment, value: summary.breakdown.minFareAdjustment },
+        { key: 'bookingFee', label: t('ride.fareBookingFee'), value: summary.breakdown.bookingFee },
+        { key: 'waiting', label: t('ride.fareWaiting'), value: summary.breakdown.waiting },
       ].filter((row) => row.value !== null && row.value > 0)
     : [];
+  const offerAdjustment = summary.breakdown?.offerAdjustment ?? 0;
+  // BE-84: fare → booking fee (platform) → commission at its rate → what the driver keeps.
+  const split = driverSplitOf(ride);
 
   return (
     <View style={styles.card} testID="driver-ride-summary">
@@ -65,6 +73,28 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
           <Text style={styles.rowValue}>{money(row.value ?? 0)}</Text>
         </View>
       ))}
+
+      {offerAdjustment !== 0 && (
+        <View style={styles.row} testID="driver-ride-breakdown-offer">
+          <Text style={styles.rowLabel}>{t('ride.fareOffer')}</Text>
+          <Text style={styles.rowValue}>{formatSignedMoney(offerAdjustment)}</Text>
+        </View>
+      )}
+
+      {split && (
+        <View style={styles.splitBlock} testID="driver-ride-split">
+          {split.bookingFee > 0 && (
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>{t('driverFare.bookingFee')}</Text>
+              <Text style={styles.rowValue}>{money(-split.bookingFee)}</Text>
+            </View>
+          )}
+          <View style={styles.row} testID="driver-ride-commission">
+            <Text style={styles.rowLabel}>{t('driverFare.commission', { rate: formatRate(split.commissionRate) })}</Text>
+            <Text style={styles.rowValue}>{money(-Math.abs(split.commissionAmount))}</Text>
+          </View>
+        </View>
+      )}
 
       {summary.driverEarnings !== null && (
         <View style={[styles.row, styles.earningsRow]}>
@@ -127,6 +157,12 @@ const createStyles = (theme: AppTheme) =>
     rowValue: {
       ...theme.typography.numericSmall,
       color: theme.colors.textPrimary,
+    },
+    splitBlock: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border,
+      marginTop: theme.space[2],
+      paddingTop: theme.space[2],
     },
     earningsRow: {
       borderTopWidth: StyleSheet.hairlineWidth,

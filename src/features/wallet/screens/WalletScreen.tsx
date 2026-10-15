@@ -17,6 +17,7 @@ import {
   SkeletonList,
 } from '../../../components/ui';
 import { t } from '../../../i18n';
+import { formatMoney } from '../../../core/format/money';
 import { componentTokens, layout, space } from '../../../theme';
 import { BalanceCard } from '../components/BalanceCard';
 import { CommissionCard } from '../components/CommissionCard';
@@ -136,6 +137,20 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
       {header}
       <View style={styles.headerBlock}>
         <BalanceCard wallet={walletData} isDriver={isDriver} />
+        {!isDriver && walletData.amountOwed > 0 ? (
+          // BE-85: a cancellation or no-show fee left the passenger owing; a top-up clears it.
+          <Banner
+            tone="warning"
+            title={t('fare.owedTitle', { amount: formatMoney(walletData.amountOwed, { currency: walletData.currency }) })}
+            text={t('fare.owedWalletBody')}
+            action={
+              walletData.canTopUp && walletData.topUp
+                ? { label: t('fare.owedTopUp'), onPress: () => navigation.navigate(ADD_MONEY_ROUTE), testID: 'wallet-owed-top-up' }
+                : undefined
+            }
+            testID="wallet-amount-owed"
+          />
+        ) : null}
         {walletData.canTopUp && walletData.topUp ? (
           <Button
             label={t('topUp.addMoney')}

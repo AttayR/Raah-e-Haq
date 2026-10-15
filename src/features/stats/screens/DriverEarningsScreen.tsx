@@ -22,6 +22,8 @@ import { componentTokens, layout, space } from '../../../theme';
 import { EarningsChart } from '../components/EarningsChart';
 import { EarningsHero } from '../components/EarningsHero';
 import { EarningsWalletCard } from '../components/EarningsWalletCard';
+import { EarningsLinksCard } from '../components/EarningsLinksCard';
+import { DRIVER_STATEMENTS_ROUTE, DRIVER_STRIKES_ROUTE } from '../../driver-statements/navigation';
 import { STATS_COPY } from '../copy';
 import { earningsRideText } from '../format';
 import { useDriverEarnings } from '../hooks';
@@ -137,6 +139,10 @@ export default function DriverEarningsScreen() {
         {periodControl}
         <EarningsHero earnings={data} />
         {walletCard}
+        <EarningsLinksCard
+          onOpenStatements={() => navigation.navigate(DRIVER_STATEMENTS_ROUTE)}
+          onOpenStrikes={() => navigation.navigate(DRIVER_STRIKES_ROUTE)}
+        />
         {error ? (
           <AppText variant="bodySmall" color="danger" testID="earnings-refresh-error">
             {error}

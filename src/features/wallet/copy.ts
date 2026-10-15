@@ -1,3 +1,5 @@
+import { t, type TranslationKey } from '../../i18n';
+
 /** Static copy for the wallet (T-508). Amounts and entries come from GET /wallet (BE-09). */
 export const WALLET_COPY = {
   title: 'Wallet',
@@ -24,10 +26,12 @@ export const WALLET_COPY = {
   reversed: 'Reversed',
   viewRide: 'View ride',
   pending: 'Pending',
-  // Driver commission.
-  commissionTitle: 'Commission owed',
-  commissionNoneOwed: 'You owe no commission. Thank you!',
-  commissionBody: 'Pay the platform commission at the office in cash or by bank transfer, then report it here.',
+  // Driver commission. T-521: what is owed can include fare-dispute recoveries (BE-82), so it is
+  // "amount owed", not "commission".
+  commissionTitle: 'Amount owed',
+  commissionNoneOwed: 'You owe nothing. Thank you!',
+  commissionBody:
+    'Platform commission from your trips, plus any fare-dispute recoveries. Pay it at the office in cash or by bank transfer, then report it here. A top-up also lowers it.',
   payCommission: 'Pay commission',
   paymentRequests: 'Payment reports',
   paymentRequestsSubtitle: 'Your commission payments and their review',
@@ -82,6 +86,24 @@ export const WALLET_COPY = {
   settlementsFailed: "Couldn't load your payment reports",
   reviewNote: 'Reviewer note',
 } as const;
+
+/**
+ * T-521: labels for the ledger types BE-82 / BE-85 added, said from the wallet owner's side. Other
+ * types keep the server's `label`.
+ */
+const TYPE_LABEL_KEYS: ReadonlyMap<string, TranslationKey> = new Map<string, TranslationKey>([
+  ['cancellation_fee', 'walletTypes.cancellation_fee'],
+  ['cancellation_compensation', 'walletTypes.cancellation_compensation'],
+  ['cancellation_compensation_release', 'walletTypes.cancellation_compensation_release'],
+  ['fare_dispute_charge', 'walletTypes.fare_dispute_charge'],
+  ['refund', 'walletTypes.refund'],
+]);
+
+/** The i18n label of a ledger type the app labels itself, else null (use the server's `label`). */
+export const transactionTypeLabel = (type: string): string | null => {
+  const key = TYPE_LABEL_KEYS.get(type);
+  return key ? t(key) : null;
+};
 
 export const SETTLEMENT_STATUS_LABEL = {
   pending: 'Waiting for review',

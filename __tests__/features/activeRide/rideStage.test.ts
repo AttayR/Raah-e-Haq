@@ -119,9 +119,18 @@ describe('fareSummaryOf', () => {
     };
     expect(fareSummaryOf(wire)).toEqual({
       total: 310,
-      breakdown: { base: 50, distance: 200, time: 40, stops: 20, minFareAdjustment: 0 },
+      breakdown: { base: 50, distance: 200, time: 40, stops: 20, minFareAdjustment: 0, bookingFee: 0, offerAdjustment: 0, waiting: 0 },
       paymentMethod: 'cash',
     });
+  });
+
+  it('T-521: reads the booking fee, the signed offer adjustment and billed waiting', () => {
+    const wire = {
+      total_fare: '182.00',
+      payment_method: 'cash',
+      fare_breakdown: { base: 100, distance: 40, time: 12, stops: 0, min_fare_adjustment: 0, booking_fee: 10, offer_adjustment: '-10.00', waiting: 6, total: 182 },
+    };
+    expect(fareSummaryOf(wire)?.breakdown).toMatchObject({ bookingFee: 10, offerAdjustment: -10, waiting: 6 });
   });
 
   it('no breakdown when the server sends none; null without a total', () => {

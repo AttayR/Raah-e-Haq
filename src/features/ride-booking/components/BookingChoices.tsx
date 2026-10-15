@@ -9,6 +9,12 @@ import { estimateFor } from '../hooks';
 import { BOOKING_COPY } from '../copy';
 import { space } from '../../../theme';
 import { formatFare, quoteBreakdown, toVehicleOptions } from '../vehicleOptions';
+import { t } from '../../../i18n';
+import { FareNoticeBanner, FarePolicyNote } from '../../fare/components/FareBits';
+import { OfferStepper } from '../../fare/components/OfferStepper';
+import type { FareOffer } from '../../fare/hooks';
+import { offerDifference } from '../../fare/offer';
+import type { FareNotice } from '../../fare/types';
 
 type StatusLineProps = { status: 'loading' | 'error' | 'empty'; text: string; onRetry?: () => void };
 
@@ -97,13 +103,19 @@ type FareReviewProps = {
   vehicleType: VehicleType | null;
   estimates: Loaded<FareEstimates>;
   onConfirm: () => void;
+  /** BE-83: the passenger's offer for this quote (the stepper renders only with a band). */
+  offer?: FareOffer;
+  /** BE-60: the vehicle catalogue's fuel notice, used when the estimate carries none. */
+  catalogueNotice?: FareNotice | null;
 };
 
 /**
  * The selected type's server quote (BE-05) as a money hero and the kit FareBreakdown (§5.26), with
- * one primary "Request {vehicle}" (no emoji), or the quote's loading/error state.
+ * one primary "Request {vehicle}" (no emoji), or the quote's loading/error state. T-521: the fuel
+ * notice, "Offer your fare" inside the band (the hero and total follow the offer) and, while fees
+ * are on, the waiting and cancel terms.
  */
-export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, onConfirm }) => {
+export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, onConfirm, offer, catalogueNotice = null }) => {
   if (estimates.status === 'error') {
     return (
       <BookingStatusLine status="error" text={estimates.error ?? BOOKING_COPY.estimateFailed} onRetry={estimates.retry} />
@@ -114,29 +126,34 @@ export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, 
     return <BookingStatusLine status="loading" text={BOOKING_COPY.estimateLoading} />;
   }
   const route = estimates.data;
+  const offered = offer?.band ? offer : null;
+  const total = offered?.value ?? quote.fare;
   return (
     <View style={styles.review}>
+      <FareNoticeBanner notice={route.fare_notice ?? catalogueNotice} />
       <View style={styles.hero}>
         <AppText variant="caption" color="textSecondary" testID="fare-estimate-title">
           {BOOKING_COPY.estimatedFareTitle}
         </AppText>
         <AppText variant="numericXL" testID="fare-estimate-amount">
-          {formatFare(quote.fare, quote.currency)}
+          {formatFare(total, quote.currency)}
         </AppText>
         <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
           {[vehicleType.label, formatDistance(route.distance_km), formatDuration(route.duration_min)].filter(Boolean).join(' · ')}
         </AppText>
       </View>
+      {offered ? <OfferStepper offer={offered} /> : null}
       <FareBreakdown
-        breakdown={quoteBreakdown(quote)}
-        total={quote.fare}
+        breakdown={quoteBreakdown(quote, offered ? offerDifference(offered.band, offered.value) : 0)}
+        total={total}
         currency={quote.currency}
         distanceKm={route.distance_km}
         durationMin={route.duration_min}
         totalLabel={BOOKING_COPY.estimatedTotal}
-        footnote={BOOKING_COPY.estimateNote}
+        footnote={t('fare.lockNote')}
         testID="fare-breakdown"
       />
+      <FarePolicyNote policy={quote.fare_policy} />
       <Button
         label={BOOKING_COPY.request(vehicleType.label)}
         size="lg"

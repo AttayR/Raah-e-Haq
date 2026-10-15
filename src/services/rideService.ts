@@ -26,6 +26,8 @@ export interface RideRequest {
   passenger_count?: number;
   special_instructions?: string;
   stops?: RideStopRequest[];
+  /** BE-83: the passenger's offer in whole rupees, inside the estimate's `offer_band`. */
+  offered_fare?: number;
 }
 
 export interface RideStopRequest {
@@ -133,6 +135,38 @@ export interface RideResource {
   pin_required?: boolean;
   /** BE-81: the start is blocked until an admin clears it (the driver contacts support). */
   pin_blocked?: boolean;
+  /**
+   * BE-60 / BE-82..85 (T-521). Read these through features/fare/api (decimals arrive as strings),
+   * never by hand. Passenger-only and driver-only keys are absent for the other side.
+   */
+  booking_fee?: number | string | null;
+  server_fare?: number | string | null;
+  offered_fare?: number | string | null;
+  is_offer?: boolean;
+  fare_locked?: boolean;
+  accepted_fare?: number | string | null;
+  fare_locked_at?: string | null;
+  waiting_minutes?: number | null;
+  waiting_fee?: number | string | null;
+  arrival_verified?: boolean;
+  /** While the ride is requested or active (BE-85). */
+  fare_policy?: unknown;
+  /** Passenger only, while the ride can be cancelled (BE-85). */
+  cancellation_preview?: unknown;
+  /** Driver only: when "Passenger didn't come" may be used (BE-85). */
+  no_show_cancel_at?: string | null;
+  cancellation_fee?: number | string | null;
+  cancellation_charge_reason?: string | null;
+  /** How often a driver cancel put the ride back in the queue (BE-85 re-matching). */
+  requeue_count?: number | null;
+  /** Passenger only (BE-82). */
+  overcharge_report?: unknown;
+  /** BE-84, the ride's driver only. */
+  fare?: number | string | null;
+  commission_rate?: number | string | null;
+  commission_amount?: number | string | null;
+  driver_net?: number | string | null;
+  commission_final?: boolean;
 }
 
 /** RideResource.contact as the server sends it (BE-78). */
@@ -158,6 +192,10 @@ export interface RideFareBreakdown {
   time: number | string;
   stops: number | string;
   min_fare_adjustment: number | string;
+  /** BE-60 / BE-83 / BE-85 parts (absent on older rides); they still add up to `total`. */
+  booking_fee?: number | string;
+  offer_adjustment?: number | string;
+  waiting?: number | string;
   total: number | string;
 }
 

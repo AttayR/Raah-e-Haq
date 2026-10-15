@@ -58,7 +58,7 @@ export interface EarningsRide {
   id: number;
   /** Public ride code: shown on the ride details only, never as the row title (T-514). */
   rideCode: string | null;
-  /** Not sent by GET /driver/earnings yet (BE-15 follow-up); the row shows the time instead. */
+  /** BE-84 sends them; older servers do not (the row then shows the time instead). */
   pickupAddress: string | null;
   dropoffAddress: string | null;
   vehicleType: string | null;
@@ -69,6 +69,10 @@ export interface EarningsRide {
   platformCommission: number;
   driverEarnings: number;
   paymentMethod: string | null;
+  /** BE-84 split: the rate (percent) and amount of commission; null from older servers. */
+  commissionRate: number | null;
+  commissionAmount: number | null;
+  bookingFee: number;
 }
 
 export interface DriverEarnings {

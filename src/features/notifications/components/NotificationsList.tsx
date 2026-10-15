@@ -55,7 +55,7 @@ export function NotificationsList({ role, list, header, onScroll }: Notification
     (item: AppNotification) => {
       if (item.readAt === null) markRead(item.id);
       const target = resolveNotificationTarget(
-        { category: item.category, type: item.type, rideId: item.data.rideId },
+        { category: item.category, type: item.type, rideId: item.data.rideId, requeued: item.data.requeued },
         role,
       );
       openNotificationTarget(navigation, role, target, 'list');

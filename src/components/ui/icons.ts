@@ -129,6 +129,13 @@ export const iconGlyphs = {
   pinCode: 'dialpad',
   lockClock: 'lock-clock',
   support: 'lifebuoy',
+  // Fare fairness (T-521).
+  minus: 'minus',
+  fareLock: 'lock-check-outline',
+  waiting: 'timer-sand',
+  report: 'flag-outline',
+  statement: 'calendar-week',
+  dispute: 'scale-balance',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

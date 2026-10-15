@@ -89,6 +89,11 @@ const TYPE_ICONS: Record<string, IconName> = {
   opening_balance: 'wallet',
   topup: 'topUp',
   wallet_topup: 'topUp',
+  // T-521 (BE-82 / BE-85).
+  cancellation_fee: 'close',
+  cancellation_compensation: 'clock',
+  cancellation_compensation_release: 'clock',
+  fare_dispute_charge: 'dispute',
 };
 
 /** Leading glyph: by type, then by direction for unknown types. */

@@ -26,6 +26,7 @@ import {
 } from '../../features/driver-ride/hooks';
 import { useDriverRideSafety } from '../../features/safety/useDriverRideSafety';
 import { PinEntrySheet } from '../../features/safety/components/PinEntrySheet';
+import { noShowFeeOf, useNoShowReady, type DriverCancelMode } from '../../features/driver-ride/noShow';
 import { DriverRideSafetyButton } from '../../features/safety/components/RideSafety';
 import {
   activeStops,
@@ -58,7 +59,8 @@ const DriverRideScreen: React.FC = () => {
   const navigation = useNavigation();
   const flow = useDriverRideFlow();
   const { ride, step, pendingAction } = flow;
-  const [cancelOpen, setCancelOpen] = useState(false);
+  // BE-85: a normal cancel records a strike; after the wait, "Passenger didn't come" does not.
+  const [cancelMode, setCancelMode] = useState<DriverCancelMode | null>(null);
   const isFocused = useIsFocused();
   const appActive = useAppIsActive();
   useDriverRideStatusPolling(isFocused && appActive);
@@ -145,10 +147,12 @@ const DriverRideScreen: React.FC = () => {
 
   const onCancel = useCallback(
     async (note: string) => {
-      if (await flow.cancel(note)) setCancelOpen(false);
+      if (await flow.cancel(note)) setCancelMode(null);
     },
     [flow],
   );
+
+  const noShowReady = useNoShowReady(ride, step);
 
   const onDone = useCallback(() => {
     flow.finish();
@@ -279,7 +283,8 @@ const DriverRideScreen: React.FC = () => {
               onArrived={flow.arrived}
               onComplete={flow.complete}
               onCompleteStop={flow.completeStop}
-              onCancel={() => setCancelOpen(true)}
+              onCancel={() => setCancelMode('strike')}
+              onNoShow={noShowReady ? () => setCancelMode('no_show') : undefined}
               bottomInset={insets.bottom}
             />
           </View>
@@ -291,10 +296,13 @@ const DriverRideScreen: React.FC = () => {
         <PinEntrySheet {...safety.pinSheet} />
 
         <CancelReasonSheet
-          visible={cancelOpen}
+          visible={cancelMode !== null}
+          mode={cancelMode ?? 'strike'}
+          noShowFee={noShowFeeOf(ride)}
+          noShowAvailable={noShowReady}
           submitting={pendingAction === 'cancel'}
           onSubmit={onCancel}
-          onClose={() => setCancelOpen(false)}
+          onClose={() => setCancelMode(null)}
         />
       </View>
     </Screen>

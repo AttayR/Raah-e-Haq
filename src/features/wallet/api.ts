@@ -1,5 +1,6 @@
 import { apiService, unwrap } from '../../services/api';
 import { isRecord, readId, readNumber, readNumberOrNull, readOneOf, readText } from '../../core/api/read';
+import { transactionTypeLabel } from './copy';
 import type { Pagination } from '../../core/api/types';
 import type {
   Page,
@@ -109,6 +110,7 @@ export const toWallet = (raw: unknown): Wallet => {
     status: readOneOf(data.status, STATUSES, 'active'),
     // The contract defines it as max(0, -balance); read it, fall back to the rule.
     commissionOwed: Math.max(0, readNumberOrNull(data.commission_owed) ?? -balance),
+    amountOwed: Math.max(0, readNumberOrNull(data.amount_owed) ?? -balance),
     availableBalance: Math.max(0, readNumber(data.available_balance)),
     totalSpent: readNumber(data.total_spent),
     totalEarnings: readNumber(data.total_earnings),
@@ -150,7 +152,7 @@ export const toTransaction = (raw: unknown): WalletTransaction | null => {
     id,
     reference: readText(raw.reference),
     type,
-    label: readText(raw.label) ?? humanise(type),
+    label: transactionTypeLabel(type) ?? readText(raw.label) ?? humanise(type),
     direction: readOneOf(raw.direction, DIRECTIONS, 'none'),
     amount: Math.abs(readNumber(raw.amount)),
     grossAmount: readNumberOrNull(raw.gross_amount),

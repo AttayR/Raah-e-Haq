@@ -124,7 +124,7 @@ describe('toRideSummary', () => {
       distanceKm: 6.2,
       durationMinutes: 18,
       paymentMethod: 'cash',
-      breakdown: { base: 50, distance: 210.5, time: 54, stops: 25, minFareAdjustment: 0 },
+      breakdown: { base: 50, distance: 210.5, time: 54, stops: 25, minFareAdjustment: 0, bookingFee: null, offerAdjustment: null, waiting: null },
     });
   });
 

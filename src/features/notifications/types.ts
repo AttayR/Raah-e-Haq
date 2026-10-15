@@ -21,6 +21,8 @@ export interface NotificationPayload {
   /** PKR amount as the server sends it (string). */
   fare: string | null;
   cancelledBy: 'passenger' | 'driver' | 'admin' | null;
+  /** BE-85: a driver's cancel put the ride back in the queue (the passenger is still searching). */
+  requeued: boolean;
 }
 
 export interface AppNotification {

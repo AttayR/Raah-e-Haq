@@ -55,6 +55,7 @@ const toPayload = (raw: unknown): NotificationPayload => {
     messageId: toId(data.message_id),
     fare: typeof data.fare === 'number' ? String(data.fare) : toText(data.fare),
     cancelledBy: CANCELLED_BY.find((who) => who === data.cancelled_by) ?? null,
+    requeued: data.requeued === true || data.requeued === 'true' || data.requeued === 1,
   };
 };
 

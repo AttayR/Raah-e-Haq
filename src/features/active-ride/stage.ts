@@ -1,6 +1,7 @@
 import type { RideFareBreakdown, RideResource } from '../../services/rideService';
 import type { RideStatus } from './status';
 import { firstNameOf } from '../../utils/format';
+import { fareExtrasOf } from '../fare/api';
 
 /**
  * The passenger's ride stage machine (T-304, PAX-05). The stage is derived from the server's
@@ -60,19 +61,22 @@ export const canPassengerCancel = (stage: PassengerRideStage): boolean =>
  *
  * A ride that goes back from a driver stage to `requested` was requeued by the driver's cancel
  * (BE-04 requeue mode): the passenger is searching again, with the `driver_cancelled` notice,
- * which stays until the stage moves on.
+ * which stays until the stage moves on. T-521 (BE-85 re-matching): a ride that is searching with
+ * `requeue_count > 0` was put back by a driver's cancel even when this screen never saw the
+ * driver (a restore after relaunch, a poll that missed the accept), so it gets the notice too.
  */
 export const advanceRideStage = (
   prev: PassengerRideStageState | null,
-  ride: Pick<RideResource, 'id' | 'status'> | null,
+  ride: Pick<RideResource, 'id' | 'status'> & Partial<Pick<RideResource, 'requeue_count'>> | null,
 ): PassengerRideStageState | null => {
   if (!ride) return null;
   const stage = rideStageOf(ride.status);
   const sameRide = !!prev && prev.rideId === ride.id;
   let notice: PassengerRideNotice = null;
-  if (sameRide && stage === 'searching') {
-    const wasWithDriver = DRIVER_STAGES.includes(prev.stage);
-    if (wasWithDriver || prev.notice === 'driver_cancelled') notice = 'driver_cancelled';
+  if (stage === 'searching') {
+    const wasWithDriver = sameRide && DRIVER_STAGES.includes(prev.stage);
+    const requeued = typeof ride.requeue_count === 'number' && ride.requeue_count > 0;
+    if (wasWithDriver || requeued || (sameRide && prev.notice === 'driver_cancelled')) notice = 'driver_cancelled';
   }
   if (sameRide && prev.stage === stage && prev.notice === notice) return prev;
   return { rideId: ride.id, stage, notice };
@@ -132,6 +136,10 @@ export interface RideFareSummary {
     time: number;
     stops: number;
     minFareAdjustment: number;
+    /** BE-60 / BE-83 / BE-85 parts (0 on older rides). */
+    bookingFee: number;
+    offerAdjustment: number;
+    waiting: number;
   } | null;
   paymentMethod: string | null;
 }
@@ -144,6 +152,7 @@ const breakdownOf = (raw: RideFareBreakdown | null | undefined): RideFareSummary
     time: toNumber(raw.time) ?? 0,
     stops: toNumber(raw.stops) ?? 0,
     minFareAdjustment: toNumber(raw.min_fare_adjustment) ?? 0,
+    ...fareExtrasOf(raw),
   };
 };
 

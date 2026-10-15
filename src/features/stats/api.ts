@@ -94,10 +94,14 @@ const toEarningsRide = (raw: unknown): EarningsRide | null => {
     completedAt: readText(raw.completed_at),
     distanceKm: readNumberOrNull(raw.distance_km),
     durationMinutes: readNumberOrNull(raw.duration_minutes),
-    totalFare: readNumber(raw.total_fare),
+    totalFare: readNumberOrNull(raw.fare) ?? readNumber(raw.total_fare),
     platformCommission: readNumber(raw.platform_commission),
-    driverEarnings: readNumber(raw.driver_earnings),
+    // BE-84: `driver_net` is the same number as `driver_earnings`; prefer it when sent.
+    driverEarnings: readNumberOrNull(raw.driver_net) ?? readNumber(raw.driver_earnings),
     paymentMethod: readText(raw.payment_method),
+    commissionRate: readNumberOrNull(raw.commission_rate),
+    commissionAmount: readNumberOrNull(raw.commission_amount),
+    bookingFee: Math.max(0, readNumber(raw.booking_fee)),
   };
 };
 

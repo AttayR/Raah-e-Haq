@@ -10,6 +10,7 @@ import {
   buildEstimateBody,
   fetchFareEstimates,
   fetchVehicleTypes,
+  normalizeFareEstimates,
   type FareEstimates,
 } from '../../../src/features/ride-booking/api';
 import { formatFare, quoteBreakdown, toVehicleOptions } from '../../../src/features/ride-booking/vehicleOptions';
@@ -59,8 +60,9 @@ describe('GET /public/vehicle-types', () => {
   it('returns the catalogue keys and labels, dropping unknown keys', async () => {
     mock.onGet('/public/vehicle-types').reply(200, envelope([...catalogue, { key: 'economy', label: 'Economy' }]));
 
-    const types = await fetchVehicleTypes();
+    const { types, notice } = await fetchVehicleTypes();
 
+    expect(notice).toBeNull();
     expect(types.map((t) => t.key)).toEqual(['car', 'bike', 'rickshaw', 'van']);
     expect(types[0]).toEqual({ key: 'car', label: 'Car', capacity: 4 });
   });
@@ -110,8 +112,11 @@ describe('vehicle options and fare breakdown', () => {
       vehicle_type: e.vehicle_type as 'car' | 'bike' | 'van',
       fare: e.fare,
       currency: 'PKR',
-      breakdown: e.breakdown,
+      breakdown: { ...e.breakdown, booking_fee: 0 },
+      offer_band: null,
+      fare_policy: null,
     })),
+    fare_notice: null,
   };
   const types = catalogue.map(({ key, label, capacity }) => ({ key: key as 'car', label, capacity }));
 
@@ -148,9 +153,66 @@ describe('vehicle options and fare breakdown', () => {
 
   it('lists stops and a minimum-fare top-up only when the server charged them', () => {
     const rows = fareBreakdownRows(
-      quoteBreakdown({ vehicle_type: 'bike', fare: 100, currency: 'PKR', breakdown: { base: 30, distance: 20, time: 10, stops: 20, min_fare_adjustment: 20 } }),
+      quoteBreakdown({
+        vehicle_type: 'bike',
+        fare: 100,
+        currency: 'PKR',
+        breakdown: { base: 30, distance: 20, time: 10, stops: 20, min_fare_adjustment: 20, booking_fee: 0 },
+        offer_band: null,
+        fare_policy: null,
+      }),
       { distanceKm: estimates.distance_km, durationMin: estimates.duration_min },
     );
     expect(rows.map((r) => r.label)).toEqual(['Base fare', 'Distance · 6.4 km', 'Time · 14 min', 'Stops', 'Minimum fare adjustment']);
+  });
+});
+
+describe('T-521: fare notice, offer band, fare policy and booking fee', () => {
+  const band = { min: 130, max: 180, step: 10, server_fare: 152, down_percent: 20, up_percent: 20 };
+  const policy = {
+    fees_enabled: true,
+    free_wait_min: 3,
+    wait_per_min: 3,
+    max_wait_billed_minutes: 15,
+    cancel_fee: 50,
+    free_cancel_minutes: 5,
+    no_show_wait_minutes: 5,
+  };
+
+  it('reads the band, the terms, the booking fee and the estimate notice', () => {
+    const data = normalizeFareEstimates({
+      ...estimateData,
+      fare_notice: { percent: 10, note: 'Fares updated for fuel prices', effective_from: '2026-10-14T12:00:00+00:00' },
+      estimates: [{ ...quote('car', 152), offer_band: band, fare_policy: policy, breakdown: { base: 100, distance: 30, time: 12, stops: 0, min_fare_adjustment: 0, booking_fee: 10 } }],
+    });
+    const car = data.estimates[0];
+    expect(data.fare_notice).toEqual({ percent: 10, note: 'Fares updated for fuel prices', effectiveFrom: '2026-10-14T12:00:00+00:00' });
+    expect(car.offer_band).toEqual({ min: 130, max: 180, step: 10, serverFare: 152 });
+    expect(car.fare_policy).toMatchObject({ feesEnabled: true, freeWaitMin: 3, waitPerMin: 3, cancelFee: 50, freeCancelMinutes: 5 });
+    expect(car.breakdown.booking_fee).toBe(10);
+    expect(fareBreakdownRows(quoteBreakdown(car)).map((r) => r.label)).toContain('Booking fee');
+  });
+
+  it('treats offers off (null band), a band without the server fare inside, and no notice as absent', () => {
+    const data = normalizeFareEstimates({
+      ...estimateData,
+      estimates: [
+        { ...quote('car', 152), offer_band: null },
+        { ...quote('bike', 120), offer_band: { ...band, server_fare: 500 } },
+      ],
+    });
+    expect(data.fare_notice).toBeNull();
+    expect(data.estimates.map((e) => e.offer_band)).toEqual([null, null]);
+  });
+
+  it('GET /public/vehicle-types returns meta.fare_notice with the types', async () => {
+    mock.onGet('/public/vehicle-types').reply(200, {
+      success: true,
+      data: catalogue,
+      meta: { fare_notice: { percent: 10, note: 'Fares updated for fuel prices', effective_from: null } },
+    });
+    const { types, notice } = await fetchVehicleTypes();
+    expect(types).toHaveLength(4);
+    expect(notice?.note).toBe('Fares updated for fuel prices');
   });
 });

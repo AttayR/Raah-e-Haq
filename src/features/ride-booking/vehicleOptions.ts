@@ -35,11 +35,17 @@ export const toVehicleOptions = (types: ReadonlyArray<VehicleType>, estimates: F
     };
   });
 
-/** The quote's server breakdown in the kit FareBreakdown shape (it adds up to the quoted fare). */
-export const quoteBreakdown = (quote: FareEstimate): FareBreakdownInput => ({
+/**
+ * The quote's server breakdown in the kit FareBreakdown shape (it adds up to the quoted fare).
+ * `offerAdjustment` is the passenger's offer less the server fare (BE-83), so the rows add up to
+ * the offer instead.
+ */
+export const quoteBreakdown = (quote: FareEstimate, offerAdjustment = 0): FareBreakdownInput => ({
   base: quote.breakdown.base,
   distance: quote.breakdown.distance,
   time: quote.breakdown.time,
   stops: quote.breakdown.stops,
   minFareAdjustment: quote.breakdown.min_fare_adjustment,
+  bookingFee: quote.breakdown.booking_fee,
+  offerAdjustment,
 });

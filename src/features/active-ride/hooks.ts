@@ -7,6 +7,9 @@ import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { toast } from '../../core/toast';
 import { askForPushInContext } from '../notifications/push';
 import { hideModal, showErrorModal } from '../../components/NotificationManager';
+import { confirm } from '../../core/dialog';
+import { t } from '../../i18n';
+import { formatMoney } from '../../utils/format';
 import { classifyRideRequestFailure, type RideRequestFailure } from '../ride-booking/rideRequestFailure';
 import { BOOKING_COPY } from '../ride-booking/copy';
 import {
@@ -194,7 +197,30 @@ export const useRestoreActiveRide = (onRestored: (ride: RideResource) => void): 
 export interface ActiveRideActionsOptions {
   /** BE-37: POST /rides refused with PHONE_NOT_VERIFIED; take the passenger to verify. */
   onPhoneNotVerified?: () => void;
+  /** BE-85: POST /rides refused with PASSENGER_BALANCE_OWED; take the passenger to top up. */
+  onBalanceOwed?: () => void;
 }
+
+/**
+ * "You owe Rs 200. Top up your wallet to book" (BE-85) with Top up / Not now. Without a top-up
+ * route it is the server's message with OK.
+ */
+export const showBalanceOwed = async (
+  failure: { message: string; amountOwed: number | null },
+  onTopUp: (() => void) | undefined,
+): Promise<void> => {
+  if (!onTopUp) {
+    showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal });
+    return;
+  }
+  const topUp = await confirm({
+    title: failure.amountOwed !== null ? t('fare.owedTitle', { amount: formatMoney(failure.amountOwed) }) : failure.message,
+    body: t('fare.owedBody'),
+    confirmLabel: t('fare.owedTopUp'),
+    cancelLabel: t('fare.owedNotNow'),
+  });
+  if (topUp) onTopUp();
+};
 
 /**
  * Create and cancel for the booking screen: a loading toast while POST /rides runs, and an
@@ -206,6 +232,8 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
   const dispatch = useDispatch<ActiveRideDispatch>();
   const onPhoneNotVerifiedRef = useRef(options.onPhoneNotVerified);
   onPhoneNotVerifiedRef.current = options.onPhoneNotVerified;
+  const onBalanceOwedRef = useRef(options.onBalanceOwed);
+  onBalanceOwedRef.current = options.onBalanceOwed;
 
   const requestRide = useCallback(
     async (request: RideRequest): Promise<RideResource> => {
@@ -230,7 +258,9 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
             : { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal },
           verify ? { label: BOOKING_COPY.notNow, onPress: hideModal } : undefined,
         );
-      } else if (failure.kind === 'message') {
+      } else if (failure.kind === 'balance_owed') {
+        showBalanceOwed(failure, onBalanceOwedRef.current);
+      } else if (failure.kind === 'message' || failure.kind === 'offer_out_of_band') {
         showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, {
           label: ACTIVE_RIDE_COPY.dismiss,
           onPress: hideModal,

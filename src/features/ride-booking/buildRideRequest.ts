@@ -16,6 +16,8 @@ export interface RideRequestInput {
   vehicleType: string | null | undefined;
   passengerCount?: number;
   specialInstructions?: string;
+  /** BE-83: the passenger's offer (whole rupees), only when it differs from the server fare. */
+  offeredFare?: number | null;
 }
 
 export type BuildRideRequestResult =
@@ -89,6 +91,9 @@ export const buildRideRequest = (input: RideRequestInput): BuildRideRequestResul
     vehicle_type: vehicleType,
     ...(count !== undefined ? { passenger_count: count } : {}),
     ...(instructions ? { special_instructions: instructions } : {}),
+    ...(typeof input.offeredFare === 'number' && Number.isInteger(input.offeredFare) && input.offeredFare > 0
+      ? { offered_fare: input.offeredFare }
+      : {}),
     ...(stops.length > 0
       ? {
           stops: stops.map((stop, index) => ({

@@ -36,6 +36,11 @@ export interface Wallet {
   currency: string;
   status: WalletStatus;
   commissionOwed: number;
+  /**
+   * BE-85 `amount_owed` (everyone): max(0, -balance). A passenger owes it after a cancellation or
+   * no-show fee; above the server's limit booking is refused until a top-up clears it.
+   */
+  amountOwed: number;
   availableBalance: number;
   totalSpent: number;
   totalEarnings: number;

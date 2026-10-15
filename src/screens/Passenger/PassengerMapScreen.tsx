@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Keyboard, StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { AppState, Keyboard, StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { MapPressEvent } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView from '../../components/SafeMapView';
@@ -24,9 +24,10 @@ import { logger } from '../../core/logging/logger';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '../../features/active-ride/slice';
-import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
+import { RideRequestRefused, useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
 import { isRideInProgress } from '../../features/active-ride/status';
-import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
+import { usePassengerCancel } from '../../features/active-ride/cancel';
+import { useFareOffer } from '../../features/fare/hooks';
 import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { regionInViewport, usePassengerRideCamera, viewportEdgePadding, type MapViewport } from '../../features/active-ride/camera';
@@ -35,7 +36,7 @@ import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/co
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
-import { useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
+import { estimateFor, useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 import { BookingSheet } from '../../features/ride-booking/components/BookingSheet';
 import { MapTopControls, MAP_TOP_CONTROLS_HEIGHT } from '../../features/ride-booking/components/MapTopControls';
@@ -88,6 +89,8 @@ const PassengerMapScreen = () => {
   // verified (T-504 builds that flow).
   const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
     onPhoneNotVerified: () => navigation.navigate('Profile'),
+    // BE-85: owing more than the limit blocks booking until a top-up.
+    onBalanceOwed: () => navigation.navigate('AddMoney'),
   });
 
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
@@ -202,6 +205,8 @@ const PassengerMapScreen = () => {
   const vehicleTypes = useVehicleTypes();
   const estimates = useFareEstimates(pickup, destination, stops);
   const selectedType = vehicleTypes.data?.find((t) => t.key === selectedVehicle) ?? null;
+  // BE-83: the passenger's offer for the selected quote (starts at the server fare).
+  const offer = useFareOffer(estimateFor(estimates.data, selectedVehicle)?.offer_band ?? null);
   const tripSummary = estimates.data ? BOOKING_COPY.tripSummary(estimates.data.distance_km, estimates.data.duration_min) : null;
 
   // PAX-14/PAX-24: only in the explicit choose-on-map mode, never on a marker press.
@@ -364,29 +369,8 @@ const PassengerMapScreen = () => {
     }
   }, [stage, navigation, rideShown]);
 
-  // Cancel: the outcome is shown once, by the stage panel (a poll that saw the cancel first
-  // shows the same card), so no success alert here; a 409 just re-reads the ride.
-  const handleCancelRide = useCallback(() => {
-    Alert.alert(ACTIVE_RIDE_COPY.cancelConfirmTitle, ACTIVE_RIDE_COPY.cancelConfirmMessage, [
-      { text: ACTIVE_RIDE_COPY.keepRide, style: 'cancel' },
-      {
-        text: ACTIVE_RIDE_COPY.cancelRide,
-        style: 'destructive',
-        onPress: async () => {
-          if (!currentRide) {
-            resetSelection();
-            return;
-          }
-          try {
-            await cancelRideService(currentRide.id);
-          } catch (cancelError) {
-            const message = cancelError instanceof Error ? cancelError.message : ACTIVE_RIDE_COPY.cancelFailedFallback;
-            Alert.alert(ACTIVE_RIDE_COPY.cancelFailedTitle, message);
-          }
-        },
-      },
-    ]);
-  }, [currentRide, cancelRideService, resetSelection]);
+  // Cancel with the server's fee preview (BE-85); the outcome is shown once, by the stage panel.
+  const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection);
 
   // Pickup at the passenger's position; its address is resolved and kept with the point.
   const pickupAtCurrentLocation = useCallback(async () => {
@@ -419,6 +403,7 @@ const PassengerMapScreen = () => {
         dropoff: d,
         stops: st.filter((x): x is Place => x !== null),
         vehicleType: selectedVehicle,
+        offeredFare: offer.offeredFare,
       });
       if (!built.ok) {
         setError(built.error);
@@ -427,13 +412,15 @@ const PassengerMapScreen = () => {
       }
       await requestRideService(built.request);
       setStage('requesting');
-    } catch {
-      // requestRide already showed the server's message (or routed the refusal).
+    } catch (refusal) {
+      // requestRide already showed the server's message (or routed the refusal); an offer
+      // outside the band moves the stepper into the server's band (BE-83).
+      if (refusal instanceof RideRequestRefused && refusal.failure.kind === 'offer_out_of_band') offer.applyBand(refusal.failure.band);
       setStage('fare'); // Go back to fare stage on error
     } finally {
       setIsLoading(false);
     }
-  }, [pickup, destination, stops, selectedVehicle, requestRideService]);
+  }, [pickup, destination, stops, selectedVehicle, requestRideService, offer]);
 
   // Auto-fit map to the route whenever it updates, above the sheet (T-314). The sheet settles
   // after the route arrives (keyboard closes, vehicle list loads), so a sheet height change of
@@ -650,6 +637,8 @@ const PassengerMapScreen = () => {
               tripSummary={tripSummary}
               vehicleType={selectedType}
               estimates={estimates}
+              offer={offer}
+              catalogueNotice={vehicleTypes.notice}
               onChangeVehicle={() => setStage('vehicle')}
               onCancel={handleCancelRide}
               onConfirm={() => { onRequestRide(); setStage('requesting'); }}

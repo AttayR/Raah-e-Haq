@@ -11,6 +11,7 @@ import {
   type LatLng,
   type VehicleType,
 } from './api';
+import type { FareNotice } from '../fare/types';
 import { BOOKING_COPY } from './copy';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -29,19 +30,27 @@ const useRetryOnRecovery = (status: LoadStatus, retry: () => void) => {
   useConnectionRecovered(retry, failed);
 };
 
-/** GET /public/vehicle-types once per mount, with loading/error states and a retry. */
+/**
+ * GET /public/vehicle-types once per mount, with loading/error states and a retry. `notice` is
+ * the fuel adjustment in force (BE-60 `meta.fare_notice`), or null.
+ */
 export const useVehicleTypes = () => {
-  const [state, setState] = useState<Loaded<VehicleType[]>>({ status: 'loading', data: null, error: null });
+  const [state, setState] = useState<Loaded<VehicleType[]> & { notice: FareNotice | null }>({
+    status: 'loading',
+    data: null,
+    error: null,
+    notice: null,
+  });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
     setState((s) => ({ ...s, status: 'loading', error: null }));
     fetchVehicleTypes(controller.signal)
-      .then((data) => setState({ status: 'ready', data, error: null }))
+      .then(({ types, notice }) => setState({ status: 'ready', data: types, error: null, notice }))
       .catch((error) => {
         if (!controller.signal.aborted) {
-          setState({ status: 'error', data: null, error: errorText(error, BOOKING_COPY.vehicleTypesFailed) });
+          setState({ status: 'error', data: null, error: errorText(error, BOOKING_COPY.vehicleTypesFailed), notice: null });
         }
       });
     return () => controller.abort();

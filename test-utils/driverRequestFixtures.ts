@@ -42,5 +42,7 @@ export const makePendingRequest = (overrides: Partial<PendingRideRequest> = {}):
   paymentMethod: 'cash',
   vehicleType: 'car',
   expiresAt: null,
+  isOffer: false,
+  serverFare: null,
   ...overrides,
 });

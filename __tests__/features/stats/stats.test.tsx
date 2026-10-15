@@ -244,7 +244,8 @@ describe('DriverEarningsScreen', () => {
     mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
     mock.onGet('/wallet').reply(200, envelope(rawWallet({ commission_owed: 116 })));
     showEarnings();
-    await waitFor(() => expect(screen.getByText('Commission owed: Rs 116')).toBeTruthy());
+    // T-521: what is owed can include fare-dispute recoveries, so it is "Amount owed".
+    await waitFor(() => expect(screen.getByText('Amount owed: Rs 116')).toBeTruthy());
     expect(screen.getAllByText('Earnings').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('earnings-back')).toBeNull();
     fireEvent.press(screen.getByTestId('earnings-wallet'));

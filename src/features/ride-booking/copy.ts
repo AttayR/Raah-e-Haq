@@ -9,11 +9,10 @@ export const BOOKING_COPY = {
   estimateLoading: 'Calculating fare…',
   estimateFailed: 'Could not calculate the fare.',
   retry: 'Retry',
-  // T-311: the booking price is the server's quote; the final fare is set when the trip ends.
-  // The footnote is DESIGN_SYSTEM §5.26's estimate note (UI-R5).
+  // T-311: the booking price is the server's quote. T-521: the footnote is `fare.lockNote` (BE-82
+  // locks the fare when a driver accepts).
   estimatedFareTitle: 'Estimated fare',
   estimatedTotal: 'Estimated total',
-  estimateNote: 'Estimated fare. Final fare is calculated at the end of the trip. Pay cash to your driver.',
   /** §7: the button names the action and the choice ("Request Rickshaw"). */
   request: (vehicle: string) => `Request ${vehicle}`,
   tripSummary: (km: number, min: number) => `${km} km • ${min} min`,

@@ -6,7 +6,8 @@ import type { PendingRideRequest } from '../../features/driver-requests/api';
 import { DRIVER_REQUESTS_COPY as COPY } from '../../features/driver-requests/copy';
 import type { RideRequestFeedView } from '../../features/driver-requests/hooks';
 import { formatMoney } from '../../utils/format';
-import { AddressPair, AppText, Button, IconButton, PersonCard } from '../ui';
+import { AddressPair, AppText, Badge, Button, IconButton, PersonCard } from '../ui';
+import { t } from '../../i18n';
 
 const formatKm = (value: number): string => (value < 10 ? value.toFixed(1) : String(Math.round(value)));
 
@@ -62,6 +63,17 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
             {payment && (
               <AppText variant="caption" color="textSecondary">
                 {payment}
+              </AppText>
+            )}
+          </View>
+        )}
+        {request.isOffer && (
+          // BE-83: the fare above is the passenger's offer; the app fare is shown for comparison.
+          <View style={styles.metric} testID="incoming-request-offer">
+            <Badge label={t('driverFare.offerBadge')} tone="info" />
+            {request.serverFare !== null && (
+              <AppText variant="caption" color="textSecondary" testID="incoming-request-server-fare">
+                {t('driverFare.offerVsApp', { amount: formatMoney(request.serverFare) })}
               </AppText>
             )}
           </View>

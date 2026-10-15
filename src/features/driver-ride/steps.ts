@@ -113,6 +113,10 @@ export interface FareBreakdownSummary {
   time: number | null;
   stops: number | null;
   minFareAdjustment: number | null;
+  /** BE-60 / BE-83 / BE-85 parts; null on older rides. */
+  bookingFee: number | null;
+  offerAdjustment: number | null;
+  waiting: number | null;
 }
 
 /** The completed ride's numbers as the server computed them; null where it sent none. */
@@ -134,11 +138,15 @@ export const toRideSummary = (ride: RideResource): DriverRideSummary => {
         time: toNumber(raw.time),
         stops: toNumber(raw.stops),
         minFareAdjustment: toNumber(raw.min_fare_adjustment),
+        bookingFee: toNumber(raw.booking_fee),
+        offerAdjustment: toNumber(raw.offer_adjustment),
+        waiting: toNumber(raw.waiting),
       }
     : null;
   return {
     totalFare: toNumber(raw?.total) ?? toNumber(ride.total_fare),
-    driverEarnings: toNumber(ride.driver_earnings),
+    // BE-84: `driver_net` is the split's figure; `driver_earnings` the stored one (same once completed).
+    driverEarnings: toNumber(ride.driver_net) ?? toNumber(ride.driver_earnings),
     breakdown,
     distanceKm: toNumber(ride.distance_km),
     durationMinutes: toNumber(ride.duration_minutes),
