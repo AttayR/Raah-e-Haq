@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import MapView, { EdgePadding, LatLng, MapViewProps, PROVIDER_GOOGLE } from 'react-native-maps';
 import { BrandColors } from '../theme/colors';
+import { useAppTheme } from '../app/providers/ThemeProvider';
 import { logger } from '../core/logging/logger';
 
 interface SafeMapViewProps extends MapViewProps {
@@ -18,6 +19,7 @@ export interface SafeMapViewRef {
 
 const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
   ({ fallbackComponent, ...props }, ref) => {
+    const { theme } = useAppTheme();
     const mapRef = useRef<MapView>(null);
     const [isMapReady, setIsMapReady] = useState(false);
     const [hasError, setHasError] = useState(false);
@@ -153,7 +155,12 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
+        // T-540: Google Maps follows the phone's dark mode until the custom style applies, so a
+        // light-theme map on a dark-mode phone flashed dark grey while loading. Pin it to the app
+        // theme and paint the style's land colour behind the tiles.
+        userInterfaceStyle={theme.mode}
         {...props}
+        style={[{ backgroundColor: theme.mapBackground }, props.style]}
         onMapReady={handleMapReady}
         onMapLoaded={handleMapLoaded}
         onError={handleError}
@@ -162,7 +169,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
         cacheEnabled={false}
         moveOnMarkerPress={false}
         loadingIndicatorColor={BrandColors.primary}
-        loadingBackgroundColor="white"
+        loadingBackgroundColor={theme.mapBackground}
         // Critical props to prevent MapView crashes
         showsUserLocation={false}
         showsMyLocationButton={false}

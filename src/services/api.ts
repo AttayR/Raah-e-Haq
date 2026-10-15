@@ -11,6 +11,7 @@ import { currentSessionEpoch, isStaleSession } from '../store/sessionEpoch';
 import { logger } from '../core/logging/logger';
 import { toApiError, type ApiError } from '../core/api/errors';
 import { logApiFailure } from '../core/api/logApiFailure';
+import { connectivity } from '../core/api/connectivity';
 import type { ApiResponse } from '../core/api/types';
 
 export type { ApiResponse } from '../core/api/types';
@@ -249,6 +250,7 @@ apiClient.interceptors.request.use(
 // 403 ACCOUNT_* of the current session routes to account status (T-106).
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    connectivity.reportResponse();
     return response;
   },
   async (error) => {
@@ -256,6 +258,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(toApiError(error));
     }
     const apiError = toApiError(error);
+    // T-540: "the server answers again" clears stale network errors on screen.
+    connectivity.reportFailure(apiError.kind);
     if (apiError.status === 401 && axios.isAxiosError(error)) {
       reportUnauthorized(error.config);
     }

@@ -6,9 +6,11 @@ import { AppState, AppStateStatus } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 import rideService, { NearbyDriver } from '../../src/services/rideService';
 import { ApiError } from '../../src/core/api/errors';
+import { __resetConnectivityForTests, connectivity } from '../../src/core/api/connectivity';
 import {
   NEARBY_ERROR_RETRY_MS,
   NEARBY_MIN_GAP_MS,
+  NEARBY_NETWORK_RETRY_MS,
   NEARBY_POLL_MS,
   __resetNearbyDriversThrottleForTests,
   useNearbyDrivers,
@@ -46,6 +48,7 @@ const advance = async (ms: number) => {
 beforeEach(() => {
   jest.useFakeTimers();
   __resetNearbyDriversThrottleForTests();
+  __resetConnectivityForTests();
   spy = jest.spyOn(rideService, 'getNearbyDrivers');
   appStateListeners = [];
   removeListener = jest.fn();
@@ -143,7 +146,21 @@ describe('useNearbyDrivers', () => {
     expect(result.current.drivers).toEqual([]);
   });
 
-  it('shows an error state and retries after a minute', async () => {
+  it('shows an error state and retries a server error after a minute', async () => {
+    spy
+      .mockRejectedValueOnce(new ApiError({ kind: 'server', status: 500, message: 'Something went wrong on our side. Please try again.' }))
+      .mockResolvedValue([driver]);
+    const { result } = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    expect(result.current.status).toBe('error');
+    await advance(NEARBY_ERROR_RETRY_MS - 1);
+    expect(spy).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('ready');
+  });
+
+  it('T-540: a network error retries after 15 s, not a minute, and clears on success', async () => {
     spy
       .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
       .mockResolvedValue([driver]);
@@ -154,9 +171,28 @@ describe('useNearbyDrivers', () => {
       status: 'error',
       error: 'Network error. Please check your connection.',
     });
-    await advance(NEARBY_ERROR_RETRY_MS);
+    await advance(NEARBY_NETWORK_RETRY_MS);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+  });
+
+  it('T-540: asks again as soon as the connection is back (after the 10 s floor)', async () => {
+    spy
+      .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
+      .mockResolvedValue([driver]);
+    const { result } = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    expect(result.current.status).toBe('error');
+    await advance(NEARBY_MIN_GAP_MS);
+    // Another request reached the server: the connection is back.
+    await act(async () => {
+      connectivity.reportFailure('network');
+      connectivity.reportResponse();
+    });
+    await advance(0);
     expect(spy).toHaveBeenCalledTimes(2);
     expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
   });
 
   it('aborts the in-flight request on unmount', async () => {

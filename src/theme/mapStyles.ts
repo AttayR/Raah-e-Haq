@@ -10,8 +10,17 @@ export type MapStyleRule = {
   stylers: Array<Record<string, string | number>>;
 };
 
+/**
+ * The land colour of each style: also the map's background before its tiles draw, so a loading
+ * map shows the theme instead of Google's grey (T-540).
+ */
+export const mapBackgrounds: Record<ColorMode, string> = {
+  light: '#F2F2F2',
+  dark: '#1D2230',
+};
+
 export const lightMapStyle: MapStyleRule[] = [
-  { elementType: 'geometry', stylers: [{ color: '#F2F2F2' }] },
+  { elementType: 'geometry', stylers: [{ color: mapBackgrounds.light }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C9D8EE' }] },
   { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#FFFFFF' }] },
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#E1E4EB' }] },
@@ -27,7 +36,7 @@ export const lightMapStyle: MapStyleRule[] = [
 ];
 
 export const darkMapStyle: MapStyleRule[] = [
-  { elementType: 'geometry', stylers: [{ color: '#1D2230' }] },
+  { elementType: 'geometry', stylers: [{ color: mapBackgrounds.dark }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#9099B0' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#1D2230' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0F1A2E' }] },

@@ -52,8 +52,9 @@ const ENTER_EASING = toAnimatedEasing({ x1: 0.2, y1: 0, x2: 0, y2: 1 });
 const EXIT_EASING = toAnimatedEasing({ x1: 0.3, y1: 0, x2: 1, y2: 1 });
 
 /**
- * Toast (DESIGN_SYSTEM §5.16, UI-R3 restyle): top-anchored at `insets.top + 8`, 16 from the
- * sides, min height 48, radius 12; light mode `textPrimary` fill with `textInverse` text, dark
+ * Toast (DESIGN_SYSTEM §5.16, UI-R3 restyle): top-anchored 8 below the 56 Header bar
+ * (`insets.top + 56 + 8`; T-540: never over the back button; `topOffset` overrides the 56), 16
+ * from the sides, min height 48, radius 12; light mode `textPrimary` fill with `textInverse` text, dark
  * mode `surfaceRaised` with `textPrimary`; elevation 4. Leading 20 glyph tinted by tone, text
  * `bodySmall` ([UI-R3] title 2 lines, message 2), optional `buttonSmall` action in navy-300. In: −16→0 +
  * fade 250 ms; out: fade + −8 in 200 ms; reduced motion: fade only. Swipe up or tap to dismiss.
@@ -70,7 +71,7 @@ export function ToastView({ config, onHide, preview = false }: Props) {
   const dark = theme.mode === 'dark';
   const fill = dark ? theme.colors.surfaceRaised : theme.colors.textPrimary;
   const textColor = dark ? theme.colors.textPrimary : theme.colors.textInverse;
-  const { id, title, message, duration, type, action, topOffset = 0 } = config;
+  const { id, title, message, duration, type, action, topOffset = componentTokens.header.barHeight } = config;
   // One separator between the lines, never "..": a title may already end its sentence.
   const label = message ? `${title}${/[.!?]$/.test(title) ? '' : '.'} ${message}` : title;
 

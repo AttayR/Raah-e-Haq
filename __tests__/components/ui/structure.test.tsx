@@ -15,6 +15,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme, componentTokens } from '../../../src/theme';
 import {
@@ -47,7 +48,7 @@ const flat = (style: StyleProp<ViewStyle & TextStyle>): ViewStyle & TextStyle =>
 const noop = () => {};
 
 describe('keyboardAvoidingProps', () => {
-  it('pads on iOS by the top inset and is off on Android (adjustResize)', () => {
+  it('pads on iOS by the offset above the parent and is off on Android (adjustResize)', () => {
     expect(keyboardAvoidingProps('ios', 59)).toEqual({ behavior: 'padding', enabled: true, keyboardVerticalOffset: 59 });
     expect(keyboardAvoidingProps('ios', -3).keyboardVerticalOffset).toBe(0);
     expect(keyboardAvoidingProps('android', 24)).toEqual({ behavior: undefined, enabled: false, keyboardVerticalOffset: 0 });
@@ -81,6 +82,18 @@ describe('Screen', () => {
       </Screen>,
     );
     expect(screen.getByTestId('chat-keyboard-avoider')).toContainElement(screen.getByText('composer'));
+  });
+
+  it('does not count the padded top inset twice (T-540: composer sat ~62 pt above the keyboard)', async () => {
+    await renderThemed(
+      <SafeAreaInsetsContext.Provider value={{ top: 62, bottom: 34, left: 0, right: 0 }}>
+        <Screen keyboardAvoiding testID="chat">
+          <Text>composer</Text>
+        </Screen>
+      </SafeAreaInsetsContext.Provider>,
+    );
+    // The SafeAreaView pads the 62 inset, so it is already in the KAV's onLayout frame.y.
+    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props).toMatchObject({ behavior: 'padding', keyboardVerticalOffset: 0 });
   });
 
   it('wires pull to refresh tinted with primary', async () => {
@@ -253,6 +266,24 @@ describe('ListItem and ListGroup', () => {
       .UNSAFE_getAllByType(View)
       .find(v => flat(v.props.style).marginStart === componentTokens.listItem.dividerInset.icon);
     expect(divider).toBeTruthy();
+  });
+
+  it('without an inset prop, each divider follows the content start of the row above (T-540)', async () => {
+    await renderThemed(
+      <ListGroup testID="g">
+        <ListItem title="Allow push" icon="bell" />
+        <ListItem title="Ride updates" />
+        <ListItem title="Messages" />
+        <ListItem title="Plain" icon="bell" iconStyle="plain" />
+        <ListItem title="Last" />
+      </ListGroup>,
+    );
+    const inset = (i: number) => flat(screen.getByTestId(`g-divider-${i}`).props.style).marginStart;
+    const { dividerInset } = componentTokens.listItem;
+    expect(inset(1)).toBe(dividerInset.tile); // under the tile row: aligned with its text
+    expect(inset(2)).toBe(dividerInset.none); // icon-less rows: the 16 gutter, not 72
+    expect(inset(3)).toBe(dividerInset.none);
+    expect(inset(4)).toBe(dividerInset.icon);
   });
 });
 

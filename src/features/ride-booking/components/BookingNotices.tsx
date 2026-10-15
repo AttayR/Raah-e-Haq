@@ -81,7 +81,7 @@ export const LocationWaitState: React.FC<{
 export const MapPlaceholder: React.FC<{ message: string }> = ({ message }) => {
   const { theme } = useAppTheme();
   return (
-    <View style={[styles.mapPlaceholder, { backgroundColor: theme.colors.surfaceAlt }]}>
+    <View style={[styles.mapPlaceholder, { backgroundColor: theme.mapBackground }]}>
       <AppText variant="bodyStrong" color="textSecondary">
         {message}
       </AppText>

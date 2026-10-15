@@ -11,7 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { layout, type StatusBarStyle } from '../../theme';
 import { keyboardAvoidingProps } from './keyboard';
@@ -29,7 +29,8 @@ export type ScreenProps = React.PropsWithChildren<{
   /**
    * Keeps the end of the content above the keyboard (iOS; Android resizes the window). Default:
    * on for `scroll` screens. Turn it on for non-scroll screens whose bottom holds an input or a
-   * sticky action (chat composer, a FlatList form). Offsets by the top inset when `edges` pads it.
+   * sticky action (chat composer, a FlatList form). The padded top inset is already in the KAV's
+   * frame, so no extra offset (T-540).
    */
   keyboardAvoiding?: boolean;
   /** Pull to refresh for `scroll` screens, tinted `primary`. */
@@ -49,8 +50,7 @@ export type ScreenProps = React.PropsWithChildren<{
 
 /**
  * Screen root (DESIGN_SYSTEM §5.1): safe-area insets, the `background` colour, the status bar
- * from the theme (so no screen sets StatusBar itself) and keyboard avoidance with the top-inset
- * offset (see `keyboard.ts`). `scroll` screens get `keyboardShouldPersistTaps="handled"`, so
+ * from the theme (so no screen sets StatusBar itself) and keyboard avoidance (see `keyboard.ts`). `scroll` screens get `keyboardShouldPersistTaps="handled"`, so
  * the first tap with the keyboard up reaches the button.
  *
  * Anything presented in a native Modal (Dialog, modal BottomSheet) is a separate window and
@@ -70,10 +70,8 @@ export function Screen({
   children,
 }: ScreenProps) {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const background = { backgroundColor: theme.colors.background };
   const avoid = keyboardAvoiding ?? scroll;
-  const topInset = edges.includes('top') ? insets.top : 0;
 
   const refresh =
     refreshControl ??
@@ -110,7 +108,9 @@ export function Screen({
       {avoid ? (
         <KeyboardAvoidingView
           style={styles.root}
-          {...keyboardAvoidingProps(Platform.OS, topInset)}
+          // The KAV is a direct child of the SafeAreaView: its frame already includes the padded
+          // top inset, so nothing sits above its parent (T-540; see keyboard.ts).
+          {...keyboardAvoidingProps(Platform.OS, 0)}
           testID={testID ? `${testID}-keyboard-avoider` : undefined}
         >
           {body}

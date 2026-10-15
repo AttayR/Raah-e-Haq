@@ -24,8 +24,10 @@ export interface ToastOptions {
   action?: ToastAction;
   onHide?: () => void;
   /**
-   * Extra points between the safe-area top and the toast, so it clears a floating control at
-   * the top of the screen (e.g. a map screen's back button). Defaults to 0.
+   * Points between `insets.top + 8` and the toast, so it clears whatever sits at the top of the
+   * screen. Defaults to the Header bar height (56), which keeps a pushed screen's back button and
+   * a map screen's 48 floating back button tappable (T-540); a screen with taller floating
+   * controls passes its own (driver ride: 64).
    */
   topOffset?: number;
 }

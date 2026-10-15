@@ -1,23 +1,26 @@
 import type { KeyboardAvoidingViewProps } from 'react-native';
 
 /**
- * KeyboardAvoidingView props used by `Screen` (DESIGN_SYSTEM §5.1, UI-R3). One place for the fix
- * first made in the chat thread (T-512) and the Pay commission form (T-509):
+ * KeyboardAvoidingView props used by `Screen` (DESIGN_SYSTEM §5.1, UI-R3).
  *
- * RN's KeyboardAvoidingView compares its own bottom edge with the keyboard's `screenY`, but it
- * takes that edge from `onLayout`, which is relative to its parent, not to the window. Inside
- * `Screen` the KAV sits in a SafeAreaView that pads the top inset, so without an offset it
- * under-pads by exactly the status bar / Dynamic Island inset and the keyboard covers the end of
- * the content (the chat composer, a form's submit button). Anything above the KAV inside the
- * same parent (a Header) is already counted by `onLayout`'s `y`; only what sits above the parent
- * (the padded top inset) belongs in `keyboardVerticalOffset`.
+ * RN's KeyboardAvoidingView pads by `frame.y + frame.height - (keyboard.screenY - offset)`, with
+ * `frame` from its own `onLayout`, which is relative to its parent, not to the window. So
+ * `keyboardVerticalOffset` must be exactly the distance from the window top to the parent's top
+ * edge: anything inside the parent (its padding, a Header above the KAV) is already in `frame.y`.
+ *
+ * In `Screen` the KAV is a direct child of the safe-area `SafeAreaView`, whose top inset is Yoga
+ * padding and therefore already counted in `frame.y`; the screen itself starts at the window top.
+ * So `Screen` passes 0. T-540: it used to pass the top inset as well (a leftover from T-512, when
+ * the chat's KAV sat one level deeper, below the padded area), which counted the inset twice and
+ * left the chat composer and form actions floating a top inset (~62 pt on iPhone 17) above the
+ * keyboard.
  *
  * Android keeps `adjustResize` (AndroidManifest), so the KAV is off there.
  */
 export const keyboardAvoidingProps = (
   os: string,
-  topInset: number,
+  offsetAboveParent: number,
 ): Pick<KeyboardAvoidingViewProps, 'behavior' | 'enabled' | 'keyboardVerticalOffset'> =>
   os === 'ios'
-    ? { behavior: 'padding', enabled: true, keyboardVerticalOffset: Math.max(0, topInset) }
+    ? { behavior: 'padding', enabled: true, keyboardVerticalOffset: Math.max(0, offsetAboveParent) }
     : { behavior: undefined, enabled: false, keyboardVerticalOffset: 0 };

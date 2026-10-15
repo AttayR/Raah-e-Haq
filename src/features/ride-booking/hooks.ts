@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useConnectionRecovered } from '../../core/api/connectivity';
 import { toApiError } from '../../core/api/errors';
 import type { VehicleTypeKey } from '../../services/rideService';
 import {
@@ -22,6 +23,12 @@ interface Loaded<T> {
 
 const errorText = (error: unknown, fallback: string): string => toApiError(error).message || fallback;
 
+/** T-540: a failed load asks again once the connection is back, so its error does not linger. */
+const useRetryOnRecovery = (status: LoadStatus, retry: () => void) => {
+  const failed = status === 'error';
+  useConnectionRecovered(retry, failed);
+};
+
 /** GET /public/vehicle-types once per mount, with loading/error states and a retry. */
 export const useVehicleTypes = () => {
   const [state, setState] = useState<Loaded<VehicleType[]>>({ status: 'loading', data: null, error: null });
@@ -41,6 +48,7 @@ export const useVehicleTypes = () => {
   }, [attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  useRetryOnRecovery(state.status, retry);
   return { ...state, retry };
 };
 
@@ -81,6 +89,7 @@ export const useFareEstimates = (pickup: LatLng | null, dropoff: LatLng | null, 
   }, [key, attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  useRetryOnRecovery(state.status, retry);
   return { ...state, retry };
 };
 

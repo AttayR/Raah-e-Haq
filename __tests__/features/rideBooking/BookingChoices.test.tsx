@@ -11,10 +11,12 @@ import { FareReview, VehicleChoice } from '../../../src/features/ride-booking/co
 import { useFareEstimates, useVehicleTypes } from '../../../src/features/ride-booking/hooks';
 import type { FareEstimates, VehicleType } from '../../../src/features/ride-booking/api';
 import { envelope, makeStore } from '../../../test-utils/rideFixtures';
+import { __resetConnectivityForTests } from '../../../src/core/api/connectivity';
 
 let mock: MockAdapter;
 
 beforeEach(() => {
+  __resetConnectivityForTests();
   mock = new MockAdapter(apiClient);
 });
 
@@ -129,5 +131,42 @@ describe('booking hooks', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     expect(mock.history.post).toHaveLength(1);
+  });
+
+  it('T-540: a "Network error" clears by itself once the server answers again', async () => {
+    mock.onGet('/public/vehicle-types').networkErrorOnce();
+    mock.onGet('/public/vehicle-types').reply(200, envelope(types));
+    mock.onPost('/rides/estimate').networkErrorOnce();
+    mock.onPost('/rides/estimate').reply(200, envelope(estimates));
+    mock.onGet('/ping').reply(200, envelope({}));
+    const pickup = { latitude: 31.5, longitude: 74.3 };
+    const dropoff = { latitude: 31.4, longitude: 74.2 };
+    const { result } = renderHook(() => ({ types: useVehicleTypes(), fares: useFareEstimates(pickup, dropoff, []) }), { wrapper });
+    await waitFor(() => expect(result.current.types.status).toBe('error'));
+    await waitFor(() => expect(result.current.fares.status).toBe('error'));
+    expect(result.current.types.error).toBe('Network error. Please check your connection.');
+
+    // Any other request getting a response (here a nearby-drivers poll stand-in) means "back".
+    await act(async () => {
+      await apiClient.get('/ping');
+    });
+    await waitFor(() => expect(result.current.types.status).toBe('ready'));
+    await waitFor(() => expect(result.current.fares.status).toBe('ready'));
+    expect(result.current.types.error).toBeNull();
+    expect(result.current.fares.error).toBeNull();
+    expect(result.current.fares.data).toEqual(estimates);
+  });
+
+  it('T-540: no refetch on a response when nothing failed', async () => {
+    mock.onGet('/public/vehicle-types').reply(200, envelope(types));
+    mock.onGet('/ping').networkErrorOnce();
+    mock.onGet('/ping').reply(200, envelope({}));
+    const { result } = renderHook(() => useVehicleTypes(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await apiClient.get('/ping').catch(() => undefined);
+      await apiClient.get('/ping');
+    });
+    expect(mock.history.get.filter((r) => r.url === '/public/vehicle-types')).toHaveLength(1);
   });
 });

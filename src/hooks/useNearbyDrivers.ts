@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import rideService, { NearbyDriver, NearbyVehicleType } from '../services/rideService';
+import { useConnectionRecovered } from '../core/api/connectivity';
 import { toApiError } from '../core/api/errors';
 
 /**
@@ -10,11 +11,15 @@ import { toApiError } from '../core/api/errors';
  * requests are at least MIN_GAP_MS apart (also when the centre moves), the steady poll is
  * POLL_MS, and a 429 waits for its retry_after. Polling runs only while the app is in the
  * foreground (B-08). Timers and the in-flight request are cleared when disabled, backgrounded
- * or unmounted. A 401 stops polling (the session is gone).
+ * or unmounted. A 401 stops polling (the session is gone). T-540: after an error it asks again as
+ * soon as the connection is back (still no sooner than MIN_GAP_MS after the last request), and
+ * after a no-response failure (`network`/`timeout`) it retries every NETWORK_RETRY_MS instead of
+ * a minute, so a "Network error" line clears soon after the server is reachable again.
  */
 export const NEARBY_POLL_MS = 30_000;
 export const NEARBY_MIN_GAP_MS = 10_000;
 export const NEARBY_ERROR_RETRY_MS = 60_000;
+export const NEARBY_NETWORK_RETRY_MS = 15_000;
 
 export type NearbyDriversStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -64,6 +69,10 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
   const appActive = useAppIsActive();
   const enabled = enabledOption && appActive;
   const [state, setState] = useState<NearbyDriversState>(INITIAL);
+  // Bumped when the connection is back while the last request failed: restarts the schedule now.
+  const [recovery, setRecovery] = useState(0);
+  const failed = state.status === 'error';
+  useConnectionRecovered(() => setRecovery((n) => n + 1), enabled && failed);
 
   const lat = center ? roundCoord(center.latitude) : null;
   const lng = center ? roundCoord(center.longitude) : null;
@@ -113,7 +122,8 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
         setState({ drivers: [], status: 'error', error: apiError.message });
         // A 401 ends the session (single logout); retrying would only repeat it.
         if (apiError.kind !== 'auth') {
-          schedule(NEARBY_ERROR_RETRY_MS);
+          const noResponse = apiError.kind === 'network' || apiError.kind === 'timeout';
+          schedule(noResponse ? NEARBY_NETWORK_RETRY_MS : NEARBY_ERROR_RETRY_MS);
         }
       }
     };
@@ -125,8 +135,8 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
       if (timer) clearTimeout(timer);
       controller?.abort();
     };
-    // refreshKey only restarts the schedule (its value is not read).
-  }, [enabled, lat, lng, radiusKm, vehicleType, refreshKey]);
+    // refreshKey and recovery only restart the schedule (their values are not read).
+  }, [enabled, lat, lng, radiusKm, vehicleType, refreshKey, recovery]);
 
   return state;
 };

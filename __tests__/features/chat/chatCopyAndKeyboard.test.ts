@@ -1,9 +1,9 @@
 /**
  * T-512: the read-only notice's time carries its day when it isn't today, and the thread's
- * KeyboardAvoidingView offsets by the top safe-area inset on iOS (its onLayout frame is
- * relative to the Screen's SafeAreaView, so without the offset the keyboard covered the
- * composer). Android keeps adjustResize, so the KAV is off there. UI-R3 moved the helper into
- * the kit (`Screen keyboardAvoiding`), shared with the Pay commission form (T-509).
+ * KeyboardAvoidingView offsets by whatever sits above its parent on iOS (its onLayout frame is
+ * relative to that parent). Android keeps adjustResize, so the KAV is off there. UI-R3 moved the
+ * helper into the kit (`Screen keyboardAvoiding`), shared with the Pay commission form (T-509);
+ * `Screen` passes 0 since its KAV's parent already pads the top inset (T-540).
  */
 import { formatChatDayTime, formatChatTime } from '../../../src/features/chat/copy';
 import { keyboardAvoidingProps as chatKeyboardAvoidingProps } from '../../../src/components/ui/keyboard';
@@ -42,9 +42,10 @@ describe('formatChatDayTime', () => {
 });
 
 describe('chatKeyboardAvoidingProps', () => {
-  it('pads on iOS, offset by the top safe-area inset (SE 20, Pro Max 59)', () => {
+  it('pads on iOS, offset by the distance above the parent, never negative', () => {
     expect(chatKeyboardAvoidingProps('ios', 20)).toEqual({ behavior: 'padding', enabled: true, keyboardVerticalOffset: 20 });
-    expect(chatKeyboardAvoidingProps('ios', 59)).toEqual({ behavior: 'padding', enabled: true, keyboardVerticalOffset: 59 });
+    expect(chatKeyboardAvoidingProps('ios', 0)).toEqual({ behavior: 'padding', enabled: true, keyboardVerticalOffset: 0 });
+    expect(chatKeyboardAvoidingProps('ios', -5).keyboardVerticalOffset).toBe(0);
   });
 
   it('is off on Android (adjustResize resizes the window)', () => {

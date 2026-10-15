@@ -5,7 +5,7 @@
 import { borderWidth } from './borders';
 import { componentTokens, type ComponentTokens } from './components';
 import { createElevation, type ElevationScale } from './elevation';
-import { mapStyles, type MapStyleRule } from './mapStyles';
+import { mapBackgrounds, mapStyles, type MapStyleRule } from './mapStyles';
 import { motion, motionPatterns, reducedMotion, springs } from './motion';
 import { radius } from './radii';
 import { layout, space } from './spacing';
@@ -59,6 +59,8 @@ export type AppTheme = {
   motionPatterns: typeof motionPatterns;
   reducedMotion: typeof reducedMotion;
   mapStyle: MapStyleRule[];
+  /** The map style's land colour, shown while tiles load (T-540). */
+  mapBackground: string;
   statusBarStyle: StatusBarStyle;
 };
 
@@ -87,6 +89,7 @@ export const createTheme = (mode: ColorMode): AppTheme => {
     motionPatterns,
     reducedMotion,
     mapStyle: mapStyles[mode],
+    mapBackground: mapBackgrounds[mode],
     statusBarStyle: statusBarStyles[mode],
   };
 };

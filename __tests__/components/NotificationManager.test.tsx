@@ -136,17 +136,21 @@ describe('NotificationManager toast host', () => {
     announce.mockRestore();
   });
 
-  it('moves the toast down by topOffset so it clears a floating back button (T-411)', async () => {
+  it('sits below the 56 Header bar by default so it never covers the back button (T-540)', async () => {
     await renderHost();
     act(() => {
-      toast.info('Default');
+      toast.error('Could not save the change.');
     });
-    const defaultTop = StyleSheet.flatten(screen.getByTestId('toast').props.style).top as number;
-    act(() => toast.hide());
+    // Test safe-area top inset is 0: 0 + 8 + 56 (the back button's row ends at inset + 56).
+    expect(StyleSheet.flatten(screen.getByTestId('toast').props.style).top).toBe(64);
+  });
+
+  it('topOffset replaces the header clearance for taller floating controls (T-411)', async () => {
+    await renderHost();
     act(() => {
       toast.info('Offset', undefined, { topOffset: 64 });
     });
-    expect(StyleSheet.flatten(screen.getByTestId('toast').props.style).top).toBe(defaultTop + 64);
+    expect(StyleSheet.flatten(screen.getByTestId('toast').props.style).top).toBe(8 + 64);
   });
 
   it('useToast() returns the same API for components', async () => {

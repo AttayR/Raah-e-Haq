@@ -162,7 +162,7 @@ describe('PayCommissionScreen keyboard (T-509)', () => {
     mockParams = { owed: 116, currency: 'PKR' };
   });
 
-  it('pads the form by the top safe-area inset on iOS so Report payment clears the keypad', () => {
+  it('pads the form by the keyboard on iOS (offset never negative) so Report payment clears the keypad', () => {
     expect(formKeyboardAvoidingProps('ios', 62)).toEqual({ behavior: 'padding', enabled: true, keyboardVerticalOffset: 62 });
     expect(formKeyboardAvoidingProps('ios', -1).keyboardVerticalOffset).toBe(0);
     expect(formKeyboardAvoidingProps('android', 24)).toEqual({ behavior: undefined, enabled: false, keyboardVerticalOffset: 0 });
