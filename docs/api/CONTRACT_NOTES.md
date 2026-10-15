@@ -619,3 +619,66 @@ App flow (T-520): SOS button on the trip screen → POST sos → sheet with "Cal
 - Switches: env `RIDES_PIN_ENABLED` (default on) and `RIDES_PIN_DISABLED_VEHICLE_TYPES` (csv), and on the admin settings page (App tab; rows added by migration) `ride_pin_enabled` and `ride_pin_disabled_vehicle_types`. They combine: the PIN is on only when **both** switches are on, and the disabled types are the **union** of both lists. So env is the deploy-level kill switch and the admin can only narrow it. When off, `pin_required` is false, the passenger gets no `pin`, and start works without it. Settings are read once per request (no per-ride queries in lists). **Per-city switching is out of scope**: there is no city model; revisit when cities exist. Rides assigned before this change have no PIN and start as before. Admin status moves never need it.
 - Local QA note: `.env.example` keeps `RIDES_PIN_ENABLED=true`. Until the app sends the PIN (T-520), the local `.env` may set it to `false` (owner/coordinator). Demo seed rides in `accepted`/`arrived` now carry a PIN.
 - App: passenger trip screen shows the PIN large ("Tell your driver this PIN") while `pin` is present; driver app shows a 4-digit PIN entry when `pin_required` is true before calling start, and handles the three codes.
+
+## BE-60 / BE-84: admin rate card, fuel adjustment, transparent commission, weekly statements (2026-10-14, for T-521)
+
+All changes are additive; existing keys keep their meaning. Money is PKR; fares and splits are whole rupees (JSON numbers).
+
+### Rates
+
+- Rates now come from the admin rate card (table `vehicle_types`, admin panel "Fares & Commission"), seeded from `config/fares.php` with the same prices, so nothing changes on deploy. A **fuel adjustment** (percent, start time, short public note) is applied on top of `base_fare`, `per_km`, `per_min` and `min_fare` of every type (not on `per_stop` or `booking_fee`).
+- New fare part **`booking_fee`** (default 0; the platform keeps it in full): `total = max(trip, min_fare) + per_stop * stops + booking_fee`.
+- **Snapshot:** each ride stores the rates it was booked with (incl. `per_stop`, `booking_fee`, the fuel percent and the commission percent). Stop changes and completion price from that snapshot, so an admin edit never reprices a ride already booked. Rides booked before this release use the current rates.
+
+### GET `/public/vehicle-types` (no auth)
+
+- Only **bookable (active)** types are listed, in the admin's order. `?include_inactive=1` lists every type (use it for driver registration). `include_inactive` must be a boolean (422 otherwise).
+- Items gain `name` (same as `label`, the admin-editable display name), `active` (bool), `sort_order`, `fare.booking_fee` and `fare_note` (the fuel note in force, or null). `fare.*` are the rates **after** the fuel adjustment.
+- New sibling `meta.fare_notice`: `{ percent, note, effective_from }` or `null`. Show `note` (e.g. "Fares updated for fuel prices") on the booking sheet when it is not null.
+
+```json
+{ "success": true, "message": "Vehicle types",
+  "data": [ { "key": "car", "label": "Car", "name": "Car", "capacity": 4, "icon": "car", "active": true, "sort_order": 10,
+              "fare": { "currency": "PKR", "base_fare": 110, "per_km": 16.5, "per_min": 2.2, "min_fare": 165, "per_stop": 25, "booking_fee": 0 },
+              "fare_note": "Fares updated for fuel prices" } ],
+  "meta": { "fare_notice": { "percent": 10, "note": "Fares updated for fuel prices", "effective_from": "2026-10-14T12:00:00+00:00" } } }
+```
+
+### POST `/rides/estimate`, POST `/rides`
+
+- Without `vehicle_type`, the estimate lists active types only. A switched-off type: estimate 422 `errors.vehicle_type` ("This vehicle type is not available right now."); ride create 422 `error.code VALIDATION_ERROR`, `error.details.vehicle_type[0]` with the same text.
+- Each `breakdown` gains `booking_fee` (it still adds up to `fare`). The estimate's `data` gains `fare_notice` (same shape as above, or null).
+
+### Ride objects (RideResource)
+
+- Everyone: `booking_fee`; `fare_breakdown.booking_fee` (the parts still add up to `total`; `stops` no longer includes the booking fee).
+- **Driver of the ride and admins only** (and drivers looking at an unassigned request in the feed): `driver_earnings`, `platform_commission`, and new `fare`, `commission_rate` (percent, e.g. 12.5), `commission_amount`, `driver_net`, `commission_final` (bool). Completed rides: the stored numbers (`commission_final: true`). Before completion: the split of the current total at the ride's snapshot rate (`commission_final: false`).
+- **Passengers never get** `driver_earnings`, `platform_commission`, `fare`, `commission_rate`, `commission_amount`, `driver_net` or `commission_final` (the keys are absent; before this release passengers got `driver_earnings`/`platform_commission`).
+- Split: `driver_net = round((fare - booking_fee) * (100 - rate) / 100)` (half up, in the driver's favour); `commission_amount = fare - booking_fee - driver_net`; `platform_commission = commission_amount + booking_fee` (= the ledger's `commission_due`). `driver_net + platform_commission = fare`.
+
+### GET `/driver/earnings` rows
+
+Each item of `rides` gains `pickup_address`, `dropoff_address`, `fare`, `booking_fee`, `commission_rate`, `commission_amount`, `driver_net` (existing `total_fare`, `platform_commission`, `driver_earnings` unchanged). Rides completed before this release have no stored rate; `commission_rate` is derived from their stored amounts.
+
+### GET `/driver/statements?week=2026-W42` (role driver; passengers 403; 401 without token)
+
+- `week`: ISO week (`2026-W42`) or any date in it (`2026-10-14`); default this week. Weeks run Monday 00:00 to Sunday 23:59:59 Asia/Karachi. A malformed week, a week after this one, or before 2020: 422 `VALIDATION_ERROR`, `errors.week`. Throttle 30/min. Always the token driver's own data.
+
+```json
+{ "success": true, "message": "Weekly statement",
+  "data": { "week": "2026-W42", "timezone": "Asia/Karachi", "from": "2026-10-12T00:00:00+05:00", "to": "2026-10-18T23:59:59+05:00", "currency": "PKR",
+    "rides": { "count": 2, "gross_fares": 400, "cash_collected": 400, "booking_fees": 0, "commission": 50, "platform_total": 50, "driver_net": 350 },
+    "by_vehicle_type": [ { "vehicle_type": "car", "commission_rate": 12.5, "rides": 2, "gross_fares": 400, "commission": 50, "driver_net": 350 } ],
+    "ledger": { "commission_due": 50, "commission_paid": 10, "topups": 0, "payouts": 0, "other": 0, "net_change": -40 },
+    "balance": { "opening": -24, "closing": -64 },
+    "commission_owed": { "start_of_week": 24, "end_of_week": 64, "now": 64 },
+    "reconciled": true } }
+```
+
+- `rides.*`: completed rides in the week, from the split stored on each ride. `cash_collected` = `gross_fares` (cash only).
+- `ledger.*`: the driver's wallet entries posted in the week (positive numbers; `net_change` is signed). `commission_paid` = approved commission payments; `topups` = JazzCash/Easypaisa top-ups (they reduce what is owed).
+- `commission_owed` is the wallet balance below zero at the start, the end, and right now. `reconciled` is true when the ledger's `commission_due` for the week's rides equals their `platform_total`.
+
+### Admin panel (not the app)
+
+`/admin/fares` (rate card: name, active, seats, base, per km, per min, min fare, per stop, booking fee, commission % 0–50, order; fuel adjustment −50..100 % with start time in Pakistan time and a public note, scheduled ones can be withdrawn, ones in force stay as history; every write audited), `/admin/payments/statements?week=&driver_id=` (weekly statement per driver). `driver_commission_percentage` is no longer on the App Settings page: commission is per vehicle type now (that setting is only the fallback for a type off the rate card).
