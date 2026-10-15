@@ -203,6 +203,9 @@ describe('PassengerProfile', () => {
     // No background image / dimming overlay (QA: page looked greyed out).
     expect(screen.UNSAFE_root.findAll((node) => node.props.source !== undefined && typeof node.type !== 'string')).toHaveLength(0);
     expect(screen.getByText('TP')).toBeTruthy();
+    // T-504: the avatar changes the photo (camera badge, labelled button).
+    expect(screen.getByLabelText('Add profile photo')).toBeTruthy();
+    expect(screen.getByTestId('passenger-profile-photo-badge')).toBeTruthy();
     expect(screen.getByText('Test Passenger')).toBeTruthy();
     expect(screen.getByTestId('passenger-profile-meta').props.children).toBe('Rider · Member since Mar 2026');
     expect(screen.getByText('+920000000001')).toBeTruthy();

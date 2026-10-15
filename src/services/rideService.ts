@@ -84,6 +84,7 @@ export interface RideResource {
   passenger?: {
     id: number;
     name: string;
+    profile_image_url?: string | null;
     /** BE-07: null until the passenger has 3 ratings (show "New"). */
     rating?: number | null;
   };

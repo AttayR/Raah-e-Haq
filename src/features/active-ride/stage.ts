@@ -98,6 +98,8 @@ const text = (value: unknown): string | null =>
 /** What the driver-assigned card shows. Only server data; a missing field is left out. */
 export interface DriverCardInfo {
   name: string | null;
+  /** The driver's public photo (BE-29), or null: the Avatar shows initials. */
+  photoUri: string | null;
   /** null when unrated (or rating 0). */
   rating: number | null;
   /** "Toyota Corolla", or null when the server sent neither make nor model. */
@@ -113,6 +115,7 @@ export const driverCardOf = (ride: Pick<RideResource, 'driver' | 'vehicle'>): Dr
   return {
     // [T-519] First name only, the same as ride details and the rating sheet.
     name: firstNameOf(text(ride.driver?.name)),
+    photoUri: text(ride.driver?.profile_image_url),
     rating: rating !== null && rating > 0 ? rating : null,
     vehicleName: vehicleName || null,
     color: text(vehicle?.color),

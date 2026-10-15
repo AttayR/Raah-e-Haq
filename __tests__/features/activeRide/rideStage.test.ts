@@ -84,16 +84,24 @@ describe('cancelledByOf', () => {
 describe('driverCardOf', () => {
   it('uses the server driver and vehicle (make, model, colour, plate)', () => {
     const ride = makeRide({
-      driver: { id: 5, name: 'Ali Raza Khan', rating: 4.5 },
+      driver: { id: 5, name: 'Ali Raza Khan', rating: 4.5, profile_image_url: 'https://cdn.test/ali.jpg' },
       vehicle: { id: 3, make: 'Suzuki', model: 'Alto', color: 'Silver', license_plate: 'LEB-77' },
     });
-    // T-519: first name only, the same as ride details and the rating sheet.
-    expect(driverCardOf(ride)).toEqual({ name: 'Ali', rating: 4.5, vehicleName: 'Suzuki Alto', color: 'Silver', plate: 'LEB-77' });
+    // T-519: first name only, the same as ride details and the rating sheet. T-504: the photo too.
+    expect(driverCardOf(ride)).toEqual({
+      name: 'Ali',
+      photoUri: 'https://cdn.test/ali.jpg',
+      rating: 4.5,
+      vehicleName: 'Suzuki Alto',
+      color: 'Silver',
+      plate: 'LEB-77',
+    });
   });
 
   it('invents nothing when fields are missing (no "Car", no rating for unrated)', () => {
     expect(driverCardOf(makeRide({ driver: { id: 5, name: '', rating: 0 }, vehicle: null }))).toEqual({
       name: null,
+      photoUri: null,
       rating: null,
       vehicleName: null,
       color: null,

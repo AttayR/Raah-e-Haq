@@ -146,6 +146,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       {driver ? (
         <PersonCard
           name={driver.name}
+          photoUri={driver.photoUri}
           fallbackName={ACTIVE_RIDE_COPY.driverFallbackName}
           rating={driver.rating}
           vehicleName={driver.vehicleName}

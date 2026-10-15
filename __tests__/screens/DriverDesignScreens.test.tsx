@@ -5,7 +5,8 @@
  */
 import React from 'react';
 import { Linking, StyleSheet, useColorScheme, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,6 +23,9 @@ import { statsApi, toMyStats } from '../../src/features/stats/api';
 import { rideHistoryApi, toRide } from '../../src/features/ride-history/api';
 import type { Ride } from '../../src/features/ride-history/types';
 import { driverProfileApi } from '../../src/features/driver-profile/api';
+import { driverDocumentsApi } from '../../src/features/driverDocuments/api';
+import type { DriverDocument } from '../../src/features/driverDocuments/types';
+import { apiService } from '../../src/services/api';
 import DriverProfile from '../../src/screens/Driver/DriverProfile';
 import { initialDriverRideState } from '../../src/features/driver-ride/slice';
 import type { RideResource } from '../../src/services/rideService';
@@ -92,7 +96,7 @@ const renderScreen = async (
     reducer: rootReducer,
     preloadedState: {
       ...initial,
-      apiAuth: { ...initial.apiAuth, user: { ...user(status as User['status']), ...extraUser } },
+      apiAuth: { ...initial.apiAuth, isAuthenticated: true, user: { ...user(status as User['status']), ...extraUser } },
       driverRide: { ...initialDriverRideState, ride },
     },
   });
@@ -226,7 +230,67 @@ describe('DriverDriveScreen recent trips (T-507)', () => {
   });
 });
 
+const profileDoc = (status: DriverDocument['status'], rejectionReason: string | null = null): DriverDocument => ({
+  type: 'profile',
+  required: true,
+  status,
+  rejectionReason,
+  canUpload: status === 'rejected',
+});
+
 describe('DriverProfile (T-507)', () => {
+  beforeEach(() => {
+    jest.spyOn(driverDocumentsApi, 'list').mockResolvedValue({ documents: [profileDoc('approved')], allRequiredApproved: true });
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it('[T-504] an approved photo shows no review note; a pending one says it is under review', async () => {
+    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
+    await renderScreen(DriverProfile);
+    expect(screen.queryByTestId('photo-review-pending')).toBeNull();
+    expect(screen.getByLabelText('Add profile photo')).toBeTruthy();
+
+    jest.spyOn(driverDocumentsApi, 'list').mockResolvedValue({ documents: [profileDoc('pending')], allRequiredApproved: false });
+    await renderScreen(DriverProfile);
+    expect(screen.getByTestId('photo-review-pending')).toHaveTextContent(/Photo under review/);
+  });
+
+  it('[T-504] a rejected photo shows the reason', async () => {
+    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
+    jest.spyOn(driverDocumentsApi, 'list').mockResolvedValue({
+      documents: [profileDoc('rejected', 'Face not visible')],
+      allRequiredApproved: false,
+    });
+    await renderScreen(DriverProfile);
+    expect(screen.getByTestId('photo-review-rejected')).toHaveTextContent(/Photo not approved.*Reason: Face not visible/);
+  });
+
+  it('[T-504] a new photo shows as under review at once, and the store holds the new photo', async () => {
+    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
+    jest.spyOn(apiService, 'uploadAvatar').mockResolvedValue({
+      success: true,
+      data: { ...user('active'), profile_image_url: 'http://localhost:8000/storage/avatars/new.jpg' },
+    });
+    // The server puts the new photo back to review (BE-66): later reads say pending.
+    jest
+      .spyOn(driverDocumentsApi, 'list')
+      .mockResolvedValueOnce({ documents: [profileDoc('approved')], allRequiredApproved: true })
+      .mockResolvedValue({ documents: [profileDoc('pending')], allRequiredApproved: false });
+    (launchImageLibrary as jest.Mock).mockResolvedValueOnce({
+      assets: [{ uri: 'file:///tmp/me.jpg', type: 'image/jpeg', fileName: 'me.jpg', fileSize: 100_000 }],
+    });
+    await renderScreen(DriverProfile);
+    expect(screen.queryByTestId('photo-review-pending')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('driver-profile-photo-button'));
+    fireEvent.press(screen.getByTestId('photo-source-library'));
+
+    await waitFor(() => expect(screen.getByTestId('photo-review-pending')).toBeTruthy());
+    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(
+      'http://localhost:8000/storage/avatars/new.jpg',
+    );
+  });
+
   it('shows stats from GET /me/stats (rating "New", PKR), the vehicle and the licence; no demo values', async () => {
     jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([
       { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved' },
@@ -244,7 +308,7 @@ describe('DriverProfile (T-507)', () => {
     expect(screen.getByText('31 Mar 2028')).toBeTruthy();
     expect(screen.queryByText(/4\.9|156|\$|Toyota Corolla|DL-123456789/)).toBeNull();
     // Initials when there is no photo (T-514).
-    expect(screen.getByTestId('driver-profile-avatar-initials')).toHaveTextContent('TD');
+    expect(screen.getByTestId('driver-profile-photo-avatar-initials')).toHaveTextContent('TD');
   });
 
   it('a failed stats read shows dashes and a note, never a number; no vehicle or licence says so', async () => {

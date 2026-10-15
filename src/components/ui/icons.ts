@@ -94,6 +94,9 @@ export const iconGlyphs = {
   refresh: 'refresh',
   retry: 'refresh',
   upload: 'file-upload-outline',
+  // Profile photo (T-504).
+  camera: 'camera-outline',
+  photoLibrary: 'image-multiple-outline',
   document: 'file-document-outline',
   lock: 'lock-outline',
   eye: 'eye-outline',

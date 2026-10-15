@@ -34,6 +34,7 @@ export const makePendingRequest = (overrides: Partial<PendingRideRequest> = {}):
   pickup: { latitude: 31.51, longitude: 74.34 },
   dropoff: { latitude: 31.47, longitude: 74.36 },
   passengerFirstName: 'Ayesha',
+  passengerPhotoUrl: null,
   passengerRating: 4.8,
   estimatedDistanceKm: 1.24,
   estimatedPickupMin: 3,

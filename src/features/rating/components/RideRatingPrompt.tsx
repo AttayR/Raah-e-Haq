@@ -27,7 +27,7 @@ type Props = {
 const ratedPerson = (ride: RideResource, role: RaterRole): { name: string | null; photoUri: string | null } =>
   role === 'passenger'
     ? { name: firstNameOf(readText(ride.driver?.name)), photoUri: readText(ride.driver?.profile_image_url) }
-    : { name: firstNameOf(readText(ride.passenger?.name)), photoUri: null };
+    : { name: firstNameOf(readText(ride.passenger?.name)), photoUri: readText(ride.passenger?.profile_image_url) };
 
 /**
  * The after-ride rating prompt (T-505) for the passenger map and the driver ride screen: opens the

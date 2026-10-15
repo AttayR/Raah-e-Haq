@@ -45,8 +45,9 @@ export interface PendingRideRequest {
   dropoffAddress: string;
   pickup: LatLng | null;
   dropoff: LatLng | null;
-  /** The minimal passenger card: first name and rating only (no phone before accept). */
+  /** The minimal passenger card: first name, photo and rating only (no phone before accept). */
   passengerFirstName: string | null;
+  passengerPhotoUrl: string | null;
   passengerRating: number | null;
   /** km from the driver to the pickup. */
   estimatedDistanceKm: number | null;
@@ -113,6 +114,7 @@ export const toPendingRideRequest = (
     pickup: toLatLng(raw.pickup_latitude, raw.pickup_longitude),
     dropoff: toLatLng(raw.dropoff_latitude, raw.dropoff_longitude),
     passengerFirstName: toText(passenger.first_name) ?? toText(passenger.name),
+    passengerPhotoUrl: toText(passenger.profile_image_url),
     passengerRating: riderRating(passenger.rating),
     estimatedDistanceKm: toNumber(raw.estimated_distance),
     estimatedPickupMin: toNumber(raw.estimated_pickup_min),

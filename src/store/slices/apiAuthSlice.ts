@@ -11,6 +11,7 @@ import {
   resetPassword,
   getUserProfile,
   updateUserProfile,
+  uploadProfilePhoto,
   initializeAuth,
   revalidateSession,
   isStaleSessionRejection,
@@ -361,6 +362,15 @@ const authSlice = createSlice({
         state.status = 'failed';
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
+
+    // Profile photo (T-504): only a success touches the store. Progress and failure belong to
+    // the photo editor, so no other screen shows a spinner or an error while it uploads.
+    builder.addCase(uploadProfilePhoto.fulfilled, (state, action) => {
+      if (!state.isAuthenticated) {
+        return;
+      }
+      state.user = action.payload;
+    });
   },
 });
 

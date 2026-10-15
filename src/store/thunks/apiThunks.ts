@@ -11,6 +11,7 @@ import {
   ResetPasswordRequest,
   OtpSentInfo,
   User,
+  type MultipartFile,
 } from '../../services/api';
 import { authStorage } from '../../services/authStorage';
 import { unwrap, toApiError, toThunkRejection, ThunkRejection, ApiError } from '../../core/api/errors';
@@ -416,6 +417,43 @@ export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConf
       return user;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Profile update failed'));
+    }
+  }
+);
+
+export interface UploadProfilePhotoRequest {
+  file: MultipartFile;
+  /** Upload progress, 0 to 1 (only when the platform reports a total size). */
+  onProgress?: (fraction: number) => void;
+  /** Aborting it cancels the upload; the thunk then rejects with kind `cancelled`. */
+  signal?: AbortSignal;
+}
+
+/**
+ * T-504: POST /profile/avatar. The response is the owner's profile with the new
+ * `profile_image_url`, so the signed-in user is replaced and every avatar bound to it (Account,
+ * Home, Drive) shows the new photo at once. A result that arrives after sign-out is dropped.
+ */
+export const uploadProfilePhoto = createAsyncThunk<User, UploadProfilePhotoRequest, ThunkConfig>(
+  'auth/uploadProfilePhoto',
+  async ({ file, onProgress, signal }, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const body = await apiService.uploadAvatar(file, {
+        signal,
+        onUploadProgress: (event) => {
+          if (onProgress && event.total && event.total > 0) {
+            onProgress(Math.min(1, Math.max(0, event.loaded / event.total)));
+          }
+        },
+      });
+      const user = requireUser(unwrap(body));
+      if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
+        return rejectWithValue(staleSessionRejection());
+      }
+      return user;
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Could not upload the photo'));
     }
   }
 );

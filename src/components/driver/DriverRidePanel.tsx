@@ -134,6 +134,7 @@ export const DriverRidePanel: React.FC<Props> = ({
           variant="plain"
           // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
           name={firstNameOf(ride.passenger?.name)}
+          photoUri={ride.passenger?.profile_image_url ?? null}
           fallbackName={COPY.passengerFallback}
           rating={riderRating(ride.passenger?.rating)}
           newRatingLabel={COPY.noRating}

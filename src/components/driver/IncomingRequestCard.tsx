@@ -101,6 +101,7 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
       <PersonCard
         variant="plain"
         name={request.passengerFirstName}
+        photoUri={request.passengerPhotoUrl}
         fallbackName={COPY.passengerFallback}
         rating={request.passengerRating}
         newRatingLabel={COPY.noRating}

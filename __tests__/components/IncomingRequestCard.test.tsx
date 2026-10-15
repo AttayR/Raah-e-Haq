@@ -1,5 +1,6 @@
 /** T-403/T-404: the driver's incoming request card and its loading / empty / error states. */
 import React from 'react';
+import { Image } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 import { IncomingRequestCard, RideRequestPanel } from '../../src/components/driver/IncomingRequestCard';
 import { makePendingRequest } from '../../test-utils/driverRequestFixtures';
@@ -25,6 +26,20 @@ describe('IncomingRequestCard', () => {
     expect(getByTestId('incoming-request-distance').props.children).toBe('2.4 km');
     expect(getByTestId('incoming-request-eta').props.children).toBe('6 min');
     getByText('Cash');
+  });
+
+  it("shows the passenger's photo from the request card (T-504)", () => {
+    const { UNSAFE_getAllByType } = render(
+      <IncomingRequestCard
+        request={makePendingRequest({ passengerPhotoUrl: 'https://cdn.test/ayesha.jpg' })}
+        accepting={false}
+        disabled={false}
+        onAccept={noop}
+        onReject={noop}
+      />,
+    );
+    const sources = UNSAFE_getAllByType(Image).map((image) => (image.props.source as { uri?: string }).uri);
+    expect(sources).toContain('https://cdn.test/ayesha.jpg');
   });
 
   it('hides numbers the server did not send', () => {

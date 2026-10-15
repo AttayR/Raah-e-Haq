@@ -453,6 +453,9 @@ export interface MultipartFile {
   type: string;
 }
 
+/** A profile photo upload may take longer than an ordinary request on a slow mobile network. */
+export const AVATAR_UPLOAD_TIMEOUT_MS = 60000;
+
 /** The server takes jpeg/png/jpg/gif only (BE-66/BE-68); anything else is labelled JPEG. */
 const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   png: 'image/png',
@@ -760,6 +763,23 @@ class ApiService {
   // `{ user }`; callers pass it through normalizeUser. A new phone waits in pending_phone (BE-35).
   async updateProfile(userData: Partial<User>): Promise<ApiResponse<ApiUser>> {
     const response = await apiClient.put('/profile', userData);
+    return response.data;
+  }
+
+  /**
+   * POST /profile/avatar (T-504): multipart field `avatar`, an image of at most 2048 KB. `data`
+   * is the owner's profile (BE-29 ProfileResource) with the new `profile_image_url`. For a
+   * driver the new photo goes back to review (BE-66: GET /driver/documents `profile` pending).
+   * `config` carries the caller's upload progress callback and abort signal.
+   */
+  async uploadAvatar(file: MultipartFile, config?: AxiosRequestConfig): Promise<ApiResponse<ApiUser>> {
+    const form = new FormData();
+    form.append('avatar', file);
+    const response = await apiClient.post('/profile/avatar', form, {
+      timeout: AVATAR_UPLOAD_TIMEOUT_MS,
+      ...config,
+      headers: { 'Content-Type': 'multipart/form-data', ...config?.headers },
+    });
     return response.data;
   }
 

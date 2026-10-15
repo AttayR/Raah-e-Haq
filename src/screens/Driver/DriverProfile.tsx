@@ -3,7 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { RootState } from '../../store';
-import { AppText, Avatar, Badge, IconButton, ListGroup, ListItem, Screen, StatTile } from '../../components/ui';
+import { AppText, Badge, IconButton, ListGroup, ListItem, Screen, StatTile } from '../../components/ui';
+import { PhotoReviewBanner, ProfilePhotoEditor, usePhotoReview } from '../../features/profile-photo';
 import { ProfileInfoList } from '../../components/passenger/settings/ProfileInfoList';
 import { formatCalendarDate, formatMonthYear } from '../../components/passenger/settings/format';
 import { useMyStats } from '../../features/stats/hooks';
@@ -15,10 +16,11 @@ import { space } from '../../theme';
 
 /**
  * Driver Profile (T-507, T-514; shared-profile spec, the driver side of PassengerProfile):
- * identity (Avatar with initials fallback, name, "Driver · Member since", approval badge), the
+ * identity (tappable avatar that changes the photo, T-504; name, "Driver · Member since",
+ * approval badge; the photo's review state from GET /driver/documents), the
  * lifetime stats from GET /me/stats (rating "New" until rated, trips, earnings in PKR), the
  * personal info the server sent, the vehicle from GET /profile/documents and the licence from
- * the profile. Nothing is hardcoded; editing and photo upload come with T-504.
+ * the profile. Nothing is hardcoded; editing the other fields comes with T-504.
  */
 const DriverProfile = () => {
   const navigation = useNavigation();
@@ -28,6 +30,7 @@ const DriverProfile = () => {
   const driverStats = stats.data?.role === 'driver' ? stats.data : null;
   const values = toDriverProfileStats(driverStats);
   const vehicles = useMyVehicles(isFocused);
+  const photoReview = usePhotoReview(isFocused);
 
   const name = user?.name?.trim() || COPY.driverFallbackName;
   const since = formatMonthYear(user?.created_at);
@@ -46,7 +49,12 @@ const DriverProfile = () => {
       </View>
 
       <View style={styles.identity} testID="driver-profile-identity">
-        <Avatar name={name} uri={user?.profile_image_url} size={96} testID="driver-profile-avatar" />
+        <ProfilePhotoEditor
+          name={name}
+          uri={user?.profile_image_url}
+          onUploaded={photoReview.markPending}
+          testID="driver-profile-photo"
+        />
         <View style={styles.identityText}>
           <AppText variant="h2" align="center" numberOfLines={2}>
             {name}
@@ -60,6 +68,7 @@ const DriverProfile = () => {
           label={approved ? COPY.approved : COPY.pendingApproval}
           testID="driver-profile-status"
         />
+        <PhotoReviewBanner review={photoReview.review} />
       </View>
 
       <View>

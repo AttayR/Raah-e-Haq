@@ -20,6 +20,7 @@ describe('toPendingRideRequest', () => {
       pickup: { latitude: 31.51, longitude: 74.34 },
       dropoff: { latitude: 31.47, longitude: 74.36 },
       passengerFirstName: 'Ayesha',
+      passengerPhotoUrl: null,
       passengerRating: 4.8,
       estimatedDistanceKm: 1.24,
       estimatedPickupMin: 3,
@@ -42,6 +43,14 @@ describe('toPendingRideRequest', () => {
       passengerRating: null,
       expiresAt: null,
     });
+  });
+
+  it('keeps the passenger photo from the minimal card (T-504)', () => {
+    const request = toPendingRideRequest(
+      pendingRide({ passenger: { id: 3, first_name: 'Ayesha', profile_image_url: 'https://cdn.test/p.jpg', rating: null } }),
+      10,
+    );
+    expect(request?.passengerPhotoUrl).toBe('https://cdn.test/p.jpg');
   });
 
   it('drops entries without an id or an address', () => {
