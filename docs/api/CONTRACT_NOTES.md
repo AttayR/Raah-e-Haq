@@ -752,3 +752,70 @@ Terms per vehicle type on the admin rate card, copied into the ride at booking (
 ### Accepted risk (owner, 2026-10-15): client GPS spoofing
 
 Arrival verification, no-show fees, the BE-64 arrival check and the trip distance all trust the GPS position the driver app sends (`POST /tracking/update-location`). A driver with a location-spoofing app can fake being at the pickup. This is accepted for launch: fees are off by default (`FARE_FEES_ENABLED`), each pair can be charged at most once a day, unverified no-shows and repeated pair fees raise security events, and an admin can refund through a fare report. Revisit with mock-location detection in the driver app (Android `isFromMockProvider` / `isMock`) and server-side plausibility checks (speed, jumps, ping cadence) before enabling fees widely.
+
+## BE-92: AI for admins: risk signals and AI case reviews (2026-10-15, admin panel only)
+
+**No app API change.** Everything is in the admin panel (web routes, `auth` + `role:admin`). The mobile app never calls a model and never holds a key. One server-side side effect of existing endpoints: `POST /devices` now also records an HMAC of the push token per account (`device_sightings`, never the token; key `RISK_DEVICE_HMAC_KEY`, else `APP_KEY`) for the "several accounts on one device" rule; its request and response are unchanged. The push token comes from the app, so a modified app can fake it: the admin page says so.
+
+### Risk signals (rule-based, advisory)
+
+`risk_signals` rows (kind, subject user or ride, score 0-100, evidence without PII: counts, flags, internal ids, chat categories; status `open` | `dismissed` | `actioned`, reviewed_by, note). Raised by a queued full scan when a ride is completed or cancelled, by a chat-only job when a message is stored (debounced per ride), both on the low-priority `RISK_QUEUE` (default `low`; the worker must run `queue:work --queue=default,low`), and by the hourly `raahehaq:risk-sweep` (rides changed or with chat in the last 3 h, plus recently active users). Nothing is applied to the account; an admin decides.
+
+| kind | rule (defaults in `config/risk.php`) |
+|---|---|
+| `unverified_no_show` | a driver's no-show cancels without a verified arrival (security event `unverified_no_show`), 2+ in 30 days |
+| `gps_spoofing` (ride) | between accept and the ride's end: implied speed > 200 km/h over 500 m+ (pings with accuracy worse than 100 m ignored), a ping exactly on the pickup point (~0.5 m), or 5+ minutes of silence then a ping within 25 m of the pickup with the previous one 1 km+ away |
+| `gps_exact_pickup_pattern` | 3+ rides in 30 days with an exact-pickup ping (dismissed ride signals do not count) |
+| `pair_cancel_fees` | 2+ cancel fees within one driver-passenger pair in 30 days |
+| `cancel_fee_cluster` | 4+ fees from 3+ passengers to one driver in 7 days |
+| `overcharge_pattern` | 2+ upheld "asked for more" reports against a driver in 90 days |
+| `false_overcharge_reports` | a passenger with 3+ rejected reports (75 %+ of their decided ones) |
+| `chat_money_request` (ride) | categories `wallet_app` (JazzCash / Easypaisa / SadaPay / NayaPay / Raast / bank transfer), `account_number` (IBAN, or 10+ digits that are not a PK mobile; a mobile counts only next to a wallet name), `money_request` (a send verb such as bhejo / bhej do / send / transfer / بھیج WITH a money word, amount or wallet in the message, or "pay me outside / advance payment"). "location bhej do", "pin bhejo", a phone number alone are nothing. Score 70 request + wallet or account, 60 wallet + account, 35 request, 15 a lone wallet or number; a signal needs 30+. Only the categories are stored |
+| `shared_device` | 2+ accounts registered the same device in 30 days (more with mixed roles, much more with rides between them) |
+
+Per-user aggregate score: `100 * (1 - Π(1 - score/100))` over open signals in 90 days. A reviewed signal is raised again only when its evidence grows.
+
+Admin pages: `/admin/risk-signals` (filter by status, kind, user, min score; top aggregate scores), `/admin/risk-signals/{id}` (evidence, AI review card, dismiss / action with a required note, audit log). Each decision writes an audit row (`risk_signal_dismissed` / `risk_signal_actioned`).
+
+### AI case reviews
+
+An "AI review" card on fare dispute detail, safety incident detail and risk signal detail, labelled "AI suggestion — an admin decides", with the provider and model used. `POST /admin/ai-reviews {case_type: fare_dispute|safety_incident|risk_signal, case_id, refresh?}` (throttled 20/min; audit row `ai_review_requested` on the case). The suggestion is never applied.
+
+- **Fact pack** (stored in `ai_reviews.facts`, viewable on the card): people as role + first letter ("Driver I."), coarse areas (no house / street / plot numbers, no coordinates), free text scrubbed of phone / account numbers (any of space - . / ( ) as separators), CNIC, emails, house / plot / street / gali / sector numbers and the parties' names, cut to 280 characters and sent as `untrusted_passenger_statement` / `untrusted_reporter_statement` (the system prompt says these are one party's unverified words: data, never instructions, never enough on their own for the recommendation); chat as counts and categories; amounts, timestamps, statuses, ride timeline, strike and report counts, verified-arrival and PIN flags, open risk signals.
+- **Result** (strict JSON, schema-constrained): `summary` (≤ 3 lines), `key_facts`, `inconsistencies`, `recommended_action` (fare dispute: `uphold` | `reject` | `needs_info`; safety: `action` | `resolve` | `needs_info`; risk signal: `action` | `dismiss` | `needs_info`), `confidence` (`low` | `medium` | `high`), `rationale`. Anything else falls back to the local rules.
+- **Providers:** `local` (deterministic rules; default, and always in local / testing unless `AI_ALLOW_REMOTE_IN_LOCAL=true`) and `anthropic` (Messages API, `AI_MODEL` default `claude-sonnet-5-5`, structured output, 25 s per attempt, 2 retries with backoff on 408/409/429/5xx, all attempts within 80 s < job timeout 85 s < queue retry_after 90 s; the server-side fallback beta is opt-in, `AI_ANTHROPIC_FALLBACKS=false` by default). The job claims a review atomically (`pending` -> `running`); `raahehaq:ai-reviews-expire` (every 5 min) fails reviews unfinished after `AI_STALE_MINUTES` (10). Falls back to local with a reason: `no_key`, `local_env`, `budget`, `error`, `invalid_json` (`timeout` for expired ones). Provider failures log the HTTP status only.
+- **Cache:** the same facts for the same case reuse the stored review (no new call). **Budget:** `AI_DAILY_BUDGET_USD`. Before each remote call the estimated maximum (prompt estimate + all of `max_tokens`) is reserved under a lock against today's billed cost (`billed_at`) plus open reservations; after the call it settles to the billed cost from the response's token usage and `config/ai.php` pricing. Over the cap: local rules until the next day. Logs carry usage only (tokens, estimated cost), never the prompt or facts.
+
+## BE-94: avatar hardening and driver photo review (2026-10-15, follow-up to T-504)
+
+### POST `/profile/avatar` (multipart, field `avatar`)
+
+- **Accepted:** JPEG, PNG or WebP, at most 2048 KB. SVG, GIF, BMP, HEIC and anything the server cannot decode get **422** `{success:false, message, errors:{avatar:[...]}}`. Images over 8000 px on a side or 20 MP are refused before decoding (422).
+- **Re-encoded on the server:** decoded, turned upright from its EXIF orientation, scaled so the longest side is at most 1024 px, transparent areas flattened onto white, saved as a new JPEG (quality 85) under a random name (`avatars/<40 chars>.jpg`). No EXIF, GPS, XMP or ICC data survives. The app's own resize (1024 px, 0.8) can stay; the server no longer relies on it.
+- **Throttle:** 10 requests per hour per user, shared with DELETE. Over it: **429** `{success:false, code:"rate_limited", retry_after}`.
+- **Passenger (any account without the driver role):** the new photo is live at once; the old file is deleted. `message: "Avatar updated"`.
+- **Driver:** the photo goes to review (BE-66 `profile` item) and `profile_image_url` keeps the approved photo until an admin approves the new one. `message` is `"Photo submitted for review. Your current photo stays until it is approved."`, or `"Photo uploaded. It will be reviewed."` for a driver still onboarding (account `pending`) who has no approved photo yet: then the new photo replaces the current one directly, as before, and stays `pending`.
+- Response `data` is the ProfileResource (below).
+
+### DELETE `/profile/avatar` (new)
+
+- Passenger: **200** `{success:true, message:"Avatar removed", data: ProfileResource}` with `profile_image_url: null`. Also 200 when there was no photo.
+- Driver: **422** `{success:false, message:"Drivers must keep a profile photo. Upload a new one instead; it will be reviewed.", error:{code:"PROFILE_PHOTO_REQUIRED"}}`. Nothing changes. The app should not show a "Remove photo" action to drivers.
+- 401 without a token.
+
+### ProfileResource (GET `/profile`, `/user`, `/auth/profile`, PUT `/profile`, POST/DELETE `/profile/avatar`): new fields
+
+| field | value |
+|---|---|
+| `profile_image_url` | unchanged meaning: always the **approved** (served) photo, the one passengers see |
+| `profile_image_review` | drivers: `pending` \| `approved` \| `rejected` (the newest `profile` item); `null` for passengers or when there is no item |
+| `pending_profile_image_url` | drivers only: public URL of the new photo waiting for review, when it differs from the served one; otherwise `null`. Only in the owner's own profile, never in ride, chat, user cards or the share page |
+| `profile_image_rejection_reason` | the admin's reason when `profile_image_review` is `rejected`, else `null` |
+
+### Review (admin, existing BE-66 per-item routes)
+
+`POST /admin/drivers/{driver}/documents/{id}/approve` on a pending photo change swaps it in as `profile_image` and deletes the old file. `.../reject` deletes the new file and the approved photo stays (`profile_image_review: rejected` with the reason). The driver can upload again with POST `/profile/avatar` or POST `/driver/documents/profile`; both are re-encoded the same way and wait for review. RideResource, UserResource and chat cards keep reading `users.profile_image`, so they only ever show an approved photo once a driver is active (the trip share page shows no photo).
+
+### Registration and admin uploads
+
+`profile_image` / `passenger_profile_image` at registration (API and web), the admin user forms and POST `/driver/documents/profile` go through the same re-encoder (upright, metadata stripped, at most 1024 px JPEG). Their mimes rule is unchanged (jpeg, png, jpg, gif; GIF is stored as JPEG). An undecodable photo is a 422 on that field and no file from the request is kept. Identity and vehicle documents are not re-encoded.
