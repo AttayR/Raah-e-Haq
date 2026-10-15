@@ -1,34 +1,34 @@
-import { useCallback } from 'react';
-import { useRemoteData } from '../../core/api/useRemoteData';
-import { driverDocumentsApi } from '../driverDocuments/api';
-import type { DriverDocumentsState } from '../driverDocuments/types';
+import type { User } from '../../services/api';
 
 /**
- * A driver's profile photo review (BE-66): POST /profile/avatar puts the `profile` item of
- * GET /driver/documents back to `pending`; an admin then approves or rejects it. Null when the
- * photo is approved, missing, or the review could not be read.
+ * A driver's profile photo review (BE-94): the signed-in profile (GET /profile, POST and DELETE
+ * /profile/avatar) carries `profile_image_review`, `pending_profile_image_url` and
+ * `profile_image_rejection_reason`. Passengers keep seeing the approved `profile_image_url` until
+ * an admin approves the new one. Null when the photo is approved or there is no review.
  */
-export type PhotoReview = { status: 'pending' } | { status: 'rejected'; reason: string | null } | null;
+export type PhotoReview =
+  | { status: 'pending'; pendingUri: string | null }
+  | { status: 'rejected'; reason: string | null }
+  | null;
 
-export const toPhotoReview = (state: DriverDocumentsState): PhotoReview => {
-  const item = state.documents.find((doc) => doc.type === 'profile');
-  if (item?.status === 'pending') return { status: 'pending' };
-  if (item?.status === 'rejected') return { status: 'rejected', reason: item.rejectionReason };
+const present = (value: string | null | undefined): string | null =>
+  typeof value === 'string' && value.trim().length > 0 ? value : null;
+
+export const toPhotoReview = (
+  user: Pick<User, 'profile_image_review' | 'pending_profile_image_url' | 'profile_image_rejection_reason'> | null | undefined,
+): PhotoReview => {
+  if (user?.profile_image_review === 'pending') {
+    return { status: 'pending', pendingUri: present(user.pending_profile_image_url) };
+  }
+  if (user?.profile_image_review === 'rejected') {
+    return { status: 'rejected', reason: present(user.profile_image_rejection_reason) };
+  }
   return null;
 };
 
-const fetchPhotoReview = async (): Promise<PhotoReview> => toPhotoReview(await driverDocumentsApi.list());
-
 /**
- * The driver's photo review, read while `enabled` (the Profile screen is focused). After an
- * upload, `markPending` shows the review at once and a quiet refresh confirms it.
+ * The photo the driver sees on their own Profile: the one waiting for review when there is one
+ * (labelled "Under review"), else the approved one.
  */
-export function usePhotoReview(enabled: boolean) {
-  const remote = useRemoteData<PhotoReview>({ fetch: fetchPhotoReview, fallbackError: '', enabled });
-  const { setData, refresh } = remote;
-  const markPending = useCallback(() => {
-    setData({ status: 'pending' });
-    refresh().catch(() => undefined);
-  }, [refresh, setData]);
-  return { review: remote.data ?? null, markPending };
-}
+export const ownPhotoUri = (user: Pick<User, 'profile_image_url'> | null | undefined, review: PhotoReview): string | null =>
+  (review?.status === 'pending' ? review.pendingUri : null) ?? present(user?.profile_image_url);

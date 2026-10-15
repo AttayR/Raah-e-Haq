@@ -1,8 +1,19 @@
 import React, { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, EmptyState, ErrorState, Header, Screen, SkeletonCard, SkeletonGroup } from '../../../components/ui';
+import {
+  AppText,
+  Button,
+  EmptyState,
+  ErrorState,
+  Header,
+  Screen,
+  SkeletonCard,
+  SkeletonGroup,
+  useHeaderScroll,
+} from '../../../components/ui';
 import { componentTokens, layout, space } from '../../../theme';
 
 const skeletonHeights = componentTokens.skeleton.heights;
@@ -47,12 +58,15 @@ export default function RideDetailsScreen() {
     [setData, shownRide],
   );
 
+  // The header stays above the scrolling content, so Back is always reachable (T-543).
+  const { scrollY, onScroll } = useHeaderScroll();
   const header = (
     <Header
       tone="background"
       title={RIDE_HISTORY_COPY.detailsTitle}
       backLabel={RIDE_HISTORY_COPY.back}
       onBack={() => navigation.goBack()}
+      scrollY={scrollY}
       testID="ride-details"
     />
   );
@@ -102,59 +116,65 @@ export default function RideDetailsScreen() {
   const rated = otherParty(ride, viewer);
 
   return (
-    <Screen
-      scroll
-      testID="ride-details-screen"
-      contentStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={status === 'refreshing'}
-          onRefresh={refresh}
-          tintColor={theme.colors.primary}
-          colors={[theme.colors.primary]}
-        />
-      }
-    >
+    <Screen testID="ride-details-screen">
       {header}
-      <View style={styles.body}>
-        {status === 'failed' && error ? (
-          <AppText variant="bodySmall" color="danger" testID="ride-details-refresh-error">
-            {error}
-          </AppText>
-        ) : null}
-        <SummaryCard ride={ride} viewer={viewer} />
-        <CancellationCard ride={ride} viewer={viewer} />
-        <RouteCard ride={ride} />
-        <PersonCard ride={ride} viewer={viewer} canMessage={canOpenChat(ride)} onMessage={onMessage} />
-        <RideRatingSection
-          rideId={ride.id}
-          role={viewer}
-          myRating={ride.myRating}
-          canRate={ride.canRate}
-          personName={rated?.name ?? null}
-          photoUri={rated?.profileImageUrl ?? null}
-          onChange={onRatingChange}
-        />
-        {viewer === 'passenger' ? (
-          // BE-82: "Driver asked for more?" for 24 h after the ride, then the report's status.
-          <OverchargeReportSection
-            rideId={ride.id}
-            state={ride.overcharge}
-            fare={ride.fareLock?.acceptedFare ?? ride.totalFare}
-            onReported={() => {
-              refresh();
-            }}
-            testID="ride-details-overcharge"
+      <Animated.ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        testID="ride-details-scroll"
+        refreshControl={
+          <RefreshControl
+            refreshing={status === 'refreshing'}
+            onRefresh={refresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
           />
-        ) : null}
-        <ReceiptCard ride={ride} viewer={viewer} />
-        <TimelineCard ride={ride} />
-      </View>
+        }
+      >
+        <View style={styles.body}>
+          {status === 'failed' && error ? (
+            <AppText variant="bodySmall" color="danger" testID="ride-details-refresh-error">
+              {error}
+            </AppText>
+          ) : null}
+          <SummaryCard ride={ride} viewer={viewer} />
+          <CancellationCard ride={ride} viewer={viewer} />
+          <RouteCard ride={ride} />
+          <PersonCard ride={ride} viewer={viewer} canMessage={canOpenChat(ride)} onMessage={onMessage} />
+          <RideRatingSection
+            rideId={ride.id}
+            role={viewer}
+            myRating={ride.myRating}
+            canRate={ride.canRate}
+            personName={rated?.name ?? null}
+            photoUri={rated?.profileImageUrl ?? null}
+            onChange={onRatingChange}
+          />
+          {viewer === 'passenger' ? (
+            // BE-82: "Driver asked for more?" for 24 h after the ride, then the report's status.
+            <OverchargeReportSection
+              rideId={ride.id}
+              state={ride.overcharge}
+              fare={ride.fareLock?.acceptedFare ?? ride.totalFare}
+              onReported={() => {
+                refresh();
+              }}
+              testID="ride-details-overcharge"
+            />
+          ) : null}
+          <ReceiptCard ride={ride} viewer={viewer} />
+          <TimelineCard ride={ride} />
+        </View>
+      </Animated.ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1 },
   content: { paddingBottom: space[8] },
   body: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[3], width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
   skeleton: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[3] },

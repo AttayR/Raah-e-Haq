@@ -23,7 +23,7 @@ import { BalanceCard } from '../components/BalanceCard';
 import { CommissionCard } from '../components/CommissionCard';
 import { TransactionRow } from '../components/TransactionRow';
 import { WALLET_COPY } from '../copy';
-import { ADD_MONEY_ROUTE } from '../navigation';
+import { ADD_MONEY_ROUTE, topUpParamsFor } from '../navigation';
 import { groupByDay, type TransactionSection } from '../format';
 import { useCancelSettlement, useWallet, useWalletTransactions } from '../hooks';
 import type { Settlement, TransactionFilter, WalletTransaction } from '../types';
@@ -145,7 +145,12 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
             text={t('fare.owedWalletBody')}
             action={
               walletData.canTopUp && walletData.topUp
-                ? { label: t('fare.owedTopUp'), onPress: () => navigation.navigate(ADD_MONEY_ROUTE), testID: 'wallet-owed-top-up' }
+                ? {
+                    label: t('fare.owedTopUp'),
+                    // T-543: Add money opens with the amount owed filled in.
+                    onPress: () => navigation.navigate(ADD_MONEY_ROUTE, topUpParamsFor(walletData.amountOwed)),
+                    testID: 'wallet-owed-top-up',
+                  }
                 : undefined
             }
             testID="wallet-amount-owed"

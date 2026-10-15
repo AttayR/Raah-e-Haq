@@ -27,6 +27,8 @@ import { openRideDetails } from '../../features/ride-history/navigation';
 import { useSavedPlaces } from '../../features/saved-places/hooks';
 import { otherCount, takenLabels } from '../../features/saved-places/format';
 import { bookingParamsFor } from '../../features/saved-places/navigation';
+import { selectInProgressRide } from '../../features/active-ride/slice';
+import { liveRideStatusText } from '../../features/active-ride/status';
 import { t } from '../../i18n';
 import { radius, space } from '../../theme';
 
@@ -53,6 +55,12 @@ export default function PassengerHomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
   const { user } = useSelector((state: RootState) => state.apiAuth);
+  // T-543: a ride in progress (booked, or restored at launch) gets "Return to your ride".
+  const inProgressRide = useSelector(selectInProgressRide);
+  const liveRide = useMemo(
+    () => (inProgressRide ? { status: liveRideStatusText(inProgressRide.status) } : null),
+    [inProgressRide],
+  );
   const [now, setNow] = useState(() => new Date());
 
   // T-315: no lookups while another screen covers Home; failures show in the sheet, no alerts.
@@ -223,6 +231,8 @@ export default function PassengerHomeScreen() {
           onSeeAllRides={() =>
             navigation.navigate('PassengerTabs', { screen: 'Activity', params: { segment: 'rides' } })
           }
+          liveRide={liveRide}
+          onReturnToRide={() => navigation.navigate('Booking')}
         />
       </BottomSheet>
     </Screen>

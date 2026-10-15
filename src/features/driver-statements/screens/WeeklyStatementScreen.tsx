@@ -11,7 +11,11 @@ import { vehicleLabel } from '../../ride-history/copy';
 import { formatRate } from '../../fare/format';
 import { StatementCard } from '../components/StatementRows';
 import { useWeeklyStatement } from '../hooks';
-import type { WeeklyStatement } from '../types';
+import type { StatementVehicleLine, WeeklyStatement } from '../types';
+
+/** A by-type line's React key: vehicle type plus commission rate, unique per statement (T-543). */
+export const statementLineKey = (line: Pick<StatementVehicleLine, 'vehicleType' | 'commissionRate'>): string =>
+  `${line.vehicleType}@${line.commissionRate}`;
 
 function StatementBody({ statement }: { statement: WeeklyStatement }) {
   const money = (n: number) => formatMoney(n, { currency: statement.currency });
@@ -42,8 +46,10 @@ function StatementBody({ statement }: { statement: WeeklyStatement }) {
           title={t('statements.byType')}
           testID="statement-types"
           rows={statement.byVehicleType.map((line) => ({
-            key: line.vehicleType,
-            label: `${vehicleLabel(line.vehicleType) ?? line.vehicleType}: ${t('statements.typeLine', {
+            // One line per vehicle type and commission rate (BE-84): a rate change mid-week gives
+            // the same type twice, so the type alone is not unique (T-543).
+            key: statementLineKey(line),
+            label: `${vehicleLabel(line.vehicleType) ?? line.vehicleType}: ${t(line.rides === 1 ? 'statements.typeLineOne' : 'statements.typeLine', {
               rides: line.rides,
               rate: formatRate(line.commissionRate),
               net: money(line.driverNet),

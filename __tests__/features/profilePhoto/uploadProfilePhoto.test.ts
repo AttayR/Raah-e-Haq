@@ -10,7 +10,7 @@ import { apiClient, apiService, AVATAR_UPLOAD_TIMEOUT_MS } from '../../../src/se
 import { authStorage } from '../../../src/services/authStorage';
 import { rootReducer } from '../../../src/store/rootReducer';
 import type { SessionThunkExtra } from '../../../src/store/thunks/sessionThunks';
-import { loginUser, uploadProfilePhoto } from '../../../src/store/thunks/apiThunks';
+import { loginUser, removeProfilePhoto, uploadProfilePhoto } from '../../../src/store/thunks/apiThunks';
 
 const TOKEN = 'test-token-not-real';
 const FILE = { uri: 'file:///tmp/avatar.jpg', name: 'avatar.jpg', type: 'image/jpeg' };
@@ -73,7 +73,7 @@ describe('uploadProfilePhoto', () => {
 
     const result = await store.dispatch(uploadProfilePhoto({ file: FILE }));
 
-    expect(result.payload).toMatchObject({ profile_image_url: NEW_PHOTO });
+    expect(result.payload).toMatchObject({ user: { profile_image_url: NEW_PHOTO }, message: 'Avatar updated' });
     expect(append.mock.calls).toEqual([['avatar', FILE]]);
     expect(sent).toEqual({ isForm: true, timeout: AVATAR_UPLOAD_TIMEOUT_MS, contentType: 'multipart/form-data' });
     expect(store.getState().apiAuth.user?.profile_image_url).toBe(NEW_PHOTO);
@@ -121,6 +121,33 @@ describe('uploadProfilePhoto', () => {
     expect(store.getState().apiAuth.user?.profile_image_url).toBe(OLD_PHOTO);
   });
 
+  it('[T-542] a driver upload keeps the approved photo and stores the pending one with its review', async () => {
+    const store = await signedIn();
+    mock.onPost('/profile/avatar').reply(200, {
+      success: true,
+      message: 'Photo submitted for review. Your current photo stays until it is approved.',
+      data: { ...profile(OLD_PHOTO), role: 'driver', roles: ['driver'], profile_image_review: 'pending', pending_profile_image_url: NEW_PHOTO },
+    });
+
+    const result = await store.dispatch(uploadProfilePhoto({ file: FILE }));
+
+    expect(result.payload).toMatchObject({ message: 'Photo submitted for review. Your current photo stays until it is approved.' });
+    const user = store.getState().apiAuth.user;
+    expect(user?.profile_image_url).toBe(OLD_PHOTO);
+    expect(user?.pending_profile_image_url).toBe(NEW_PHOTO);
+    expect(user?.profile_image_review).toBe('pending');
+  });
+
+  it('[T-542] 429 rate_limited carries retry_after', async () => {
+    const store = await signedIn();
+    mock.onPost('/profile/avatar').reply(429, { success: false, code: 'rate_limited', retry_after: 1800 });
+
+    const result = await store.dispatch(uploadProfilePhoto({ file: FILE }));
+
+    expect(result.payload).toMatchObject({ kind: 'rate_limited', status: 429, retryAfter: 1800 });
+    expect(store.getState().apiAuth.user?.profile_image_url).toBe(OLD_PHOTO);
+  });
+
   it('a result after sign-out is not stored', async () => {
     const store = makeStore();
     mock.onPost('/profile/avatar').reply(200, { success: true, data: profile(NEW_PHOTO) });
@@ -128,5 +155,34 @@ describe('uploadProfilePhoto', () => {
     await store.dispatch(uploadProfilePhoto({ file: FILE }));
 
     expect(store.getState().apiAuth.user).toBeNull();
+  });
+});
+
+describe('removeProfilePhoto (BE-94)', () => {
+  it('DELETE /profile/avatar clears the photo of the signed-in user', async () => {
+    const store = await signedIn();
+    mock.onDelete('/profile/avatar').reply(200, { success: true, message: 'Avatar removed', data: { ...profile(OLD_PHOTO), profile_image_url: null } });
+
+    const result = await store.dispatch(removeProfilePhoto());
+
+    expect(removeProfilePhoto.fulfilled.match(result)).toBe(true);
+    expect(store.getState().apiAuth.user?.profile_image_url).toBeNull();
+  });
+
+  it('a driver gets PROFILE_PHOTO_REQUIRED and keeps the photo', async () => {
+    const store = await signedIn();
+    mock.onDelete('/profile/avatar').reply(422, {
+      success: false,
+      message: 'Drivers must keep a profile photo. Upload a new one instead; it will be reviewed.',
+      error: { code: 'PROFILE_PHOTO_REQUIRED' },
+    });
+
+    const result = await store.dispatch(removeProfilePhoto());
+
+    expect(result.payload).toMatchObject({
+      code: 'PROFILE_PHOTO_REQUIRED',
+      message: 'Drivers must keep a profile photo. Upload a new one instead; it will be reviewed.',
+    });
+    expect(store.getState().apiAuth.user?.profile_image_url).toBe(OLD_PHOTO);
   });
 });

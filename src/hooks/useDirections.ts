@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { MAPS_CONFIG } from '../config/mapsConfig';
 import { logger } from '../core/logging/logger';
 
@@ -8,7 +8,18 @@ export interface Coordinates {
 }
 
 export const useDirections = () => {
-  const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
+  const [routeCoordinates, setRouteCoordinatesState] = useState<Coordinates[]>([]);
+  // Each request (and each clear) gets a number; only the newest request may set the route, so
+  // a response that lands after clearRoute() (a cancelled ride, T-543) or after a newer request
+  // cannot bring an old route back.
+  const generation = useRef(0);
+  const begin = useCallback(() => {
+    generation.current += 1;
+    const mine = generation.current;
+    return (points: Coordinates[]) => {
+      if (generation.current === mine) setRouteCoordinatesState(points);
+    };
+  }, []);
 
   /* eslint-disable no-bitwise */
   const decodePolyline = (t: string) => {
@@ -39,6 +50,7 @@ export const useDirections = () => {
   /* eslint-enable no-bitwise */
 
   const fetchRoute = useCallback(async (pickup: Coordinates, destination: Coordinates) => {
+    const setRouteCoordinates = begin();
     try {
       logger.debug('🗺️ Fetching route:', { pickup, destination });
       
@@ -104,9 +116,10 @@ export const useDirections = () => {
       logger.error('❌ Error fetching route:', error);
       setRouteCoordinates([]);
     }
-  }, []);
+  }, [begin]);
 
   const fetchRouteWithWaypoints = useCallback(async (pickup: Coordinates, waypoints: Coordinates[], destination: Coordinates) => {
+    const setRouteCoordinates = begin();
     try {
       let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
       
@@ -129,9 +142,9 @@ export const useDirections = () => {
     } catch {
       setRouteCoordinates([]);
     }
-  }, []);
+  }, [begin]);
 
-  const clearRoute = useCallback(() => setRouteCoordinates([]), []);
+  const clearRoute = useCallback(() => begin()([]), [begin]);
 
   return { routeCoordinates, fetchRoute, fetchRouteWithWaypoints, clearRoute };
 };

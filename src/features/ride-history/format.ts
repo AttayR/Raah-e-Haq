@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { formatMoney, formatRelativeDate, formatTime } from '../../utils/format';
 import { RIDE_HISTORY_COPY, TIMELINE_LABEL } from './copy';
 import type { Ride, RidePerson, RideStatus, RideViewer } from './types';
@@ -24,10 +25,15 @@ export const formatDateTime = (value: string | null): string => {
 
 /**
  * The amount a row and the summary show: the fare for the passenger, the earnings for the
- * driver. A cancelled ride shows "No charge" (the API has no cancellation fee).
+ * driver. A cancelled ride shows the passenger the fee they were charged (BE-85
+ * `cancellation_fee` > 0, "Rs 50 fee", T-543), else "No charge".
  */
 export const rideAmountText = (ride: Ride, viewer: RideViewer): string => {
-  if (ride.status === 'cancelled') return RIDE_HISTORY_COPY.noCharge;
+  if (ride.status === 'cancelled') {
+    return viewer === 'passenger' && ride.cancellationFee !== null && ride.cancellationFee > 0
+      ? t('fare.feeCharged', { amount: formatMoney(ride.cancellationFee) })
+      : RIDE_HISTORY_COPY.noCharge;
+  }
   if (viewer === 'driver' && ride.status === 'completed' && ride.driverEarnings !== null) {
     return formatMoney(ride.driverEarnings);
   }

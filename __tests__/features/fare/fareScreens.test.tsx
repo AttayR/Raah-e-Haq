@@ -5,6 +5,7 @@
  * offer hook resets per quote and takes the server's band after a 422.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, renderHook, waitFor } from '@testing-library/react-native';
 import { apiClient } from '../../../src/services/api';
@@ -16,6 +17,7 @@ import { toast } from '../../../src/core/toast';
 import type { RideResource } from '../../../src/services/rideService';
 import type { OfferBand } from '../../../src/features/fare/types';
 import { makeRide } from '../../../test-utils/rideFixtures';
+import { layout } from '../../../src/theme';
 
 let mock: MockAdapter;
 
@@ -100,13 +102,22 @@ describe('trip panel (passenger)', () => {
     const ride = makeRide({ status: 'cancelled', cancellation_reason: 'passenger', cancellation_fee: '50.00', cancellation_charge_reason: 'late_cancel' });
     const { getByTestId } = render(panel(ride));
     expect(getByTestId('active-ride-subtitle').props.children).toBe(
-      'You cancelled this ride. A cancellation fee of Rs 50 was added to your wallet.',
+      'You cancelled this ride. A cancellation fee of Rs 50 was charged to your wallet.',
     );
   });
 });
 
 describe('"Driver asked for more?" (BE-82)', () => {
   const report = { id: 3, kind: 'asked_for_more', status: 'open', asked_amount: 400, fare: 152, refund_amount: 0, created_at: '2026-10-15T10:00:00Z', resolved_at: null };
+
+  it('[T-543] the report sheet has the side gutter on its header and fields', () => {
+    const { getByTestId } = render(
+      <OverchargeReportSection rideId={41} state={{ canReport: true, report: null }} fare={152} />,
+    );
+    fireEvent.press(getByTestId('overcharge-button'));
+    expect(StyleSheet.flatten(getByTestId('overcharge-form-header').props.style)).toMatchObject({ paddingHorizontal: layout.gutter });
+    expect(StyleSheet.flatten(getByTestId('overcharge-form-fields').props.style)).toMatchObject({ paddingHorizontal: layout.gutter });
+  });
 
   it('reports with the amount and note, then shows the status instead of the button', async () => {
     mock.onPost('/rides/41/report-overcharge').reply(201, {

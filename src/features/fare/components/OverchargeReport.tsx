@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppText, BottomSheet, Button, Card, Icon, TextField } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { space } from '../../../theme';
+import { layout, space } from '../../../theme';
 import { formatMoney } from '../../../utils/format';
 import { ASKED_AMOUNT_MAX, REPORT_NOTE_MAX } from '../api';
 import { reportStatusText } from '../format';
@@ -60,7 +60,7 @@ export function OverchargeReportSheet({ visible, fare, submitting, error, onSubm
       accessibilityLabel={t('fare.reportTitle')}
       testID="overcharge-sheet"
       header={
-        <View style={styles.header}>
+        <View style={styles.header} testID="overcharge-form-header">
           <AppText variant="h3" accessibilityRole="header">
             {t('fare.reportTitle')}
           </AppText>
@@ -83,7 +83,7 @@ export function OverchargeReportSheet({ visible, fare, submitting, error, onSubm
         </View>
       }
     >
-      <View style={styles.body}>
+      <View style={styles.body} testID="overcharge-form-fields">
         <TextField
           label={t('fare.reportAmount')}
           value={amount}
@@ -189,8 +189,9 @@ export function OverchargeReportSection({ rideId, state, fare, onReported, testI
 }
 
 const styles = StyleSheet.create({
-  header: { gap: space[1] },
-  body: { gap: space[3] },
+  // The sheet pads only its footer; header and body take the same side gutter (T-543 QA D1).
+  header: { gap: space[1], paddingHorizontal: layout.gutter, paddingBottom: space[3] },
+  body: { gap: space[3], paddingHorizontal: layout.gutter },
   footer: { gap: space[2] },
   section: { gap: space[2] },
   statusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },

@@ -429,12 +429,23 @@ export interface UploadProfilePhotoRequest {
   signal?: AbortSignal;
 }
 
+/** A profile photo change that the server accepted: the new profile and the server's `message`. */
+export interface ProfilePhotoResult {
+  user: User;
+  /** BE-94: e.g. "Photo submitted for review. Your current photo stays until it is approved." */
+  message: string | null;
+}
+
+const serverMessage = (body: { message?: unknown } | null | undefined): string | null =>
+  typeof body?.message === 'string' && body.message.trim().length > 0 ? body.message : null;
+
 /**
  * T-504: POST /profile/avatar. The response is the owner's profile with the new
- * `profile_image_url`, so the signed-in user is replaced and every avatar bound to it (Account,
- * Home, Drive) shows the new photo at once. A result that arrives after sign-out is dropped.
+ * `profile_image_url` (a driver's new photo waits in `pending_profile_image_url`, BE-94), so the
+ * signed-in user is replaced and every avatar bound to it (Account, Home, Drive) follows at once.
+ * A result that arrives after sign-out is dropped.
  */
-export const uploadProfilePhoto = createAsyncThunk<User, UploadProfilePhotoRequest, ThunkConfig>(
+export const uploadProfilePhoto = createAsyncThunk<ProfilePhotoResult, UploadProfilePhotoRequest, ThunkConfig>(
   'auth/uploadProfilePhoto',
   async ({ file, onProgress, signal }, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
@@ -451,9 +462,30 @@ export const uploadProfilePhoto = createAsyncThunk<User, UploadProfilePhotoReque
       if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
         return rejectWithValue(staleSessionRejection());
       }
-      return user;
+      return { user, message: serverMessage(body) };
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Could not upload the photo'));
+    }
+  }
+);
+
+/**
+ * BE-94: DELETE /profile/avatar (passengers). The profile comes back with no photo and replaces
+ * the signed-in user. A driver gets 422 PROFILE_PHOTO_REQUIRED (the rejection carries the code).
+ */
+export const removeProfilePhoto = createAsyncThunk<ProfilePhotoResult, void, ThunkConfig>(
+  'auth/removeProfilePhoto',
+  async (_, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const body = await apiService.removeAvatar();
+      const user = requireUser(unwrap(body));
+      if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
+        return rejectWithValue(staleSessionRejection());
+      }
+      return { user, message: serverMessage(body) };
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Could not remove the photo'));
     }
   }
 );

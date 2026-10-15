@@ -147,12 +147,12 @@ describe('text', () => {
   });
 
   it('the cancel preview: costs now, free until a time, or free', () => {
-    expect(cancelPreviewText({ feeNow: 50, freeUntil: null, reason: 'late_cancel' })).toBe('Cancelling now costs Rs 50. It is added to your wallet.');
+    expect(cancelPreviewText({ feeNow: 50, freeUntil: null, reason: 'late_cancel' })).toBe('Cancelling now costs Rs 50. It is charged to your wallet.');
     expect(cancelPreviewText({ feeNow: 0, freeUntil: '2026-10-15T13:05:00+05:00', reason: null })).toMatch(/^Free to cancel until \d{1,2}:05 (AM|PM)\.$/);
     expect(cancelPreviewText({ feeNow: 0, freeUntil: null, reason: null })).toBe('Cancelling now is free.');
     expect(cancelPreviewText(null)).toBeNull();
     expect(cancelConfirmBody({ cancellation_preview: { fee_now: 50, free_until: null, reason: 'late_cancel' } })).toBe(
-      'Are you sure you want to cancel this ride? Cancelling now costs Rs 50. It is added to your wallet.',
+      'Are you sure you want to cancel this ride? Cancelling now costs Rs 50. It is charged to your wallet.',
     );
     expect(cancelConfirmBody(null)).toBe('Are you sure you want to cancel this ride?');
   });
@@ -168,8 +168,8 @@ describe('text', () => {
     expect(reportStatusText(report)).toBe('Received. We are looking into it.');
     expect(reportStatusText({ ...report, status: 'upheld', refundAmount: 50 })).toBe('Upheld. Rs 50 was refunded to your wallet.');
     expect(reportStatusText({ ...report, status: 'rejected' })).toBe('Reviewed. No action was taken.');
-    expect(cancellationFeeText(50, 'no_show')).toBe('A no-show fee of Rs 50 was added to your wallet.');
-    expect(cancellationFeeText(50, 'late_cancel')).toBe('A cancellation fee of Rs 50 was added to your wallet.');
+    expect(cancellationFeeText(50, 'no_show')).toBe('A no-show fee of Rs 50 was charged to your wallet.');
+    expect(cancellationFeeText(50, 'late_cancel')).toBe('A cancellation fee of Rs 50 was charged to your wallet.');
     expect(cancellationFeeText(0, null)).toBeNull();
   });
 });
@@ -242,6 +242,8 @@ describe('balance owed on book (BE-85)', () => {
     if (current) dialog.answer(current.id, true);
     await shown;
     expect(onTopUp).toHaveBeenCalledTimes(1);
+    // T-543: the amount owed goes with it, to prefill Add money.
+    expect(onTopUp).toHaveBeenCalledWith(200);
   });
 
   it('"Not now" does not open the top-up', async () => {

@@ -9,7 +9,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { apiClient } from '../../../src/services/api';
 import { calendarDate, shiftDate, toDriverStrikes, toWeeklyStatement } from '../../../src/features/driver-statements/api';
 import { nextIsCurrent } from '../../../src/features/driver-statements/hooks';
-import WeeklyStatementScreen from '../../../src/features/driver-statements/screens/WeeklyStatementScreen';
+import WeeklyStatementScreen, { statementLineKey } from '../../../src/features/driver-statements/screens/WeeklyStatementScreen';
 import DriverStrikesScreen, { strikeKindLabel } from '../../../src/features/driver-statements/screens/DriverStrikesScreen';
 import { envelope } from '../../../test-utils/rideFixtures';
 
@@ -107,6 +107,24 @@ describe('WeeklyStatementScreen', () => {
     fireEvent.press(screen.getByTestId('statement-next'));
     await waitFor(() => expect(screen.getByTestId('statement-range').props.children).toBe('12 Oct – 18 Oct'));
     expect(mock.history.get[2].params).toBeUndefined();
+  });
+
+  it('[T-543] one vehicle type at several commission rates renders without a duplicate key', async () => {
+    const lines = [
+      { vehicle_type: 'car', commission_rate: 19.9, rides: 1, gross_fares: 402, commission: 80, driver_net: 322 },
+      { vehicle_type: 'car', commission_rate: 19.91, rides: 2, gross_fares: 442, commission: 88, driver_net: 354 },
+      { vehicle_type: 'car', commission_rate: 20, rides: 1, gross_fares: 485, commission: 97, driver_net: 388 },
+    ];
+    mock.onGet('/driver/statements').reply(200, envelope(week({ by_vehicle_type: lines })));
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(<WeeklyStatementScreen />);
+    await waitFor(() => expect(screen.getByTestId('statement-types')).toBeTruthy());
+    expect(errors.mock.calls.some((call) => String(call[0]).includes('same key'))).toBe(false);
+    errors.mockRestore();
+    screen.getByText(/Car: 1 trip · 19\.9% commission/);
+    screen.getByText(/Car: 2 trips · 19\.91% commission/);
+    const keys = toWeeklyStatement(week({ by_vehicle_type: lines }))!.byVehicleType.map(statementLineKey);
+    expect(new Set(keys).size).toBe(3);
   });
 
   it('shows the error with retry', async () => {

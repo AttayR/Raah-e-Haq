@@ -8,8 +8,11 @@ export type WalletRoutes = {
   Wallet: undefined;
   /** `transaction` is the list row, shown while GET /wallet/transactions/{id} loads. */
   WalletTransaction: { id: number; transaction?: WalletTransaction };
-  /** T-515: amount, provider and method for a top-up (POST /wallet/topups). */
-  AddMoney: undefined;
+  /**
+   * T-515: amount, provider and method for a top-up (POST /wallet/topups). `amount` prefills the
+   * field (T-543: what the passenger owes), clamped to the server's limits on the screen.
+   */
+  AddMoney: AddMoneyParams | undefined;
   /** T-515: the provider's hosted checkout in an in-app browser (`next_action.redirect`). */
   TopUpCheckout: TopUpCheckoutParams;
   /**
@@ -27,6 +30,12 @@ export type TopUpCheckoutParams = {
 };
 
 export type TopUpStatusParams = { id: string; result?: TopUpResult; providerName?: string };
+
+export type AddMoneyParams = { amount?: number };
+
+/** Add money's params for an amount owed: prefilled when it is a positive number, else none. */
+export const topUpParamsFor = (amountOwed: number | null | undefined): AddMoneyParams | undefined =>
+  typeof amountOwed === 'number' && Number.isFinite(amountOwed) && amountOwed > 0 ? { amount: amountOwed } : undefined;
 
 /** Driver-only wallet routes: report a commission payment, and the list of reports. */
 export type DriverWalletRoutes = WalletRoutes & {

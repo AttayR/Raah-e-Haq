@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { User, OtpSentInfo } from '../../services/api';
 import {
   loginUser,
@@ -12,6 +12,7 @@ import {
   getUserProfile,
   updateUserProfile,
   uploadProfilePhoto,
+  removeProfilePhoto,
   initializeAuth,
   revalidateSession,
   isStaleSessionRejection,
@@ -365,11 +366,11 @@ const authSlice = createSlice({
 
     // Profile photo (T-504): only a success touches the store. Progress and failure belong to
     // the photo editor, so no other screen shows a spinner or an error while it uploads.
-    builder.addCase(uploadProfilePhoto.fulfilled, (state, action) => {
+    builder.addMatcher(isAnyOf(uploadProfilePhoto.fulfilled, removeProfilePhoto.fulfilled), (state, action) => {
       if (!state.isAuthenticated) {
         return;
       }
-      state.user = action.payload;
+      state.user = action.payload.user;
     });
   },
 });

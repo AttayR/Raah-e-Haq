@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import MockAdapter from 'axios-mock-adapter';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiClient, type User } from '../../../src/services/api';
@@ -169,6 +169,14 @@ describe('ride format', () => {
     expect(rideAmountText(ride(), 'passenger')).toBe('Rs 470');
     expect(rideAmountText(ride(), 'driver')).toBe('Rs 376');
     expect(rideAmountText(ride({ status: 'cancelled' }), 'passenger')).toBe('No charge');
+  });
+
+  it('[T-543] a cancelled ride the passenger was charged for shows the fee, not "No charge"', () => {
+    const charged = ride({ status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' });
+    expect(rideAmountText(charged, 'passenger')).toBe('Rs 50 fee');
+    expect(rideAmountText(ride({ status: 'cancelled', cancellation_fee: 0 }), 'passenger')).toBe('No charge');
+    // The driver's share is credited separately; their row keeps "No charge".
+    expect(rideAmountText(charged, 'driver')).toBe('No charge');
   });
 
   it('builds the receipt from the server breakdown; the driver also sees fee and earnings', async () => {
@@ -343,6 +351,10 @@ describe('RideDetailsScreen', () => {
     expect(screen.getByTestId('ride-details-receipt-earned')).toBeTruthy();
     expect(screen.queryByTestId('ride-details-message')).toBeNull();
     expect(allText()).not.toContain(PASSENGER_PHONE);
+    // T-543: the header (and Back) sits above the scrolling content, so it never scrolls away.
+    expect(screen.getByTestId('ride-details-back')).toBeTruthy();
+    expect(within(screen.getByTestId('ride-details-scroll')).queryByTestId('ride-details-back')).toBeNull();
+    expect(within(screen.getByTestId('ride-details-scroll')).getByTestId('ride-details-amount')).toBeTruthy();
   });
 
   it('cancelled: who cancelled and the note, "No charge", no fare lines', async () => {

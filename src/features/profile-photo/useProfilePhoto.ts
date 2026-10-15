@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { useAppDispatch } from '../../store';
-import { isStaleSessionRejection, uploadProfilePhoto } from '../../store/thunks/apiThunks';
-import { firstFieldMessages, rejectionMessage } from '../../core/api/errors';
+import {
+  isStaleSessionRejection,
+  removeProfilePhoto,
+  uploadProfilePhoto,
+  type ProfilePhotoResult,
+} from '../../store/thunks/apiThunks';
+import { firstFieldMessages, rejectionMessage, type ThunkRejection } from '../../core/api/errors';
 import { confirm } from '../../core/dialog';
 import { toast } from '../../core/toast';
+import { componentTokens, space } from '../../theme';
 import { t } from '../../i18n';
 import type { MultipartFile, User } from '../../services/api';
 import { pickProfilePhoto, type PhotoSource, type PickProblem } from './picker';
 
-export type ProfilePhotoPhase = 'idle' | 'uploading' | 'failed';
+export type ProfilePhotoPhase = 'idle' | 'uploading' | 'removing' | 'failed';
 
 export interface ProfilePhotoState {
   phase: ProfilePhotoPhase;
@@ -30,6 +36,34 @@ const PROBLEM_COPY: Record<Exclude<PickProblem, 'permission'>, string> = {
   failed: t('profilePhoto.pickFailed'),
 };
 
+/** The Profile avatar (ProfilePhotoEditor) is this tall. */
+export const PROFILE_PHOTO_SIZE = 96;
+
+/**
+ * Photo toasts sit below the Profile avatar, not over it (T-543 QA F2): the header bar, the
+ * identity block's top padding, the avatar, then a small gap.
+ */
+export const PHOTO_TOAST_OFFSET = componentTokens.header.barHeight + space[4] + PROFILE_PHOTO_SIZE + space[2];
+const TOAST_PLACEMENT = { topOffset: PHOTO_TOAST_OFFSET } as const;
+
+/** BE-94: a driver can never remove their photo (DELETE /profile/avatar 422). */
+export const PROFILE_PHOTO_REQUIRED = 'PROFILE_PHOTO_REQUIRED';
+
+/**
+ * The text for a refused photo change: 429 `rate_limited` names the wait (`retry_after`
+ * seconds, 10 changes an hour shared by upload and remove), a 422 its field message, a driver's
+ * PROFILE_PHOTO_REQUIRED the server's own sentence, anything else the API layer's message.
+ */
+export const photoRefusalMessage = (payload: ThunkRejection | undefined, fallback: string): string => {
+  if (payload?.kind === 'rate_limited' || payload?.status === 429) {
+    const seconds = payload.retryAfter;
+    return seconds && seconds > 0
+      ? t('profilePhoto.rateLimited', { minutes: Math.max(1, Math.ceil(seconds / 60)) })
+      : t('profilePhoto.rateLimitedNoTime');
+  }
+  return firstFieldMessages(payload?.fieldErrors).avatar ?? rejectionMessage(payload, fallback);
+};
+
 /** Camera or photos access is off: explain why it is needed and offer the app's Settings page. */
 const askForAccess = async (source: PhotoSource): Promise<void> => {
   const camera = source === 'camera';
@@ -44,14 +78,28 @@ const askForAccess = async (source: PhotoSource): Promise<void> => {
   }
 };
 
+type Options = {
+  onUploaded?: (user: User) => void;
+  /**
+   * After a successful upload, show the server's `message` instead of "Profile photo updated."
+   * (drivers, BE-94: "Photo submitted for review. Your current photo stays until it is approved.").
+   */
+  useServerMessage?: boolean;
+};
+
+const savedMessage = (result: ProfilePhotoResult, useServerMessage: boolean): string =>
+  (useServerMessage ? result.message : null) ?? t('profilePhoto.saved');
+
 /**
  * Change the profile photo (T-504), the same for passengers and drivers: pick (camera or
  * library, resized and compressed by the picker), show the local photo at once, upload it to
  * POST /profile/avatar with progress and a Cancel, and on success the store holds the server's
- * profile (new `profile_image_url`), so every avatar of the signed-in user follows. A failure or
- * a cancel rolls the avatar back to the current photo; a failed upload can be retried.
+ * profile (new `profile_image_url`, or a driver's `pending_profile_image_url`, BE-94), so every
+ * avatar of the signed-in user follows. A failure or a cancel rolls the avatar back to the
+ * current photo; a failed upload can be retried. `remove` (passengers only) asks first, then
+ * DELETE /profile/avatar.
  */
-export function useProfilePhoto({ onUploaded }: { onUploaded?: (user: User) => void } = {}) {
+export function useProfilePhoto({ onUploaded, useServerMessage = false }: Options = {}) {
   const dispatch = useAppDispatch();
   const [state, setState] = useState<ProfilePhotoState>(IDLE);
   const lastFile = useRef<MultipartFile | null>(null);
@@ -89,8 +137,8 @@ export function useProfilePhoto({ onUploaded }: { onUploaded?: (user: User) => v
       if (uploadProfilePhoto.fulfilled.match(result)) {
         lastFile.current = null;
         update(IDLE);
-        toast.success(t('profilePhoto.saved'));
-        onUploadedRef.current?.(result.payload);
+        toast.success(savedMessage(result.payload, useServerMessage), undefined, TOAST_PLACEMENT);
+        onUploadedRef.current?.(result.payload.user);
         return;
       }
       const payload = result.payload;
@@ -99,12 +147,41 @@ export function useProfilePhoto({ onUploaded }: { onUploaded?: (user: User) => v
         update(IDLE);
         return;
       }
-      const message =
-        firstFieldMessages(payload?.fieldErrors).avatar ?? rejectionMessage(payload, t('profilePhoto.failedTitle'));
+      const message = photoRefusalMessage(payload, t('profilePhoto.failedTitle'));
       update({ phase: 'failed', progress: 0, previewUri: null, error: message });
     },
-    [dispatch, update],
+    [dispatch, update, useServerMessage],
   );
+
+  const remove = useCallback(async () => {
+    if (controller.current) return;
+    const ok = await confirm({
+      title: t('profilePhoto.removeConfirmTitle'),
+      body: t('profilePhoto.removeConfirmBody'),
+      confirmLabel: t('profilePhoto.removeConfirm'),
+      cancelLabel: t('common.cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
+    lastFile.current = null;
+    update({ ...IDLE, phase: 'removing' });
+    const result = await dispatch(removeProfilePhoto());
+    update(IDLE);
+    if (removeProfilePhoto.fulfilled.match(result)) {
+      toast.success(t('profilePhoto.removed'), undefined, TOAST_PLACEMENT);
+      return;
+    }
+    const payload = result.payload;
+    if (isStaleSessionRejection(payload)) return;
+    // A driver (PROFILE_PHOTO_REQUIRED) gets the server's own sentence: upload a new one instead.
+    toast.error(
+      payload?.code === PROFILE_PHOTO_REQUIRED
+        ? rejectionMessage(payload, t('profilePhoto.removeFailed'))
+        : photoRefusalMessage(payload, t('profilePhoto.removeFailed')),
+      undefined,
+      TOAST_PLACEMENT,
+    );
+  }, [dispatch, update]);
 
   const choose = useCallback(
     async (source: PhotoSource) => {
@@ -115,7 +192,7 @@ export function useProfilePhoto({ onUploaded }: { onUploaded?: (user: User) => v
         if (picked.problem === 'permission') {
           await askForAccess(source);
         } else {
-          toast.error(PROBLEM_COPY[picked.problem]);
+          toast.error(PROBLEM_COPY[picked.problem], undefined, TOAST_PLACEMENT);
         }
         return;
       }
@@ -135,5 +212,5 @@ export function useProfilePhoto({ onUploaded }: { onUploaded?: (user: User) => v
     update(IDLE);
   }, [update]);
 
-  return { state, choose, cancel, retry, dismissError };
+  return { state, choose, cancel, retry, dismissError, remove };
 }

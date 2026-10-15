@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Banner, Chip } from '../../../components/ui';
+import { AppText, Banner, Button, Chip } from '../../../components/ui';
 import { SavedPlaceChips } from '../../saved-places/components/SavedPlaceChips';
 import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
@@ -43,6 +43,12 @@ type BodyProps = {
   recentRides: HomeRecentRide[];
   onOpenRide: (id: string) => void;
   onSeeAllRides: () => void;
+  /**
+   * A ride still in progress (T-543): "Return to your ride" takes the place of "Where to?" (a
+   * second booking is not possible anyway), with the ride's status line under it.
+   */
+  liveRide?: { status: string } | null;
+  onReturnToRide?: () => void;
 };
 
 /**
@@ -62,10 +68,29 @@ export function HomeSheetBody({
   recentRides,
   onOpenRide,
   onSeeAllRides,
+  liveRide = null,
+  onReturnToRide,
 }: BodyProps) {
   return (
     <View style={styles.body}>
-      <WhereToBar onPress={onWhereTo} />
+      {liveRide && onReturnToRide ? (
+        <View style={styles.live} testID="home-live-ride">
+          <Button
+            label={t('home.returnToRide')}
+            size="lg"
+            leadingIcon="rides"
+            onPress={onReturnToRide}
+            haptic="impactLight"
+            accessibilityHint={liveRide.status}
+            testID="home-return-to-ride"
+          />
+          <AppText variant="bodySmall" color="textSecondary" align="center" numberOfLines={1} testID="home-live-ride-status">
+            {liveRide.status}
+          </AppText>
+        </View>
+      ) : (
+        <WhereToBar onPress={onWhereTo} />
+      )}
       <View style={styles.chips}>
         <SavedPlaceChips
           places={savedPlaces}
@@ -106,5 +131,6 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: layout.gutter },
   body: { paddingHorizontal: layout.gutter, paddingTop: space[3] },
   chips: { marginTop: space[3] },
+  live: { gap: space[2] },
   more: { paddingTop: space[6], gap: space[4] },
 });

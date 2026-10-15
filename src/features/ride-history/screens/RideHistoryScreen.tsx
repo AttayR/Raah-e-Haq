@@ -8,7 +8,7 @@ import { layout, space } from '../../../theme';
 import { RideHistoryRow } from '../components/RideHistoryRow';
 import { RIDE_HISTORY_COPY } from '../copy';
 import { useRideHistory, useRideViewer } from '../hooks';
-import { openRideDetails, type RideDetailsNavigator } from '../navigation';
+import { useOpenRide } from '../../active-ride/useOpenRide';
 import type { Ride, RideHistoryFilter } from '../types';
 
 const FILTERS = [
@@ -29,12 +29,12 @@ export type RideHistoryListProps = {
 /**
  * Ride history for both roles (T-501, BE-01): GET /rides scoped to the signed-in user, newest
  * first, with an All / Completed / Cancelled filter, pull to refresh and infinite scroll.
- * Passengers see the fare, drivers their earnings. Tapping a ride opens RideDetails. The list
+ * Passengers see the fare, drivers their earnings. Tapping a ride opens RideDetails (a
+ * passenger's ride in progress opens the live ride instead, T-543). The list
  * is also the passenger's Activity › Rides (UI-R4); the driver opens it from Account.
  */
 export function RideHistoryList({ visible, header, onScroll }: RideHistoryListProps) {
   const { theme } = useAppTheme();
-  const navigation = useNavigation<RideDetailsNavigator>();
   const viewer = useRideViewer();
   const [filter, setFilter] = useState<RideHistoryFilter>('all');
   const list = useRideHistory(filter, visible);
@@ -50,9 +50,13 @@ export function RideHistoryList({ visible, header, onScroll }: RideHistoryListPr
     refresh();
   }, [refresh]);
 
+  // A passenger's ride still in progress opens the live ride, a finished one its details (T-543).
+  const openRide = useOpenRide(viewer);
   const onOpen = useCallback(
-    (ride: Ride) => openRideDetails(navigation, ride.id, ride),
-    [navigation],
+    (ride: Ride) => {
+      openRide(ride.id, ride).catch(() => undefined);
+    },
+    [openRide],
   );
 
   const renderItem = useCallback(

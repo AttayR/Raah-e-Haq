@@ -115,7 +115,8 @@ describe('wallet (BE-85 amount owed, new ledger types)', () => {
     await waitFor(() => expect(screen.getByTestId('wallet-amount-owed')).toBeTruthy());
     screen.getByText('You owe Rs 200');
     fireEvent.press(screen.getByTestId('wallet-owed-top-up'));
-    expect(mockNavigate).toHaveBeenCalledWith('AddMoney');
+    // T-543: Add money opens with the amount owed filled in.
+    expect(mockNavigate).toHaveBeenCalledWith('AddMoney', { amount: 200 });
   });
 
   it('no owed banner when nothing is owed', async () => {
@@ -162,6 +163,23 @@ describe('driver cancel (BE-85 strikes and no-shows)', () => {
     render(<CancelReasonSheet visible submitting={false} onSubmit={jest.fn()} onClose={jest.fn()} />);
     screen.getByTestId('cancel-reason-strike');
     screen.getByText('Why are you cancelling?');
+  });
+
+  it('[T-543] taps inside the sheet (strike warning, title, hint) never close it; only Keep ride does', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<CancelReasonSheet visible submitting={false} onSubmit={jest.fn()} onClose={onClose} />);
+    fireEvent.press(screen.getByTestId('cancel-reason-strike'));
+    fireEvent.press(screen.getByText('Cancelling after accepting records a strike. Repeated strikes put your account under review.'));
+    fireEvent.press(screen.getByText('Why are you cancelling?'));
+    fireEvent(screen.getByTestId('cancel-reason-input'), 'focus');
+    fireEvent.changeText(screen.getByTestId('cancel-reason-input'), 'Car broke down');
+    // A poll re-render with the no-show pointer (the wait just ended) keeps the sheet and the note.
+    rerender(<CancelReasonSheet visible noShowAvailable submitting={false} onSubmit={jest.fn()} onClose={onClose} />);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId('cancel-reason-sheet')).toBeTruthy();
+    expect(screen.getByTestId('cancel-reason-input').props.value).toBe('Car broke down');
+    fireEvent.press(screen.getByTestId('cancel-reason-keep'));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('"Passenger didn\'t come": no strike, a note filled in, the fee only while fees are on', () => {
@@ -265,7 +283,7 @@ describe('driver split (BE-84) and cancel fees on ride details', () => {
   it('a cancel fee is said from each side; nothing charged reads as before', () => {
     const charged = toRide({ id: 14, status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' });
     const free = toRide({ id: 15, status: 'cancelled', cancellation_fee: null });
-    expect(charged && cancellationChargeText(charged, 'passenger')).toBe('A no-show fee of Rs 50 was added to your wallet.');
+    expect(charged && cancellationChargeText(charged, 'passenger')).toBe('A no-show fee of Rs 50 was charged to your wallet.');
     expect(charged && cancellationChargeText(charged, 'driver')).toBe(
       'The passenger was charged Rs 50 for this cancellation. Your share shows in your wallet once it is credited.',
     );

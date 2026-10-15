@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Avatar, Banner, Button, Icon } from '../../../components/ui';
+import { AppText, Avatar, Badge, Banner, Button, Icon } from '../../../components/ui';
 import { t } from '../../../i18n';
 import type { User } from '../../../services/api';
 import { space } from '../../../theme';
-import { useProfilePhoto } from '../useProfilePhoto';
+import { PROFILE_PHOTO_SIZE, useProfilePhoto } from '../useProfilePhoto';
 import { PhotoSourceSheet } from './PhotoSourceSheet';
 
-const SIZE = 96;
+const SIZE = PROFILE_PHOTO_SIZE;
 const BADGE = 32;
 
 type Props = {
@@ -17,6 +17,12 @@ type Props = {
   uri?: string | null;
   /** After the server accepted the photo (the store already holds the new profile). */
   onUploaded?: (user: User) => void;
+  /** Offer "Remove photo" when there is a photo (passengers only; drivers must keep one, BE-94). */
+  canRemove?: boolean;
+  /** `uri` is the driver's new photo waiting for review (BE-94): label it "Under review". */
+  underReview?: boolean;
+  /** Toast the server's `message` after an upload (drivers: "submitted for review"). */
+  useServerMessage?: boolean;
   testID?: string;
 };
 
@@ -24,13 +30,23 @@ type Props = {
  * The tappable profile avatar of the passenger and driver Profile screens (T-504): Avatar 96 with
  * a camera badge; tapping opens Take photo / Choose from library. While the photo uploads the
  * picked photo shows under a progress scrim with a Cancel; a failure puts the current photo
- * back and offers Retry.
+ * back and offers Retry. Passengers can also remove the photo; a driver's photo waiting for review
+ * carries an "Under review" label (BE-94).
  */
-export function ProfilePhotoEditor({ name, uri, onUploaded, testID = 'profile-photo' }: Props) {
+export function ProfilePhotoEditor({
+  name,
+  uri,
+  onUploaded,
+  canRemove = false,
+  underReview = false,
+  useServerMessage = false,
+  testID = 'profile-photo',
+}: Props) {
   const { theme } = useAppTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { state, choose, cancel, retry } = useProfilePhoto({ onUploaded });
+  const { state, choose, cancel, retry, remove } = useProfilePhoto({ onUploaded, useServerMessage });
   const uploading = state.phase === 'uploading';
+  const busy = uploading || state.phase === 'removing';
   const percent = Math.round(state.progress * 100);
   const hasPhoto = !!uri && uri.trim().length > 0;
   const circle = { width: SIZE, height: SIZE, borderRadius: SIZE / 2 };
@@ -39,24 +55,27 @@ export function ProfilePhotoEditor({ name, uri, onUploaded, testID = 'profile-ph
     <View style={styles.container} testID={testID}>
       <Pressable
         onPress={() => setSheetOpen(true)}
-        disabled={uploading}
+        disabled={busy}
         accessibilityRole="button"
         accessibilityLabel={hasPhoto ? t('profilePhoto.change') : t('profilePhoto.add')}
-        accessibilityState={{ disabled: uploading, busy: uploading }}
+        accessibilityHint={underReview && !uploading ? t('profilePhoto.underReviewA11y') : undefined}
+        accessibilityState={{ disabled: busy, busy }}
         hitSlop={space[2]}
         testID={`${testID}-button`}
       >
         <Avatar name={name} uri={state.previewUri ?? uri} size={SIZE} testID={`${testID}-avatar`} />
-        {uploading ? (
+        {busy ? (
           <View
             style={[styles.scrim, circle, { backgroundColor: theme.colors.overlay }]}
             accessibilityLiveRegion="polite"
             testID={`${testID}-progress`}
           >
             <ActivityIndicator color={theme.colors.onPrimary} />
-            <AppText variant="caption" color="onPrimary">
-              {state.progress > 0 ? `${percent}%` : t('profilePhoto.uploadingShort')}
-            </AppText>
+            {uploading ? (
+              <AppText variant="caption" color="onPrimary">
+                {state.progress > 0 ? `${percent}%` : t('profilePhoto.uploadingShort')}
+              </AppText>
+            ) : null}
           </View>
         ) : (
           <View
@@ -70,6 +89,10 @@ export function ProfilePhotoEditor({ name, uri, onUploaded, testID = 'profile-ph
           </View>
         )}
       </Pressable>
+
+      {underReview && hasPhoto && !busy ? (
+        <Badge tone="info" label={t('profilePhoto.underReview')} testID={`${testID}-under-review`} />
+      ) : null}
 
       {uploading ? (
         <Button
@@ -93,7 +116,12 @@ export function ProfilePhotoEditor({ name, uri, onUploaded, testID = 'profile-ph
         />
       ) : null}
 
-      <PhotoSourceSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onPick={choose} />
+      <PhotoSourceSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onPick={choose}
+        onRemove={canRemove && hasPhoto ? remove : undefined}
+      />
     </View>
   );
 }

@@ -100,6 +100,24 @@ describe('Wallet › Add money', () => {
 });
 
 describe('AddMoneyScreen', () => {
+  it.each([
+    [160.4, '161'],
+    [50, '100'],
+    [99999, '25000'],
+  ])('[T-543] opened from "You owe %s" the amount is prefilled within the limits (%s)', async (owed, shown) => {
+    mockParams = { amount: owed };
+    mock.onGet('/wallet').reply(200, walletWithTopUp());
+    show(AddMoneyScreen);
+    await waitFor(() => expect(screen.getByTestId('add-money-amount-input').props.value).toBe(shown));
+  });
+
+  it('[T-543] without an amount the field starts empty', async () => {
+    mock.onGet('/wallet').reply(200, walletWithTopUp());
+    show(AddMoneyScreen);
+    await screen.findByTestId('add-money-amount-input');
+    expect(screen.getByTestId('add-money-amount-input').props.value).toBe('');
+  });
+
   it('pays with a preset and a mobile account, then opens the status screen', async () => {
     mock.onGet('/wallet').reply(200, walletWithTopUp());
     mock.onPost('/wallet/topups').reply(201, envelope(rawTopUp({ amount: 1000 })));

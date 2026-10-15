@@ -25,6 +25,15 @@ export const topUpPresets = (config: TopUpConfig): number[] => {
   return TOP_UP_PRESETS.filter((amount) => amount >= config.minAmount && amount <= ceiling);
 };
 
+/**
+ * The amount to prefill from what is owed (T-543): whole rupees rounded up (so the top-up clears
+ * the debt), at least the minimum and at most the ceiling. Null when nothing fits today.
+ */
+export const prefillTopUpAmount = (owed: number | null | undefined, config: TopUpConfig): number | null => {
+  if (typeof owed !== 'number' || !Number.isFinite(owed) || owed <= 0 || !canTopUpToday(config)) return null;
+  return Math.min(topUpCeiling(config), Math.max(config.minAmount, Math.ceil(owed)));
+};
+
 export interface TopUpFormValues {
   /** As typed: whole rupees. */
   amount: string;

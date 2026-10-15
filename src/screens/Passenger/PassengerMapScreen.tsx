@@ -27,6 +27,7 @@ import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '.
 import { RideRequestRefused, useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
 import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
+import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
 import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
@@ -90,7 +91,7 @@ const PassengerMapScreen = () => {
   const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
     onPhoneNotVerified: () => navigation.navigate('Profile'),
     // BE-85: owing more than the limit blocks booking until a top-up.
-    onBalanceOwed: () => navigation.navigate('AddMoney'),
+    onBalanceOwed: (amountOwed) => navigation.navigate('AddMoney', topUpParamsFor(amountOwed)),
   });
 
   const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
@@ -349,6 +350,13 @@ const PassengerMapScreen = () => {
       setStage('vehicle');
     },
   });
+
+  // A cancelled ride's route and destination leave the map at once (T-543): the outcome card
+  // stays until Done, and the pickup goes back to the passenger's position ("Current location").
+  const rideCancelled = rideStage?.stage === 'cancelled';
+  useEffect(() => {
+    if (rideCancelled) resetSelection();
+  }, [rideCancelled, resetSelection]);
 
   // The passenger has seen the outcome (completed / cancelled): start over.
   const finishRide = useCallback(() => {

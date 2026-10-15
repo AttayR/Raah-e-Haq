@@ -10,7 +10,8 @@ import { formatMonthYear } from './format';
 /**
  * Profile identity block (shared-profile §1): Avatar 96 (photo or initials), name, "Rider" and
  * "Member since {month year}" when the server sends `created_at`. Tapping the avatar changes the
- * photo (T-504, POST /profile/avatar); the new photo reaches every avatar through the store.
+ * photo (T-504, POST /profile/avatar) or removes it (BE-94, DELETE /profile/avatar); the result
+ * reaches every avatar through the store.
  */
 export function ProfileIdentity({ user }: { user: User | null }) {
   const name = user?.name?.trim() || COPY.passengerFallbackName;
@@ -20,7 +21,7 @@ export function ProfileIdentity({ user }: { user: User | null }) {
 
   return (
     <View style={styles.container} testID="passenger-profile-identity">
-      <ProfilePhotoEditor name={name} uri={user?.profile_image_url} testID="passenger-profile-photo" />
+      <ProfilePhotoEditor name={name} uri={user?.profile_image_url} canRemove testID="passenger-profile-photo" />
       <View style={styles.text}>
         <AppText variant="h2" align="center" numberOfLines={2} accessibilityRole="header">
           {name}

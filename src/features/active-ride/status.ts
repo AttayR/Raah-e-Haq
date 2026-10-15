@@ -1,4 +1,5 @@
 import type { RideResource } from '../../services/rideService';
+import { ACTIVE_RIDE_COPY } from './copy';
 
 /**
  * Ride statuses as the API returns them (RideResource.status, from the backend's
@@ -28,3 +29,17 @@ export const isRideInProgress = (ride: WithStatus): boolean =>
 
 export const isRideTerminal = (ride: WithStatus): boolean =>
   !!ride && TERMINAL_RIDE_STATUSES.includes(ride.status);
+
+/** One line for a ride in progress, e.g. on Home's "Return to your ride" card (T-543). */
+export const liveRideStatusText = (status: RideStatus): string => {
+  switch (status) {
+    case 'requested':
+      return ACTIVE_RIDE_COPY.searchingTitle;
+    case 'accepted':
+      return ACTIVE_RIDE_COPY.driverEnRouteTitle;
+    case 'arrived':
+      return ACTIVE_RIDE_COPY.driverArrivedTitle;
+    default:
+      return ACTIVE_RIDE_COPY.inTripTitle;
+  }
+};

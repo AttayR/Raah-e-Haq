@@ -68,9 +68,19 @@ describe('pickProfilePhoto', () => {
 });
 
 describe('profilePhotoProblem', () => {
-  it('accepts JPEG and PNG within 2048 KB', () => {
+  it('accepts JPEG, PNG and WebP within 2048 KB (BE-94), and nothing else', () => {
     expect(profilePhotoProblem({ type: 'image/jpeg', fileSize: PROFILE_PHOTO_MAX_BYTES })).toBeNull();
     expect(profilePhotoProblem({ type: 'IMAGE/PNG' })).toBeNull();
+    expect(profilePhotoProblem({ type: 'image/webp' })).toBeNull();
+    expect(profilePhotoProblem({ type: 'image/gif' })).toBe('wrongType');
+    expect(profilePhotoProblem({ type: 'image/svg+xml' })).toBe('wrongType');
     expect(profilePhotoProblem({})).toBe('wrongType');
+  });
+
+  it('sends a WebP with its own type and extension', async () => {
+    library.mockResolvedValueOnce({ assets: [{ uri: 'file:///tmp/e.webp', type: 'image/webp' }] });
+    expect(await pickProfilePhoto('library')).toEqual({
+      file: { uri: 'file:///tmp/e.webp', name: 'avatar.webp', type: 'image/webp' },
+    });
   });
 });

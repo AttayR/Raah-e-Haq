@@ -64,16 +64,16 @@ const controlUploads = () => {
   return { uploads, spy };
 };
 
-const renderEditor = async () => {
+const renderEditor = async (props: Partial<React.ComponentProps<typeof ProfilePhotoEditor>> = {}) => {
   const initial = rootReducer(undefined, { type: '@@init' });
   const store = configureStore({
     reducer: rootReducer,
     preloadedState: { ...initial, apiAuth: { ...initial.apiAuth, isAuthenticated: true, user: signedInUser } },
   });
   const Bound = () => {
-    const [uri, setUri] = React.useState<string | undefined>(store.getState().apiAuth.user?.profile_image_url);
+    const [uri, setUri] = React.useState<string | null | undefined>(store.getState().apiAuth.user?.profile_image_url);
     React.useEffect(() => store.subscribe(() => setUri(store.getState().apiAuth.user?.profile_image_url)), []);
-    return <ProfilePhotoEditor name="Test Rider" uri={uri} />;
+    return <ProfilePhotoEditor name="Test Rider" uri={uri} {...props} />;
   };
   render(
     <Provider store={store}>
@@ -108,7 +108,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('ProfilePhotoEditor', () => {
-  it('offers Take photo and Choose from library (no Remove: the server cannot remove a photo)', async () => {
+  it('offers Take photo and Choose from library; no Remove unless the screen allows it (drivers)', async () => {
     await renderEditor();
     expect(screen.getByLabelText('Change profile photo')).toBeTruthy();
     fireEvent.press(screen.getByTestId('profile-photo-button'));
@@ -185,5 +185,47 @@ describe('ProfilePhotoEditor', () => {
     await waitFor(() => expect(openSettings).toHaveBeenCalled());
     expect(spy).not.toHaveBeenCalled();
     expect(photoUri()).toBe(OLD_PHOTO);
+  });
+
+  it('[T-542] Remove photo (passengers) asks first, then DELETE /profile/avatar shows the initials', async () => {
+    const removeSpy = jest
+      .spyOn(apiService, 'removeAvatar')
+      .mockResolvedValue({ success: true, message: 'Avatar removed', data: { ...signedInUser, profile_image_url: null } });
+    mockConfirm.mockResolvedValueOnce(true);
+    const store = await renderEditor({ canRemove: true });
+
+    fireEvent.press(screen.getByTestId('profile-photo-button'));
+    fireEvent.press(screen.getByTestId('photo-source-remove'));
+
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Remove your photo?', destructive: true })));
+    await waitFor(() => expect(removeSpy).toHaveBeenCalled());
+    await waitFor(() => expect(store.getState().apiAuth.user?.profile_image_url).toBeNull());
+    expect(photoUri()).toBeUndefined();
+  });
+
+  it('[T-542] declining the Remove question keeps the photo', async () => {
+    const removeSpy = jest.spyOn(apiService, 'removeAvatar');
+    mockConfirm.mockResolvedValueOnce(false);
+    await renderEditor({ canRemove: true });
+
+    fireEvent.press(screen.getByTestId('profile-photo-button'));
+    fireEvent.press(screen.getByTestId('photo-source-remove'));
+
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalled());
+    expect(removeSpy).not.toHaveBeenCalled();
+    expect(photoUri()).toBe(OLD_PHOTO);
+  });
+
+  it('[T-542] a 429 names how long to wait', async () => {
+    const { uploads } = controlUploads();
+    await renderEditor();
+
+    await pick('library');
+    await waitFor(() => expect(uploads).toHaveLength(1));
+    await act(async () =>
+      uploads[0].reject(new ApiError({ kind: 'rate_limited', status: 429, message: 'Too many attempts.', code: 'rate_limited', retryAfter: 1500 })),
+    );
+
+    await waitFor(() => expect(screen.getByTestId('profile-photo-error')).toHaveTextContent(/Try again in 25 min/));
   });
 });

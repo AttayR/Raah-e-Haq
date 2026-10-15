@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import type { RootState } from '../../store';
+import { useAppDispatch, type RootState } from '../../store';
+import { getUserProfile } from '../../store/thunks/apiThunks';
 import { AppText, Badge, IconButton, ListGroup, ListItem, Screen, StatTile } from '../../components/ui';
-import { PhotoReviewBanner, ProfilePhotoEditor, usePhotoReview } from '../../features/profile-photo';
+import { ownPhotoUri, PhotoReviewBanner, ProfilePhotoEditor, toPhotoReview } from '../../features/profile-photo';
 import { ProfileInfoList } from '../../components/passenger/settings/ProfileInfoList';
 import { formatCalendarDate, formatMonthYear } from '../../components/passenger/settings/format';
 import { useMyStats } from '../../features/stats/hooks';
@@ -17,7 +18,8 @@ import { space } from '../../theme';
 /**
  * Driver Profile (T-507, T-514; shared-profile spec, the driver side of PassengerProfile):
  * identity (tappable avatar that changes the photo, T-504; name, "Driver · Member since",
- * approval badge; the photo's review state from GET /driver/documents), the
+ * approval badge; the photo's review state from the profile itself, BE-94: a new photo waiting
+ * for review shows here labelled "Under review" while riders keep seeing the approved one), the
  * lifetime stats from GET /me/stats (rating "New" until rated, trips, earnings in PKR), the
  * personal info the server sent, the vehicle from GET /profile/documents and the licence from
  * the profile. Nothing is hardcoded; editing the other fields comes with T-504.
@@ -30,7 +32,14 @@ const DriverProfile = () => {
   const driverStats = stats.data?.role === 'driver' ? stats.data : null;
   const values = toDriverProfileStats(driverStats);
   const vehicles = useMyVehicles(isFocused);
-  const photoReview = usePhotoReview(isFocused);
+  const dispatch = useAppDispatch();
+  const photoReview = toPhotoReview(user);
+  const photoUri = ownPhotoUri(user, photoReview);
+
+  // Re-read the profile when the screen is focused, so an admin's photo decision shows up.
+  useEffect(() => {
+    if (isFocused) dispatch(getUserProfile()).catch(() => undefined);
+  }, [dispatch, isFocused]);
 
   const name = user?.name?.trim() || COPY.driverFallbackName;
   const since = formatMonthYear(user?.created_at);
@@ -51,8 +60,9 @@ const DriverProfile = () => {
       <View style={styles.identity} testID="driver-profile-identity">
         <ProfilePhotoEditor
           name={name}
-          uri={user?.profile_image_url}
-          onUploaded={photoReview.markPending}
+          uri={photoUri}
+          underReview={photoReview?.status === 'pending' && !!photoReview.pendingUri}
+          useServerMessage
           testID="driver-profile-photo"
         />
         <View style={styles.identityText}>
@@ -68,7 +78,7 @@ const DriverProfile = () => {
           label={approved ? COPY.approved : COPY.pendingApproval}
           testID="driver-profile-status"
         />
-        <PhotoReviewBanner review={photoReview.review} />
+        <PhotoReviewBanner review={photoReview} />
       </View>
 
       <View>

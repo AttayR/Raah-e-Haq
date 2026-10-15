@@ -197,8 +197,11 @@ export const useRestoreActiveRide = (onRestored: (ride: RideResource) => void): 
 export interface ActiveRideActionsOptions {
   /** BE-37: POST /rides refused with PHONE_NOT_VERIFIED; take the passenger to verify. */
   onPhoneNotVerified?: () => void;
-  /** BE-85: POST /rides refused with PASSENGER_BALANCE_OWED; take the passenger to top up. */
-  onBalanceOwed?: () => void;
+  /**
+   * BE-85: POST /rides refused with PASSENGER_BALANCE_OWED; take the passenger to top up, with
+   * the amount owed (when the server sent it) to prefill Add money (T-543).
+   */
+  onBalanceOwed?: (amountOwed: number | null) => void;
 }
 
 /**
@@ -207,7 +210,7 @@ export interface ActiveRideActionsOptions {
  */
 export const showBalanceOwed = async (
   failure: { message: string; amountOwed: number | null },
-  onTopUp: (() => void) | undefined,
+  onTopUp: ((amountOwed: number | null) => void) | undefined,
 ): Promise<void> => {
   if (!onTopUp) {
     showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal });
@@ -219,7 +222,7 @@ export const showBalanceOwed = async (
     confirmLabel: t('fare.owedTopUp'),
     cancelLabel: t('fare.owedNotNow'),
   });
-  if (topUp) onTopUp();
+  if (topUp) onTopUp(failure.amountOwed);
 };
 
 /**

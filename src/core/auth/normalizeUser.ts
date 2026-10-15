@@ -1,4 +1,4 @@
-import type { AccountStatus, User, UserRole } from '../../services/api';
+import type { AccountStatus, ProfileImageReview, User, UserRole } from '../../services/api';
 import type { AccountRefusal } from '../api/errors';
 
 /**
@@ -70,7 +70,6 @@ const OPTIONAL_STRING_FIELDS = [
   'bio',
   'gender',
   'date_of_birth',
-  'profile_image_url',
   'emergency_contact',
   'emergency_contact_name',
   'emergency_contact_relation',
@@ -85,7 +84,21 @@ const OPTIONAL_STRING_FIELDS = [
 
 type OptionalStringField = (typeof OPTIONAL_STRING_FIELDS)[number];
 
-const NULLABLE_STRING_FIELDS = ['pending_phone', 'phone_verified_at', 'rejection_reason'] as const;
+const NULLABLE_STRING_FIELDS = [
+  'pending_phone',
+  'phone_verified_at',
+  'rejection_reason',
+  // BE-94: the served photo (null after DELETE /profile/avatar) and a driver's pending one.
+  'profile_image_url',
+  'pending_profile_image_url',
+  'profile_image_rejection_reason',
+] as const;
+
+const PHOTO_REVIEWS: readonly ProfileImageReview[] = ['pending', 'approved', 'rejected'];
+
+/** BE-94 `profile_image_review`; anything else (or a missing value) is null. */
+const toPhotoReviewStatus = (value: unknown): ProfileImageReview | null =>
+  PHOTO_REVIEWS.find(known => known === value) ?? null;
 
 type NullableStringField = (typeof NULLABLE_STRING_FIELDS)[number];
 
@@ -156,6 +169,9 @@ export function normalizeUser(raw: unknown): User | null {
       user[field] = value;
     }
   });
+  if ('profile_image_review' in raw) {
+    user.profile_image_review = toPhotoReviewStatus(raw.profile_image_review);
+  }
   return user;
 }
 

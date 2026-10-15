@@ -291,6 +291,9 @@ export interface ApiUser {
   [key: string]: unknown;
 }
 
+/** A driver's profile photo review (BE-94 ProfileResource `profile_image_review`). */
+export type ProfileImageReview = 'pending' | 'approved' | 'rejected';
+
 /** The normalised signed-in user (normalizeUser). Routing reads only `role` and `status`. */
 export interface User {
   id: number;
@@ -313,7 +316,14 @@ export interface User {
   bio?: string;
   gender?: string;
   date_of_birth?: string;
-  profile_image_url?: string;
+  /** BE-94: always the approved (served) photo, the one other people see; null after a removal. */
+  profile_image_url?: string | null;
+  /** BE-94, drivers: the newest photo review (`null` for passengers or when there is none). */
+  profile_image_review?: ProfileImageReview | null;
+  /** BE-94, drivers, own profile only: the new photo waiting for review, when it differs. */
+  pending_profile_image_url?: string | null;
+  /** BE-94: the admin's reason when `profile_image_review` is `rejected`. */
+  profile_image_rejection_reason?: string | null;
   emergency_contact?: string;
   emergency_contact_name?: string;
   emergency_contact_relation?: string;
@@ -767,10 +777,12 @@ class ApiService {
   }
 
   /**
-   * POST /profile/avatar (T-504): multipart field `avatar`, an image of at most 2048 KB. `data`
-   * is the owner's profile (BE-29 ProfileResource) with the new `profile_image_url`. For a
-   * driver the new photo goes back to review (BE-66: GET /driver/documents `profile` pending).
-   * `config` carries the caller's upload progress callback and abort signal.
+   * POST /profile/avatar (T-504, BE-94): multipart field `avatar`, a JPEG, PNG or WebP of at
+   * most 2048 KB (re-encoded to JPEG on the server). `data` is the owner's profile
+   * (ProfileResource). For a driver the new photo waits for review: `profile_image_url` stays the
+   * approved one and `pending_profile_image_url` / `profile_image_review` describe the new one;
+   * `message` says so. 429 `rate_limited` + `retry_after` after 10 changes an hour (shared with
+   * DELETE). `config` carries the caller's upload progress callback and abort signal.
    */
   async uploadAvatar(file: MultipartFile, config?: AxiosRequestConfig): Promise<ApiResponse<ApiUser>> {
     const form = new FormData();
@@ -780,6 +792,15 @@ class ApiService {
       ...config,
       headers: { 'Content-Type': 'multipart/form-data', ...config?.headers },
     });
+    return response.data;
+  }
+
+  /**
+   * DELETE /profile/avatar (BE-94): passengers only; `data` is the profile with
+   * `profile_image_url: null`. A driver gets 422 `error.code: PROFILE_PHOTO_REQUIRED`.
+   */
+  async removeAvatar(config?: AxiosRequestConfig): Promise<ApiResponse<ApiUser>> {
+    const response = await apiClient.delete('/profile/avatar', config);
     return response.data;
   }
 

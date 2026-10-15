@@ -7,7 +7,7 @@ import { ACTIVE_RIDE_COPY } from './copy';
 
 /**
  * The passenger's cancel question with the server's preview (BE-85 `cancellation_preview`):
- * "Free to cancel until 6:05 PM." or "Cancelling now costs Rs 50. It is added to your wallet."
+ * "Free to cancel until 6:05 PM." or "Cancelling now costs Rs 50. It is charged to your wallet."
  * Without a preview (a booking not sent yet, an older server) it is the plain question.
  */
 export const cancelConfirmBody = (ride: Pick<RideResource, 'cancellation_preview'> | null): string => {

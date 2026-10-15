@@ -5,14 +5,15 @@ import type { MultipartFile } from '../../services/api';
 export type PhotoSource = 'camera' | 'library';
 
 /**
- * POST /profile/avatar takes an `image` of at most 2048 KB (Laravel `image|max:2048`). The
+ * POST /profile/avatar takes a JPEG, PNG or WebP of at most 2048 KB (BE-94; the server re-encodes
+ * it to JPEG and strips its metadata). The
  * picker scales the photo so its longest side is at most 1024 px and re-encodes it as JPEG at
  * 0.8, which also drops the camera's EXIF block (GPS) on iOS and keeps only the orientation on
  * Android. A 1024 px JPEG at 0.8 is far below the limit; the size check below is a safety net.
  */
 export const PROFILE_PHOTO_MAX_PX = 1024;
 export const PROFILE_PHOTO_MAX_BYTES = 2048 * 1024;
-export const PROFILE_PHOTO_TYPES: readonly string[] = ['image/jpeg', 'image/jpg', 'image/png'];
+export const PROFILE_PHOTO_TYPES: readonly string[] = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 const COMMON = {
   mediaType: 'photo',
@@ -31,7 +32,7 @@ export type PickProblem = 'permission' | 'unavailable' | 'wrongType' | 'tooLarge
 
 export type ProfilePhotoPick = { file: MultipartFile } | { problem: PickProblem } | null;
 
-const EXTENSIONS: Record<string, string> = { 'image/png': 'png' };
+const EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp' };
 
 /** Checks a picked asset against the server's rule; null when it can be sent. */
 export function profilePhotoProblem(asset: Pick<Asset, 'type' | 'fileSize'>): PickProblem | null {

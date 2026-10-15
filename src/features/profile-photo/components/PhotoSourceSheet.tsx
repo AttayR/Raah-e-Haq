@@ -16,15 +16,22 @@ type Props = {
   onClose: () => void;
   /** Called once the sheet has closed, with the row the user chose. */
   onPick: (source: PhotoSource) => void;
+  /**
+   * Shows "Remove photo" (BE-94 DELETE /profile/avatar, passengers with a photo only: drivers
+   * must keep one). Called once the sheet has closed.
+   */
+  onRemove?: () => void;
 };
 
+type Choice = PhotoSource | 'remove';
+
 /**
- * The profile photo action sheet (T-504): Take photo (front camera) or Choose from library.
- * There is no "Remove photo" row: the server has no endpoint that removes a profile photo.
+ * The profile photo action sheet (T-504): Take photo (front camera), Choose from library and,
+ * when `onRemove` is given, Remove photo.
  */
-export function PhotoSourceSheet({ visible, onClose, onPick }: Props) {
+export function PhotoSourceSheet({ visible, onClose, onPick, onRemove }: Props) {
   const sheet = useRef<BottomSheetHandle>(null);
-  const chosen = useRef<PhotoSource | null>(null);
+  const chosen = useRef<Choice | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -34,19 +41,20 @@ export function PhotoSourceSheet({ visible, onClose, onPick }: Props) {
     [],
   );
 
-  const choose = (source: PhotoSource) => {
-    chosen.current = source;
+  const choose = (choice: Choice) => {
+    chosen.current = choice;
     sheet.current?.close();
   };
 
   const closed = () => {
-    const source = chosen.current;
+    const choice = chosen.current;
     chosen.current = null;
     onClose();
-    if (source) {
+    if (choice) {
       timer.current = setTimeout(() => {
         timer.current = null;
-        onPick(source);
+        if (choice === 'remove') onRemove?.();
+        else onPick(choice);
       }, PICKER_OPEN_DELAY_MS);
     }
   };
@@ -90,6 +98,17 @@ export function PhotoSourceSheet({ visible, onClose, onPick }: Props) {
           chevron={false}
           testID="photo-source-library"
         />
+        {onRemove ? (
+          <ListItem
+            icon="delete"
+            title={t('profilePhoto.remove')}
+            subtitle={t('profilePhoto.removeSubtitle')}
+            onPress={() => choose('remove')}
+            chevron={false}
+            destructive
+            testID="photo-source-remove"
+          />
+        ) : null}
       </ListGroup>
     </BottomSheet>
   );

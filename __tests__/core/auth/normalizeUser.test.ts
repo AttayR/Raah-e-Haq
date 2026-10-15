@@ -252,3 +252,30 @@ describe('mergeServerUser (T-111, BE-35/BE-38 phone verify)', () => {
     expect(mergeServerUser(registered, { phone: '+923000000012' })).toBeNull();
   });
 });
+
+describe('normalizeUser: BE-94 photo review fields (T-542)', () => {
+  it('keeps the review, the pending photo and the reason; a removed photo is null', () => {
+    expect(
+      normalizeUser({
+        id: 7,
+        status: 'active',
+        role: 'driver',
+        profile_image_url: 'http://localhost:8000/storage/avatars/a.jpg',
+        profile_image_review: 'rejected',
+        pending_profile_image_url: null,
+        profile_image_rejection_reason: 'Face not visible',
+      }),
+    ).toMatchObject({
+      profile_image_url: 'http://localhost:8000/storage/avatars/a.jpg',
+      profile_image_review: 'rejected',
+      pending_profile_image_url: null,
+      profile_image_rejection_reason: 'Face not visible',
+    });
+    expect(normalizeUser({ id: 8, status: 'active', role: 'passenger', profile_image_url: null })?.profile_image_url).toBeNull();
+  });
+
+  it('an unknown review value is null; no field means no key', () => {
+    expect(normalizeUser({ id: 7, status: 'active', profile_image_review: 'weird' })?.profile_image_review).toBeNull();
+    expect(normalizeUser({ id: 7, status: 'active' })).not.toHaveProperty('profile_image_review');
+  });
+});

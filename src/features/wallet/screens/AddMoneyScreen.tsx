@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSelector } from 'react-redux';
-import { useIsFocused, useNavigation, type ParamListBase } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute, type ParamListBase, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootState } from '../../../store';
 import {
@@ -25,10 +25,11 @@ import { KeyboardDoneBar } from '../components/KeyboardDoneBar';
 import { TopUpProviderPicker } from '../components/TopUpProviderPicker';
 import { WALLET_COPY } from '../copy';
 import { useWallet } from '../hooks';
-import { TOP_UP_CHECKOUT_ROUTE, TOP_UP_STATUS_ROUTE } from '../navigation';
+import { TOP_UP_CHECKOUT_ROUTE, TOP_UP_STATUS_ROUTE, type WalletRoutes } from '../navigation';
 import {
   canTopUpToday,
   needsCnic,
+  prefillTopUpAmount,
   topUpFieldErrors,
   topUpPresets,
   validateTopUpForm,
@@ -84,8 +85,20 @@ export default function AddMoneyScreen() {
 
   // Preselect the only gateway once the wallet has loaded.
   useEffect(() => {
-    if (config?.providers.length === 1 && values.provider === null) setValues(initialValues(config));
+    if (config?.providers.length === 1 && values.provider === null) {
+      setValues((current) => ({ ...initialValues(config), amount: current.amount }));
+    }
   }, [config, values.provider]);
+
+  // T-543: "Top up" from "You owe" fills in the amount owed, within the limits, once.
+  const owed = useRoute<RouteProp<WalletRoutes, 'AddMoney'>>().params?.amount;
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !config) return;
+    prefilled.current = true;
+    const amount = prefillTopUpAmount(owed, config);
+    if (amount !== null) setValues((current) => (current.amount === '' ? { ...current, amount: String(amount) } : current));
+  }, [config, owed]);
 
   const set = (patch: Partial<TopUpFormValues>, cleared: Array<keyof TopUpFormErrors>) => {
     setValues((current) => ({ ...current, ...patch }));

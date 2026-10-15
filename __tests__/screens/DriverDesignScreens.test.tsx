@@ -24,12 +24,13 @@ import { rideHistoryApi, toRide } from '../../src/features/ride-history/api';
 import type { Ride } from '../../src/features/ride-history/types';
 import { driverProfileApi } from '../../src/features/driver-profile/api';
 import { driverDocumentsApi } from '../../src/features/driverDocuments/api';
-import type { DriverDocument } from '../../src/features/driverDocuments/types';
 import { apiService } from '../../src/services/api';
 import DriverProfile from '../../src/screens/Driver/DriverProfile';
 import { initialDriverRideState } from '../../src/features/driver-ride/slice';
 import type { RideResource } from '../../src/services/rideService';
 import { makeRide } from '../../test-utils/rideFixtures';
+import { toast } from '../../src/core/toast';
+import { PHOTO_TOAST_OFFSET } from '../../src/features/profile-photo/useProfilePhoto';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -230,65 +231,89 @@ describe('DriverDriveScreen recent trips (T-507)', () => {
   });
 });
 
-const profileDoc = (status: DriverDocument['status'], rejectionReason: string | null = null): DriverDocument => ({
-  type: 'profile',
-  required: true,
-  status,
-  rejectionReason,
-  canUpload: status === 'rejected',
-});
+const APPROVED_PHOTO = 'http://localhost:8000/storage/avatars/approved.jpg';
+const PENDING_PHOTO = 'http://localhost:8000/storage/avatars/pending.jpg';
 
 describe('DriverProfile (T-507)', () => {
+  let getProfile: jest.SpyInstance;
+  /** GET /auth/profile on focus (BE-94: the review fields come with the profile). */
+  const serveProfile = (extra: Partial<User>) => {
+    getProfile = jest
+      .spyOn(apiService, 'getProfile')
+      .mockResolvedValue({ success: true, data: { user: { ...user('active'), ...extra } } });
+  };
   beforeEach(() => {
-    jest.spyOn(driverDocumentsApi, 'list').mockResolvedValue({ documents: [profileDoc('approved')], allRequiredApproved: true });
+    // The focus refresh stays in flight unless a test serves a profile, so the preloaded user counts.
+    getProfile = jest.spyOn(apiService, 'getProfile').mockReturnValue(new Promise(() => undefined));
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it('[T-504] an approved photo shows no review note; a pending one says it is under review', async () => {
+  it('[T-542] reads the review from the profile (no GET /driver/documents); an approved photo shows no note', async () => {
+    const documents = jest.spyOn(driverDocumentsApi, 'list');
     jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    await renderScreen(DriverProfile);
+    await renderScreen(DriverProfile, {}, null, { profile_image_url: APPROVED_PHOTO, profile_image_review: 'approved' });
+    expect(getProfile).toHaveBeenCalled();
+    expect(documents).not.toHaveBeenCalled();
     expect(screen.queryByTestId('photo-review-pending')).toBeNull();
-    expect(screen.getByLabelText('Add profile photo')).toBeTruthy();
+    expect(screen.queryByTestId('driver-profile-photo-under-review')).toBeNull();
+    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(APPROVED_PHOTO);
+  });
 
-    jest.spyOn(driverDocumentsApi, 'list').mockResolvedValue({ documents: [profileDoc('pending')], allRequiredApproved: false });
-    await renderScreen(DriverProfile);
+  it('[T-542] a pending photo shows the new photo labelled Under review (riders keep the approved one)', async () => {
+    const pending: Partial<User> = {
+      profile_image_url: APPROVED_PHOTO,
+      profile_image_review: 'pending',
+      pending_profile_image_url: PENDING_PHOTO,
+    };
+    serveProfile(pending);
+    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
+    await renderScreen(DriverProfile, {}, null, pending);
     expect(screen.getByTestId('photo-review-pending')).toHaveTextContent(/Photo under review/);
+    expect(screen.getByTestId('driver-profile-photo-under-review')).toHaveTextContent('Under review');
+    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(PENDING_PHOTO);
   });
 
   it('[T-504] a rejected photo shows the reason', async () => {
+    const rejected: Partial<User> = {
+      profile_image_url: APPROVED_PHOTO,
+      profile_image_review: 'rejected',
+      profile_image_rejection_reason: 'Face not visible',
+    };
+    serveProfile(rejected);
     jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    jest.spyOn(driverDocumentsApi, 'list').mockResolvedValue({
-      documents: [profileDoc('rejected', 'Face not visible')],
-      allRequiredApproved: false,
-    });
-    await renderScreen(DriverProfile);
+    await renderScreen(DriverProfile, {}, null, rejected);
     expect(screen.getByTestId('photo-review-rejected')).toHaveTextContent(/Photo not approved.*Reason: Face not visible/);
+    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(APPROVED_PHOTO);
   });
 
-  it('[T-504] a new photo shows as under review at once, and the store holds the new photo', async () => {
+  it('[T-542] after an upload the new photo shows as under review, the server message is shown, no Remove', async () => {
+    const toastSuccess = jest.spyOn(toast, 'success');
     jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
+    const message = 'Photo submitted for review. Your current photo stays until it is approved.';
     jest.spyOn(apiService, 'uploadAvatar').mockResolvedValue({
       success: true,
-      data: { ...user('active'), profile_image_url: 'http://localhost:8000/storage/avatars/new.jpg' },
+      message,
+      data: {
+        ...user('active'),
+        profile_image_url: APPROVED_PHOTO,
+        profile_image_review: 'pending',
+        pending_profile_image_url: PENDING_PHOTO,
+      },
     });
-    // The server puts the new photo back to review (BE-66): later reads say pending.
-    jest
-      .spyOn(driverDocumentsApi, 'list')
-      .mockResolvedValueOnce({ documents: [profileDoc('approved')], allRequiredApproved: true })
-      .mockResolvedValue({ documents: [profileDoc('pending')], allRequiredApproved: false });
     (launchImageLibrary as jest.Mock).mockResolvedValueOnce({
       assets: [{ uri: 'file:///tmp/me.jpg', type: 'image/jpeg', fileName: 'me.jpg', fileSize: 100_000 }],
     });
-    await renderScreen(DriverProfile);
+    await renderScreen(DriverProfile, {}, null, { profile_image_url: APPROVED_PHOTO, profile_image_review: 'approved' });
     expect(screen.queryByTestId('photo-review-pending')).toBeNull();
 
     fireEvent.press(screen.getByTestId('driver-profile-photo-button'));
+    expect(screen.queryByTestId('photo-source-remove')).toBeNull();
     fireEvent.press(screen.getByTestId('photo-source-library'));
 
     await waitFor(() => expect(screen.getByTestId('photo-review-pending')).toBeTruthy());
-    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(
-      'http://localhost:8000/storage/avatars/new.jpg',
-    );
+    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(PENDING_PHOTO);
+    // Below the avatar, not over it (T-543).
+    expect(toastSuccess).toHaveBeenCalledWith(message, undefined, { topOffset: PHOTO_TOAST_OFFSET });
   });
 
   it('shows stats from GET /me/stats (rating "New", PKR), the vehicle and the licence; no demo values', async () => {
