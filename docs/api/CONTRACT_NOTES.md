@@ -790,7 +790,7 @@ An "AI review" card on fare dispute detail, safety incident detail and risk sign
 
 ### POST `/profile/avatar` (multipart, field `avatar`)
 
-- **Accepted:** JPEG, PNG or WebP, at most 2048 KB. SVG, GIF, BMP, HEIC and anything the server cannot decode get **422** `{success:false, message, errors:{avatar:[...]}}`. Images over 8000 px on a side or 20 MP are refused before decoding (422).
+- **Accepted:** JPEG, PNG or WebP, at most 2048 KB. SVG, GIF, BMP, HEIC and anything the server cannot decode get **422** `{success:false, message, errors:{avatar:[...]}}`. Images over 8000 px on a side or 12.5 MP are refused before decoding (422).
 - **Re-encoded on the server:** decoded, turned upright from its EXIF orientation, scaled so the longest side is at most 1024 px, transparent areas flattened onto white, saved as a new JPEG (quality 85) under a random name (`avatars/<40 chars>.jpg`). No EXIF, GPS, XMP or ICC data survives. The app's own resize (1024 px, 0.8) can stay; the server no longer relies on it.
 - **Throttle:** 10 requests per hour per user, shared with DELETE. Over it: **429** `{success:false, code:"rate_limited", retry_after}`.
 - **Passenger (any account without the driver role):** the new photo is live at once; the old file is deleted. `message: "Avatar updated"`.
@@ -819,3 +819,7 @@ An "AI review" card on fare dispute detail, safety incident detail and risk sign
 ### Registration and admin uploads
 
 `profile_image` / `passenger_profile_image` at registration (API and web), the admin user forms and POST `/driver/documents/profile` go through the same re-encoder (upright, metadata stripped, at most 1024 px JPEG). Their mimes rule is unchanged (jpeg, png, jpg, gif; GIF is stored as JPEG). An undecodable photo is a 422 on that field and no file from the request is kept. Identity and vehicle documents are not re-encoded.
+
+### Admin decisions are bound to the file shown (BE-94 security follow-up)
+
+`GET /admin/drivers/{driver}/documents` items now carry `version` (an opaque fingerprint of that item's file; the driver's own GET `/driver/documents` shows it too, harmlessly). `POST /admin/drivers/{driver}/documents/{id}/approve` and `.../reject` **require** `document_version` (the `version` the admin was shown): missing → 422 on `document_version`; a different value (the driver re-uploaded since) → **409** `error.code: "DOCUMENT_CHANGED"` and nothing is decided, so the admin must reload. The web panel forms send it as a hidden field and show a flash error on a mismatch. No passenger/driver app change.
