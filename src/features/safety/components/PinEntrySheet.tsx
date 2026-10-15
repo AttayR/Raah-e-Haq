@@ -3,7 +3,7 @@ import { StyleSheet, View, type TextInput } from 'react-native';
 import { AppText, Banner, BottomSheet, Button, Icon, OtpInput } from '../../../components/ui';
 import { RIDE_PIN_LENGTH } from '../../../config/safety';
 import { t } from '../../../i18n';
-import { space } from '../../../theme';
+import { layout, space } from '../../../theme';
 import { formatCountdown } from '../pin';
 import { isValidPin } from '../rules';
 
@@ -58,6 +58,15 @@ export function PinEntrySheet({
     setPin('');
   }, [visible, attempt]);
 
+  // After a wrong PIN the keypad stays up for the next try. A lock or a block comes with no
+  // error line (and the lock's countdown only starts on the next render), so neither refocuses.
+  const lastAttempt = useRef(attempt);
+  useEffect(() => {
+    if (attempt === lastAttempt.current) return;
+    lastAttempt.current = attempt;
+    if (visible && error !== null && !locked && !blocked) inputRef.current?.focus();
+  }, [attempt, visible, error, locked, blocked]);
+
   const submit = (code: string) => {
     if (!submitting && !locked && isValidPin(code)) onSubmit(code);
   };
@@ -103,16 +112,20 @@ export function PinEntrySheet({
       footer={footer}
     >
       {blocked ? null : (
-        <View style={styles.body}>
+        <View style={styles.body} testID="pin-entry-content">
           <OtpInput
             ref={inputRef}
             value={pin}
-            onChange={setPin}
+            // Ignored while the try is in flight; not disabled then, since a non-editable field
+            // drops the keyboard after every wrong PIN.
+            onChange={(next) => {
+              if (!submitting) setPin(next);
+            }}
             onComplete={submit}
             length={RIDE_PIN_LENGTH}
             label={t('safety.pinEntryLabel')}
             error={locked ? null : error}
-            disabled={submitting || locked}
+            disabled={locked}
             autoFocus={visible && !locked}
             oneTimeCode={false}
             testID="pin-entry-input"
@@ -132,7 +145,8 @@ export function PinEntrySheet({
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', gap: space[2], paddingBottom: space[2] },
-  body: { gap: space[4], paddingBottom: space[2] },
+  // Side padding like the other kit sheets (the sheet body itself has none).
+  header: { alignItems: 'center', gap: space[2], paddingHorizontal: layout.gutter, paddingBottom: space[2] },
+  body: { gap: space[4], paddingHorizontal: layout.gutter, paddingBottom: space[2] },
   footer: { gap: space[2] },
 });

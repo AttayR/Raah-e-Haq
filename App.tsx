@@ -16,6 +16,7 @@ import { createLinking } from './src/app/navigation/linking';
 import type { RootState } from './src/store';
 import ReduxProvider from './src/app/providers/ReduxProvider';
 import NotificationManager from './src/components/NotificationManager';
+import SplashScreen from './src/components/SplashScreen';
 import { DevKitGalleryHost } from './src/features/dev-gallery/DevKitGalleryHost';
 
 function ThemedNav() {
@@ -73,7 +74,8 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
     <SafeAreaProvider>
       <ReduxProvider>
-        <ThemeProvider>
+        {/* The splash, not a blank frame, while the appearance is read (T-539). */}
+        <ThemeProvider fallback={<SplashScreen />}>
           <NotificationManager>
             <DevKitGalleryHost>
               <ThemedNav />

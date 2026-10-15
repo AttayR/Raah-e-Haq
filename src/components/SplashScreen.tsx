@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ActivityIndicator, Image, StyleSheet, useColorScheme, View } from 'react-native';
+import { hideNativeSplash } from '../core/nativeSplash';
 import { DarkTheme, LightTheme } from '../theme';
 
 /**
@@ -13,18 +14,25 @@ import { DarkTheme, LightTheme } from '../theme';
  * exactly in the centre, so the logo stays put and only the spinner appears below it.
  * Keep the colours in step with ios/…/SplashBackground.colorset and android res colors.xml
  * (__tests__/components/SplashScreen.test.tsx checks them).
+ *
+ * The native splash stays up until this one is on screen (T-539): after its first layout and
+ * the next frame it asks native to hide, so there is no empty frame (logo blink) in between.
  */
 /** Matches the native splash logo (120 pt; 120/240/360 px assets). */
 const LOGO_SIZE = 120;
 
 export default function SplashScreen() {
   const theme = useColorScheme() === 'dark' ? DarkTheme : LightTheme;
+  const onLayout = useCallback(() => {
+    requestAnimationFrame(hideNativeSplash);
+  }, []);
 
   return (
     <View
       testID="app-splash"
       accessibilityLabel="Loading"
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      onLayout={onLayout}
     >
       <Image
         source={require('../assets/images/logo.png')}

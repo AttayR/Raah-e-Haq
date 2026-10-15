@@ -7,7 +7,7 @@ import { confirm } from '../../../core/dialog';
 import { haptics } from '../../../core/haptics';
 import { toast } from '../../../core/toast';
 import { t } from '../../../i18n';
-import { componentTokens, space } from '../../../theme';
+import { componentTokens, layout, space } from '../../../theme';
 import { shareTripLink, telUrl, type LiveShare, type SosState } from '../hooks';
 import { smsUrl } from '../rules';
 import type { SosPosition, SosResult } from '../types';
@@ -103,7 +103,7 @@ export function SosSheet({ visible, onClose, role, sos, position, share, onAddCo
       }
       footer={<Button label={t('common.close')} variant="ghost" onPress={onClose} testID="sos-close" />}
     >
-      <View style={styles.body}>
+      <View style={styles.body} testID="sos-content">
         <View style={styles.calls}>
           {numbers.map((item) => (
             <Button
@@ -187,8 +187,9 @@ export function SosSheet({ visible, onClose, role, sos, position, share, onAddCo
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', gap: space[2], paddingBottom: space[2] },
+  // Side padding like the other kit sheets (the sheet body itself has none).
+  header: { alignItems: 'center', gap: space[2], paddingHorizontal: layout.gutter, paddingBottom: space[2] },
   badge: { width: k.sheetBadge, height: k.sheetBadge, borderRadius: k.sheetBadge / 2, alignItems: 'center', justifyContent: 'center' },
-  body: { gap: space[4], paddingBottom: space[2] },
+  body: { gap: space[4], paddingHorizontal: layout.gutter, paddingBottom: space[2] },
   calls: { gap: space[2] },
 });

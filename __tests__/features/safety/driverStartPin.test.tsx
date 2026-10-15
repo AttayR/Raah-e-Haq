@@ -6,7 +6,7 @@
  * switched the PIN on.
  */
 import React from 'react';
-import { Linking, TextInput } from 'react-native';
+import { Linking, StyleSheet, TextInput } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -74,6 +74,8 @@ describe('driver start PIN', () => {
     expect(screen.getByTestId('pin-entry-input-input').props.keyboardType).toBe('number-pad');
     expect(screen.getByTestId('pin-entry-input-input').props.autoFocus).toBe(true);
     expect(screen.getByTestId('pin-entry-input-input').props.textContentType).toBe('none');
+    // T-539: content off the screen edges (the kit sheet body has no side padding).
+    expect(StyleSheet.flatten(screen.getByTestId('pin-entry-content').props.style)).toMatchObject({ paddingHorizontal: 16 });
 
     mock.onPost('/rides/41/start').reply(200, envelope(makeRide({ status: 'started' })));
     enterPin(screen, '0427');
@@ -99,9 +101,43 @@ describe('driver start PIN', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it('a wrong PIN keeps the keypad up: the field stays editable while checking and is refocused, cleared (T-539)', async () => {
+    const focusSpy = jest.spyOn(TextInput.prototype, 'focus').mockImplementation(() => undefined);
+    const { screen } = await renderScreen(pinRide());
+    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    let answer: (value: [number, unknown]) => void = () => undefined;
+    mock.onPost('/rides/41/start').reply(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    enterPin(screen, '1111');
+    await waitFor(() => expect(startPosts()).toHaveLength(1));
+    // Checking: a non-editable field would drop the keyboard; typing is ignored instead.
+    expect(screen.getByTestId('pin-entry-input-input').props.editable).toBe(true);
+    enterPin(screen, '9');
+    expect(screen.getByTestId('pin-entry-input-input').props.value).toBe('1111');
+    focusSpy.mockClear();
+
+    await act(async () => {
+      answer([422, { success: false, error: { code: 'PIN_INVALID', attempts_left: 4 } }]);
+    });
+    await waitFor(() => expect(screen.getByText("That PIN isn't right. 4 attempts left.")).toBeTruthy());
+    expect(screen.getByTestId('pin-entry-input-input').props.value).toBe('');
+    expect(screen.getByTestId('pin-entry-input-input').props.editable).toBe(true);
+    expect(focusSpy).toHaveBeenCalled();
+
+    // The next try goes straight in.
+    mock.onPost('/rides/41/start').reply(200, envelope(makeRide({ status: 'started' })));
+    enterPin(screen, '0427');
+    await waitFor(() => expect(startPosts()).toHaveLength(2));
+  });
+
   it('PIN_LOCKED counts down from retry_after with the entry disabled, then refocuses for a retry', async () => {
     jest.useFakeTimers();
     const focusSpy = jest.spyOn(TextInput.prototype, 'focus').mockImplementation(() => undefined);
+    focusSpy.mockClear(); // the spy may carry calls from an earlier test
     const { screen } = await renderScreen(pinRide());
     fireEvent.press(screen.getByTestId('driver-ride-start'));
     mock.onPost('/rides/41/start').reply(423, { success: false, error: { code: 'PIN_LOCKED', retry_after: 65 } }, { 'retry-after': '65' });
@@ -111,6 +147,8 @@ describe('driver start PIN', () => {
     expect(screen.getByTestId('pin-entry-locked')).toHaveTextContent(/Too many wrong PINs\. Try again in 1:05\.$/);
     expect(screen.getByTestId('pin-entry-submit').props.accessibilityState).toMatchObject({ disabled: true });
     expect(screen.getByTestId('pin-entry-input-input').props.editable).toBe(false);
+    // Locked: the keypad is not brought back for a wrong-PIN retry.
+    expect(focusSpy).not.toHaveBeenCalled();
 
     await act(async () => {
       jest.advanceTimersByTime(5000);

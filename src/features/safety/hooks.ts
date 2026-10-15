@@ -177,12 +177,16 @@ export interface LiveShare {
   stop: () => Promise<void>;
 }
 
-/** Opens the native share sheet with the trip link; a dismissed sheet is not an error. */
+/**
+ * Opens the native share sheet with the trip link; a dismissed sheet is not an error, a sheet
+ * that could not open says so (never a silent tap).
+ */
 export const shareTripLink = async (url: string): Promise<void> => {
   try {
     await Share.share({ message: t('safety.shareMessage', { url }) });
   } catch (error) {
     logger.debug('[safety] share sheet failed', { error: error instanceof Error ? error.message : 'unknown' });
+    toast.error(t('safety.shareSheetFailed'));
   }
 };
 
@@ -224,6 +228,9 @@ export const useLiveShare = (rideId: number | null): LiveShare => {
           dispatch(liveShareStarted({ rideId: id, url: next.url, expiresAt: next.expiresAt }));
           await shareTripLink(next.url);
         } catch (error) {
+          // Every refusal is visible, an unusable link included; a cancelled request needs none.
+          if (isApiError(error) && error.kind === 'cancelled') return;
+          logger.debug('[safety] share failed', { code: isApiError(error) ? error.code : undefined });
           const over = isApiError(error) && error.code === SAFETY_CODES.rideNotActive;
           toast.error(over ? t('safety.shareRideOver') : t('safety.shareFailed'));
         }

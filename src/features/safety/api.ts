@@ -87,20 +87,31 @@ export const toSosResult = (raw: unknown): SosResult => {
     incidentStatus: readText(incident.status),
     emergencyNumbers: toEmergencyNumbers(data.emergency_numbers),
     emergencyContacts: toContacts(data.emergency_contacts),
-    shareUrl: toHttpsUrl(data.share_url),
+    shareUrl: toShareableUrl(data.share_url),
     shareMessage: readText(data.share_message) ?? '',
   };
 };
 
-/** Only an https link is shared (never another scheme from a response). */
-const toHttpsUrl = (value: unknown): string | null => {
-  const text = readText(value);
-  return text && /^https:\/\/\S+$/i.test(text.trim()) ? text.trim() : null;
+/** Dev-only hosts of the local backend (simulator, Android emulator). */
+const DEV_HTTP_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '10.0.2.2']);
+
+/**
+ * The trip link we may share, or null: https anywhere; plain http only to the local backend
+ * (localhost / 127.0.0.1 / 10.0.2.2) and only in a Debug build (`dev`), so local QA can share
+ * the trip. A release build shares https only, and never another scheme from a response.
+ */
+export const toShareableUrl = (value: unknown, dev: boolean = __DEV__): string | null => {
+  const text = readText(value)?.trim();
+  if (!text || /\s/.test(text)) return null;
+  if (/^https:\/\/[^/?#\s]+/i.test(text)) return text;
+  if (!dev) return null;
+  const host = /^http:\/\/([^/?#:@]+)(?::\d+)?(?:[/?#]|$)/i.exec(text)?.[1]?.toLowerCase();
+  return host !== undefined && DEV_HTTP_HOSTS.has(host) ? text : null;
 };
 
 export const toShareLink = (raw: unknown): ShareLink => {
   const data = isRecord(raw) ? raw : {};
-  const url = toHttpsUrl(data.url);
+  const url = toShareableUrl(data.url);
   if (!url) throw new Error('Invalid share link response');
   return { url, expiresAt: readText(data.expires_at) };
 };

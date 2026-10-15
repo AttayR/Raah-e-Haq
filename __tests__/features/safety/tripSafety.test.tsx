@@ -9,7 +9,8 @@
  * - Call (BE-78): proxy dials the masked number, chat_only opens the chat, every tap asks again.
  */
 import React from 'react';
-import { Linking, Platform, Share } from 'react-native';
+import { Linking, Platform, Share, StyleSheet } from 'react-native';
+import { layout } from '../../../src/theme';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -20,7 +21,7 @@ import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { PassengerTripSafety } from '../../../src/features/safety/components/RideSafety';
 import { RidePinCard } from '../../../src/features/safety/components/RidePinCard';
 import { useRideCall } from '../../../src/features/safety/hooks';
-import { safetyApi, toCallSession, toSosBody, toSosResult } from '../../../src/features/safety/api';
+import { safetyApi, toCallSession, toShareableUrl, toShareLink, toSosBody, toSosResult } from '../../../src/features/safety/api';
 import { canCallOn, isSosAvailable, rideContactOf, ridePinOf, smsUrl } from '../../../src/features/safety/rules';
 import { dialog, dialogStore } from '../../../src/core/dialog';
 import { toast } from '../../../src/core/toast';
@@ -102,6 +103,15 @@ describe('SOS sheet', () => {
     fireEvent.press(screen.getByTestId('sos-call-rescue'));
     expect(openURL.mock.calls.map((c) => c[0])).toEqual(['tel:15', 'tel:1122']);
     expect(mock.history.post).toHaveLength(0);
+  });
+
+  it('keeps its content off the screen edges (T-539: the kit sheet body has no side padding)', async () => {
+    await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-sos'));
+    expect(StyleSheet.flatten(screen.getByTestId('sos-content').props.style)).toMatchObject({ paddingHorizontal: layout.gutter });
+    expect(StyleSheet.flatten(screen.getByTestId('sos-sheet-header').props.children.props.style)).toMatchObject({
+      paddingHorizontal: layout.gutter,
+    });
   });
 
   it('a failed alert keeps the call buttons working and says to call', async () => {
@@ -205,6 +215,44 @@ describe('Share live trip', () => {
     expect(shareSpy).not.toHaveBeenCalled();
   });
 
+  it('a local http link works in a Debug build (T-539): the share sheet opens', async () => {
+    mock.onPost('/rides/41/share').reply(201, { success: true, data: { url: 'http://127.0.0.1:8000/t/tok', token: 'tok', expires_at: 'x' } });
+    await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    await flush();
+    expect(shareSpy).toHaveBeenCalledWith({ message: 'Follow my Raah-e-Haq trip live: http://127.0.0.1:8000/t/tok' });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('an unusable link says so (never a silent tap) and opens no share sheet (T-539)', async () => {
+    mock.onPost('/rides/41/share').reply(201, { success: true, data: { url: 'http://example.com/t/tok', token: 'tok', expires_at: 'x' } });
+    const { store } = await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    await flush();
+    expect(toast.error).toHaveBeenCalledWith("Couldn't create a trip link. Please try again.");
+    expect(shareSpy).not.toHaveBeenCalled();
+    expect(store.getState().activeRide.shareLink).toBeNull();
+  });
+
+  it('a share sheet that cannot open says so (T-539)', async () => {
+    mock.onPost('/rides/41/share').reply(201, { success: true, data: { url: 'https://raahehaq.com/t/tok', token: 'tok', expires_at: 'x' } });
+    shareSpy.mockRejectedValueOnce(new Error('no activity'));
+    await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    await flush();
+    expect(toast.error).toHaveBeenCalledWith("Couldn't open sharing on this phone. Please try again.");
+  });
+
+  it('a failed share from the SOS sheet says so too', async () => {
+    mock.onPost('/rides/41/share').reply(500, { success: false, message: 'x' });
+    await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-sos'));
+    await flush();
+    fireEvent.press(screen.getByTestId('sos-share-trip'));
+    await flush();
+    expect(toast.error).toHaveBeenCalledWith("Couldn't create a trip link. Please try again.");
+  });
+
   it('is not offered after the ride (SOS still is)', async () => {
     await renderSafety(makeRide({ id: 41, status: 'completed', driver_id: 3, completed_at: new Date().toISOString() }));
     screen.getByTestId('trip-safety-sos');
@@ -271,6 +319,24 @@ describe('safety mappers and rules', () => {
     expect(result.emergencyContacts).toEqual([{ id: 1, name: 'Ayesha', phone: '+923001234567' }]);
     expect(toSosBody(null)).toEqual({});
     expect(toSosBody({ latitude: 31.5, longitude: 74.3, accuracy: 12 })).toEqual({ latitude: 31.5, longitude: 74.3, accuracy: 12 });
+  });
+
+  it('shares https anywhere; plain http only to the local backend and only in a Debug build (T-539)', () => {
+    // Release: https only.
+    expect(toShareableUrl('https://raahehaq.com/t/abc', false)).toBe('https://raahehaq.com/t/abc');
+    expect(toShareableUrl('http://127.0.0.1:8000/t/abc', false)).toBeNull();
+    expect(toShareableUrl('http://localhost:8000/t/abc', false)).toBeNull();
+    // Debug: the local backend's hosts only.
+    expect(toShareableUrl('http://127.0.0.1:8000/t/abc', true)).toBe('http://127.0.0.1:8000/t/abc');
+    expect(toShareableUrl(' http://localhost/t/abc ', true)).toBe('http://localhost/t/abc');
+    expect(toShareableUrl('http://10.0.2.2:8000/t/abc', true)).toBe('http://10.0.2.2:8000/t/abc');
+    expect(toShareableUrl('http://raahehaq.com/t/abc', true)).toBeNull();
+    expect(toShareableUrl('http://localhost.evil.com/t/abc', true)).toBeNull();
+    expect(toShareableUrl('http://user@localhost/t', true)).toBeNull();
+    expect(toShareableUrl(['javascript', 'alert(1)'].join(':'), true)).toBeNull();
+    expect(toShareableUrl('https://raahehaq.com/t/a b', true)).toBeNull();
+    expect(toShareableUrl(42, true)).toBeNull();
+    expect(() => toShareLink({ url: 'ftp://raahehaq.com/t' })).toThrow('Invalid share link response');
   });
 
   it('reads contact and the PIN only from the server fields', () => {

@@ -1,9 +1,10 @@
 import React from 'react';
-import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import NotificationManager from '../../src/components/NotificationManager';
+import { ModalRoot } from '../../src/components/ui/ModalRoot';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
-import { toast, useToast } from '../../src/core/toast';
+import { toast, toastStore, useToast } from '../../src/core/toast';
 
 // ThemeProvider holds its children until the stored appearance is read (T-601).
 const renderHost = async (children: React.ReactNode = <Text>screen</Text>) => {
@@ -156,5 +157,51 @@ describe('NotificationManager toast host', () => {
     await renderHost(<Shows />);
     fireEvent.press(screen.getByText('save'));
     expect(screen.getByText('Saved')).toBeTruthy();
+  });
+});
+
+describe('toast inside a native Modal (T-539)', () => {
+  // A modal sheet (ModalRoot) is a separate window over the root host: a toast asked for while it
+  // is up (a failed share from the SOS sheet) must render inside it, not under it.
+  const ModalWindow = ({ open }: { open: boolean }) =>
+    open ? (
+      <View testID="modal-window">
+        <ModalRoot>
+          <Text>sheet</Text>
+        </ModalRoot>
+      </View>
+    ) : null;
+
+  it('renders in the open Modal instead of the root, and back at the root once it closes', async () => {
+    const { rerender } = await renderHost(<ModalWindow open />);
+    act(() => {
+      toast.error("Couldn't create a trip link. Please try again.");
+    });
+    expect(screen.getAllByTestId('toast')).toHaveLength(1);
+    expect(within(screen.getByTestId('modal-window')).getByTestId('toast')).toBeTruthy();
+
+    rerender(
+      <ThemeProvider>
+        <NotificationManager>
+          <ModalWindow open={false} />
+        </NotificationManager>
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    expect(screen.queryByTestId('modal-window')).toBeNull();
+    expect(screen.getAllByTestId('toast')).toHaveLength(1);
+  });
+
+  it('the Modal host outranks the root host; the newest wins at one level', () => {
+    const root = toastStore.registerHost(0);
+    const modal = toastStore.registerHost(1);
+    const rootAgain = toastStore.registerHost(0);
+    expect(toastStore.getActiveHost()).toBe(modal.id);
+    modal.unregister();
+    expect(toastStore.getActiveHost()).toBe(rootAgain.id);
+    rootAgain.unregister();
+    expect(toastStore.getActiveHost()).toBe(root.id);
+    root.unregister();
+    expect(toastStore.getActiveHost()).toBeNull();
   });
 });

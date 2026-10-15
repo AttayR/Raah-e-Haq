@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useSyncExternalStore } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import ModernModal, { ModernModalConfig } from './ModernModal';
-import { toast, toastStore, type ToastAction } from '../core/toast';
+import { toast, type ToastAction } from '../core/toast';
 import { DialogHost } from './ui/Dialog';
-import { ToastView } from './ui/Toast';
+import { ToastHost } from './ui/Toast';
 import { logger } from '../core/logging/logger';
 
 interface NotificationManagerProps {
@@ -138,7 +138,6 @@ export const showRideCompletedToast = (fare: number) => {
 };
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) => {
-  const currentToast = useSyncExternalStore(toastStore.subscribe, toastStore.getCurrent);
   const [currentModal, setCurrentModal] = useState<ModernModalConfig | null>(modalConfig);
 
   const updateModal = useCallback(() => {
@@ -154,8 +153,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) =
     };
   }, [updateModal]);
 
-  const handleToastHide = useCallback((id: string) => toast.hide(id), []);
-
   const handleModalClose = () => {
     setCurrentModal(null);
     modalConfig = null;
@@ -165,14 +162,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) =
     <View style={styles.container}>
       {children}
 
-      {/* Toast: one at a time; key remounts it so each toast animates and times out on its own */}
-      {currentToast && (
-        <ToastView
-          key={currentToast.id}
-          config={currentToast}
-          onHide={handleToastHide}
-        />
-      )}
+      {/* Toast: one at a time (a native Modal's ModalRoot takes over while it is up) */}
+      <ToastHost />
 
       {/* Product dialogs: confirm() / alert() from src/core/dialog (UI-R3) */}
       <DialogHost />

@@ -2,8 +2,9 @@ import axios from 'axios';
 import { isApiError, rejectionMessage, toApiError } from '../api/errors';
 
 /**
- * The one toast API. A module-level queue rendered by NotificationManager (mounted once in
- * App.tsx). Callable from anywhere: screens (`useToast()`), hooks, thunks and services.
+ * The one toast API. A module-level queue rendered by the active `ToastHost` (NotificationManager
+ * at the app root, or ModalRoot inside a native Modal). Callable from anywhere: screens
+ * (`useToast()`), hooks, thunks and services.
  * One toast is visible at a time; the rest wait in order (DESIGN_SYSTEM 5.16).
  */
 
@@ -45,6 +46,13 @@ type Listener = () => void;
 let queue: ToastConfig[] = [];
 const listeners = new Set<Listener>();
 let counter = 0;
+/**
+ * Mounted toast hosts, oldest first. A native Modal (ModalRoot) is a separate window that covers
+ * the root host, so it mounts its own host at a higher level; the active host is the newest one
+ * at the highest level, so a toast asked for while a modal sheet is up shows above that sheet.
+ */
+let hosts: Array<{ id: number; level: number }> = [];
+let hostCounter = 0;
 
 const emit = () => listeners.forEach(listener => listener());
 
@@ -140,4 +148,24 @@ export const toastStore = {
   },
   getCurrent: (): ToastConfig | null => queue[0] ?? null,
   getQueue: (): readonly ToastConfig[] => queue,
+  /** Adds a host (0 = the app root, 1 = inside a native Modal); unregister on unmount. */
+  registerHost: (level = 0): { id: number; unregister: () => void } => {
+    hostCounter += 1;
+    const id = hostCounter;
+    hosts = [...hosts, { id, level }];
+    emit();
+    return {
+      id,
+      unregister: () => {
+        hosts = hosts.filter(h => h.id !== id);
+        emit();
+      },
+    };
+  },
+  /** The host that renders toasts: the newest one at the highest level. */
+  getActiveHost: (): number | null =>
+    hosts.reduce<{ id: number; level: number } | null>(
+      (best, h) => (best === null || h.level >= best.level ? h : best),
+      null,
+    )?.id ?? null,
 };

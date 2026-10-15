@@ -6,7 +6,7 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
         <!-- Native splash (T-531): shown from launch until the JS SplashScreen draws the same
              logo in the same place, instead of a white window. MainActivity swaps it for the
-             plain splash_background colour once React has drawn (T-531). -->
+             plain splash_background colour once the JS splash has drawn (RHSplashModule, T-539). -->
         <item name="android:windowBackground">@drawable/splash_background</item>
     </style>
 

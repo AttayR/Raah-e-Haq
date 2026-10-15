@@ -107,6 +107,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       in: window,
       launchOptions: appDelegate.launchOptions
     )
+    NativeSplash.show(over: window)
   }
 
   // raahehaq:// links while the app runs (T-515: the top-up checkout's return link). With the
@@ -117,17 +118,39 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   }
 }
 
+/**
+ * T-539: the launch screen stays on top of the React root until JS has drawn its own splash
+ * (the JS SplashScreen calls RHSplash.hide(), RHSplash.m). The root view's loadingView is not
+ * used: with the new architecture it is removed as soon as the surface starts, long before JS
+ * draws anything, which showed the bare background (the logo blink between the two splashes).
+ */
+enum NativeSplash {
+  /** Keep in step with RHNativeSplashIdentifier in RHSplash.m. */
+  static let identifier = "RHNativeSplash"
+  /** Never strand the user behind the splash if JS fails before it can hide it. */
+  static let fallbackSeconds: TimeInterval = 15
+
+  static func show(over window: UIWindow) {
+    guard let launch = UIStoryboard(name: "LaunchScreen", bundle: nil).instantiateInitialViewController()?.view else {
+      return
+    }
+    launch.frame = window.bounds
+    launch.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    launch.accessibilityIdentifier = identifier
+    window.addSubview(launch)
+    DispatchQueue.main.asyncAfter(deadline: .now() + fallbackSeconds) { [weak launch] in
+      guard let launch, launch.accessibilityIdentifier == identifier else { return }
+      launch.removeFromSuperview()
+    }
+  }
+}
+
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
-  // T-531: until the JS splash mounts, the React root shows the launch screen (brand colour and
-  // logo) instead of the default white system background, so there is no flash in between.
+  // T-531: behind the native splash overlay the React root has the brand colour, not the
+  // default white system background.
   override func customize(_ rootView: RCTRootView) {
     super.customize(rootView)
     rootView.backgroundColor = UIColor(named: "SplashBackground") ?? .systemBackground
-    if let launch = UIStoryboard(name: "LaunchScreen", bundle: nil).instantiateInitialViewController()?.view {
-      launch.frame = rootView.bounds
-      launch.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-      rootView.loadingView = launch
-    }
   }
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {

@@ -109,6 +109,26 @@ describe.each([
     expect(StyleSheet.flatten(getByTestId('booking-sheet').props.style).maxHeight).toBe(667);
   });
 
+  it('sheet: content scrolls below a fixed 24 pt handle band, with a hairline once scrolled (T-539)', () => {
+    const { getByTestId } = render(
+      <BookingSheet maxHeightRatio={0.5}>
+        <AppText>Bilal</AppText>
+      </BookingSheet>,
+    );
+    // The scroll (and its clipping) starts 24 below the top, never right under the handle.
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-handle-area').props.style)).toMatchObject({ height: 24, paddingTop: 8 });
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-scroll').props.contentContainerStyle).paddingTop).toBeUndefined();
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-handle-area').props.style).borderBottomWidth).toBeUndefined();
+
+    fireEvent.scroll(getByTestId('booking-sheet-scroll'), { nativeEvent: { contentOffset: { x: 0, y: 40 } } });
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-handle-area').props.style)).toMatchObject({
+      borderBottomWidth: theme.borderWidth.thin,
+      borderBottomColor: theme.colors.border,
+    });
+    fireEvent.scroll(getByTestId('booking-sheet-scroll'), { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-handle-area').props.style).borderBottomWidth).toBeUndefined();
+  });
+
   it('nearby drivers render as car badges, not pins', () => {
     const { getByTestId } = render(
       <NearbyDriverMarkers

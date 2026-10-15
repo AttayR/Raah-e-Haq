@@ -3,6 +3,7 @@ import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, LightTheme, type AppTheme, type ColorMode } from '../../theme';
 import { logger } from '../../core/logging/logger';
+import { saveNativeAppearance } from '../../core/nativeSplash';
 
 /** User appearance preference (Settings -> Appearance, DESIGN_SYSTEM §1.6). */
 export type AppearancePreference = 'system' | 'light' | 'dark';
@@ -47,7 +48,15 @@ const ThemeCtx = createContext<ThemeContextValue>({
   setScheme: () => {},
 });
 
-export function ThemeProvider({ children }: React.PropsWithChildren) {
+type ThemeProviderProps = React.PropsWithChildren<{
+  /**
+   * Shown instead of the children while the stored preference is read (the app passes its
+   * splash, so nothing blank shows between the splashes, T-539). Default: nothing.
+   */
+  fallback?: React.ReactNode;
+}>;
+
+export function ThemeProvider({ children, fallback = null }: ThemeProviderProps) {
   // useColorScheme subscribes to Appearance changes, so a system switch re-renders the tree.
   const systemScheme = useColorScheme();
   const [scheme, setSchemeState] = useState<AppearancePreference>('system');
@@ -69,6 +78,8 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
         // Applied even after the timeout: a late read still restores the user's choice.
         if (active && !userChose.current && isPreference(stored)) {
           setSchemeState(stored);
+          // Keeps the native launch splash in step (e.g. after an update installed the module).
+          saveNativeAppearance(stored);
         }
       } catch (error) {
         // Storage unavailable: keep following the system scheme.
@@ -89,6 +100,7 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
   const setScheme = useCallback((preference: AppearancePreference) => {
     userChose.current = true;
     setSchemeState(preference);
+    saveNativeAppearance(preference);
     (async () => {
       try {
         await AsyncStorage.setItem(APPEARANCE_STORAGE_KEY, preference);
@@ -102,7 +114,7 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
   const mode = resolveColorMode(scheme, systemScheme);
   const value = useMemo(() => ({ theme: themes[mode], scheme, setScheme }), [mode, scheme, setScheme]);
 
-  return <ThemeCtx.Provider value={value}>{ready ? children : null}</ThemeCtx.Provider>;
+  return <ThemeCtx.Provider value={value}>{ready ? children : fallback}</ThemeCtx.Provider>;
 }
 
 export function useAppTheme() {

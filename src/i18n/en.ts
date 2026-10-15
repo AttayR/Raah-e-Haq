@@ -569,6 +569,7 @@ export const en = {
     stopSharingA11y: 'Stop sharing your live trip',
     shareMessage: 'Follow my Raah-e-Haq trip live: {url}',
     shareFailed: "Couldn't create a trip link. Please try again.",
+    shareSheetFailed: "Couldn't open sharing on this phone. Please try again.",
     shareStopped: 'Trip sharing stopped. The link no longer works.',
     shareStopFailed: "Couldn't stop sharing. Please try again.",
     shareRideOver: 'This ride has ended, so it can no longer be shared.',

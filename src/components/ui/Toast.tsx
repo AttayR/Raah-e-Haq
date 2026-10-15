@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import type { ToastConfig, ToastType } from '../../core/toast';
+import { toast, toastStore, type ToastConfig, type ToastType } from '../../core/toast';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { t } from '../../i18n';
 import { componentTokens, DarkTheme, layout, motionPatterns, radius, space } from '../../theme';
@@ -187,6 +187,29 @@ export function ToastView({ config, onHide, preview = false }: Props) {
       </View>
     </Animated.View>
   );
+}
+
+const hideToast = (id: string) => toast.hide(id);
+
+/**
+ * Renders the queued toasts one at a time. Mounted by NotificationManager (app root) and by
+ * `ModalRoot` (`inline`, inside native Modals); only the active host renders, so a toast asked
+ * for while a modal sheet is up (a failed share from the SOS sheet) shows above that sheet
+ * instead of under it. Screens never mount it.
+ */
+export function ToastHost({ inline = false }: { inline?: boolean }) {
+  const current = useSyncExternalStore(toastStore.subscribe, toastStore.getCurrent);
+  const active = useSyncExternalStore(toastStore.subscribe, toastStore.getActiveHost);
+  const [hostId, setHostId] = useState<number | null>(null);
+  useEffect(() => {
+    // Hosts inside a Modal (inline) outrank the root host.
+    const host = toastStore.registerHost(inline ? 1 : 0);
+    setHostId(host.id);
+    return host.unregister;
+  }, [inline]);
+  if (!current || hostId === null || active !== hostId) return null;
+  // The key remounts it so each toast animates and times out on its own.
+  return <ToastView key={current.id} config={current} onHide={hideToast} />;
 }
 
 const styles = StyleSheet.create({

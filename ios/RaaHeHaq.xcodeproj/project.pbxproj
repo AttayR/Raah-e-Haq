@@ -12,6 +12,7 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		60F5F2972AEAA6181EAAE2CE /* Pods_RaaHeHaq.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 48289B8796E76D73E0ADA44B /* Pods_RaaHeHaq.framework */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		A5390E012F00000100C0FFEE /* RHSplash.m in Sources */ = {isa = PBXBuildFile; fileRef = A5390E022F00000100C0FFEE /* RHSplash.m */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
@@ -24,6 +25,7 @@
 		48289B8796E76D73E0ADA44B /* Pods_RaaHeHaq.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RaaHeHaq.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		6C687DF0DEE76C9E501CC6FF /* Pods-RaaHeHaq.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RaaHeHaq.debug.xcconfig"; path = "Target Support Files/Pods-RaaHeHaq/Pods-RaaHeHaq.debug.xcconfig"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = RaaHeHaq/AppDelegate.swift; sourceTree = "<group>"; };
+		A5390E022F00000100C0FFEE /* RHSplash.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RHSplash.m; path = RaaHeHaq/RHSplash.m; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = RaaHeHaq/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		9D5D716729DB38EB8C671553 /* Pods-RaaHeHaq.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RaaHeHaq.release.xcconfig"; path = "Target Support Files/Pods-RaaHeHaq/Pods-RaaHeHaq.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -47,6 +49,7 @@
 				04F1DE592E6265AE00233D06 /* GoogleService-Info.plist */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				A5390E022F00000100C0FFEE /* RHSplash.m */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -273,6 +276,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				A5390E012F00000100C0FFEE /* RHSplash.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

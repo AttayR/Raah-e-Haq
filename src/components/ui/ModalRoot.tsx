@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { StatusBarStyle } from '../../theme';
 import { DialogHost } from './Dialog';
+import { ToastHost } from './Toast';
 
 type Props = React.PropsWithChildren<{
   /** Overrides the theme's bar style (e.g. light content over a dark scrim). */
@@ -29,6 +30,8 @@ export function ModalRoot({ statusBarStyle, withDialogHost = true, children }: P
         {children}
         {/* Dialogs asked for while this Modal is up render as an overlay inside it (iOS cannot stack a second Modal). */}
         {withDialogHost ? <DialogHost inline /> : null}
+        {/* Toasts too: the root host sits under this Modal's window and would never be seen. */}
+        <ToastHost inline />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
