@@ -146,6 +146,9 @@ describe('map-first Home', () => {
       );
     await renderHome();
     expect(screen.getByText('Liberty Market')).toBeTruthy();
+    // T-536 (PERF-19): one small page for the card, not the 20-ride history page.
+    const ridesGet = mock.history.get.find((r) => r.url === '/rides');
+    expect(ridesGet?.params).toMatchObject({ page: 1, per_page: 4 });
     // A ride still in progress is the booking screen's, not a "recent" ride.
     expect(screen.queryByText('In progress')).toBeNull();
     fireEvent.press(screen.getByTestId('home-recent-ride-61'));

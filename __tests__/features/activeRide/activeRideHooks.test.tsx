@@ -168,6 +168,92 @@ describe('useActiveRidePolling', () => {
     expect(activeRidePollMs(undefined)).toBe(ACTIVE_RIDE_POLL_MS);
   });
 
+  it('T-536: no status reads while the app is in the background; reads at once on return', async () => {
+    jest.useFakeTimers();
+    let onAppState: ((state: AppStateStatus) => void) | undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
+      onAppState = handler as (state: AppStateStatus) => void;
+      return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>;
+    });
+    mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21, status: 'requested' })));
+    const rideGets = () => mock.history.get.filter((r) => r.url === '/rides/21');
+
+    renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(withRide('requested')) });
+    await settle();
+    expect(rideGets()).toHaveLength(1);
+
+    act(() => onAppState?.('background'));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS * 10);
+    });
+    expect(rideGets()).toHaveLength(1);
+
+    act(() => onAppState?.('active'));
+    await settle();
+    expect(rideGets()).toHaveLength(2);
+    // Then the normal cadence again.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS);
+    });
+    expect(rideGets()).toHaveLength(3);
+  });
+
+  it('T-536: a 429 waits its Retry-After, then the cadence comes back', async () => {
+    jest.useFakeTimers();
+    mock
+      .onGet('/rides/21')
+      .replyOnce(429, { success: false, message: 'Too many requests' }, { 'retry-after': '30' })
+      .onGet('/rides/21')
+      .reply(200, envelope(makeRide({ id: 21, status: 'requested' })));
+    const rideGets = () => mock.history.get.filter((r) => r.url === '/rides/21');
+
+    renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(withRide('requested')) });
+    await settle();
+    expect(rideGets()).toHaveLength(1);
+
+    // Every 3 s before T-536; now nothing until the 30 s the server asked for.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(30_000 - 1);
+    });
+    expect(rideGets()).toHaveLength(1);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1);
+    });
+    expect(rideGets()).toHaveLength(2);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS);
+    });
+    expect(rideGets()).toHaveLength(3);
+  });
+
+  it('T-536: a slow read is never overlapped by the next one', async () => {
+    jest.useFakeTimers();
+    let release: () => void = () => {};
+    mock.onGet('/rides/21').reply(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve([200, envelope(makeRide({ id: 21, status: 'requested' }))]);
+        }),
+    );
+    const rideGets = () => mock.history.get.filter((r) => r.url === '/rides/21');
+
+    renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(withRide('requested')) });
+    await settle();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS * 5);
+    });
+    expect(rideGets()).toHaveLength(1);
+
+    await act(async () => {
+      release();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS);
+    });
+    expect(rideGets()).toHaveLength(2);
+  });
+
   it('clears its interval on unmount', async () => {
     jest.useFakeTimers();
     mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21 })));

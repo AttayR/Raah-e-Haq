@@ -11,6 +11,7 @@ import { DRIVER_RIDE_CODES, driverRideApi, runTransition, type DriverRideTransit
 import { DRIVER_RIDE_COPY } from './copy';
 import { isRestorableDriverRide } from './steps';
 import { PIN_CODES } from '../safety/pin';
+import { invalidateStatsForRide } from '../stats/invalidate';
 
 /**
  * The ride the signed-in driver is on (T-404/T-405): the one source of truth for the driver
@@ -50,7 +51,9 @@ const runGuarded = async <Rejected>(
   const startedIn = currentSessionEpoch();
   try {
     const ride = await request();
-    return isStaleSession(startedIn) ? rejectWithValue(staleSessionRejection()) : ride;
+    if (isStaleSession(startedIn)) return rejectWithValue(staleSessionRejection());
+    invalidateStatsForRide(ride);
+    return ride;
   } catch (error) {
     return rejectWithValue(toThunkRejection(error, fallback));
   }

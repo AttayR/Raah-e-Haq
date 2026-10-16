@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnectionRecovered } from '../../core/api/connectivity';
 import { toApiError } from '../../core/api/errors';
+import { CACHE_TTL, cacheVersion, readCache, writeCache } from '../../core/api/queryCache';
 import type { VehicleTypeKey } from '../../services/rideService';
 import {
   fetchFareEstimates,
@@ -9,6 +10,7 @@ import {
   type FareEstimate,
   type FareEstimates,
   type LatLng,
+  type VehicleCatalogue,
   type VehicleType,
 } from './api';
 import type { FareNotice } from '../fare/types';
@@ -30,31 +32,46 @@ const useRetryOnRecovery = (status: LoadStatus, retry: () => void) => {
   useConnectionRecovered(retry, failed);
 };
 
+const VEHICLE_TYPES_CACHE_KEY = 'public/vehicle-types';
+
+type VehicleTypesState = Loaded<VehicleType[]> & { notice: FareNotice | null };
+
+const cachedVehicleTypes = (): VehicleTypesState | null => {
+  const cached = readCache<VehicleCatalogue>(VEHICLE_TYPES_CACHE_KEY, CACHE_TTL.vehicleTypes);
+  return cached ? { status: 'ready', data: cached.value.types, error: null, notice: cached.value.notice } : null;
+};
+
 /**
  * GET /public/vehicle-types once per mount, with loading/error states and a retry. `notice` is
- * the fuel adjustment in force (BE-60 `meta.fare_notice`), or null.
+ * the fuel adjustment in force (BE-60 `meta.fare_notice`), or null. T-536: a read from the last
+ * hour is reused from the cache (the catalogue rarely changes; every fare comes from the
+ * server's estimate anyway); a retry always asks the server.
  */
 export const useVehicleTypes = () => {
-  const [state, setState] = useState<Loaded<VehicleType[]> & { notice: FareNotice | null }>({
-    status: 'loading',
-    data: null,
-    error: null,
-    notice: null,
-  });
+  const [cachedOnMount] = useState(cachedVehicleTypes);
+  const [state, setState] = useState<VehicleTypesState>(
+    () => cachedOnMount ?? { status: 'loading', data: null, error: null, notice: null },
+  );
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    // Shown from the cache on the first frame: no request until a retry.
+    if (attempt === 0 && cachedOnMount) return undefined;
     const controller = new AbortController();
+    const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
     setState((s) => ({ ...s, status: 'loading', error: null }));
     fetchVehicleTypes(controller.signal)
-      .then(({ types, notice }) => setState({ status: 'ready', data: types, error: null, notice }))
+      .then((catalogue) => {
+        writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
+        setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
+      })
       .catch((error) => {
         if (!controller.signal.aborted) {
           setState({ status: 'error', data: null, error: errorText(error, BOOKING_COPY.vehicleTypesFailed), notice: null });
         }
       });
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, cachedOnMount]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   useRetryOnRecovery(state.status, retry);

@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toApiError } from '../../core/api/errors';
+import { CACHE_NAMES, CACHE_TTL } from '../../core/api/queryCache';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { statsApi } from './api';
 import { STATS_COPY } from './copy';
 import type { DriverEarnings, EarningsPeriod, EarningsRide, MyStats } from './types';
 
-/** GET /me/stats; read when the screen is focused (the server caches it up to 5 min). */
+/** T-536: one GET /me/stats a minute at most across screens and tab switches. */
+const STATS_CACHE = { name: CACHE_NAMES.stats, ttlMs: CACHE_TTL.stats } as const;
+
+/**
+ * GET /me/stats; read when the screen is focused (the server caches it up to 5 min), unless a
+ * read from the last minute is still in the cache (T-536). Pull to refresh always asks.
+ */
 export const useMyStats = (enabled: boolean, fallbackError: string = STATS_COPY.statsFailed): RemoteData<MyStats> =>
-  useRemoteData({ fetch: statsApi.getMyStats, fallbackError, enabled });
+  useRemoteData({ fetch: statsApi.getMyStats, fallbackError, enabled, cache: STATS_CACHE });
 
 export interface DriverEarningsState extends RemoteData<DriverEarnings> {
   /** Page 1 rides followed by any loaded later pages. */

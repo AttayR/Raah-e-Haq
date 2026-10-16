@@ -2,12 +2,12 @@ import { useCallback, useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import { ApiError, rejectionMessage, type ThunkRejection } from '../../core/api/errors';
+import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
 import { toast, type ToastOptions } from '../../core/toast';
 import type { RideResource } from '../../services/rideService';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
 import { layout, space } from '../../theme/spacing';
-import { usePolling, type PollOutcome } from '../chat/polling';
+import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
 import { loadDriverStatus, selectDriverStatusState, type DriverStatusState } from '../driver-status/slice';
 import { DRIVER_RIDE_CODES, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
@@ -253,22 +253,12 @@ export const useDriverRideRestore = (): void => {
 /** How often the open ride screen re-reads the ride (T-413), like the passenger side. */
 export const DRIVER_RIDE_POLL_INTERVAL_MS = 8000;
 
-/** A refused poll as an ApiError, so the shared back-off honours a 429's Retry-After. */
-const pollFailure = (payload: ThunkRejection): ApiError =>
-  new ApiError({
-    kind: payload.kind,
-    message: payload.message,
-    status: payload.status,
-    code: payload.code,
-    retryAfter: payload.retryAfter,
-  });
-
 /**
  * Re-reads the driver's ride (GET /rides/{id}) every ~8 s while `enabled` (the ride screen is
  * focused and the app is in the foreground) and the ride is accepted, arrived or started, so a
  * passenger cancel (or a completion elsewhere) shows without the driver acting (T-413).
  *
- * The chat's poll engine (one request at a time: the next one is scheduled only after the last
+ * The shared poll engine (src/core/polling) (one request at a time: the next one is scheduled only after the last
  * settled; failures back off, a 429 waits its Retry-After) stops on blur, background, unmount
  * and once the ride reaches a final status. A poll that meets another ride request in flight
  * (the slice's `pendingAction` guard) is skipped, never sent alongside it. A 403/404 drops the
@@ -290,7 +280,7 @@ export const useDriverRideStatusPolling = (enabled: boolean): void => {
     if (action.meta.condition) return 'continue';
     const payload = action.payload;
     if (isStaleSessionRejection(payload)) return 'stop';
-    throw payload ? pollFailure(payload) : new Error(DRIVER_RIDE_COPY.refreshFailed);
+    throw payload ? pollFailureOf(payload) : new Error(DRIVER_RIDE_COPY.refreshFailed);
   }, [dispatch, rideId]);
 
   usePolling({

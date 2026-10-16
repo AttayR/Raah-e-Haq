@@ -1,11 +1,23 @@
 import { useCallback, useRef, useState } from 'react';
 import { MAPS_CONFIG } from '../config/mapsConfig';
 import { logger } from '../core/logging/logger';
+import { CACHE_TTL, cacheVersion, readCache, writeCache } from '../core/api/queryCache';
 
 export interface Coordinates {
   latitude: number;
   longitude: number;
 }
+
+/**
+ * T-536 (PERF-19): the same route asked again within 5 min (a re-render, back on the booking
+ * screen, the same pins) comes from the cache, keyed by the points rounded to 4 decimals (about
+ * 11 m). Only an OK answer is cached.
+ */
+export const directionsCacheKey = (points: ReadonlyArray<Coordinates>): string =>
+  `directions|${points.map((p) => `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`).join(';')}`;
+
+const cachedRoute = (key: string): Coordinates[] | null =>
+  readCache<Coordinates[]>(key, CACHE_TTL.directions)?.value ?? null;
 
 export const useDirections = () => {
   const [routeCoordinates, setRouteCoordinatesState] = useState<Coordinates[]>([]);
@@ -70,7 +82,15 @@ export const useDirections = () => {
         setRouteCoordinates([]);
         return;
       }
-      
+
+      const cacheKey = directionsCacheKey([pickup, destination]);
+      const cached = cachedRoute(cacheKey);
+      if (cached) {
+        setRouteCoordinates(cached);
+        return;
+      }
+      const since = cacheVersion(cacheKey);
+
       const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
       
       const res = await fetch(url);
@@ -107,6 +127,7 @@ export const useDirections = () => {
       if (json.routes && json.routes[0] && json.routes[0].overview_polyline) {
         const points = decodePolyline(json.routes[0].overview_polyline.points);
         logger.debug('✅ Route decoded successfully:', points.length, 'points');
+        writeCache(cacheKey, points, since);
         setRouteCoordinates(points);
       } else {
         logger.warn('⚠️ No route data in response');
@@ -121,6 +142,13 @@ export const useDirections = () => {
   const fetchRouteWithWaypoints = useCallback(async (pickup: Coordinates, waypoints: Coordinates[], destination: Coordinates) => {
     const setRouteCoordinates = begin();
     try {
+      const cacheKey = directionsCacheKey([pickup, ...waypoints, destination]);
+      const cached = cachedRoute(cacheKey);
+      if (cached) {
+        setRouteCoordinates(cached);
+        return;
+      }
+      const since = cacheVersion(cacheKey);
       let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
       
       if (waypoints.length > 0) {
@@ -135,6 +163,7 @@ export const useDirections = () => {
       }
       if (json.routes && json.routes[0] && json.routes[0].overview_polyline) {
         const points = decodePolyline(json.routes[0].overview_polyline.points);
+        if (json.status === 'OK') writeCache(cacheKey, points, since);
         setRouteCoordinates(points);
       } else {
         setRouteCoordinates([]);

@@ -6,12 +6,25 @@
  * a user or token checks it, and the 401 handler ignores 401s of earlier sessions.
  */
 let epoch = 0;
+const epochListeners = new Set<() => void>();
 
 export const currentSessionEpoch = (): number => epoch;
 
 export const bumpSessionEpoch = (): number => {
   epoch += 1;
+  [...epochListeners].forEach((listener) => listener());
   return epoch;
+};
+
+/**
+ * T-536: runs `listener` each time a session ends or starts (the epoch moves on), e.g. so the
+ * in-memory GET cache drops everything of the previous account. Returns the unsubscribe.
+ */
+export const onSessionEpochChange = (listener: () => void): (() => void) => {
+  epochListeners.add(listener);
+  return () => {
+    epochListeners.delete(listener);
+  };
 };
 
 export const isStaleSession = (startedIn: number): boolean => startedIn !== epoch;

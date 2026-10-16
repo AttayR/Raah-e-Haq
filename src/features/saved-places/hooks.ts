@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { isApiError } from '../../core/api/errors';
+import { CACHE_NAMES, CACHE_TTL, invalidateCache } from '../../core/api/queryCache';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { t } from '../../i18n';
 import { savedPlacesApi } from './api';
@@ -22,9 +23,16 @@ export interface SavedPlacesState extends RemoteData<SavedPlacesList> {
  * list kept, refetched quietly each time `enabled` turns true again (screen focus), so a place
  * added or edited on the form shows when the list comes back on screen.
  */
+const SAVED_PLACES_CACHE = { name: CACHE_NAMES.savedPlaces, ttlMs: CACHE_TTL.savedPlaces } as const;
+
 export function useSavedPlaces(enabled: boolean): SavedPlacesState {
   const fetch = useCallback(() => savedPlacesApi.list(), []);
-  const remote = useRemoteData<SavedPlacesList>({ fetch, fallbackError: t('savedPlaces.loadFailed'), enabled });
+  const remote = useRemoteData<SavedPlacesList>({
+    fetch,
+    fallbackError: t('savedPlaces.loadFailed'),
+    enabled,
+    cache: SAVED_PLACES_CACHE,
+  });
   const { data, setData } = remote;
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -58,6 +66,14 @@ export function useSavedPlaces(enabled: boolean): SavedPlacesState {
 
 const isNotFound = (cause: unknown): boolean => isApiError(cause) && cause.kind === 'not_found';
 
-/** POST for a new place, PUT for an edit; resolves with the server's answer. */
-export const saveSavedPlace = (input: SavedPlaceInput, editing: SavedPlace | null): Promise<SavedPlaceWrite> =>
-  editing ? savedPlacesApi.update(editing, input) : savedPlacesApi.create(input);
+/**
+ * POST for a new place, PUT for an edit; resolves with the server's answer. The cached list is
+ * dropped whatever the outcome (a timeout may still have saved), so the list reads again.
+ */
+export const saveSavedPlace = async (input: SavedPlaceInput, editing: SavedPlace | null): Promise<SavedPlaceWrite> => {
+  try {
+    return await (editing ? savedPlacesApi.update(editing, input) : savedPlacesApi.create(input));
+  } finally {
+    invalidateCache(SAVED_PLACES_CACHE.name);
+  }
+};

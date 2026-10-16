@@ -9,6 +9,13 @@
 // Reanimated's mock needs that real module (serializableMappingCache, createSerializable).
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
+// T-536: the in-memory GET cache is module state; every test starts with it empty. A test that
+// mocks the module (or resets the registry) gets its own fresh copy, so a missing export is fine.
+beforeEach(() => {
+  const queryCache = require('./src/core/api/queryCache');
+  if (typeof queryCache.clearQueryCache === 'function') queryCache.clearQueryCache();
+});
+
 // AsyncStorage (official mock)
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),

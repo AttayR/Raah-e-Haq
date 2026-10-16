@@ -5,6 +5,7 @@ import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
 import { currentSessionEpoch, isStaleSession, STALE_SESSION_MESSAGE } from '../../store/sessionEpoch';
 import { fetchActiveRide } from './api';
 import { isRideInProgress, isRideTerminal } from './status';
+import { invalidateStatsForRide } from '../stats/invalidate';
 
 /**
  * The passenger's active ride: the single source of truth for every screen (T-301, PAX-10).
@@ -106,7 +107,9 @@ export const refreshActiveRide = createAsyncThunk<RideResource, number, ThunkCon
     const startedIn = currentSessionEpoch();
     try {
       const ride = await rideService.getRide(rideId);
-      return isStaleSession(startedIn) ? rejectWithValue(staleSession()) : ride;
+      if (isStaleSession(startedIn)) return rejectWithValue(staleSession());
+      invalidateStatsForRide(ride);
+      return ride;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Failed to refresh ride'));
     }
@@ -121,7 +124,9 @@ export const cancelActiveRide = createAsyncThunk<RideResource, number, ThunkConf
     const startedIn = currentSessionEpoch();
     try {
       const ride = await rideService.cancelRide(rideId);
-      return isStaleSession(startedIn) ? rejectWithValue(staleSession()) : ride;
+      if (isStaleSession(startedIn)) return rejectWithValue(staleSession());
+      invalidateStatsForRide(ride);
+      return ride;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Failed to cancel ride'));
     }

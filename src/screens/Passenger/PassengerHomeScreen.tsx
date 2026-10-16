@@ -21,8 +21,8 @@ import { logger } from '../../core/logging/logger';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
 import { HOME_PEEK_HEIGHT, HomeSheetBody, HomeSheetHeader } from '../../features/passenger-home/components/HomeSheet';
 import { greetingFor } from '../../features/passenger-home/greeting';
-import { toHomeRecentRides } from '../../features/ride-history/recentRides';
-import { useRideHistory } from '../../features/ride-history/hooks';
+import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
+import { useRecentRides } from '../../features/ride-history/hooks';
 import { openRideDetails } from '../../features/ride-history/navigation';
 import { useSavedPlaces } from '../../features/saved-places/hooks';
 import { otherCount, takenLabels } from '../../features/saved-places/format';
@@ -78,8 +78,11 @@ export default function PassengerHomeScreen() {
   const enableLocation = needsSettings ? openSettings : requestLocationPermission;
   const nearbyDrivers = useNearbyDrivers(currentLocation, { enabled: isFocused });
 
-  const rides = useRideHistory('all', isFocused);
-  const recentRides = useMemo(() => toHomeRecentRides(rides.items), [rides.items]);
+  // T-536 (PERF-19): one small page (GET /rides?per_page=4), not 20 rides for 3 rows. One more
+  // than the card shows, so a ride still in progress (left out of the card) never costs a row.
+  const recent = useRecentRides(HOME_RECENT_RIDES + 1, isFocused);
+  const rideItems = recent.data;
+  const recentRides = useMemo(() => toHomeRecentRides(rideItems ?? []), [rideItems]);
   // Saved places as chips (T-516, BE-14); a failed load just leaves the row without them.
   const saved = useSavedPlaces(isFocused);
   const addPlace = useCallback(
@@ -149,10 +152,10 @@ export default function PassengerHomeScreen() {
 
   const openRide = useCallback(
     (id: string) => {
-      const ride = rides.items.find(item => String(item.id) === id);
+      const ride = rideItems?.find(item => String(item.id) === id);
       openRideDetails(navigation, Number(id), ride);
     },
-    [navigation, rides.items],
+    [navigation, rideItems],
   );
 
   return (

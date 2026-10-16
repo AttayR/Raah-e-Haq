@@ -32,6 +32,20 @@ describe('useDirections', () => {
     expect(result.current.routeCoordinates).toHaveLength(2);
   });
 
+  it('T-536: the same route within 5 min is not asked again; a moved pin is', async () => {
+    fetchMock.mockResolvedValue(ok());
+    const first = renderHook(() => useDirections());
+    await act(() => first.result.current.fetchRoute(A, B));
+    const second = renderHook(() => useDirections());
+    // A few metres off (same 4-decimal cell) still reuses the route.
+    await act(() => second.result.current.fetchRoute({ latitude: 31.52001, longitude: 74.35001 }, B));
+    expect(second.result.current.routeCoordinates).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(() => second.result.current.fetchRoute(C, B));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('an answer that arrives after clearRoute() is dropped', async () => {
     let answer: (value: unknown) => void = () => undefined;
     fetchMock.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
