@@ -287,6 +287,27 @@ describe('RegistrationScreen server field errors (T-202)', () => {
     errorToast.mockRestore();
   });
 
+  it('BE-89: a rank/title name refusal shows under the name field and clears when the name changes', async () => {
+    const rankMessage = 'Please use your own name without a rank or title (such as Captain, Major or Colonel).';
+    mock.onPost('/auth/register').reply(422, {
+      success: false,
+      message: 'Validation Error',
+      errors: { name: [rankMessage] },
+    });
+    await renderScreen();
+    goToReview();
+
+    fireEvent.press(createButton());
+
+    await waitFor(() => expect(screen.getByText('Step 1 of 4')).toBeTruthy());
+    expect(screen.getByText(rankMessage)).toBeTruthy();
+    // A field error (the form went back to step 1 for it), shown once, not a form-level line.
+    expect(screen.getAllByText(rankMessage)).toHaveLength(1);
+
+    type('Enter your full name', 'Ali Raza');
+    expect(screen.queryByText(rankMessage)).toBeNull();
+  });
+
   it('a 422 on a field no input shows is listed at form level and the form stays put', async () => {
     mock.onPost('/auth/register').reply(422, {
       success: false,

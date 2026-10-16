@@ -843,3 +843,16 @@ An "AI review" card on fare dispute detail, safety incident detail and risk sign
 ### Admin decisions are bound to the file shown (BE-94 security follow-up)
 
 `GET /admin/drivers/{driver}/documents` items now carry `version` (an opaque fingerprint of that item's file; the driver's own GET `/driver/documents` shows it too, harmlessly). `POST /admin/drivers/{driver}/documents/{id}/approve` and `.../reject` **require** `document_version` (the `version` the admin was shown): missing → 422 on `document_version`; a different value (the driver re-uploaded since) → **409** `error.code: "DOCUMENT_CHANGED"` and nothing is decided, so the admin must reload. The web panel forms send it as a hidden field and show a flash error on a mismatch. No passenger/driver app change.
+
+## BE-89: anti-fraud in chat and personal names (2026-10-16, app T-555)
+
+### Chat `safety_warning` (money-transfer requests)
+
+Every chat message object carries `safety_warning`: `null`, or `{ "code": "money_transfer_request", "message": "<text>" }`. It is on messages in GET `/rides/{id}/messages`, the POST `/rides/{id}/messages` answer, GET `/chats` `last_message`, and the `chat.message` socket event (BE-12). It is computed from the text each time (nothing stored); a lone wallet name or phone number does not trigger it.
+
+- **Wording is per viewer on REST** (the caller: the sender is told asking is not allowed, the recipient never to send money) but **always the recipient's on the socket** (both parties receive the event). So the app ignores `message` for a known code and shows its own copy keyed by `code` + `sender_id` vs. the signed-in user's id (`src/features/chat/safety.ts`, strings `en.chatSafety`; Urdu later). Without a user id it falls back to REST `is_mine`. An unknown code shows the server `message` when non-empty.
+- **App UI (T-555):** a small warning-tone note under that bubble (`warningSoft` fill, `warning` border, alert icon, `accessibilityLabel` "Safety warning: …"), not a modal; the message itself is still shown and sendable. Recipient: never send money by JazzCash, Easypaisa or bank transfer, Raah-e-Haq never asks for transfers, report it in Help. Sender: asking for money transfers isn't allowed.
+
+### Names: no rank, title or staff look-alike (`App\Rules\PersonalName`)
+
+POST `/auth/register` and PUT `/profile` answer **422** with `errors.name` when the name carries a rank or official title ("Please use your own name without a rank or title (such as Captain, Major or Colonel).") or looks like Raah-e-Haq staff/support ("Please use your own name. Names that look like Raah-e-Haq staff or support are not allowed."). An unchanged name passes on PUT `/profile`, so an older account can still save other fields. The app shows the server text under the name field: registration via `mapRegistrationServerErrors` (`name` → `fullName`, back to step 1), Edit profile via `profileSaveErrors` (`name` → the name field). Admin edits are not checked.

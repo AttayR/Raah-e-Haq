@@ -645,6 +645,17 @@ export const en = {
     phoneInvalid: 'Enter a Pakistani mobile number, like 300 1234567.',
     back: 'Back',
   },
+  /**
+   * BE-89 chat anti-fraud note under a message whose `safety_warning.code` is
+   * `money_transfer_request`. The app's own copy, chosen by who sent the message (the server's
+   * wording is per viewer on REST and always the recipient's on the socket).
+   */
+  chatSafety: {
+    moneyRecipient:
+      'Never send money to anyone by JazzCash, Easypaisa or bank transfer. Raah-e-Haq never asks for transfers. Pay your fare in cash, and report this in Help.',
+    moneySender: "Asking for money transfers isn't allowed. Fares are paid in cash at the end of the ride.",
+    noteA11y: 'Safety warning: {text}',
+  },
   profilePhoto: {
     change: 'Change profile photo',
     add: 'Add profile photo',

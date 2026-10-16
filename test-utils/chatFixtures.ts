@@ -11,6 +11,7 @@ export const wireMessage = (overrides: Record<string, unknown> = {}) => ({
   body: 'On my way',
   created_at: '2026-10-11T12:00:00+00:00',
   read_at: null,
+  safety_warning: null,
   ...overrides,
 });
 
@@ -24,6 +25,7 @@ export const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
   body: 'On my way',
   createdAt: '2026-10-11T12:00:00+00:00',
   readAt: null,
+  safetyWarning: null,
   ...overrides,
 });
 

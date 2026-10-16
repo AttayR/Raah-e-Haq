@@ -5,6 +5,17 @@
 
 export type ChatRole = 'passenger' | 'driver';
 
+/**
+ * BE-89: the server's anti-fraud note on a message that asks for money outside the app.
+ * `message` is written for one viewer (REST: the caller; the `chat.message` socket event: always
+ * the recipient), so the app shows its own copy keyed by `code` and who sent the message.
+ */
+export interface ChatSafetyWarning {
+  /** `money_transfer_request` today; other codes may follow. */
+  code: string;
+  message: string;
+}
+
 /** One message (`M`). `body` is plain text: always rendered as text, never as HTML. */
 export interface ChatMessage {
   id: number;
@@ -17,6 +28,8 @@ export interface ChatMessage {
   body: string;
   createdAt: string;
   readAt: string | null;
+  /** BE-89: null on an ordinary message. */
+  safetyWarning: ChatSafetyWarning | null;
 }
 
 /** The other party's card (`P`). Never a phone number. */

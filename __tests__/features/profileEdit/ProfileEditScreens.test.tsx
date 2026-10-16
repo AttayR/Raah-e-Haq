@@ -130,6 +130,25 @@ describe('Edit profile', () => {
     expect(store.getState().apiAuth.user?.name).toBe('New Name');
   });
 
+  it('BE-89: a rank/staff name refused by the server shows under the name field; the profile keeps the old name', async () => {
+    const staffMessage = 'Please use your own name. Names that look like Raah-e-Haq staff or support are not allowed.';
+    mock.onPut('/profile').reply(422, {
+      success: false,
+      message: staffMessage,
+      errors: { name: [staffMessage] },
+    });
+    const store = await renderWith(<ProfileEditScreen />, rider);
+
+    fireEvent.changeText(screen.getByTestId('profile-edit-name-input'), 'Raah-e-Haq Support');
+    await flush();
+    await press('profile-edit-save');
+
+    expect(JSON.parse(mock.history.put[0].data)).toEqual({ name: 'Raah-e-Haq Support' });
+    expect(screen.getByTestId('profile-edit-name-error')).toHaveTextContent(staffMessage);
+    expect(store.getState().apiAuth.user?.name).toBe('Test Rider');
+    expect(mockGoBack).not.toHaveBeenCalled();
+  });
+
   it('a driver under 18 sees the rule under the field and nothing is sent', async () => {
     await renderWith(<ProfileEditScreen />, driver);
     fireEvent.changeText(screen.getByTestId('profile-edit-dob-input'), '2020-01-01');

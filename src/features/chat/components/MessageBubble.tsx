@@ -1,9 +1,11 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText } from '../../../components/ui';
+import { AppText, Icon } from '../../../components/ui';
+import { t } from '../../../i18n';
 import { radius, space } from '../../../theme';
 import { CHAT_COPY, formatChatTime } from '../copy';
+import { chatSafetyNoteOf } from '../safety';
 import { isRetryableSendError, type ThreadItem } from '../thread';
 
 type Props = {
@@ -11,20 +13,25 @@ type Props = {
   /** This is your newest message the other party has read. */
   seen: boolean;
   onRetry: (clientId: string) => void;
+  /** The signed-in user's id, so a BE-89 safety note is worded for sender or recipient. */
+  viewerId?: number | null;
 };
 
 /**
  * One chat bubble (T-510). Your messages sit at the end in `primary`, the other party's at the
  * start on `surface`. The body is plain text (BE-13), never parsed as markup. A pending
  * message shows "Sending…"; a failed one says why and, when it can be resent, retries on tap.
+ * A message with a BE-89 `safety_warning` gets a small warning note under it (not a modal).
  */
-export const MessageBubble: React.FC<Props> = ({ item, seen, onRetry }) => {
+export const MessageBubble: React.FC<Props> = ({ item, seen, onRetry, viewerId }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
   const mine = item.kind === 'pending' || item.message.isMine;
   const body = item.kind === 'pending' ? item.pending.body : item.message.body;
   const failed = item.kind === 'pending' && item.pending.status === 'failed';
   const retryable = failed && item.kind === 'pending' && !!item.pending.error && isRetryableSendError(item.pending.error);
+
+  const safety = item.kind === 'message' ? chatSafetyNoteOf(item.message, viewerId) : null;
 
   let meta: string;
   if (item.kind === 'pending') {
@@ -77,6 +84,20 @@ export const MessageBubble: React.FC<Props> = ({ item, seen, onRetry }) => {
           {meta}
         </AppText>
       ) : null}
+      {safety ? (
+        <View
+          style={[styles.safety, { backgroundColor: c.warningSoft, borderColor: c.warning, borderWidth: theme.borderWidth.thin }]}
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={t('chatSafety.noteA11y', { text: safety.text })}
+          testID={`chat-safety-${item.key}`}
+        >
+          <Icon name="alertTriangle" size={16} color="warning" />
+          <AppText variant="caption" color="textPrimary" style={styles.safetyText} testID={`chat-safety-${safety.audience}`}>
+            {safety.text}
+          </AppText>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -96,4 +117,15 @@ const styles = StyleSheet.create({
   sending: { opacity: 0.7 },
   meta: { marginTop: space[1], marginHorizontal: space[1] },
   metaMine: { textAlign: 'right' },
+  safety: {
+    maxWidth: '82%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space[2],
+    marginTop: space[1],
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    borderRadius: radius.md,
+  },
+  safetyText: { flexShrink: 1 },
 });

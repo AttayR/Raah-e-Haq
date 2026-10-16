@@ -11,6 +11,7 @@ import { useIsFocused, useNavigation, useRoute, type RouteProp } from '@react-na
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
+import type { RootState } from '../../../store';
 import { AppText, Button, Icon, Screen } from '../../../components/ui';
 import { layout, space } from '../../../theme';
 import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
@@ -67,6 +68,8 @@ const ChatThreadScreen: React.FC = () => {
   const keyboardVisible = useKeyboardVisible();
   const isFocused = useIsFocused();
   const appActive = useAppIsActive();
+  // BE-89: who sent a flagged message decides the safety note's wording.
+  const viewerId = useSelector((s: RootState) => s.apiAuth.user?.id ?? null);
   const { state, reload, loadOlder, send, retry } = useChatThread(rideId, isFocused && appActive);
   const canCall = useCanCall(rideId);
   // T-520: a masked call; when calls are chat only the user is already here, so only the note.
@@ -84,9 +87,14 @@ const ChatThreadScreen: React.FC = () => {
 
   const renderItem: ListRenderItem<ThreadItem> = useCallback(
     ({ item }) => (
-      <MessageBubble item={item} seen={item.kind === 'message' && item.message.id === seenId} onRetry={retry} />
+      <MessageBubble
+        item={item}
+        seen={item.kind === 'message' && item.message.id === seenId}
+        onRetry={retry}
+        viewerId={viewerId}
+      />
     ),
-    [seenId, retry],
+    [seenId, retry, viewerId],
   );
 
   const header = (

@@ -4,6 +4,7 @@ import type {
   ChatParty,
   ChatReadResult,
   ChatRole,
+  ChatSafetyWarning,
   ChatSummary,
   ChatThreadPage,
 } from './types';
@@ -21,7 +22,8 @@ import type {
  * Refusals (BE-26 envelope, `error.code`): 403 not_ride_participant, 409 chat_not_open (no
  * driver yet), 403 CONTACT_CLOSED (BE-78: sending closes 30 min after the ride ended; it was
  * 409 chat_closed before, still handled), 410 chat_expired, 422 errors.body / errors.client_id,
- * 429 rate_limited (Retry-After). Rows and pages carry `contact_closes_at` (BE-78).
+ * 429 rate_limited (Retry-After). Rows and pages carry `contact_closes_at` (BE-78). Every
+ * message carries `safety_warning` (BE-89, see `safety.ts`).
  */
 export const CHAT_CODES = {
   notParticipant: 'not_ride_participant',
@@ -53,6 +55,12 @@ const toStringOrNull = (value: unknown): string | null =>
 const toRole = (value: unknown): ChatRole | null =>
   value === 'passenger' || value === 'driver' ? value : null;
 
+/** BE-89 `safety_warning`: null, or `{code, message}` (a bad shape is treated as none). */
+export const toChatSafetyWarning = (raw: unknown): ChatSafetyWarning | null => {
+  if (!isObject(raw) || typeof raw.code !== 'string' || raw.code.trim() === '') return null;
+  return { code: raw.code, message: typeof raw.message === 'string' ? raw.message : '' };
+};
+
 /** A wire message, or null when it lacks the fields the thread needs (id, sender, body). */
 export const toChatMessage = (raw: unknown): ChatMessage | null => {
   if (!isObject(raw)) return null;
@@ -73,6 +81,7 @@ export const toChatMessage = (raw: unknown): ChatMessage | null => {
     body: raw.body,
     createdAt: typeof raw.created_at === 'string' ? raw.created_at : '',
     readAt: toStringOrNull(raw.read_at),
+    safetyWarning: toChatSafetyWarning(raw.safety_warning),
   };
 };
 
