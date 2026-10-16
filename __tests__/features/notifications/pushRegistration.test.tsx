@@ -178,7 +178,7 @@ describe('usePushNotifications', () => {
     expect(store.getState().notifications.stale).toBe(true);
   });
 
-  it('a tapped chat push marks its row read and opens the chat (Inbox › Messages where RideChat is missing)', async () => {
+  it('a tapped chat push marks its row read and opens that ride\'s thread (both role stacks register RideChat)', async () => {
     mock.onPost('/notifications/15/read').reply(200, { success: true, data: { id: 15, read_at: 'now' } });
     mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 0 } });
     renderPush();
@@ -193,7 +193,7 @@ describe('usePushNotifications', () => {
     expect(mockDispatchNav).toHaveBeenCalledWith(
       CommonActions.navigate({
         name: 'Passenger',
-        params: { screen: 'PassengerTabs', params: { screen: 'Inbox', params: { segment: 'messages' } } },
+        params: { screen: 'RideChat', params: { rideId: 7 } },
       }),
     );
   });

@@ -85,6 +85,34 @@ export const routeForTarget = (
   }
 };
 
+const focusedRouteOf = (state: AnyState | undefined): { name: string; params?: object } | null => {
+  if (!state || state.routes.length === 0) return null;
+  const route = state.routes[state.index ?? state.routes.length - 1];
+  if (!route) return null;
+  return focusedRouteOf(route.state as AnyState | undefined) ?? route;
+};
+
+/**
+ * The ride whose chat thread (`RideChat`) is the focused screen right now, or null. A foreground
+ * chat push for that ride shows no banner (T-544): the thread is already on screen.
+ */
+export const focusedChatRideId = (navigation: NotificationNavigation): number | null => {
+  const route = focusedRouteOf(rootOf(navigation).getState() as AnyState | undefined);
+  if (!route || route.name !== CHAT_THREAD_ROUTE) return null;
+  const rideId = (route.params as { rideId?: unknown } | undefined)?.rideId;
+  return typeof rideId === 'number' ? rideId : null;
+};
+
+export interface OpenTargetOptions {
+  /**
+   * The caller knows the role stack registers `RideChat` (T-544: usePushNotifications, mounted by
+   * both role stacks). Needed on a cold start: until the first navigation the root's state holds
+   * no nested stack state, so `hasRoute` cannot see `RideChat` and a chat push would open the
+   * Inbox instead of the thread.
+   */
+  chatThreadAvailable?: boolean;
+}
+
 /**
  * Opens a notification's target from anywhere in the signed-in app (a list row or a push).
  * From the list, an `inbox` target stays on the list.
@@ -94,9 +122,14 @@ export const openNotificationTarget = (
   role: NotificationRole,
   target: NotificationTarget,
   source: 'list' | 'push',
+  { chatThreadAvailable = false }: OpenTargetOptions = {},
 ): void => {
   if (source === 'list' && target.kind === 'inbox') return;
   const root = rootOf(navigation);
-  const nested = routeForTarget(role, target, hasRoute(root.getState() as AnyState | undefined, CHAT_THREAD_ROUTE));
+  const nested = routeForTarget(
+    role,
+    target,
+    chatThreadAvailable || hasRoute(root.getState() as AnyState | undefined, CHAT_THREAD_ROUTE),
+  );
   root.dispatch(CommonActions.navigate({ name: ROLE_ROOT[role], params: nested }));
 };

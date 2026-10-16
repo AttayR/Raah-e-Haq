@@ -8,6 +8,7 @@ import { CommonActions } from '@react-navigation/native';
 import { resolveNotificationTarget } from '../../../src/features/notifications/routing';
 import {
   CHAT_THREAD_ROUTE,
+  focusedChatRideId,
   hasRoute,
   openNotificationTarget,
   routeForTarget,
@@ -161,11 +162,66 @@ describe('openNotificationTarget', () => {
     );
   });
 
+  it('T-544: a push caller that knows RideChat exists opens the thread before the nested state is stored', () => {
+    // Cold start: the root route has no nested state yet, so hasRoute cannot see RideChat.
+    const dispatch = jest.fn();
+    const coldRoot = {
+      dispatch,
+      getParent: () => undefined,
+      getState: () => ({ routeNames: ['Driver'], routes: [{ key: 'd', name: 'Driver' }] }),
+    } as unknown as NotificationNavigation;
+    openNotificationTarget(coldRoot, 'driver', { kind: 'chat', rideId: 8 }, 'push');
+    expect(dispatch).toHaveBeenLastCalledWith(
+      CommonActions.navigate({
+        name: 'Driver',
+        params: { screen: 'DriverTabs', params: { screen: 'Inbox', params: { segment: 'messages' } } },
+      }),
+    );
+    openNotificationTarget(coldRoot, 'driver', { kind: 'chat', rideId: 8 }, 'push', { chatThreadAvailable: true });
+    expect(dispatch).toHaveBeenLastCalledWith(
+      CommonActions.navigate({ name: 'Driver', params: { screen: CHAT_THREAD_ROUTE, params: { rideId: 8 } } }),
+    );
+  });
+
   it('hasRoute searches nested navigators', () => {
     expect(hasRoute(undefined, 'X')).toBe(false);
     const { root } = makeNavigation(['A', 'B']);
     expect(hasRoute(root.getState(), 'B')).toBe(true);
     expect(hasRoute(root.getState(), 'C')).toBe(false);
+  });
+});
+
+describe('focusedChatRideId (T-544)', () => {
+  const navWith = (state: unknown): NotificationNavigation =>
+    ({ dispatch: jest.fn(), getParent: () => undefined, getState: () => state }) as unknown as NotificationNavigation;
+  const stackOn = (focused: { name: string; params?: object }) => ({
+    routeNames: ['Passenger'],
+    index: 0,
+    routes: [
+      {
+        key: 'p',
+        name: 'Passenger',
+        state: {
+          routeNames: ['PassengerTabs', CHAT_THREAD_ROUTE],
+          index: 1,
+          routes: [{ key: 't', name: 'PassengerTabs' }, { key: 'c', ...focused }],
+        },
+      },
+    ],
+  });
+
+  it('is the ride of the focused chat thread', () => {
+    expect(focusedChatRideId(navWith(stackOn({ name: CHAT_THREAD_ROUTE, params: { rideId: 12 } })))).toBe(12);
+  });
+
+  it('is null on any other screen, a thread without a ride id, or no state', () => {
+    expect(focusedChatRideId(navWith(stackOn({ name: 'Booking' })))).toBeNull();
+    expect(focusedChatRideId(navWith(stackOn({ name: CHAT_THREAD_ROUTE, params: {} })))).toBeNull();
+    expect(focusedChatRideId(navWith(undefined))).toBeNull();
+    // The thread is in the stack but not focused (index points at the tabs).
+    const behind = stackOn({ name: CHAT_THREAD_ROUTE, params: { rideId: 12 } });
+    behind.routes[0].state.index = 0;
+    expect(focusedChatRideId(navWith(behind))).toBeNull();
   });
 });
 
