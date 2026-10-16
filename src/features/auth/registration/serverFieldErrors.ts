@@ -20,7 +20,7 @@ const STEP_FIELDS: ReadonlyArray<{ step: RegistrationStep; fields: readonly Form
     step: 'vehicle',
     fields: [
       'vehicleType', 'vehicleNumber', 'vehicleBrand', 'vehicleModel', 'vehicleYear', 'vehicleColor',
-      'licensePlate', 'registrationNumber', 'licenseNumber', 'licenseType', 'licenseExpiryDate', 'drivingExperience',
+      'vehicleHasAc', 'licensePlate', 'registrationNumber', 'licenseNumber', 'licenseType', 'licenseExpiryDate', 'drivingExperience',
       'bankName', 'bankBranch', 'bankAccountNumber',
     ],
   },
@@ -66,6 +66,7 @@ const DRIVER_FIELDS: Readonly<Record<string, FormField>> = {
   vehicle_model: 'vehicleModel',
   vehicle_year: 'vehicleYear',
   vehicle_color: 'vehicleColor',
+  vehicle_has_ac: 'vehicleHasAc',
   license_plate: 'licensePlate',
   registration_number: 'registrationNumber',
   license_type: 'licenseType',

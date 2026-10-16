@@ -59,6 +59,8 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
   const [pickupField, setPickupQuery] = useFieldText(prefill.pickupQuery);
   const [destField, setDestQuery] = useFieldText(prefill.destQuery);
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
+  // BE-87: "Female driver" on the fare step (shown only to passengers the server lets ask).
+  const [femaleDriverOnly, setFemaleDriverOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // The points and what their fields say swap together.
@@ -112,6 +114,7 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     setMapPick(null);
     setStage('home');
     setSelectedVehicle(undefined);
+    setFemaleDriverOnly(false);
     setPickupQuery('');
     setDestQuery('');
     setError(null);
@@ -232,6 +235,8 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     setDestQuery,
     selectedVehicle,
     setSelectedVehicle,
+    femaleDriverOnly,
+    setFemaleDriverOnly,
     error,
     setError,
     swapPickupDrop,

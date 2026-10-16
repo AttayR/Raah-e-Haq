@@ -16,6 +16,7 @@ import type {
  * client:
  * - POST   /rides/{id}/call   -> { mode: proxy, number, expires_at, contact_closes_at } | { mode: chat_only }
  * - POST   /rides/{id}/sos    -> { created, incident, emergency_numbers, emergency_contacts, share_url, share_message }
+ *   (BE-87 `category: women_safety` fast-tracks it; a repeat within 2 min upgrades the same alert)
  * - POST   /rides/{id}/share  -> { url, token, expires_at };  DELETE /rides/{id}/share -> { revoked }
  * - GET/POST/PUT/DELETE /me/emergency-contacts
  * Refusals arrive as ApiErrors with these codes. Masked numbers, contact phones, share URLs and
@@ -116,6 +117,9 @@ export const toShareLink = (raw: unknown): ShareLink => {
   return { url, expiresAt: readText(data.expires_at) };
 };
 
+/** BE-87: an SOS about women's safety is fast-tracked (high priority) to the safety team. */
+export type SosCategory = 'general' | 'women_safety';
+
 /** The SOS body: the phone's position when it has one (BE-79), nothing invented. */
 export const toSosBody = (position: SosPosition | null | undefined): Record<string, number> => {
   if (!position) return {};
@@ -131,8 +135,9 @@ export const safetyApi = {
     return toCallSession(unwrap(await apiService.post<unknown>(`/rides/${rideId}/call`)));
   },
 
-  async sendSos(rideId: number, position: SosPosition | null): Promise<SosResult> {
-    return toSosResult(unwrap(await apiService.post<unknown>(`/rides/${rideId}/sos`, toSosBody(position))));
+  async sendSos(rideId: number, position: SosPosition | null, category: SosCategory = 'general'): Promise<SosResult> {
+    const body = { ...toSosBody(position), ...(category === 'women_safety' ? { category } : {}) };
+    return toSosResult(unwrap(await apiService.post<unknown>(`/rides/${rideId}/sos`, body)));
   },
 
   async startShare(rideId: number): Promise<ShareLink> {

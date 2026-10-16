@@ -8,6 +8,7 @@ import { AppText } from '../AppText';
 import { Card } from '../Card';
 import { Icon, type IconName } from '../Icon';
 import { Skeleton, SkeletonGroup } from '../Skeleton';
+import { AcBadge } from './AcBadge';
 
 const v = componentTokens.ride.vehicle;
 
@@ -22,6 +23,9 @@ export const vehicleIconName = (key: string | null | undefined): IconName => {
     case 'van':
     case 'truck':
       return 'van';
+    // BE-86: the AC tier is a car (its badge says AC).
+    case 'car_ac':
+      return 'car';
     default:
       return 'car';
   }
@@ -47,6 +51,8 @@ export type VehicleOptionCardProps = {
   selected?: boolean;
   /** Not bookable right now (no quote, no drivers): 40% and "Unavailable". */
   unavailable?: boolean;
+  /** BE-86: an air-conditioned tier: the AC badge after the name. */
+  ac?: boolean;
   onPress: () => void;
   testID?: string;
 };
@@ -64,11 +70,14 @@ export function VehicleOptionCard({
   fare,
   selected = false,
   unavailable = false,
+  ac = false,
   onPress,
   testID,
 }: VehicleOptionCardProps) {
   const { theme } = useAppTheme();
-  const label = [name, meta, unavailable ? t('ride.unavailable') : fare].filter(Boolean).join(', ');
+  const label = [name, ac ? t('ride.acBadgeA11y') : null, meta, unavailable ? t('ride.unavailable') : fare]
+    .filter(Boolean)
+    .join(', ');
   return (
     <Card
       variant={selected ? 'selected' : 'outlined'}
@@ -88,9 +97,12 @@ export function VehicleOptionCard({
         <Icon name={vehicleIconName(vehicleKey)} size={32} color="textPrimary" />
       </View>
       <View style={styles.text}>
-        <AppText variant="title" numberOfLines={1}>
-          {name}
-        </AppText>
+        <View style={styles.nameRow}>
+          <AppText variant="title" numberOfLines={1} style={styles.name}>
+            {name}
+          </AppText>
+          {ac ? <AcBadge testID={testID ? `${testID}-ac` : undefined} /> : null}
+        </View>
         {meta ? (
           <AppText variant="caption" color="textMuted" numberOfLines={1}>
             {meta}
@@ -129,6 +141,8 @@ const styles = StyleSheet.create({
   unavailable: { opacity: v.unavailableOpacity },
   tile: { width: v.tile, height: v.tile, borderRadius: v.tileRadius, alignItems: 'center', justifyContent: 'center' },
   text: { flex: 1, minWidth: 0, gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  name: { flexShrink: 1 },
   fare: { flexShrink: 0 },
   list: { gap: v.listGap },
 });

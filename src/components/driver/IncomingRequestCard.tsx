@@ -6,7 +6,7 @@ import type { PendingRideRequest } from '../../features/driver-requests/api';
 import { DRIVER_REQUESTS_COPY as COPY } from '../../features/driver-requests/copy';
 import type { RideRequestFeedView } from '../../features/driver-requests/hooks';
 import { formatMoney } from '../../utils/format';
-import { AddressPair, AppText, Badge, Button, IconButton, PersonCard } from '../ui';
+import { AcBadge, AddressPair, AppText, Badge, Button, IconButton, PersonCard } from '../ui';
 import { t } from '../../i18n';
 
 /** T-552: stops listed on the card (one line each); the rest are summed up in one row. */
@@ -97,6 +97,12 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
                 {payment}
               </AppText>
             )}
+          </View>
+        )}
+        {request.vehicleType === 'car_ac' && (
+          // BE-86: an AC ride (only drivers with an AC-approved car are offered it).
+          <View style={styles.metric}>
+            <AcBadge testID="incoming-request-ac" />
           </View>
         )}
         {request.isOffer && (

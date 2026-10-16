@@ -101,6 +101,8 @@ export function buildRegistrationRequest(form: RegistrationFormData): RegisterWi
     vehicle_make: form.vehicleBrand,
     vehicle_model: form.vehicleModel,
     vehicle_year: form.vehicleYear,
+    // BE-86: only a car can declare AC; the server refuses it for anything else.
+    ...(form.vehicleType === 'car' && form.vehicleHasAc ? { vehicle_has_ac: true } : {}),
     vehicle_color: form.vehicleColor,
     bank_name: form.bankName,
     bank_branch: form.bankBranch,

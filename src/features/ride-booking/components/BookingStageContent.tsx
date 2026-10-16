@@ -8,6 +8,7 @@ import ActiveRidePanel from '../../active-ride/components/ActiveRidePanel';
 import type { PassengerRideStageState } from '../../active-ride/stage';
 import type { FareOffer } from '../../fare/hooks';
 import { PassengerTripSafety } from '../../safety/components/RideSafety';
+import { FemaleDriverOption } from '../../women-mode/components/FemaleDriverOption';
 import type { useFareEstimates, useVehicleTypes } from '../hooks';
 import type { BookingFlow, BookingStage } from '../useBookingFlow';
 import { FareStage, MAX_STOPS, VehicleStage } from './BookingStages';
@@ -153,6 +154,14 @@ export const BookingStageContent: React.FC<Props> = ({
           onChangeVehicle={() => setStage('vehicle')}
           onCancel={onCancelRide}
           onConfirm={onConfirm}
+          preferences={
+            <FemaleDriverOption
+              pickup={pickup}
+              vehicleType={flow.selectedVehicle}
+              value={flow.femaleDriverOnly}
+              onChange={flow.setFemaleDriverOnly}
+            />
+          }
         />
       );
     case 'requesting':

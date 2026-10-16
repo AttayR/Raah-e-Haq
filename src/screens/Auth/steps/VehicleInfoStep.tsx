@@ -14,6 +14,7 @@ import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth
 import { isStepFieldRequired, maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
+import { RegistrationAcSwitch } from '../../../features/ac/components/RegistrationAcSwitch';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -362,6 +363,17 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             )}
           </View>
         </View>
+
+        {/* BE-86: optional AC declaration, cars only (an admin checks it before AC rides). */}
+        {data.vehicleType === 'car' && (
+          <View style={styles.inputGroup} ref={anchor('vehicleHasAc')}>
+            <RegistrationAcSwitch
+              value={data.vehicleHasAc}
+              onChange={(on) => onDataChange({ vehicleHasAc: on })}
+              error={validationErrors.vehicleHasAc}
+            />
+          </View>
+        )}
 
         {/* License plate & Registration number */}
         <View style={styles.inputGroup}>

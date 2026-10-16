@@ -18,6 +18,8 @@ export interface RideRequestInput {
   specialInstructions?: string;
   /** BE-83: the passenger's offer (whole rupees), only when it differs from the server fare. */
   offeredFare?: number | null;
+  /** BE-87: match only verified female drivers (sent only when true). */
+  femaleDriverOnly?: boolean;
 }
 
 export type BuildRideRequestResult =
@@ -94,6 +96,7 @@ export const buildRideRequest = (input: RideRequestInput): BuildRideRequestResul
     ...(typeof input.offeredFare === 'number' && Number.isInteger(input.offeredFare) && input.offeredFare > 0
       ? { offered_fare: input.offeredFare }
       : {}),
+    ...(input.femaleDriverOnly === true ? { female_driver_only: true } : {}),
     ...(stops.length > 0
       ? {
           stops: stops.map((stop, index) => ({

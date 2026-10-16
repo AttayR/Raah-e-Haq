@@ -4,6 +4,7 @@ import type { Pagination } from '../../core/api/types';
 import { toRideRatingState } from '../rating/api';
 import { firstNameOf } from '../../utils/format';
 import { driverSplitOf, fareExtrasOf, fareLockOf, toOverchargeState } from '../fare/api';
+import { isAcRide, toAcReportState } from '../ac/api';
 import type {
   CancellationReason,
   Page,
@@ -141,6 +142,8 @@ export const toRide = (raw: unknown): Ride | null => {
     cancellationChargeReason: chargeReasonOf(raw.cancellation_charge_reason),
     overcharge: toOverchargeState(raw.overcharge_report),
     split: driverSplitOf(raw),
+    isAc: isAcRide(raw),
+    acReport: toAcReportState(raw.ac_report),
   };
 };
 

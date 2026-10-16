@@ -157,6 +157,19 @@ describe('SOS sheet', () => {
     expect(openURL.mock.calls.filter((c) => String(c[0]).startsWith('sms:'))).toHaveLength(2);
   });
 
+  it("[T-522] Women's safety alert: asks first, then sends category women_safety with the position", async () => {
+    mock.onPost('/rides/41/sos').reply(201, sosBody());
+    await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-sos'));
+    unsubscribe = answerDialogs(true);
+    fireEvent.press(screen.getByTestId('sos-women-safety'));
+    await flush();
+    const posts = mock.history.post.filter((r) => r.url === '/rides/41/sos');
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(posts[0].data)).toEqual({ latitude: 31.5, longitude: 74.3, category: 'women_safety' });
+    expect(screen.getByTestId('sos-women-safety')).toHaveTextContent(/Women's-safety alert sent/);
+  });
+
   it('no emergency contacts: the alert is sent and the sheet offers to add contacts', async () => {
     mock.onPost('/rides/41/sos').reply(201, sosBody([]));
     await renderSafety();

@@ -13,6 +13,7 @@ import {
   type DriverStatusState,
 } from '../driver-status/slice';
 import { selectDriverActiveRide, type DriverRideState } from '../driver-ride/slice';
+import { t } from '../../i18n';
 import { ACCEPT_RIDE_CODES, PENDING_RIDES_CODES, type LatLng, type PendingRideRequest } from './api';
 import { DRIVER_REQUESTS_COPY } from './copy';
 import {
@@ -137,6 +138,8 @@ const ACCEPT_REFUSAL_COPY: Record<string, string> = {
   [ACCEPT_RIDE_CODES.driverNotAvailable]: DRIVER_REQUESTS_COPY.acceptNotAvailable,
   [ACCEPT_RIDE_CODES.noApprovedVehicle]: DRIVER_REQUESTS_COPY.acceptNoVehicle,
   [ACCEPT_RIDE_CODES.phoneNotVerified]: DRIVER_REQUESTS_COPY.phoneNotVerified,
+  [ACCEPT_RIDE_CODES.acVehicleRequired]: t('ac.acRequired'),
+  [ACCEPT_RIDE_CODES.femaleDriverRequired]: DRIVER_REQUESTS_COPY.rideNotAvailable,
 };
 
 /** The message for a refused accept: our copy for known codes, else the server's safe text. */

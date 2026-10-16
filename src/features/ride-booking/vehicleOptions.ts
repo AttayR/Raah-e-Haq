@@ -14,6 +14,8 @@ export type VehicleOption = {
   fare: string | null;
   /** The estimate is in but has no quote for this type: it cannot be booked. */
   unavailable: boolean;
+  /** BE-86: the AC tier (badge on the card). */
+  ac: boolean;
 };
 
 /** The app-wide money format (`Rs 1,250`, src/utils/format); kept as the booking flow's name. */
@@ -32,6 +34,7 @@ export const toVehicleOptions = (types: ReadonlyArray<VehicleType>, estimates: F
       meta: vehicleMeta(type.capacity),
       fare: quote ? formatFare(quote.fare, quote.currency) : null,
       unavailable: !!estimates && !quote,
+      ac: type.ac === true || quote?.ac === true,
     };
   });
 

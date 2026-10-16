@@ -10,6 +10,8 @@ export interface VehicleType {
   key: VehicleTypeKey;
   label: string;
   capacity: number;
+  /** BE-86: an air-conditioned tier (car_ac), served by a car with an approved AC (absent: no). */
+  ac?: boolean;
 }
 
 /** BE-05 FareCalculator breakdown (whole rupees); it adds up to `fare`. */
@@ -33,6 +35,8 @@ export interface FareEstimate {
   offer_band: OfferBand | null;
   /** BE-85: the type's waiting and cancel terms (fees off: zero charges). */
   fare_policy: FarePolicy | null;
+  /** BE-86: an air-conditioned tier (absent: no). */
+  ac?: boolean;
 }
 
 /** data of POST /rides/estimate: the route and one quote per vehicle type. */
@@ -77,7 +81,7 @@ export const normalizeVehicleTypes = (raw: unknown): VehicleType[] => {
     if (!isObject(item) || !isVehicleTypeKey(item.key)) return [];
     const label = typeof item.label === 'string' && item.label.trim() ? item.label.trim() : null;
     if (!label) return [];
-    return [{ key: item.key, label, capacity: Math.max(1, toNumber(item.capacity) ?? 1) }];
+    return [{ key: item.key, label, capacity: Math.max(1, toNumber(item.capacity) ?? 1), ...(item.ac === true ? { ac: true } : {}) }];
   });
 };
 
@@ -107,6 +111,7 @@ export const normalizeFareEstimates = (raw: unknown): FareEstimates => {
       breakdown: normalizeBreakdown(item.breakdown),
       offer_band: toOfferBand(item.offer_band),
       fare_policy: toFarePolicy(item.fare_policy),
+      ...(item.ac === true ? { ac: true } : {}),
     }];
   });
   return {

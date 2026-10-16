@@ -28,6 +28,8 @@ export interface RideRequest {
   stops?: RideStopRequest[];
   /** BE-83: the passenger's offer in whole rupees, inside the estimate's `offer_band`. */
   offered_fare?: number;
+  /** BE-87: match only verified female drivers (female passengers whose profile allows it). */
+  female_driver_only?: boolean;
 }
 
 export interface RideStopRequest {
@@ -167,6 +169,14 @@ export interface RideResource {
   requeue_count?: number | null;
   /** Passenger only (BE-82). */
   overcharge_report?: unknown;
+  /** BE-86: an AC-tier ride (vehicle_type car_ac); read through features/ac/api. */
+  is_ac?: boolean;
+  /** BE-86, passenger only, AC rides: `{can_report, report}` ("AC not working"). */
+  ac_report?: unknown;
+  /** BE-87, passenger only: the ride asked for a female driver. Drivers never get these. */
+  female_driver_only?: boolean;
+  /** BE-87, passenger only: the women-mode block (read through features/women-mode/api). */
+  women_mode?: unknown;
   /** BE-84, the ride's driver only. */
   fare?: number | string | null;
   commission_rate?: number | string | null;
@@ -280,8 +290,12 @@ export interface LocationUpdate {
   accuracy?: number | null;
 }
 
-/** The vehicle types the server accepts everywhere (BE-58 enum, GET /public/vehicle-types). */
-export const VEHICLE_TYPE_KEYS = ['car', 'bike', 'rickshaw', 'van'] as const;
+/**
+ * The ride types the server accepts (BE-58 enum, GET /public/vehicle-types). BE-86: `car_ac` is a
+ * ride tier served by an AC-approved car, listed only while an admin has it active; a vehicle
+ * itself is never `car_ac` (registration keeps its own list of vehicle kinds).
+ */
+export const VEHICLE_TYPE_KEYS = ['car', 'bike', 'rickshaw', 'van', 'car_ac'] as const;
 export type VehicleTypeKey = (typeof VEHICLE_TYPE_KEYS)[number];
 export const isVehicleTypeKey = (value: unknown): value is VehicleTypeKey =>
   typeof value === 'string' && (VEHICLE_TYPE_KEYS as ReadonlyArray<string>).includes(value);

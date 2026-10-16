@@ -265,6 +265,7 @@ const PassengerMapScreen = () => {
         stops: st.filter((x): x is BookingPlace => x !== null),
         vehicleType: flow.selectedVehicle,
         offeredFare: offer.offeredFare,
+        femaleDriverOnly: flow.femaleDriverOnly,
       });
       if (!built.ok) {
         setError(built.error);
@@ -281,7 +282,7 @@ const PassengerMapScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pickup, destination, stops, flow.selectedVehicle, requestRideService, offer, setError, setStage]);
+  }, [pickup, destination, stops, flow.selectedVehicle, flow.femaleDriverOnly, requestRideService, offer, setError, setStage]);
 
   // T-315: a ride (its completed summary above all) always wins over the location wait.
   if (showLocationWait({ hasLocation: !!currentLocation, locationLoading, rideShown })) {

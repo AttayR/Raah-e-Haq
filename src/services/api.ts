@@ -338,6 +338,13 @@ export interface User {
   preferred_payment?: string;
   created_at?: string;
   updated_at?: string;
+  /**
+   * BE-87, passengers (own profile): whether they may ask for a female driver now. Raw; read it
+   * through features/women-mode/api. Never written to device storage (core/auth/storedUser).
+   */
+  female_driver_request?: Readonly<Record<string, unknown>> | null;
+  /** BE-87, drivers (own profile): their women-mode status (raw, features/women-mode/api). */
+  women_mode?: Readonly<Record<string, unknown>> | null;
 }
 
 export interface AuthResponse {
@@ -421,6 +428,8 @@ export interface RegisterRequest {
   vehicle_make?: string;
   vehicle_model?: string;
   vehicle_year?: string;
+  /** BE-86: the car has AC (an admin checks it before AC rides); cars only. */
+  vehicle_has_ac?: boolean;
   vehicle_color?: string;
   bank_name?: string;
   bank_branch?: string;
@@ -630,6 +639,7 @@ class ApiService {
         if (userData.vehicle_make) formData.append('vehicle_make', userData.vehicle_make);
         if (userData.vehicle_model) formData.append('vehicle_model', userData.vehicle_model);
         if (userData.vehicle_year) formData.append('vehicle_year', userData.vehicle_year);
+        if (userData.vehicle_has_ac === true) formData.append('vehicle_has_ac', '1');
         if (userData.vehicle_color) formData.append('vehicle_color', userData.vehicle_color);
         if (userData.bank_name) formData.append('bank_name', userData.bank_name);
         if (userData.bank_branch) formData.append('bank_branch', userData.bank_branch);

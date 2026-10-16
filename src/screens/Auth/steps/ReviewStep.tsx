@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
 import { Icon } from '../../../components/ui/Icon';
+import { t } from '../../../i18n';
 import {
   VEHICLE_PHOTO_SLOTS,
   filledVehiclePhotoCount,
@@ -32,6 +33,7 @@ interface ReviewData {
   vehicleModel: string;
   vehicleYear: string;
   vehicleColor: string;
+  vehicleHasAc?: boolean;
   licenseNumber: string;
   
   // Documents
@@ -128,6 +130,12 @@ export default function ReviewStep({ data }: ReviewStepProps) {
             <Text style={styles.infoLabel}>Color</Text>
             <Text style={styles.infoValue}>{data.vehicleColor || 'Not provided'}</Text>
           </View>
+          {data.vehicleType === 'car' && data.vehicleHasAc ? (
+            <View style={styles.infoItem} testID="review-vehicle-ac">
+              <Text style={styles.infoLabel}>{t('ac.registerLabel')}</Text>
+              <Text style={styles.infoValue}>{t('common.yes')}</Text>
+            </View>
+          ) : null}
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>Driving License Number</Text>
             <Text style={styles.infoValue}>{data.licenseNumber || 'Not provided'}</Text>

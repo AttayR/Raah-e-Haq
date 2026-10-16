@@ -2,7 +2,7 @@ import React from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Badge, Banner, Card, EmptyState, ErrorState, Header, Icon, Screen, SkeletonList } from '../../../components/ui';
+import { AppText, Badge, Banner, Card, EmptyState, ErrorState, Header, Icon, Screen, SkeletonList, type IconName } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import { formatDateTime } from '../../wallet/format';
@@ -13,6 +13,8 @@ import type { DriverStrike } from '../types';
 export const strikeKindLabel = (kind: string): string => {
   if (kind === 'overcharge_report') return t('strikes.kindOvercharge');
   if (kind === 'driver_cancel') return t('strikes.kindDriverCancel');
+  // BE-86: an "AC not working" report an admin confirmed (automatic ones stay pending, unlisted).
+  if (kind === 'ac_not_working') return t('strikes.kindAcNotWorking');
   const words = kind.replace(/_/g, ' ').trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : kind;
 };
@@ -27,12 +29,14 @@ export const strikeStatus = (strike: DriverStrike): { label: string; tone: 'warn
   return { label: t('strikes.statusExpired'), tone: 'neutral' };
 };
 
+const STRIKE_ICONS: Readonly<Record<string, IconName>> = { overcharge_report: 'dispute', ac_not_working: 'ac' };
+
 function StrikeRow({ strike }: { strike: DriverStrike }) {
   const status = strikeStatus(strike);
   return (
     <Card testID={`strike-${strike.key}`}>
       <View style={styles.row}>
-        <Icon name={strike.kind === 'overcharge_report' ? 'dispute' : 'close'} size={20} color="textSecondary" />
+        <Icon name={STRIKE_ICONS[strike.kind] ?? 'close'} size={20} color="textSecondary" />
         <View style={styles.flex}>
           <AppText variant="bodyStrong">{strikeKindLabel(strike.kind)}</AppText>
           {strike.createdAt ? (

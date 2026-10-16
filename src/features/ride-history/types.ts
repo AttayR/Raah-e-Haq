@@ -6,6 +6,7 @@
 
 import type { MyRating } from '../rating/types';
 import type { DriverFareSplit, FareLock, OverchargeState } from '../fare/types';
+import type { AcReportState } from '../ac/types';
 
 export type RideStatus = 'requested' | 'accepted' | 'arrived' | 'started' | 'completed' | 'cancelled';
 
@@ -100,6 +101,10 @@ export interface Ride {
   overcharge: OverchargeState | null;
   /** BE-84, the ride's driver only: fare → commission → earnings. */
   split: DriverFareSplit | null;
+  /** BE-86: an AC-tier ride. */
+  isAc: boolean;
+  /** BE-86, passenger only, AC rides: "AC not working" button and report. */
+  acReport: AcReportState | null;
 }
 
 export type { Page } from '../../core/api/types';

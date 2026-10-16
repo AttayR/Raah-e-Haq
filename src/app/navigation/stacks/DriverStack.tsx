@@ -16,6 +16,7 @@ import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/r
 import type { SafetyRoutes } from '../../../features/safety/navigation';
 import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
 import type { DriverStatementRoutes } from '../../../features/driver-statements/navigation';
+import type { VehicleAcRoutes } from '../../../features/ac/navigation';
 
 export type DriverStackParamList = {
   /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
@@ -50,6 +51,8 @@ export type DriverStackParamList = {
   /** Earnings → Weekly statements and Strikes (T-521, BE-84 / BE-82 / BE-85). */
   DriverStatements: DriverStatementRoutes['DriverStatements'];
   DriverStrikes: DriverStatementRoutes['DriverStrikes'];
+  /** Account → Vehicle AC (T-522, BE-86). */
+  VehicleAc: VehicleAcRoutes['VehicleAc'];
 };
 
 /*
@@ -74,6 +77,7 @@ const loadEmergencyContactsScreen = () => require('../../../features/safety/scre
 const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
 const loadWeeklyStatementScreen = () => require('../../../features/driver-statements/screens/WeeklyStatementScreen').default;
 const loadDriverStrikesScreen = () => require('../../../features/driver-statements/screens/DriverStrikesScreen').default;
+const loadVehicleAcScreen = () => require('../../../features/ac/screens/VehicleAcScreen').default;
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
@@ -120,6 +124,7 @@ const DriverStack = () => {
       <Stack.Screen name="EmergencyContactEditor" getComponent={loadEmergencyContactEditorScreen} />
       <Stack.Screen name="DriverStatements" getComponent={loadWeeklyStatementScreen} />
       <Stack.Screen name="DriverStrikes" getComponent={loadDriverStrikesScreen} />
+      <Stack.Screen name="VehicleAc" getComponent={loadVehicleAcScreen} />
     </Stack.Navigator>
   );
 };

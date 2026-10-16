@@ -13,6 +13,7 @@ import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { DRIVER_SETTINGS_COPY } from '../../components/driver/settings/copy';
 import { AccountChecks } from '../../features/profile-edit';
+import { DriverWomenModeRow } from '../../features/women-mode/components/DriverWomenModeRow';
 import { layout, space } from '../../theme';
 
 /**
@@ -98,6 +99,17 @@ const DriverSettingsScreen = () => {
               onPress={() => navigation.navigate('DriverDocuments')}
               testID="driver-settings-documents"
             />
+            {/* BE-86: AC is declared on a car (no row for a bike or rickshaw). */}
+            {!user?.vehicle_type || user.vehicle_type === 'car' ? (
+              <ListItem
+                icon="ac"
+                title={t('ac.rowTitle')}
+                subtitle={t('ac.rowSubtitle')}
+                onPress={() => navigation.navigate('VehicleAc')}
+                testID="driver-settings-vehicle-ac"
+              />
+            ) : null}
+            <DriverWomenModeRow raw={user?.women_mode} />
             <ListItem
               icon="history"
               title={DRIVER_SETTINGS_COPY.rideHistory}

@@ -6,7 +6,7 @@ import { haptics } from '../../core/haptics';
 import { logger } from '../../core/logging/logger';
 import { toast, type ToastOptions } from '../../core/toast';
 import { t } from '../../i18n';
-import { SAFETY_CODES, safetyApi } from './api';
+import { SAFETY_CODES, safetyApi, type SosCategory } from './api';
 import {
   liveShareStarted,
   liveShareStopped,
@@ -99,13 +99,16 @@ export type SosStatus = 'idle' | 'sending' | 'sent' | 'failed';
 export interface SosState {
   status: SosStatus;
   result: SosResult | null;
+  /** The category of the alert that was sent (BE-87), null before one was. */
+  category: SosCategory | null;
   error: string | null;
   /**
    * POST /rides/{id}/sos once: a second call after a success resolves with the same answer
    * without a new request (the server also folds repeats within 2 min into one incident).
+   * BE-87: a `women_safety` call after a general alert is sent, so the server upgrades it.
    * Resolves null when it failed (the error is in `error`).
    */
-  send: (position: SosPosition | null) => Promise<SosResult | null>;
+  send: (position: SosPosition | null, category?: SosCategory) => Promise<SosResult | null>;
 }
 
 const sosErrorText = (error: unknown): string =>
@@ -117,31 +120,38 @@ export const useSos = (rideId: number | null): SosState => {
   const [status, setStatus] = useState<SosStatus>('idle');
   const [result, setResult] = useState<SosResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<SosCategory | null>(null);
   const resultRef = useRef<SosResult | null>(null);
+  const categoryRef = useRef<SosCategory | null>(null);
   const pending = useRef<Promise<SosResult | null> | null>(null);
 
   // Another ride starts clean.
   useEffect(() => {
     resultRef.current = null;
+    categoryRef.current = null;
     pending.current = null;
     setResult(null);
+    setCategory(null);
     setStatus('idle');
     setError(null);
   }, [rideId]);
 
   const send = useCallback(
-    (position: SosPosition | null): Promise<SosResult | null> => {
+    (position: SosPosition | null, wanted: SosCategory = 'general'): Promise<SosResult | null> => {
       if (rideId === null) return Promise.resolve(null);
-      if (resultRef.current) return Promise.resolve(resultRef.current);
+      const upgrade = wanted === 'women_safety' && categoryRef.current !== 'women_safety';
+      if (resultRef.current && !upgrade) return Promise.resolve(resultRef.current);
       if (pending.current) return pending.current;
       setStatus('sending');
       setError(null);
       const request = safetyApi
-        .sendSos(rideId, position)
+        .sendSos(rideId, position, wanted)
         .then((answer) => {
           resultRef.current = answer;
+          categoryRef.current = wanted === 'women_safety' ? wanted : categoryRef.current ?? wanted;
           if (mounted.current) {
             setResult(answer);
+            setCategory(categoryRef.current);
             setStatus('sent');
           }
           haptics.notificationWarning();
@@ -165,7 +175,7 @@ export const useSos = (rideId: number | null): SosState => {
     [rideId, mounted],
   );
 
-  return { status, result, error, send };
+  return { status, result, category, error, send };
 };
 
 export interface LiveShare {

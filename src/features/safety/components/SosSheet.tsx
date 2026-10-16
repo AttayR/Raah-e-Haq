@@ -53,6 +53,8 @@ export const messageContacts = async (result: SosResult): Promise<void> => {
  * emergency contacts" (a confirm, then POST /rides/{id}/sos with the position, then the SMS
  * composer with the server's share message to the contacts) and, for the passenger, "Share
  * live trip". The alert is sent once per ride: tapping it again re-opens the messages only.
+ * BE-87: "Women's safety alert" sends it as a women's-safety case (fast-tracked), or upgrades the
+ * alert already sent.
  */
 export function SosSheet({ visible, onClose, role, sos, position, share, onAddContacts }: SosSheetProps) {
   const { theme } = useAppTheme();
@@ -74,6 +76,20 @@ export function SosSheet({ visible, onClose, role, sos, position, share, onAddCo
       if (!result) return;
     }
     if (result.emergencyContacts.length > 0) await messageContacts(result);
+  }, [sos, role, position]);
+
+  // BE-87: the same alert as a women's-safety case (or an upgrade of one already sent).
+  const womenSent = sos.category === 'women_safety';
+  const alertWomenSafety = useCallback(async () => {
+    const yes = await confirm({
+      title: t('safety.womenSafetyConfirmTitle'),
+      body: t('safety.womenSafetyConfirmBody', { other: role === 'passenger' ? t('safety.otherDriver') : t('safety.otherPassenger') }),
+      confirmLabel: t('safety.alertConfirm'),
+      destructive: true,
+    });
+    if (!yes) return;
+    const result = await sos.send(position, 'women_safety');
+    if (result && result.emergencyContacts.length > 0) await messageContacts(result);
   }, [sos, role, position]);
 
   const shareAnotherWay = useCallback(() => {
@@ -129,6 +145,15 @@ export function SosSheet({ visible, onClose, role, sos, position, share, onAddCo
             trailing={sending ? <ActivityIndicator color={theme.colors.primary} /> : undefined}
             chevron={!sending}
             testID="sos-alert-contacts"
+          />
+          <ListItem
+            icon="womenMode"
+            title={t('safety.womenSafety')}
+            subtitle={womenSent ? t('safety.womenSafetySent') : t('safety.womenSafetyBody')}
+            onPress={sending || womenSent ? undefined : alertWomenSafety}
+            disabled={sending}
+            chevron={!sending && !womenSent}
+            testID="sos-women-safety"
           />
           {share ? (
             <ListItem

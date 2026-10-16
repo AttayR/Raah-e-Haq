@@ -30,6 +30,9 @@ import { RIDE_HISTORY_COPY } from '../copy';
 import { canOpenChat, otherParty } from '../format';
 import { RideRatingSection } from '../../rating/components/RideRatingSection';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
+import { AcReportSection } from '../../ac/components/AcReportSection';
+import { SafetyReportSection } from '../../women-mode/components/SafetyReportSection';
+import { canReportSafetyAfterRide } from '../../women-mode/rules';
 import type { RideRatingState } from '../../rating/types';
 import { useRideDetail, useRideViewer } from '../hooks';
 import type { RideHistoryRoutes } from '../navigation';
@@ -165,8 +168,16 @@ export default function RideDetailsScreen() {
               testID="ride-details-overcharge"
             />
           ) : null}
+          {viewer === 'passenger' && ride.acReport ? (
+            // BE-86: "AC not working?" on an AC ride, then the report's refund status.
+            <AcReportSection rideId={ride.id} state={ride.acReport} onReported={() => refresh()} testID="ride-details-ac-report" />
+          ) : null}
           <ReceiptCard ride={ride} viewer={viewer} />
           <TimelineCard ride={ride} />
+          {viewer === 'passenger' ? (
+            // BE-87: a women's-safety report for up to 7 days after the ride (note required).
+            <SafetyReportSection rideId={ride.id} canReport={canReportSafetyAfterRide(ride, Date.now())} testID="ride-details-safety-report" />
+          ) : null}
         </View>
       </Animated.ScrollView>
     </Screen>

@@ -103,6 +103,11 @@ const toPhotoReviewStatus = (value: unknown): ProfileImageReview | null =>
 
 type NullableStringField = (typeof NULLABLE_STRING_FIELDS)[number];
 
+/** BE-87 objects of the own profile: `female_driver_request` (passengers), `women_mode` (drivers). */
+const NULLABLE_RECORD_FIELDS = ['female_driver_request', 'women_mode'] as const;
+
+type NullableRecordField = (typeof NULLABLE_RECORD_FIELDS)[number];
+
 const isPresentString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim() !== '';
 
@@ -176,6 +181,15 @@ export function normalizeUser(raw: unknown): User | null {
   if ('profile_image_review' in raw) {
     user.profile_image_review = toPhotoReviewStatus(raw.profile_image_review);
   }
+  // BE-87: the women-mode blocks of the own profile, kept as shallow copies (features map them).
+  NULLABLE_RECORD_FIELDS.forEach((field: NullableRecordField) => {
+    const value = raw[field];
+    if (isRecord(value)) {
+      user[field] = { ...value };
+    } else if (value === null) {
+      user[field] = null;
+    }
+  });
   return user;
 }
 

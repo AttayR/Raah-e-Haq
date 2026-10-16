@@ -2,6 +2,7 @@ import React, { useContext, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { NavigationContext } from '@react-navigation/native';
 import {
+  AcBadge,
   AppText,
   Button,
   FareBreakdown,
@@ -25,6 +26,9 @@ import { FareLockBadge, WaitingTimer } from '../../fare/components/FareBits';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
 import { fareLockOf, toFarePolicy, toOverchargeState } from '../../fare/api';
 import { cancellationFeeText } from '../../fare/format';
+import { AcReportSection } from '../../ac/components/AcReportSection';
+import { isAcRide, toAcReportState } from '../../ac/api';
+import { WomenModeSearching } from '../../women-mode/components/WomenModeSearching';
 import { readNumberOrNull } from '../../../core/api/read';
 import {
   canPassengerCancel,
@@ -119,6 +123,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   // BE-82: the fare is final once a driver accepted; BE-85: the waiting timer after a verified arrival.
   const lock = hasDriver ? fareLockOf(ride) : null;
   const overcharge = ride ? toOverchargeState(ride.overcharge_report) : null;
+  // BE-86: the AC tier's badge and, for an AC ride, "AC not working?".
+  const ac = isAcRide(ride);
+  const acReport = ride && ac ? toAcReportState(ride.ac_report) : null;
   // BE-81: the start PIN, only while the server sends it (accepted / arrived).
   const pin = driver ? ridePinOf(ride) : null;
   const actions: PersonAction[] = [];
@@ -148,9 +155,12 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
     <View testID={`active-ride-${stage}`} style={styles.wrap}>
       {stage === 'searching' ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
       <View style={styles.header} accessibilityLiveRegion="polite">
-        <AppText variant="h3" accessibilityRole="header">
-          {warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage]}
-        </AppText>
+        <View style={styles.titleRow}>
+          <AppText variant="h3" accessibilityRole="header" style={styles.title}>
+            {warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage]}
+          </AppText>
+          {ac ? <AcBadge testID="active-ride-ac" /> : null}
+        </View>
         {subtitle ? (
           <AppText variant="bodySmall" color={warn ? 'warning' : 'textSecondary'} testID="active-ride-subtitle">
             {subtitle}
@@ -159,6 +169,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       </View>
 
       {!finished && step !== null ? <RideProgress step={step} testID="active-ride-progress" /> : null}
+
+      {/* BE-87: "Looking for a female driver" and the keep-waiting / allow-any choice. */}
+      {stage === 'searching' && ride?.women_mode ? <WomenModeSearching rideId={ride.id} raw={ride.women_mode} /> : null}
 
       {driver ? (
         <PersonCard
@@ -211,6 +224,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           testID="active-ride-overcharge"
         />
       ) : null}
+
+      {ride && acReport ? <AcReportSection rideId={ride.id} state={acReport} testID="active-ride-ac-report" /> : null}
 
       {canPassengerCancel(stage) ? (
         <Button
@@ -277,6 +292,8 @@ export const AssignedDriverMarker = React.memo(AssignedDriverMarkerBase);
 const styles = StyleSheet.create({
   wrap: { gap: space[4] },
   header: { gap: space[1] },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  title: { flexShrink: 1 },
 });
 
 export default ActiveRidePanel;

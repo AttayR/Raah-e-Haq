@@ -31,6 +31,10 @@ export const ACCEPT_RIDE_CODES = {
   driverNotAvailable: 'DRIVER_NOT_AVAILABLE',
   noApprovedVehicle: 'NO_APPROVED_VEHICLE',
   phoneNotVerified: 'PHONE_NOT_VERIFIED',
+  /** BE-86: an AC ride, and the driver has no car with an approved AC. */
+  acVehicleRequired: 'AC_VEHICLE_REQUIRED',
+  /** BE-87: a women-mode ride. Shown as "no longer available": never the passenger's preference. */
+  femaleDriverRequired: 'FEMALE_DRIVER_REQUIRED',
 } as const;
 
 export interface LatLng {

@@ -77,6 +77,8 @@ export interface RegistrationFormData {
   vehicleModel: string;
   vehicleYear: string;
   vehicleColor: string;
+  /** BE-86: the car has AC (sent only for a car; an admin checks it before AC rides). */
+  vehicleHasAc: boolean;
   licenseNumber: string; // Driving licence number (T-207: required for drivers)
   licenseType: string;
   licenseExpiryDate: string; // YYYY-MM-DD
@@ -119,6 +121,7 @@ export const INITIAL_REGISTRATION_FORM: RegistrationFormData = {
   vehicleModel: '',
   vehicleYear: '',
   vehicleColor: '',
+  vehicleHasAc: false,
   licenseNumber: '',
   licenseType: '',
   licenseExpiryDate: '',

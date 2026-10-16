@@ -88,6 +88,7 @@ export const VehicleChoice: React.FC<VehicleChoiceProps> = ({ vehicleTypes, esti
           meta={option.meta}
           fare={option.fare}
           unavailable={option.unavailable}
+          ac={option.ac}
           selected={selectedId === option.id}
           onPress={() => {
             if (estimateFor(estimates.data, option.id)) onSelect(option.id);

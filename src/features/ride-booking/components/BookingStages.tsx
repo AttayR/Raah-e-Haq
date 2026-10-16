@@ -102,6 +102,8 @@ type FareStageProps = {
   onChangeVehicle: () => void;
   onCancel: () => void;
   onConfirm: () => void;
+  /** Ride preferences above the fare (BE-87 "Female driver"); nothing when absent. */
+  preferences?: React.ReactNode;
 };
 
 /** Booking step 4: chosen vehicle, fare review and confirm. */
@@ -116,6 +118,7 @@ export const FareStage: React.FC<FareStageProps> = (p) => (
         { label: 'Cancel', icon: 'close', tone: 'danger', onPress: p.onCancel, testID: 'cancel-booking' },
       ]}
     />
+    {p.preferences}
     <FareReview
       vehicleType={p.vehicleType}
       estimates={p.estimates}
