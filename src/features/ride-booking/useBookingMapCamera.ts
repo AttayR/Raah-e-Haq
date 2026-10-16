@@ -14,8 +14,8 @@ type Options = {
   viewportRef: RefObject<MapViewport | null>;
   sheetHeight: number;
   routeCoordinates: LatLng[];
-  /** The ride camera follows the driver: the booking camera keeps still. */
-  isRideCameraFollowing: () => boolean;
+  /** The ride camera holds the map (driver on the way, on the trip): the booking camera keeps still. */
+  rideCameraHoldsMap: () => boolean;
   onRideCameraMapReady: () => void;
   requestLocationPermission: () => unknown;
 };
@@ -31,7 +31,7 @@ export const useBookingMapCamera = ({
   viewportRef,
   sheetHeight,
   routeCoordinates,
-  isRideCameraFollowing,
+  rideCameraHoldsMap,
   onRideCameraMapReady,
   requestLocationPermission,
 }: Options) => {
@@ -64,8 +64,8 @@ export const useBookingMapCamera = ({
 
   // Initialize location (not while the ride camera follows the driver).
   useEffect(() => {
-    if (currentLocation && isMapReady && !isRideCameraFollowing()) animateToUser();
-  }, [currentLocation, isMapReady, isRideCameraFollowing, animateToUser]);
+    if (currentLocation && isMapReady && !rideCameraHoldsMap()) animateToUser();
+  }, [currentLocation, isMapReady, rideCameraHoldsMap, animateToUser]);
 
   const latestMapReady = useRef(() => {});
   latestMapReady.current = () => {
@@ -73,7 +73,7 @@ export const useBookingMapCamera = ({
     onRideCameraMapReady();
     // Delay the region animation to ensure map is fully ready
     setTimeout(() => {
-      if (!isRideCameraFollowing()) animateToUser(1000);
+      if (!rideCameraHoldsMap()) animateToUser(1000);
     }, 500);
   };
   const onMapReady = useCallback(() => latestMapReady.current(), []);
@@ -84,13 +84,14 @@ export const useBookingMapCamera = ({
   // a step (40 pt) refits too; smaller changes do not move the camera.
   const sheetStep = Math.round(sheetHeight / 40);
   useEffect(() => {
-    if (!mapRef.current || !routeCoordinates || routeCoordinates.length < 2) return;
+    // T-549: not while the ride camera holds the map (it fits the car, or the passenger panned).
+    if (!mapRef.current || !routeCoordinates || routeCoordinates.length < 2 || rideCameraHoldsMap()) return;
     try {
       mapRef.current.fitToCoordinates(routeCoordinates, { edgePadding: viewportEdgePadding(viewportRef.current), animated: true });
     } catch (e) {
       logger.debug('Error fitting map to route:', e);
     }
-  }, [routeCoordinates, sheetStep, mapRef, viewportRef]);
+  }, [routeCoordinates, sheetStep, mapRef, viewportRef, rideCameraHoldsMap]);
 
   return { isMapReady, onMapReady, onMapLoaded, centerOnUser };
 };

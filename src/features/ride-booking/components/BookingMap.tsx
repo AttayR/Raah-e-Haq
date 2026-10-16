@@ -25,6 +25,8 @@ type Props = {
   stops: LatLng[];
   destination: LatLng | null;
   route: LatLng[];
+  /** T-549: the route the driver's marker follows on the trip (the whole route, not the part left). */
+  driverRoute: LatLng[];
   /** Nearby drivers until a ride is booked; null hides them. */
   nearbyDrivers: NearbyDriver[] | null;
   driverLocation: DriverLocation | null;
@@ -54,6 +56,7 @@ const BookingMapBase: React.FC<Props> = ({
   stops,
   destination,
   route,
+  driverRoute,
   nearbyDrivers,
   driverLocation,
   vehicleType,
@@ -77,7 +80,7 @@ const BookingMapBase: React.FC<Props> = ({
           >
             <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={route} />
             {nearbyDrivers ? <NearbyDriverMarkers drivers={nearbyDrivers} /> : null}
-            <AssignedDriverMarker location={driverLocation} vehicleType={vehicleType} stage={stage} route={route} />
+            <AssignedDriverMarker location={driverLocation} vehicleType={vehicleType} stage={stage} route={driverRoute} />
           </SafeMapView>
         </MapErrorBoundary>
       </MapErrorBoundary>

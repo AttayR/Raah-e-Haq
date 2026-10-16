@@ -26,6 +26,8 @@ export const ACTIVE_RIDE_COPY = {
   cancelledBySystem: 'This ride was cancelled.',
   driverFallbackName: 'Your driver',
   driverMarkerTitle: 'Your driver',
+  // T-549: follow the car again after the passenger moved the map.
+  recentreA11y: 'Follow your ride on the map',
   // T-311: the completed summary is the server's final fare, not the booking estimate.
   finalFareLabel: 'Final fare',
   paymentLabel: (method: string) => (method === 'cash' ? 'Pay your driver in cash' : `Payment: ${method}`),

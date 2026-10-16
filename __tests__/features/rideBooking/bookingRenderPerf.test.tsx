@@ -195,6 +195,7 @@ describe('BookingMap renders (PERF-12, PERF-15)', () => {
       stops={STOPS}
       destination={DEST}
       route={route}
+      driverRoute={ROUTE}
       nearbyDrivers={null}
       // A new location object each poll, as the hook stores it.
       driverLocation={driver(driverLat)}
@@ -252,6 +253,7 @@ describe('BookingMap renders (PERF-12, PERF-15)', () => {
       stops: STOPS,
       destination: DEST,
       route: ROUTE,
+      driverRoute: ROUTE,
       nearbyDrivers: null,
       driverLocation: null,
     };
@@ -310,7 +312,7 @@ describe('useBookingMapCamera ready fallback (T-534 review)', () => {
         viewportRef: { current: null },
         sheetHeight: 0,
         routeCoordinates: [],
-        isRideCameraFollowing: () => false,
+        rideCameraHoldsMap: () => false,
         onRideCameraMapReady: jest.fn(),
         requestLocationPermission: jest.fn(),
       }),

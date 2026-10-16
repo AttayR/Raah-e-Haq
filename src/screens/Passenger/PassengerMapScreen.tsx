@@ -26,6 +26,8 @@ import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
+import { useTripRoute } from '../../features/active-ride/tripRoute';
+import { RideRecentreButton } from '../../features/active-ride/components/RideRecentreButton';
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
@@ -121,11 +123,16 @@ const PassengerMapScreen = () => {
     enabled: isFocused && (shownStage !== 'requesting' || rideEnded),
     refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
   });
-  // Driver on the way (T-311/T-312): keep the driver and the pickup in view, until the passenger pans.
+  // Driver on the way (T-311/T-312): keep the driver and the pickup in view (T-549: on the trip the
+  // car and the drop-off), until the passenger pans (T-549: the recentre button resumes it).
   // Ride cleared (T-313): recentre on the pickup, else the passenger, above the sheet (T-314).
-  const { isFollowing: isRideCameraFollowing, ...rideCamera } = usePassengerRideCamera(
+  const rideCamera = usePassengerRideCamera(
     mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation, viewport,
   );
+  // T-549: on the trip the drop-off and the route still ahead of the car, not the pickup.
+  const inTrip = rideStage?.stage === 'in_trip';
+  const trip = useTripRoute(inTrip, currentRide, driverLocation);
+  const tripRouteShown = inTrip && trip.route.length > 1;
   // T-520 (BE-78): a masked call (POST /rides/{id}/call), or the chat when calls are chat only.
   const rideId = currentRide?.id ?? null;
   const openChat = useCallback(() => {
@@ -138,7 +145,7 @@ const PassengerMapScreen = () => {
     viewportRef,
     sheetHeight,
     routeCoordinates,
-    isRideCameraFollowing,
+    rideCameraHoldsMap: rideCamera.holdsCamera,
     onRideCameraMapReady: rideCamera.onMapReady,
     requestLocationPermission,
   });
@@ -329,10 +336,11 @@ const PassengerMapScreen = () => {
           onMapReady={onMapReady}
           onMapLoaded={onMapLoaded}
           onRegionChangeComplete={rideCamera.onRegionChangeComplete}
-          pickup={pickup}
+          pickup={inTrip ? null : pickup}
           stops={stops}
-          destination={destination}
-          route={routeCoordinates}
+          destination={trip.dropoff ?? destination}
+          route={tripRouteShown ? trip.remaining : routeCoordinates}
+          driverRoute={tripRouteShown ? trip.route : routeCoordinates}
           nearbyDrivers={rideShown ? null : nearbyDrivers.drivers}
           driverLocation={driverLocation}
           vehicleType={currentRide?.vehicle_type}
@@ -345,6 +353,7 @@ const PassengerMapScreen = () => {
           onReset={rideShown ? undefined : resetSelection}
           onOpenAdvanced={() => setShowAdvancedRidePanel(true)}
         />
+        <RideRecentreButton visible={rideCamera.paused} onPress={rideCamera.recentre} />
 
         <BookingSheet onHeightChange={setSheetHeight} maxHeightRatio={sheetRatio}>
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}

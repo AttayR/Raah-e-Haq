@@ -47,6 +47,33 @@ export const driverApproachCoordinates = (
 };
 
 /**
+ * T-549: the points the ride camera follows: [driver, pickup] while the driver is on the way
+ * (as `driverApproachCoordinates`), [driver, drop-off] on the trip (QA t-545 B08: the car drove
+ * off screen), else null.
+ */
+export const rideFollowCoordinates = (
+  stage: PassengerRideStage | null | undefined,
+  driverLocation: Pick<DriverLocation, 'latitude' | 'longitude'> | null,
+  ride: RideCameraRide | null,
+): LatLng[] | null => {
+  if (stage === 'driver_en_route') return driverApproachCoordinates(stage, driverLocation, ride);
+  if (stage !== 'in_trip' || !driverLocation || !ride) return null;
+  const driver = coordinate(driverLocation.latitude, driverLocation.longitude);
+  const dropoff = coordinate(ride.dropoff_latitude, ride.dropoff_longitude);
+  return driver && dropoff ? [driver, dropoff] : null;
+};
+
+/** The ride fields the camera reads (the drop-off only on the trip). */
+export type RideCameraRide = Pick<RideResource, 'pickup_latitude' | 'pickup_longitude'> &
+  Partial<Pick<RideResource, 'dropoff_latitude' | 'dropoff_longitude'>>;
+
+/**
+ * T-549: on the trip the camera refits at most this often (ms), animated, so it follows the car
+ * without moving the map on every driver-location read.
+ */
+export const TRIP_FOLLOW_INTERVAL_MS = 5_000;
+
+/**
  * T-315: the smallest span (degrees, ~900 m of latitude) the driver-approach fit may show.
  * With the driver a few metres from the pickup, fitting the two points alone zoomed in to
  * building level and the street around the pickup was lost.
@@ -96,6 +123,13 @@ export interface FitOptions {
   /** False until the native map is ready (a fit before that is dropped by SafeMapView). */
   ready?: boolean;
   edgePadding?: EdgePadding;
+  /**
+   * T-549: at most one fit per this many ms; a move inside the window fits once at its end,
+   * with the latest points. 0 (default) fits on every move.
+   */
+  minIntervalMs?: number;
+  /** T-549: a new value fits now, whatever the interval (the recentre button, a new stage). */
+  refit?: number | string;
 }
 
 /**
@@ -106,19 +140,34 @@ export interface FitOptions {
 export const useFitCoordinates = (
   mapRef: RefObject<FitToCoordinatesMap | null>,
   coordinates: LatLng[] | null,
-  { ready = true, edgePadding = DRIVER_APPROACH_EDGE_PADDING }: FitOptions = {},
+  { ready = true, edgePadding = DRIVER_APPROACH_EDGE_PADDING, minIntervalMs = 0, refit = 0 }: FitOptions = {},
 ): void => {
   const key = ready && coordinates ? fitKeyOf(coordinates) : null;
   const latest = useRef(coordinates);
   latest.current = coordinates;
   const padding = useRef(edgePadding);
   padding.current = edgePadding;
+  const lastFitAt = useRef<number | null>(null);
+  const lastRefit = useRef(refit);
 
   useEffect(() => {
-    const points = latest.current;
-    if (key === null || !points) return;
-    mapRef.current?.fitToCoordinates(points, { edgePadding: padding.current, animated: true });
-  }, [key, mapRef]);
+    if (key === null) return undefined;
+    const fit = () => {
+      const points = latest.current;
+      if (!points) return;
+      lastFitAt.current = Date.now();
+      mapRef.current?.fitToCoordinates(points, { edgePadding: padding.current, animated: true });
+    };
+    const forced = refit !== lastRefit.current;
+    lastRefit.current = refit;
+    const wait = forced || lastFitAt.current === null ? 0 : minIntervalMs - (Date.now() - lastFitAt.current);
+    if (wait <= 0) {
+      fit();
+      return undefined;
+    }
+    const timer = setTimeout(fit, wait);
+    return () => clearTimeout(timer);
+  }, [key, refit, minIntervalMs, mapRef]);
 };
 
 /** The map ref the ride camera needs: fit for the driver approach, animate for the recentre. */
@@ -201,10 +250,20 @@ export const viewportEdgePadding = (viewport?: MapViewport | null): EdgePadding 
 
 export interface PassengerRideCamera {
   /**
-   * True while the auto-fit owns the camera (driver on the way, not paused by the passenger),
-   * so other recentring (the passenger's own position) holds back. Stable; reads the latest.
+   * True while the auto-fit owns the camera (driver on the way or on the trip, not paused by
+   * the passenger). Stable; reads the latest.
    */
   isFollowing: () => boolean;
+  /**
+   * T-549: true in a followed stage (driver on the way, on the trip) even while paused, so
+   * other recentring (the passenger's own moving position) holds back and a pan stays put.
+   * Stable; reads the latest.
+   */
+  holdsCamera: () => boolean;
+  /** T-549: the passenger panned or zoomed in a followed stage: show the recentre button. */
+  paused: boolean;
+  /** T-549: fit now and follow again (the recentre button). */
+  recentre: () => void;
   /** Pass to the map's onMapReady (the fit waits for it). */
   onMapReady: () => void;
   /** Pass to the map's onRegionChangeComplete: a pan or zoom by the passenger pauses the fit. */
@@ -213,23 +272,25 @@ export interface PassengerRideCamera {
 
 /**
  * The passenger map's ride camera (T-311/T-312): fits the driver and the pickup while the
- * driver is on the way, once the map is ready. A gesture by the passenger (Google Maps
+ * driver is on the way (T-549: the car and the drop-off on the trip), once the map is ready. A gesture by the passenger (Google Maps
  * reports `isGesture`; our own animations are not gestures) pauses it for the rest of the
- * current stage; the next stage resumes it. When the ride is cleared (T-313) the map
+ * current stage; the next stage (or `recentre`) resumes it. When the ride is cleared (T-313) the map
  * recentres on `home` (the pickup, else the passenger's position), when known.
  */
 export const usePassengerRideCamera = (
   mapRef: RefObject<RideCameraMap | null>,
   stage: PassengerRideStage | null | undefined,
   driverLocation: Pick<DriverLocation, 'latitude' | 'longitude'> | null,
-  ride: Pick<RideResource, 'pickup_latitude' | 'pickup_longitude'> | null,
+  ride: RideCameraRide | null,
   home: LatLng | null = null,
   viewport: MapViewport | null = null,
 ): PassengerRideCamera => {
   const [mapReady, setMapReady] = useState(false);
   const [pausedStage, setPausedStage] = useState<PassengerRideStage | null>(null);
+  const [refit, setRefit] = useState(0);
   const current = stage ?? null;
   const paused = pausedStage !== null && pausedStage === current;
+  const followed = current === 'driver_en_route' || current === 'in_trip';
   const latestHome = useRef(home);
   latestHome.current = home;
   const latestViewport = useRef(viewport);
@@ -250,14 +311,25 @@ export const usePassengerRideCamera = (
   }, [current, mapRef]);
 
   // T-315: never closer than MIN_DRIVER_APPROACH_DELTA, so the street around the pickup stays.
-  useFitCoordinates(mapRef, paused ? null : withMinimumSpan(driverApproachCoordinates(current, driverLocation, ride)), {
+  // T-549: on the trip the car and the drop-off, refitted at most every TRIP_FOLLOW_INTERVAL_MS.
+  useFitCoordinates(mapRef, paused ? null : withMinimumSpan(rideFollowCoordinates(current, driverLocation, ride)), {
     ready: mapReady,
     edgePadding: viewportEdgePadding(viewport),
+    minIntervalMs: current === 'in_trip' ? TRIP_FOLLOW_INTERVAL_MS : 0,
+    // A new stage (e.g. the trip starts) or the recentre button fits at once.
+    refit: `${current}:${refit}`,
   });
 
   const following = useRef(false);
-  following.current = current === 'driver_en_route' && !paused;
+  following.current = followed && !paused;
   const isFollowing = useCallback(() => following.current, []);
+  const holds = useRef(false);
+  holds.current = followed;
+  const holdsCamera = useCallback(() => holds.current, []);
+  const recentre = useCallback(() => {
+    setPausedStage(null);
+    setRefit((n) => n + 1);
+  }, []);
 
   const onMapReady = useCallback(() => setMapReady(true), []);
   const onRegionChangeComplete = useCallback(
@@ -269,5 +341,5 @@ export const usePassengerRideCamera = (
     [current],
   );
 
-  return { isFollowing, onMapReady, onRegionChangeComplete };
+  return { isFollowing, holdsCamera, paused: paused && followed, recentre, onMapReady, onRegionChangeComplete };
 };
