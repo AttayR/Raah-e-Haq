@@ -30,6 +30,23 @@ export interface RideRequest {
   offered_fare?: number;
   /** BE-87: match only verified female drivers (female passengers whose profile allows it). */
   female_driver_only?: boolean;
+  /** BE-88: with vehicle_type `parcel` only (no stops, no offer). */
+  parcel?: ParcelRequestBlock;
+}
+
+/** POST /rides `parcel` (BE-88): the receiver, the item and the sender's declaration. */
+export interface ParcelRequestBlock {
+  receiver_name: string;
+  /** E.164 (`+923001234567`); the server normalises a local number too. */
+  receiver_phone: string;
+  item_category: string;
+  size_class: string;
+  /** Whole rupees, at most the options' `max_declared_value`. */
+  declared_value: number;
+  declaration_accepted: true;
+  item_description?: string;
+  /** The `rules_version` of the options the sender read. */
+  rules_version: string;
 }
 
 export interface RideStopRequest {
@@ -177,6 +194,10 @@ export interface RideResource {
   female_driver_only?: boolean;
   /** BE-87, passenger only: the women-mode block (read through features/women-mode/api). */
   women_mode?: unknown;
+  /** BE-88: a parcel delivery (vehicle_type parcel). */
+  is_parcel?: boolean;
+  /** BE-88: the parcel block for this viewer; read it through features/parcel/api, never by hand. */
+  parcel?: unknown;
   /** BE-84, the ride's driver only. */
   fare?: number | string | null;
   commission_rate?: number | string | null;
@@ -293,9 +314,10 @@ export interface LocationUpdate {
 /**
  * The ride types the server accepts (BE-58 enum, GET /public/vehicle-types). BE-86: `car_ac` is a
  * ride tier served by an AC-approved car, listed only while an admin has it active; a vehicle
- * itself is never `car_ac` (registration keeps its own list of vehicle kinds).
+ * itself is never `car_ac` (registration keeps its own list of vehicle kinds). BE-88: `parcel`
+ * is a parcel delivery by bike, booked from "Send a parcel", never from the ride vehicle list.
  */
-export const VEHICLE_TYPE_KEYS = ['car', 'bike', 'rickshaw', 'van', 'car_ac'] as const;
+export const VEHICLE_TYPE_KEYS = ['car', 'bike', 'rickshaw', 'van', 'car_ac', 'parcel'] as const;
 export type VehicleTypeKey = (typeof VEHICLE_TYPE_KEYS)[number];
 export const isVehicleTypeKey = (value: unknown): value is VehicleTypeKey =>
   typeof value === 'string' && (VEHICLE_TYPE_KEYS as ReadonlyArray<string>).includes(value);

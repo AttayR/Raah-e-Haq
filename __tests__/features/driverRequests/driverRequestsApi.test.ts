@@ -32,6 +32,7 @@ describe('toPendingRideRequest', () => {
       isOffer: false,
       serverFare: null,
       stops: [],
+      parcel: null,
     });
   });
 

@@ -139,6 +139,8 @@ export const iconGlyphs = {
   // AC tier and women mode (T-522).
   ac: 'snowflake',
   womenMode: 'face-woman-outline',
+  // Parcel delivery (T-522, BE-88).
+  parcel: 'package-variant-closed',
   // T-533: the legacy MaterialIcons glyphs (auth, registration, error boundaries), so only the
   // MDI font ships.
   chevronUp: 'chevron-up',

@@ -17,6 +17,7 @@ export const vehicleIconName = (key: string | null | undefined): IconName => {
   switch (key) {
     case 'bike':
     case 'motorbike':
+    case 'parcel': // BE-88: parcels go by bike.
       return 'bike';
     case 'rickshaw':
       return 'rickshaw';

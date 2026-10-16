@@ -12,6 +12,8 @@ export interface VehicleType {
   capacity: number;
   /** BE-86: an air-conditioned tier (car_ac), served by a car with an approved AC (absent: no). */
   ac?: boolean;
+  /** BE-88: the parcel tier (absent: a ride); booked from "Send a parcel", never the ride list. */
+  parcel?: boolean;
 }
 
 /** BE-05 FareCalculator breakdown (whole rupees); it adds up to `fare`. */
@@ -37,6 +39,8 @@ export interface FareEstimate {
   fare_policy: FarePolicy | null;
   /** BE-86: an air-conditioned tier (absent: no). */
   ac?: boolean;
+  /** BE-88: the parcel tier's quote (absent: a ride). */
+  parcel?: boolean;
 }
 
 /** data of POST /rides/estimate: the route and one quote per vehicle type. */
@@ -81,7 +85,13 @@ export const normalizeVehicleTypes = (raw: unknown): VehicleType[] => {
     if (!isObject(item) || !isVehicleTypeKey(item.key)) return [];
     const label = typeof item.label === 'string' && item.label.trim() ? item.label.trim() : null;
     if (!label) return [];
-    return [{ key: item.key, label, capacity: Math.max(1, toNumber(item.capacity) ?? 1), ...(item.ac === true ? { ac: true } : {}) }];
+    return [{
+      key: item.key,
+      label,
+      capacity: Math.max(1, toNumber(item.capacity) ?? 1),
+      ...(item.ac === true ? { ac: true } : {}),
+      ...(item.parcel === true || item.key === 'parcel' ? { parcel: true } : {}),
+    }];
   });
 };
 
@@ -112,6 +122,7 @@ export const normalizeFareEstimates = (raw: unknown): FareEstimates => {
       offer_band: toOfferBand(item.offer_band),
       fare_policy: toFarePolicy(item.fare_policy),
       ...(item.ac === true ? { ac: true } : {}),
+      ...(item.parcel === true || item.vehicle_type === 'parcel' ? { parcel: true } : {}),
     }];
   });
   return {

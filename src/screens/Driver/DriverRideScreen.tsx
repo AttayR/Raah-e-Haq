@@ -9,6 +9,7 @@ import { IconButton, RideMarker, Screen, VehicleMarker } from '../../components/
 import { CancelReasonSheet } from '../../components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../components/driver/DriverRidePanel';
 import { DriverRideSummary } from '../../components/driver/DriverRideSummary';
+import { DriverRideCancelledCard } from '../../components/driver/DriverRideCancelledCard';
 import { DriverRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
@@ -29,6 +30,7 @@ import { useDriverRideSafety } from '../../features/safety/useDriverRideSafety';
 import { PinEntrySheet } from '../../features/safety/components/PinEntrySheet';
 import { noShowFeeOf, useNoShowReady, type DriverCancelMode } from '../../features/driver-ride/noShow';
 import { DriverRideSafetyButton } from '../../features/safety/components/RideSafety';
+import { DriverParcelSheets, useDriverParcel } from '../../features/parcel/driver';
 import {
   activeStops,
   mapsDirectionsUrl,
@@ -143,6 +145,8 @@ const DriverRideScreen: React.FC = () => {
     onMessage,
     toast: DRIVER_RIDE_TOAST_OPTIONS,
   });
+
+  const parcel = useDriverParcel({ ride, step, pendingAction, onMessage }); // BE-88: parcel steps and sheets
 
   const onNavigate = useCallback(() => {
     if (!target) return;
@@ -264,13 +268,7 @@ const DriverRideScreen: React.FC = () => {
             {step === 'summary' ? (
               <DriverRideSummary ride={ride} onDone={onDone} />
             ) : (
-              <View style={styles.card} testID="driver-ride-cancelled">
-                <Text style={styles.cardTitle}>{COPY.cancelled}</Text>
-                <Text style={styles.emptyText}>{COPY.cancelledBody}</Text>
-                <TouchableOpacity style={styles.doneButton} onPress={onDone} accessibilityRole="button" testID="driver-ride-done">
-                  <Text style={styles.doneText}>{COPY.done}</Text>
-                </TouchableOpacity>
-              </View>
+              <DriverRideCancelledCard onDone={onDone} />
             )}
           </ScrollView>
         ) : (
@@ -291,6 +289,7 @@ const DriverRideScreen: React.FC = () => {
               onCancel={() => setCancelMode('strike')}
               onNoShow={noShowReady ? () => setCancelMode('no_show') : undefined}
               bottomInset={insets.bottom}
+              parcel={parcel.panel}
             />
           </View>
         )}
@@ -299,6 +298,7 @@ const DriverRideScreen: React.FC = () => {
         <DriverRideRatingPrompt active={isFocused && step === 'summary'} />
 
         <PinEntrySheet {...safety.pinSheet} />
+        {parcel.panel ? <DriverParcelSheets {...parcel.sheets} /> : null}
 
         <CancelReasonSheet
           visible={cancelMode !== null}
@@ -369,17 +369,6 @@ const createStyles = (theme: AppTheme) =>
       bottom: 0,
       maxHeight: '65%',
     },
-    card: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.radius.lg,
-      padding: theme.space[5],
-      ...theme.elevation[3],
-    },
-    cardTitle: {
-      ...theme.typography.title,
-      color: theme.colors.textPrimary,
-      marginBottom: theme.space[2],
-    },
     emptyText: {
       ...theme.typography.bodySmall,
       color: theme.colors.textSecondary,
@@ -387,18 +376,6 @@ const createStyles = (theme: AppTheme) =>
     link: {
       ...theme.typography.buttonSmall,
       color: theme.colors.primaryText,
-    },
-    doneButton: {
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: theme.layout.touchTargetDriving,
-      borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.primary,
-      marginTop: theme.space[4],
-    },
-    doneText: {
-      ...theme.typography.button,
-      color: theme.colors.onPrimary,
     },
   });
 

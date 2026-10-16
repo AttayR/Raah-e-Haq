@@ -35,6 +35,8 @@ export const DRIVER_RIDE_CODES = {
   stopAlreadyCancelled: 'STOP_ALREADY_CANCELLED',
   stopNotActive: 'STOP_NOT_ACTIVE',
   notNearPickup: 'not_near_pickup',
+  /** BE-88: start / complete on a parcel; the parcel's own steps (photo, code) are needed. */
+  parcelStepRequired: 'PARCEL_STEP_REQUIRED',
 } as const;
 
 /** The driver's cancel note bounds (BE-04 driverCancel, `note` max:500). */

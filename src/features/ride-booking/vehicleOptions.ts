@@ -21,12 +21,16 @@ export type VehicleOption = {
 /** The app-wide money format (`Rs 1,250`, src/utils/format); kept as the booking flow's name. */
 export const formatFare = (amount: number, currency = 'PKR'): string => formatMoney(amount, currency);
 
+/** BE-88: the ride tiers only; the parcel tier is booked from "Send a parcel". */
+export const rideVehicleTypes = (types: ReadonlyArray<VehicleType>): VehicleType[] => types.filter((type) => type.parcel !== true);
+
 /**
  * The vehicle list: one option per catalogue entry, priced from the matching estimate (by
- * vehicle_type). No local multipliers: a type without a quote shows no price.
+ * vehicle_type). No local multipliers: a type without a quote shows no price. The parcel tier
+ * is never listed (BE-88).
  */
 export const toVehicleOptions = (types: ReadonlyArray<VehicleType>, estimates: FareEstimates | null): VehicleOption[] =>
-  types.map((type) => {
+  rideVehicleTypes(types).map((type) => {
     const quote = estimates?.estimates.find((e) => e.vehicle_type === type.key);
     return {
       id: type.key,

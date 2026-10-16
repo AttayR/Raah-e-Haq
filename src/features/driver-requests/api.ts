@@ -1,6 +1,7 @@
 import { apiService, unwrap } from '../../services/api';
 import type { RideResource } from '../../services/rideService';
 import { riderRating } from './rating';
+import { toParcelRequestSummary, type ParcelRequestSummary } from '../parcel/api';
 
 /**
  * Incoming ride requests for the signed-in driver (T-403/T-404, docs/api/CONTRACT_NOTES.md).
@@ -69,6 +70,8 @@ export interface PendingRideRequest {
   serverFare: number | null;
   /** T-552: the ride's stops still to visit, in route order (empty when it has none). */
   stops: PendingRideStop[];
+  /** BE-88: a parcel delivery (what is carried only; never the receiver or the value). */
+  parcel: ParcelRequestSummary | null;
 }
 
 /** One stop of a request, as the card lists it between the pickup and the drop-off. */
@@ -164,6 +167,7 @@ export const toPendingRideRequest = (
     isOffer: raw.is_offer === true && toNumber(raw.offered_fare) !== null,
     serverFare: toNumber(raw.server_fare),
     stops: toPendingRideStops(raw.stops),
+    parcel: toParcelRequestSummary(raw),
   };
 };
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Banner, Button, Chip } from '../../../components/ui';
+import { AppText, Banner, Button, Chip, ListGroup, ListItem } from '../../../components/ui';
 import { SavedPlaceChips } from '../../saved-places/components/SavedPlaceChips';
 import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
@@ -49,6 +49,8 @@ type BodyProps = {
    */
   liveRide?: { status: string } | null;
   onReturnToRide?: () => void;
+  /** BE-88: "Send a parcel", only while the parcel tier is on (and no ride is in progress). */
+  onSendParcel?: () => void;
 };
 
 /**
@@ -70,6 +72,7 @@ export function HomeSheetBody({
   onSeeAllRides,
   liveRide = null,
   onReturnToRide,
+  onSendParcel,
 }: BodyProps) {
   return (
     <View style={styles.body}>
@@ -120,6 +123,17 @@ export function HomeSheetBody({
             action={{ label: t('home.turnOnLocation'), onPress: onEnableLocation, testID: 'home-location-enable' }}
             testID="home-location-banner"
           />
+        ) : null}
+        {onSendParcel && !liveRide ? (
+          <ListGroup>
+            <ListItem
+              icon="parcel"
+              title={t('parcel.homeEntryTitle')}
+              subtitle={t('parcel.homeEntrySubtitle')}
+              onPress={onSendParcel}
+              testID="home-send-parcel"
+            />
+          </ListGroup>
         ) : null}
         <RecentRidesCard rides={recentRides} onSeeAll={onSeeAllRides} onOpen={onOpenRide} />
       </View>

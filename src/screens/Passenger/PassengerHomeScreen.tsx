@@ -30,6 +30,7 @@ import { otherCount, takenLabels } from '../../features/saved-places/format';
 import { bookingParamsFor } from '../../features/saved-places/navigation';
 import { selectInProgressRide } from '../../features/active-ride/slice';
 import { liveRideStatusText } from '../../features/active-ride/status';
+import { useParcelAvailable } from '../../features/parcel/hooks';
 import { t } from '../../i18n';
 import { radius, space } from '../../theme';
 
@@ -97,6 +98,9 @@ export default function PassengerHomeScreen() {
       }),
     [navigation, saved.places, saved.maxOther],
   );
+
+  // BE-88: "Send a parcel" only while the parcel tier is on (the cached vehicle catalogue says so).
+  const parcelAvailable = useParcelAvailable();
 
   const {
     isInitialized: notificationsInitialized,
@@ -253,6 +257,7 @@ export default function PassengerHomeScreen() {
           }
           liveRide={liveRide}
           onReturnToRide={() => navigation.navigate('Booking')}
+          onSendParcel={parcelAvailable ? () => navigation.navigate('SendParcel') : undefined}
         />
       </BottomSheet>
     </Screen>

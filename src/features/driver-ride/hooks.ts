@@ -12,6 +12,7 @@ import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling'
 import { loadDriverStatus, selectDriverStatusState, type DriverStatusState } from '../driver-status/slice';
 import { DRIVER_RIDE_CODES, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
+import { t } from '../../i18n';
 import {
   advanceDriverRide,
   cancelDriverRide,
@@ -40,6 +41,8 @@ const REFETCH_CODES: ReadonlySet<string> = new Set([
   DRIVER_RIDE_CODES.stopAlreadyCompleted,
   DRIVER_RIDE_CODES.stopAlreadyCancelled,
   DRIVER_RIDE_CODES.stopNotActive,
+  // BE-88: the ride is a parcel (re-read it, so the parcel steps show).
+  DRIVER_RIDE_CODES.parcelStepRequired,
 ]);
 
 const SUCCESS_COPY: Record<DriverRideTransition | 'stop', string> = {
@@ -95,6 +98,7 @@ export const driverRideRefusalToast = (
   if (payload?.code === DRIVER_RIDE_CODES.notAssignedDriver) return { title: DRIVER_RIDE_COPY.notAssigned };
   if (payload?.code === DRIVER_RIDE_CODES.cannotBeCancelled) return { title: DRIVER_RIDE_COPY.cannotCancel };
   if (payload?.code === DRIVER_RIDE_CODES.invalidTransition) return { title: DRIVER_RIDE_COPY.changedElsewhere };
+  if (payload?.code === DRIVER_RIDE_CODES.parcelStepRequired) return { title: t('parcel.stepRequired') };
   return { title: rejectionMessage(payload, fallback) };
 };
 

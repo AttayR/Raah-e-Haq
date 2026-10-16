@@ -161,6 +161,15 @@ const activeRideSlice = createSlice({
       // The ride is over: its link stops 15 min after the end on its own (BE-80).
       state.shareLink = null;
     },
+    /**
+     * BE-88: a write that answers with the ride (the parcel's "Send the code again") replaces the
+     * ride on screen; an answer for another ride, or for one that has ended here, is ignored.
+     */
+    activeRideReplaced: (state, action: PayloadAction<RideResource>) => {
+      if (state.ride && state.ride.id === action.payload.id && !isRideTerminal(state.ride)) {
+        state.ride = action.payload;
+      }
+    },
     /** POST /rides/{id}/share answered with the live link. */
     liveShareStarted: (state, action: PayloadAction<ActiveRideShareLink>) => {
       state.shareLink = action.payload;
@@ -255,7 +264,8 @@ const activeRideSlice = createSlice({
   },
 });
 
-export const { clearActiveRide, activeRideRatingChanged, liveShareStarted, liveShareStopped } = activeRideSlice.actions;
+export const { clearActiveRide, activeRideRatingChanged, activeRideReplaced, liveShareStarted, liveShareStopped } =
+  activeRideSlice.actions;
 
 /** The live trip link of `rideId`, or null (another ride's link is never shown). */
 export const selectLiveShareLink = (state: SliceRoot, rideId: number | null): ActiveRideShareLink | null =>

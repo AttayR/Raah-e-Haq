@@ -11,6 +11,7 @@ import { DRIVER_RIDE_CODES, driverRideApi, runTransition, type DriverRideTransit
 import { DRIVER_RIDE_COPY } from './copy';
 import { isRestorableDriverRide } from './steps';
 import { PIN_CODES } from '../safety/pin';
+import { parcelApi, type ParcelDriverStep } from '../parcel/api';
 import { invalidateStatsForRide } from '../stats/invalidate';
 
 /**
@@ -29,7 +30,7 @@ import { invalidateStatsForRide } from '../stats/invalidate';
  * Not persisted; `resetApp` (logout) clears it through the root reducer, and every thunk drops
  * an answer that arrives after a logout (session epoch).
  */
-export type DriverRideAction = DriverRideTransition | 'stop' | 'cancel' | 'refresh' | 'restore';
+export type DriverRideAction = DriverRideTransition | 'stop' | 'cancel' | 'refresh' | 'restore' | 'parcel';
 
 export interface DriverRideState {
   ride: RideResource | null;
@@ -163,6 +164,17 @@ export const cancelDriverRide = createAsyncThunk<RideResource, { rideId: number;
   { condition: (_, { getState }) => isFreeForStep(getState()) },
 );
 
+/**
+ * BE-88: a driver's step on a parcel ride (pickup with the photo, deliver or returned with a
+ * code, return, refuse at the pickup). Guarded like the other steps; the answer is the ride.
+ */
+export const parcelDriverStep = createAsyncThunk<RideResource, { rideId: number } & ParcelDriverStep, ThunkConfig>(
+  'driverRide/parcelStep',
+  ({ rideId, ...step }, { rejectWithValue }) =>
+    runGuarded(() => parcelApi.driverStep(rideId, step), rejectWithValue, DRIVER_RIDE_COPY.actionFailed),
+  { condition: (_, { getState }) => isFreeForStep(getState()) },
+);
+
 const isCurrent = (state: DriverRideState, rideId: number): boolean => state.ride?.id === rideId;
 
 /** A request starts: it is now the one in flight. */
@@ -205,6 +217,18 @@ const driverRideSlice = createSlice({
   reducers: {
     /** A newer server copy of the ride. */
     setDriverActiveRide(state, action: PayloadAction<RideResource>) {
+      state.ride = action.payload;
+    },
+    /**
+     * BE-88: a write outside the step thunks that answers with the ride (the parcel's "Send the
+     * code again"). Applied only to the current ride while it is still active and no driver's
+     * step is in flight; it takes over a background read, whose older answer is then dropped.
+     */
+    driverRideWriteAnswered(state, action: PayloadAction<RideResource>) {
+      if (!state.ride || !isCurrent(state, action.payload.id) || !isRestorableDriverRide(state.ride)) return;
+      if (state.pendingAction !== null && !isBackgroundRead(state.pendingAction)) return;
+      state.pendingAction = null;
+      state.pendingRequestId = null;
       state.ride = action.payload;
     },
     /** The driver has seen the outcome (summary, cancelled), or the ride was taken away. */
@@ -250,6 +274,13 @@ const driverRideSlice = createSlice({
           state.ride = action.payload;
         }
       })
+      .addCase(parcelDriverStep.pending, (state, action) => {
+        begin(state, 'parcel', action.meta.requestId);
+      })
+      .addCase(parcelDriverStep.fulfilled, (state, action) => {
+        settle(state, action.meta.requestId);
+        applyRide(state, action.payload);
+      })
       .addCase(cancelDriverRide.pending, (state, action) => {
         begin(state, 'cancel', action.meta.requestId);
       })
@@ -266,6 +297,7 @@ const driverRideSlice = createSlice({
           refreshDriverRide.rejected,
           restoreDriverRide.rejected,
           cancelDriverRide.rejected,
+          parcelDriverStep.rejected,
         ),
         (state, action) => {
           // A skipped thunk (condition) never set pendingAction; leave the running one alone.
@@ -288,7 +320,8 @@ const driverRideSlice = createSlice({
   },
 });
 
-export const { setDriverActiveRide, clearDriverActiveRide, driverRideRatingChanged } = driverRideSlice.actions;
+export const { setDriverActiveRide, clearDriverActiveRide, driverRideRatingChanged, driverRideWriteAnswered } =
+  driverRideSlice.actions;
 
 export const selectDriverActiveRide = (state: SliceRoot): RideResource | null => state.driverRide.ride;
 

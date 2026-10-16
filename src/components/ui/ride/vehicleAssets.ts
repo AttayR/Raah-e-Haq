@@ -31,6 +31,8 @@ const SOURCES: Record<VehicleMarkerKind, Record<ColorMode, ImageSourcePropType>>
  */
 export const vehicleMarkerKind = (vehicleType: string | null | undefined): VehicleMarkerKind => {
   const key = typeof vehicleType === 'string' ? vehicleType.trim().toLowerCase() : '';
+  // BE-88: a parcel delivery is carried by bike.
+  if (key === 'parcel') return 'bike';
   return key === 'bike' || key === 'rickshaw' ? key : 'car';
 };
 

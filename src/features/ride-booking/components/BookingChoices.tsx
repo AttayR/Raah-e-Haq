@@ -8,7 +8,7 @@ import type { LoadStatus } from '../hooks';
 import { estimateFor } from '../hooks';
 import { BOOKING_COPY } from '../copy';
 import { space } from '../../../theme';
-import { formatFare, quoteBreakdown, toVehicleOptions } from '../vehicleOptions';
+import { formatFare, quoteBreakdown, rideVehicleTypes, toVehicleOptions } from '../vehicleOptions';
 import { t } from '../../../i18n';
 import { FareNoticeBanner, FarePolicyNote } from '../../fare/components/FareBits';
 import { OfferStepper } from '../../fare/components/OfferStepper';
@@ -66,7 +66,8 @@ export const VehicleChoice: React.FC<VehicleChoiceProps> = ({ vehicleTypes, esti
       />
     );
   }
-  const types = vehicleTypes.data ?? [];
+  // BE-88: only the ride tiers (the parcel tier has its own "Send a parcel" form).
+  const types = rideVehicleTypes(vehicleTypes.data ?? []);
   if (types.length === 0) {
     return <BookingStatusLine status="empty" text={BOOKING_COPY.vehicleTypesEmpty} />;
   }

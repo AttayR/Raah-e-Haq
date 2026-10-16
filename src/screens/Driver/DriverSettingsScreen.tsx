@@ -110,6 +110,16 @@ const DriverSettingsScreen = () => {
               />
             ) : null}
             <DriverWomenModeRow raw={user?.women_mode} />
+            {/* BE-88: parcels go by bike (no row for a car or rickshaw driver). */}
+            {!user?.vehicle_type || user.vehicle_type === 'bike' ? (
+              <ListItem
+                icon="parcel"
+                title={t('parcel.optInRowTitle')}
+                subtitle={t('parcel.optInRowSubtitle')}
+                onPress={() => navigation.navigate('ParcelOptIn')}
+                testID="driver-settings-parcels"
+              />
+            ) : null}
             <ListItem
               icon="history"
               title={DRIVER_SETTINGS_COPY.rideHistory}

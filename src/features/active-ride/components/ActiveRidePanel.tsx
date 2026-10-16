@@ -4,6 +4,7 @@ import { NavigationContext } from '@react-navigation/native';
 import {
   AcBadge,
   AppText,
+  Badge,
   Button,
   FareBreakdown,
   IndeterminateBar,
@@ -29,6 +30,9 @@ import { cancellationFeeText } from '../../fare/format';
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { isAcRide, toAcReportState } from '../../ac/api';
 import { WomenModeSearching } from '../../women-mode/components/WomenModeSearching';
+import { parcelOf } from '../../parcel/api';
+import { parcelStatusText } from '../../parcel/rules';
+import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection';
 import { readNumberOrNull } from '../../../core/api/read';
 import {
   canPassengerCancel,
@@ -128,6 +132,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const acReport = ride && ac ? toAcReportState(ride.ac_report) : null;
   // BE-81: the start PIN, only while the server sends it (accepted / arrived).
   const pin = driver ? ridePinOf(ride) : null;
+  // BE-88: a parcel says its own step (picked up, returning…) and shows the sender's block.
+  const parcel = parcelOf(ride);
+  const title = parcel && !warn ? parcelStatusText(parcel.status) : warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage];
   const actions: PersonAction[] = [];
   if (driver && onCall) {
     actions.push({
@@ -157,9 +164,10 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       <View style={styles.header} accessibilityLiveRegion="polite">
         <View style={styles.titleRow}>
           <AppText variant="h3" accessibilityRole="header" style={styles.title}>
-            {warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage]}
+            {title}
           </AppText>
           {ac ? <AcBadge testID="active-ride-ac" /> : null}
+          {parcel ? <Badge label={t('parcel.badge')} tone="info" testID="active-ride-parcel" /> : null}
         </View>
         {subtitle ? (
           <AppText variant="bodySmall" color={warn ? 'warning' : 'textSecondary'} testID="active-ride-subtitle">
@@ -168,7 +176,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
         ) : null}
       </View>
 
-      {!finished && step !== null ? <RideProgress step={step} testID="active-ride-progress" /> : null}
+      {!finished && step !== null && !parcel ? <RideProgress step={step} testID="active-ride-progress" /> : null}
+
+      {parcel && ride ? <ParcelSenderSection parcel={parcel} rideId={ride.id} /> : null}
 
       {/* BE-87: "Looking for a female driver" and the keep-waiting / allow-any choice. */}
       {stage === 'searching' && ride?.women_mode ? <WomenModeSearching rideId={ride.id} raw={ride.women_mode} /> : null}

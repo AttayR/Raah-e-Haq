@@ -18,6 +18,7 @@ import type { SavedPlaceEditorParams } from '../../../features/saved-places/navi
 import type { BookingParams } from '../../../features/ride-booking/prefill';
 import type { SafetyRoutes } from '../../../features/safety/navigation';
 import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
+import type { ParcelPassengerRoutes } from '../../../features/parcel/navigation';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
@@ -51,6 +52,8 @@ export type PassengerStackParamList = {
   /** Account → Emergency contacts and its form (T-520, BE-79); the SOS sheet opens it too. */
   EmergencyContacts: SafetyRoutes['EmergencyContacts'];
   EmergencyContactEditor: SafetyRoutes['EmergencyContactEditor'];
+  /** Home → "Send a parcel" (T-522, BE-88). */
+  SendParcel: ParcelPassengerRoutes['SendParcel'];
 };
 
 /*
@@ -70,6 +73,7 @@ const loadSavedPlacesScreen = () => require('../../../features/saved-places/scre
 const loadSavedPlaceEditorScreen = () => require('../../../features/saved-places/screens/SavedPlaceEditorScreen').default;
 const loadEmergencyContactsScreen = () => require('../../../features/safety/screens/EmergencyContactsScreen').default;
 const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
+const loadSendParcelScreen = () => require('../../../features/parcel/screens/SendParcelScreen').default;
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 
@@ -117,6 +121,7 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="NotificationPreferences" getComponent={loadNotificationPreferencesScreen} />
       <Stack.Screen name="EmergencyContacts" getComponent={loadEmergencyContactsScreen} />
       <Stack.Screen name="EmergencyContactEditor" getComponent={loadEmergencyContactEditorScreen} />
+      <Stack.Screen name="SendParcel" getComponent={loadSendParcelScreen} />
     </Stack.Navigator>
   );
 };

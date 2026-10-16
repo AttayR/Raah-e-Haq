@@ -12,6 +12,8 @@ import { riderRating } from '../../features/driver-requests/rating';
 import { t } from '../../i18n';
 import { WaitingTimer } from '../../features/fare/components/FareBits';
 import { toFarePolicy } from '../../features/fare/api';
+import { DriverParcelSection } from '../../features/parcel/components/DriverParcelSection';
+import type { DriverParcelPanel } from '../../features/parcel/useDriverParcel';
 
 type Props = {
   ride: RideResource;
@@ -48,6 +50,11 @@ type Props = {
   onNoShow?: () => void;
   /** Bottom safe-area inset: the fixed footer sits `bottomInset + 16` above the screen edge. */
   bottomInset?: number;
+  /**
+   * BE-88: a parcel's own steps replace Start trip / Complete trip (pickup with a photo, deliver
+   * or hand back with a code, return or refuse), and its details join the panel.
+   */
+  parcel?: DriverParcelPanel | null;
 };
 
 const TITLES: Partial<Record<DriverRideStep, string>> = {
@@ -84,6 +91,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   onCancel,
   onNoShow,
   bottomInset = 0,
+  parcel = null,
 }) => {
   const { theme } = useAppTheme();
   const userAction = pendingAction !== null && pendingAction !== 'refresh' && pendingAction !== 'restore';
@@ -99,6 +107,10 @@ export const DriverRidePanel: React.FC<Props> = ({
       ? { label: COPY.completeStop, onPress: () => onCompleteStop(nextStop.id), testID: 'driver-ride-complete-stop' }
       : { label: COPY.complete, onPress: onComplete, testID: 'driver-ride-complete' };
   }
+
+  // BE-88: after the arrival a parcel moves on with its own steps (none while the PIN is blocked).
+  if (parcel && step !== 'to_pickup') primary = step === 'at_pickup' && startBlocked ? null : parcel.primary;
+  const secondary = parcel && !(step === 'at_pickup' && startBlocked) ? parcel.secondary : null;
 
   const actions: PersonAction[] = [];
   if (canCall) {
@@ -124,7 +136,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   const cancellable = (step === 'to_pickup' || step === 'at_pickup') && !noShow;
   const blockedNotice = step === 'at_pickup' && startBlocked;
   const arrivalNotice = step === 'to_pickup' ? arrivalRefusal : null;
-  const hasFooter = !!primary || cancellable || noShow || blockedNotice;
+  const hasFooter = !!primary || !!secondary || cancellable || noShow || blockedNotice;
   const footerPad = { paddingBottom: bottomInset + space[4] };
 
   return (
@@ -157,6 +169,8 @@ export const DriverRidePanel: React.FC<Props> = ({
           actions={actions}
           nameTestID="driver-ride-passenger"
         />
+
+        {parcel ? <DriverParcelSection {...parcel} /> : null}
 
         {step === 'at_pickup' ? (
           // BE-85: the same waiting timer the passenger sees, after a verified arrival.
@@ -217,6 +231,16 @@ export const DriverRidePanel: React.FC<Props> = ({
               loading={userAction}
               accessibilityLabel={userAction ? COPY.working : primary.label}
               testID={primary.testID}
+            />
+          ) : null}
+          {secondary ? (
+            <Button
+              label={secondary.label}
+              variant={secondary.variant ?? 'secondary'}
+              size="lg"
+              onPress={secondary.onPress}
+              disabled={userAction}
+              testID={secondary.testID}
             />
           ) : null}
           {noShow && onNoShow ? (

@@ -17,6 +17,7 @@ import type { SafetyRoutes } from '../../../features/safety/navigation';
 import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
 import type { DriverStatementRoutes } from '../../../features/driver-statements/navigation';
 import type { VehicleAcRoutes } from '../../../features/ac/navigation';
+import type { ParcelDriverRoutes } from '../../../features/parcel/navigation';
 
 export type DriverStackParamList = {
   /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
@@ -53,6 +54,8 @@ export type DriverStackParamList = {
   DriverStrikes: DriverStatementRoutes['DriverStrikes'];
   /** Account → Vehicle AC (T-522, BE-86). */
   VehicleAc: VehicleAcRoutes['VehicleAc'];
+  /** Account → Parcel deliveries (T-522, BE-88). */
+  ParcelOptIn: ParcelDriverRoutes['ParcelOptIn'];
 };
 
 /*
@@ -78,6 +81,7 @@ const loadEmergencyContactEditorScreen = () => require('../../../features/safety
 const loadWeeklyStatementScreen = () => require('../../../features/driver-statements/screens/WeeklyStatementScreen').default;
 const loadDriverStrikesScreen = () => require('../../../features/driver-statements/screens/DriverStrikesScreen').default;
 const loadVehicleAcScreen = () => require('../../../features/ac/screens/VehicleAcScreen').default;
+const loadParcelOptInScreen = () => require('../../../features/parcel/screens/ParcelOptInScreen').default;
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
@@ -125,6 +129,7 @@ const DriverStack = () => {
       <Stack.Screen name="DriverStatements" getComponent={loadWeeklyStatementScreen} />
       <Stack.Screen name="DriverStrikes" getComponent={loadDriverStrikesScreen} />
       <Stack.Screen name="VehicleAc" getComponent={loadVehicleAcScreen} />
+      <Stack.Screen name="ParcelOptIn" getComponent={loadParcelOptInScreen} />
     </Stack.Navigator>
   );
 };

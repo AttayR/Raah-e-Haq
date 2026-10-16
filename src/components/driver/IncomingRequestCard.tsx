@@ -8,6 +8,7 @@ import type { RideRequestFeedView } from '../../features/driver-requests/hooks';
 import { formatMoney } from '../../utils/format';
 import { AcBadge, AddressPair, AppText, Badge, Button, IconButton, PersonCard } from '../ui';
 import { t } from '../../i18n';
+import { ParcelRequestInfo } from '../../features/parcel/components/ParcelRequestInfo';
 
 /** T-552: stops listed on the card (one line each); the rest are summed up in one row. */
 export const REQUEST_CARD_MAX_STOPS = 2;
@@ -74,7 +75,7 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
     <View style={[styles.card, maxHeight !== undefined ? { maxHeight } : null]} testID="incoming-request-card">
       <View style={styles.header}>
         <AppText variant="h3" accessibilityRole="header" style={styles.flex}>
-          {COPY.title}
+          {request.parcel ? t('parcel.requestTitle') : COPY.title}
         </AppText>
         <IconButton
           icon="close"
@@ -137,6 +138,9 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
           </View>
         )}
       </View>
+
+      {/* BE-88: what the parcel is and that the sender pays cash at the pickup. */}
+      {request.parcel ? <ParcelRequestInfo parcel={request.parcel} /> : null}
 
       <ScrollView style={styles.addresses} bounces={false} testID="incoming-request-addresses">
         <AddressPair
