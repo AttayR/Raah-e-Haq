@@ -196,6 +196,17 @@ describe.each([
     expect(fareBreakdownRows({ time: 28 }, { durationMin: 14 })[0].label).toBe('Time · 14 min');
   });
 
+  it('T-556: a locked fare labels time and distance as the booking quote, not the driven 2 min', () => {
+    const rows = fareBreakdownRows({ distance: 120, time: 54 }, { distanceKm: 0.4, durationMin: 2, fareLocked: true });
+    expect(rows.map(r => r.label)).toEqual(['Distance (quoted at booking)', 'Time (quoted at booking)']);
+    expect(rows.some(r => r.label.includes('2 min'))).toBe(false);
+    // A metered ride keeps the measured minutes and km.
+    expect(fareBreakdownRows({ time: 54 }, { durationMin: 18, fareLocked: false })[0].label).toBe('Time · 18 min');
+    render(<FareBreakdown testID="locked" breakdown={{ time: 54 }} total={320} durationMin={2} fareLocked />);
+    expect(screen.getByText('Time (quoted at booking)')).toBeTruthy();
+    expect(screen.queryByText('Time · 2 min')).toBeNull();
+  });
+
   it('PersonCard: driver shape (vehicle line, plate pill, highlighted when arrived) and passenger shape (New rider, actions)', () => {
     const onCall = jest.fn();
     const { rerender } = render(

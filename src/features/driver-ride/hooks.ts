@@ -5,6 +5,7 @@ import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
 import { toast, type ToastOptions } from '../../core/toast';
 import type { RideResource } from '../../services/rideService';
+import { formatDistance } from '../../utils/format';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
 import { layout, space } from '../../theme/spacing';
 import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
@@ -75,7 +76,13 @@ const notNearPickupText = (payload: ThunkRejection): DriverRideToastText => {
   const title = asSentence(rejectionMessage(payload, DRIVER_RIDE_COPY.notNearPickup));
   const distance = payload.extra?.distance_m;
   if (typeof distance !== 'number' || !Number.isFinite(distance) || distance < 0) return { title };
-  return { title, message: DRIVER_RIDE_COPY.aboutAway.replace('{m}', String(Math.round(distance))) };
+  return { title, message: DRIVER_RIDE_COPY.aboutAway.replace('{distance}', formatAwayDistance(distance)) };
+};
+
+/** T-556: "812 m" below 1 km, "1.7 km" from 1 km (the kit km format). */
+export const formatAwayDistance = (metres: number): string => {
+  const rounded = Math.round(metres);
+  return rounded < 1000 ? DRIVER_RIDE_COPY.metres.replace('{m}', String(rounded)) : formatDistance(rounded / 1000);
 };
 
 /** The toast for a refused step: our copy for known codes, else the server's safe text. */

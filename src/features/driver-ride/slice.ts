@@ -20,7 +20,10 @@ import { invalidateStatsForRide } from '../stats/invalidate';
  * refresh (GET /rides/{id}) or the launch restore (GET /driver/status active_ride_id).
  *
  * `pendingAction` is the request in flight. Every thunk is skipped while one is set, so a
- * double tap sends one request and a late answer never overwrites a newer one.
+ * double tap sends one request and a late answer never overwrites a newer one. T-556 (QA
+ * 2026-10-16: one "Stop done" tap ignored): a driver's step is never skipped for a background
+ * read (the ~8 s poll, the foreground refresh, the restore). It takes over, and the read's
+ * answer, older than the step, is dropped (`pendingRequestId`).
  *
  * Not persisted; `resetApp` (logout) clears it through the root reducer, and every thunk drops
  * an answer that arrives after a logout (session epoch).
@@ -30,14 +33,23 @@ export type DriverRideAction = DriverRideTransition | 'stop' | 'cancel' | 'refre
 export interface DriverRideState {
   ride: RideResource | null;
   pendingAction: DriverRideAction | null;
+  /** The request id of `pendingAction`: only its own answer applies and clears it (T-556). */
+  pendingRequestId: string | null;
 }
 
-export const initialDriverRideState: DriverRideState = { ride: null, pendingAction: null };
+export const initialDriverRideState: DriverRideState = { ride: null, pendingAction: null, pendingRequestId: null };
 
 type SliceRoot = { driverRide: DriverRideState };
 type ThunkConfig = { state: SliceRoot; rejectValue: ThunkRejection };
 
 const isIdle = (state: SliceRoot): boolean => state.driverRide.pendingAction === null;
+
+/** Background reads a driver's step may take over (T-556). */
+const isBackgroundRead = (action: DriverRideAction | null): boolean => action === 'refresh' || action === 'restore';
+
+/** No request, or only a background read, in flight: a driver's step may be sent. */
+const isFreeForStep = (state: SliceRoot): boolean =>
+  isIdle(state) || isBackgroundRead(state.driverRide.pendingAction);
 
 /**
  * The thunk body every request shares: an answer that arrives after a logout is dropped
@@ -90,7 +102,8 @@ export const advanceDriverRide = createAsyncThunk<RideResource, AdvanceDriverRid
       rejectWithValue,
       DRIVER_RIDE_COPY.actionFailed,
     ),
-  { condition: (_, { getState }) => isIdle(getState()) },
+  // T-556: a background read in flight does not swallow the driver's tap.
+  { condition: (_, { getState }) => isFreeForStep(getState()) },
 );
 
 /** GET /rides/{id}: the latest server copy (on screen mount, foreground, or after a 409). */
@@ -121,6 +134,23 @@ export const cancelDriverRide = createAsyncThunk<RideResource, { rideId: number;
 );
 
 const isCurrent = (state: DriverRideState, rideId: number): boolean => state.ride?.id === rideId;
+
+/** A request starts: it is now the one in flight. */
+const begin = (state: DriverRideState, action: DriverRideAction, requestId: string): void => {
+  state.pendingAction = action;
+  state.pendingRequestId = requestId;
+};
+
+/**
+ * A request settled. True when it was the one in flight (the flag is cleared); false for a
+ * background read a driver's step took over, whose answer is older than that step (T-556).
+ */
+const settle = (state: DriverRideState, requestId: string): boolean => {
+  if (state.pendingRequestId !== requestId) return false;
+  state.pendingAction = null;
+  state.pendingRequestId = null;
+  return true;
+};
 
 /** Applies a server copy of the current ride (an answer for another ride is ignored). */
 const applyRide = (state: DriverRideState, ride: RideResource): void => {
@@ -168,34 +198,33 @@ const driverRideSlice = createSlice({
         state.ride = action.payload;
       })
       .addCase(advanceDriverRide.pending, (state, action) => {
-        state.pendingAction = action.meta.arg.action;
+        begin(state, action.meta.arg.action, action.meta.requestId);
       })
       .addCase(advanceDriverRide.fulfilled, (state, action) => {
-        state.pendingAction = null;
+        settle(state, action.meta.requestId);
         applyRide(state, action.payload);
       })
-      .addCase(refreshDriverRide.pending, (state) => {
-        state.pendingAction = 'refresh';
+      .addCase(refreshDriverRide.pending, (state, action) => {
+        begin(state, 'refresh', action.meta.requestId);
       })
       .addCase(refreshDriverRide.fulfilled, (state, action) => {
-        state.pendingAction = null;
-        applyRide(state, action.payload);
+        // Taken over by a driver's step: this copy predates it.
+        if (settle(state, action.meta.requestId)) applyRide(state, action.payload);
       })
-      .addCase(restoreDriverRide.pending, (state) => {
-        state.pendingAction = 'restore';
+      .addCase(restoreDriverRide.pending, (state, action) => {
+        begin(state, 'restore', action.meta.requestId);
       })
       .addCase(restoreDriverRide.fulfilled, (state, action) => {
-        state.pendingAction = null;
         // A ride accepted while the restore ran is newer than this answer.
-        if (state.ride === null && isRestorableDriverRide(action.payload)) {
+        if (settle(state, action.meta.requestId) && state.ride === null && isRestorableDriverRide(action.payload)) {
           state.ride = action.payload;
         }
       })
-      .addCase(cancelDriverRide.pending, (state) => {
-        state.pendingAction = 'cancel';
+      .addCase(cancelDriverRide.pending, (state, action) => {
+        begin(state, 'cancel', action.meta.requestId);
       })
       .addCase(cancelDriverRide.fulfilled, (state, action) => {
-        state.pendingAction = null;
+        settle(state, action.meta.requestId);
         // Cancelled, or back in the queue for another driver: no longer ours either way.
         if (isCurrent(state, action.payload.id)) {
           state.ride = null;
@@ -211,7 +240,9 @@ const driverRideSlice = createSlice({
         (state, action) => {
           // A skipped thunk (condition) never set pendingAction; leave the running one alone.
           if (action.meta.condition) return;
-          state.pendingAction = null;
+          const own = settle(state, action.meta.requestId);
+          // T-556: a background read taken over by a driver's step says nothing about the ride now.
+          if (!own && (refreshDriverRide.rejected.match(action) || restoreDriverRide.rejected.match(action))) return;
           const payload = action.payload;
           if (isStaleSessionRejection(payload)) return;
           const arg = action.meta.arg;

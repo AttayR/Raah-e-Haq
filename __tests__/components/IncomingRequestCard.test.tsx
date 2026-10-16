@@ -85,8 +85,8 @@ describe('IncomingRequestCard', () => {
     expect(getByTestId('incoming-request-addresses')).toBeTruthy();
   });
 
-  it('T-553: one hidden stop reads "Stop 3", not "Stops 3–3"', () => {
-    const { getByTestId, getByText, queryByText } = render(
+  it('T-556: exactly 3 stops lists the third address instead of "+1 more stop"', () => {
+    const { getByTestId, getByText, queryByTestId } = render(
       <IncomingRequestCard
         request={makePendingRequest({
           stops: [1, 2, 3].map(n => ({ id: 40 + n, address: `Fake stop ${n}` })),
@@ -97,9 +97,27 @@ describe('IncomingRequestCard', () => {
         onReject={noop}
       />,
     );
-    expect(getByTestId('incoming-request-more-stops').props.children).toBe('+1 more stop');
+    expect(getByTestId('incoming-request-stop-3').props.children).toBe('Fake stop 3');
+    expect(getByTestId('incoming-request-stop-3').props.numberOfLines).toBe(1);
     getByText('Stop 3');
-    expect(queryByText('Stops 3–3')).toBeNull();
+    expect(queryByTestId('incoming-request-more-stops')).toBeNull();
+  });
+
+  it('T-556: 4 stops collapse the two hidden ones into "+2 more stops"', () => {
+    const { getByTestId, getByText, queryByTestId } = render(
+      <IncomingRequestCard
+        request={makePendingRequest({
+          stops: [1, 2, 3, 4].map(n => ({ id: 50 + n, address: `Fake stop ${n}` })),
+        })}
+        accepting={false}
+        disabled={false}
+        onAccept={noop}
+        onReject={noop}
+      />,
+    );
+    expect(queryByTestId('incoming-request-stop-3')).toBeNull();
+    expect(getByTestId('incoming-request-more-stops').props.children).toBe('+2 more stops');
+    getByText('Stops 3–4');
   });
 
   it("shows the passenger's photo from the request card (T-504)", () => {

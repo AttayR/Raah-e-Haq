@@ -90,6 +90,13 @@ describe('driverRideRefusalToast (T-411)', () => {
     });
   });
 
+  it('T-556: from 1 km the distance reads in km ("About 1.7 km away", not "1737 m")', () => {
+    expect(driverRideRefusalToast(notNear('Too far.', { distance_m: 1737 }), 'x').message).toBe('About 1.7 km away.');
+    expect(driverRideRefusalToast(notNear('Too far.', { distance_m: 999.4 }), 'x').message).toBe('About 999 m away.');
+    expect(driverRideRefusalToast(notNear('Too far.', { distance_m: 999.6 }), 'x').message).toBe('About 1.0 km away.');
+    expect(driverRideRefusalToast(notNear('Too far.', { distance_m: 12_400 }), 'x').message).toBe('About 12 km away.');
+  });
+
   it('shows only the title when the distance is missing or not usable', () => {
     expect(driverRideRefusalToast(notNear('Too far', { distance_m: Number.NaN }), 'x')).toEqual({ title: 'Too far.' });
     expect(driverRideRefusalToast(notNear('Too far', { distance_m: -5 }), 'x')).toEqual({ title: 'Too far.' });

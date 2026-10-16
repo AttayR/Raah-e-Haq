@@ -86,6 +86,50 @@ describe('advanceDriverRide', () => {
     expect(selectDriverActiveRide(store.getState())?.completed_stops_count).toBe(1);
   });
 
+  it('T-556: a "Stop done" tap during a background read is sent, and the older read answer is dropped', async () => {
+    let gets = 0;
+    mock.onGet('/rides/41').reply(() => {
+      gets += 1;
+      if (gets === 1) {
+        // The poll's read, sent before the tap and answered after the step.
+        return new Promise((resolve) => setTimeout(() => resolve([200, envelope(makeRide({ status: 'started', completed_stops_count: 0 }))]), 30));
+      }
+      return [200, envelope(makeRide({ status: 'started', completed_stops_count: 1 }))];
+    });
+    mock.onPost('/rides/41/stops/5/complete').reply(200, envelope({ id: 41, completed_stops: 1, remaining_stops: 0 }));
+    const store = storeWithRide(makeRide({ status: 'started' }));
+
+    const read = store.dispatch(refreshDriverRide(41));
+    expect(store.getState().driverRide.pendingAction).toBe('refresh');
+    const step = await store.dispatch(advanceDriverRide({ rideId: 41, action: 'stop', stopId: 5 }));
+    // Before T-556 the step was skipped (a rejected condition) while the read ran: the tap did nothing.
+    expect(advanceDriverRide.fulfilled.match(step)).toBe(true);
+    expect(mock.history.post.map((r) => r.url)).toEqual(['/rides/41/stops/5/complete']);
+    expect(selectDriverActiveRide(store.getState())?.completed_stops_count).toBe(1);
+    expect(store.getState().driverRide.pendingAction).toBeNull();
+
+    await read;
+    // The read predates the step: it neither reverts the stop nor touches the flag.
+    expect(selectDriverActiveRide(store.getState())?.completed_stops_count).toBe(1);
+    expect(store.getState().driverRide.pendingAction).toBeNull();
+  });
+
+  it('T-556: a background read refused after a step took over does not drop the ride', async () => {
+    mock.onGet('/rides/41').replyOnce(() => new Promise((resolve) => setTimeout(() => resolve([404, { success: false, message: 'Not found' }]), 30)));
+    mock.onPost('/rides/41/arrived').reply(200, envelope(makeRide({ status: 'arrived' })));
+    const store = storeWithRide(makeRide({ status: 'accepted' }));
+    const read = store.dispatch(refreshDriverRide(41));
+    await store.dispatch(advanceDriverRide({ rideId: 41, action: 'arrived' }));
+    await read;
+    expect(selectDriverActiveRide(store.getState())?.status).toBe('arrived');
+    // While a step runs, a new read is still skipped (one request at a time from then on).
+    mock.onPost('/rides/41/start').reply(() => new Promise((resolve) => setTimeout(() => resolve([200, envelope(makeRide({ status: 'started' }))]), 10)));
+    const start = store.dispatch(advanceDriverRide({ rideId: 41, action: 'start' }));
+    const skipped = await store.dispatch(refreshDriverRide(41));
+    expect(refreshDriverRide.rejected.match(skipped) && skipped.meta.condition).toBe(true);
+    await start;
+  });
+
   it('sends one request on a double tap', async () => {
     mock.onPost('/rides/41/arrived').reply(200, envelope(makeRide({ status: 'arrived' })));
     const store = storeWithRide(makeRide({ status: 'accepted' }));

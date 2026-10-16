@@ -59,16 +59,27 @@ export const rideFollowCoordinates = (
   driverLocation: Pick<DriverLocation, 'latitude' | 'longitude'> | null,
   ride: RideCameraRide | null,
 ): LatLng[] | null => {
-  if (stage === 'driver_en_route') return driverApproachCoordinates(stage, driverLocation, ride);
+  if (stage === 'driver_en_route') {
+    // T-556 (QA 2026-10-16 #35): the stop pins are drawn on the approach too, and one sat under
+    // the status bar; they are fitted after the car and the pickup.
+    const approach = driverApproachCoordinates(stage, driverLocation, ride);
+    return approach && ride ? [...approach, ...activeStopCoordinates(ride)] : approach;
+  }
   if (stage !== 'in_trip' || !driverLocation || !ride) return null;
   const driver = coordinate(driverLocation.latitude, driverLocation.longitude);
   const dropoff = coordinate(ride.dropoff_latitude, ride.dropoff_longitude);
   if (!driver || !dropoff) return null;
-  const stops = activeStops({ stops: ride.stops ?? [] })
+  return [driver, ...activeStopCoordinates(ride), dropoff];
+};
+
+/**
+ * The coordinates of the stops still to visit, in route order (bad coordinates left out): the
+ * stop pins both ride maps draw, which their cameras keep in the fit (T-552, T-556).
+ */
+export const activeStopCoordinates = (ride: Partial<Pick<RideResource, 'stops'>> | null | undefined): LatLng[] =>
+  activeStops({ stops: ride?.stops ?? [] })
     .map((stop) => coordinate(stop.latitude, stop.longitude))
     .filter((point): point is LatLng => point !== null);
-  return [driver, ...stops, dropoff];
-};
 
 /** The ride fields the camera reads (the drop-off and the stops only on the trip). */
 export type RideCameraRide = Pick<RideResource, 'pickup_latitude' | 'pickup_longitude'> &

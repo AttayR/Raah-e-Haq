@@ -1,5 +1,5 @@
 import React, { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
-import { Keyboard, Platform, ScrollView, type ScrollViewProps, type View } from 'react-native';
+import { Keyboard, Platform, ScrollView, View, type ScrollViewProps, type ViewProps } from 'react-native';
 import { space } from '../../theme';
 
 /**
@@ -180,6 +180,35 @@ type ProviderProps = React.PropsWithChildren<{ getScroll: () => RevealScrollable
 export function KeyboardRevealProvider({ getScroll, children }: ProviderProps) {
   const reveal = useKeyboardRevealController(getScroll);
   return <KeyboardRevealContext.Provider value={reveal}>{children}</KeyboardRevealContext.Provider>;
+}
+
+type GroupProps = React.PropsWithChildren<{ style?: ViewProps['style']; testID?: string }>;
+
+/**
+ * T-556 (QA 2026-10-16 #25): a section whose heading must stay in view with its field. Fields
+ * inside report the whole group (heading, field and the field's suggestions) to the enclosing
+ * reveal, so revealing scrolls the group's top into view, not just the field, whose list would
+ * otherwise push the heading out above the sheet. A new error still reveals the field itself.
+ * Without an enclosing controller it is a plain View.
+ */
+export function KeyboardRevealGroup({ style, testID, children }: GroupProps) {
+  const parent = useKeyboardReveal();
+  const groupRef = useRef<View | null>(null);
+  const value = useMemo<KeyboardReveal | null>(() => {
+    if (!parent) return null;
+    const asGroup = (target: Measurable | null): Measurable | null => (target ? groupRef.current ?? target : null);
+    return {
+      focus: (target) => parent.focus(asGroup(target)),
+      blur: (target) => parent.blur(asGroup(target)),
+      layoutChanged: (target) => parent.layoutChanged(asGroup(target)),
+      error: (target) => parent.error(target),
+    };
+  }, [parent]);
+  return (
+    <View ref={groupRef} style={style} testID={testID}>
+      <KeyboardRevealContext.Provider value={value}>{children}</KeyboardRevealContext.Provider>
+    </View>
+  );
 }
 
 /**

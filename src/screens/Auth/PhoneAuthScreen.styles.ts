@@ -2,6 +2,7 @@ import { StyleSheet, Dimensions } from 'react-native';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Spacing } from '../../theme/spacing';
+import { lightColors } from '../../theme/tokens';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -29,6 +30,21 @@ export const styles = StyleSheet.create({
     zIndex: 10,
   },
   /** Keyboard up (T-113): title only, so Send/Verify stay above the keyboard. */
+  // T-556: back control at the header's top start, a 44 pt target above the decorative circles.
+  headerBack: {
+    position: 'absolute',
+    top: Spacing[2],
+    start: Spacing[2],
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  headerBackIcon: {
+    color: lightColors.onPrimary,
+  },
   fixedHeaderCompact: {
     paddingTop: Spacing[2],
     paddingBottom: Spacing[4],

@@ -193,6 +193,21 @@ describe('Edit profile', () => {
     expect(store.getState().apiAuth.user?.address).toBeUndefined();
   });
 
+  it('T-556: the Save bar sits below the form (never over it) with its own edge, so About you is never under it', async () => {
+    await renderWith(<ProfileEditScreen />, rider);
+    const footer = screen.getByTestId('profile-edit-footer');
+    const style = StyleSheet.flatten(footer.props.style);
+    // In the layout flow after the scroll view, not an overlay the last field could sit under.
+    expect(style.position).not.toBe('absolute');
+    expect(screen.getByTestId('profile-edit-scroll')).not.toContainElement(footer);
+    expect(footer).toContainElement(screen.getByTestId('profile-edit-save'));
+    expect(screen.getByTestId('profile-edit-scroll')).toContainElement(screen.getByTestId('profile-edit-bio'));
+    // A visible edge: hairline in the border token over the screen background.
+    expect(style.borderTopWidth).toBeGreaterThan(0);
+    expect(style.borderTopColor).toBeTruthy();
+    expect(style.backgroundColor).toBeTruthy();
+  });
+
   it('T-545: the phone helper sits under the row at full width (not cut next to "Change number")', async () => {
     await renderWith(<ProfileEditScreen />, rider);
     expect(screen.getByTestId('profile-edit-phone-helper')).toHaveTextContent(

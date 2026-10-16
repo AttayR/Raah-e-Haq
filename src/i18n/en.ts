@@ -255,6 +255,10 @@ export const en = {
     fareDistancePlain: 'Distance',
     fareTime: 'Time · {duration}',
     fareTimePlain: 'Time',
+    // T-556: a locked fare (BE-82) charges the time and distance quoted at booking, not the
+    // trip as driven, so the measured minutes/km are not shown next to those amounts.
+    fareTimeLocked: 'Time (quoted at booking)',
+    fareDistanceLocked: 'Distance (quoted at booking)',
     fareStops: 'Stops',
     fareMinimum: 'Minimum fare adjustment',
     fareDiscount: 'Discount',

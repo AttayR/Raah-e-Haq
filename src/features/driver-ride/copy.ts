@@ -71,7 +71,11 @@ export const DRIVER_RIDE_COPY = {
   notAssigned: 'This ride is no longer assigned to you.',
   cannotCancel: 'The ride can only be cancelled before the trip starts.',
   notNearPickup: 'You are not at the pickup yet.',
-  /** Appended to the not-near-pickup message; `{m}` is the server's distance in metres. */
-  aboutAway: 'About {m} m away.',
+  /**
+   * Appended to the not-near-pickup message; `{distance}` is the server's distance, in metres
+   * below 1 km and in km from there (T-556: "About 1737 m away" read badly).
+   */
+  aboutAway: 'About {distance} away.',
+  metres: '{m} m',
   navigateFailed: 'Could not open the maps app.',
 } as const;

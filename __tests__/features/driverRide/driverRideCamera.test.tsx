@@ -202,3 +202,44 @@ describe('useDriverRideCamera', () => {
     expect(result.current.paused).toBe(false);
   });
 });
+
+describe('T-556: the stops still to visit stay in the fit (QA 2026-10-16 #37/#38)', () => {
+  // Stop 2 north of the driver (it sat under the status bar), stop 3 south (under the panel).
+  const STOP_NORTH = offset(DRIVER, 1500, -300);
+  const STOP_SOUTH = offset(PICKUP, -900, 400);
+
+  it('every stop lands in the strip between the top controls and the panel', () => {
+    const region = driverRideRegion(driverRideFitCoordinates(DRIVER, PICKUP, [STOP_NORTH, STOP_SOUTH]), TALL_PANEL)!;
+    const covered = { top: TALL_PANEL.topInset + TALL_PANEL.topControls, bottom: TALL_PANEL.mapHeight - TALL_PANEL.dockHeight };
+    [DRIVER, PICKUP, STOP_NORTH, STOP_SOUTH].forEach((p) => {
+      const { y } = toScreen(p, region, TALL_PANEL);
+      expect(y).toBeGreaterThan(covered.top);
+      expect(y).toBeLessThan(covered.bottom);
+    });
+    // Before T-556 the screen fitted the target alone, and the north stop was off the strip.
+    const targetOnly = driverRideRegion(driverRideFitCoordinates(DRIVER, PICKUP), TALL_PANEL)!;
+    expect(toScreen(STOP_NORTH, targetOnly, TALL_PANEL).y).toBeLessThan(covered.top);
+  });
+
+  it('the hook fits the stops, and refits when a stop is done', () => {
+    const map = { animateToRegion: jest.fn() };
+    const ref = { current: map };
+    const { result, rerender } = renderHook(
+      (props: { route: LatLng[] }) =>
+        useDriverRideCamera(ref, { step: 'on_trip', driver: DRIVER, target: STOP_NORTH, route: props.route, viewport: VIEWPORT }),
+      { initialProps: { route: [STOP_NORTH, STOP_SOUTH] } },
+    );
+    act(() => result.current.onMapReady());
+    expect(map.animateToRegion).toHaveBeenLastCalledWith(
+      driverRideRegion(driverRideFitCoordinates(DRIVER, STOP_NORTH, [STOP_NORTH, STOP_SOUTH]), VIEWPORT),
+      DRIVER_RIDE_FIT_MS,
+    );
+    rerender({ route: [STOP_NORTH, STOP_SOUTH] });
+    expect(map.animateToRegion).toHaveBeenCalledTimes(1);
+    rerender({ route: [STOP_NORTH] });
+    expect(map.animateToRegion).toHaveBeenCalledTimes(2);
+    expect(driverRideFitKey('on_trip', DRIVER, STOP_NORTH, [STOP_NORTH])).not.toBe(
+      driverRideFitKey('on_trip', DRIVER, STOP_NORTH, [STOP_NORTH, STOP_SOUTH]),
+    );
+  });
+});

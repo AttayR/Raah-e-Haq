@@ -19,6 +19,7 @@ import { toast } from '../../../core/toast';
 import { formatIsoDateInput } from '../../auth/registration/inputFormat';
 import { formatPkPhone } from '../../safety/rules';
 import { t } from '../../../i18n';
+import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { layout, space } from '../../../theme';
 import { ADDRESS_MAX, BIO_MAX, EMAIL_MAX, GENDERS, NAME_MAX, type Gender } from '../form';
 import { useProfileEditForm } from '../useProfileEditForm';
@@ -44,6 +45,16 @@ export default function ProfileEditScreen() {
   const { form, errors, setField } = edit;
   const [saved, setSaved] = useState(false);
   const isDriver = user?.role === 'driver';
+  const { theme } = useAppTheme();
+  // T-556 (QA 2026-10-16 #6): the Save bar is laid out below the scroll view (never over it), but
+  // with no edge of its own the field cut at the scroll edge ("About you" on first open) read as
+  // covered by the button. A hairline and the screen background make it a bar the form scrolls
+  // under; the end of the form still scrolls fully clear of it.
+  const footerEdge = {
+    borderTopWidth: theme.borderWidth.hairline,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  };
 
   // Saved: leave once the discard guard is off (it is read on the next render).
   useEffect(() => {
@@ -203,7 +214,7 @@ export default function ProfileEditScreen() {
           </AppText>
         ) : null}
       </KeyboardAwareScrollView>
-      <View style={styles.footer}>
+      <View style={[styles.footer, footerEdge]} testID="profile-edit-footer">
         <Button
           label={t('profileEdit.save')}
           onPress={onSave}

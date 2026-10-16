@@ -152,13 +152,17 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   stepCircleActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: lightColors.surface,
   },
   stepCircleCompleted: {
-    backgroundColor: '#10b981',
+    backgroundColor: lightColors.success,
   },
+  // The active circle is white, so its glyph takes the brand navy (T-556: it was white on white).
   stepIconActive: {
-    color: '#ffffff',
+    color: lightColors.primary,
+  },
+  stepIconCompleted: {
+    color: lightColors.onSuccess,
   },
   stepIconIdle: {
     color: '#9ca3af',

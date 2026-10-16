@@ -243,6 +243,7 @@ export function ReceiptCard({ ride, viewer }: SectionProps) {
         total={b ? b.total : ride.totalFare}
         distanceKm={ride.distanceKm}
         durationMin={ride.durationMinutes}
+        fareLocked={ride.fareLock !== null}
         totalLabel={C.total}
         extraRows={[...driverRows, ...info]}
       />

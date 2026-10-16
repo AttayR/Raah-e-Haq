@@ -12,6 +12,7 @@ import {
   KeyboardAwareScrollView,
   KeyboardDoneBar,
   KeyboardRevealContext,
+  KeyboardRevealGroup,
   REVEAL_DELAY_MS,
   REVEAL_MARGIN,
   TextField,
@@ -240,6 +241,56 @@ describe('TextField reports to the reveal controller', () => {
     await act(async () => {});
     fireEvent(screen.getByTestId('name-input'), 'focus');
     expect(screen.getByTestId('name-error')).toHaveTextContent('Enter your name.');
+  });
+});
+
+describe('T-556: KeyboardRevealGroup keeps a section heading in view with its field', () => {
+  const fake = (): KeyboardReveal => ({ focus: jest.fn(), blur: jest.fn(), layoutChanged: jest.fn(), error: jest.fn() });
+
+  function Section({ reveal, error }: { reveal: KeyboardReveal; error?: string }) {
+    return (
+      <ThemeProvider>
+        <KeyboardRevealContext.Provider value={reveal}>
+          <KeyboardRevealGroup testID="group">
+            <TextField label="Stop A" value="" onChangeText={jest.fn()} testID="a" />
+            <TextField label="Stop B" value="" onChangeText={jest.fn()} error={error} testID="b" />
+          </KeyboardRevealGroup>
+        </KeyboardRevealContext.Provider>
+      </ThemeProvider>
+    );
+  }
+
+  it('fields report the whole group (one target for both), not themselves; errors still reveal the field', async () => {
+    const reveal = fake();
+    const view = render(<Section reveal={reveal} />);
+    await act(async () => {});
+    fireEvent(screen.getByTestId('a-input'), 'focus');
+    fireEvent(screen.getByTestId('a'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 120 } } });
+    fireEvent(screen.getByTestId('a-input'), 'blur');
+    fireEvent(screen.getByTestId('b-input'), 'focus');
+    const group = (reveal.focus as jest.Mock).mock.calls[0][0];
+    expect(group).toBeTruthy();
+    // The same target for both fields and every report: the group, so its heading is revealed.
+    expect((reveal.focus as jest.Mock).mock.calls[1][0]).toBe(group);
+    expect((reveal.layoutChanged as jest.Mock).mock.calls[0][0]).toBe(group);
+    expect((reveal.blur as jest.Mock).mock.calls[0][0]).toBe(group);
+
+    view.rerender(<Section reveal={reveal} error="Pick a place." />);
+    expect(reveal.error).toHaveBeenCalledTimes(1);
+    expect((reveal.error as jest.Mock).mock.calls[0][0]).not.toBe(group);
+  });
+
+  it('is a plain view outside a reveal controller', async () => {
+    render(
+      <ThemeProvider>
+        <KeyboardRevealGroup testID="group">
+          <TextField label="Stop" value="" onChangeText={jest.fn()} testID="s" />
+        </KeyboardRevealGroup>
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    fireEvent(screen.getByTestId('s-input'), 'focus');
+    expect(screen.getByTestId('group')).toContainElement(screen.getByTestId('s'));
   });
 });
 

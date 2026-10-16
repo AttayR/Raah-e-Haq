@@ -24,9 +24,10 @@ jest.mock('../../src/store', () => {
 
 const mockNavigate = jest.fn();
 const mockPopTo = jest.fn();
+const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: mockNavigate, popTo: mockPopTo }),
+  useNavigation: () => ({ navigate: mockNavigate, popTo: mockPopTo, goBack: mockGoBack, canGoBack: () => true }),
 }));
 
 const PHONE = '+923001234567';
@@ -72,6 +73,23 @@ afterEach(() => {
 });
 
 describe('PhoneAuthScreen (T-101)', () => {
+  it('T-556: the header has a back button: the code step returns to the number, the number step leaves', async () => {
+    replyLocalSend();
+    mockGoBack.mockClear();
+    await renderScreen();
+    expect(screen.getByLabelText('Back')).toBeTruthy();
+    await sendCode();
+    await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('phone-auth-back'));
+    expect(screen.getByText('Phone Verification')).toBeTruthy();
+    expect(screen.queryByText('Enter verification code')).toBeNull();
+    expect(mockGoBack).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('phone-auth-back'));
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
+  });
+
   it('never shows the code the local backend echoes, nor test-code UI', async () => {
     replyLocalSend();
     const store = await renderScreen();

@@ -147,17 +147,30 @@ export interface RegionCameraMap {
 /** How long a refit animates (ms). */
 export const DRIVER_RIDE_FIT_MS = 500;
 
-/** The refit key: the step, the target, and the driver rounded to ~110 m. */
-export const driverRideFitKey = (step: DriverRideStep, driver: LatLng | null, target: LatLng | null): string | null => {
+/**
+ * The refit key: the step, the target, the driver rounded to ~110 m, and (T-556) the other
+ * points fitted with them (the stops still to visit), so a stop that appears or is done refits.
+ */
+export const driverRideFitKey = (
+  step: DriverRideStep,
+  driver: LatLng | null,
+  target: LatLng | null,
+  route?: ReadonlyArray<LatLng> | null,
+): string | null => {
   if (!target) return null;
   const follow = driver ? `${driver.latitude.toFixed(FOLLOW_DECIMALS)},${driver.longitude.toFixed(FOLLOW_DECIMALS)}` : '-';
-  return `${step}|${fitKeyOf([target])}|${follow}`;
+  const others = route && route.length > 0 ? fitKeyOf([...route]) : '-';
+  return `${step}|${fitKeyOf([target])}|${follow}|${others}`;
 };
 
 export interface DriverRideCameraOptions {
   step: DriverRideStep;
   driver: LatLng | null;
   target: LatLng | null;
+  /**
+   * Other points kept in the fit. T-556 (QA 2026-10-16 #37/#38): the stops still to visit,
+   * whose pins were left under the status bar or the panel when only the target was fitted.
+   */
   route?: ReadonlyArray<LatLng> | null;
   viewport: DriverRideViewport | null;
 }
@@ -190,7 +203,7 @@ export const useDriverRideCamera = (
   latest.current = { driver, target, route, viewport };
 
   const laidOut = viewport !== null && viewport.mapHeight > 0 && viewport.dockHeight > 0;
-  const key = ready && laidOut && !paused ? driverRideFitKey(step, driver, target) : null;
+  const key = ready && laidOut && !paused ? driverRideFitKey(step, driver, target, route) : null;
   // Re-fit when the panel changes height (step content swap), in 24 pt steps.
   const dockStep = viewport ? Math.round(viewport.dockHeight / 24) : 0;
   const widthStep = viewport?.mapWidth ? Math.round(viewport.mapWidth / 24) : 0;

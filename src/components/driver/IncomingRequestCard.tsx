@@ -48,8 +48,11 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
   const payment = paymentLabel(request.paymentMethod);
   // T-552: the ride's stops, in order, between the pickup and the drop-off: the first
   // REQUEST_CARD_MAX_STOPS on one line each, then one "+N more stops" row (up to 5 per ride).
+  // T-556: a summary row for a single stop takes the same line as its address, so the card
+  // only collapses when two or more stops would be hidden.
   const stops = useMemo(() => {
-    const shown = request.stops.slice(0, REQUEST_CARD_MAX_STOPS).map((stop, index) => ({
+    const listed = request.stops.length <= REQUEST_CARD_MAX_STOPS + 1 ? request.stops.length : REQUEST_CARD_MAX_STOPS;
+    const shown = request.stops.slice(0, listed).map((stop, index) => ({
       address: stop.address,
       key: stop.id ?? index,
       testID: `incoming-request-stop-${index + 1}`,

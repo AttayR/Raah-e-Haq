@@ -19,6 +19,7 @@ import { openRideChat } from '../../features/chat/navigation';
 import { useAppIsActive } from '../../features/driver-requests/hooks';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
 import { useDriverRideCamera, type DriverRideViewport } from '../../features/driver-ride/camera';
+import { activeStopCoordinates } from '../../features/active-ride/camera';
 import {
   DRIVER_RIDE_TOAST_OPTIONS,
   useDriverRideFlow,
@@ -85,10 +86,13 @@ const DriverRideScreen: React.FC = () => {
         : null,
     [mapHeight, mapSize.width, dockHeight, insets.top, theme],
   );
+  // T-556: every stop pin still to visit stays in the fit (one sat under the status bar).
+  const stopPoints = useMemo(() => activeStopCoordinates(ride), [ride]);
   const camera = useDriverRideCamera(mapRef, {
     step,
     driver: position,
     target: target?.coordinate ?? null,
+    route: stopPoints,
     viewport,
   });
 

@@ -230,6 +230,15 @@ export default function PhoneAuthScreen() {
     clearCode();
   };
 
+  // T-556: the header back: from the code step back to the number, else out of the screen.
+  const handleHeaderBack = () => {
+    if (currentStep === 'verification') {
+      handleBackToPhone();
+    } else if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  };
+
   // Back to Login on its Email tab (AUTH-18), not a new Login on the Phone tab.
   const renderEmailFallback = () =>
     suggestEmail ? <EmailFallback onPress={() => navigation.popTo('Login', { method: 'email' })} /> : null;
@@ -387,6 +396,7 @@ export default function PhoneAuthScreen() {
           title={currentStep === 'phone' ? COPY.header.phoneTitle : COPY.header.codeTitle}
           subtitle={currentStep === 'phone' ? COPY.header.phoneSubtitle : COPY.header.codeSubtitle}
           compact={keyboardUp}
+          onBack={handleHeaderBack}
         />
 
         {/* Scrollable Content */}

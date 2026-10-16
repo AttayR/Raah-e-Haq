@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { AppText } from '../../../components/ui/AppText';
+import { KeyboardRevealGroup } from '../../../components/ui/keyboardReveal';
 import StopsEditor from '../../../components/passenger/StopsEditor';
 import { space } from '../../../theme';
 import { BOOKING_COPY } from '../copy';
@@ -70,7 +71,9 @@ export const VehicleStage: React.FC<VehicleStageProps> = (p) => (
       onSelect={p.onSelectVehicle}
     />
     {p.canEditStops && (
-      <View style={styles.stops}>
+      // T-556: while the stop search is typed in, the sheet reveals this whole section, so the
+      // heading stays in view above the field and its suggestions.
+      <KeyboardRevealGroup style={styles.stops} testID="booking-stops-section">
         <AppText variant="title">{`Add optional stops (up to ${MAX_STOPS})`}</AppText>
         <StopsEditor
           stops={p.stops}
@@ -82,7 +85,7 @@ export const VehicleStage: React.FC<VehicleStageProps> = (p) => (
         {p.stops.length < MAX_STOPS && (
           <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={p.onAddStopOnMap} />
         )}
-      </View>
+      </KeyboardRevealGroup>
     )}
   </View>
 );

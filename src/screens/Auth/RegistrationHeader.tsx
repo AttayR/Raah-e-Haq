@@ -12,6 +12,14 @@ interface Props {
   stepIndex: number | null;
 }
 
+/** Glyph colour that reads on each circle: navy on the white active one, white on green. */
+export function stepIconTint(isActive: boolean, isCompleted: boolean): string {
+  if (isCompleted) {
+    return styles.stepIconCompleted.color;
+  }
+  return isActive ? styles.stepIconActive.color : styles.stepIconIdle.color;
+}
+
 /** Brand header of the registration screen with the step progress (moved out in T-201). */
 export default function RegistrationHeader({ title, subtitle, stepIndex }: Props) {
   return (
@@ -61,7 +69,8 @@ export default function RegistrationHeader({ title, subtitle, stepIndex }: Props
                     <Icon
                       name={isCompleted ? 'checkMark' : step.icon}
                       size={16}
-                      tint={isCompleted || isActive ? styles.stepIconActive.color : styles.stepIconIdle.color}
+                      tint={stepIconTint(isActive, isCompleted)}
+                      testID={`registration-step-icon-${step.key}`}
                     />
                   </View>
                   <Text style={[styles.stepTitle, isActive && styles.stepTitleActive]}>{step.title}</Text>

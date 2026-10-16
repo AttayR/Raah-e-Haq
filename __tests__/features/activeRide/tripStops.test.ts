@@ -72,13 +72,28 @@ describe('T-552: the trip camera fits the stops still to visit', () => {
     ]);
   });
 
-  it('without stops it is still the car and the drop-off; the approach is unchanged', () => {
+  it('without stops it is still the car and the drop-off', () => {
     expect(rideFollowCoordinates('in_trip', car(31.51, 74.34), rideWithStops([]))).toEqual([car(31.51, 74.34), DROPOFF]);
-    const ride = rideWithStops([stop(21, 1, 'active', 31.53, 74.36)]);
-    expect(rideFollowCoordinates('driver_en_route', car(31.51, 74.34), ride)).toEqual([
+    expect(rideFollowCoordinates('driver_en_route', car(31.51, 74.34), rideWithStops([]))).toEqual([
       car(31.51, 74.34),
       { latitude: 31.52, longitude: 74.35 },
     ]);
+  });
+
+  it('T-556: on the approach the active stop pins are fitted after the car and the pickup', () => {
+    const ride = rideWithStops([
+      stop(22, 2, 'active', 31.6, 74.3),
+      stop(21, 1, 'active', 31.53, 74.36),
+      stop(23, 3, 'completed', 31.7, 74.4),
+    ]);
+    expect(rideFollowCoordinates('driver_en_route', car(31.51, 74.34), ride)).toEqual([
+      car(31.51, 74.34),
+      { latitude: 31.52, longitude: 74.35 },
+      car(31.53, 74.36),
+      car(31.6, 74.3),
+    ]);
+    // Without the driver's position there is still nothing to follow.
+    expect(rideFollowCoordinates('driver_en_route', null, ride)).toBeNull();
   });
 
   it('the hook fits the stop, and a completed stop drops out of the next fit', () => {

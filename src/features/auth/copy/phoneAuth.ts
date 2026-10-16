@@ -11,6 +11,7 @@ export const PHONE_AUTH_COPY = {
     phoneSubtitle: 'Enter your phone number to get started',
     codeTitle: 'Verify Code',
     codeSubtitle: 'Enter your verification code',
+    back: 'Back',
   },
   phoneStep: {
     title: 'Enter your phone number',

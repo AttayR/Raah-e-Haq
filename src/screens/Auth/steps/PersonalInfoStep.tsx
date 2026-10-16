@@ -444,7 +444,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Relationship *</Text>
-          <Text style={styles.inputHint}>Select the relationship to your emergency contact (API accepts only these values)</Text>
+          <Text style={styles.inputHint}>Select the relationship to your emergency contact</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
             {EMERGENCY_RELATION_OPTIONS.map((opt) => (
               <TouchableOpacity

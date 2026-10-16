@@ -194,6 +194,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           total={fare.total}
           distanceKm={ride?.distance_km ?? null}
           durationMin={ride?.duration_minutes ?? null}
+          fareLocked={ride?.fare_locked === true}
           totalLabel={ACTIVE_RIDE_COPY.finalFareLabel}
           footnote={fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
         />

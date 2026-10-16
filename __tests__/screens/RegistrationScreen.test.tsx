@@ -96,6 +96,12 @@ afterEach(() => {
 });
 
 describe('RegistrationScreen (T-201)', () => {
+  it('T-556: the relationship hint has no developer copy about the API', async () => {
+    await renderScreen();
+    expect(screen.getByText('Select the relationship to your emergency contact')).toBeTruthy();
+    expect(screen.queryByText(/API/)).toBeNull();
+  });
+
   it('every step sits in one keyboard-aware scroller, with no nested vertical ScrollView (T-204)', async () => {
     await renderScreen();
     const expectSingleScroller = () => {

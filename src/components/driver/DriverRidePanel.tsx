@@ -213,7 +213,8 @@ export const DriverRidePanel: React.FC<Props> = ({
               size="lg"
               haptic="impactLight"
               onPress={primary.onPress}
-              disabled={busy && !userAction}
+              // T-556: a background read (the ~8 s poll) no longer disables the step for its
+              // ~half second, which swallowed a "Stop done" tap; the step takes over the read.
               loading={userAction}
               accessibilityLabel={userAction ? COPY.working : primary.label}
               testID={primary.testID}

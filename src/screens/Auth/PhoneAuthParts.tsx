@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, InputAccessoryView, Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import BrandButton from '../../components/BrandButton';
+import { Icon } from '../../components/ui/Icon';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import { styles } from './PhoneAuthScreen.styles';
@@ -49,13 +50,27 @@ interface HeaderProps {
   subtitle: string;
   /** Keyboard up: only the title, so the card and its button fit above the keyboard. */
   compact: boolean;
+  /** T-556: the top-start back button (the screen had no way back but a swipe). */
+  onBack?: () => void;
 }
 
 /** Brand header. Tapping it closes the keyboard (it sits outside the scroll view). */
-export function PhoneAuthHeader({ title, subtitle, compact }: HeaderProps) {
+export function PhoneAuthHeader({ title, subtitle, compact, onBack }: HeaderProps) {
   return (
     <Pressable onPress={Keyboard.dismiss} accessible={false}>
       <View style={[styles.fixedHeader, compact && styles.fixedHeaderCompact]}>
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel={COPY.header.back}
+            hitSlop={4}
+            style={styles.headerBack}
+            testID="phone-auth-back"
+          >
+            <Icon name="back" size={24} tint={styles.headerBackIcon.color} />
+          </Pressable>
+        ) : null}
         <View style={styles.decorativeCircle1} />
         <View style={styles.decorativeCircle2} />
         <View style={styles.decorativeCircle3} />
