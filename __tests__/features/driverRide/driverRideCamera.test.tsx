@@ -11,6 +11,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import type { LatLng, Region } from 'react-native-maps';
 import {
   DRIVER_RIDE_FIT_MS,
+  FIT_MARGIN_BOTTOM,
   FIT_MARGIN_SIDE,
   MIN_DRIVER_RIDE_DELTA,
   driverRideFitCoordinates,
@@ -93,6 +94,12 @@ describe('driverRideVisibleStrip', () => {
     expect(strip.top).toBeGreaterThan(59 + 64);
     expect(strip.bottom).toBeLessThan(800 - 300);
     expect(strip.bottom - strip.top).toBeGreaterThan(200);
+  });
+
+  it('T-553: keeps a marker\'s size above the panel, so the car is not half under its edge', () => {
+    const strip = driverRideVisibleStrip(VIEWPORT);
+    expect(FIT_MARGIN_BOTTOM).toBeGreaterThanOrEqual(40);
+    expect(strip.bottom).toBe(800 - 300 - FIT_MARGIN_BOTTOM);
   });
 
   it('with a panel taller than the map leaves a small strip instead of none', () => {

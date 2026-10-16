@@ -39,13 +39,22 @@ type VehicleStageProps = {
   onFocusChange?: (focused: boolean) => void;
 };
 
-/** Booking step 3: route summary with edit chips, vehicle choice, optional stops. */
+/** The trip card's stop rows (T-553): a map-picked stop has no address until booking. */
+export const tripCardStops = (stops: ReadonlyArray<BookingPlace>) =>
+  stops.map((s, i) => ({
+    key: i,
+    address: (typeof s.address === 'string' && s.address.trim()) || BOOKING_COPY.pinnedOnMap,
+    testID: `trip-details-stop-${i + 1}`,
+  }));
+
+/** Booking step 3: route summary (with its stops) and edit chips, vehicle choice, optional stops. */
 export const VehicleStage: React.FC<VehicleStageProps> = (p) => (
   <View style={styles.stack}>
     <TripSummaryCard
       testID="trip-details"
       label="Trip details"
       pickup={p.pickupLabel}
+      stops={tripCardStops(p.stops)}
       dropoff={p.dropoffLabel}
       meta={p.tripSummary}
       actions={[

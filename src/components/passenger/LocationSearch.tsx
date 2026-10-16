@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { fetchAutocomplete, fetchPlaceDetails, type PlacesBias } from '../../services/placesService';
 import { MIN_AUTOCOMPLETE_CHARS, newPlacesSessionToken } from '../../services/placesSession';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
 import { Icon, type IconName } from '../ui/Icon';
+import { useKeyboardReveal } from '../ui/keyboardReveal';
 import { MAX_FONT_SIZE_MULTIPLIER, radius, space, textStyles } from '../../theme';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 
@@ -116,6 +117,27 @@ const LocationSearch: React.FC<Props> = ({
   nearRef.current = near;
   // One Places session per search: made by the first lookup, ended by the pick.
   const sessionRef = useRef<string | null>(null);
+  // T-553: inside a keyboard-aware scroll (the booking sheet), the field and its suggestions are
+  // kept above the keyboard as the list appears (QA V-02: stop suggestions opened under it).
+  const reveal = useKeyboardReveal();
+  const containerRef = useRef<View | null>(null);
+  const focusedRef = useRef(false);
+  const onFocusChangeRef = useRef(onFocusChange);
+  onFocusChangeRef.current = onFocusChange;
+  const revealRef = useRef(reveal);
+  revealRef.current = reveal;
+
+  // T-553: a field unmounted while focused (its step left after a pick or Back) never reports
+  // the blur; report it so the booking sheet leaves its compact mode.
+  useEffect(
+    () => () => {
+      if (!focusedRef.current) return;
+      focusedRef.current = false;
+      revealRef.current?.blur(containerRef.current);
+      onFocusChangeRef.current?.(false);
+    },
+    [],
+  );
 
   const setText = useCallback((value: string) => {
     textRef.current = value;
@@ -180,6 +202,8 @@ const LocationSearch: React.FC<Props> = ({
         sessionRef.current = null;
         if (details) {
           setEdited(false);
+          // T-553: a pick closes the keyboard, so the sheet leaves its compact mode.
+          Keyboard.dismiss();
           onSelect({ ...s, coords: { latitude: details.latitude, longitude: details.longitude } });
         }
       } finally {
@@ -189,6 +213,7 @@ const LocationSearch: React.FC<Props> = ({
     }
     sessionRef.current = null;
     setEdited(false);
+    Keyboard.dismiss();
     onSelect(s);
   };
 
@@ -206,7 +231,10 @@ const LocationSearch: React.FC<Props> = ({
   };
 
   const setFocus = (value: boolean) => {
+    focusedRef.current = value;
     setFocused(value);
+    if (value) reveal?.focus(containerRef.current);
+    else reveal?.blur(containerRef.current);
     onFocusChange?.(value);
   };
 
@@ -216,7 +244,7 @@ const LocationSearch: React.FC<Props> = ({
   const showError = status === 'error';
 
   return (
-    <View>
+    <View ref={containerRef} testID={`location-search-${mode}-container`} onLayout={focused ? () => reveal?.layoutChanged(containerRef.current) : undefined}>
       <View
         style={[
           styles.field,

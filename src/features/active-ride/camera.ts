@@ -259,16 +259,24 @@ export const viewportEdgePadding = (viewport?: MapViewport | null): EdgePadding 
 export const RIDE_CONTROLS_CLEARANCE = 24;
 
 /**
- * T-552: fit padding for the ride camera. As `viewportEdgePadding`, but the top never shrinks
- * under the top controls (back, recentre, +) when a tall sheet forces the clamp: the bottom
- * gives way instead, so a fitted stop or drop-off pin is never drawn under the controls.
+ * T-553 (QA 2026-10-16 2-05/2-06): room (pt) kept between the sheet's edge and a fitted ride
+ * point. The car marker is drawn centred on its coordinate (~40 pt), so 24 pt left half of it
+ * under the sheet; this keeps the whole car (or a pin) above the edge, with a small gap.
+ */
+export const RIDE_MARKER_CLEARANCE = 48;
+
+/**
+ * T-552: fit padding for the ride camera: the top clear of the top controls (back, recentre),
+ * the bottom clear of the sheet by a marker's size (T-553). When a tall sheet leaves too little
+ * map, the bottom gives way, never the top, so a fitted stop or drop-off pin is never drawn
+ * under the controls.
  */
 export const rideFollowEdgePadding = (viewport?: MapViewport | null): EdgePadding => {
   const pad = viewportEdgePadding(viewport);
   if (!viewport || viewport.bottom <= 0) return pad;
-  const top = Math.max(0, viewport.top ?? 0) + RIDE_CONTROLS_CLEARANCE;
-  if (pad.top >= top) return pad;
-  const bottom = Math.max(0, Math.min(pad.bottom, viewport.mapHeight - MIN_VISIBLE_MAP - top));
+  const top = Math.max(pad.top, Math.max(0, viewport.top ?? 0) + RIDE_CONTROLS_CLEARANCE);
+  const wanted = viewport.bottom + RIDE_MARKER_CLEARANCE;
+  const bottom = Math.max(0, Math.min(wanted, viewport.mapHeight - MIN_VISIBLE_MAP - top));
   return { ...pad, top, bottom };
 };
 

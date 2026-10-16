@@ -86,6 +86,25 @@ describe('PhoneAuthScreen (T-101)', () => {
     expect(JSON.stringify(store.getState())).not.toContain(LOCAL_CODE);
   });
 
+  it('T-553: Send code right after typing validates the number just typed, not a stale render', async () => {
+    let sentBody: unknown;
+    mock.onPost('/auth/send-otp').reply(config => {
+      sentBody = JSON.parse(config.data);
+      return [200, { success: true, message: 'OTP sent successfully', data: { phone: PHONE, expires_in: 60 } }];
+    });
+    await renderScreen();
+    const input = screen.getByPlaceholderText('Enter phone number');
+    const button = screen.getByText('Send Code');
+    // The tap lands before the typed text re-renders the screen (fast typing on a device).
+    await act(async () => {
+      fireEvent.changeText(input, PHONE);
+      fireEvent.press(button);
+    });
+    await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
+    expect(screen.queryByText(/must be in/i)).toBeNull();
+    expect(sentBody).toEqual(expect.objectContaining({ phone: PHONE }));
+  });
+
   it('shows expiry from the server expires_in, then an expired state with resend', async () => {
     replyLocalSend();
     await renderScreen();

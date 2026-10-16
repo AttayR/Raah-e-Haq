@@ -12,15 +12,14 @@ type Props = {
   onRecenter: () => void;
   /** Hidden while a ride is shown (starting over is not allowed then). */
   onReset?: () => void;
-  onOpenAdvanced: () => void;
 };
 
 /**
  * Floating map controls below the status bar / Dynamic Island (`insets.top + 8`), never
- * inside it: back at the start edge, recentre, start over and the advanced request at the
- * end edge.
+ * inside it: back at the start edge, recentre and start over at the end edge. T-553: the
+ * legacy "+" Request Ride modal is gone (the sheet books every ride, stops included).
  */
-export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, onReset, onOpenAdvanced }) => {
+export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, onReset }) => {
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -41,14 +40,6 @@ export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, onReset, o
         {onReset ? (
           <IconButton testID="map-reset" variant="floating" icon="refresh" iconColor="primaryText" accessibilityLabel="Start over" onPress={onReset} />
         ) : null}
-        <IconButton
-          testID="map-advanced"
-          variant="floating"
-          icon="add"
-          iconColor="primaryText"
-          accessibilityLabel="More ride options"
-          onPress={onOpenAdvanced}
-        />
       </View>
     </View>
   );

@@ -46,6 +46,9 @@ export default function PhoneAuthScreen() {
 
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
   const [phoneInput, setPhoneInput] = useState('+92');
+  // T-553 (QA: "Phone must be in +92… format" on a fast first Send code): the handlers read the
+  // latest typed number here, not a render's possibly stale `phoneInput`.
+  const phoneRef = useRef('+92');
   const [verificationCode, setVerificationCode] = useState('');
   const [phoneError, setPhoneError] = useState<string>('');
   const [otpError, setOtpError] = useState<string>('');
@@ -86,7 +89,7 @@ export default function PhoneAuthScreen() {
   const requestCode = async (isResend: boolean) => {
     const fallback = isResend ? COPY.fallbacks.resend : COPY.fallbacks.send;
     const showError = isResend ? setOtpError : setPhoneError;
-    const phone = phoneInput.trim();
+    const phone = phoneRef.current.trim();
     if (inFlight.current) {
       return;
     }
@@ -130,7 +133,7 @@ export default function PhoneAuthScreen() {
   const handleSendCode = async () => {
     setPhoneError('');
 
-    const validation = OtpService.validatePhoneNumber(phoneInput.trim());
+    const validation = OtpService.validatePhoneNumber(phoneRef.current.trim());
     if (!validation.isValid) {
       logger.debug('❌ PhoneAuthScreen - Phone validation failed:', validation.error);
       setPhoneError(validation.error || COPY.phoneStep.invalidPhone);
@@ -153,7 +156,7 @@ export default function PhoneAuthScreen() {
     }
 
     const otpData = {
-      phone: phoneInput.trim(),
+      phone: phoneRef.current.trim(),
       otp_code: sanitizeOtpInput(verificationCode),
     };
 
@@ -246,7 +249,9 @@ export default function PhoneAuthScreen() {
           placeholder={COPY.phoneStep.placeholder}
           value={phoneInput}
           onChangeText={(text) => {
-            setPhoneInput(formatPkPhoneInput(text));
+            const formatted = formatPkPhoneInput(text);
+            phoneRef.current = formatted;
+            setPhoneInput(formatted);
             setPhoneError('');
           }}
           keyboardType="phone-pad"

@@ -8,7 +8,7 @@ import {
   TRIP_FOLLOW_INTERVAL_MS,
   rideFollowCoordinates,
   usePassengerRideCamera,
-  viewportEdgePadding,
+  rideFollowEdgePadding,
   withMinimumSpan,
 } from '../../../src/features/active-ride/camera';
 import type { PassengerRideStage } from '../../../src/features/active-ride/stage';
@@ -78,7 +78,7 @@ describe('T-549: the ride camera on the trip', () => {
     const { fit, rerender } = setup({ stage: 'in_trip', location: car(31.51, 74.34) });
     expect(fit).toHaveBeenCalledTimes(1);
     expect(fit).toHaveBeenLastCalledWith(withMinimumSpan([car(31.51, 74.34), DROPOFF]), {
-      edgePadding: viewportEdgePadding(viewport),
+      edgePadding: rideFollowEdgePadding(viewport),
       animated: true,
     });
 

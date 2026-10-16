@@ -281,6 +281,7 @@ const DriverRideScreen: React.FC = () => {
               onMessage={onMessage}
               onNavigate={onNavigate}
               onArrived={flow.arrived}
+              arrivalRefusal={flow.arrivalRefusal}
               onComplete={flow.complete}
               onCompleteStop={flow.completeStop}
               onCancel={() => setCancelMode('strike')}

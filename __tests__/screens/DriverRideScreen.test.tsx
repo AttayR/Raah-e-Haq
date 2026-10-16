@@ -176,6 +176,28 @@ describe('DriverRideScreen', () => {
     expect(mock.history.get.filter((r) => r.url === '/driver/status')).toHaveLength(0);
   });
 
+  it('T-553: the refused arrival stays on the panel with the server reason and distance until a retry passes', async () => {
+    jest.spyOn(toast, 'error').mockImplementation(() => '');
+    const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger }));
+    await settle(store);
+    const reason = 'You are not at the pickup point yet. Get within 300 m of the pickup to mark arrived';
+    mock.onPost('/rides/41/arrived').replyOnce(422, {
+      success: false,
+      message: reason,
+      error: { code: 'not_near_pickup', message: reason, distance_m: 451.6, radius_m: 300 },
+    });
+
+    fireEvent.press(screen.getByTestId('driver-ride-arrived'));
+    await waitFor(() => screen.getByTestId('driver-ride-arrival-refused'));
+    screen.getByText(`${reason}.`);
+    screen.getByText('About 452 m away.');
+
+    mock.onPost('/rides/41/arrived').replyOnce(200, envelope(makeRide({ status: 'arrived', passenger })));
+    fireEvent.press(screen.getByTestId('driver-ride-arrived'));
+    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for the passenger'));
+    expect(screen.queryByTestId('driver-ride-arrival-refused')).toBeNull();
+  });
+
   it('refreshes a stale location ping once before calling arrived (T-409)', async () => {
     const order: string[] = [];
     jest.spyOn(locationTrackingService, 'pingIfStale').mockImplementation(async (maxAgeMs: number) => {

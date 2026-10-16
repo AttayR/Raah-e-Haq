@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
-import { AddressPair } from '../../../components/ui/ride/AddressPair';
+import { AddressPair, type AddressStop } from '../../../components/ui/ride/AddressPair';
 import { t } from '../../../i18n';
 import { Chip, type ChipTone } from '../../../components/ui/Chip';
 import type { IconName } from '../../../components/ui/Icon';
@@ -21,6 +21,8 @@ type Props = {
   label: string;
   pickup?: string | null;
   dropoff?: string | null;
+  /** T-553: the stops between them, in order (on the rail as "Stop n"). */
+  stops?: ReadonlyArray<AddressStop>;
   /** One line under the route ("8.2 km · 18 min", vehicle). */
   meta?: string | null;
   actions: TripSummaryAction[];
@@ -31,7 +33,7 @@ type Props = {
  * The route being booked (the kit AddressPair "Raah line", DESIGN_SYSTEM 5.23, UI-R5) with its edit actions as
  * chips that wrap onto a second line on narrow screens instead of running off the card.
  */
-export const TripSummaryCard: React.FC<Props> = ({ label, pickup, dropoff, meta, actions, testID }) => {
+export const TripSummaryCard: React.FC<Props> = ({ label, pickup, dropoff, stops, meta, actions, testID }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
   return (
@@ -40,7 +42,12 @@ export const TripSummaryCard: React.FC<Props> = ({ label, pickup, dropoff, meta,
         {label}
       </AppText>
       {pickup || dropoff ? (
-        <AddressPair density="compact" pickup={pickup || t('ride.pickup')} dropoff={dropoff || t('ride.dropoff')} />
+        <AddressPair
+          density="compact"
+          pickup={pickup || t('ride.pickup')}
+          stops={stops}
+          dropoff={dropoff || t('ride.dropoff')}
+        />
       ) : null}
       {meta ? (
         <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>

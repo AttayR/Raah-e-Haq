@@ -85,6 +85,23 @@ describe('IncomingRequestCard', () => {
     expect(getByTestId('incoming-request-addresses')).toBeTruthy();
   });
 
+  it('T-553: one hidden stop reads "Stop 3", not "Stops 3–3"', () => {
+    const { getByTestId, getByText, queryByText } = render(
+      <IncomingRequestCard
+        request={makePendingRequest({
+          stops: [1, 2, 3].map(n => ({ id: 40 + n, address: `Fake stop ${n}` })),
+        })}
+        accepting={false}
+        disabled={false}
+        onAccept={noop}
+        onReject={noop}
+      />,
+    );
+    expect(getByTestId('incoming-request-more-stops').props.children).toBe('+1 more stop');
+    getByText('Stop 3');
+    expect(queryByText('Stops 3–3')).toBeNull();
+  });
+
   it("shows the passenger's photo from the request card (T-504)", () => {
     const { UNSAFE_getAllByType } = render(
       <IncomingRequestCard

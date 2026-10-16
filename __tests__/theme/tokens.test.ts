@@ -151,7 +151,7 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
     ['onAccent', 'accent', 8.33, 8.33, 4.5],
     ['borderStrong', 'surface', 3.28, 3.43, 3],
     ['ratingStar', 'surface', 3.46, 8.5, 3],
-    // Filled success button label (AdvancedRideRequestPanel submit, BrandButton success).
+    // Filled success button label (BrandButton success).
     ['onSuccess', 'success', 5.78, 9.23, 4.5],
     // T-545: disabled Button label on its solid fill, and a disabled ghost/outline label on the page.
     ['textDisabled', 'fillDisabled', 5.57, 6.7, 4.5],

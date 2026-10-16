@@ -14,7 +14,6 @@ import { NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import { reverseGeocode } from '../../services/placesService';
 import StageChips from '../../components/passenger/StageChips';
-import AdvancedRideRequestPanel from '../../components/passenger/AdvancedRideRequestPanel';
 import { logger } from '../../core/logging/logger';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '../../store';
@@ -31,7 +30,7 @@ import { RideRecentreButton } from '../../features/active-ride/components/RideRe
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
-import { advancedRideInput, buildRideRequest, withAddresses, type AdvancedRideData, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
+import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
 import { estimateFor, useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 import { BookingSheet } from '../../features/ride-booking/components/BookingSheet';
@@ -43,6 +42,7 @@ import { bookingInitialRegion, showLocationWait } from '../../features/ride-book
 import { bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
 import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
 import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
+import { useSearchFocus } from '../../features/ride-booking/useSearchFocus';
 import { openRideChat } from '../../features/chat/navigation';
 import { useRideCall } from '../../features/safety/hooks';
 import { canCallOn } from '../../features/safety/rules';
@@ -95,9 +95,9 @@ const PassengerMapScreen = () => {
   const { pickup, stops, destination, mapPick, stage, error, setError, setStage, resetSelection } = flow;
 
   const [isLoading, setIsLoading] = useState(false);
-  const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
-  // While a search field is focused the sheet drops its extras so suggestions get the room.
-  const [searchFocused, setSearchFocused] = useState(false);
+  // While a search field is focused the sheet drops its extras so suggestions get the room; a
+  // pick, Back (a new step) or the keyboard closing leaves that mode (T-553).
+  const [searchFocused, setSearchFocused] = useSearchFocus(rideShown ? 'ride' : stage);
   // T-314: what covers the map, so recentring and fitting keep points above the sheet.
   const [sheetHeight, setSheetHeight] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
@@ -150,6 +150,8 @@ const PassengerMapScreen = () => {
     rideCameraHoldsMap: rideCamera.holdsCamera,
     onRideCameraMapReady: rideCamera.onMapReady,
     requestLocationPermission,
+    // T-553: a picked pickup is shown on the map while no route is drawn yet.
+    focusPoint: !rideShown && (stage === 'home' || stage === 'pickup' || stage === 'destination') ? pickup : null,
   });
 
   // Unmount: drop the map ref and cancel the screen's network requests.
@@ -182,22 +184,6 @@ const PassengerMapScreen = () => {
   // BE-83: the passenger's offer for the selected quote (starts at the server fare).
   const offer = useFareOffer(estimateFor(estimates.data, flow.selectedVehicle)?.offer_band ?? null);
   const tripSummary = estimates.data ? BOOKING_COPY.tripSummary(estimates.data.distance_km, estimates.data.duration_min) : null;
-
-  // The Advanced panel's request (removed in T-309) goes through the same builder.
-  const handleRequestRide = async (rideData: AdvancedRideData) => {
-    const built = buildRideRequest(advancedRideInput(rideData));
-    if (!built.ok) {
-      setError(built.error);
-      return;
-    }
-    try {
-      await requestRideService(built.request);
-      setError(null);
-      setShowAdvancedRidePanel(false);
-    } catch {
-      // requestRide already showed the server's message (or routed the refusal).
-    }
-  };
 
   // A ride from Redux (booked here, or restored on launch) puts its own pickup and
   // destination on the map, once per ride (not on every poll).
@@ -353,7 +339,6 @@ const PassengerMapScreen = () => {
           onBack={goBack}
           onRecenter={centerOnUser}
           onReset={rideShown ? undefined : resetSelection}
-          onOpenAdvanced={() => setShowAdvancedRidePanel(true)}
         />
         <RideRecentreButton visible={rideCamera.paused} onPress={rideCamera.recentre} />
 
@@ -388,13 +373,6 @@ const PassengerMapScreen = () => {
 
         {/* T-505: rate the driver over the trip summary once the ride completes. */}
         <PassengerRideRatingPrompt active={isFocused} />
-
-        <AdvancedRideRequestPanel
-          visible={showAdvancedRidePanel}
-          onClose={() => setShowAdvancedRidePanel(false)}
-          onRequestRide={handleRequestRide}
-          isLoading={isLoading}
-        />
       </View>
     </ErrorBoundary>
   );

@@ -174,7 +174,9 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
 
   /**
    * A pickup picked in the search. With `routeIfReady` (the two-field start) and a destination,
-   * the route and the vehicle step; else the destination step.
+   * the route and the vehicle step; the two-field start without a destination stays put, so the
+   * pickup row keeps showing the pick above the destination row (T-553); the pickup step goes on
+   * to the destination step.
    */
   const selectPickup = useCallback((c: LatLng, address: string, routeIfReady: boolean) => {
     setPickup({ ...c, address });
@@ -183,7 +185,7 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     if (destination && routeIfReady) {
       routeVia(c, destination);
       setStage('vehicle');
-    } else {
+    } else if (!routeIfReady) {
       setStage('destination');
     }
   }, [destination, routeVia, setPickupQuery]);

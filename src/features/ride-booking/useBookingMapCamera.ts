@@ -18,6 +18,11 @@ type Options = {
   rideCameraHoldsMap: () => boolean;
   onRideCameraMapReady: () => void;
   requestLocationPermission: () => unknown;
+  /**
+   * T-553: a point to show while no route is drawn (the picked pickup on the search steps): the
+   * map moves to it, above the sheet, when it changes and when the sheet settles.
+   */
+  focusPoint?: LatLng | null;
 };
 
 /**
@@ -34,6 +39,7 @@ export const useBookingMapCamera = ({
   rideCameraHoldsMap,
   onRideCameraMapReady,
   requestLocationPermission,
+  focusPoint = null,
 }: Options) => {
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -92,6 +98,21 @@ export const useBookingMapCamera = ({
       logger.debug('Error fitting map to route:', e);
     }
   }, [routeCoordinates, sheetStep, mapRef, viewportRef, rideCameraHoldsMap]);
+
+  // T-553: a picked pickup moves the map to it (QA: the sheet collapsed, the map stayed put).
+  const focusRef = useRef(focusPoint);
+  focusRef.current = focusPoint;
+  const focusKey = focusPoint ? `${focusPoint.latitude},${focusPoint.longitude}` : null;
+  const hasRoute = !!routeCoordinates && routeCoordinates.length >= 2;
+  useEffect(() => {
+    const point = focusRef.current;
+    if (!focusKey || !point || !isMapReady || !mapRef.current || hasRoute || rideCameraHoldsMap()) return;
+    try {
+      mapRef.current.animateToRegion(regionInViewport(point, viewportRef.current));
+    } catch (e) {
+      logger.debug('Error animating to the picked point:', e);
+    }
+  }, [focusKey, sheetStep, isMapReady, hasRoute, mapRef, viewportRef, rideCameraHoldsMap]);
 
   return { isMapReady, onMapReady, onMapLoaded, centerOnUser };
 };

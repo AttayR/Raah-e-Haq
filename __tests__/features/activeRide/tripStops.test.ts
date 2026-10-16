@@ -8,6 +8,7 @@ import type { LatLng } from 'react-native-maps';
 import {
   MIN_VISIBLE_MAP,
   RIDE_CONTROLS_CLEARANCE,
+  RIDE_MARKER_CLEARANCE,
   rideFollowCoordinates,
   rideFollowEdgePadding,
   usePassengerRideCamera,
@@ -117,10 +118,15 @@ describe('T-552: the trip camera fits the stops still to visit', () => {
 });
 
 describe('T-552: ride fit padding keeps points clear of the top controls', () => {
-  it('is the viewport padding when the sheet leaves room (top = controls + clearance)', () => {
+  it('top = controls + clearance; T-553: bottom = sheet + a marker\'s clearance (not 24)', () => {
     const viewport = { mapHeight: 874, bottom: 438, top: 118 };
-    expect(rideFollowEdgePadding(viewport)).toEqual(viewportEdgePadding(viewport));
-    expect(rideFollowEdgePadding(viewport).top).toBe(118 + RIDE_CONTROLS_CLEARANCE);
+    const pad = rideFollowEdgePadding(viewport);
+    expect(pad.top).toBe(118 + RIDE_CONTROLS_CLEARANCE);
+    expect(pad.bottom).toBe(438 + RIDE_MARKER_CLEARANCE);
+    // More room than the booking fit: the car marker drawn on its coordinate stays above the sheet.
+    expect(pad.bottom).toBeGreaterThan(viewportEdgePadding(viewport).bottom);
+    expect(RIDE_MARKER_CLEARANCE).toBeGreaterThanOrEqual(40);
+    expect(pad.right).toBe(48);
   });
 
   it('with a tall sheet the bottom gives way, never the top (the generic clamp shrank both)', () => {

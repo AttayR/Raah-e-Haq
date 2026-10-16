@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { useKeyboardHeight } from '../../../hooks/useKeyboardHeight';
+import { KeyboardRevealProvider, type RevealScrollable } from '../../../components/ui/keyboardReveal';
 import { componentTokens, radius, space } from '../../../theme';
 import { MAP_TOP_CONTROLS_HEIGHT } from './MapTopControls';
 
@@ -33,7 +34,9 @@ type Props = {
  * scrolls inside, clipped 24 below the top (the kit sheet's content top) with a hairline once
  * scrolled, so nothing slides under the handle half cut (T-539). On iOS it rides above the
  * keyboard (Android resizes the window itself, `adjustResize`), so search suggestions stay
- * visible while typing.
+ * visible while typing. T-553: a focused search field and its suggestions are scrolled into the
+ * visible part of the sheet (the kit keyboard reveal), e.g. the stop search at the end of the
+ * vehicle step.
  */
 export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHeightRatio, testID = 'booking-sheet' }) => {
   const { theme } = useAppTheme();
@@ -47,6 +50,8 @@ export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHei
   const ratioCap = maxHeightRatio && !keyboardUp ? windowHeight * maxHeightRatio : Infinity;
   const maxHeight = Math.max(0, Math.min(belowControls, ratioCap));
   const [scrolled, setScrolled] = useState(false);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const getScroll = useCallback((): RevealScrollable | null => scrollRef.current, []);
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = e.nativeEvent.contentOffset.y > 0;
     if (next !== scrolled) setScrolled(next);
@@ -77,6 +82,7 @@ export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHei
         <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
       </View>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -90,7 +96,7 @@ export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHei
           { paddingBottom: (keyboardUp ? 0 : insets.bottom) + space[4] },
         ]}
       >
-        {children}
+        <KeyboardRevealProvider getScroll={getScroll}>{children}</KeyboardRevealProvider>
       </ScrollView>
     </View>
   );

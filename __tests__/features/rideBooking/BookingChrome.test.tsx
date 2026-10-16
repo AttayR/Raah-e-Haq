@@ -50,13 +50,14 @@ describe.each([
   });
 
   it('map controls start at insets.top + 8, all labelled; reset hidden during a ride', () => {
-    const handlers = { onBack: jest.fn(), onRecenter: jest.fn(), onReset: jest.fn(), onOpenAdvanced: jest.fn() };
+    const handlers = { onBack: jest.fn(), onRecenter: jest.fn(), onReset: jest.fn() };
     const { getByLabelText, getByTestId, queryByLabelText, rerender } = render(<MapTopControls {...handlers} />);
     expect(StyleSheet.flatten(getByTestId('map-top-controls').props.style)).toMatchObject({ top: 55 });
     fireEvent.press(getByLabelText('Back'));
     fireEvent.press(getByLabelText('Show my location'));
     fireEvent.press(getByLabelText('Start over'));
-    fireEvent.press(getByLabelText('More ride options'));
+    // T-553: no legacy "+" Request Ride entry point.
+    expect(queryByLabelText('More ride options')).toBeNull();
     Object.values(handlers).forEach((h) => expect(h).toHaveBeenCalledTimes(1));
     rerender(<MapTopControls {...handlers} onReset={undefined} />);
     expect(queryByLabelText('Start over')).toBeNull();

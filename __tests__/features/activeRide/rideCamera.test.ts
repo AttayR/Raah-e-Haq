@@ -12,6 +12,7 @@ import {
   clampViewportInsets,
   MIN_VISIBLE_MAP,
   regionInViewport,
+  rideFollowEdgePadding,
   viewportEdgePadding,
   useFitCoordinates,
   usePassengerRideCamera,
@@ -275,6 +276,6 @@ describe('T-314: recentre and fit above the bottom sheet', () => {
     const viewport = { mapHeight: 667, bottom: 280, top: 76 };
     const { result } = renderHook(() => usePassengerRideCamera(mapRef, 'driver_en_route', driver, pickupRide, null, viewport));
     act(() => result.current.onMapReady());
-    expect(fit).toHaveBeenLastCalledWith(expect.any(Array), { edgePadding: viewportEdgePadding(viewport), animated: true });
+    expect(fit).toHaveBeenLastCalledWith(expect.any(Array), { edgePadding: rideFollowEdgePadding(viewport), animated: true });
   });
 });

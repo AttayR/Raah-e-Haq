@@ -31,6 +31,11 @@ type Props = {
   onMessage?: () => void;
   onNavigate: () => void;
   onArrived: () => void;
+  /**
+   * T-553: the server's reason the last "I've arrived" was refused (BE-64 not_near_pickup) and the
+   * distance, shown above the button while heading to the pickup.
+   */
+  arrivalRefusal?: { title: string; message?: string } | null;
   onStart: () => void;
   onComplete: () => void;
   onCompleteStop: (stopId: number) => void;
@@ -72,6 +77,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   onMessage,
   onNavigate,
   onArrived,
+  arrivalRefusal = null,
   onStart,
   onComplete,
   onCompleteStop,
@@ -118,6 +124,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   const noShow = step === 'at_pickup' && !!onNoShow;
   const cancellable = (step === 'to_pickup' || step === 'at_pickup') && !noShow;
   const blockedNotice = step === 'at_pickup' && startBlocked;
+  const arrivalNotice = step === 'to_pickup' ? arrivalRefusal : null;
   const hasFooter = !!primary || cancellable || noShow || blockedNotice;
   const footerPad = { paddingBottom: bottomInset + space[4] };
 
@@ -189,6 +196,15 @@ export const DriverRidePanel: React.FC<Props> = ({
               text={t('safety.pinBlockedBody')}
               action={onContactSupport ? { label: t('safety.contactSupport'), onPress: onContactSupport, testID: 'driver-ride-support' } : undefined}
               testID="driver-ride-pin-blocked"
+            />
+          ) : null}
+          {arrivalNotice ? (
+            <Banner
+              tone="warning"
+              icon="pin"
+              title={arrivalNotice.message ? arrivalNotice.title : undefined}
+              text={arrivalNotice.message ?? arrivalNotice.title}
+              testID="driver-ride-arrival-refused"
             />
           ) : null}
           {primary ? (

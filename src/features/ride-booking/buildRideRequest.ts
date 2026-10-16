@@ -133,26 +133,3 @@ export const withAddresses = async <P extends BookingPlace>(
     }),
   );
 
-/** What the Advanced request panel hands over (snake_case, as the old form built it). */
-export interface AdvancedRideData {
-  pickup_address: string;
-  dropoff_address: string;
-  pickup_latitude: number;
-  pickup_longitude: number;
-  dropoff_latitude: number;
-  dropoff_longitude: number;
-  vehicle_type: string;
-  passenger_count: number;
-  special_instructions: string;
-  stops: { address: string; latitude: number; longitude: number; stop_order: number }[];
-}
-
-/** The Advanced panel's request as builder input: the same rules as the booking sheet. */
-export const advancedRideInput = (d: AdvancedRideData): RideRequestInput => ({
-  pickup: { latitude: d.pickup_latitude, longitude: d.pickup_longitude, address: d.pickup_address },
-  dropoff: { latitude: d.dropoff_latitude, longitude: d.dropoff_longitude, address: d.dropoff_address },
-  stops: [...d.stops].sort((x, y) => x.stop_order - y.stop_order),
-  vehicleType: d.vehicle_type,
-  passengerCount: d.passenger_count,
-  specialInstructions: d.special_instructions,
-});

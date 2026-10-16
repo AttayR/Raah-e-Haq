@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
@@ -104,6 +104,11 @@ export interface DriverRideFlow {
   pendingAction: DriverRideAction | null;
   /** Resolve true when the server accepted the step. */
   arrived: () => Promise<boolean>;
+  /**
+   * T-553: why the server last refused "I've arrived" (BE-64 422 not_near_pickup: its message and
+   * the distance), kept on the panel until the next attempt or step, since a toast is easy to miss.
+   */
+  arrivalRefusal: DriverRideToastText | null;
   /** POST /rides/{id}/start, with the passenger's PIN when the ride needs one (BE-81). */
   start: (pin?: string) => Promise<DriverStartResult>;
   complete: () => Promise<boolean>;
@@ -128,6 +133,13 @@ export const useDriverRideFlow = (): DriverRideFlow => {
   const ride = useSelector(selectDriverActiveRide);
   const pendingAction = useSelector(selectDriverRidePendingAction);
   const rideId = ride?.id ?? null;
+  const step = rideStep(ride);
+  const [arrivalRefusal, setArrivalRefusal] = useState<DriverRideToastText | null>(null);
+
+  // A new ride or step (arrived elsewhere, cancelled) drops the old refusal.
+  useEffect(() => {
+    setArrivalRefusal(null);
+  }, [rideId, step]);
 
   useEffect(() => {
     if (rideId === null) return undefined;
@@ -213,11 +225,22 @@ export const useDriverRideFlow = (): DriverRideFlow => {
     dispatch(loadDriverStatus());
   }, [dispatch]);
 
+  const arrived = useCallback(async (): Promise<boolean> => {
+    if (rideId === null) return false;
+    setArrivalRefusal(null);
+    const result = await run({ rideId, action: 'arrived' });
+    if (!result.ok && result.payload?.code === DRIVER_RIDE_CODES.notNearPickup) {
+      setArrivalRefusal(driverRideRefusalToast(result.payload, DRIVER_RIDE_COPY.notNearPickup));
+    }
+    return result.ok;
+  }, [run, rideId]);
+
   return {
     ride,
-    step: rideStep(ride),
+    step,
     pendingAction,
-    arrived: useCallback(() => advance(rideId === null ? null : { rideId, action: 'arrived' }), [advance, rideId]),
+    arrived,
+    arrivalRefusal,
     start,
     complete: useCallback(() => advance(rideId === null ? null : { rideId, action: 'complete' }), [advance, rideId]),
     completeStop: useCallback(

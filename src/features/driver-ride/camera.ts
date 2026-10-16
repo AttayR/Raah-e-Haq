@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Details, LatLng, Region } from 'react-native-maps';
-import { fitKeyOf, withMinimumSpan } from '../active-ride/camera';
+import { RIDE_MARKER_CLEARANCE, fitKeyOf, withMinimumSpan } from '../active-ride/camera';
 import type { DriverRideStep } from './steps';
 
 /**
@@ -54,8 +54,11 @@ export interface DriverRideViewport {
 
 /** Room above the top-most point inside the strip (a pin's head sits above its coordinate). */
 export const FIT_MARGIN_TOP = 48;
-/** Room below the bottom-most point, above the panel. */
-export const FIT_MARGIN_BOTTOM = 24;
+/**
+ * Room below the bottom-most point, above the panel. T-553 (QA 2026-10-16 2-06): the car marker
+ * is drawn centred on its coordinate, so 24 pt left half of it under the panel; a marker's size.
+ */
+export const FIT_MARGIN_BOTTOM = RIDE_MARKER_CLEARANCE;
 /** Room left and right of the points. */
 export const FIT_MARGIN_SIDE = 40;
 /** The fitted strip is never treated as shorter than this (a panel taller than the map). */
