@@ -6,24 +6,48 @@
  */
 export const REGISTRATION_COPY = {
   form: {
-    title: 'Create Account',
-    subtitle: (role: 'driver' | 'passenger') => `Join RaaH-e-Haq as ${role === 'driver' ? 'Driver' : 'Passenger'}`,
     progress: (step: number, of: number) => `Step ${step} of ${of}`,
     /** A backend from before BE-35 (no phone step): the old success message. */
     created: 'Your account has been created successfully! Please wait for admin approval.',
     fixErrors: 'Please fix the highlighted fields.',
-    /** T-202: a 422 whose fields no input shows; the messages are listed above the buttons. */
+    /** T-202: a 422 whose fields no input shows; the messages are listed above the action bar. */
     notAccepted: 'Your details could not be accepted. See the message below.',
-    next: 'Next',
-    previous: 'Previous',
-    create: 'Create Account',
-    creating: 'Creating Account...',
-    /** BE-53 register limiter (429 rate_limited): Create Account waits for retry_after. */
-    createIn: (countdown: string) => `Create Account (${countdown})`,
+    /** UI-R7: one primary action per page (spec auth-registration). */
+    continue: 'Continue',
+    back: 'Back',
+    create: 'Create account',
+    creating: 'Creating account',
+    /** BE-53 register limiter (429 rate_limited): Create account waits for retry_after. */
+    createIn: (countdown: string) => `Create account (${countdown})`,
+    chooseRoleFirst: 'Choose how you will use Raah-e-Haq.',
+    legal: 'By creating an account you agree to the Terms and Privacy Policy.',
+  },
+  /** Page titles and descriptions (UI-R7). */
+  pages: {
+    role: { title: 'How will you use Raah-e-Haq?', description: "You can't switch later from the app." },
+    personal: { title: 'About you', description: 'Your details as they appear on your CNIC.' },
+    vehicle: { title: 'Vehicle & licence', description: 'The vehicle you will drive and your driving licence.' },
+    documentsDriver: { title: 'Documents', description: 'Clear photos of your documents. Our team checks them before you can drive.' },
+    documentsPassenger: { title: 'Verify your identity', description: 'We use your CNIC to keep riders and drivers safe.' },
+    payout: { title: 'Payout', description: 'We pay your earnings here. Only you and the admin team can see this.' },
+    review: { title: 'Check your details', description: 'Make sure everything is right before you create your account.' },
+  },
+  role: {
+    groupA11y: 'Account type',
+    rideTitle: 'I want to ride',
+    rideBody: 'Book rides around your city.',
+    driveTitle: 'I want to drive',
+    driveBody: 'Earn by giving rides. Needs your licence, vehicle and documents.',
+  },
+  /** Leaving the form with details typed (spec: Dialog, not a native alert). */
+  leave: {
+    title: 'Discard sign-up?',
+    body: "Your details won't be saved.",
+    confirm: 'Discard',
+    cancel: 'Keep going',
   },
   verify: {
-    headerTitle: 'Verify Your Number',
-    headerSubtitle: 'One last step to finish signing up',
+    headerTitle: 'Verify your number',
     title: 'Enter verification code',
     subtitle: (phone: string) => `Enter the code sent by SMS to ${phone}.`,
     /** register answered code_sent: false without a message. */
@@ -49,6 +73,8 @@ export const REGISTRATION_COPY = {
     pendingApproval:
       'Phone number verified. Your account is pending admin approval; you can sign in once it is approved.',
     goToSignIn: 'Go to Sign In',
+    /** The phone step's Header back: leaving asks first (usePreventRemove). */
+    backA11y: 'Leave verification',
   },
   fallbacks: {
     register: 'Registration failed',

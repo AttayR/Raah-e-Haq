@@ -9,9 +9,9 @@ import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert, Keyboard } from 'react-native';
+import { Keyboard } from 'react-native';
 import RegistrationPhoneStep from '../../src/features/auth/components/RegistrationPhoneStep';
-import { REGISTRATION_CODE_DONE_ID } from '../../src/screens/Auth/PhoneAuthParts';
+import { dialog, dialogStore } from '../../src/core/dialog';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import { rootReducer } from '../../src/store/rootReducer';
 import type { SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
@@ -99,13 +99,13 @@ beforeEach(async () => {
   mockDispatch.mockClear();
   mockSetOptions.mockClear();
   mockPrevent.enabled = false;
-  jest.spyOn(Alert, 'alert').mockClear();
   await authStorage.clear();
   await AsyncStorage.clear();
 });
 
 afterEach(() => {
   act(() => toast.hide());
+  act(() => dialog.dismissAll());
   mock.restore();
   jest.useRealTimers();
 });
@@ -276,7 +276,9 @@ describe('RegistrationPhoneStep', () => {
   it('the code input brings its own iOS Done bar (T-550) that closes the keyboard', async () => {
     const dismiss = jest.spyOn(Keyboard, 'dismiss');
     await renderStep();
-    expect(screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID).toBe(REGISTRATION_CODE_DONE_ID);
+    // The kit TextField renders its own bar with a unique id (UI-R7; T-548/T-550).
+    const input = screen.getByPlaceholderText('6-digit code');
+    expect(input.props.inputAccessoryViewID).toEqual(expect.stringMatching(/^textFieldDone/));
     fireEvent.press(screen.getByTestId('registration-code-done'));
     expect(dismiss).toHaveBeenCalledTimes(1);
     dismiss.mockRestore();
@@ -288,22 +290,28 @@ describe('RegistrationPhoneStep', () => {
   });
 
   it('asks before leaving while the code is entered (back, swipe, Go to Sign In)', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await renderStep();
 
     // The native iOS swipe cannot be stopped from JS, so it is switched off (QA T-201).
     expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
 
     expect(tryToLeave().prevented).toBe(true);
-    expect(alert).toHaveBeenCalledWith('Leave verification?', 'You can finish later from the emailed link.', expect.any(Array));
+    // UI-R7: a themed Dialog (core/dialog), not a native alert.
+    const asked = dialogStore.getCurrent();
+    expect(asked).toMatchObject({
+      title: 'Leave verification?',
+      body: 'You can finish later from the emailed link.',
+      confirmLabel: 'Leave',
+      cancelLabel: 'Stay',
+    });
     expect(mockDispatch).not.toHaveBeenCalled();
-    const buttons = alert.mock.calls[0][2] as Array<{ text: string; onPress?: () => void }>;
-    buttons.find((button) => button.text === 'Leave')?.onPress?.();
+    await act(async () => {
+      if (asked) dialog.answer(asked.id, true);
+    });
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'POP' });
   });
 
   it('does not ask once the step is over (pending driver verified)', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mock.onPost('/auth/phone/verify').reply(200, {
       success: true,
       message: 'Phone number verified. Your account is pending admin approval; you can sign in once it is approved.',
@@ -314,7 +322,7 @@ describe('RegistrationPhoneStep', () => {
     await waitFor(() => expect(screen.getByText('Number verified')).toBeTruthy());
 
     expect(tryToLeave().prevented).toBe(false);
-    expect(alert).not.toHaveBeenCalled();
+    expect(dialogStore.getCurrent()).toBeNull();
     expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
   });
 });

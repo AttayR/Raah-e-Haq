@@ -14,7 +14,6 @@ import { styles } from './PhoneAuthScreen.styles';
  */
 export const PHONE_INPUT_DONE_ID = 'phoneAuthPhoneDone';
 export const CODE_INPUT_DONE_ID = 'phoneAuthCodeDone';
-export const REGISTRATION_CODE_DONE_ID = 'registrationCodeDone';
 
 interface KeyboardDoneBarProps {
   /** The input points its `inputAccessoryViewID` at this; one bar per input. */

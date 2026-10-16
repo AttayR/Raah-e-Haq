@@ -24,6 +24,7 @@ import {
   RideVehiclesSection,
 } from './sections/RideSections';
 import { DriverRidePreview, TripAssignedPreview } from './sections/RideScreenPreviews';
+import { REGISTRATION_PREVIEWS } from './sections/RegistrationPreviews';
 import { VehicleMotionSection } from './sections/VehicleMotionSection';
 import {
   LargeTitlePreview,
@@ -111,6 +112,7 @@ const SCREEN_PREVIEWS: Section[] = [
   ['screen-signout', () => <SignOutDialogPreview />],
   ['screen-large', () => <LargeTitlePreview scrolled={false} />],
   ['screen-large-scrolled', () => <LargeTitlePreview scrolled />],
+  ...REGISTRATION_PREVIEWS,
 ];
 
 export const GALLERY_SECTION_KEYS = [...SECTIONS, ...SCREEN_PREVIEWS].map(([key]) => key);

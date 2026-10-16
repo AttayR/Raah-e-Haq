@@ -7,7 +7,8 @@
  *   under Login).
  */
 import React from 'react';
-import { Alert, Button, Text } from 'react-native';
+import { Button, Text } from 'react-native';
+import { dialog, dialogStore } from '../../src/core/dialog';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
@@ -75,22 +76,22 @@ const renderStack = async () => {
 
 const routeNames = () => navigationRef.getRootState().routes.map((route) => route.name);
 
-/** Presses the button of the last Alert.alert call. */
-const answerAlert = (alert: jest.SpyInstance, text: string) => {
-  const buttons = alert.mock.calls[alert.mock.calls.length - 1][2] as Array<{ text: string; onPress?: () => void }>;
-  act(() => buttons.find((button) => button.text === text)?.onPress?.());
+/** Answers the open confirm Dialog (UI-R7: core/dialog instead of a native alert). */
+const answerDialog = async (choice: 'Stay' | 'Leave') => {
+  const current = dialogStore.getCurrent();
+  expect(current).toMatchObject({ confirmLabel: 'Leave', cancelLabel: 'Stay' });
+  await act(async () => {
+    if (current) dialog.answer(current.id, choice === 'Leave');
+  });
 };
-
-let alert: jest.SpyInstance;
 
 beforeEach(() => {
   jest.useFakeTimers();
-  alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
 afterEach(() => {
   act(() => toast.hide());
-  alert.mockRestore();
+  act(() => dialog.dismissAll());
   jest.useRealTimers();
 });
 
@@ -106,15 +107,18 @@ describe('leaving the registration code step', () => {
     await renderStack();
 
     act(() => navigationRef.goBack());
-    expect(alert).toHaveBeenCalledWith('Leave verification?', 'You can finish later from the emailed link.', expect.any(Array));
+    expect(dialogStore.getCurrent()).toMatchObject({
+      title: 'Leave verification?',
+      body: 'You can finish later from the emailed link.',
+    });
     expect(routeNames()).toEqual(['Login', 'Signup']);
 
-    answerAlert(alert, 'Stay');
+    await answerDialog('Stay');
     expect(routeNames()).toEqual(['Login', 'Signup']);
     expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy();
 
     act(() => navigationRef.goBack());
-    answerAlert(alert, 'Leave');
+    await answerDialog('Leave');
     await act(async () => {});
     expect(routeNames()).toEqual(['Login']);
 
@@ -129,10 +133,10 @@ describe('leaving the registration code step', () => {
     await renderStack();
 
     fireEvent.press(screen.getByText('Go to Sign In'));
-    expect(alert).toHaveBeenCalledTimes(1);
+    expect(dialogStore.getCurrent()).toMatchObject({ title: 'Leave verification?' });
     expect(routeNames()).toEqual(['Login', 'Signup']);
 
-    answerAlert(alert, 'Leave');
+    await answerDialog('Leave');
     await act(async () => {});
 
     expect(routeNames()).toEqual(['Login']);

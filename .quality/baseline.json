@@ -1,8 +1,8 @@
 {
-  "tsErrors": 22,
-  "eslintErrors": 10,
-  "eslintWarnings": 4,
+  "tsErrors": 21,
+  "eslintErrors": 7,
+  "eslintWarnings": 1,
   "jestPassing": true,
   "bundleOk": true,
-  "updatedAt": "2026-10-16T08:09:14.826Z"
+  "updatedAt": "2026-10-16T13:40:44.820Z"
 }

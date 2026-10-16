@@ -1,5 +1,5 @@
 /**
- * T-201 (AUTH-11): Next validates the step against registrationSchema and shows the errors
+ * T-201 (AUTH-11): Continue validates the step against registrationSchema and shows the errors
  * inline; Create Account sends the normalised phone and, on the BE-38 201 (no token, no user
  * id), opens the code step instead of failing with "Invalid response format". A 429 from the
  * register limiter (BE-53) holds Create Account for retry_after.
@@ -8,7 +8,13 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { ScrollView } from 'react-native';
 import RegistrationScreen from '../../src/screens/Auth/RegistrationScreen';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
@@ -16,16 +22,27 @@ import { rootReducer } from '../../src/store/rootReducer';
 import type { SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
+import { dialog, dialogStore } from '../../src/core/dialog';
 
 jest.mock('../../src/store', () => {
   const redux = jest.requireActual('react-redux');
-  return { useAppDispatch: redux.useDispatch, useAppSelector: redux.useSelector };
+  return {
+    useAppDispatch: redux.useDispatch,
+    useAppSelector: redux.useSelector,
+  };
 });
 
 const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
+const mockSetOptions = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({ navigate: mockNavigate, popTo: mockNavigate, setOptions: jest.fn(), dispatch: jest.fn() }),
+  useNavigation: () => ({
+    navigate: mockNavigate,
+    popTo: mockNavigate,
+    setOptions: mockSetOptions,
+    dispatch: mockDispatch,
+  }),
   // Leaving the code step is covered with a real stack in __tests__/navigation/RegistrationLeave.
   usePreventRemove: jest.fn(),
 }));
@@ -35,10 +52,13 @@ const VERIFICATION_TOKEN = 'test-verification-token-not-real';
 let mock: MockAdapter;
 
 const renderScreen = async () => {
-  const extra: SessionThunkExtra = { purgePersistedState: jest.fn(() => Promise.resolve()) };
+  const extra: SessionThunkExtra = {
+    purgePersistedState: jest.fn(() => Promise.resolve()),
+  };
   const store = configureStore({
     reducer: rootReducer,
-    middleware: (getDefault) => getDefault({ serializableCheck: false, thunk: { extraArgument: extra } }),
+    middleware: getDefault =>
+      getDefault({ serializableCheck: false, thunk: { extraArgument: extra } }),
   });
   render(
     <Provider store={store}>
@@ -52,58 +72,140 @@ const renderScreen = async () => {
   return store;
 };
 
-const type = (placeholder: string, value: string) => fireEvent.changeText(screen.getByPlaceholderText(placeholder), value);
+const type = (placeholder: string, value: string) =>
+  fireEvent.changeText(screen.getByPlaceholderText(placeholder), value);
+const phoneInput = () => screen.getByTestId('registration-phone-input');
+const dobInput = () => screen.getByTestId('registration-dob-input');
+const next = () => fireEvent.press(screen.getByTestId('registration-continue'));
+
+/** UI-R7: the wizard opens on the role page; the passenger pages follow (Step 1 of 3). */
+const chooseRider = () => {
+  fireEvent.press(screen.getByText('I want to ride'));
+  next();
+};
 
 /** A complete passenger personal step, typed the way a user would (phone as 03…). */
 const fillPassengerPersonal = () => {
   type('Enter your full name', 'Test Passenger');
   type('Enter your email address', 'passenger@example.test');
-  fireEvent.changeText(screen.getAllByPlaceholderText('+92XXXXXXXXXX')[0], '03009990001');
+  fireEvent.changeText(phoneInput(), '03009990001');
   type('00000-0000000-0', '3520212345671');
   type('Enter your complete address', 'House 1, Street 2, Lahore');
-  type('YYYY-MM-DD (e.g. 1990-01-15)', '19900115'); // digits only: the iOS number pad has no "-" (T-206)
+  fireEvent.changeText(dobInput(), '19900115'); // digits only: the iOS number pad has no "-" (T-206)
   fireEvent.press(screen.getByText('Female'));
   type('Create a strong password', 'Secret123');
   type('Confirm your password', 'Secret123');
-  fireEvent.changeText(screen.getAllByPlaceholderText('+92XXXXXXXXXX')[1], '03009990002');
+  fireEvent.changeText(
+    screen.getByTestId('registration-emergency-phone-input'),
+    '03009990002',
+  );
   type('Full name of emergency contact', 'Test Contact');
   fireEvent.press(screen.getByText('Father'));
 };
 
-/** The header title also reads "Create Account"; the button is the last match. */
-const createButton = () => {
-  const matches = screen.getAllByText('Create Account');
-  return matches[matches.length - 1];
-};
+const createButton = () => screen.getByTestId('registration-submit');
 
 const goToReview = () => {
+  chooseRider();
   fillPassengerPersonal();
-  fireEvent.press(screen.getByText('Next')); // -> vehicle (skipped for passengers)
-  fireEvent.press(screen.getByText('Next')); // -> documents
-  fireEvent.press(screen.getByText('Next')); // -> review
+  next(); // -> identity (passengers have no vehicle page, UI-R7)
+  next(); // -> review
 };
 
 beforeEach(() => {
   jest.useFakeTimers();
   mock = new MockAdapter(apiClient);
   mockNavigate.mockClear();
+  mockDispatch.mockClear();
+  mockSetOptions.mockClear();
 });
 
 afterEach(() => {
   act(() => toast.hide());
+  act(() => dialog.dismissAll());
   mock.restore();
   jest.useRealTimers();
 });
 
 describe('RegistrationScreen (T-201)', () => {
+  it('UI-R7: opens on the role page; Continue waits for a role, then shows the rider pages', async () => {
+    await renderScreen();
+    expect(screen.getByText('How will you use Raah-e-Haq?')).toBeTruthy();
+    expect(screen.queryByText(/^Step /)).toBeNull();
+    expect(
+      screen.getByTestId('registration-continue').props.accessibilityState,
+    ).toMatchObject({ disabled: true });
+    fireEvent.press(screen.getByText('I want to drive'));
+    expect(
+      screen.getByTestId('registration-role-driver').props.accessibilityState,
+    ).toMatchObject({ checked: true });
+    fireEvent.press(screen.getByText('I want to ride'));
+    next();
+    expect(screen.getByText('About you')).toBeTruthy();
+    expect(screen.getByText('Step 1 of 3')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('registration-header-back'));
+    expect(screen.getByText('How will you use Raah-e-Haq?')).toBeTruthy();
+  });
+
+  it('UI-R7: Android back steps back a page; leaving with details typed asks first (Dialog)', async () => {
+    const { usePreventRemove } = jest.requireMock(
+      '@react-navigation/native',
+    ) as { usePreventRemove: jest.Mock };
+    const latest = () =>
+      usePreventRemove.mock.calls[usePreventRemove.mock.calls.length - 1];
+    const back = () =>
+      act(() => latest()[1]({ data: { action: { type: 'GO_BACK' } } }));
+    await renderScreen();
+    // Nothing typed on the role page: no guard, and the iOS swipe stays on.
+    expect(latest()[0]).toBe(false);
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+
+    chooseRider();
+    type('Enter your full name', 'Test Passenger');
+    expect(latest()[0]).toBe(true);
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    back();
+    expect(screen.getByText('How will you use Raah-e-Haq?')).toBeTruthy();
+    expect(dialogStore.getCurrent()).toBeNull();
+
+    back();
+    const asked = dialogStore.getCurrent();
+    expect(asked).toMatchObject({
+      title: 'Discard sign-up?',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep going',
+    });
+    expect(mockDispatch).not.toHaveBeenCalled();
+    await act(async () => {
+      if (asked) dialog.answer(asked.id, true);
+    });
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+  });
+
+  it('UI-R7: a driver gets five steps and the 18+ hint on the date of birth', async () => {
+    await renderScreen();
+    fireEvent.press(screen.getByText('I want to drive'));
+    next();
+    expect(screen.getByText('Step 1 of 5')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Drivers must be 18 or older. Type the digits, e.g. 19900115.',
+      ),
+    ).toBeTruthy();
+  });
+
   it('T-556: the relationship hint has no developer copy about the API', async () => {
     await renderScreen();
-    expect(screen.getByText('Select the relationship to your emergency contact')).toBeTruthy();
+    chooseRider();
+    expect(
+      screen.getByText('Select the relationship to your emergency contact'),
+    ).toBeTruthy();
     expect(screen.queryByText(/API/)).toBeNull();
   });
 
   it('every step sits in one keyboard-aware scroller, with no nested vertical ScrollView (T-204)', async () => {
     await renderScreen();
+    chooseRider();
     const expectSingleScroller = () => {
       const scrolls = screen.UNSAFE_getAllByType(ScrollView);
       expect(scrolls).toHaveLength(1);
@@ -111,18 +213,23 @@ describe('RegistrationScreen (T-201)', () => {
     };
     expectSingleScroller();
     fillPassengerPersonal();
-    fireEvent.press(screen.getByText('Next')); // -> vehicle (skipped for passengers)
-    fireEvent.press(screen.getByText('Next')); // -> documents
-    expect(screen.getByText('CNIC Verification')).toBeTruthy();
+    next(); // -> identity
+    expect(screen.getByText('Verify your identity')).toBeTruthy();
     expectSingleScroller();
-    fireEvent.press(screen.getByText('Next')); // -> review
-    expect(screen.getByText('Terms & Conditions')).toBeTruthy();
+    next(); // -> review
+    expect(screen.getByText('Check your details')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'By creating an account you agree to the Terms and Privacy Policy.',
+      ),
+    ).toBeTruthy();
     expectSingleScroller();
   });
 
   it('date of birth typed as digits on the number pad gets its dashes (T-206)', async () => {
     await renderScreen();
-    const dob = () => screen.getByPlaceholderText('YYYY-MM-DD (e.g. 1990-01-15)');
+    chooseRider();
+    const dob = dobInput;
     expect(dob().props.maxLength).toBe(10);
     fireEvent.changeText(dob(), '199001');
     expect(dob().props.value).toBe('1990-01');
@@ -134,51 +241,73 @@ describe('RegistrationScreen (T-201)', () => {
 
   it('passenger documents show no required marker on the optional CNIC images (T-206)', async () => {
     await renderScreen();
+    chooseRider();
     fillPassengerPersonal();
-    fireEvent.press(screen.getByText('Next')); // -> vehicle (skipped for passengers)
-    fireEvent.press(screen.getByText('Next')); // -> documents
-    expect(screen.getByText('CNIC Front Picture')).toBeTruthy();
+    next(); // -> identity
+    expect(screen.getByText('CNIC front')).toBeTruthy();
     expect(screen.queryByText('*')).toBeNull();
   });
 
-  it('Next on an empty step shows the schema errors inline and stays on step 1', async () => {
+  it('Continue on an empty step shows the schema errors inline and stays on step 1', async () => {
     await renderScreen();
+    chooseRider();
 
-    fireEvent.press(screen.getByText('Next'));
+    next();
 
     expect(screen.getByText('Phone number is required')).toBeTruthy();
     expect(screen.getByText('Password is required')).toBeTruthy();
     expect(screen.getByText('Full name is required')).toBeTruthy();
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+    expect(screen.getByText('Step 1 of 3')).toBeTruthy();
   });
 
   it('a weak password blocks step 1; fixing the field clears its error', async () => {
     await renderScreen();
+    chooseRider();
     fillPassengerPersonal();
     type('Create a strong password', 'weakpass');
     type('Confirm your password', 'weakpass');
 
-    fireEvent.press(screen.getByText('Next'));
-    expect(screen.getByText('Password must contain at least one uppercase letter')).toBeTruthy();
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+    next();
+    expect(
+      screen.getByText('Password must contain at least one uppercase letter'),
+    ).toBeTruthy();
+    expect(screen.getByText('Step 1 of 3')).toBeTruthy();
 
     type('Create a strong password', 'Secret123');
-    expect(screen.queryByText('Password must contain at least one uppercase letter')).toBeNull();
+    expect(
+      screen.queryByText('Password must contain at least one uppercase letter'),
+    ).toBeNull();
   });
 
   it('sends +923… and opens the code step on the BE-38 201', async () => {
     let sentPhone: unknown;
-    mock.onPost('/auth/register').reply((config) => {
+    mock.onPost('/auth/register').reply(config => {
       // Node's FormData in Jest (React Native's has getParts() instead).
       sentPhone = (config.data as { get(name: string): unknown }).get('phone');
       return [
         201,
         {
           success: true,
-          message: 'Registration received. Enter the code sent to your phone to verify your number and finish signing up. We have also sent you an email.',
+          message:
+            'Registration received. Enter the code sent to your phone to verify your number and finish signing up. We have also sent you an email.',
           data: {
-            user: { name: 'Test Passenger', email: 'passenger@example.test', user_type: 'passenger', role: 'passenger', roles: ['passenger'], status: 'active', phone: null, pending_phone: '+923009990001' },
-            phone_verification: { phone: '+923009990001', code_sent: true, expires_in: 60, verification_token: VERIFICATION_TOKEN, verification_token_expires_in: 3600 },
+            user: {
+              name: 'Test Passenger',
+              email: 'passenger@example.test',
+              user_type: 'passenger',
+              role: 'passenger',
+              roles: ['passenger'],
+              status: 'active',
+              phone: null,
+              pending_phone: '+923009990001',
+            },
+            phone_verification: {
+              phone: '+923009990001',
+              code_sent: true,
+              expires_in: 60,
+              verification_token: VERIFICATION_TOKEN,
+              verification_token_expires_in: 3600,
+            },
           },
         },
       ];
@@ -188,11 +317,57 @@ describe('RegistrationScreen (T-201)', () => {
 
     fireEvent.press(createButton());
 
-    await waitFor(() => expect(screen.getByText('Enter the code sent by SMS to +923009990001.')).toBeTruthy());
+    await waitFor(() =>
+      expect(
+        screen.getByText('Enter the code sent by SMS to +923009990001.'),
+      ).toBeTruthy(),
+    );
     expect(sentPhone).toBe('+923009990001');
     expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy();
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(JSON.stringify(store.getState())).not.toContain(VERIFICATION_TOKEN);
+  });
+
+  it('UI-R7: back is blocked while Create account is submitting', async () => {
+    let release: (value: [number, unknown]) => void = () => undefined;
+    mock.onPost('/auth/register').reply(
+      () =>
+        new Promise(resolve => {
+          release = resolve;
+        }),
+    );
+    const { usePreventRemove } = jest.requireMock(
+      '@react-navigation/native',
+    ) as { usePreventRemove: jest.Mock };
+    const latest = () =>
+      usePreventRemove.mock.calls[usePreventRemove.mock.calls.length - 1];
+    await renderScreen();
+    goToReview();
+
+    fireEvent.press(createButton());
+    await act(async () => {});
+    expect(createButton().props.accessibilityState).toMatchObject({
+      busy: true,
+    });
+
+    fireEvent.press(screen.getByTestId('registration-header-back'));
+    expect(screen.getByText('Step 3 of 3')).toBeTruthy();
+    expect(latest()[0]).toBe(true);
+    act(() => latest()[1]({ data: { action: { type: 'GO_BACK' } } }));
+    expect(screen.getByText('Step 3 of 3')).toBeTruthy();
+    expect(dialogStore.getCurrent()).toBeNull();
+    expect(mockDispatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      release([500, { success: false, message: 'Server error' }]);
+    });
+    await waitFor(() =>
+      expect(createButton().props.accessibilityState).not.toMatchObject({
+        busy: true,
+      }),
+    );
+    fireEvent.press(screen.getByTestId('registration-header-back'));
+    expect(screen.getByText('Step 2 of 3')).toBeTruthy();
   });
 
   it('429 rate_limited holds Create Account for retry_after', async () => {
@@ -207,20 +382,24 @@ describe('RegistrationScreen (T-201)', () => {
 
     fireEvent.press(createButton());
 
-    await waitFor(() => expect(screen.getByText('Create Account (30s)')).toBeTruthy());
-    fireEvent.press(screen.getByText('Create Account (30s)'));
+    await waitFor(() =>
+      expect(screen.getByText('Create account (30s)')).toBeTruthy(),
+    );
+    fireEvent.press(screen.getByText('Create account (30s)'));
     expect(mock.history.post).toHaveLength(1);
 
     act(() => {
       jest.advanceTimersByTime(30_000);
     });
-    // The header title also reads "Create Account"; the button is the second match.
-    expect(screen.getAllByText('Create Account')).toHaveLength(2);
+    expect(screen.getByText('Create account')).toBeTruthy();
   });
 
   it('email input: no autocorrect or capitals, email keyboard and autofill (QA T-201)', async () => {
     await renderScreen();
-    expect(screen.getByPlaceholderText('Enter your email address').props).toMatchObject({
+    chooseRider();
+    expect(
+      screen.getByPlaceholderText('Enter your email address').props,
+    ).toMatchObject({
       autoCorrect: false,
       autoCapitalize: 'none',
       keyboardType: 'email-address',
@@ -230,21 +409,25 @@ describe('RegistrationScreen (T-201)', () => {
 
   it('typing clears a stale "required" error on the phone field (QA T-201)', async () => {
     await renderScreen();
-    fireEvent.press(screen.getByText('Next'));
+    chooseRider();
+    next();
     expect(screen.getByText('Phone number is required')).toBeTruthy();
 
-    fireEvent.changeText(screen.getAllByPlaceholderText('+92XXXXXXXXXX')[0], '0300');
+    fireEvent.changeText(phoneInput(), '0300');
     expect(screen.queryByText('Phone number is required')).toBeNull();
 
     // A blur right after the last keystroke checks the typed value, not an older render's.
-    fireEvent.changeText(screen.getAllByPlaceholderText('+92XXXXXXXXXX')[0], '03009990001');
-    fireEvent(screen.getAllByPlaceholderText('+92XXXXXXXXXX')[0], 'blur');
+    fireEvent.changeText(phoneInput(), '03009990001');
+    fireEvent(phoneInput(), 'blur');
     expect(screen.queryByText('Phone number is required')).toBeNull();
-    expect(screen.queryByText('Enter a Pakistani mobile number, e.g. +923001234567')).toBeNull();
+    expect(
+      screen.queryByText('Enter a Pakistani mobile number, e.g. +923001234567'),
+    ).toBeNull();
   });
 
   it('the password meter shows nothing for an empty password', async () => {
     await renderScreen();
+    chooseRider();
     expect(screen.queryByText('Weak')).toBeNull();
     type('Create a strong password', 'a');
     expect(screen.getByText('Weak')).toBeTruthy();
@@ -261,7 +444,9 @@ describe('RegistrationScreen server field errors (T-202)', () => {
       errors: {
         email: ['The email field must be a valid email address.'],
         phone: ['Enter a Pakistani mobile number.'],
-        passenger_emergency_contact_name: ['The passenger emergency contact name field is required.'],
+        passenger_emergency_contact_name: [
+          'The passenger emergency contact name field is required.',
+        ],
       },
     });
     const errorToast = jest.spyOn(toast, 'error');
@@ -271,30 +456,41 @@ describe('RegistrationScreen server field errors (T-202)', () => {
 
     fireEvent.press(createButton());
 
-    await waitFor(() => expect(screen.getByText('Step 1 of 4')).toBeTruthy());
-    expect(screen.getByText('The email field must be a valid email address.')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Step 1 of 3')).toBeTruthy());
+    expect(
+      screen.getByText('The email field must be a valid email address.'),
+    ).toBeTruthy();
     expect(screen.getByText('Enter a Pakistani mobile number.')).toBeTruthy();
-    expect(screen.getByText('The passenger emergency contact name field is required.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The passenger emergency contact name field is required.',
+      ),
+    ).toBeTruthy();
     expect(errorToast).toHaveBeenCalledTimes(1);
-    expect(errorToast).toHaveBeenCalledWith('Please fix the highlighted fields.');
+    expect(errorToast).toHaveBeenCalledWith(
+      'Please fix the highlighted fields.',
+    );
     // The registration thunk has reducer cases (AUTH-17).
     expect(store.getState().apiAuth.status).toBe('failed');
     expect(store.getState().apiAuth.error).toBe('Validation Error');
 
     type('Enter your email address', 'passenger2@example.test');
-    expect(screen.queryByText('The email field must be a valid email address.')).toBeNull();
+    expect(
+      screen.queryByText('The email field must be a valid email address.'),
+    ).toBeNull();
     expect(screen.getByText('Enter a Pakistani mobile number.')).toBeTruthy();
 
     // A server error survives moving between steps until its field is edited.
-    fireEvent.press(screen.getByText('Next'));
-    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
-    fireEvent.press(screen.getByText('Previous'));
+    next();
+    expect(screen.getByText('Step 2 of 3')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('registration-header-back'));
     expect(screen.getByText('Enter a Pakistani mobile number.')).toBeTruthy();
     errorToast.mockRestore();
   });
 
   it('BE-89: a rank/title name refusal shows under the name field and clears when the name changes', async () => {
-    const rankMessage = 'Please use your own name without a rank or title (such as Captain, Major or Colonel).';
+    const rankMessage =
+      'Please use your own name without a rank or title (such as Captain, Major or Colonel).';
     mock.onPost('/auth/register').reply(422, {
       success: false,
       message: 'Validation Error',
@@ -305,7 +501,7 @@ describe('RegistrationScreen server field errors (T-202)', () => {
 
     fireEvent.press(createButton());
 
-    await waitFor(() => expect(screen.getByText('Step 1 of 4')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Step 1 of 3')).toBeTruthy());
     expect(screen.getByText(rankMessage)).toBeTruthy();
     // A field error (the form went back to step 1 for it), shown once, not a form-level line.
     expect(screen.getAllByText(rankMessage)).toHaveLength(1);
@@ -318,7 +514,11 @@ describe('RegistrationScreen server field errors (T-202)', () => {
     mock.onPost('/auth/register').reply(422, {
       success: false,
       message: 'Validation Error',
-      errors: { passenger_preferred_payment: ['The selected passenger preferred payment is invalid.'] },
+      errors: {
+        passenger_preferred_payment: [
+          'The selected passenger preferred payment is invalid.',
+        ],
+      },
     });
     const errorToast = jest.spyOn(toast, 'error');
     await renderScreen();
@@ -328,11 +528,17 @@ describe('RegistrationScreen server field errors (T-202)', () => {
     fireEvent.press(createButton());
 
     await waitFor(() =>
-      expect(screen.getByText('The selected passenger preferred payment is invalid.')).toBeTruthy(),
+      expect(
+        screen.getByText(
+          'The selected passenger preferred payment is invalid.',
+        ),
+      ).toBeTruthy(),
     );
-    expect(screen.getByText('Step 4 of 4')).toBeTruthy();
+    expect(screen.getByText('Step 3 of 3')).toBeTruthy();
     expect(errorToast).toHaveBeenCalledTimes(1);
-    expect(errorToast).toHaveBeenCalledWith('Your details could not be accepted. See the message below.');
+    expect(errorToast).toHaveBeenCalledWith(
+      'Your details could not be accepted. See the message below.',
+    );
     errorToast.mockRestore();
   });
 });

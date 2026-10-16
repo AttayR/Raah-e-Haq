@@ -2,18 +2,10 @@
  * The registration form's data and steps (T-201). The screen holds one RegistrationFormData;
  * each step edits part of it and is validated by src/schemas/registrationSchema before Next.
  */
-import type { IconName } from '../../../components/ui/icons';
-
 export type RegistrationRole = 'driver' | 'passenger';
 
+/** The schema steps (registrationSchema); the wizard's pages per role are in ./pages (UI-R7). */
 export type RegistrationStep = 'personal' | 'vehicle' | 'documents' | 'review';
-
-export const REGISTRATION_STEPS: ReadonlyArray<{ key: RegistrationStep; title: string; icon: IconName }> = [
-  { key: 'personal', title: 'Personal Info', icon: 'account' },
-  { key: 'vehicle', title: 'Vehicle Info', icon: 'car' },
-  { key: 'documents', title: 'Documents', icon: 'document' },
-  { key: 'review', title: 'Review', icon: 'check' },
-];
 
 /**
  * The vehicle types the backend accepts (BE-58: car, bike, rickshaw, van; anything else is a

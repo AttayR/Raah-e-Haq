@@ -26,8 +26,8 @@ describe('T-207: driving licence inputs', () => {
     const onDataChange = jest.fn();
     await renderInTheme(<VehicleInfoStep data={driver} onDataChange={onDataChange} errors={{}} />);
 
-    expect(screen.getByText('Driving License Number *')).toBeTruthy();
-    fireEvent.changeText(screen.getByPlaceholderText('As printed on your driving license'), 'LHR-123');
+    expect(screen.getByText('Driving licence number *')).toBeTruthy();
+    fireEvent.changeText(screen.getByPlaceholderText('As printed on your driving licence'), 'LHR-123');
     expect(onDataChange).toHaveBeenLastCalledWith({ licenseNumber: 'LHR-123' });
   });
 

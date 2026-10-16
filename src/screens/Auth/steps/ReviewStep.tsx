@@ -1,600 +1,138 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Dimensions,
-  Image,
-} from 'react-native';
-import { BrandColors } from '../../../theme/colors';
-import { Icon } from '../../../components/ui/Icon';
+import { StyleSheet, View } from 'react-native';
+import { AppText } from '../../../components/ui';
 import { t } from '../../../i18n';
+import { REGISTRATION_COPY } from '../../../features/auth/copy/registration';
+import {
+  EMERGENCY_RELATION_OPTIONS,
+  LICENSE_TYPES,
+  REGISTRATION_FIELDS as F,
+} from '../../../features/auth/copy/registrationFields';
+import type { RegistrationPage } from '../../../features/auth/registration/pages';
 import {
   VEHICLE_PHOTO_SLOTS,
-  filledVehiclePhotoCount,
   vehicleTypeLabel,
+  type RegistrationFormData,
 } from '../../../features/auth/registration/registrationForm';
+import { space } from '../../../theme';
+import { ReviewRow, ReviewSection, ReviewThumbs } from './ReviewSection';
 
-const { width: screenWidth } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
+const R = F.review;
 
-interface ReviewData {
-  // Personal Info
-  fullName: string;
-  email: string;
-  cnic: string;
-  address: string;
-  phoneNumber: string;
-  
-  // Vehicle Info (for drivers)
-  vehicleType: string;
-  vehicleNumber: string;
-  vehicleBrand: string;
-  vehicleModel: string;
-  vehicleYear: string;
-  vehicleColor: string;
-  vehicleHasAc?: boolean;
-  licenseNumber: string;
-  
-  // Documents
-  driverPicture: string;
-  cnicPicture: string;
-  cnicBackPicture: string;
-  licenseFrontPicture: string;
-  vehiclePictures: string[];
-  
-  // Role
-  role: 'driver' | 'passenger';
-}
+type Props = {
+  data: RegistrationFormData;
+  onDataChange?: (patch: Partial<RegistrationFormData>) => void;
+  /** Opens the page that edits a section (the header "Edit" buttons); hidden without it. */
+  onEdit?: (page: RegistrationPage) => void;
+};
 
-interface ReviewStepProps {
-  data: ReviewData;
-  onDataChange: (data: Partial<ReviewData>) => void;
-}
+/** CNIC with all but the last digit hidden: 35202-1234567-1 → •••••-•••••••-1. */
+export const maskCnic = (cnic: string): string => cnic.replace(/\d(?=[\d-]*\d$)/g, '•');
 
+/** Account number or IBAN with only the last 4 shown. */
+export const maskAccount = (account: string): string => {
+  const plain = account.replace(/\s/g, '');
+  return plain.length > 4 ? `•••• ${plain.slice(-4)}` : plain;
+};
 
-export default function ReviewStep({ data }: ReviewStepProps) {
-  // Safety check for undefined data
-  if (!data) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Loading...</Text>
-      </View>
-    );
-  }
+const labelOf = (options: ReadonlyArray<{ value: string; label: string }>, value: string) =>
+  options.find((option) => option.value === value)?.label ?? value;
 
-  const renderPersonalInfo = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Icon name="account" size={20} tint={BrandColors.primary} />
-        <Text style={styles.sectionTitle}>Personal Information</Text>
-      </View>
-      <View style={styles.infoGrid}>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Full Name</Text>
-          <Text style={styles.infoValue}>{data.fullName || 'Not provided'}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Email</Text>
-          <Text style={styles.infoValue}>{data.email || 'Not provided'}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Phone Number</Text>
-          <Text style={styles.infoValue}>{data.phoneNumber || 'Not provided'}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>CNIC</Text>
-          <Text style={styles.infoValue}>{data.cnic || 'Not provided'}</Text>
-        </View>
-        <View style={styles.infoItemFull}>
-          <Text style={styles.infoLabel}>Address</Text>
-          <Text style={styles.infoValue}>{data.address || 'Not provided'}</Text>
-        </View>
-      </View>
-    </View>
-  );
+const capitalise = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
 
-  const renderVehicleInfo = () => {
-    if (data.role === 'passenger') return null;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Icon name="car" size={20} tint={BrandColors.primary} />
-          <Text style={styles.sectionTitle}>Vehicle Information</Text>
-        </View>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Vehicle Type</Text>
-            <Text style={styles.infoValue}>
-              {data.vehicleType ? vehicleTypeLabel(data.vehicleType) : 'Not provided'}
-            </Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Registration Number</Text>
-            <Text style={styles.infoValue}>{data.vehicleNumber || 'Not provided'}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Brand</Text>
-            <Text style={styles.infoValue}>{data.vehicleBrand || 'Not provided'}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Model</Text>
-            <Text style={styles.infoValue}>{data.vehicleModel || 'Not provided'}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Year</Text>
-            <Text style={styles.infoValue}>{data.vehicleYear || 'Not provided'}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Color</Text>
-            <Text style={styles.infoValue}>{data.vehicleColor || 'Not provided'}</Text>
-          </View>
-          {data.vehicleType === 'car' && data.vehicleHasAc ? (
-            <View style={styles.infoItem} testID="review-vehicle-ac">
-              <Text style={styles.infoLabel}>{t('ac.registerLabel')}</Text>
-              <Text style={styles.infoValue}>{t('common.yes')}</Text>
-            </View>
-          ) : null}
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Driving License Number</Text>
-            <Text style={styles.infoValue}>{data.licenseNumber || 'Not provided'}</Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderDocuments = () => {
-    if (data.role === 'passenger') return null;
-    const vehicleCount = filledVehiclePhotoCount(data.vehiclePictures);
-    const vehicleComplete = vehicleCount >= VEHICLE_PHOTO_SLOTS.length;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Icon name="document" size={20} tint={BrandColors.primary} />
-          <Text style={styles.sectionTitle}>Documents</Text>
-        </View>
-        <View style={styles.documentsGrid}>
-          <View style={styles.documentItem}>
-            <Text style={styles.documentLabel}>Driver Picture</Text>
-            <View style={styles.documentPreview}>
-              {data.driverPicture ? (
-                <Image source={{ uri: data.driverPicture }} style={styles.documentImage} />
-              ) : (
-                <View style={styles.documentPlaceholder}>
-                  <Icon name="account" size={24} tint="#9ca3af" />
-                </View>
-              )}
-              <View style={styles.documentStatus}>
-                <Icon 
-                  name={data.driverPicture ? 'check' : 'error'} 
-                  size={16} 
-                  tint={data.driverPicture ? '#10b981' : '#ef4444'} 
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.documentItem}>
-            <Text style={styles.documentLabel}>CNIC Front</Text>
-            <View style={styles.documentPreview}>
-              {data.cnicPicture ? (
-                <Image source={{ uri: data.cnicPicture }} style={styles.documentImage} />
-              ) : (
-                <View style={styles.documentPlaceholder}>
-                  <Icon name="idCard" size={24} tint="#9ca3af" />
-                </View>
-              )}
-              <View style={styles.documentStatus}>
-                <Icon 
-                  name={data.cnicPicture ? 'check' : 'error'} 
-                  size={16} 
-                  tint={data.cnicPicture ? '#10b981' : '#ef4444'} 
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.documentItem}>
-            <Text style={styles.documentLabel}>CNIC Back</Text>
-            <View style={styles.documentPreview}>
-              {data.cnicBackPicture ? (
-                <Image source={{ uri: data.cnicBackPicture }} style={styles.documentImage} />
-              ) : (
-                <View style={styles.documentPlaceholder}>
-                  <Icon name="idCard" size={24} tint="#9ca3af" />
-                </View>
-              )}
-              <View style={styles.documentStatus}>
-                <Icon
-                  name={data.cnicBackPicture ? 'check' : 'error'}
-                  size={16}
-                  tint={data.cnicBackPicture ? '#10b981' : '#ef4444'}
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.documentItemFull}>
-            <Text style={styles.documentLabel}>Vehicle Pictures</Text>
-            <View style={styles.vehiclePicturesPreview}>
-              {vehicleCount > 0 ? (
-                <View style={styles.vehiclePicturesGrid}>
-                  {/* One preview per slot, in slot order; an empty slot shows a placeholder. */}
-                  {VEHICLE_PHOTO_SLOTS.map(({ label }, index) => {
-                    const uri = data.vehiclePictures?.[index];
-                    return uri ? (
-                      <Image key={label} source={{ uri }} style={styles.vehiclePicturePreview} accessibilityLabel={label} />
-                    ) : (
-                      <View key={label} style={styles.morePicturesIndicator} accessibilityLabel={label}>
-                        <Icon name="addPhoto" size={16} tint="#9ca3af" />
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={styles.noPicturesPlaceholder}>
-                  <Icon name="car" size={24} tint="#9ca3af" />
-                  <Text style={styles.noPicturesText}>No pictures uploaded</Text>
-                </View>
-              )}
-              <View style={styles.documentStatus}>
-                <Icon 
-                  name={vehicleComplete ? 'check' : 'error'} 
-                  size={16} 
-                  tint={vehicleComplete ? '#10b981' : '#ef4444'} 
-                />
-              </View>
-            </View>
-            <Text style={styles.vehiclePicturesCount}>
-              {vehicleCount}/{VEHICLE_PHOTO_SLOTS.length} pictures uploaded
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderAccountType = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Icon name="accountCircle" size={20} tint={BrandColors.primary} />
-        <Text style={styles.sectionTitle}>Account Type</Text>
-      </View>
-      <View style={styles.accountTypeCard}>
-        <Icon 
-          name={data.role === 'driver' ? 'car' : 'account'} 
-          size={32} 
-          tint={BrandColors.primary} 
-        />
-        <View style={styles.accountTypeInfo}>
-          <Text style={styles.accountTypeTitle}>
-            {data.role === 'driver' ? 'Driver Account' : 'Passenger Account'}
-          </Text>
-          <Text style={styles.accountTypeDescription}>
-            {data.role === 'driver' 
-              ? 'You can provide rides and earn money' 
-              : 'You can book rides and travel safely'
-            }
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  const getCompletionStatus = () => {
-    const requiredFields = [
-      data.fullName || '',
-      data.email || '',
-      data.cnic || '',
-      data.address || '',
-      data.phoneNumber || '',
-    ];
-
-    if (data.role === 'driver') {
-      requiredFields.push(
-        data.vehicleType || '',
-        data.vehicleNumber || '',
-        data.vehicleBrand || '',
-        data.vehicleModel || '',
-        data.vehicleYear || '',
-        data.vehicleColor || '',
-        data.licenseNumber || '',
-        data.driverPicture || '',
-        data.cnicPicture || '',
-        data.cnicBackPicture || '',
-        data.licenseFrontPicture || ''
-      );
-    }
-
-    const completedFields = requiredFields.filter(field => field && field.trim()).length;
-    const totalFields = requiredFields.length;
-    const percentage = (completedFields / totalFields) * 100;
-
-    return {
-      completed: completedFields,
-      total: totalFields,
-      percentage: Math.round(percentage),
-      isComplete: percentage === 100
-    };
-  };
-
-  const completionStatus = getCompletionStatus();
+/**
+ * Review page "Check your details" (UI-R7): one card per page with an Edit link to it, CNIC and
+ * bank account masked, document thumbnails, and the legal line above the action bar.
+ */
+export default function ReviewStep({ data, onEdit }: Props) {
+  const driver = data.role === 'driver';
+  const edit = (page: RegistrationPage) => (onEdit ? () => onEdit(page) : undefined);
+  const P = F.personal;
 
   return (
-    <View style={styles.container}>
-      {/* Completion Status */}
-      <View style={styles.completionCard}>
-        <View style={styles.completionHeader}>
-          <Icon 
-            name={completionStatus.isComplete ? 'check' : 'waiting'} 
-            size={24} 
-            tint={completionStatus.isComplete ? '#10b981' : '#f59e0b'} 
+    <View style={styles.step}>
+      <ReviewSection title={R.account} onEdit={edit('role')} testID="review-account">
+        <ReviewRow label={R.signingUpAs} value={driver ? R.driver : R.rider} />
+      </ReviewSection>
+
+      <ReviewSection title={R.personal} onEdit={edit('personal')} testID="review-personal">
+        <ReviewRow label={P.fullName} value={data.fullName} />
+        <ReviewRow label={P.email} value={data.email} />
+        <ReviewRow label={P.phone} value={data.phoneNumber} />
+        <ReviewRow label={P.cnic} value={maskCnic(data.cnic)} testID="review-cnic" />
+        <ReviewRow label={P.dob} value={data.dateOfBirth} />
+        <ReviewRow label={P.gender} value={capitalise(data.gender)} />
+        <ReviewRow label={P.address} value={data.address} />
+      </ReviewSection>
+
+      {data.emergencyContactName || data.emergencyContactNumber ? (
+        <ReviewSection title={R.emergency} onEdit={edit('personal')} testID="review-emergency">
+          <ReviewRow label={F.emergency.name} value={data.emergencyContactName} />
+          <ReviewRow label={F.emergency.phone} value={data.emergencyContactNumber} />
+          <ReviewRow
+            label={F.emergency.relationship}
+            value={data.emergencyRelationship ? labelOf(EMERGENCY_RELATION_OPTIONS, data.emergencyRelationship) : ''}
           />
-          <Text style={styles.completionTitle}>
-            {completionStatus.isComplete ? 'Ready to Create Account' : 'Almost Complete'}
-          </Text>
-        </View>
-        <Text style={styles.completionSubtitle}>
-          {completionStatus.isComplete 
-            ? 'All required information has been provided. You can now create your account.'
-            : `${completionStatus.completed} of ${completionStatus.total} required fields completed (${completionStatus.percentage}%)`
+        </ReviewSection>
+      ) : null}
+
+      {driver ? (
+        <ReviewSection title={R.vehicle} onEdit={edit('vehicle')} testID="review-vehicle">
+          <ReviewRow label={F.vehicle.type} value={data.vehicleType ? vehicleTypeLabel(data.vehicleType) : ''} />
+          <ReviewRow label={F.vehicle.make} value={[data.vehicleBrand, data.vehicleModel].filter(Boolean).join(' ')} />
+          <ReviewRow label={F.vehicle.year} value={data.vehicleYear} />
+          <ReviewRow label={F.vehicle.colour} value={data.vehicleColor} />
+          {data.vehicleType === 'car' && data.vehicleHasAc ? (
+            <ReviewRow label={t('ac.registerLabel')} value={t('common.yes')} testID="review-vehicle-ac" />
+          ) : null}
+          <ReviewRow label={F.vehicle.vehicleNumber} value={data.vehicleNumber} />
+          <ReviewRow label={F.vehicle.licensePlate} value={data.licensePlate} />
+          <ReviewRow label={F.vehicle.registrationNumber} value={data.registrationNumber} />
+          <ReviewRow label={F.licence.number} value={data.licenseNumber} />
+          <ReviewRow label={F.licence.type} value={data.licenseType ? labelOf(LICENSE_TYPES, data.licenseType) : ''} />
+          <ReviewRow label={F.licence.expiry} value={data.licenseExpiryDate} />
+          <ReviewRow
+            label={F.licence.experience}
+            value={data.drivingExperience ? F.licence.experienceValue(data.drivingExperience) : ''}
+          />
+        </ReviewSection>
+      ) : null}
+
+      <ReviewSection title={driver ? R.documents : R.identity} onEdit={edit('documents')} testID="review-documents">
+        <ReviewThumbs
+          items={
+            driver
+              ? [
+                  { label: F.documents.driverPicture, uri: data.driverPicture },
+                  { label: F.documents.cnicFront, uri: data.cnicPicture },
+                  { label: F.documents.cnicBack, uri: data.cnicBackPicture },
+                  { label: F.documents.licenceFront, uri: data.licenseFrontPicture },
+                  ...VEHICLE_PHOTO_SLOTS.map(({ label }, index) => ({ label, uri: data.vehiclePictures?.[index] })),
+                ]
+              : [
+                  { label: F.documents.cnicFront, uri: data.cnicFrontPicture },
+                  { label: F.documents.cnicBack, uri: data.cnicBackPicture },
+                  { label: F.documents.profileOptional, uri: data.profilePicture },
+                ]
           }
-        </Text>
-        <View style={styles.progressBar}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                width: `${completionStatus.percentage}%`,
-                backgroundColor: completionStatus.isComplete ? '#10b981' : BrandColors.primary
-              }
-            ]} 
-          />
-        </View>
-      </View>
+        />
+      </ReviewSection>
 
-      {/* Review Sections */}
-      {renderAccountType()}
-      {renderPersonalInfo()}
-      {renderVehicleInfo()}
-      {renderDocuments()}
+      {driver ? (
+        <ReviewSection title={R.payout} onEdit={edit('payout')} testID="review-payout">
+          <ReviewRow label={F.payout.bankName} value={data.bankName} />
+          <ReviewRow label={F.payout.bankBranch} value={data.bankBranch} />
+          <ReviewRow label={F.payout.account} value={maskAccount(data.bankAccountNumber)} testID="review-account-number" />
+        </ReviewSection>
+      ) : null}
 
-      {/* Terms and Conditions */}
-      <View style={styles.termsCard}>
-        <View style={styles.termsHeader}>
-          <Icon name="info" size={20} tint="#6b7280" />
-          <Text style={styles.termsTitle}>Terms & Conditions</Text>
-        </View>
-        <Text style={styles.termsText}>
-          By creating an account, you agree to our Terms of Service and Privacy Policy. 
-          Your information will be used to verify your identity and provide our services.
-        </Text>
-      </View>
+      <AppText variant="bodySmall" color="textSecondary" testID="registration-legal">
+        {REGISTRATION_COPY.form.legal}
+      </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignSelf: 'stretch',
-  },
-  completionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: isSmallScreen ? 20 : 25,
-    padding: isSmallScreen ? 20 : 24,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  completionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  completionTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  completionSubtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#6b7280',
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    borderRadius: isSmallScreen ? 20 : 25,
-    padding: isSmallScreen ? 20 : 24,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  infoGrid: {
-    gap: 12,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  infoItemFull: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  infoLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#6b7280',
-    fontWeight: '500',
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#1f2937',
-    fontWeight: '600',
-    textAlign: 'right',
-    flex: 1,
-  },
-  accountTypeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-  },
-  accountTypeInfo: {
-    flex: 1,
-  },
-  accountTypeTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  accountTypeDescription: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#6b7280',
-  },
-  documentsGrid: {
-    gap: 16,
-  },
-  documentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  documentItemFull: {
-    gap: 8,
-  },
-  documentLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#6b7280',
-    fontWeight: '500',
-    flex: 1,
-  },
-  documentPreview: {
-    position: 'relative',
-  },
-  documentImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  documentPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  documentStatus: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 2,
-  },
-  vehiclePicturesPreview: {
-    position: 'relative',
-  },
-  vehiclePicturesGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  vehiclePicturePreview: {
-    width: 50,
-    height: 50,
-    borderRadius: 6,
-  },
-  morePicturesIndicator: {
-    width: 50,
-    height: 50,
-    borderRadius: 6,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noPicturesPlaceholder: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 16,
-  },
-  noPicturesText: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-  vehiclePicturesCount: {
-    fontSize: 12,
-    color: '#6b7280',
-    textAlign: 'right',
-  },
-  termsCard: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: isSmallScreen ? 16 : 20,
-    padding: isSmallScreen ? 16 : 20,
-    borderLeftWidth: 4,
-    borderLeftColor: BrandColors.primary,
-    marginBottom: 20,
-  },
-  termsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  termsTitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  termsText: {
-    fontSize: isSmallScreen ? 12 : 14,
-    color: '#6b7280',
-    lineHeight: 20,
-  },
+  step: { gap: space[4] },
 });

@@ -58,6 +58,17 @@ export const en = {
     sheetHandleA11y: 'Sheet',
     sheetHandleHint: 'Swipe up or down to resize',
     locateA11y: 'Show my location',
+    // UI-R7 upload tile + select field.
+    uploadAdd: 'Add photo',
+    uploadHint: 'JPG or PNG, clear and readable',
+    uploadReplaceA11y: 'Replace {label}',
+    uploadRemoveA11y: 'Remove {label}',
+    uploadEmptyA11y: '{label}, no photo yet',
+    uploadFilledA11y: '{label}, photo added',
+    requiredA11y: 'required',
+    selectPlaceholder: 'Select',
+    selectHint: 'Opens a list to choose from',
+    selectedA11y: 'selected',
   },
   kitGallery: {
     title: 'UI kit gallery',

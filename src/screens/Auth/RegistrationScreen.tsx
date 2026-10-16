@@ -1,332 +1,210 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StatusBar,
-  ImageBackground,
-  type ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import { View } from 'react-native';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Icon } from '../../components/ui/Icon';
-import { useApiAuth } from '../../hooks/useApiAuth';
-import { useOtpTimers } from '../../hooks/useOtpTimers';
-import { BrandColors } from '../../theme/colors';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { layout } from '../../theme';
+import { AppText, Button, Header, Icon, KeyboardAwareScrollView, Screen } from '../../components/ui';
+import { confirm } from '../../core/dialog';
+import { formatCountdown } from '../../services/otpService';
+import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
+import { FieldAnchorContext } from '../../features/auth/registration/fieldAnchors';
+import { pageProgress, type RegistrationPage } from '../../features/auth/registration/pages';
+import type { RegistrationRole } from '../../features/auth/registration/registrationForm';
+import { hasFormInput, useRegistrationWizard } from '../../features/auth/registration/useRegistrationWizard';
+import RegistrationPhoneStep from '../../features/auth/components/RegistrationPhoneStep';
+import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
+import RegistrationHeader from './RegistrationHeader';
+import { styles } from './RegistrationScreen.styles';
+import RoleStep from './steps/RoleStep';
 import PersonalInfoStep from './steps/PersonalInfoStep';
 import VehicleInfoStep from './steps/VehicleInfoStep';
 import DocumentsStep from './steps/DocumentsStep';
+import PayoutStep from './steps/PayoutStep';
 import ReviewStep from './steps/ReviewStep';
-import RegistrationHeader from './RegistrationHeader';
-import { styles } from './RegistrationScreen.styles';
-import { toast } from '../../core/toast';
-import { logger } from '../../core/logging/logger';
-import { rejectionMessage } from '../../core/api/errors';
-import { formatCountdown } from '../../services/otpService';
-import { registerUserWithImages, type PendingPhoneVerification } from '../../store/thunks/apiThunks';
-import { firstInvalidStep, validateStep, type StepErrors } from '../../schemas/registrationSchema';
-import {
-  INITIAL_REGISTRATION_FORM,
-  REGISTRATION_STEPS,
-  type RegistrationFormData,
-  type RegistrationRole,
-  type RegistrationStep,
-} from '../../features/auth/registration/registrationForm';
-import { buildRegistrationRequest } from '../../features/auth/registration/buildRegistrationRequest';
-import { mapRegistrationServerErrors } from '../../features/auth/registration/serverFieldErrors';
-import { FieldAnchorContext } from '../../features/auth/registration/fieldAnchors';
-import RegistrationPhoneStep from '../../features/auth/components/RegistrationPhoneStep';
-import AuthKeyboardScroll from '../../features/auth/components/AuthKeyboardScroll';
-import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
-import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 
-/** How far above a field's error line the form scrolls, so its label and input show too. */
-const FIELD_SCROLL_OFFSET = 120;
+const pageCopy = (page: RegistrationPage, role: RegistrationRole) => {
+  if (page === 'documents') return role === 'driver' ? COPY.pages.documentsDriver : COPY.pages.documentsPassenger;
+  return COPY.pages[page];
+};
 
-/** What registration left for the phone step. In memory only: the token is a bearer secret. */
-interface PhoneStepState {
-  pending: PendingPhoneVerification;
-  role: RegistrationRole | null;
-}
+type Props = {
+  /** Preselects the role card (Signup route param); the role page still opens first. */
+  initialRole?: RegistrationRole;
+};
 
-export default function RegistrationScreen() {
+/**
+ * Registration wizard (T-201/T-202, refreshed in UI-R7 per spec auth-registration): role page,
+ * then per-role pages (passenger: About you · Identity · Review; driver: About you · Vehicle &
+ * licence · Documents · Payout · Review), a sticky Continue / Create account bar, and the phone
+ * code step after the BE-38 201. Back goes to the previous page; leaving with details typed asks
+ * first (Dialog). The focused field stays above the keyboard and the action bar (T-545).
+ */
+export default function RegistrationScreen({ initialRole }: Props = {}) {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
-  const { registerWithImages } = useApiAuth();
-  // BE-53: 429 rate_limited on register holds Create Account for retry_after.
-  const { resendIn: submitWait, blockResend: holdSubmit } = useOtpTimers();
+  const { theme } = useAppTheme();
+  const w = useRegistrationWizard(initialRole);
+  const { page, formData, phoneStep } = w;
 
-  const [currentStep, setCurrentStep] = useState<RegistrationStep>('personal');
-  const [submitting, setSubmitting] = useState(false);
-  const [stepErrors, setStepErrors] = useState<StepErrors>({});
-  // T-202: the last 422, per form input (cleared when the input changes) and form-level.
-  const [serverErrors, setServerErrors] = useState<StepErrors>({});
-  const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [scrollTarget, setScrollTarget] = useState<{ field: string } | null>(null);
-  const [formData, setFormData] = useState<RegistrationFormData>(INITIAL_REGISTRATION_FORM);
-  const [phoneStep, setPhoneStep] = useState<PhoneStepState | null>(null);
-  // One registration at a time: a second tap lands before `submitting` re-renders the button.
-  const inFlight = useRef(false);
-  const scrollRef = useRef<ScrollView>(null);
-  // The form's container and its offset in the scroll content, to turn a field's position into a scroll offset.
-  const containerRef = useRef<View>(null);
-  const containerY = useRef(0);
-  // Error lines the steps mark with ref={anchor(field)}, and one stable ref callback per field.
-  const anchors = useRef(new Map<string, View>());
-  const anchorRefs = useRef(new Map<string, (node: View | null) => void>());
-
-  const anchor = useCallback((field: string) => {
-    let ref = anchorRefs.current.get(field);
-    if (!ref) {
-      ref = (node: View | null) => {
-        if (node) {
-          anchors.current.set(field, node);
-        } else {
-          anchors.current.delete(field);
-        }
-      };
-      anchorRefs.current.set(field, ref);
-    }
-    return ref;
-  }, []);
-
-  // After a 422 the step that has the first error is rendered; then scroll to that field.
+  // A backend from before BE-35 created the account outright: back to sign in.
   useEffect(() => {
-    if (!scrollTarget) return undefined;
-    const frame = requestAnimationFrame(() => {
-      const node = anchors.current.get(scrollTarget.field);
-      const container = containerRef.current;
-      if (!node || !container) return;
-      node.measureLayout(container, (_x, y) => {
-        const offset = containerY.current + y - FIELD_SCROLL_OFFSET;
-        scrollRef.current?.scrollTo({ y: Math.max(0, offset), animated: true });
-      });
+    if (w.finished) navigation.popTo('Login');
+  }, [w.finished, navigation]);
+
+  // Back steps through the pages; on the first page, leaving with details typed asks first.
+  const guard = !phoneStep && !w.finished && (w.submitting || w.pageIndex > 0 || hasFormInput(formData));
+  // The iOS swipe cannot be stopped from JS (the screen would leave natively while the JS stack
+  // kept it), so it is off while guarded. The phone step sets its own (T-201); effects of the
+  // step run before this one, so this stays out of its way.
+  useEffect(() => {
+    if (phoneStep) return;
+    navigation.setOptions({ gestureEnabled: !guard });
+  }, [guard, phoneStep, navigation]);
+
+  usePreventRemove(guard, ({ data }) => {
+    // Create account is uploading: stay put (leaving would drop the phone step that follows).
+    if (w.submitting) return;
+    const isBack = data.action.type === 'GO_BACK' || data.action.type === 'POP';
+    if (isBack && w.handleBack()) return;
+    if (!hasFormInput(formData)) {
+      navigation.dispatch(data.action);
+      return;
+    }
+    confirm({
+      title: COPY.leave.title,
+      body: COPY.leave.body,
+      confirmLabel: COPY.leave.confirm,
+      cancelLabel: COPY.leave.cancel,
+      destructive: true,
+    }).then((discard) => {
+      if (discard) navigation.dispatch(data.action);
     });
-    return () => cancelAnimationFrame(frame);
-  }, [scrollTarget]);
+  });
 
-  const stepIndex = REGISTRATION_STEPS.findIndex((step) => step.key === currentStep);
-
-  const updateFormData = (patch: Partial<RegistrationFormData>) => {
-    setFormData((prev) => ({ ...prev, ...patch }));
-    const edited = Object.keys(patch) as (keyof RegistrationFormData)[];
-    const dropEdited = (prev: StepErrors) => {
-      if (!edited.some((key) => prev[key])) return prev;
-      const next = { ...prev };
-      edited.forEach((key) => delete next[key]);
-      return next;
-    };
-    // An edited field's errors are stale: the next Next re-validates it, the next submit re-asks the server.
-    setStepErrors(dropEdited);
-    setServerErrors(dropEdited);
-    if (patch.role !== undefined && patch.role !== formData.role) {
-      // The other role's form: the last 422 was about fields it may not have.
-      setServerErrors({});
-      setFormErrors([]);
-    }
+  // Sticky bar: 8 above the home indicator, at least 16 from the edge without one (DS §3.2).
+  const insets = useSafeAreaInsets();
+  const footerEdge = {
+    paddingBottom: insets.bottom > 0 ? layout.bottomActionOffset : layout.bottomActionMinOffset,
+    borderTopWidth: theme.borderWidth.hairline,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   };
 
-  const handleNext = () => {
-    const errors = validateStep(currentStep, formData);
-    setStepErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      toast.error(COPY.form.fixErrors);
-      return;
-    }
-    if (stepIndex < REGISTRATION_STEPS.length - 1) {
-      setCurrentStep(REGISTRATION_STEPS[stepIndex + 1].key);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (stepIndex > 0) {
-      setStepErrors({});
-      setCurrentStep(REGISTRATION_STEPS[stepIndex - 1].key);
-    }
-  };
-
-  /**
-   * 422 field errors (T-202): each under its input until that input changes; the form opens the
-   * first step that has one and scrolls to its first errored field. Fields no input shows are
-   * listed above the buttons. One toast sums it up.
-   */
-  const showServerFieldErrors = (fieldErrors: Record<string, string[]>) => {
-    const mapped = mapRegistrationServerErrors(fieldErrors, formData.role);
-    setServerErrors(mapped.fieldErrors);
-    setFormErrors(mapped.formErrors);
-    if (mapped.step && mapped.firstField) {
-      setStepErrors({});
-      setCurrentStep(mapped.step);
-      setScrollTarget({ field: mapped.firstField });
-      toast.error(COPY.form.fixErrors);
-    } else {
-      toast.error(COPY.form.notAccepted);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (inFlight.current || submitWait > 0) {
-      return;
-    }
-    // Every step again: a step left with Previous may have been edited since its Next.
-    const invalid = firstInvalidStep(formData);
-    if (invalid) {
-      setCurrentStep(invalid.step);
-      setStepErrors(invalid.errors);
-      toast.error(COPY.form.fixErrors);
-      return;
-    }
-
-    inFlight.current = true;
-    setSubmitting(true);
-    setServerErrors({});
-    setFormErrors([]);
-    try {
-      const result = await registerWithImages(buildRegistrationRequest(formData));
-
-      if (registerUserWithImages.fulfilled.match(result)) {
-        const outcome = result.payload;
-        if (outcome.kind === 'verify_phone') {
-          // BE-35/BE-38: the same answer for a new and a taken email; the code step decides.
-          const role = outcome.role === 'driver' || outcome.role === 'passenger' ? outcome.role : formData.role;
-          setPhoneStep({ pending: outcome.phoneVerification, role });
-          if (outcome.message) {
-            toast.success(outcome.message);
-          }
-          return;
-        }
-        // A backend from before BE-35: no phone step.
-        toast.success(COPY.form.created);
-        navigation.popTo('Login');
-        return;
-      }
-
-      const payload = registerUserWithImages.rejected.match(result) ? result.payload : undefined;
-      const message = rejectionMessage(payload, COPY.fallbacks.register);
-      logger.debug('RegistrationScreen - registration refused', { kind: payload?.kind, status: payload?.status, code: payload?.code });
-      if (payload?.kind === 'rate_limited') {
-        holdSubmit(payload.retryAfter);
-        toast.error(message);
-      } else if (payload && Object.keys(payload.fieldErrors).length > 0) {
-        showServerFieldErrors(payload.fieldErrors);
-      } else {
-        toast.error(message);
-      }
-    } catch (error: unknown) {
-      logger.error('RegistrationScreen - registration error', error);
-      toast.fromError(error, COPY.fallbacks.register);
-    } finally {
-      inFlight.current = false;
-      setSubmitting(false);
-    }
-  };
-
-  const renderStepContent = () => {
-    // Schema errors from the last Next win over the last 422's message for the same input.
-    const errors: StepErrors = { ...serverErrors, ...stepErrors };
-    switch (currentStep) {
+  const renderPage = () => {
+    const stepProps = { data: formData, onDataChange: w.updateFormData, errors: w.errors };
+    switch (page) {
+      case 'role':
+        return <RoleStep value={w.roleChosen ? formData.role : null} onChange={w.chooseRole} />;
       case 'personal':
-        return <PersonalInfoStep data={formData} onDataChange={updateFormData} errors={errors} />;
+        return <PersonalInfoStep {...stepProps} />;
       case 'vehicle':
-        return <VehicleInfoStep data={formData} onDataChange={updateFormData} errors={errors} />;
+        return <VehicleInfoStep {...stepProps} />;
       case 'documents':
-        return <DocumentsStep data={formData} onDataChange={updateFormData} errors={errors} />;
+        return <DocumentsStep {...stepProps} />;
+      case 'payout':
+        return <PayoutStep {...stepProps} />;
       case 'review':
-        return <ReviewStep data={formData} onDataChange={updateFormData} />;
+        return <ReviewStep data={formData} onEdit={w.goTo} />;
       default:
         return null;
     }
   };
 
   const renderFormErrors = () =>
-    formErrors.length > 0 ? (
-      <View style={styles.formErrorBox} accessibilityRole="alert">
-        <Icon name="error" size={16} tint={styles.formErrorText.color} />
+    w.formErrors.length > 0 ? (
+      <View style={[styles.formErrors, { backgroundColor: theme.colors.dangerSoft }]} accessibilityRole="alert">
+        <Icon name="warning" size={20} color="danger" />
         <View style={styles.formErrorList}>
-          {formErrors.map((message) => (
-            <Text key={message} style={styles.formErrorText}>
+          {w.formErrors.map((message) => (
+            <AppText key={message} variant="bodySmall" color="danger">
               {message}
-            </Text>
+            </AppText>
           ))}
         </View>
       </View>
     ) : null;
 
-  const renderButtons = () => (
-    <View style={styles.buttonContainerScrollable}>
-      {stepIndex > 0 && (
-        <TouchableOpacity style={styles.previousButton} onPress={handlePrevious} disabled={submitting}>
-          <Icon name="arrowBack" size={20} tint={BrandColors.primary} />
-          <Text style={styles.previousButtonText}>{COPY.form.previous}</Text>
-        </TouchableOpacity>
-      )}
-      {currentStep === 'review' ? (
-        <TouchableOpacity
-          style={[styles.submitButton, (submitting || submitWait > 0) && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={submitting || submitWait > 0}
-          accessibilityRole="button"
-        >
-          {submitting ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color={styles.submitButtonText.color} />
-              <Text style={styles.submitButtonText}>{COPY.form.creating}</Text>
-            </View>
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {submitWait > 0 ? COPY.form.createIn(formatCountdown(submitWait)) : COPY.form.create}
-            </Text>
-          )}
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext} accessibilityRole="button">
-          <Text style={styles.nextButtonText}>{COPY.form.next}</Text>
-          <Icon name="arrowForward" size={20} tint={styles.nextButtonText.color} />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const renderAction = () => {
+    if (page === 'review') {
+      return (
+        <Button
+          label={w.submitWait > 0 ? COPY.form.createIn(formatCountdown(w.submitWait)) : COPY.form.create}
+          onPress={w.handleSubmit}
+          loading={w.submitting}
+          disabled={w.submitWait > 0}
+          accessibilityLabel={w.submitting ? COPY.form.creating : undefined}
+          haptic="impactLight"
+          testID="registration-submit"
+        />
+      );
+    }
+    return (
+      <Button
+        label={COPY.form.continue}
+        onPress={w.handleNext}
+        disabled={page === 'role' && !w.roleChosen}
+        trailingIcon="arrowForward"
+        testID="registration-continue"
+      />
+    );
+  };
+
+  const copy = phoneStep ? null : pageCopy(page, formData.role);
 
   return (
-    // Top edge only; the scroll content pads itself above the home indicator (T-204).
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={BrandColors.primary} translucent={false} />
-      <ImageBackground
-        source={require('../../assets/images/background_raahe_haq.png')}
-        style={styles.backgroundImage}
-        resizeMode="cover"
+    <Screen keyboardAvoiding edges={['top', 'bottom']} testID="registration">
+      <Header
+        tone="background"
+        title={phoneStep ? COPY.verify.headerTitle : undefined}
+        // Inside the wizard Back is the previous page; on the first page it leaves (guarded above).
+        onBack={() => {
+          if (w.submitting) return;
+          if (phoneStep || !w.handleBack()) navigation.goBack();
+        }}
+        backLabel={phoneStep ? COPY.verify.backA11y : COPY.form.back}
+        testID="registration-header"
+      />
+      <KeyboardAwareScrollView
+        ref={w.scrollRef}
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        testID="registration-scroll"
       >
-        <RegistrationHeader
-          title={phoneStep ? COPY.verify.headerTitle : COPY.form.title}
-          subtitle={phoneStep ? COPY.verify.headerSubtitle : COPY.form.subtitle(formData.role)}
-          stepIndex={phoneStep ? null : stepIndex}
-        />
-
-        <AuthKeyboardScroll scrollRef={scrollRef} style={styles.scrollView}>
-          <View
-            ref={containerRef}
-            style={styles.container}
-            onLayout={(event) => {
-              containerY.current = event.nativeEvent.layout.y;
-            }}
-          >
-            {phoneStep ? (
-              <RegistrationPhoneStep
-                pending={phoneStep.pending}
-                role={phoneStep.role}
-                onGoToSignIn={() => navigation.popTo('Login')}
-              />
-            ) : (
-              <FieldAnchorContext.Provider value={anchor}>
-                {renderStepContent()}
-                {renderFormErrors()}
-                {renderButtons()}
-              </FieldAnchorContext.Provider>
-            )}
-          </View>
-        </AuthKeyboardScroll>
-      </ImageBackground>
-    </SafeAreaView>
+        <View
+          ref={w.containerRef}
+          style={styles.container}
+          onLayout={(event) => {
+            w.containerY.current = event.nativeEvent.layout.y;
+          }}
+        >
+          {phoneStep ? (
+            <RegistrationPhoneStep
+              pending={phoneStep.pending}
+              role={phoneStep.role}
+              onGoToSignIn={() => navigation.popTo('Login')}
+            />
+          ) : (
+            <FieldAnchorContext.Provider value={w.anchor}>
+              {copy ? (
+                <RegistrationHeader
+                  title={copy.title}
+                  description={copy.description}
+                  progress={pageProgress(page, formData.role)}
+                />
+              ) : null}
+              {renderPage()}
+              {renderFormErrors()}
+            </FieldAnchorContext.Provider>
+          )}
+        </View>
+      </KeyboardAwareScrollView>
+      {phoneStep ? null : (
+        <View style={[styles.footer, footerEdge]} testID="registration-footer">
+          {renderAction()}
+        </View>
+      )}
+    </Screen>
   );
 }

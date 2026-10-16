@@ -198,6 +198,32 @@ export const componentTokens = {
   mapControls: { sheetGap: space[4], edge: space[4] },
   /** T-520 safety: the SOS sheet's round badge and the passenger's PIN digit tiles. */
   safety: { sheetBadge: 56, sheetBadgeGlyph: 28, pinDigitWidth: 36, pinDigitHeight: 48 },
+  /**
+   * UI-R7 (auth-registration): photo upload tile. Wide 120 (104 on small phones), dashed 1.5pt
+   * `borderStrong` while empty; square tiles for a set of sides (vehicle photos); a floating 32
+   * replace button 8 in from the top end once filled.
+   */
+  uploadTile: {
+    height: 120,
+    compactHeight: 104,
+    squareMin: 96,
+    border: 1.5,
+    glyph: 28,
+    squareGlyph: 24,
+    action: 32,
+    actionInset: space[2],
+    thumb: 64,
+  },
+  /** UI-R7 registration wizard: segmented step progress (one 4pt segment per step) and choice cards. */
+  wizard: {
+    progressHeight: 4,
+    progressGap: space[1],
+    choiceMinHeight: 88,
+    compactChoiceMinHeight: 76,
+    choiceIconTile: 48,
+    /** Window heights below this (iPhone SE: 667) use the compact choice cards and upload tiles. */
+    compactWindowHeight: 700,
+  },
 } as const;
 
 export type ComponentTokens = typeof componentTokens;

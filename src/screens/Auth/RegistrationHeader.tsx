@@ -1,85 +1,73 @@
 import React from 'react';
-import { Image, Text, View } from 'react-native';
-import { Icon } from '../../components/ui/Icon';
-import { REGISTRATION_STEPS } from '../../features/auth/registration/registrationForm';
+import { StyleSheet, View } from 'react-native';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { AppText } from '../../components/ui';
 import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
-import { styles } from './RegistrationScreen.styles';
+import { componentTokens, radius, space } from '../../theme';
+
+const w = componentTokens.wizard;
 
 interface Props {
   title: string;
-  subtitle: string;
-  /** Index into REGISTRATION_STEPS; null hides the progress (the phone step). */
-  stepIndex: number | null;
+  description?: string;
+  /** "Step n of m"; null hides the progress (role page, phone step). */
+  progress: { current: number; total: number } | null;
 }
 
-/** Glyph colour that reads on each circle: navy on the white active one, white on green. */
-export function stepIconTint(isActive: boolean, isCompleted: boolean): string {
-  if (isCompleted) {
-    return styles.stepIconCompleted.color;
-  }
-  return isActive ? styles.stepIconActive.color : styles.stepIconIdle.color;
-}
-
-/** Brand header of the registration screen with the step progress (moved out in T-201). */
-export default function RegistrationHeader({ title, subtitle, stepIndex }: Props) {
+/**
+ * Top of every registration page (spec auth-registration, UI-R7): a segmented progress bar (one
+ * 4pt segment per step, done and current `primary`, upcoming `border` so it shows on
+ * `background`), "Step n of m", then the page title (`h2`) and description. Replaces the navy
+ * brand header with decorative circles.
+ */
+export default function RegistrationHeader({ title, description, progress }: Props) {
+  const { theme } = useAppTheme();
   return (
-    <View style={styles.fixedHeader}>
-      <View style={styles.decorativeCircle1} />
-      <View style={styles.decorativeCircle2} />
-      <View style={styles.decorativeCircle3} />
-      <View style={styles.decorativeCircle4} />
-      <View style={styles.decorativeCircle5} />
-
-      <View style={styles.logoContainer}>
-        <View style={styles.logoWrapper}>
-          <Image
-            source={require('../../assets/images/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
-      </View>
-
-      {stepIndex === null ? null : (
-        <>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
+    <View style={styles.wrap}>
+      {progress ? (
+        <View
+          style={styles.progress}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={COPY.form.progress(progress.current, progress.total)}
+          accessibilityValue={{ min: 0, max: progress.total, now: progress.current }}
+          testID="registration-progress"
+        >
+          <View style={styles.segments}>
+            {Array.from({ length: progress.total }, (_, index) => (
               <View
-                style={[styles.progressFill, { width: `${((stepIndex + 1) / REGISTRATION_STEPS.length) * 100}%` }]}
+                key={index}
+                testID={`registration-progress-${index + 1}`}
+                style={[
+                  styles.segment,
+                  { backgroundColor: index < progress.current ? theme.colors.primary : theme.colors.border },
+                ]}
               />
-            </View>
-            <Text style={styles.progressText}>{COPY.form.progress(stepIndex + 1, REGISTRATION_STEPS.length)}</Text>
+            ))}
           </View>
-
-          <View style={styles.stepIndicators}>
-            {REGISTRATION_STEPS.map((step, index) => {
-              const isActive = index === stepIndex;
-              const isCompleted = index < stepIndex;
-              return (
-                <View key={step.key} style={styles.stepIndicator}>
-                  <View
-                    style={[
-                      styles.stepCircle,
-                      isActive && styles.stepCircleActive,
-                      isCompleted && styles.stepCircleCompleted,
-                    ]}
-                  >
-                    <Icon
-                      name={isCompleted ? 'checkMark' : step.icon}
-                      size={16}
-                      tint={stepIconTint(isActive, isCompleted)}
-                      testID={`registration-step-icon-${step.key}`}
-                    />
-                  </View>
-                  <Text style={[styles.stepTitle, isActive && styles.stepTitleActive]}>{step.title}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </>
-      )}
+          <AppText variant="caption" color="textMuted">
+            {COPY.form.progress(progress.current, progress.total)}
+          </AppText>
+        </View>
+      ) : null}
+      <View style={styles.titleBlock}>
+        <AppText variant="h2" accessibilityRole="header">
+          {title}
+        </AppText>
+        {description ? (
+          <AppText variant="bodySmall" color="textSecondary">
+            {description}
+          </AppText>
+        ) : null}
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { gap: space[2] },
+  progress: { gap: space[3], marginBottom: space[1] },
+  segments: { flexDirection: 'row', gap: w.progressGap },
+  segment: { flex: 1, height: w.progressHeight, borderRadius: radius.pill },
+  titleBlock: { gap: space[1] },
+});

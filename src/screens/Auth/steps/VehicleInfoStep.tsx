@@ -1,780 +1,210 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity,
-  Dimensions,
-  ScrollView,
-} from 'react-native';
-import { BrandColors } from '../../../theme/colors';
-import { Icon } from '../../../components/ui/Icon';
-import ThemedTextInput from '../../../components/ThemedTextInput';
-import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth/registration/registrationForm';
-import { isStepFieldRequired, maxVehicleYear, MIN_VEHICLE_YEAR, validateStepField } from '../../../schemas/registrationSchema';
-import { mergeStepErrors } from './stepErrors';
-import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
+import React, { useEffect } from 'react';
+import { View } from 'react-native';
+import { SelectField, TextField } from '../../../components/ui';
+import {
+  DRIVING_EXPERIENCE_OPTIONS,
+  LICENSE_TYPES,
+  REGISTRATION_FIELDS,
+  VEHICLE_BRANDS,
+  VEHICLE_COLOURS,
+} from '../../../features/auth/copy/registrationFields';
+import { formatIsoDateInput } from '../../../features/auth/registration/inputFormat';
+import { maxVehicleYear, MIN_VEHICLE_YEAR } from '../../../schemas/registrationSchema';
 import { RegistrationAcSwitch } from '../../../features/ac/components/RegistrationAcSwitch';
 import { acAllowedFor, vehicleYearOptions } from '../../../features/ac/api';
 import { useRegistrationVehicleRules } from '../../../features/ac/hooks';
+import VehicleTypePicker from './VehicleTypePicker';
+import { Anchored, ControlLabel, FieldError, FormGroup, stepStyles, useStepFields, type StepProps } from './stepParts';
 
-const { width: screenWidth } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
+const V = REGISTRATION_FIELDS.vehicle;
+const L = REGISTRATION_FIELDS.licence;
 
-type VehicleInfoData = RegistrationFormData;
+const toOptions = (values: readonly string[]) => values.map((value) => ({ value, label: value }));
+const BRAND_OPTIONS = toOptions(VEHICLE_BRANDS);
+const COLOUR_OPTIONS = toOptions(VEHICLE_COLOURS);
+const EXPERIENCE_OPTIONS = DRIVING_EXPERIENCE_OPTIONS.map((value) => ({ value, label: L.experienceValue(value) }));
 
-interface VehicleInfoStepProps {
-  data: VehicleInfoData;
-  onDataChange: (data: Partial<VehicleInfoData>) => void;
-  errors: Partial<Record<string, string>>;
-}
+/** ABC-1234 or ABC-1234-D: letters upper-cased, separators inserted as the user types. */
+export const formatVehicleNumber = (value: string): string => {
+  const cleaned = (value || '').replace(/[^A-Za-z0-9]/g, '');
+  if (cleaned.length <= 3) return cleaned.toUpperCase();
+  if (cleaned.length <= 7) return `${cleaned.slice(0, 3).toUpperCase()}-${cleaned.slice(3)}`;
+  return `${cleaned.slice(0, 3).toUpperCase()}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 8).toUpperCase()}`;
+};
 
-const LICENSE_TYPES = [
-  { value: 'LTV', label: 'LTV (Light Transport Vehicle)' },
-  { value: 'HTV', label: 'HTV (Heavy Transport Vehicle)' },
-  { value: 'Motorcycle', label: 'Motorcycle' },
-  { value: 'PSV', label: 'PSV (Public Service Vehicle)' },
-  { value: 'other', label: 'Other' },
-];
-
-const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '20', '25', '30'];
-
-const vehicleBrands = [
-  'Toyota', 'Honda', 'Suzuki', 'Nissan', 'Mitsubishi', 'Hyundai', 'Kia',
-  'Ford', 'Chevrolet', 'BMW', 'Mercedes-Benz', 'Audi', 'Volkswagen',
-  'Mazda', 'Subaru', 'Lexus', 'Infiniti', 'Acura', 'Other'
-];
-
-const vehicleColors = [
-  'White', 'Black', 'Silver', 'Gray', 'Red', 'Blue', 'Green', 'Yellow',
-  'Orange', 'Brown', 'Gold', 'Purple', 'Pink', 'Other'
-];
-
-
-export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleInfoStepProps) {
-  const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
-  const [showColorDropdown, setShowColorDropdown] = useState(false);
-  const [showYearDropdown, setShowYearDropdown] = useState(false);
-  const [showLicenseTypeDropdown, setShowLicenseTypeDropdown] = useState(false);
-  const [showExperienceDropdown, setShowExperienceDropdown] = useState(false);
-  const anchor = useFieldAnchor();
+/**
+ * Driver page "Vehicle & licence" (UI-R7): vehicle type cards, make, model, year (the server's
+ * range, BE-105), colour, the AC declaration for a car (gated by the AC minimum year, T-558), the
+ * vehicle number, number plate and registration number, then the driving licence (required,
+ * T-207). The bank fields of the same schema step are on the Payout page (PayoutStep).
+ */
+export default function VehicleInfoStep(props: StepProps) {
+  const { data, onDataChange } = props;
+  const f = useStepFields('vehicle', props);
+  const { errors } = f;
   // BE-105: the server's year range and AC minimum year (null until loaded or on an older server).
   const vehicleRules = useRegistrationVehicleRules();
-  // Rules that arrive after an old year was picked with AC on turn the declaration off.
-  const acTooOld = data ? acAllowedFor(vehicleRules, data.vehicleType, data.vehicleYear).tooOld : false;
-  const hasAc = data?.vehicleHasAc === true;
-  useEffect(() => {
-    if (acTooOld && hasAc) onDataChange({ vehicleHasAc: false });
-  }, [acTooOld, hasAc, onDataChange]);
-
-  // Safety check for undefined data
-  if (!data) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Loading...</Text>
-      </View>
-    );
-  }
-
-  // Schema errors from Next (T-201) plus the ones found on blur.
-  const validationErrors = mergeStepErrors(errors, localErrors);
-  // The newest 20 model years the backend accepts (BE-29 / BE-105 meta.vehicle_year, AUTH-12).
-  const vehicleYears = vehicleYearOptions(vehicleRules?.vehicleYear ?? null, maxVehicleYear(), MIN_VEHICLE_YEAR);
   const acRule = acAllowedFor(vehicleRules, data.vehicleType, data.vehicleYear);
+  // Rules that arrive after an old year was picked with AC on turn the declaration off.
+  const hasAc = data.vehicleHasAc === true;
+  useEffect(() => {
+    if (acRule.tooOld && hasAc) onDataChange({ vehicleHasAc: false });
+  }, [acRule.tooOld, hasAc, onDataChange]);
 
-  const formatVehicleNumber = (value: string): string => {
-    if (!value) return '';
-    // Remove all non-alphanumeric characters
-    const cleaned = value.replace(/[^A-Za-z0-9]/g, '');
-    
-    // Format as ABC-1234 or ABC-1234-D
-    if (cleaned.length <= 3) {
-      return cleaned.toUpperCase();
-    } else if (cleaned.length <= 7) {
-      return `${cleaned.slice(0, 3).toUpperCase()}-${cleaned.slice(3)}`;
-    } else {
-      return `${cleaned.slice(0, 3).toUpperCase()}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 8).toUpperCase()}`;
-    }
-  };
+  // The newest 20 model years the backend accepts (BE-29 / BE-105 meta.vehicle_year, AUTH-12).
+  const yearOptions = toOptions(vehicleYearOptions(vehicleRules?.vehicleYear ?? null, maxVehicleYear(), MIN_VEHICLE_YEAR));
 
-  const handleInputChange = (field: keyof VehicleInfoData, value: string) => {
-    let processedValue = value || '';
-    
-    if (field === 'vehicleNumber') {
-      processedValue = formatVehicleNumber(value);
-    }
-    
-    onDataChange({ [field]: processedValue });
-    
-    // Clear validation error when user starts typing
-    if (validationErrors[field]) {
-      setValidationErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  const validateField = (field: keyof VehicleInfoData, value: string) => {
-    const error = validateStepField('vehicle', field, { ...data, [field]: value || '' });
-    setValidationErrors(prev => ({ ...prev, [field]: error ?? '' }));
-  };
-
-  const handleVehicleTypeSelect = (type: string) => {
-    onDataChange({ vehicleType: type });
-    setValidationErrors(prev => ({ ...prev, vehicleType: '' }));
-  };
-
-  const handleBrandSelect = (brand: string) => {
-    onDataChange({ vehicleBrand: brand });
-    setShowBrandDropdown(false);
-    setValidationErrors(prev => ({ ...prev, vehicleBrand: '' }));
-  };
-
-  const handleColorSelect = (color: string) => {
-    onDataChange({ vehicleColor: color });
-    setShowColorDropdown(false);
-    setValidationErrors(prev => ({ ...prev, vehicleColor: '' }));
-  };
-
-  const handleYearSelect = (year: string) => {
+  const selectYear = (year: string) => {
     // BE-105: a year older than the AC minimum turns the AC declaration off.
     const tooOld = acAllowedFor(vehicleRules, data.vehicleType, year).tooOld;
-    onDataChange(tooOld && data.vehicleHasAc ? { vehicleYear: year, vehicleHasAc: false } : { vehicleYear: year });
-    setShowYearDropdown(false);
-    setValidationErrors(prev => ({ ...prev, vehicleYear: '' }));
+    if (tooOld && data.vehicleHasAc) onDataChange({ vehicleHasAc: false });
+    f.set('vehicleYear', year);
   };
 
-  if (data.role === 'passenger') {
-    return (
-      <View style={styles.container}>
-        <View style={styles.skipCard}>
-          <Icon name="check" size={48} tint="#10b981" />
-          <Text style={styles.skipTitle}>Vehicle Information Skipped</Text>
-          <Text style={styles.skipSubtitle}>
-            As a passenger, you don't need to provide vehicle information. 
-            You can book rides from available drivers.
-          </Text>
-        </View>
-      </View>
-    );
-  }
+  const text = (
+    field: 'vehicleModel' | 'licensePlate' | 'registrationNumber' | 'licenseNumber',
+    label: string,
+    placeholder: string,
+    extra: Partial<React.ComponentProps<typeof TextField>> = {},
+  ) => (
+    <Anchored field={field}>
+      <TextField
+        label={f.label(label, field)}
+        placeholder={placeholder}
+        value={data[field]}
+        onChangeText={(value) => f.set(field, value)}
+        onBlur={() => f.blur(field)}
+        error={errors[field]}
+        {...extra}
+      />
+    </Anchored>
+  );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Vehicle Information</Text>
-        <Text style={styles.formSubtitle}>
-          Please provide details about your vehicle
-        </Text>
-
-        {/* Vehicle Type Selection */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Vehicle Type *</Text>
-          <View style={styles.vehicleTypeGrid}>
-            {VEHICLE_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.vehicleTypeCard,
-                  data.vehicleType === type.id && styles.vehicleTypeCardActive
-                ]}
-                onPress={() => handleVehicleTypeSelect(type.id)}
-                activeOpacity={0.8}
-              >
-                <Icon 
-                  name={type.icon} 
-                  size={24} 
-                  tint={data.vehicleType === type.id ? '#ffffff' : BrandColors.primary} 
-                />
-                <Text style={[
-                  styles.vehicleTypeLabel,
-                  data.vehicleType === type.id && styles.vehicleTypeLabelActive
-                ]}>
-                  {type.label}
-                </Text>
-                <Text style={[
-                  styles.vehicleTypeDescription,
-                  data.vehicleType === type.id && styles.vehicleTypeDescriptionActive
-                ]}>
-                  {type.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
+    <View style={stepStyles.step}>
+      <FormGroup title={V.group}>
+        <Anchored field="vehicleType">
+          <View style={stepStyles.control}>
+            <ControlLabel>{f.label(V.type, 'vehicleType')}</ControlLabel>
+            <VehicleTypePicker value={data.vehicleType} onChange={(id) => f.set('vehicleType', id)} accessibilityLabel={V.type} />
+            <FieldError message={errors.vehicleType} testID="registration-vehicle-type-error" />
           </View>
-          {validationErrors.vehicleType && (
-            <View style={styles.errorContainer} ref={anchor('vehicleType')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleType}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Vehicle Number */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Vehicle Registration Number *</Text>
-          <ThemedTextInput
-            placeholder="ABC-1234 or ABC-1234-D"
-            value={data.vehicleNumber || ''}
-            onChangeText={(value) => handleInputChange('vehicleNumber', value)}
-            onBlur={() => validateField('vehicleNumber', data.vehicleNumber || '')}
-            autoCapitalize="characters"
-            style={styles.input}
+        </Anchored>
+        <Anchored field="vehicleBrand">
+          <SelectField
+            label={f.label(V.make, 'vehicleBrand')}
+            sheetTitle={V.makeSheet}
+            value={data.vehicleBrand}
+            options={BRAND_OPTIONS}
+            onChange={(value) => f.set('vehicleBrand', value)}
+            error={errors.vehicleBrand}
+            testID="registration-vehicle-make"
           />
-          {validationErrors.vehicleNumber && (
-            <View style={styles.errorContainer} ref={anchor('vehicleNumber')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleNumber}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Vehicle Brand */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Vehicle Brand *</Text>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setShowBrandDropdown(!showBrandDropdown)}
-          >
-            <Text style={[styles.dropdownText, !data.vehicleBrand && styles.dropdownPlaceholder]}>
-              {data.vehicleBrand || 'Select vehicle brand'}
-            </Text>
-            <Icon 
-              name={showBrandDropdown ? 'chevronUp' : 'chevronDown'} 
-              size={20} 
-              tint="#6b7280" 
-            />
-          </TouchableOpacity>
-          {showBrandDropdown && (
-            <View style={styles.dropdownList}>
-              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {vehicleBrands.map((brand) => (
-                  <TouchableOpacity
-                    key={brand}
-                    style={styles.dropdownItem}
-                    onPress={() => handleBrandSelect(brand)}
-                  >
-                    <Text style={styles.dropdownItemText}>{brand}</Text>
-                    {data.vehicleBrand === brand && (
-                      <Icon name="checkMark" size={20} tint={BrandColors.primary} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-          {validationErrors.vehicleBrand && (
-            <View style={styles.errorContainer} ref={anchor('vehicleBrand')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleBrand}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Vehicle Model */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Vehicle Model *</Text>
-          <ThemedTextInput
-            placeholder="Enter vehicle model"
-            value={data.vehicleModel || ''}
-            onChangeText={(value) => handleInputChange('vehicleModel', value)}
-            onBlur={() => validateField('vehicleModel', data.vehicleModel || '')}
-            style={styles.input}
+        </Anchored>
+        {text('vehicleModel', V.model, V.modelPlaceholder, { testID: 'registration-vehicle-model' })}
+        <Anchored field="vehicleYear">
+          <SelectField
+            label={f.label(V.year, 'vehicleYear')}
+            sheetTitle={V.yearSheet}
+            value={data.vehicleYear}
+            options={yearOptions}
+            onChange={selectYear}
+            error={errors.vehicleYear}
+            testID="registration-vehicle-year"
           />
-          {validationErrors.vehicleModel && (
-            <View style={styles.errorContainer} ref={anchor('vehicleModel')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.vehicleModel}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Vehicle Year and Color Row */}
-        <View style={styles.rowContainer}>
-          <View style={[styles.inputGroup, styles.halfWidth]}>
-            <Text style={styles.inputLabel}>Year *</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowYearDropdown(!showYearDropdown)}
-            >
-              <Text style={[styles.dropdownText, !data.vehicleYear && styles.dropdownPlaceholder]}>
-                {data.vehicleYear || 'Year'}
-              </Text>
-              <Icon 
-                name={showYearDropdown ? 'chevronUp' : 'chevronDown'} 
-                size={20} 
-                tint="#6b7280" 
-              />
-            </TouchableOpacity>
-            {showYearDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {vehicleYears.map((year) => (
-                    <TouchableOpacity
-                      key={year}
-                      style={styles.dropdownItem}
-                      onPress={() => handleYearSelect(year)}
-                    >
-                      <Text style={styles.dropdownItemText}>{year}</Text>
-                      {data.vehicleYear === year && (
-                        <Icon name="checkMark" size={20} tint={BrandColors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-            {validationErrors.vehicleYear && (
-              <View style={styles.errorContainer} ref={anchor('vehicleYear')}>
-                <Icon name="error" size={16} tint="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.vehicleYear}</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={[styles.inputGroup, styles.halfWidth]}>
-            <Text style={styles.inputLabel}>Color *</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowColorDropdown(!showColorDropdown)}
-            >
-              <Text style={[styles.dropdownText, !data.vehicleColor && styles.dropdownPlaceholder]}>
-                {data.vehicleColor || 'Color'}
-              </Text>
-              <Icon 
-                name={showColorDropdown ? 'chevronUp' : 'chevronDown'} 
-                size={20} 
-                tint="#6b7280" 
-              />
-            </TouchableOpacity>
-            {showColorDropdown && (
-              <View style={styles.dropdownList}>
-                <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {vehicleColors.map((color) => (
-                    <TouchableOpacity
-                      key={color}
-                      style={styles.dropdownItem}
-                      onPress={() => handleColorSelect(color)}
-                    >
-                      <View style={[styles.colorIndicator, { backgroundColor: color.toLowerCase() }]} />
-                      <Text style={styles.dropdownItemText}>{color}</Text>
-                      {data.vehicleColor === color && (
-                        <Icon name="checkMark" size={20} tint={BrandColors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-            {validationErrors.vehicleColor && (
-              <View style={styles.errorContainer} ref={anchor('vehicleColor')}>
-                <Icon name="error" size={16} tint="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.vehicleColor}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
+        </Anchored>
+        <Anchored field="vehicleColor">
+          <SelectField
+            label={f.label(V.colour, 'vehicleColor')}
+            sheetTitle={V.colourSheet}
+            value={data.vehicleColor}
+            options={COLOUR_OPTIONS}
+            onChange={(value) => f.set('vehicleColor', value)}
+            error={errors.vehicleColor}
+            testID="registration-vehicle-colour"
+          />
+        </Anchored>
         {/* BE-86: optional AC declaration, cars only (an admin checks it before AC rides).
             BE-105: off and disabled below the server's AC minimum year; the 422 stays the check. */}
-        {acRule.shown && (
-          <View style={styles.inputGroup} ref={anchor('vehicleHasAc')}>
+        {acRule.shown ? (
+          <Anchored field="vehicleHasAc">
             <RegistrationAcSwitch
               value={data.vehicleHasAc}
-              onChange={(on) => onDataChange({ vehicleHasAc: on })}
-              error={validationErrors.vehicleHasAc}
+              onChange={(on) => f.set('vehicleHasAc', on)}
+              error={errors.vehicleHasAc}
               tooOldMinYear={acRule.tooOld ? vehicleRules?.acMinVehicleYear ?? null : null}
             />
-          </View>
-        )}
-
-        {/* License plate & Registration number */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>License Plate *</Text>
-          <ThemedTextInput
-            placeholder="e.g. ABC-1234-D"
-            value={data.licensePlate || ''}
-            onChangeText={(v) => onDataChange({ licensePlate: v })}
-            style={styles.input}
-          />
-          {validationErrors.licensePlate && (
-            <View style={styles.errorContainer} ref={anchor('licensePlate')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licensePlate}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Vehicle Registration Number *</Text>
-          <ThemedTextInput
-            placeholder="Official registration number"
-            value={data.registrationNumber || ''}
-            onChangeText={(v) => onDataChange({ registrationNumber: v })}
-            style={styles.input}
-          />
-          {validationErrors.registrationNumber && (
-            <View style={styles.errorContainer} ref={anchor('registrationNumber')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.registrationNumber}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Driving licence number (T-207: required for drivers, sent as license_number) */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>
-            Driving License Number{isStepFieldRequired('vehicle', 'licenseNumber', data.role) ? ' *' : ''}
-          </Text>
-          <ThemedTextInput
-            placeholder="As printed on your driving license"
-            value={data.licenseNumber || ''}
-            onChangeText={(value) => handleInputChange('licenseNumber', value)}
-            onBlur={() => validateField('licenseNumber', data.licenseNumber || '')}
+          </Anchored>
+        ) : null}
+        <Anchored field="vehicleNumber">
+          <TextField
+            label={f.label(V.vehicleNumber, 'vehicleNumber')}
+            placeholder={V.vehicleNumberPlaceholder}
+            value={data.vehicleNumber}
+            onChangeText={(value) => f.set('vehicleNumber', formatVehicleNumber(value))}
+            onBlur={() => f.blur('vehicleNumber')}
             autoCapitalize="characters"
             autoCorrect={false}
-            maxLength={50}
-            style={styles.input}
+            error={errors.vehicleNumber}
+            testID="registration-vehicle-number"
           />
-          {validationErrors.licenseNumber && (
-            <View style={styles.errorContainer} ref={anchor('licenseNumber')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licenseNumber}</Text>
-            </View>
-          )}
-        </View>
+        </Anchored>
+        {text('licensePlate', V.licensePlate, V.licensePlatePlaceholder, {
+          autoCapitalize: 'characters',
+          autoCorrect: false,
+          testID: 'registration-license-plate',
+        })}
+        {text('registrationNumber', V.registrationNumber, V.registrationNumberPlaceholder, {
+          autoCapitalize: 'characters',
+          autoCorrect: false,
+          testID: 'registration-registration-number',
+        })}
+      </FormGroup>
 
-        {/* License type & expiry & experience */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>License Type *</Text>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setShowLicenseTypeDropdown(!showLicenseTypeDropdown)}
-          >
-            <Text style={[styles.dropdownText, !data.licenseType && styles.dropdownPlaceholder]}>
-              {LICENSE_TYPES.find((t) => t.value === data.licenseType)?.label || 'Select license type'}
-            </Text>
-            <Icon name={showLicenseTypeDropdown ? 'chevronUp' : 'chevronDown'} size={20} tint="#6b7280" />
-          </TouchableOpacity>
-          {showLicenseTypeDropdown && (
-            <View style={styles.dropdownList}>
-              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {LICENSE_TYPES.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      onDataChange({ licenseType: opt.value });
-                      setShowLicenseTypeDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>{opt.label}</Text>
-                    {data.licenseType === opt.value && <Icon name="checkMark" size={20} tint={BrandColors.primary} />}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-          {validationErrors.licenseType && (
-            <View style={styles.errorContainer} ref={anchor('licenseType')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licenseType}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>License Expiry Date *</Text>
-          <ThemedTextInput
-            placeholder="YYYY-MM-DD"
-            value={data.licenseExpiryDate || ''}
-            onChangeText={(v) => onDataChange({ licenseExpiryDate: v })}
-            style={styles.input}
+      <FormGroup title={L.group}>
+        {/* Driving licence number (T-207: required for drivers, sent as license_number). */}
+        {text('licenseNumber', L.number, L.numberPlaceholder, {
+          autoCapitalize: 'characters',
+          autoCorrect: false,
+          maxLength: 50,
+          testID: 'registration-license-number',
+        })}
+        <Anchored field="licenseType">
+          <SelectField
+            label={f.label(L.type, 'licenseType')}
+            value={data.licenseType}
+            options={LICENSE_TYPES}
+            onChange={(value) => f.set('licenseType', value)}
+            error={errors.licenseType}
+            testID="registration-license-type"
           />
-          {validationErrors.licenseExpiryDate && (
-            <View style={styles.errorContainer} ref={anchor('licenseExpiryDate')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.licenseExpiryDate}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Driving Experience (years) *</Text>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setShowExperienceDropdown(!showExperienceDropdown)}
-          >
-            <Text style={[styles.dropdownText, !data.drivingExperience && styles.dropdownPlaceholder]}>
-              {data.drivingExperience ? `${data.drivingExperience} years` : 'Select years'}
-            </Text>
-            <Icon name={showExperienceDropdown ? 'chevronUp' : 'chevronDown'} size={20} tint="#6b7280" />
-          </TouchableOpacity>
-          {showExperienceDropdown && (
-            <View style={styles.dropdownList}>
-              <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {DRIVING_EXPERIENCE_OPTIONS.map((y) => (
-                  <TouchableOpacity
-                    key={y}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      onDataChange({ drivingExperience: y });
-                      setShowExperienceDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>{y} years</Text>
-                    {data.drivingExperience === y && <Icon name="checkMark" size={20} tint={BrandColors.primary} />}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-          {validationErrors.drivingExperience && (
-            <View style={styles.errorContainer} ref={anchor('drivingExperience')}>
-              <Icon name="error" size={16} tint="#ef4444" />
-              <Text style={styles.errorText}>{validationErrors.drivingExperience}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Bank details */}
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Bank Details</Text>
-          <Text style={styles.formSubtitle}>Required for driver payouts</Text>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Bank Name *</Text>
-            <ThemedTextInput
-              placeholder="e.g. HBL, UBL, MCB"
-              value={data.bankName || ''}
-              onChangeText={(v) => onDataChange({ bankName: v })}
-              style={styles.input}
-            />
-            {validationErrors.bankName && (
-              <View style={styles.errorContainer} ref={anchor('bankName')}>
-                <Icon name="error" size={16} tint="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.bankName}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Bank Branch *</Text>
-            <ThemedTextInput
-              placeholder="Branch name or address"
-              value={data.bankBranch || ''}
-              onChangeText={(v) => onDataChange({ bankBranch: v })}
-              style={styles.input}
-            />
-            {validationErrors.bankBranch && (
-              <View style={styles.errorContainer} ref={anchor('bankBranch')}>
-                <Icon name="error" size={16} tint="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.bankBranch}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Bank Account Number *</Text>
-            <ThemedTextInput
-              placeholder="IBAN or account number"
-              value={data.bankAccountNumber || ''}
-              onChangeText={(v) => onDataChange({ bankAccountNumber: v })}
-              keyboardType="number-pad"
-              style={styles.input}
-            />
-            {validationErrors.bankAccountNumber && (
-              <View style={styles.errorContainer} ref={anchor('bankAccountNumber')}>
-                <Icon name="error" size={16} tint="#ef4444" />
-                <Text style={styles.errorText}>{validationErrors.bankAccountNumber}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
+        </Anchored>
+        <Anchored field="licenseExpiryDate">
+          <TextField
+            label={f.label(L.expiry, 'licenseExpiryDate')}
+            placeholder={L.expiryPlaceholder}
+            helper={L.expiryHelper}
+            value={data.licenseExpiryDate}
+            onChangeText={(value) => f.set('licenseExpiryDate', formatIsoDateInput(value))}
+            onBlur={() => f.blur('licenseExpiryDate')}
+            keyboardType="number-pad"
+            maxLength={10}
+            doneBar
+            error={errors.licenseExpiryDate}
+            testID="registration-license-expiry"
+          />
+        </Anchored>
+        <Anchored field="drivingExperience">
+          <SelectField
+            label={f.label(L.experience, 'drivingExperience')}
+            value={data.drivingExperience}
+            options={EXPERIENCE_OPTIONS}
+            onChange={(value) => f.set('drivingExperience', value)}
+            error={errors.drivingExperience}
+            testID="registration-driving-experience"
+          />
+        </Anchored>
+      </FormGroup>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: 20,
-  },
-  skipCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: isSmallScreen ? 20 : 25,
-    padding: isSmallScreen ? 20 : 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  skipTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  skipSubtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: isSmallScreen ? 20 : 25,
-    padding: isSmallScreen ? 20 : 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  formTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  formSubtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#6b7280',
-    marginBottom: 24,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    marginBottom: 4,
-  },
-  vehicleTypeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  vehicleTypeCard: {
-    flex: 1,
-    minWidth: '45%',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
-  },
-  vehicleTypeCardActive: {
-    backgroundColor: BrandColors.primary,
-    borderColor: BrandColors.primary,
-  },
-  vehicleTypeLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    marginTop: 8,
-    marginBottom: 4,
-    color: BrandColors.primary,
-  },
-  vehicleTypeLabelActive: {
-    color: '#ffffff',
-  },
-  vehicleTypeDescription: {
-    fontSize: 12,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  vehicleTypeDescriptionActive: {
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-  },
-  dropdownText: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#374151',
-    flex: 1,
-  },
-  dropdownPlaceholder: {
-    color: '#9ca3af',
-  },
-  dropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 200,
-    zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  dropdownScroll: {
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  dropdownItemText: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#374151',
-    flex: 1,
-  },
-  colorIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 4,
-    gap: 6,
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 12,
-    flex: 1,
-  },
-});

@@ -155,6 +155,9 @@ export const iconGlyphs = {
   paused: 'pause-circle',
   blocked: 'cancel',
   admin: 'shield-account-outline',
+  // UI-R7 role choice cards: trailing radio.
+  radioOn: 'radiobox-marked',
+  radioOff: 'radiobox-blank',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

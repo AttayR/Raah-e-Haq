@@ -1,20 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useAppTheme } from '../../app/providers/ThemeProvider';
-import RegistrationForm from './RegistrationForm';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
+import RegistrationScreen from './RegistrationScreen';
 
-export default function SignupScreen() {
-  const { theme } = useAppTheme();
-
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <RegistrationForm />
-    </View>
-  );
+/** AuthStack `Signup`: the registration wizard; `role` (when a caller passes it) preselects a role card. */
+export default function SignupScreen({ route }: NativeStackScreenProps<AuthStackParamList, 'Signup'>) {
+  return <RegistrationScreen initialRole={route.params?.role} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
