@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { AppState } from 'react-native';
-import { useApiAuth } from '../../hooks/useApiAuth';
+import { useAppDispatch } from '../../store';
+import { bootstrapAuth } from '../../store/thunks/apiThunks';
 import { authStorage } from '../../services/authStorage';
 import { signOutLegacyFirebaseAuth } from '../../services/legacyFirebaseSignOut';
 import { logger } from '../../core/logging/logger';
@@ -10,7 +11,11 @@ interface AuthProviderProps {
 }
 
 export default function AuthProvider({ children }: AuthProviderProps) {
-  const { initialize } = useApiAuth();
+  // T-534 (PERF-16): dispatch only; the app root does not subscribe to the auth slice.
+  const dispatch = useAppDispatch();
+  const initialize = useCallback(() => {
+    dispatch(bootstrapAuth());
+  }, [dispatch]);
 
   useEffect(() => {
     logger.debug('AuthProvider - Initializing API authentication...');

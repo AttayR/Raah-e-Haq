@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { fetchAutocomplete, fetchPlaceDetails, type PlacesBias } from '../../services/placesService';
+import { MIN_AUTOCOMPLETE_CHARS, newPlacesSessionToken } from '../../services/placesSession';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
 import { Icon, type IconName } from '../ui/Icon';
@@ -18,16 +19,27 @@ export type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
 
 type Props = {
   mode: 'pickup' | 'destination';
+  /**
+   * The text the field shows when the screen sets it ("Current location", a ride's address, a
+   * reset). What the passenger types stays in this component (T-534, PERF-10): a new `query`
+   * (or a new `queryRevision`) replaces it.
+   */
   query: string;
-  onChangeQuery: (q: string) => void;
+  /** Bump to put `query` back in the field even when its text did not change (e.g. a reset). */
+  queryRevision?: number;
+  /** Optional: every keystroke, for small screens that keep the text themselves. */
+  onChangeQuery?: (q: string) => void;
   onSelect: (s: Suggestion) => void;
   readOnly?: boolean;
   /** Called when the field gains / loses focus (the booking sheet makes room for results). */
   onFocusChange?: (focused: boolean) => void;
   /** Overrides the mode's placeholder (e.g. "Add a stop"). */
   placeholder?: string;
-  /** Overrides the leading glyph; `null` hides it (the Raah line dot already marks the row). */
-  leadingIcon?: IconName | null;
+  /**
+   * Overrides the leading glyph; `null` hides it (the Raah line dot already marks the row). A
+   * function gets the field's current text.
+   */
+  leadingIcon?: IconName | null | ((text: string) => IconName | null);
   /** Shown as a "Set location on map" row after "No places found" or a failed search. */
   onChooseOnMap?: () => void;
   /** Rank suggestions near this point (the rider or the pickup); results stay in Pakistan anyway. */
@@ -36,17 +48,24 @@ type Props = {
 
 const PLACEHOLDER = { pickup: 'Pickup location', destination: 'Where to?' } as const;
 const LEADING_ICON: Record<Props['mode'], IconName> = { pickup: 'origin', destination: 'search' };
+/** T-534 (PERF-10): one lookup after the passenger pauses typing, not one per keystroke. */
+export const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 
 /**
  * Address field with Google Places suggestions (passenger-destination-search.md): field 48
  * high on `surfaceAlt`, suggestion rows min 64 with a 40 circle icon, one-line title and
  * subtitle, plus "No places found" and "Search isn't working" states. It searches only for
  * text the passenger typed, never for a prefilled value ("Current location", a ride's
- * address). The lookups themselves are unchanged (T-302/T-303 own them).
+ * address).
+ *
+ * T-534 (PERF-10): the typed text lives here, so a keystroke re-renders only this field. A
+ * lookup waits for a 300 ms pause and 3 characters, a newer query aborts the older request,
+ * and the lookups of one search (autocomplete + details) share a Places session token.
  */
 const LocationSearch: React.FC<Props> = ({
   mode,
   query,
+  queryRevision,
   onChangeQuery,
   onSelect,
   readOnly,
@@ -58,6 +77,8 @@ const LocationSearch: React.FC<Props> = ({
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
+  const [text, setTextState] = useState(query);
+  const textRef = useRef(query);
   const [remote, setRemote] = useState<Suggestion[]>([]);
   const [status, setStatus] = useState<SearchStatus>('idle');
   const [focused, setFocused] = useState(false);
@@ -67,18 +88,41 @@ const LocationSearch: React.FC<Props> = ({
   // Read when a search starts; a new GPS fix must not search again.
   const nearRef = useRef(near);
   nearRef.current = near;
+  // One Places session per search: made by the first lookup, ended by the pick.
+  const sessionRef = useRef<string | null>(null);
+
+  const setText = useCallback((value: string) => {
+    textRef.current = value;
+    setTextState(value);
+  }, []);
+
+  // The screen set the field (or reset it): its text replaces what was typed.
+  const appliedRevision = useRef(queryRevision);
+  useEffect(() => {
+    const revised = appliedRevision.current !== queryRevision;
+    appliedRevision.current = queryRevision;
+    if (!revised && query === textRef.current) return;
+    setText(query);
+    setEdited(false);
+  }, [query, queryRevision, setText]);
 
   useEffect(() => {
+    if (readOnly || !edited || text.trim().length < MIN_AUTOCOMPLETE_CHARS) {
+      setRemote([]);
+      setStatus('idle');
+      return;
+    }
     let cancelled = false;
-    (async () => {
-      if (readOnly || !edited || query.length < 2) {
-        setRemote([]);
-        setStatus('idle');
-        return;
-      }
+    const controller = new AbortController();
+    // The spinner shows once the lookup starts, not on every keystroke of the pause.
+    const timer = setTimeout(async () => {
       setStatus('loading');
+      if (!sessionRef.current) sessionRef.current = newPlacesSessionToken();
       try {
-        const results = await fetchAutocomplete(query, nearRef.current);
+        const results = await fetchAutocomplete(text, nearRef.current, {
+          sessionToken: sessionRef.current,
+          signal: controller.signal,
+        });
         if (cancelled) return;
         const mapped: Suggestion[] = results.map((r) => ({
           id: r.place_id,
@@ -94,15 +138,20 @@ const LocationSearch: React.FC<Props> = ({
         setRemote([]);
         setStatus('error');
       }
-    })();
-    return () => { cancelled = true; };
-  }, [query, readOnly, edited]);
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [text, readOnly, edited]);
 
   const pick = async (s: Suggestion) => {
     if (s.coords.latitude === 0) {
       setSelectingId(s.id);
       try {
-        const details = await fetchPlaceDetails(s.id);
+        const details = await fetchPlaceDetails(s.id, { sessionToken: sessionRef.current ?? undefined });
+        sessionRef.current = null;
         if (details) {
           setEdited(false);
           onSelect({ ...s, coords: { latitude: details.latitude, longitude: details.longitude } });
@@ -112,8 +161,15 @@ const LocationSearch: React.FC<Props> = ({
       }
       return;
     }
+    sessionRef.current = null;
     setEdited(false);
     onSelect(s);
+  };
+
+  const changeText = (q: string) => {
+    setEdited(true);
+    setText(q);
+    onChangeQuery?.(q);
   };
 
   const setFocus = (value: boolean) => {
@@ -121,7 +177,8 @@ const LocationSearch: React.FC<Props> = ({
     onFocusChange?.(value);
   };
 
-  const glyph = leadingIcon === undefined ? LEADING_ICON[mode] : leadingIcon;
+  const glyph =
+    leadingIcon === undefined ? LEADING_ICON[mode] : typeof leadingIcon === 'function' ? leadingIcon(text) : leadingIcon;
   const showNoResults = status === 'done' && remote.length === 0;
   const showError = status === 'error';
 
@@ -140,11 +197,8 @@ const LocationSearch: React.FC<Props> = ({
           accessibilityLabel={mode === 'pickup' ? 'Pickup location' : 'Destination'}
           style={[styles.input, { color: c.textPrimary }]}
           placeholder={placeholder ?? PLACEHOLDER[mode]}
-          value={query}
-          onChangeText={(q) => {
-            setEdited(true);
-            onChangeQuery(q);
-          }}
+          value={text}
+          onChangeText={changeText}
           placeholderTextColor={c.textMuted}
           editable={!readOnly}
           maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
@@ -154,14 +208,11 @@ const LocationSearch: React.FC<Props> = ({
           onBlur={() => setFocus(false)}
         />
         {status === 'loading' ? <ActivityIndicator size="small" color={c.textSecondary} testID="location-search-spinner" /> : null}
-        {query.length > 0 && !readOnly ? (
+        {text.length > 0 && !readOnly ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Clear"
-            onPress={() => {
-              setEdited(true);
-              onChangeQuery('');
-            }}
+            onPress={() => changeText('')}
             hitSlop={space[3]}
           >
             <Icon name="clear" size={20} color="textMuted" />

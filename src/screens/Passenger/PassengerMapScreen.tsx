@@ -1,21 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Keyboard, StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import { MapPressEvent } from 'react-native-maps';
+import { StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import SafeMapView from '../../components/SafeMapView';
+import type { SafeMapViewRef } from '../../components/SafeMapView';
 import { useNavigation, useFocusEffect, useIsFocused, useRoute, type RouteProp } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
-import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import { useDirections } from '../../hooks/useDirections';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { cancelAllRequests } from '../../services/api';
-import LocationSearch, { suggestionAddress } from '../../components/passenger/LocationSearch';
-import DualLocationPicker from '../../components/passenger/DualLocationPicker';
-import { NearbyDriverMarkers, NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
+import { NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import { reverseGeocode } from '../../services/placesService';
 import StageChips from '../../components/passenger/StageChips';
@@ -29,43 +24,41 @@ import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
 import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
-import ActiveRidePanel, { AssignedDriverMarker } from '../../features/active-ride/components/ActiveRidePanel';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
-import { regionInViewport, usePassengerRideCamera, viewportEdgePadding, type MapViewport } from '../../features/active-ride/camera';
-import { mapTapTarget, type MapPickTarget } from '../../features/ride-booking/mapTap';
-import { ChooseOnMapButton, MapPickBanner } from '../../features/ride-booking/components/MapPick';
+import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
+import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
-import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
+import { advancedRideInput, buildRideRequest, withAddresses, type AdvancedRideData, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
 import { estimateFor, useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 import { BookingSheet } from '../../features/ride-booking/components/BookingSheet';
 import { MapTopControls, MAP_TOP_CONTROLS_HEIGHT } from '../../features/ride-booking/components/MapTopControls';
-import { BookingMapLayers } from '../../features/ride-booking/components/BookingMapLayers';
-import { BookingErrorBanner, LocationWaitState, MapPlaceholder } from '../../features/ride-booking/components/BookingNotices';
-import { FareStage, MAX_STOPS, VehicleStage } from '../../features/ride-booking/components/BookingStages';
+import { BookingMap } from '../../features/ride-booking/components/BookingMap';
+import { BookingStageContent } from '../../features/ride-booking/components/BookingStageContent';
+import { BookingErrorBanner, LocationWaitState } from '../../features/ride-booking/components/BookingNotices';
 import { bookingInitialRegion, showLocationWait } from '../../features/ride-booking/locationGate';
 import { bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
-import { space } from '../../theme';
-import { displayAddress } from '../../features/passenger-home/greeting';
+import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
+import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
 import { openRideChat } from '../../features/chat/navigation';
 import { useRideCall } from '../../features/safety/hooks';
 import { canCallOn } from '../../features/safety/rules';
-import { PassengerTripSafety } from '../../features/safety/components/RideSafety';
 
-/** A picked point: coordinates and the address the passenger saw (T-302). */
-type Place = BookingPlace;
 /** iPhone SE class height (667 pt): the capped sheets get a little more room. */
 const SHORT_WINDOW_HEIGHT = 700;
 
-type Stage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
-
+/**
+ * Passenger booking and live ride map. T-534 (PERF-10/11/12/15): the booking state lives in
+ * useBookingFlow, the map in the memoised BookingMap (mounted at once, stable handlers), the
+ * sheet's steps in BookingStageContent, and typed search text in the search fields.
+ */
 const PassengerMapScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
   // T-516: a saved place can open booking with its pickup and/or destination already chosen.
   const route = useRoute<RouteProp<PassengerStackParamList, 'Booking'>>();
   const [prefill] = useState(() => bookingPrefillState(route.params));
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<SafeMapViewRef | null>(null);
   const { handleError } = useErrorHandler();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -82,7 +75,6 @@ const PassengerMapScreen = () => {
     openSettings: openLocationSettings,
   } = useNativeLocation({ active: isFocused });
 
-  usePassengerNotifications();
   // The active ride lives in Redux (T-301): one copy for every screen, restored on launch.
   const dispatch = useDispatch<AppDispatch>();
   const currentRide = useSelector(selectActiveRide);
@@ -94,21 +86,14 @@ const PassengerMapScreen = () => {
     onBalanceOwed: (amountOwed) => navigation.navigate('AddMoney', topUpParamsFor(amountOwed)),
   });
 
-  const { routeCoordinates, fetchRouteWithWaypoints, clearRoute, fetchRoute } = useDirections() as any;
+  const directions = useDirections();
+  const { routeCoordinates, fetchRoute } = directions;
+  const rideShown = !!currentRide;
+  const flow = useBookingFlow({ prefill, currentLocation, rideShown, directions });
+  const { pickup, stops, destination, mapPick, stage, error, setError, setStage, resetSelection } = flow;
 
-  const [pickup, setPickup] = useState<Place | null>(prefill.pickup);
-  const [stops, setStops] = useState<Place[]>([]);
-  const [destination, setDestination] = useState<Place | null>(prefill.destination);
-  // Map taps set a location only in this explicit mode (T-304, PAX-14).
-  const [mapPick, setMapPick] = useState<MapPickTarget | null>(null);
-  const [stage, setStage] = useState<Stage>(prefill.stage);
-  const [pickupQuery, setPickupQuery] = useState(prefill.pickupQuery);
-  const [destQuery, setDestQuery] = useState(prefill.destQuery);
-  const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvancedRidePanel, setShowAdvancedRidePanel] = useState(false);
-  const [isMapReady, setIsMapReady] = useState(false);
   // While a search field is focused the sheet drops its extras so suggestions get the room.
   const [searchFocused, setSearchFocused] = useState(false);
   // T-314: what covers the map, so recentring and fitting keep points above the sheet.
@@ -126,8 +111,7 @@ const PassengerMapScreen = () => {
   // the booking steps; that includes its outcome (completed / cancelled) until Done.
   const rideStage = usePassengerRideStage(currentRide);
   const rideSubmitting = useSelector(selectActiveRideSubmitting);
-  const rideShown = !!currentRide;
-  const shownStage: Stage = rideShown ? 'requesting' : stage;
+  const shownStage: BookingStage = rideShown ? 'requesting' : stage;
 
   // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked. Once
   // the ride has ended (T-311) they are read again at once, and again on Done, so the map
@@ -148,12 +132,16 @@ const PassengerMapScreen = () => {
     if (rideId !== null) openRideChat(navigation, rideId);
   }, [navigation, rideId]);
   const rideCall = useRideCall(rideId, { onChatOnly: openChat });
-
-  // Show the map after a short delay even if onMapReady is slow.
-  useEffect(() => {
-    const timer = setTimeout(() => setIsMapReady(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  const { isMapReady, onMapReady, onMapLoaded, centerOnUser } = useBookingMapCamera({
+    mapRef,
+    currentLocation,
+    viewportRef,
+    sheetHeight,
+    routeCoordinates,
+    isRideCameraFollowing,
+    onRideCameraMapReady: rideCamera.onMapReady,
+    requestLocationPermission,
+  });
 
   // Unmount: drop the map ref and cancel the screen's network requests.
   useEffect(() => {
@@ -167,21 +155,9 @@ const PassengerMapScreen = () => {
     };
   }, []);
 
-  // Map calls are not made while the app is in the background.
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (next) => {
-      if ((next === 'background' || next === 'inactive') && mapRef.current) {
-        logger.debug('App backgrounded, pausing MapView operations');
-      }
-    });
-    return () => subscription?.remove();
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
-      logger.debug('PassengerMapScreen focused');
       return () => {
-        logger.debug('PassengerMapScreen unfocused - cleaning up');
         try {
           cancelAllRequests();
         } catch (e) {
@@ -191,101 +167,16 @@ const PassengerMapScreen = () => {
     }, []),
   );
 
-  const swapPickupDrop = useCallback(() => {
-    if (pickup && destination) {
-      const newPickup = destination;
-      const newDest = pickup;
-      setPickup(newPickup);
-      setDestination(newDest);
-      clearRoute();
-      fetchRoute(newPickup, newDest);
-    }
-  }, [pickup, destination, fetchRoute, clearRoute]);
-
   // Vehicle catalogue (GET /public/vehicle-types) and one server estimate per route (BE-05).
   const vehicleTypes = useVehicleTypes();
   const estimates = useFareEstimates(pickup, destination, stops);
-  const selectedType = vehicleTypes.data?.find((t) => t.key === selectedVehicle) ?? null;
   // BE-83: the passenger's offer for the selected quote (starts at the server fare).
-  const offer = useFareOffer(estimateFor(estimates.data, selectedVehicle)?.offer_band ?? null);
+  const offer = useFareOffer(estimateFor(estimates.data, flow.selectedVehicle)?.offer_band ?? null);
   const tripSummary = estimates.data ? BOOKING_COPY.tripSummary(estimates.data.distance_km, estimates.data.duration_min) : null;
 
-  // PAX-14/PAX-24: only in the explicit choose-on-map mode, never on a marker press.
-  const onPressMap = useCallback((e: MapPressEvent) => {
-    const target = mapTapTarget({ mode: mapPick, action: e.nativeEvent.action, rideShown });
-    if (!target) return;
-    const point = { latitude: e.nativeEvent.coordinate.latitude, longitude: e.nativeEvent.coordinate.longitude };
-    setMapPick(null);
-    if (target === 'pickup') {
-      setPickup(point);
-      setPickupQuery(BOOKING_COPY.pinnedOnMap);
-      if (destination) {
-        fetchRouteWithWaypoints(point, stops, destination);
-        setStage('vehicle');
-      } else {
-        clearRoute();
-        setStage('destination');
-      }
-    } else if (target === 'destination') {
-      setDestination(point);
-      setDestQuery(BOOKING_COPY.pinnedOnMap);
-      if (pickup) {
-        fetchRouteWithWaypoints(pickup, stops, point);
-        setStage('vehicle');
-      } else {
-        setStage('pickup');
-      }
-    } else if (pickup && destination && stops.length < MAX_STOPS) {
-      const ns = [...stops, point];
-      setStops(ns);
-      fetchRouteWithWaypoints(pickup, ns, destination);
-    }
-  }, [mapPick, rideShown, pickup, stops, destination, fetchRouteWithWaypoints, clearRoute]);
-
-  // The passenger's position, centred in the part of the map above the sheet (T-314).
-  const animateToUser = useCallback((duration?: number) => {
-    if (!currentLocation || !mapRef.current) return;
-    try {
-      mapRef.current.animateToRegion(regionInViewport(currentLocation, viewportRef.current), duration);
-    } catch (e) {
-      logger.debug('Error animating to current location:', e);
-    }
-  }, [currentLocation]);
-
-  const centerOnUser = useCallback(() => {
-    if (currentLocation && mapRef.current && isMapReady) {
-      animateToUser();
-    } else if (!currentLocation) {
-      requestLocationPermission();
-    }
-  }, [currentLocation, requestLocationPermission, isMapReady, animateToUser]);
-
-  // Initialize location (not while the ride camera follows the driver).
-  useEffect(() => {
-    if (currentLocation && isMapReady && !isRideCameraFollowing()) animateToUser();
-  }, [currentLocation, isMapReady, isRideCameraFollowing, animateToUser]);
-
   // The Advanced panel's request (removed in T-309) goes through the same builder.
-  const handleRequestRide = async (rideData: {
-    pickup_address: string;
-    dropoff_address: string;
-    pickup_latitude: number;
-    pickup_longitude: number;
-    dropoff_latitude: number;
-    dropoff_longitude: number;
-    vehicle_type: string;
-    passenger_count: number;
-    special_instructions: string;
-    stops: { address: string; latitude: number; longitude: number; stop_order: number }[];
-  }) => {
-    const built = buildRideRequest({
-      pickup: { latitude: rideData.pickup_latitude, longitude: rideData.pickup_longitude, address: rideData.pickup_address },
-      dropoff: { latitude: rideData.dropoff_latitude, longitude: rideData.dropoff_longitude, address: rideData.dropoff_address },
-      stops: [...rideData.stops].sort((x, y) => x.stop_order - y.stop_order),
-      vehicleType: rideData.vehicle_type,
-      passengerCount: rideData.passenger_count,
-      specialInstructions: rideData.special_instructions,
-    });
+  const handleRequestRide = async (rideData: AdvancedRideData) => {
+    const built = buildRideRequest(advancedRideInput(rideData));
     if (!built.ok) {
       setError(built.error);
       return;
@@ -299,22 +190,10 @@ const PassengerMapScreen = () => {
     }
   };
 
-  const resetSelection = useCallback(() => {
-    setPickup(null);
-    setStops([]);
-    setDestination(null);
-    setMapPick(null);
-    setStage('home');
-    setSelectedVehicle(undefined);
-    setPickupQuery('');
-    setDestQuery('');
-    setError(null);
-    clearRoute();
-  }, [clearRoute]);
-
   // A ride from Redux (booked here, or restored on launch) puts its own pickup and
   // destination on the map, once per ride (not on every poll).
   const shownRideIdRef = useRef<number | null>(null);
+  const { setPickup, setDestination, setPickupQuery, setDestQuery, setMapPick } = flow;
   useEffect(() => {
     if (!currentRide || !isRideInProgress(currentRide) || shownRideIdRef.current === currentRide.id) return;
     shownRideIdRef.current = currentRide.id;
@@ -322,7 +201,7 @@ const PassengerMapScreen = () => {
     setDestination({ latitude: Number(currentRide.dropoff_latitude), longitude: Number(currentRide.dropoff_longitude) });
     setPickupQuery(currentRide.pickup_address);
     setDestQuery(currentRide.dropoff_address);
-  }, [currentRide]);
+  }, [currentRide, setPickup, setDestination, setPickupQuery, setDestQuery]);
 
   // Saved-place prefill (T-516): new params while open replace the points they carry; the route
   // is drawn once a prefilled destination has a pickup (the GPS one when none was given).
@@ -365,37 +244,16 @@ const PassengerMapScreen = () => {
     resetSelection();
   }, [dispatch, resetSelection]);
 
+  const { stepBack } = flow;
   const goBack = useCallback(() => {
-    const stageOrder: Stage[] = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
-    const currentIndex = stageOrder.indexOf(stage);
-    // A ride stays in Redux; Back only leaves the screen.
-    if (currentIndex > 0 && !rideShown) {
-      setStage(stageOrder[currentIndex - 1]);
-      setError(null);
-    } else {
-      navigation.goBack();
-    }
-  }, [stage, navigation, rideShown]);
+    if (!stepBack()) navigation.goBack();
+  }, [stepBack, navigation]);
 
   // Cancel with the server's fee preview (BE-85); the outcome is shown once, by the stage panel.
   const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection);
 
-  // Pickup at the passenger's position; its address is resolved and kept with the point.
-  const pickupAtCurrentLocation = useCallback(async () => {
-    if (!currentLocation) return null;
-    const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
-    setPickup(cur);
-    setPickupQuery(BOOKING_COPY.resolvingAddress);
-    const raw = await reverseGeocode(cur.latitude, cur.longitude).catch(() => null);
-    // Street address without a leading Plus Code; the field says "Current location" until edited.
-    const addr = raw ? displayAddress(raw) : null;
-    setPickupQuery(BOOKING_COPY.currentLocation);
-    // Only if the passenger has not picked another pickup meanwhile.
-    if (addr) setPickup((p) => (p && p.latitude === cur.latitude && p.longitude === cur.longitude ? { ...p, address: addr } : p));
-    return cur;
-  }, [currentLocation]);
-
   // Default: populate pickup with current location when it becomes available
+  const { pickupAtCurrentLocation } = flow;
   useEffect(() => {
     if (currentLocation && !pickup) pickupAtCurrentLocation();
   }, [currentLocation, pickup, pickupAtCurrentLocation]);
@@ -409,8 +267,8 @@ const PassengerMapScreen = () => {
       const built = buildRideRequest({
         pickup: p,
         dropoff: d,
-        stops: st.filter((x): x is Place => x !== null),
-        vehicleType: selectedVehicle,
+        stops: st.filter((x): x is BookingPlace => x !== null),
+        vehicleType: flow.selectedVehicle,
         offeredFare: offer.offeredFare,
       });
       if (!built.ok) {
@@ -428,32 +286,7 @@ const PassengerMapScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pickup, destination, stops, selectedVehicle, requestRideService, offer]);
-
-  // Auto-fit map to the route whenever it updates, above the sheet (T-314). The sheet settles
-  // after the route arrives (keyboard closes, vehicle list loads), so a sheet height change of
-  // a step (40 pt) refits too; smaller changes do not move the camera.
-  const sheetStep = Math.round(sheetHeight / 40);
-  useEffect(() => {
-    if (!mapRef.current || !routeCoordinates || routeCoordinates.length < 2) return;
-    try {
-      mapRef.current.fitToCoordinates(routeCoordinates, { edgePadding: viewportEdgePadding(viewportRef.current), animated: true });
-    } catch (e) {
-      logger.debug('Error fitting map to route:', e);
-    }
-  }, [routeCoordinates, sheetStep]);
-
-  // "Set location on map" from the search results: close the keyboard, enter the map pick mode.
-  const chooseOnMap = useCallback((target: MapPickTarget) => {
-    Keyboard.dismiss();
-    setMapPick(target);
-  }, []);
-
-  const updateStops = useCallback((ns: Place[]) => {
-    if (!pickup || !destination) return;
-    setStops(ns);
-    fetchRouteWithWaypoints(pickup, ns, destination);
-  }, [pickup, destination, fetchRouteWithWaypoints]);
+  }, [pickup, destination, stops, flow.selectedVehicle, requestRideService, offer, setError, setStage]);
 
   // T-315: a ride (its completed summary above all) always wins over the location wait.
   if (showLocationWait({ hasLocation: !!currentLocation, locationLoading, rideShown })) {
@@ -466,7 +299,6 @@ const PassengerMapScreen = () => {
     );
   }
 
-  const initialRegion = bookingInitialRegion(currentLocation, currentRide, MAPS_CONFIG.DEFAULT_REGION);
   const compact = searchFocused;
   // Vehicle, fare and the ride itself: half the window (60% on short phones) so the route and
   // the driver stay visible above the sheet; longer content scrolls.
@@ -488,41 +320,24 @@ const PassengerMapScreen = () => {
       >
         <StatusBar barStyle={theme.statusBarStyle} />
 
-        {!isMapReady ? (
-          <MapPlaceholder message="Loading map…" />
-        ) : (
-          <MapErrorBoundary fallback={<MapPlaceholder message="Map error. Please restart the app." />}>
-            <MapErrorBoundary>
-              <SafeMapView
-                ref={mapRef}
-                style={styles.map}
-                initialRegion={initialRegion}
-                customMapStyle={theme.mapStyle}
-                onPress={onPressMap}
-                onMapReady={() => {
-                  setIsMapReady(true);
-                  rideCamera.onMapReady();
-                  // Delay the region animation to ensure map is fully ready
-                  setTimeout(() => {
-                    if (!isRideCameraFollowing()) animateToUser(1000);
-                  }, 500);
-                }}
-                onRegionChangeComplete={rideCamera.onRegionChangeComplete}
-                onMapLoaded={() => setIsMapReady(true)}
-                fallbackComponent={<MapPlaceholder message="Map loading…" />}
-              >
-                <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={routeCoordinates} />
-                {!rideShown && <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />}
-                <AssignedDriverMarker
-                  location={driverLocation}
-                  vehicleType={currentRide?.vehicle_type}
-                  stage={rideStage?.stage}
-                  route={routeCoordinates}
-                />
-              </SafeMapView>
-            </MapErrorBoundary>
-          </MapErrorBoundary>
-        )}
+        <BookingMap
+          mapRef={mapRef}
+          initialRegion={bookingInitialRegion(currentLocation, currentRide, MAPS_CONFIG.DEFAULT_REGION)}
+          mapStyle={theme.mapStyle}
+          ready={isMapReady}
+          onPress={flow.onPressMap}
+          onMapReady={onMapReady}
+          onMapLoaded={onMapLoaded}
+          onRegionChangeComplete={rideCamera.onRegionChangeComplete}
+          pickup={pickup}
+          stops={stops}
+          destination={destination}
+          route={routeCoordinates}
+          nearbyDrivers={rideShown ? null : nearbyDrivers.drivers}
+          driverLocation={driverLocation}
+          vehicleType={currentRide?.vehicle_type}
+          stage={rideStage?.stage}
+        />
 
         <MapTopControls
           onBack={goBack}
@@ -536,135 +351,28 @@ const PassengerMapScreen = () => {
           {shownStage !== 'requesting' && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
           {!rideShown && !compact && <StageChips stage={shownStage} />}
           {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
-
-          {shownStage === 'home' && (
-            <DualLocationPicker
-              pickup={pickup}
-              destination={destination}
-              pickupQuery={pickupQuery}
-              destQuery={destQuery}
-              onPickupQuery={setPickupQuery}
-              onDestQuery={setDestQuery}
-              compact={compact}
-              onFocusChange={setSearchFocused}
-              onChooseOnMap={chooseOnMap}
-              onSelectPickup={(c, address) => {
-                setPickup({ ...c, address });
-                if (destination) {
-                  fetchRoute(c, destination);
-                  setStage('vehicle');
-                } else {
-                  setStage('destination');
-                }
-              }}
-              onSelectDestination={(c, address) => {
-                setDestination({ ...c, address });
-                if (pickup) {
-                  fetchRoute(pickup, c);
-                  setStage('vehicle');
-                } else {
-                  setStage('pickup');
-                }
-              }}
-              onUseCurrentLocation={async () => {
-                const cur = await pickupAtCurrentLocation();
-                if (cur && destination) {
-                  fetchRoute(cur, destination);
-                  setStage('vehicle');
-                }
-              }}
-              onSwap={swapPickupDrop}
-            />
-          )}
-          {shownStage === 'home' && !compact && <ChooseOnMapButton onPress={() => setMapPick(pickup ? 'destination' : 'pickup')} />}
-
-          {shownStage === 'pickup' && (
-            <View style={styles.stack}>
-              <LocationSearch
-                mode="pickup"
-                query={pickupQuery}
-                onChangeQuery={setPickupQuery}
-                onFocusChange={setSearchFocused}
-                onChooseOnMap={() => chooseOnMap('pickup')}
-                near={currentLocation}
-                onSelect={(s) => { setPickup({ ...s.coords, address: suggestionAddress(s) }); setStage('destination'); }}
-              />
-              {!compact && <ChooseOnMapButton onPress={() => setMapPick('pickup')} />}
-            </View>
-          )}
-
-          {shownStage === 'destination' && (
-            <View style={styles.stack}>
-              <LocationSearch
-                mode="destination"
-                query={destQuery}
-                onChangeQuery={setDestQuery}
-                onFocusChange={setSearchFocused}
-                onChooseOnMap={() => chooseOnMap('destination')}
-                near={pickup ?? currentLocation}
-                onSelect={(s) => {
-                  if (!pickup && currentLocation) {
-                    setPickup({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
-                  }
-                  const nextPickup = pickup || (currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined);
-                  setDestination({ ...s.coords, address: suggestionAddress(s) });
-                  if (nextPickup) {
-                    fetchRoute(nextPickup, s.coords);
-                  }
-                  setStage('vehicle');
-                }}
-              />
-              {!compact && <ChooseOnMapButton onPress={() => setMapPick('destination')} />}
-            </View>
-          )}
-
-          {shownStage === 'vehicle' && (
-            <VehicleStage
-              pickupLabel={pickup?.address || pickupQuery}
-              dropoffLabel={destination?.address || destQuery}
-              tripSummary={tripSummary}
-              vehicleTypes={vehicleTypes}
-              estimates={estimates}
-              selectedVehicle={selectedVehicle}
-              onSelectVehicle={(id) => { setSelectedVehicle(id); setStage('fare'); }}
-              onEditPickup={() => setStage('pickup')}
-              onEditDestination={() => setStage('destination')}
-              onSwap={swapPickupDrop}
-              canEditStops={!!(pickup && destination)}
-              stops={stops}
-              onAddStop={(c, address) => updateStops([...stops, { ...c, address }].slice(0, MAX_STOPS))}
-              onRemoveStop={(index) => updateStops(stops.filter((_, i) => i !== index))}
-              onAddStopOnMap={() => setMapPick('stop')}
-              onFocusChange={setSearchFocused}
-            />
-          )}
-
-          {shownStage === 'fare' && (
-            <FareStage
-              vehicleLabel={selectedType?.label ?? null}
-              tripSummary={tripSummary}
-              vehicleType={selectedType}
-              estimates={estimates}
-              offer={offer}
-              catalogueNotice={vehicleTypes.notice}
-              onChangeVehicle={() => setStage('vehicle')}
-              onCancel={handleCancelRide}
-              onConfirm={() => { onRequestRide(); setStage('requesting'); }}
-            />
-          )}
-
-          {shownStage === 'requesting' && (
-            <ActiveRidePanel
-              stageState={rideStage ?? { rideId: null, stage: 'searching', notice: null }}
-              ride={currentRide}
-              onCancel={handleCancelRide}
-              onDone={finishRide}
-              onCall={canCallOn(currentRide) ? rideCall.call : undefined}
-              calling={rideCall.calling}
-              safety={currentRide ? <PassengerTripSafety ride={currentRide} position={currentLocation} /> : null}
-              busy={isLoading || rideSubmitting}
-            />
-          )}
+          <BookingStageContent
+            flow={flow}
+            shownStage={shownStage}
+            compact={compact}
+            onFocusChange={setSearchFocused}
+            currentLocation={currentLocation}
+            vehicleTypes={vehicleTypes}
+            estimates={estimates}
+            offer={offer}
+            tripSummary={tripSummary}
+            onConfirm={() => {
+              onRequestRide();
+              setStage('requesting');
+            }}
+            onCancelRide={handleCancelRide}
+            ride={currentRide}
+            rideStage={rideStage}
+            onDone={finishRide}
+            onCall={canCallOn(currentRide) ? rideCall.call : undefined}
+            calling={rideCall.calling}
+            busy={isLoading || rideSubmitting}
+          />
         </BookingSheet>
 
         {/* T-505: rate the driver over the trip summary once the ride completes. */}
@@ -683,8 +391,6 @@ const PassengerMapScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  map: { flex: 1 },
-  stack: { gap: space[2] },
 });
 
 export default PassengerMapScreen;

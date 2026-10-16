@@ -185,6 +185,25 @@ describe('create, poll and cancel share one ride', () => {
     expect(store.getState().activeRide.ride?.status).toBe('accepted');
   });
 
+  it('T-534 (PERF-11): a poll with the same ride keeps the old object; a change replaces it', async () => {
+    const store = makeStore();
+    store.dispatch(createActiveRide.fulfilled(makeRide({ id: 21 }), 'req', request));
+    mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21, status: 'accepted' })));
+    await store.dispatch(refreshActiveRide(21));
+    const first = store.getState().activeRide.ride;
+    expect(first?.status).toBe('accepted');
+
+    // The same answer again (a new object from the network): nothing for a screen to redraw.
+    await store.dispatch(refreshActiveRide(21));
+    expect(store.getState().activeRide.ride).toBe(first);
+
+    mock.onGet('/rides/21').reply(200, envelope(makeRide({ id: 21, status: 'arrived' })));
+    await store.dispatch(refreshActiveRide(21));
+    const second = store.getState().activeRide.ride;
+    expect(second).not.toBe(first);
+    expect(second?.status).toBe('arrived');
+  });
+
   it('a poll answer for another ride is ignored', async () => {
     const store = makeStore();
     store.dispatch(createActiveRide.fulfilled(makeRide({ id: 21 }), 'req', request));

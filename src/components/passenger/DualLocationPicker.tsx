@@ -5,6 +5,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
 import { Chip } from '../ui/Chip';
 import { IconButton } from '../ui/IconButton';
+import type { IconName } from '../ui/Icon';
 import { radius, space } from '../../theme';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 
@@ -13,10 +14,12 @@ type Coords = { latitude: number; longitude: number } | null;
 type Props = {
   pickup: Coords;
   destination: Coords;
+  /** Text the screen puts in the fields; typed text stays in the fields (T-534). */
   pickupQuery: string;
   destQuery: string;
-  onPickupQuery: (q: string) => void;
-  onDestQuery: (q: string) => void;
+  /** Bumped by the screen to put its text back in a field (e.g. after a reset). */
+  pickupRevision?: number;
+  destRevision?: number;
   /** `address` is the picked suggestion's text, sent with the ride (T-302). */
   onSelectPickup: (c: { latitude: number; longitude: number }, address: string) => void;
   onSelectDestination: (c: { latitude: number; longitude: number }, address: string) => void;
@@ -29,12 +32,15 @@ type Props = {
   onChooseOnMap?: (target: 'pickup' | 'destination') => void;
 };
 
+/** The pickup field shows the locate glyph while it reads "Current location". */
+const currentLocationGlyph = (text: string): IconName | null => (text === BOOKING_COPY.currentLocation ? 'locate' : null);
+
 /** Pickup and destination fields on the Raah line (DESIGN_SYSTEM 5.23), with swap. */
 const DualLocationPicker: React.FC<Props> = ({
   pickupQuery,
   destQuery,
-  onPickupQuery,
-  onDestQuery,
+  pickupRevision,
+  destRevision,
   onSelectPickup,
   onSelectDestination,
   onUseCurrentLocation,
@@ -58,10 +64,10 @@ const DualLocationPicker: React.FC<Props> = ({
           <LocationSearch
             mode="pickup"
             query={pickupQuery}
-            onChangeQuery={onPickupQuery}
+            queryRevision={pickupRevision}
             onSelect={(s) => onSelectPickup(s.coords, suggestionAddress(s))}
             readOnly={pickupQuery === BOOKING_COPY.resolvingAddress}
-            leadingIcon={pickupQuery === BOOKING_COPY.currentLocation ? 'locate' : null}
+            leadingIcon={currentLocationGlyph}
             onChooseOnMap={onChooseOnMap ? () => onChooseOnMap('pickup') : undefined}
             onFocusChange={onFocusChange}
           />
@@ -73,7 +79,7 @@ const DualLocationPicker: React.FC<Props> = ({
           <LocationSearch
             mode="destination"
             query={destQuery}
-            onChangeQuery={onDestQuery}
+            queryRevision={destRevision}
             onSelect={(s) => onSelectDestination(s.coords, suggestionAddress(s))}
             onFocusChange={onFocusChange}
             onChooseOnMap={onChooseOnMap ? () => onChooseOnMap('destination') : undefined}

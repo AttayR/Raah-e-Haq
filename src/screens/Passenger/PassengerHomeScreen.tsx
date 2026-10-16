@@ -57,7 +57,8 @@ export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
-  const { user } = useSelector((state: RootState) => state.apiAuth);
+  // T-534 (PERF-16): the user only, not every auth status flip.
+  const user = useSelector((state: RootState) => state.apiAuth.user);
   // T-543: a ride in progress (booked, or restored at launch) gets "Return to your ride".
   const inProgressRide = useSelector(selectInProgressRide);
   const liveRide = useMemo(

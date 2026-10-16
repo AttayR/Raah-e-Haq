@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { memo, useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MapView, { EdgePadding, LatLng, MapViewProps, PROVIDER_GOOGLE } from 'react-native-maps';
 import { BrandColors } from '../theme/colors';
@@ -17,7 +17,10 @@ export interface SafeMapViewRef {
   fitToCoordinates: (coordinates: LatLng[], options?: { edgePadding?: EdgePadding; animated?: boolean }) => void;
 }
 
-const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
+/** One padding object for every render (T-534, PERF-12): a new one is a native prop update. */
+const NO_MAP_PADDING: EdgePadding = { top: 0, right: 0, bottom: 0, left: 0 };
+
+const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
   ({ fallbackComponent, ...props }, ref) => {
     const { theme } = useAppTheme();
     const mapRef = useRef<MapView>(null);
@@ -77,7 +80,7 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           }
         }
       },
-    }));
+    }), [isMapReady, isMounted]);
 
     useEffect(() => {
       setIsMounted(true);
@@ -149,8 +152,6 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       );
     }
 
-    logger.debug('SafeMapView: Rendering MapView - isMounted:', isMounted, 'hasError:', hasError, 'isMapReady:', isMapReady);
-    
     return (
       <MapView
         ref={mapRef}
@@ -185,13 +186,19 @@ const SafeMapView = forwardRef<SafeMapViewRef, SafeMapViewProps>(
         scrollEnabled={true}
         zoomEnabled={true}
         zoomControlEnabled={false}
-        mapPadding={{ top: 0, right: 0, bottom: 0, left: 0 }}
+        mapPadding={NO_MAP_PADDING}
       />
     );
   }
 );
 
-SafeMapView.displayName = 'SafeMapView';
+SafeMapViewBase.displayName = 'SafeMapView';
+
+/**
+ * Memoised (T-534, PERF-12): a parent render with the same props (stable handlers, the same
+ * children elements) does not re-render the native map.
+ */
+const SafeMapView = memo(SafeMapViewBase);
 
 const styles = StyleSheet.create({
   fallbackContainer: {

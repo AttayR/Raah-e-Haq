@@ -96,9 +96,10 @@ type MarkerProps = PinProps & {
 
 /**
  * A custom ride pin on the map (§5.21; replaces Google's default teardrops). The view is
- * snapshotted once it has drawn (`useMarkerTracking`).
+ * snapshotted once it has drawn (`useMarkerTracking`). Memoised (T-534, PERF-12): a parent
+ * render with the same point sends nothing to the native marker.
  */
-export function RideMarker({ kind, index, label, coordinate, title, testID }: MarkerProps) {
+function RideMarkerBase({ kind, index, label, coordinate, title, testID }: MarkerProps) {
   const { theme } = useAppTheme();
   const [height, setHeight] = useState<number | null>(null);
   const tracks = useMarkerTracking(`${theme.mode}|${label ?? ''}|${index ?? ''}|${height ?? 0}`);
@@ -139,3 +140,5 @@ const styles = StyleSheet.create({
   },
   bubble: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: space[2], paddingVertical: space[1], maxWidth: p.labelMaxWidth },
 });
+
+export const RideMarker = React.memo(RideMarkerBase);

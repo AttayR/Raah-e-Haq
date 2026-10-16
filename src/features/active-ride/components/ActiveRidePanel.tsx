@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { NavigationContext } from '@react-navigation/native';
 import {
@@ -240,18 +240,25 @@ export const trackingRouteFor = (
  * the server heading (else the direction of travel), and following the route polyline on the
  * trip (`trackingRouteFor`). Reduced motion jumps.
  */
-export const AssignedDriverMarker: React.FC<{
+const AssignedDriverMarkerBase: React.FC<{
   location: DriverLocation | null;
   vehicleType?: string | null;
   /** The passenger stage: the route is only snapped to while `in_trip`. */
   stage?: PassengerRideStage | null;
   route?: ReadonlyArray<LatLng> | null;
 }> = ({ location, vehicleType, stage, route }) => {
-  if (!location) return null;
+  const latitude = location?.latitude;
+  const longitude = location?.longitude;
+  // T-534 (PERF-12): the same point keeps the same object, so the memoised marker skips.
+  const coordinate = useMemo(
+    () => (latitude === undefined || longitude === undefined ? null : { latitude, longitude }),
+    [latitude, longitude],
+  );
+  if (!location || !coordinate) return null;
   return (
     <VehicleMarker
       testID="assigned-driver-marker"
-      coordinate={{ latitude: location.latitude, longitude: location.longitude }}
+      coordinate={coordinate}
       heading={location.heading}
       vehicleType={vehicleType}
       route={trackingRouteFor(stage, route)}
@@ -260,6 +267,8 @@ export const AssignedDriverMarker: React.FC<{
     />
   );
 };
+
+export const AssignedDriverMarker = React.memo(AssignedDriverMarkerBase);
 
 const styles = StyleSheet.create({
   wrap: { gap: space[4] },

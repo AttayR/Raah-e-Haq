@@ -15,8 +15,8 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { user } = useSelector((s: RootState) => s.apiAuth);
-  const role = user?.role;
+  // T-534 (PERF-16): the role only; other auth changes do not re-render the role stack.
+  const role = useSelector((s: RootState) => s.apiAuth.user?.role);
 
   logger.debug('RootNavigation - Current role:', role);
   logger.debug('RootNavigation - Role type:', typeof role);

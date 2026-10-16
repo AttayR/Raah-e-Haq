@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice, type PayloadAction, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, current, type PayloadAction, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type RideRequest, type RideResource } from '../../services/rideService';
 import type { RideRatingFields } from '../rating/types';
 import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
@@ -6,6 +6,7 @@ import { currentSessionEpoch, isStaleSession, STALE_SESSION_MESSAGE } from '../.
 import { fetchActiveRide } from './api';
 import { isRideInProgress, isRideTerminal } from './status';
 import { invalidateStatsForRide } from '../stats/invalidate';
+import { jsonEqual } from '../../core/jsonEqual';
 
 /**
  * The passenger's active ride: the single source of truth for every screen (T-301, PAX-10).
@@ -216,7 +217,14 @@ const activeRideSlice = createSlice({
         state.isRefreshing = false;
         // Ignore an answer for a ride that is no longer the active one (cleared), and a late
         // answer that would bring a finished ride (e.g. just cancelled) back to life.
-        if (state.ride && state.ride.id === action.payload.id && !isRideTerminal(state.ride)) {
+        // T-534 (PERF-11): the same ride again keeps the old object, so the screens that read it
+        // do not re-render on every status poll.
+        if (
+          state.ride &&
+          state.ride.id === action.payload.id &&
+          !isRideTerminal(state.ride) &&
+          !jsonEqual(current(state.ride), action.payload)
+        ) {
           state.ride = action.payload;
         }
       })

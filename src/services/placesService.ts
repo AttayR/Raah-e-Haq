@@ -1,5 +1,8 @@
 import MAPS_CONFIG from '../config/mapsConfig';
 import { logger } from '../core/logging/logger';
+import { MIN_AUTOCOMPLETE_CHARS } from './placesSession';
+
+export { MIN_AUTOCOMPLETE_CHARS, newPlacesSessionToken } from './placesSession';
 
 export type AutocompleteItem = {
   place_id: string;
@@ -22,11 +25,18 @@ export const PLACES_BIAS_RADIUS_M = 50_000;
 
 export type PlacesBias = { latitude: number; longitude: number } | null | undefined;
 
+export type PlacesRequestOptions = {
+  /** Shared by the autocomplete requests and the details request of one search. */
+  sessionToken?: string;
+  /** Aborts the request when a newer query (or unmount) replaces it. */
+  signal?: AbortSignal;
+};
+
 const isFiniteBias = (near: PlacesBias): near is { latitude: number; longitude: number } =>
   !!near && Number.isFinite(near.latitude) && Number.isFinite(near.longitude) && !(near.latitude === 0 && near.longitude === 0);
 
 /** The Place Autocomplete URL: Pakistan only, biased around `near` when known. */
-export const autocompleteUrl = (query: string, near?: PlacesBias): string => {
+export const autocompleteUrl = (query: string, near?: PlacesBias, sessionToken?: string): string => {
   const params = [
     `input=${encodeURIComponent(query)}`,
     `components=country:${PLACES_COUNTRY}`,
@@ -35,21 +45,30 @@ export const autocompleteUrl = (query: string, near?: PlacesBias): string => {
   if (isFiniteBias(near)) {
     params.push(`location=${near.latitude},${near.longitude}`, `radius=${PLACES_BIAS_RADIUS_M}`);
   }
+  if (sessionToken) params.push(`sessiontoken=${encodeURIComponent(sessionToken)}`);
   params.push(`key=${MAPS_CONFIG.API_KEY}`);
   return `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.join('&')}`;
 };
 
-export async function fetchAutocomplete(query: string, near?: PlacesBias): Promise<AutocompleteItem[]> {
-  if (!query || query.length < 2) return [];
-  const res = await fetch(autocompleteUrl(query, near));
+export async function fetchAutocomplete(
+  query: string,
+  near?: PlacesBias,
+  options: PlacesRequestOptions = {},
+): Promise<AutocompleteItem[]> {
+  if (!query || query.trim().length < MIN_AUTOCOMPLETE_CHARS) return [];
+  const res = await fetch(autocompleteUrl(query, near, options.sessionToken), { signal: options.signal });
   const json = await res.json();
   if (json.status !== 'OK') return [];
   return json.predictions as AutocompleteItem[];
 }
 
-export async function fetchPlaceDetails(placeId: string): Promise<{ latitude: number; longitude: number; address?: string } | null> {
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=geometry/location,formatted_address&region=${PLACES_COUNTRY}&key=${MAPS_CONFIG.API_KEY}`;
-  const res = await fetch(url);
+export async function fetchPlaceDetails(
+  placeId: string,
+  options: PlacesRequestOptions = {},
+): Promise<{ latitude: number; longitude: number; address?: string } | null> {
+  const session = options.sessionToken ? `&sessiontoken=${encodeURIComponent(options.sessionToken)}` : '';
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=geometry/location,formatted_address&region=${PLACES_COUNTRY}${session}&key=${MAPS_CONFIG.API_KEY}`;
+  const res = await fetch(url, { signal: options.signal });
   const json = await res.json();
   if (json.status !== 'OK' || !json.result?.geometry?.location) return null;
   const { lat, lng } = json.result.geometry.location;

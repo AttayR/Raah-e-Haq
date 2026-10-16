@@ -1,0 +1,230 @@
+import { useCallback, useState } from 'react';
+import { Keyboard } from 'react-native';
+import type { MapPressEvent } from 'react-native-maps';
+import { reverseGeocode } from '../../services/placesService';
+import { displayAddress } from '../passenger-home/greeting';
+import type { BookingPlace } from './buildRideRequest';
+import { MAX_STOPS } from './components/BookingStages';
+import { BOOKING_COPY } from './copy';
+import { mapTapTarget, type MapPickTarget } from './mapTap';
+import type { BookingPrefillState } from './prefill';
+
+/** The booking steps; `requesting` is also the stage while a ride is shown. */
+export type BookingStage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
+
+const STAGE_ORDER: BookingStage[] = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
+
+type LatLng = { latitude: number; longitude: number };
+
+/**
+ * Text the screen puts in a search field. Every set bumps `revision`, so the field takes it even
+ * when the passenger typed something else meanwhile (T-534: typed text stays in the field).
+ */
+export type FieldText = { text: string; revision: number };
+
+export interface BookingDirections {
+  fetchRoute: (pickup: LatLng, destination: LatLng) => unknown;
+  fetchRouteWithWaypoints: (pickup: LatLng, waypoints: LatLng[], destination: LatLng) => unknown;
+  clearRoute: () => void;
+}
+
+const useFieldText = (initial: string) => {
+  const [field, setField] = useState<FieldText>({ text: initial, revision: 0 });
+  const set = useCallback((text: string) => setField((f) => ({ text, revision: f.revision + 1 })), []);
+  return [field, set] as const;
+};
+
+type Options = {
+  prefill: BookingPrefillState;
+  currentLocation: LatLng | null;
+  rideShown: boolean;
+  directions: BookingDirections;
+};
+
+/**
+ * The booking state of the passenger map (T-534 split of PassengerMapScreen): the chosen
+ * points, the step, the map-pick mode and what the search fields show, with the handlers that
+ * move between steps and draw the route.
+ */
+export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions }: Options) => {
+  const { fetchRoute, fetchRouteWithWaypoints, clearRoute } = directions;
+  const [pickup, setPickup] = useState<BookingPlace | null>(prefill.pickup);
+  const [stops, setStops] = useState<BookingPlace[]>([]);
+  const [destination, setDestination] = useState<BookingPlace | null>(prefill.destination);
+  // Map taps set a location only in this explicit mode (T-304, PAX-14).
+  const [mapPick, setMapPick] = useState<MapPickTarget | null>(null);
+  const [stage, setStage] = useState<BookingStage>(prefill.stage);
+  const [pickupField, setPickupQuery] = useFieldText(prefill.pickupQuery);
+  const [destField, setDestQuery] = useFieldText(prefill.destQuery);
+  const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
+
+  // The points and what their fields say swap together.
+  const swapPickupDrop = useCallback(() => {
+    if (pickup && destination) {
+      setPickup(destination);
+      setDestination(pickup);
+      setPickupQuery(destField.text);
+      setDestQuery(pickupField.text);
+      clearRoute();
+      fetchRoute(destination, pickup);
+    }
+  }, [pickup, destination, pickupField.text, destField.text, fetchRoute, clearRoute, setPickupQuery, setDestQuery]);
+
+  // PAX-14/PAX-24: only in the explicit choose-on-map mode, never on a marker press.
+  const onPressMap = useCallback((e: MapPressEvent) => {
+    const target = mapTapTarget({ mode: mapPick, action: e.nativeEvent.action, rideShown });
+    if (!target) return;
+    const point = { latitude: e.nativeEvent.coordinate.latitude, longitude: e.nativeEvent.coordinate.longitude };
+    setMapPick(null);
+    if (target === 'pickup') {
+      setPickup(point);
+      setPickupQuery(BOOKING_COPY.pinnedOnMap);
+      if (destination) {
+        fetchRouteWithWaypoints(point, stops, destination);
+        setStage('vehicle');
+      } else {
+        clearRoute();
+        setStage('destination');
+      }
+    } else if (target === 'destination') {
+      setDestination(point);
+      setDestQuery(BOOKING_COPY.pinnedOnMap);
+      if (pickup) {
+        fetchRouteWithWaypoints(pickup, stops, point);
+        setStage('vehicle');
+      } else {
+        setStage('pickup');
+      }
+    } else if (pickup && destination && stops.length < MAX_STOPS) {
+      const ns = [...stops, point];
+      setStops(ns);
+      fetchRouteWithWaypoints(pickup, ns, destination);
+    }
+  }, [mapPick, rideShown, pickup, stops, destination, fetchRouteWithWaypoints, clearRoute, setPickupQuery, setDestQuery]);
+
+  const resetSelection = useCallback(() => {
+    setPickup(null);
+    setStops([]);
+    setDestination(null);
+    setMapPick(null);
+    setStage('home');
+    setSelectedVehicle(undefined);
+    setPickupQuery('');
+    setDestQuery('');
+    setError(null);
+    clearRoute();
+  }, [clearRoute, setPickupQuery, setDestQuery]);
+
+  /** Back steps through the booking; a ride stays in Redux, so Back then leaves the screen. */
+  const stepBack = useCallback((): boolean => {
+    const currentIndex = STAGE_ORDER.indexOf(stage);
+    if (currentIndex > 0 && !rideShown) {
+      setStage(STAGE_ORDER[currentIndex - 1]);
+      setError(null);
+      return true;
+    }
+    return false;
+  }, [stage, rideShown]);
+
+  // Pickup at the passenger's position; its address is resolved and kept with the point.
+  const pickupAtCurrentLocation = useCallback(async () => {
+    if (!currentLocation) return null;
+    const cur = { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
+    setPickup(cur);
+    setPickupQuery(BOOKING_COPY.resolvingAddress);
+    const raw = await reverseGeocode(cur.latitude, cur.longitude).catch(() => null);
+    // Street address without a leading Plus Code; the field says "Current location" until edited.
+    const addr = raw ? displayAddress(raw) : null;
+    setPickupQuery(BOOKING_COPY.currentLocation);
+    // Only if the passenger has not picked another pickup meanwhile.
+    if (addr) setPickup((p) => (p && p.latitude === cur.latitude && p.longitude === cur.longitude ? { ...p, address: addr } : p));
+    return cur;
+  }, [currentLocation, setPickupQuery]);
+
+  // "Set location on map" from the search results: close the keyboard, enter the map pick mode.
+  const chooseOnMap = useCallback((target: MapPickTarget) => {
+    Keyboard.dismiss();
+    setMapPick(target);
+  }, []);
+
+  const updateStops = useCallback((ns: BookingPlace[]) => {
+    if (!pickup || !destination) return;
+    setStops(ns);
+    fetchRouteWithWaypoints(pickup, ns, destination);
+  }, [pickup, destination, fetchRouteWithWaypoints]);
+
+  /**
+   * A pickup picked in the search. With `routeIfReady` (the two-field start) and a destination,
+   * the route and the vehicle step; else the destination step.
+   */
+  const selectPickup = useCallback((c: LatLng, address: string, routeIfReady: boolean) => {
+    setPickup({ ...c, address });
+    // The field keeps the picked address (Back to this step shows it, not the old text).
+    setPickupQuery(address);
+    if (destination && routeIfReady) {
+      fetchRoute(c, destination);
+      setStage('vehicle');
+    } else {
+      setStage('destination');
+    }
+  }, [destination, fetchRoute, setPickupQuery]);
+
+  /** A destination picked in the search: the route from the pickup (else the passenger's position). */
+  const selectDestination = useCallback((c: LatLng, address: string, fallbackToGps: boolean) => {
+    const gps = currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : null;
+    if (!pickup && fallbackToGps && gps) {
+      setPickup(gps);
+      setPickupQuery(BOOKING_COPY.currentLocation);
+    }
+    const from = pickup ?? (fallbackToGps ? gps : null);
+    setDestination({ ...c, address });
+    setDestQuery(address);
+    if (from) {
+      fetchRoute(from, c);
+      setStage('vehicle');
+    } else {
+      setStage(fallbackToGps ? 'vehicle' : 'pickup');
+    }
+  }, [pickup, currentLocation, fetchRoute, setPickupQuery, setDestQuery]);
+
+  const pickCurrentLocation = useCallback(async () => {
+    const cur = await pickupAtCurrentLocation();
+    if (cur && destination) {
+      fetchRoute(cur, destination);
+      setStage('vehicle');
+    }
+  }, [pickupAtCurrentLocation, destination, fetchRoute]);
+
+  return {
+    pickup,
+    setPickup,
+    stops,
+    destination,
+    setDestination,
+    mapPick,
+    setMapPick,
+    stage,
+    setStage,
+    pickupField,
+    setPickupQuery,
+    destField,
+    setDestQuery,
+    selectedVehicle,
+    setSelectedVehicle,
+    error,
+    setError,
+    swapPickupDrop,
+    onPressMap,
+    resetSelection,
+    stepBack,
+    pickupAtCurrentLocation,
+    chooseOnMap,
+    updateStops,
+    selectPickup,
+    selectDestination,
+    pickCurrentLocation,
+  };
+};
+
+export type BookingFlow = ReturnType<typeof useBookingFlow>;

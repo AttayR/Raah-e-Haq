@@ -12,9 +12,10 @@ type Props = {
 /**
  * Pickup, stops, destination and the route on the booking map with the kit's custom pins and
  * cased route line (DESIGN_SYSTEM §5.21, UI-R5): pickup circle, numbered stops, drop-off square;
- * no Google teardrops.
+ * no Google teardrops. Memoised (T-534, PERF-12): a screen render that leaves the points and
+ * the route alone sends nothing to the native map.
  */
-export const BookingMapLayers: React.FC<Props> = ({ pickup, stops, destination, route }) => (
+const BookingMapLayersBase: React.FC<Props> = ({ pickup, stops, destination, route }) => (
   <>
     {route.length > 1 && <RouteLine coordinates={route} testID="booking-route" />}
     {pickup && <RideMarker kind="pickup" coordinate={pickup} testID="pickup-marker" />}
@@ -24,5 +25,7 @@ export const BookingMapLayers: React.FC<Props> = ({ pickup, stops, destination, 
     {destination && <RideMarker kind="dropoff" coordinate={destination} testID="destination-marker" />}
   </>
 );
+
+export const BookingMapLayers = React.memo(BookingMapLayersBase);
 
 export default BookingMapLayers;

@@ -13,7 +13,11 @@ import { logger } from '../../core/logging/logger';
  * that stores a user passes it through normalizeUser first.
  */
 export default function AuthFlow() {
-  const { isAuthenticated, user, isInitialized } = useSelector((state: RootState) => state.apiAuth);
+  // T-534 (PERF-16): only the fields routing reads, so an auth thunk's status flip (profile
+  // save, OTP) does not re-render the navigator root.
+  const isAuthenticated = useSelector((state: RootState) => state.apiAuth.isAuthenticated);
+  const user = useSelector((state: RootState) => state.apiAuth.user);
+  const isInitialized = useSelector((state: RootState) => state.apiAuth.isInitialized);
 
   const route = resolveAuthRoute({ isInitialized, isAuthenticated, user });
   logger.debug('AuthFlow - route:', { route, role: user?.role ?? null, status: user?.status ?? null });

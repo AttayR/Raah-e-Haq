@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Easing } from 'react-native';
 import { Polyline, type LatLng } from 'react-native-maps';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -29,8 +29,11 @@ type Props = {
  * Route line (DESIGN_SYSTEM §5.21): a 5pt `routeLine` over a 7pt `routeLineCasing`, round caps
  * and joins, the traveled part in `routeLineTraveled`. Each new coordinate list draws on in 600 ms
  * ease-out (reduced motion: drawn at once).
+ *
+ * T-534 (PERF-12): memoised, and the arrays handed to the native Polylines keep their identity
+ * between renders, so a parent render does not resend the whole route to the map.
  */
-export function RouteLine({ coordinates, traveled, drawOn = true, testID }: Props) {
+function RouteLineBase({ coordinates, traveled, drawOn = true, testID }: Props) {
   const { theme } = useAppTheme();
   const reduced = useReducedMotion();
   const animate = drawOn && !reduced;
@@ -63,8 +66,8 @@ export function RouteLine({ coordinates, traveled, drawOn = true, testID }: Prop
   }, [animate, coordinates]);
 
   const c = theme.colors;
-  const visible = coordinates.slice(0, count);
-  const done = traveled && traveled.length > 1 ? traveled.slice() : null;
+  const visible = useMemo(() => coordinates.slice(0, count), [coordinates, count]);
+  const done = useMemo(() => (traveled && traveled.length > 1 ? traveled.slice() : null), [traveled]);
   return (
     <>
       {done ? (
@@ -106,3 +109,5 @@ export function RouteLine({ coordinates, traveled, drawOn = true, testID }: Prop
     </>
   );
 }
+
+export const RouteLine = React.memo(RouteLineBase);
