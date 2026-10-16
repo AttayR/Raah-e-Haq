@@ -32,7 +32,8 @@ import { t } from '../../i18n';
 import { componentTokens, layout, motion, motionPatterns, reducedMotion, space, springs } from '../../theme';
 import { toEasing } from './easing';
 import { ModalRoot } from './ModalRoot';
-import { releaseTarget, resolveSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
+import { useModalTurn } from './modalQueue';
+import { fullHeight, releaseTarget, resolveSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
 
 export type { SheetSnap } from './sheetSnaps';
 
@@ -153,8 +154,21 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   const container = useSharedValue(0);
   const [current, setCurrent] = useState<SheetSnap | null>(null);
   const [mounted, setMounted] = useState(modal ? visible : true);
+  // [T-560] A modal sheet puts its native Modal up only on its turn (one root Modal at a time on
+  // iOS): `live` is true while its Modal is rendered. A map sheet is always live.
+  const turn = useModalTurn(modal && mounted);
+  const live = modal ? mounted && turn : mounted;
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  // [T-560] True from the start of a modal close until the sheet unmounts: a keyboard event or a
+  // content re-measure in that window must not re-place the sheet, which would cancel the close
+  // animation, skip the unmount and leave an invisible Modal over the screen.
+  const closing = useRef(false);
   const restoreSnap = useRef<SheetSnap | null>(null);
   const containerRef = useRef(0);
+  // Read when re-opening mid-close (a ref: a snap-height change must not re-run the visibility effect).
+  const resolvedRef = useRef(resolved);
+  resolvedRef.current = resolved;
 
   const animateTo = useCallback(
     (height: number, velocity = 0, done?: () => void, containerOnJS?: number) => {
@@ -197,6 +211,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   );
 
   const unmount = useCallback(() => {
+    closing.current = false;
     setMounted(false);
     currentRef.current = null;
     setCurrent(null);
@@ -212,17 +227,38 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       if (resolved[0]) snapTo(resolved[0].snap);
       return;
     }
+    if (!liveRef.current) {
+      // Still waiting for its turn: nothing on screen to animate out.
+      finishClose();
+      return;
+    }
+    closing.current = true;
     animateTo(0, 0, finishClose, containerRef.current);
   }, [animateTo, finishClose, modal, resolved, snapTo]);
 
   useImperativeHandle(ref, () => ({ snapTo, close }), [close, snapTo]);
+  const markClosing = useCallback(() => {
+    closing.current = true;
+  }, []);
 
   // Modal visibility from the parent.
   useEffect(() => {
     if (!modal) return;
     if (visible) {
+      if (closing.current) {
+        // Re-opened while sliding out: rise again to where it was.
+        closing.current = false;
+        const target = resolvedRef.current.find(r => r.snap === currentRef.current) ?? resolvedRef.current[0];
+        if (target) animateTo(target.height, 0, undefined, containerRef.current);
+      }
       setMounted(true);
-    } else if (mounted) {
+    } else if (mounted && !closing.current) {
+      if (!liveRef.current) {
+        // Never got its turn (another sheet was up): unmount without an animation.
+        unmount();
+        return;
+      }
+      closing.current = true;
       animateTo(0, 0, unmount, containerRef.current);
     }
   }, [animateTo, modal, mounted, unmount, visible]);
@@ -231,7 +267,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // re-placement when the snap heights change (rotation, content swap on a `content` snap).
   const initialSnapRef = useRef(initialSnap);
   useEffect(() => {
-    if (!mounted || containerHeight === 0 || resolved.length === 0) return;
+    if (!live || closing.current || containerHeight === 0 || resolved.length === 0) return;
     container.value = containerHeight;
     containerRef.current = containerHeight;
     const wanted = currentRef.current ?? initialSnapRef.current ?? resolved[0].snap;
@@ -242,7 +278,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     }
     animateTo(target.height, 0, undefined, containerHeight);
     settle(target);
-  }, [animateTo, container, containerHeight, mounted, resolved, settle, top]);
+  }, [animateTo, container, containerHeight, live, resolved, settle, top]);
 
   // [T-519] Visible body height (between the header and the footer / keyboard) for the
   // focused-field scroll below; a ref so the keyboard listeners need not re-subscribe.
@@ -272,19 +308,20 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     );
   }, [reduce]);
   useEffect(() => {
-    if (!mounted || !active) return undefined;
+    if (!live || !active) return undefined;
     const sub = Keyboard.addListener('keyboardDidShow', revealFocusedField);
     return () => sub.remove();
-  }, [active, mounted, revealFocusedField]);
+  }, [active, live, revealFocusedField]);
 
   // Keyboard: go `full` while a field inside is focused; the footer rides above the keyboard.
   useEffect(() => {
-    if (!mounted || !active) return undefined;
+    if (!live || !active) return undefined;
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const show = Keyboard.addListener(showEvent, event => {
       // Android resizes the window (adjustResize), so only iOS lifts the footer itself.
       setKeyboardHeight(Platform.OS === 'ios' ? event.endCoordinates.height : 0);
+      if (closing.current) return;
       if (expandOnKeyboard && current !== 'full') {
         restoreSnap.current = current;
         const highest = resolved[resolved.length - 1];
@@ -293,6 +330,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     });
     const hide = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
+      if (closing.current) return;
       if (restoreSnap.current) {
         snapTo(restoreSnap.current);
         restoreSnap.current = null;
@@ -302,7 +340,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       show.remove();
       hide.remove();
     };
-  }, [active, current, expandOnKeyboard, mounted, resolved, snapTo, snaps]);
+  }, [active, current, expandOnKeyboard, live, resolved, snapTo, snaps]);
 
   // Android back: a modal sheet closes; a raised map sheet collapses before navigation goes back.
   useEffect(() => {
@@ -346,6 +384,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         const height = container.value - top.value;
         const target = releaseTarget(height, event.velocityY, resolved, modal);
         if (target === 'close') {
+          runOnJS(markClosing)();
           animateTo(0, event.velocityY, finishClose);
           return;
         }
@@ -353,7 +392,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         animateTo(target.height, event.velocityY);
         runOnJS(settle)(target);
       });
-  }, [animateTo, container, finishClose, modal, resolved, settle, startTop, top]);
+  }, [animateTo, container, finishClose, markClosing, modal, resolved, settle, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: top.value }] }));
   const scrimStyle = useAnimatedStyle(() => {
@@ -372,7 +411,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   const highestSnap = resolved[resolved.length - 1]?.snap;
   const scrollable = current !== null && current === highestSnap;
-  const sheetHeight = resolved[resolved.length - 1]?.height ?? 0;
+  // [T-560] Until a snap resolves, the (still off-screen) sheet takes the full height so its
+  // header and body lay out at their natural size and can be measured. At height 0 they measured
+  // 0, so a `content` sheet without body content (header + footer only) never resolved a snap
+  // and never appeared, while its Modal (and the dialog host inside it) stayed mounted.
+  const sheetHeight =
+    resolved[resolved.length - 1]?.height ?? (containerHeight > 0 ? fullHeight({ containerHeight, topInset: insets.top }) : 0);
 
   const onContainerLayout = (e: LayoutChangeEvent) => setContainerHeight(Math.round(e.nativeEvent.layout.height));
 
@@ -475,7 +519,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     );
   }
 
-  if (!mounted) {
+  if (!live) {
     return null;
   }
   return (

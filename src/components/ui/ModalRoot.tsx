@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { StatusBarStyle } from '../../theme';
 import { DialogHost } from './Dialog';
+import { InsideModalContext } from './modalQueue';
 import { ToastHost } from './Toast';
 
 type Props = React.PropsWithChildren<{
@@ -27,11 +28,14 @@ export function ModalRoot({ statusBarStyle, withDialogHost = true, children }: P
     <GestureHandlerRootView style={styles.root}>
       <StatusBar barStyle={statusBarStyle ?? theme.statusBarStyle} translucent backgroundColor="transparent" />
       <SafeAreaProvider>
-        {children}
-        {/* Dialogs asked for while this Modal is up render as an overlay inside it (iOS cannot stack a second Modal). */}
-        {withDialogHost ? <DialogHost inline /> : null}
-        {/* Toasts too: the root host sits under this Modal's window and would never be seen. */}
-        <ToastHost inline />
+        {/* [T-560] Sheets inside this Modal are presented by it, so they never wait for a turn. */}
+        <InsideModalContext.Provider value>
+          {children}
+          {/* Dialogs asked for while this Modal is up render as an overlay inside it (iOS cannot stack a second Modal). */}
+          {withDialogHost ? <DialogHost inline /> : null}
+          {/* Toasts too: the root host sits under this Modal's window and would never be seen. */}
+          <ToastHost inline />
+        </InsideModalContext.Provider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
