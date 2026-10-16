@@ -12,16 +12,21 @@ import { configureStore } from '@reduxjs/toolkit';
 import Geolocation from '@react-native-community/geolocation';
 import { rootReducer } from '../../src/store/rootReducer';
 import { driverLocationApi } from '../../src/features/driver-location/api';
+import {
+  DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
+  DRIVER_LOCATION_WATCH_OPTIONS,
+} from '../../src/features/driver-location/config';
 import { driverStatusApi } from '../../src/features/driver-status/api';
 import { loadDriverStatus } from '../../src/features/driver-status/slice';
 import locationTrackingService from '../../src/services/locationTrackingService';
 import { statsApi } from '../../src/features/stats/api';
 import DriverDriveScreen from '../../src/screens/Driver/DriverDriveScreen';
 
+let mockFocused = true;
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => ({ navigate: jest.fn() }),
-  useIsFocused: () => true,
+  useIsFocused: () => mockFocused,
 }));
 
 const geo = Geolocation as jest.Mocked<typeof Geolocation>;
@@ -36,6 +41,7 @@ const flush = async () => {
 };
 
 beforeEach(() => {
+  mockFocused = true;
   geo.watchPosition.mockReset();
   geo.watchPosition.mockImplementation(() => 1);
   geo.clearWatch.mockClear();
@@ -99,4 +105,61 @@ it('while offline the Drive map holds the shared watcher and releases it on unmo
   screen.unmount();
   expect(geo.clearWatch).toHaveBeenCalledTimes(1);
   expect(geo.getCurrentPosition).not.toHaveBeenCalled();
+});
+
+it('T-537: an offline driver holds a low-power watch only while Drive is focused', async () => {
+  const store = configureStore({ reducer: rootReducer });
+  // A new element each time, so a rerender reads the mocked focus again.
+  const ui = () => (
+    <Provider store={store}>
+      <DriverDriveScreen />
+    </Provider>
+  );
+  const screen = render(ui());
+  await flush();
+  expect(geo.watchPosition).toHaveBeenCalledTimes(1);
+  expect(geo.watchPosition).toHaveBeenLastCalledWith(
+    expect.any(Function),
+    expect.any(Function),
+    DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
+  );
+
+  // The driver switches to Earnings or Inbox: Drive stays mounted but lets go of the GPS.
+  mockFocused = false;
+  screen.rerender(ui());
+  await flush();
+  expect(geo.clearWatch).toHaveBeenCalledTimes(1);
+
+  // Back on Drive: the watch starts again.
+  mockFocused = true;
+  screen.rerender(ui());
+  await flush();
+  expect(geo.watchPosition).toHaveBeenCalledTimes(2);
+  screen.unmount();
+});
+
+it('T-537: while tracking, leaving Drive keeps the high-accuracy watch of the tracker', async () => {
+  const store = configureStore({ reducer: rootReducer });
+  await store.dispatch(loadDriverStatus());
+  await locationTrackingService.startTracking();
+  // A new element each time, so a rerender reads the mocked focus again.
+  const ui = () => (
+    <Provider store={store}>
+      <DriverDriveScreen />
+    </Provider>
+  );
+  const screen = render(ui());
+  await flush();
+  mockFocused = false;
+  screen.rerender(ui());
+  await flush();
+
+  expect(geo.watchPosition).toHaveBeenCalledTimes(1);
+  expect(geo.watchPosition).toHaveBeenLastCalledWith(
+    expect.any(Function),
+    expect.any(Function),
+    DRIVER_LOCATION_WATCH_OPTIONS,
+  );
+  expect(geo.clearWatch).not.toHaveBeenCalled();
+  screen.unmount();
 });

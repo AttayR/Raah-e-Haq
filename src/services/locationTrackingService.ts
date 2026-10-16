@@ -6,6 +6,7 @@ import { logger } from '../core/logging/logger';
 import { DRIVER_LOCATION_CODES, driverLocationApi } from '../features/driver-location/api';
 import {
   DRIVER_LOCATION_CONFIG,
+  DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
   DRIVER_LOCATION_RIDE_CONFIG,
   DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
   DRIVER_LOCATION_WATCH_OPTIONS,
@@ -22,6 +23,15 @@ import {
 } from '../features/driver-location/throttle';
 
 export type { LocationFix } from '../features/driver-location/throttle';
+
+/** Which options the device watcher runs with (T-537). */
+type WatchMode = 'ride' | 'tracking' | 'lowPower';
+
+const WATCH_OPTIONS = {
+  ride: DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
+  tracking: DRIVER_LOCATION_WATCH_OPTIONS,
+  lowPower: DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
+} as const;
 
 export interface TrackingOptions {
   /** Called after the server answered 409 DRIVER_OFFLINE (tracking has already stopped). */
@@ -68,7 +78,8 @@ const requestForegroundPermission = async (): Promise<boolean> => {
  *   runs in the background: the callers stop when the app leaves the foreground.
  * - Posts POST /tracking/update-location at most every `minPostIntervalMs`, and skips a post
  *   when the driver moved less than `minMoveMeters` and the last post is under `heartbeatMs` old.
- *   A fix older than `maxFixAgeMs` is never posted, so a frozen position is not sent as fresh.
+ *   A fix older than `maxFixAgeMs` is never posted, so a frozen position is not sent as fresh,
+ *   and neither is a fix from the low-power watch (T-537).
  * - Self-heal (T-410): while tracking, no new fix for `watchRestartAfterMs` restarts the watcher
  *   once; the next restart needs another full silent window.
  * - 409 DRIVER_OFFLINE: stops, then calls `onDriverOffline` (the caller reloads the status).
@@ -78,6 +89,9 @@ const requestForegroundPermission = async (): Promise<boolean> => {
  * - Ride cadence (T-517, `setRideCadence`): while the driver has a ride in progress the tick is
  *   DRIVER_LOCATION_RIDE_CONFIG (every 4 s, 5 m) and the watcher reports more often; the timer
  *   and the watcher are restarted only when the cadence actually changes.
+ * - Watch accuracy (T-537): high accuracy while tracking (online, or the ride options on a
+ *   ride); while only screens hold it (an offline driver's map) the low-power options. The
+ *   watcher restarts only when that mode changes.
  */
 class LocationTrackingService {
   private active = false;
@@ -92,6 +106,8 @@ class LocationTrackingService {
 
   // The shared device watcher.
   private watchId: number | null = null;
+  /** The options the running watcher was started with. */
+  private watchMode: WatchMode | null = null;
   private watchGeneration = 0;
   /** Tracking holds the watcher (set once permission was granted). */
   private trackingHoldsWatch = false;
@@ -103,6 +119,11 @@ class LocationTrackingService {
   private lastSignAt = 0;
   /** When the device last delivered a fix (epoch ms); 0 before the first one. */
   private lastFixAt = 0;
+  /**
+   * T-537: the latest fix came from the low-power watch (about 100 m on iOS). Such a fix is
+   * shown on the map but never posted: going online waits for the first high-accuracy fix.
+   */
+  private lastFixLowPower = false;
   /** T-517: a ride is in progress, so post (and watch) at the ride cadence. */
   private rideCadence = false;
 
@@ -152,10 +173,7 @@ class LocationTrackingService {
     if (this.active && this.timer !== null) {
       this.startTimer(this.generation);
     }
-    if (this.watchId !== null) {
-      this.stopWatch();
-      this.startWatch();
-    }
+    this.syncWatch();
   }
 
   getRideCadence(): boolean {
@@ -218,6 +236,7 @@ class LocationTrackingService {
     this.stopTracking();
     this.lastLocation = null;
     this.lastFixAt = 0;
+    this.lastFixLowPower = false;
     this.rideCadence = false;
     this.listeners.clear();
   }
@@ -286,28 +305,42 @@ class LocationTrackingService {
     }, this.config().minPostIntervalMs);
   }
 
-  /** Runs the device watcher exactly while someone holds it. */
+  /** The options the watcher should run with now (T-537). */
+  private wantedWatchMode(): WatchMode {
+    if (this.rideCadence) return 'ride';
+    return this.trackingHoldsWatch ? 'tracking' : 'lowPower';
+  }
+
+  /**
+   * Runs the device watcher exactly while someone holds it, with the options of the current
+   * mode; a running watcher restarts only when the mode changed.
+   */
   private syncWatch(): void {
     const wanted = this.trackingHoldsWatch || this.watchRefs > 0;
-    if (wanted && this.watchId === null) {
-      this.startWatch();
-    } else if (!wanted && this.watchId !== null) {
-      this.stopWatch();
+    if (!wanted) {
+      if (this.watchId !== null) this.stopWatch();
+      return;
     }
+    if (this.watchId !== null && this.watchMode === this.wantedWatchMode()) return;
+    if (this.watchId !== null) this.stopWatch();
+    this.startWatch();
   }
 
   private startWatch(): void {
     const watchGeneration = ++this.watchGeneration;
+    const mode = this.wantedWatchMode();
     this.lastSignAt = Date.now();
+    this.watchMode = mode;
     this.watchId = Geolocation.watchPosition(
       (position) => this.handlePosition(watchGeneration, position),
       (error) => this.handleWatchError(watchGeneration, error),
-      this.rideCadence ? DRIVER_LOCATION_RIDE_WATCH_OPTIONS : DRIVER_LOCATION_WATCH_OPTIONS,
+      WATCH_OPTIONS[mode],
     );
   }
 
   private stopWatch(): void {
     this.watchGeneration += 1;
+    this.watchMode = null;
     if (this.watchId !== null) {
       Geolocation.clearWatch(this.watchId);
       this.watchId = null;
@@ -328,7 +361,11 @@ class LocationTrackingService {
   }
 
   private isFixFresh(now: number): boolean {
-    return this.lastFixAt > 0 && now - this.lastFixAt < DRIVER_LOCATION_CONFIG.maxFixAgeMs;
+    return (
+      this.lastFixAt > 0 &&
+      !this.lastFixLowPower &&
+      now - this.lastFixAt < DRIVER_LOCATION_CONFIG.maxFixAgeMs
+    );
   }
 
   private handlePosition(watchGeneration: number, position: DevicePosition): void {
@@ -338,6 +375,7 @@ class LocationTrackingService {
     if (!fix) return;
     this.lastLocation = fix;
     this.lastFixAt = now;
+    this.lastFixLowPower = this.watchMode === 'lowPower';
     this.lastSignAt = now;
     this.listeners.forEach((listener) => {
       try {

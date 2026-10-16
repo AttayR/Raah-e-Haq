@@ -65,7 +65,7 @@ const DriverRideScreen: React.FC = () => {
   const appActive = useAppIsActive();
   useDriverRideStatusPolling(isFocused && appActive);
   // T-517: the driver's own vehicle from the shared watcher (the tracker posts at ride cadence).
-  const position = useDriverDevicePosition();
+  const position = useDriverDevicePosition(isFocused);
 
   const target = navigationTarget(ride);
   const pickup = ride ? toLatLng(ride.pickup_latitude, ride.pickup_longitude) : null;

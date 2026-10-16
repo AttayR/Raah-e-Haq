@@ -12,14 +12,15 @@ export const ALLOWED_UPLOAD_TYPES: readonly string[] = ['image/jpeg', 'image/jpg
 
 /**
  * Picker options shared by registration and re-upload: the picker scales the photo down to
- * 2000 px and re-encodes it at 0.8, which keeps a phone photo well under 5 MB.
+ * 1600 px and re-encodes it at 0.7 (T-537, PERF-22: about half the bytes of 2000 px / 0.8 on
+ * mobile data), still sharp enough for an admin to read a CNIC or licence, and well under 5 MB.
  */
 export const DOCUMENT_PICKER_OPTIONS = {
   mediaType: 'photo',
   selectionLimit: 1,
-  quality: 0.8,
-  maxWidth: 2000,
-  maxHeight: 2000,
+  quality: 0.7,
+  maxWidth: 1600,
+  maxHeight: 1600,
   includeBase64: false,
 } as const;
 

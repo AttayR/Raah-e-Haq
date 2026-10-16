@@ -9,7 +9,12 @@
  */
 import Geolocation from '@react-native-community/geolocation';
 import { driverLocationApi } from '../../../src/features/driver-location/api';
-import { DRIVER_LOCATION_CONFIG } from '../../../src/features/driver-location/config';
+import {
+  DRIVER_LOCATION_CONFIG,
+  DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
+  DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
+  DRIVER_LOCATION_WATCH_OPTIONS,
+} from '../../../src/features/driver-location/config';
 import locationTrackingService from '../../../src/services/locationTrackingService';
 
 const { minPostIntervalMs, heartbeatMs, watchRestartAfterMs, maxFixAgeMs, arrivalPingMaxAgeMs } =
@@ -170,16 +175,21 @@ describe('one shared watcher (T-410)', () => {
     await settle();
     expect(geo.watchPosition).toHaveBeenCalledTimes(1);
 
+    // T-537: tracking takes over the running watch with its options (one native watch at a time).
     await locationTrackingService.startTracking();
-    expect(geo.watchPosition).toHaveBeenCalledTimes(1);
-
-    locationTrackingService.stopTracking();
-    expect(geo.clearWatch).not.toHaveBeenCalled();
-
-    release();
-    release();
     expect(geo.clearWatch).toHaveBeenCalledTimes(1);
-    expect(geo.clearWatch).toHaveBeenCalledWith(1);
+    expect(geo.clearWatch).toHaveBeenLastCalledWith(1);
+    expect(geo.watchPosition).toHaveBeenCalledTimes(2);
+
+    // Tracking stops while the screen still holds it: the watch goes on, in low power.
+    locationTrackingService.stopTracking();
+    expect(geo.clearWatch).toHaveBeenCalledTimes(2);
+    expect(geo.watchPosition).toHaveBeenCalledTimes(3);
+
+    release();
+    release();
+    expect(geo.clearWatch).toHaveBeenCalledTimes(3);
+    expect(geo.clearWatch).toHaveBeenLastCalledWith(3);
   });
 
   it('releasing a screen hold never stops the watch while tracking runs', async () => {
@@ -236,5 +246,68 @@ describe('one shared watcher (T-410)', () => {
 
     expect(geo.getCurrentPosition).not.toHaveBeenCalled();
     expect(geo.stopObserving).not.toHaveBeenCalled();
+  });
+});
+
+describe('watch accuracy by mode (T-537, PERF-20)', () => {
+  const lastOptions = () => geo.watchPosition.mock.calls[geo.watchPosition.mock.calls.length - 1][2];
+
+  it('a screen hold alone (offline driver) runs the low-power watch', async () => {
+    locationTrackingService.acquireLocationWatch();
+    await settle();
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS);
+    expect(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS.enableHighAccuracy).toBe(false);
+  });
+
+  it('online tracking runs the high-accuracy watch; a ride its own; back to low power when tracking stops', async () => {
+    const release = locationTrackingService.acquireLocationWatch();
+    await settle();
+    await locationTrackingService.startTracking();
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_WATCH_OPTIONS);
+    expect(DRIVER_LOCATION_WATCH_OPTIONS.enableHighAccuracy).toBe(true);
+
+    locationTrackingService.setRideCadence(true);
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_RIDE_WATCH_OPTIONS);
+    locationTrackingService.setRideCadence(false);
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_WATCH_OPTIONS);
+
+    const watches = geo.watchPosition.mock.calls.length;
+    locationTrackingService.stopTracking();
+    expect(geo.watchPosition).toHaveBeenCalledTimes(watches + 1);
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS);
+    release();
+    expect(geo.clearWatch).toHaveBeenCalledTimes(watches + 1);
+  });
+
+  it('going online never posts the last low-power fix; the first post is a high-accuracy fix', async () => {
+    const listener = jest.fn();
+    locationTrackingService.addLocationListener(listener);
+    locationTrackingService.acquireLocationWatch();
+    await settle();
+    emit(0); // low-power fix: shown on the map
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await locationTrackingService.startTracking();
+    await advance(heartbeatMs);
+    await locationTrackingService.pingIfStale(arrivalPingMaxAgeMs);
+    expect(post).not.toHaveBeenCalled();
+
+    emit(40); // first fix of the high-accuracy watch
+    await settle();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toMatchObject({ latitude: expect.closeTo(BASE.latitude + 40 / 111_195, 6) });
+
+    // The heartbeat goes on as before.
+    await advance(heartbeatMs);
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
+  it('a second screen hold does not restart a watch that already has the right options', async () => {
+    await locationTrackingService.startTracking();
+    locationTrackingService.acquireLocationWatch();
+    locationTrackingService.acquireLocationWatch();
+    await settle();
+    expect(geo.watchPosition).toHaveBeenCalledTimes(1);
+    expect(geo.clearWatch).not.toHaveBeenCalled();
   });
 });

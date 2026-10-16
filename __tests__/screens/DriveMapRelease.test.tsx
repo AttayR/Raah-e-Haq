@@ -11,6 +11,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import Geolocation from '@react-native-community/geolocation';
 import { rootReducer } from '../../src/store/rootReducer';
+import { driverLocationApi } from '../../src/features/driver-location/api';
 import { driverStatusApi } from '../../src/features/driver-status/api';
 import locationTrackingService from '../../src/services/locationTrackingService';
 import { statsApi } from '../../src/features/stats/api';
@@ -77,6 +78,7 @@ beforeEach(() => {
   geo.watchPosition.mockImplementation(() => 1);
   geo.clearWatch.mockClear();
   jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
+  jest.spyOn(driverLocationApi, 'post').mockResolvedValue(undefined);
   jest.spyOn(statsApi, 'getMyStats').mockRejectedValue(new Error('not in this test'));
   jest.spyOn(driverStatusApi, 'get').mockResolvedValue({ status: 'offline', activeRideId: null, changedAt: null });
 });
@@ -93,6 +95,9 @@ it('unmounts the Drive map under DriverRide and mounts it again on return; the G
       <DriverDriveScreen />
     </Provider>
   );
+  // DriverRide is on top only during a ride, when the tracker holds the watcher (T-537: the
+  // Drive screen's own hold ends while it is not focused).
+  await locationTrackingService.startTracking();
   const screen = render(ui);
   await flush();
   const onPosition = geo.watchPosition.mock.calls[0][0] as unknown as PositionCallback;

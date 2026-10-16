@@ -8,7 +8,12 @@ import {
   toLocationFix,
   type LocationFix,
 } from '../../../src/features/driver-location/throttle';
-import { DRIVER_LOCATION_CONFIG } from '../../../src/features/driver-location/config';
+import {
+  DRIVER_LOCATION_CONFIG,
+  DRIVER_LOCATION_RIDE_CONFIG,
+  DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
+  DRIVER_LOCATION_WATCH_OPTIONS,
+} from '../../../src/features/driver-location/config';
 
 const { minPostIntervalMs, heartbeatMs, minMoveMeters } = DRIVER_LOCATION_CONFIG;
 
@@ -89,5 +94,19 @@ describe('toLocationFix', () => {
   it('drops a position without a usable coordinate', () => {
     expect(toLocationFix({ coords: { latitude: Number.NaN, longitude: 2 } }, 0)).toBeNull();
     expect(toLocationFix({ coords: { latitude: 91, longitude: 2 } }, 0)).toBeNull();
+  });
+});
+
+describe('cadences (T-537, PERF-21)', () => {
+  it('online without a ride posts at most every 10 s on a 25 m move, heartbeat 30 s', () => {
+    expect(DRIVER_LOCATION_CONFIG).toMatchObject({ minPostIntervalMs: 10_000, minMoveMeters: 25, heartbeatMs: 30_000 });
+    expect(DRIVER_LOCATION_WATCH_OPTIONS).toMatchObject({ distanceFilter: 25, interval: 10_000 });
+    // Well inside the server's 5-minute "current position" window (rides.pending, BE-20).
+    expect(DRIVER_LOCATION_CONFIG.heartbeatMs).toBeLessThan(5 * 60_000);
+  });
+
+  it('the ride cadence is unchanged (every 4 s on a 5 m move)', () => {
+    expect(DRIVER_LOCATION_RIDE_CONFIG).toMatchObject({ minPostIntervalMs: 4_000, minMoveMeters: 5, heartbeatMs: 30_000 });
+    expect(DRIVER_LOCATION_RIDE_WATCH_OPTIONS).toMatchObject({ enableHighAccuracy: true, distanceFilter: 5, interval: 2_000 });
   });
 });

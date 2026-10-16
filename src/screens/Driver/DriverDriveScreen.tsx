@@ -72,7 +72,8 @@ export default function DriverDriveScreen() {
   const { isOnline, isOnRide, isBusy, isChecking, disabled, toggle } = useDriverStatusToggle();
   const currentRide = useSelector(selectDriverActiveRide);
   // The tracker's one shared watcher (T-410): asking the device here ended its watch on iOS.
-  const position = useDriverDevicePosition();
+  // T-537: held only while Drive is focused; tracking holds it itself while online.
+  const position = useDriverDevicePosition(isFocused);
   const lat = position?.latitude;
   const lng = position?.longitude;
   const location = useMemo(

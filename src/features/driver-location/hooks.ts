@@ -93,17 +93,22 @@ export const useDriverLastPosition = (): DriverPosition | null => {
 
 /**
  * useDriverDeviceLocation with the direction of travel (T-517): holds the shared watcher while
- * mounted and in the foreground, and returns the latest DriverPosition.
+ * mounted, `focused` and in the foreground, and returns the latest DriverPosition.
+ *
+ * T-537 (PERF-20): pass the screen's focus, so an offline driver reading Earnings or Inbox (Drive
+ * stays mounted as the first tab) holds no watcher. While tracking runs (online or on a ride) the
+ * tracker holds the watcher itself, so positions keep coming whatever the screen's focus.
  */
-export const useDriverDevicePosition = (): DriverPosition | null => {
+export const useDriverDevicePosition = (focused = true): DriverPosition | null => {
   const isActive = useAppIsActive();
   const position = useDriverLastPosition();
+  const hold = isActive && focused;
   useEffect(() => {
-    if (!isActive) {
+    if (!hold) {
       return undefined;
     }
     return locationTrackingService.acquireLocationWatch();
-  }, [isActive]);
+  }, [hold]);
   return position;
 };
 

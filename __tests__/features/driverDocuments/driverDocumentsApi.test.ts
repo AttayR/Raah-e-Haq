@@ -8,7 +8,7 @@ import { apiClient, __resetUnauthorizedStateForTests } from '../../../src/servic
 import { driverDocumentsApi, toDriverDocuments } from '../../../src/features/driverDocuments/api';
 import { DRIVER_DOCUMENTS_COPY } from '../../../src/features/driverDocuments/copy';
 import { uploadErrorMessage } from '../../../src/features/driverDocuments/hooks';
-import { MAX_UPLOAD_BYTES, uploadProblem } from '../../../src/features/driverDocuments/upload';
+import { DOCUMENT_PICKER_OPTIONS, MAX_UPLOAD_BYTES, uploadProblem } from '../../../src/features/driverDocuments/upload';
 
 const raw = (type: string, status: string, extra: Record<string, unknown> = {}) => ({
   id: 1,
@@ -100,6 +100,12 @@ describe('uploadProblem (server rule: jpeg/png/jpg/gif, at most 5 MB)', () => {
     expect(uploadProblem({ type: 'image/heic', fileSize: 1000 })).toBe(DRIVER_DOCUMENTS_COPY.wrongType);
     expect(uploadProblem({ type: 'image/jpeg', fileSize: MAX_UPLOAD_BYTES + 1 })).toBe(DRIVER_DOCUMENTS_COPY.tooLarge);
     expect(uploadProblem({})).toBe(DRIVER_DOCUMENTS_COPY.wrongType);
+  });
+});
+
+describe('DOCUMENT_PICKER_OPTIONS (T-537, PERF-22)', () => {
+  it('scales document photos to 1600 px at quality 0.7', () => {
+    expect(DOCUMENT_PICKER_OPTIONS).toMatchObject({ maxWidth: 1600, maxHeight: 1600, quality: 0.7 });
   });
 });
 
