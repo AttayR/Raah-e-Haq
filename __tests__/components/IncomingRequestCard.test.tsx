@@ -28,6 +28,63 @@ describe('IncomingRequestCard', () => {
     getByText('Cash');
   });
 
+  it('T-552: lists the stops, in order, between the pickup and the drop-off', () => {
+    const { getAllByText, getByTestId, getByText, queryByTestId } = render(
+      <IncomingRequestCard
+        request={makePendingRequest({
+          stops: [
+            { id: 11, address: 'First Fake Stop' },
+            { id: 12, address: 'Second Fake Stop' },
+          ],
+        })}
+        accepting={false}
+        disabled={false}
+        onAccept={noop}
+        onReject={noop}
+      />,
+    );
+    expect(getByTestId('incoming-request-stop-1').props.children).toBe('First Fake Stop');
+    expect(getByTestId('incoming-request-stop-2').props.children).toBe('Second Fake Stop');
+    getByText('Stop 1');
+    getByText('Stop 2');
+    expect(queryByTestId('incoming-request-stop-3')).toBeNull();
+    // Rendered order: pickup, stop 1, stop 2, drop-off.
+    expect(getAllByText(/^(Fake|First|Second)/).map((node) => node.props.children)).toEqual([
+      'Fake Pickup Street',
+      'First Fake Stop',
+      'Second Fake Stop',
+      'Fake Dropoff Road',
+    ]);
+  });
+
+  it('T-552: 5 long stops stay compact: two stops, "+3 more stops", header, fare and Accept kept, height bounded', () => {
+    const long = (n: number) => ({ id: 30 + n, address: `Fake stop ${n}, a very long address that would wrap over several lines on a phone` });
+    const { getByTestId, queryByTestId, getByText } = render(
+      <IncomingRequestCard
+        request={makePendingRequest({ estimatedFare: 350, stops: [1, 2, 3, 4, 5].map(long) })}
+        accepting={false}
+        disabled={false}
+        onAccept={noop}
+        onReject={noop}
+        maxHeight={420}
+      />,
+    );
+    getByTestId('incoming-request-reject');
+    getByText('New Ride Request');
+    getByTestId('incoming-request-fare');
+    getByTestId('incoming-request-accept');
+    expect(getByTestId('incoming-request-stop-1').props.numberOfLines).toBe(1);
+    expect(getByTestId('incoming-request-stop-2').props.numberOfLines).toBe(1);
+    expect(queryByTestId('incoming-request-stop-3')).toBeNull();
+    expect(getByTestId('incoming-request-more-stops').props.children).toBe('+3 more stops');
+    getByText('Stops 3–5');
+    // Pickup and drop-off keep two lines.
+    expect(getByTestId('incoming-request-pickup').props.numberOfLines).toBe(2);
+    // The card is bounded and only the addresses scroll.
+    expect(getByTestId('incoming-request-card').props.style).toEqual(expect.arrayContaining([{ maxHeight: 420 }]));
+    expect(getByTestId('incoming-request-addresses')).toBeTruthy();
+  });
+
   it("shows the passenger's photo from the request card (T-504)", () => {
     const { UNSAFE_getAllByType } = render(
       <IncomingRequestCard

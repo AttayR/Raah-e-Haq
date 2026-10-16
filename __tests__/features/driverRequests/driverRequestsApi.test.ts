@@ -6,6 +6,7 @@ import { apiClient } from '../../../src/services/api';
 import {
   driverRequestsApi,
   toPendingRideRequest,
+  toPendingRideStops,
   toPendingRidesPage,
 } from '../../../src/features/driver-requests/api';
 import { pendingRide } from '../../../test-utils/driverRequestFixtures';
@@ -30,7 +31,29 @@ describe('toPendingRideRequest', () => {
       expiresAt: Date.parse('2026-10-09T10:00:00.000Z') + 10 * 60_000,
       isOffer: false,
       serverFare: null,
+      stops: [],
     });
+  });
+
+  it('T-552: lists the active stops in route order (QA 2026-10-16: the card showed none)', () => {
+    const request = toPendingRideRequest(
+      pendingRide({
+        stops: [
+          { id: 12, address: 'Second Fake Stop', latitude: '31.50', longitude: '74.35', stop_order: 2, status: 'active' },
+          { id: 11, address: 'First Fake Stop', latitude: '31.49', longitude: '74.35', stop_order: 1, status: 'active' },
+          { id: 13, address: 'Done Fake Stop', stop_order: 3, status: 'completed' },
+          { id: 14, address: '  ', stop_order: 4, status: 'active' },
+          'junk',
+        ],
+      }),
+      10,
+    );
+    expect(request?.stops).toEqual([
+      { id: 11, address: 'First Fake Stop' },
+      { id: 12, address: 'Second Fake Stop' },
+    ]);
+    expect(toPendingRideStops(undefined)).toEqual([]);
+    expect(toPendingRideStops([{ address: 'No Id Stop' }])).toEqual([{ id: null, address: 'No Id Stop' }]);
   });
 
   it('T-521 (BE-83): marks a passenger offer and keeps the app fare to compare', () => {

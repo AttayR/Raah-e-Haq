@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import type { PendingRideRequest } from '../../features/driver-requests/api';
@@ -8,6 +8,9 @@ import type { RideRequestFeedView } from '../../features/driver-requests/hooks';
 import { formatMoney } from '../../utils/format';
 import { AddressPair, AppText, Badge, Button, IconButton, PersonCard } from '../ui';
 import { t } from '../../i18n';
+
+/** T-552: stops listed on the card (one line each); the rest are summed up in one row. */
+export const REQUEST_CARD_MAX_STOPS = 2;
 
 const formatKm = (value: number): string => (value < 10 ? value.toFixed(1) : String(Math.round(value)));
 
@@ -25,21 +28,47 @@ type CardProps = {
   disabled: boolean;
   onAccept: (rideId: number) => void;
   onReject: (rideId: number) => void;
+  /**
+   * T-552: the most height the card may take (the space above its bottom offset, below the
+   * status bar). The addresses scroll when the card would be taller.
+   */
+  maxHeight?: number;
 };
 
 /**
  * One incoming request from GET /rides/pending (T-403) on the UI-R5 ride kit: rider PersonCard
- * (name + rating or "New rider"), the route as an AddressPair at driving size, fare and pickup
- * metrics, and a primary Accept (navy, not green). Only fields the server sent are shown. The
- * sheet redesign with the countdown ring is UI-R11.
+ * (name + rating or "New rider"), the route as an AddressPair at driving size (T-552: with the
+ * ride's stops, in order, between the pickup and the drop-off), fare and pickup metrics, and a
+ * primary Accept (navy, not green). Only fields the server sent are shown. The sheet redesign
+ * with the countdown ring is UI-R11.
  */
-export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, disabled, onAccept, onReject }) => {
+export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, disabled, onAccept, onReject, maxHeight }) => {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const payment = paymentLabel(request.paymentMethod);
+  // T-552: the ride's stops, in order, between the pickup and the drop-off: the first
+  // REQUEST_CARD_MAX_STOPS on one line each, then one "+N more stops" row (up to 5 per ride).
+  const stops = useMemo(() => {
+    const shown = request.stops.slice(0, REQUEST_CARD_MAX_STOPS).map((stop, index) => ({
+      address: stop.address,
+      key: stop.id ?? index,
+      testID: `incoming-request-stop-${index + 1}`,
+    }));
+    const more = request.stops.length - shown.length;
+    if (more <= 0) return shown;
+    return [
+      ...shown,
+      {
+        address: COPY.moreStops(more),
+        key: 'more',
+        label: COPY.moreStopsLabel(shown.length + 1, request.stops.length),
+        testID: 'incoming-request-more-stops',
+      },
+    ];
+  }, [request.stops]);
 
   return (
-    <View style={styles.card} testID="incoming-request-card">
+    <View style={[styles.card, maxHeight !== undefined ? { maxHeight } : null]} testID="incoming-request-card">
       <View style={styles.header}>
         <AppText variant="h3" accessibilityRole="header" style={styles.flex}>
           {COPY.title}
@@ -100,15 +129,19 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
         )}
       </View>
 
-      <AddressPair
-        size="lg"
-        labels
-        numberOfLines={2}
-        pickup={request.pickupAddress}
-        dropoff={request.dropoffAddress}
-        pickupTestID="incoming-request-pickup"
-        dropoffTestID="incoming-request-dropoff"
-      />
+      <ScrollView style={styles.addresses} bounces={false} testID="incoming-request-addresses">
+        <AddressPair
+          size="lg"
+          labels
+          numberOfLines={2}
+          stopNumberOfLines={1}
+          pickup={request.pickupAddress}
+          stops={stops}
+          dropoff={request.dropoffAddress}
+          pickupTestID="incoming-request-pickup"
+          dropoffTestID="incoming-request-dropoff"
+        />
+      </ScrollView>
 
       <PersonCard
         variant="plain"
@@ -136,6 +169,8 @@ export const IncomingRequestCard: React.FC<CardProps> = ({ request, accepting, d
 
 type PanelProps = {
   view: RideRequestFeedView;
+  /** T-552: passed to the card (see `CardProps.maxHeight`). */
+  maxHeight?: number;
   acceptingId: number | null;
   onAccept: (rideId: number) => void;
   onReject: (rideId: number) => void;
@@ -143,7 +178,7 @@ type PanelProps = {
 };
 
 /** The request card, or the feed's loading, empty or error state (nothing while idle). */
-export const RideRequestPanel: React.FC<PanelProps> = ({ view, acceptingId, onAccept, onReject, onRetry }) => {
+export const RideRequestPanel: React.FC<PanelProps> = ({ view, maxHeight, acceptingId, onAccept, onReject, onRetry }) => {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -158,6 +193,7 @@ export const RideRequestPanel: React.FC<PanelProps> = ({ view, acceptingId, onAc
         disabled={acceptingId !== null}
         onAccept={onAccept}
         onReject={onReject}
+        maxHeight={maxHeight}
       />
     );
   }
@@ -208,6 +244,11 @@ const createStyles = (theme: AppTheme) =>
     flex: {
       flex: 1,
       minWidth: 0,
+    },
+    // T-552: only the addresses give way (scroll) when the card hits its max height.
+    addresses: {
+      flexGrow: 0,
+      flexShrink: 1,
     },
     metrics: {
       flexDirection: 'row',

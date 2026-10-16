@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
@@ -56,6 +57,8 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const isFocused = useIsFocused();
   const location = useDriverLastLocation();
@@ -98,14 +101,19 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
     return null;
   }
 
+  const bottom = bottomOffset + theme.space[4];
+  // T-552: the card is placed from the bottom; with several stops it must not grow past the top.
+  const maxHeight = Math.max(0, windowHeight - insets.top - theme.space[4] - bottom);
+
   return (
     <View
-      style={[styles.container, { bottom: bottomOffset + theme.space[4] }]}
+      style={[styles.container, { bottom }]}
       pointerEvents="box-none"
       testID="ride-request-host"
     >
       <RideRequestPanel
         view={view}
+        maxHeight={maxHeight}
         acceptingId={acceptingId}
         onAccept={handleAccept}
         onReject={reject}

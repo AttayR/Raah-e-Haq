@@ -26,7 +26,7 @@ import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
-import { useTripRoute } from '../../features/active-ride/tripRoute';
+import { useRideMapRoutes, useTripRoute } from '../../features/active-ride/tripRoute';
 import { RideRecentreButton } from '../../features/active-ride/components/RideRecentreButton';
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -133,7 +133,8 @@ const PassengerMapScreen = () => {
   // the stop pins are the ride's stops still to visit (also after a reopen; done ones go).
   const inTrip = rideStage?.stage === 'in_trip';
   const trip = useTripRoute(inTrip, currentRide, driverLocation);
-  const tripRouteShown = inTrip && trip.route.length > 1;
+  // T-552: on the trip only the trip route (the booking route only after it failed).
+  const mapRoutes = useRideMapRoutes(inTrip, trip, routeCoordinates, driverLocation);
   // T-520 (BE-78): a masked call (POST /rides/{id}/call), or the chat when calls are chat only.
   const rideId = currentRide?.id ?? null;
   const openChat = useCallback(() => {
@@ -340,8 +341,8 @@ const PassengerMapScreen = () => {
           pickup={inTrip ? null : pickup}
           stops={inTrip ? trip.stops : stops}
           destination={trip.dropoff ?? destination}
-          route={tripRouteShown ? trip.remaining : routeCoordinates}
-          driverRoute={tripRouteShown ? trip.route : routeCoordinates}
+          route={mapRoutes.route}
+          driverRoute={mapRoutes.driverRoute}
           nearbyDrivers={rideShown ? null : nearbyDrivers.drivers}
           driverLocation={driverLocation}
           vehicleType={currentRide?.vehicle_type}

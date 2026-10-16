@@ -44,5 +44,6 @@ export const makePendingRequest = (overrides: Partial<PendingRideRequest> = {}):
   expiresAt: null,
   isOffer: false,
   serverFare: null,
+  stops: [],
   ...overrides,
 });

@@ -12,6 +12,9 @@ export const DRIVER_REQUESTS_COPY = {
   noRating: 'New rider',
   pickup: 'Pickup',
   dropoff: 'Drop-off',
+  // T-552: the card lists the first stops; the rest are counted.
+  moreStopsLabel: (from: number, to: number) => `Stops ${from}–${to}`,
+  moreStops: (count: number) => `+${count} more ${count === 1 ? 'stop' : 'stops'}`,
   toPickup: 'to pickup',
   away: 'away',
   minutesShort: 'min',

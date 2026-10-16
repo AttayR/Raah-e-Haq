@@ -139,14 +139,15 @@ export const useDirections = () => {
     }
   }, [begin]);
 
-  const fetchRouteWithWaypoints = useCallback(async (pickup: Coordinates, waypoints: Coordinates[], destination: Coordinates) => {
+  // T-552: resolves true when a route came back (cache or Directions), false when none did.
+  const fetchRouteWithWaypoints = useCallback(async (pickup: Coordinates, waypoints: Coordinates[], destination: Coordinates): Promise<boolean> => {
     const setRouteCoordinates = begin();
     try {
       const cacheKey = directionsCacheKey([pickup, ...waypoints, destination]);
       const cached = cachedRoute(cacheKey);
       if (cached) {
         setRouteCoordinates(cached);
-        return;
+        return true;
       }
       const since = cacheVersion(cacheKey);
       let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=${MAPS_CONFIG.API_KEY}`;
@@ -165,11 +166,13 @@ export const useDirections = () => {
         const points = decodePolyline(json.routes[0].overview_polyline.points);
         if (json.status === 'OK') writeCache(cacheKey, points, since);
         setRouteCoordinates(points);
-      } else {
-        setRouteCoordinates([]);
+        return points.length > 1;
       }
+      setRouteCoordinates([]);
+      return false;
     } catch {
       setRouteCoordinates([]);
+      return false;
     }
   }, [begin]);
 

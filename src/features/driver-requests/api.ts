@@ -63,6 +63,14 @@ export interface PendingRideRequest {
    */
   isOffer: boolean;
   serverFare: number | null;
+  /** T-552: the ride's stops still to visit, in route order (empty when it has none). */
+  stops: PendingRideStop[];
+}
+
+/** One stop of a request, as the card lists it between the pickup and the drop-off. */
+export interface PendingRideStop {
+  id: number | null;
+  address: string;
 }
 
 export interface PendingRidesPage {
@@ -93,6 +101,26 @@ const toTime = (value: unknown): number | null => {
   if (typeof value !== 'string') return null;
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : null;
+};
+
+/**
+ * T-552 (QA 2026-10-16 3-04): the ride's `stops` (RideStopResource) as the card lists them:
+ * active ones (a stop with no status counts as active) with an address, by `stop_order`.
+ */
+export const toPendingRideStops = (raw: unknown): PendingRideStop[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(isRecord)
+    .filter((stop) => stop.status === undefined || stop.status === null || stop.status === 'active')
+    .map((stop, index) => ({
+      id: typeof stop.id === 'number' && Number.isInteger(stop.id) ? stop.id : null,
+      address: toText(stop.address),
+      order: toNumber(stop.stop_order) ?? Number.MAX_SAFE_INTEGER,
+      index,
+    }))
+    .filter((stop): stop is { id: number | null; address: string; order: number; index: number } => stop.address !== null)
+    .sort((a, b) => a.order - b.order || a.index - b.index)
+    .map(({ id, address }) => ({ id, address }));
 };
 
 /**
@@ -131,6 +159,7 @@ export const toPendingRideRequest = (
       requestedAt !== null && maxAgeMinutes !== null ? requestedAt + maxAgeMinutes * 60_000 : null,
     isOffer: raw.is_offer === true && toNumber(raw.offered_fare) !== null,
     serverFare: toNumber(raw.server_fare),
+    stops: toPendingRideStops(raw.stops),
   };
 };
 

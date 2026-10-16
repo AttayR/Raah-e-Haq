@@ -82,4 +82,19 @@ describe('useDirections', () => {
 
     expect(result.current.routeCoordinates).toHaveLength(1);
   });
+
+  it('T-552: the waypoint request says whether a route came back', async () => {
+    fetchMock.mockResolvedValueOnce(ok()).mockRejectedValueOnce(new Error('offline'));
+    const { result } = renderHook(() => useDirections());
+    let answer: boolean | undefined;
+    await act(async () => {
+      answer = await result.current.fetchRouteWithWaypoints({ latitude: 31.41, longitude: 74.21 }, [C], B);
+    });
+    expect(answer).toBe(true);
+    await act(async () => {
+      answer = await result.current.fetchRouteWithWaypoints({ latitude: 31.42, longitude: 74.22 }, [], B);
+    });
+    expect(answer).toBe(false);
+    expect(result.current.routeCoordinates).toEqual([]);
+  });
 });

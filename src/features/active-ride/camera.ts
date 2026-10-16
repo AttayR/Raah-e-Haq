@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Details, EdgePadding, LatLng, Region } from 'react-native-maps';
 import type { DriverLocation, RideResource } from '../../services/rideService';
+import { activeStops } from '../driver-ride/steps';
 import type { PassengerRideStage } from './stage';
 
 /**
@@ -49,7 +50,9 @@ export const driverApproachCoordinates = (
 /**
  * T-549: the points the ride camera follows: [driver, pickup] while the driver is on the way
  * (as `driverApproachCoordinates`), [driver, drop-off] on the trip (QA t-545 B08: the car drove
- * off screen), else null.
+ * off screen), else null. T-552 (QA 2026-10-16 2-06): on the trip the stops still to visit are
+ * fitted too, in route order between the car and the drop-off, so a stop pin is never left at
+ * the edge under the map controls.
  */
 export const rideFollowCoordinates = (
   stage: PassengerRideStage | null | undefined,
@@ -60,12 +63,16 @@ export const rideFollowCoordinates = (
   if (stage !== 'in_trip' || !driverLocation || !ride) return null;
   const driver = coordinate(driverLocation.latitude, driverLocation.longitude);
   const dropoff = coordinate(ride.dropoff_latitude, ride.dropoff_longitude);
-  return driver && dropoff ? [driver, dropoff] : null;
+  if (!driver || !dropoff) return null;
+  const stops = activeStops({ stops: ride.stops ?? [] })
+    .map((stop) => coordinate(stop.latitude, stop.longitude))
+    .filter((point): point is LatLng => point !== null);
+  return [driver, ...stops, dropoff];
 };
 
-/** The ride fields the camera reads (the drop-off only on the trip). */
+/** The ride fields the camera reads (the drop-off and the stops only on the trip). */
 export type RideCameraRide = Pick<RideResource, 'pickup_latitude' | 'pickup_longitude'> &
-  Partial<Pick<RideResource, 'dropoff_latitude' | 'dropoff_longitude'>>;
+  Partial<Pick<RideResource, 'dropoff_latitude' | 'dropoff_longitude' | 'stops'>>;
 
 /**
  * T-549: on the trip the camera refits at most this often (ms), animated, so it follows the car
@@ -248,6 +255,23 @@ export const viewportEdgePadding = (viewport?: MapViewport | null): EdgePadding 
   return { top, right: 48, bottom, left: 48 };
 };
 
+/** Room (pt) kept between the top map controls and a fitted ride point (a 22 pt stop pin + gap). */
+export const RIDE_CONTROLS_CLEARANCE = 24;
+
+/**
+ * T-552: fit padding for the ride camera. As `viewportEdgePadding`, but the top never shrinks
+ * under the top controls (back, recentre, +) when a tall sheet forces the clamp: the bottom
+ * gives way instead, so a fitted stop or drop-off pin is never drawn under the controls.
+ */
+export const rideFollowEdgePadding = (viewport?: MapViewport | null): EdgePadding => {
+  const pad = viewportEdgePadding(viewport);
+  if (!viewport || viewport.bottom <= 0) return pad;
+  const top = Math.max(0, viewport.top ?? 0) + RIDE_CONTROLS_CLEARANCE;
+  if (pad.top >= top) return pad;
+  const bottom = Math.max(0, Math.min(pad.bottom, viewport.mapHeight - MIN_VISIBLE_MAP - top));
+  return { ...pad, top, bottom };
+};
+
 export interface PassengerRideCamera {
   /**
    * True while the auto-fit owns the camera (driver on the way or on the trip, not paused by
@@ -311,10 +335,11 @@ export const usePassengerRideCamera = (
   }, [current, mapRef]);
 
   // T-315: never closer than MIN_DRIVER_APPROACH_DELTA, so the street around the pickup stays.
-  // T-549: on the trip the car and the drop-off, refitted at most every TRIP_FOLLOW_INTERVAL_MS.
+  // T-549: on the trip the car and the drop-off, refitted at most every TRIP_FOLLOW_INTERVAL_MS
+  // (T-552: and the stops still to visit, clear of the top controls).
   useFitCoordinates(mapRef, paused ? null : withMinimumSpan(rideFollowCoordinates(current, driverLocation, ride)), {
     ready: mapReady,
-    edgePadding: viewportEdgePadding(viewport),
+    edgePadding: rideFollowEdgePadding(viewport),
     minIntervalMs: current === 'in_trip' ? TRIP_FOLLOW_INTERVAL_MS : 0,
     // A new stage (e.g. the trip starts) or the recentre button fits at once.
     refit: `${current}:${refit}`,

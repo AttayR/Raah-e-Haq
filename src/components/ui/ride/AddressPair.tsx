@@ -32,6 +32,8 @@ export type AddressPairProps = {
   size?: 'md' | 'lg';
   /** Lines per address: 1 (ellipsis, default) or 0 for unlimited (ride details). */
   numberOfLines?: number;
+  /** Lines per stop address when it differs from `numberOfLines` (compact stops on a request card). */
+  stopNumberOfLines?: number;
   /** Hairline dividers inset to the text start, for rows that act as fields. */
   dividers?: boolean;
   /** Addresses are selectable (ride details, receipts). */
@@ -80,6 +82,7 @@ export function AddressPair({
   density = 'regular',
   size = 'md',
   numberOfLines = 1,
+  stopNumberOfLines,
   dividers = false,
   selectable = false,
   pickupTestID,
@@ -99,7 +102,9 @@ export function AddressPair({
     })),
     { kind: 'dropoff', address: dropoff, key: 'dropoff', label: t('ride.dropoff'), a11y: t('ride.dropoffA11y', { address: dropoff }), testID: dropoffTestID },
   ];
-  const lines = numberOfLines > 0 ? numberOfLines : undefined;
+  const linesOf = (n: number) => (n > 0 ? n : undefined);
+  const lines = linesOf(numberOfLines);
+  const stopLines = stopNumberOfLines === undefined ? lines : linesOf(stopNumberOfLines);
   return (
     <View testID={testID}>
       {rows.map((row, i) => (
@@ -129,7 +134,7 @@ export function AddressPair({
             ) : null}
             <AppText
               variant={size === 'lg' ? 'h3' : 'body'}
-              numberOfLines={lines}
+              numberOfLines={row.kind === 'stop' ? stopLines : lines}
               ellipsizeMode="tail"
               selectable={selectable}
               testID={row.testID}

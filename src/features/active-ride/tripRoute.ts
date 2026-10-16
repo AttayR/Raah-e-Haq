@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LatLng } from 'react-native-maps';
 import { useDirections } from '../../hooks/useDirections';
 import type { DriverLocation, RideResource } from '../../services/rideService';
@@ -147,6 +147,8 @@ export interface TripRoute {
   remaining: LatLng[];
   /** The ride's stops still to visit, in route order: the stop pins (stable while unchanged). */
   stops: LatLng[];
+  /** T-552: the last trip route request came back with no route (network, Directions error). */
+  failed: boolean;
 }
 
 /**
@@ -185,6 +187,9 @@ export const useTripRoute = (
   const requestedStopsKey = useRef<string | null>(null);
 
   const lastRequestAt = useRef<number | null>(null);
+  // T-552: whether the newest request failed; older answers are ignored.
+  const [failedFor, setFailedFor] = useState<number | null>(null);
+  const requestSeq = useRef(0);
   const routeRef = useRef(routeCoordinates);
   routeRef.current = routeCoordinates;
 
@@ -194,6 +199,8 @@ export const useTripRoute = (
     if (requestedFor.current === rideId) return;
     if (requestedFor.current !== null) clearRoute();
     requestedFor.current = rideId;
+    requestSeq.current += 1;
+    setFailedFor(null);
     lastRequestAt.current = null;
     requestedStopsKey.current = null;
   }, [rideId, clearRoute]);
@@ -217,11 +224,61 @@ export const useTripRoute = (
     lastRequestAt.current = now;
     requestedStopsKey.current = stopsKey;
     // Same cache key as the booking route (pickup, stops, drop-off) for the first request.
-    fetchRouteWithWaypoints(next.from, next.waypoints, next.to);
+    requestSeq.current += 1;
+    const seq = requestSeq.current;
+    Promise.resolve(fetchRouteWithWaypoints(next.from, next.waypoints, next.to)).then((ok: unknown) => {
+      if (seq !== requestSeq.current || typeof ok !== 'boolean') return;
+      setFailedFor(ok ? null : seq);
+    });
   }, [rideId, driver, pickup, dropoff, stopsKey, fetchRouteWithWaypoints]);
 
   const route = rideId === null ? EMPTY : routeCoordinates;
   const remaining = useMemo(() => (route.length > 1 ? remainingRoute(route, driver) : route), [route, driver]);
   const stops = rideId === null ? EMPTY : stopsRef.current.points;
-  return { dropoff, route, remaining, stops };
+  const failed = rideId !== null && failedFor !== null && failedFor === requestSeq.current;
+  return { dropoff, route, remaining, stops, failed };
+};
+
+export interface RideMapRoutes {
+  /** The line drawn on the map. */
+  route: LatLng[];
+  /** The route the assigned driver's marker follows. */
+  driverRoute: LatLng[];
+}
+
+/**
+ * T-552 (QA 2026-10-16 2-05): the routes the passenger map draws. Before the trip, the booking
+ * route. On the trip, the trip route (the part still ahead of the car). While the trip route is
+ * on its way nothing is drawn, so the line from before the trip (which still ran behind the car)
+ * does not linger for a frame when the trip starts; only after the trip route request failed is
+ * the booking route shown again (from the car on), so the passenger is not left without a line.
+ */
+export const rideMapRoutes = (
+  inTrip: boolean,
+  trip: Pick<TripRoute, 'route' | 'remaining' | 'failed'>,
+  bookingRoute: LatLng[],
+  driver: LatLng | null = null,
+): RideMapRoutes => {
+  if (!inTrip) return { route: bookingRoute, driverRoute: bookingRoute };
+  if (trip.route.length > 1) return { route: trip.remaining, driverRoute: trip.route };
+  if (trip.failed && bookingRoute.length > 1) {
+    return { route: remainingRoute(bookingRoute, driver), driverRoute: bookingRoute };
+  }
+  return { route: EMPTY, driverRoute: EMPTY };
+};
+
+/** `rideMapRoutes`, memoised on its inputs (the map is memoised: same arrays, no re-render). */
+export const useRideMapRoutes = (
+  inTrip: boolean,
+  trip: Pick<TripRoute, 'route' | 'remaining' | 'failed'>,
+  bookingRoute: LatLng[],
+  driverLocation: Pick<DriverLocation, 'latitude' | 'longitude'> | null,
+): RideMapRoutes => {
+  const { route, remaining, failed } = trip;
+  const carLat = driverLocation?.latitude;
+  const carLng = driverLocation?.longitude;
+  return useMemo(
+    () => rideMapRoutes(inTrip, { route, remaining, failed }, bookingRoute, toPoint(carLat, carLng)),
+    [inTrip, route, remaining, failed, bookingRoute, carLat, carLng],
+  );
 };
