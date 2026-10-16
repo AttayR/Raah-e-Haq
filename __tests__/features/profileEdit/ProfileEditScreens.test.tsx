@@ -158,15 +158,20 @@ describe('Edit profile', () => {
     expect(screen.getByTestId('profile-edit-scroll')).not.toContainElement(screen.getByTestId('profile-edit-save'));
   });
 
-  it('T-548: clearing a saved address explains it cannot be removed yet and sends nothing', async () => {
-    await renderWith(<ProfileEditScreen />, rider);
+  it('T-550: clearing a saved address sends address null (BE-101) and the profile drops it', async () => {
+    let sent: unknown = null;
+    mock.onPut('/profile').reply((config) => {
+      sent = JSON.parse(config.data);
+      return [200, { success: true, message: 'Profile updated', data: serverProfile(rider, { address: null }) }];
+    });
+    const store = await renderWith(<ProfileEditScreen />, rider);
     fireEvent.changeText(screen.getByTestId('profile-edit-address-input'), '   ');
     await flush();
     await press('profile-edit-save');
-    expect(screen.getByTestId('profile-edit-address-error')).toHaveTextContent(
-      "A saved address can't be removed yet. Enter a new address or put the saved one back.",
-    );
-    expect(mock.history.put).toHaveLength(0);
+    expect(screen.queryByTestId('profile-edit-address-error')).toBeNull();
+    expect(sent).toEqual({ address: null });
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
+    expect(store.getState().apiAuth.user?.address).toBeUndefined();
   });
 
   it('T-545: the phone helper sits under the row at full width (not cut next to "Change number")', async () => {

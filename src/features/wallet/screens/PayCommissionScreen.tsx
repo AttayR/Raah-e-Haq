@@ -6,7 +6,6 @@ import { firstFieldMessages, toApiError } from '../../../core/api/errors';
 import { formatMoney, moneyInputText } from '../../../core/format/money';
 import { toast } from '../../../core/toast';
 import { layout, space } from '../../../theme';
-import { KeyboardDoneBar, PAY_COMMISSION_KEYBOARD_DONE_ID } from '../components/KeyboardDoneBar';
 import { WALLET_COPY } from '../copy';
 import { submitSettlement } from '../hooks';
 import type { DriverWalletRoutes } from '../navigation';
@@ -131,7 +130,7 @@ export default function PayCommissionScreen() {
           onChangeText={update('amount')}
           keyboardType="decimal-pad"
           inputMode="decimal"
-          inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
+          doneBar
           error={errors.amount}
           testID="pay-commission-amount"
         />
@@ -171,7 +170,7 @@ export default function PayCommissionScreen() {
           onChangeText={update('note')}
           multiline
           maxLength={SETTLEMENT_NOTE_MAX}
-          inputAccessoryViewID={PAY_COMMISSION_KEYBOARD_DONE_ID}
+          doneBar
           error={errors.note}
           testID="pay-commission-note"
         />
@@ -193,11 +192,6 @@ export default function PayCommissionScreen() {
           testID="pay-commission-submit"
         />
       </ScrollView>
-      <KeyboardDoneBar
-        nativeID={PAY_COMMISSION_KEYBOARD_DONE_ID}
-        label={WALLET_COPY.keyboardDone}
-        testID="pay-commission-keyboard-done"
-      />
     </Screen>
   );
 }

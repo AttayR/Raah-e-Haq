@@ -13,7 +13,7 @@ import apiAuthReducer from '../../src/store/slices/apiAuthSlice';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
 import { Keyboard, ScrollView } from 'react-native';
-import { KEYBOARD_DONE_ID } from '../../src/screens/Auth/PhoneAuthParts';
+import { CODE_INPUT_DONE_ID, PHONE_INPUT_DONE_ID } from '../../src/screens/Auth/PhoneAuthParts';
 
 // The real store module starts redux-persist (a timer that outlives the test); the screen
 // only needs the typed hooks, so they are pointed at the test store's Provider.
@@ -436,17 +436,25 @@ describe('PhoneAuthScreen (T-101)', () => {
       expect(screen.queryByText('Invalid or expired OTP')).toBeNull();
     });
 
-    it('number-pad inputs get the Done bar, and Done closes the keyboard', async () => {
+    it('each number-pad input gets its own Done bar (T-550), and Done closes the keyboard', async () => {
       const dismiss = jest.spyOn(Keyboard, 'dismiss');
       replyLocalSend();
       await renderScreen();
-      expect(screen.getByPlaceholderText('Enter phone number').props.inputAccessoryViewID).toBe(KEYBOARD_DONE_ID);
-      fireEvent.press(screen.getByText('Done'));
-      expect(dismiss).toHaveBeenCalled();
+      expect(screen.getByPlaceholderText('Enter phone number').props.inputAccessoryViewID).toBe(PHONE_INPUT_DONE_ID);
+      expect(screen.getAllByText('Done')).toHaveLength(1);
+      fireEvent.press(screen.getByTestId('phone-auth-phone-done'));
+      expect(dismiss).toHaveBeenCalledTimes(1);
 
       await sendCode();
       await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
-      expect(screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID).toBe(KEYBOARD_DONE_ID);
+      // Fabric attaches a bar to the first input with its id only: the code input has its own
+      // id and its own bar, and the phone step's bar left with the phone input.
+      expect(CODE_INPUT_DONE_ID).not.toBe(PHONE_INPUT_DONE_ID);
+      expect(screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID).toBe(CODE_INPUT_DONE_ID);
+      expect(screen.queryByTestId('phone-auth-phone-done')).toBeNull();
+      expect(screen.getAllByText('Done')).toHaveLength(1);
+      fireEvent.press(screen.getByTestId('phone-auth-code-done'));
+      expect(dismiss).toHaveBeenCalledTimes(2);
       // The first tap on Verify acts instead of only closing the keyboard.
       expect(screen.UNSAFE_getByType(ScrollView).props.keyboardShouldPersistTaps).toBe('handled');
     });

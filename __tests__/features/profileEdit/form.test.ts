@@ -66,6 +66,14 @@ describe('buildProfileUpdate', () => {
     expect(buildProfileUpdate(same.form, same.initial, passenger)).toEqual({});
   });
 
+  it('a cleared address is sent as null (BE-101) and passes validation', () => {
+    const { initial, form } = edit(passenger, { address: '   ' });
+    expect(validateProfileForm(form, initial, passenger, NOW)).toEqual({});
+    expect(buildProfileUpdate(form, initial, passenger)).toEqual({ address: null });
+    const changed = edit(passenger, { address: ' New Street, Lahore ' });
+    expect(buildProfileUpdate(changed.form, changed.initial, passenger)).toEqual({ address: 'New Street, Lahore' });
+  });
+
   it('typing the email that is already pending needs no password', () => {
     const user = { ...passenger, pending_email: 'next@example.test' };
     const { initial, form } = edit(user, { email: 'next@example.test' });
@@ -100,9 +108,10 @@ describe('validateProfileForm', () => {
   it('fields the server cannot clear may not be emptied; unchanged fields are not checked', () => {
     const { initial, form } = edit(passenger, { name: ' ', address: '', email: '' });
     const errors = validateProfileForm(form, initial, passenger, NOW);
-    expect(Object.keys(errors).sort()).toEqual(['address', 'email', 'name']);
-    // T-548: the server refuses an empty address (`sometimes|string`), so the message says why.
-    expect(errors.address).toBe("A saved address can't be removed yet. Enter a new address or put the saved one back.");
+    // BE-101 (T-550): the address may be cleared now; name and email still may not.
+    expect(Object.keys(errors).sort()).toEqual(['email', 'name']);
+    const tooLong = edit(passenger, { address: 'x'.repeat(501) });
+    expect(validateProfileForm(tooLong.form, tooLong.initial, passenger, NOW).address).toBeDefined();
     // An old driver profile under 18 that is not edited is not re-validated.
     const old = { ...driver, date_of_birth: '2010-01-01' };
     const untouched = edit(old, { name: 'Other' });

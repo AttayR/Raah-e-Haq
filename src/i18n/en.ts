@@ -859,7 +859,6 @@ export const en = {
     dobFuture: 'Your date of birth must be in the past.',
     dobYear: 'Use a year of birth from 1900.',
     dobDriverAge: 'Drivers must be at least 18 years old.',
-    addressCannotClear: "A saved address can't be removed yet. Enter a new address or put the saved one back.",
     addressTooLong: 'Use at most 500 characters.',
     bioTooLong: 'Use at most 500 characters.',
   },

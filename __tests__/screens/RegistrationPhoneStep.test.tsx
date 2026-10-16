@@ -9,8 +9,9 @@ import { configureStore } from '@reduxjs/toolkit';
 import MockAdapter from 'axios-mock-adapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Keyboard } from 'react-native';
 import RegistrationPhoneStep from '../../src/features/auth/components/RegistrationPhoneStep';
+import { REGISTRATION_CODE_DONE_ID } from '../../src/screens/Auth/PhoneAuthParts';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import { rootReducer } from '../../src/store/rootReducer';
 import type { SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
@@ -270,6 +271,15 @@ describe('RegistrationPhoneStep', () => {
     // The decoy lockout shows only the latest state, not "Code expired" as well (QA T-201).
     expect(screen.queryByText('Code expired. Please request a new code.')).toBeNull();
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('the code input brings its own iOS Done bar (T-550) that closes the keyboard', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    await renderStep();
+    expect(screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID).toBe(REGISTRATION_CODE_DONE_ID);
+    fireEvent.press(screen.getByTestId('registration-code-done'));
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    dismiss.mockRestore();
   });
 
   it('shows the wrong-number hint', async () => {

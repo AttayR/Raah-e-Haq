@@ -298,3 +298,54 @@ describe('useTripRoute with a stop', () => {
     expect(mockFetchRoute).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('T-550: trip stop pins come from the ride', () => {
+  const stop = (id: number, order: number, status: 'active' | 'completed', latitude: number, longitude: number) => ({
+    id,
+    ride_id: 207,
+    address: `Stop ${id}`,
+    latitude,
+    longitude,
+    stop_order: order,
+    status,
+    status_label: status,
+    status_color: '',
+    created_at: 't',
+    updated_at: 't',
+  });
+  type P = { active: boolean; location: LatLng | null; first: 'active' | 'completed' };
+  const rideWith = (first: 'active' | 'completed') => ({
+    ...ride,
+    // Out of order on purpose: pins follow stop_order.
+    stops: [stop(22, 2, 'active', 31.5, 74.31), stop(21, 1, first, 31.51, 74.33)],
+  });
+
+  beforeEach(() => {
+    mockFetchRoute.mockClear();
+    mockRoute = [];
+  });
+
+  it('shows the active stops in route order (also after a reopen), keeps the array while they do not change, drops a completed one', () => {
+    const { result, rerender } = renderHook(
+      ({ active, location, first }: P) => useTripRoute(active, rideWith(first), location),
+      { initialProps: { active: false, location: null, first: 'active' } as P },
+    );
+    // Not on the trip: no pins from here (the booking form draws its own).
+    expect(result.current.stops).toEqual([]);
+
+    // The trip, as on a reopen: the ride alone gives both pins, in stop_order.
+    rerender({ active: true, location: car(31.515, 74.34), first: 'active' });
+    const pins = result.current.stops;
+    expect(pins).toEqual([
+      { latitude: 31.51, longitude: 74.33 },
+      { latitude: 31.5, longitude: 74.31 },
+    ]);
+    // A new car position (new ride object, same stops): the same array, so the map does not re-render.
+    rerender({ active: true, location: car(31.512, 74.335), first: 'active' });
+    expect(result.current.stops).toBe(pins);
+
+    // Stop 1 completed: its pin goes.
+    rerender({ active: true, location: car(31.51, 74.33), first: 'completed' });
+    expect(result.current.stops).toEqual([{ latitude: 31.5, longitude: 74.31 }]);
+  });
+});

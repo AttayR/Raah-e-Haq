@@ -6,7 +6,7 @@ import { t, type TranslationKey } from '../../i18n';
 /**
  * The Edit profile form (T-504b), pure: what PUT /profile may change and how. The rules follow
  * ProfileController::update (name ≤ 255, email, gender male|female|other, a past date of birth
- * that is 18+ for a driver (BE-68), address ≤ 500, bio ≤ 500 or empty). The phone is not here:
+ * that is 18+ for a driver (BE-68), address ≤ 500 or empty (BE-101), bio ≤ 500 or empty). The phone is not here:
  * it changes through POST /profile/phone (BE-35).
  */
 
@@ -107,7 +107,8 @@ const dateOfBirthError = (value: string, isDriver: boolean, now: Date): Translat
 
 /**
  * Field errors for the changed fields (unchanged ones are not sent, so they are not checked).
- * A field the server cannot clear (name, email, date of birth, address) may not be emptied.
+ * A field the server cannot clear (name, email, date of birth) may not be emptied; the address
+ * and bio may (BE-101).
  */
 export const validateProfileForm = (
   form: ProfileForm,
@@ -134,11 +135,8 @@ export const validateProfileForm = (
     if (issue) errors.dateOfBirth = issue;
   }
   if (changed(form, initial, 'address')) {
-    const address = form.address.trim();
-    // PUT /profile has `address: sometimes|string` (not nullable), so "" or null is refused with a
-    // raw "must be a string" (T-548). Until the server accepts clearing, say so plainly here.
-    if (!address) errors.address = 'profileEdit.addressCannotClear';
-    else if (address.length > ADDRESS_MAX) errors.address = 'profileEdit.addressTooLong';
+    // An empty address clears the saved one (BE-101: `address: nullable|string|max:500`).
+    if (form.address.trim().length > ADDRESS_MAX) errors.address = 'profileEdit.addressTooLong';
   }
   if (form.bio.trim().length > BIO_MAX) errors.bio = 'profileEdit.bioTooLong';
 
@@ -153,7 +151,8 @@ export const validateProfileForm = (
 /**
  * PUT /profile with only the changed fields. The email is sent only when the user changed it,
  * so saving a name never cancels a pending email change (sending the current email does, BE-38);
- * `current_password` only when that change needs it. The phone is never sent (BE-35).
+ * `current_password` only when that change needs it. A cleared address or bio is sent as null
+ * (BE-101). The phone is never sent (BE-35).
  */
 export const buildProfileUpdate = (form: ProfileForm, initial: ProfileForm, user: User | null): ProfileUpdateRequest => {
   const update: ProfileUpdateRequest = {};
@@ -164,7 +163,7 @@ export const buildProfileUpdate = (form: ProfileForm, initial: ProfileForm, user
   }
   if (changed(form, initial, 'gender') && form.gender) update.gender = form.gender;
   if (changed(form, initial, 'dateOfBirth')) update.date_of_birth = form.dateOfBirth.trim();
-  if (changed(form, initial, 'address')) update.address = form.address.trim();
+  if (changed(form, initial, 'address')) update.address = form.address.trim() || null;
   if (changed(form, initial, 'bio')) update.bio = form.bio.trim() || null;
   return update;
 };

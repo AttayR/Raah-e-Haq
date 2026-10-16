@@ -21,7 +21,6 @@ import { formatMoney } from '../../../core/format/money';
 import { triggerHaptic } from '../../../core/haptics';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
-import { KeyboardDoneBar } from '../components/KeyboardDoneBar';
 import { TopUpProviderPicker } from '../components/TopUpProviderPicker';
 import { WALLET_COPY } from '../copy';
 import { useWallet } from '../hooks';
@@ -39,8 +38,6 @@ import {
 import { useCreateTopUp } from '../topUpHooks';
 import { isAllowedCheckoutUrl } from '../topUpLinks';
 import type { TopUpConfig, TopUpMethod, TopUpResult } from '../types';
-
-export const ADD_MONEY_KEYBOARD_DONE_ID = 'addMoneyKeyboardDone';
 
 /** Refusals that belong under the amount field (BE-74). */
 const AMOUNT_CODES = new Set(['DAILY_LIMIT_REACHED']);
@@ -218,7 +215,7 @@ export default function AddMoneyScreen() {
           keyboardType="number-pad"
           inputMode="numeric"
           maxLength={7}
-          inputAccessoryViewID={ADD_MONEY_KEYBOARD_DONE_ID}
+          doneBar
           helper={helper}
           error={errors.amount}
           disabled={!today}
@@ -284,7 +281,7 @@ export default function AddMoneyScreen() {
             error={errors.mobile}
             autoComplete="off"
             textContentType="none"
-            inputAccessoryViewID={ADD_MONEY_KEYBOARD_DONE_ID}
+            doneBar
             testID="add-money-mobile"
           />
         ) : null}
@@ -301,7 +298,7 @@ export default function AddMoneyScreen() {
             textContentType="none"
             helper={t('topUp.cnicHelper', { provider: provider.name })}
             error={errors.cnic}
-            inputAccessoryViewID={ADD_MONEY_KEYBOARD_DONE_ID}
+            doneBar
             testID="add-money-cnic"
           />
         ) : null}
@@ -325,7 +322,6 @@ export default function AddMoneyScreen() {
           testID="add-money-pay"
         />
       </ScrollView>
-      <KeyboardDoneBar nativeID={ADD_MONEY_KEYBOARD_DONE_ID} label={WALLET_COPY.keyboardDone} testID="add-money-keyboard-done" />
     </Screen>
   );
 }

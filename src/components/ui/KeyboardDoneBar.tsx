@@ -14,8 +14,12 @@ export type KeyboardDoneBarProps = {
 /**
  * iOS bar with a "Done" button above the keyboard. The number pad (and a multiline input) has no
  * return key, so without it the keyboard could not be closed (T-509; kit since T-545). Android's
- * keyboards always have a close key, so nothing is rendered there. Render it once per screen and
- * point every such input's `inputAccessoryViewID` at its `nativeID`.
+ * keyboards always have a close key, so nothing is rendered there.
+ *
+ * Prefer `<TextField doneBar />`: the field renders its own bar with a unique id (T-548/T-550).
+ * On Fabric an InputAccessoryView attaches only to the first input in the window with its
+ * `nativeID`, so do not share one bar between several inputs. Use this directly only for an
+ * input that is not a TextField: one bar per input, a unique `nativeID`, rendered next to it.
  */
 export function KeyboardDoneBar({ nativeID, label, testID }: KeyboardDoneBarProps) {
   const { theme } = useAppTheme();

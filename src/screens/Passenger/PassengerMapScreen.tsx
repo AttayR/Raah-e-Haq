@@ -129,7 +129,8 @@ const PassengerMapScreen = () => {
   const rideCamera = usePassengerRideCamera(
     mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation, viewport,
   );
-  // T-549: on the trip the drop-off and the route still ahead of the car, not the pickup.
+  // T-549: on the trip the drop-off and the route still ahead of the car, not the pickup; T-550:
+  // the stop pins are the ride's stops still to visit (also after a reopen; done ones go).
   const inTrip = rideStage?.stage === 'in_trip';
   const trip = useTripRoute(inTrip, currentRide, driverLocation);
   const tripRouteShown = inTrip && trip.route.length > 1;
@@ -337,7 +338,7 @@ const PassengerMapScreen = () => {
           onMapLoaded={onMapLoaded}
           onRegionChangeComplete={rideCamera.onRegionChangeComplete}
           pickup={inTrip ? null : pickup}
-          stops={stops}
+          stops={inTrip ? trip.stops : stops}
           destination={trip.dropoff ?? destination}
           route={tripRouteShown ? trip.remaining : routeCoordinates}
           driverRoute={tripRouteShown ? trip.route : routeCoordinates}

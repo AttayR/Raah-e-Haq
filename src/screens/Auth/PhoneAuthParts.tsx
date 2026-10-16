@@ -5,19 +5,38 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import { styles } from './PhoneAuthScreen.styles';
 
-/** The number pad has no return key on iOS: inputs point their inputAccessoryViewID here. */
-export const KEYBOARD_DONE_ID = 'phoneAuthKeyboardDone';
+/**
+ * The number pad has no return key on iOS, so each such input gets its own Done bar with its own
+ * id, rendered next to it (T-550): on Fabric an InputAccessoryView attaches only to the first
+ * input in the window with its id, so one screen-level bar shared by the phone and the code
+ * input could show on only one of them. The bar mounts and unmounts with its input.
+ */
+export const PHONE_INPUT_DONE_ID = 'phoneAuthPhoneDone';
+export const CODE_INPUT_DONE_ID = 'phoneAuthCodeDone';
+export const REGISTRATION_CODE_DONE_ID = 'registrationCodeDone';
+
+interface KeyboardDoneBarProps {
+  /** The input points its `inputAccessoryViewID` at this; one bar per input. */
+  nativeID: string;
+  testID?: string;
+}
 
 /** iOS "Done" bar above the number pad, so the keyboard can always be closed (AUTH-18). */
-export function KeyboardDoneBar() {
+export function KeyboardDoneBar({ nativeID, testID }: KeyboardDoneBarProps) {
   const { theme } = useAppTheme();
   if (Platform.OS !== 'ios') {
     return null;
   }
   return (
-    <InputAccessoryView nativeID={KEYBOARD_DONE_ID}>
+    <InputAccessoryView nativeID={nativeID}>
       <View style={[styles.doneBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
-        <Pressable onPress={Keyboard.dismiss} accessibilityRole="button" hitSlop={8} style={styles.doneButton}>
+        <Pressable
+          onPress={Keyboard.dismiss}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={styles.doneButton}
+          testID={testID}
+        >
           <Text style={[styles.doneText, { color: theme.colors.primaryText }]}>{COPY.keyboard.done}</Text>
         </Pressable>
       </View>

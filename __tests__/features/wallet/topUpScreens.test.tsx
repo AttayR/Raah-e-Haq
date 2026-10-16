@@ -6,6 +6,7 @@
  * ledger entry opens with its top-up.
  */
 import React from 'react';
+import { Keyboard } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -227,6 +228,24 @@ describe('AddMoneyScreen', () => {
     expect(screen.getByText('JazzCash mobile number')).toBeTruthy();
     fireEvent.press(screen.getByTestId('top-up-provider-easypaisa'));
     expect(screen.queryByTestId('add-money-cnic')).toBeNull();
+  });
+
+  it('[T-550] amount, mobile and CNIC each get their own iOS Done bar (Fabric attaches a shared one to the first input only)', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    mock.onGet('/wallet').reply(
+      200,
+      walletWithTopUp({ providers: [{ id: 'jazzcash', name: 'JazzCash', methods: ['mwallet', 'card'] }] }),
+    );
+    show(AddMoneyScreen);
+    const amountId = (await screen.findByTestId('add-money-amount-input')).props.inputAccessoryViewID;
+    const mobileId = screen.getByTestId('add-money-mobile-input').props.inputAccessoryViewID;
+    const cnicId = screen.getByTestId('add-money-cnic-input').props.inputAccessoryViewID;
+    expect([amountId, mobileId, cnicId].every(Boolean)).toBe(true);
+    expect(new Set([amountId, mobileId, cnicId]).size).toBe(3);
+    expect(screen.getAllByRole('button', { name: 'Done' })).toHaveLength(3);
+    fireEvent.press(screen.getByTestId('add-money-cnic-done'));
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    dismiss.mockRestore();
   });
 
   it('shows a daily-limit refusal under the amount', async () => {

@@ -13,7 +13,6 @@ import PayCommissionScreen from '../../../src/features/wallet/screens/PayCommiss
 import SettlementsScreen from '../../../src/features/wallet/screens/SettlementsScreen';
 import TransactionDetailScreen, { methodLabel } from '../../../src/features/wallet/screens/TransactionDetailScreen';
 import { keyboardAvoidingProps as formKeyboardAvoidingProps } from '../../../src/components/ui/keyboard';
-import { PAY_COMMISSION_KEYBOARD_DONE_ID } from '../../../src/features/wallet/components/KeyboardDoneBar';
 import { toTransaction } from '../../../src/features/wallet/api';
 import { envelope, pageInfo, rawSettlement, rawTransaction } from '../../../test-utils/walletFixtures';
 
@@ -168,16 +167,24 @@ describe('PayCommissionScreen keyboard (T-509)', () => {
     expect(formKeyboardAvoidingProps('android', 24)).toEqual({ behavior: undefined, enabled: false, keyboardVerticalOffset: 0 });
   });
 
-  it('gives the number pad (and the note) a Done bar that closes the keyboard', async () => {
+  it('gives the number pad and the note each their own Done bar that closes the keyboard (T-550)', async () => {
     const dismiss = jest.spyOn(Keyboard, 'dismiss');
     show(PayCommissionScreen);
     // UI-R3: the kit TextField puts the input at `${testID}-input`.
     const amount = await screen.findByTestId('pay-commission-amount-input');
-    expect(amount.props.inputAccessoryViewID).toBe(PAY_COMMISSION_KEYBOARD_DONE_ID);
-    expect(screen.getByTestId('pay-commission-note-input').props.inputAccessoryViewID).toBe(PAY_COMMISSION_KEYBOARD_DONE_ID);
+    // Fabric attaches an InputAccessoryView to the first input with its id only, so the two
+    // fields must not share one (T-548/T-550).
+    const amountId = amount.props.inputAccessoryViewID;
+    const noteId = screen.getByTestId('pay-commission-note-input').props.inputAccessoryViewID;
+    expect(amountId).toBeTruthy();
+    expect(noteId).toBeTruthy();
+    expect(noteId).not.toBe(amountId);
+    expect(screen.getByTestId('pay-commission-reference-input').props.inputAccessoryViewID).toBeUndefined();
     expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props).toMatchObject({ behavior: 'padding', keyboardVerticalOffset: 0 });
-    fireEvent.press(screen.getByTestId('pay-commission-keyboard-done'));
+    fireEvent.press(screen.getByTestId('pay-commission-amount-done'));
     expect(dismiss).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByTestId('pay-commission-note-done'));
+    expect(dismiss).toHaveBeenCalledTimes(2);
   });
 
   it('the first tap on Report payment with the keypad open submits (and closes the keypad)', async () => {

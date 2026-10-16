@@ -78,7 +78,6 @@ export const WALLET_COPY = {
   formSubmitted: 'Payment reported. It is waiting for review.',
   formFailed: "Couldn't report the payment. Please try again.",
   formInfo: 'An admin checks your payment and then updates your balance.',
-  keyboardDone: 'Done',
   // Settlement list.
   settlementsTitle: 'Payment reports',
   settlementsEmptyTitle: 'No payment reports yet',

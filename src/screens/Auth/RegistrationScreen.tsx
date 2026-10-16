@@ -20,7 +20,6 @@ import VehicleInfoStep from './steps/VehicleInfoStep';
 import DocumentsStep from './steps/DocumentsStep';
 import ReviewStep from './steps/ReviewStep';
 import RegistrationHeader from './RegistrationHeader';
-import { KeyboardDoneBar } from './PhoneAuthParts';
 import { styles } from './RegistrationScreen.styles';
 import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
@@ -328,7 +327,6 @@ export default function RegistrationScreen() {
           </View>
         </AuthKeyboardScroll>
       </ImageBackground>
-      <KeyboardDoneBar />
     </SafeAreaView>
   );
 }

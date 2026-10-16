@@ -10,7 +10,7 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { formatCountdown, OTP_LENGTH } from '../../../services/otpService';
 import type { PendingPhoneVerification } from '../../../store/thunks/apiThunks';
 import { styles } from '../../../screens/Auth/PhoneAuthScreen.styles';
-import { KEYBOARD_DONE_ID } from '../../../screens/Auth/PhoneAuthParts';
+import { KeyboardDoneBar, REGISTRATION_CODE_DONE_ID } from '../../../screens/Auth/PhoneAuthParts';
 import { PHONE_AUTH_COPY } from '../copy/phoneAuth';
 import { REGISTRATION_COPY as COPY } from '../copy/registration';
 import { useRegistrationPhoneVerify } from '../hooks/useRegistrationPhoneVerify';
@@ -122,13 +122,14 @@ export default function RegistrationPhoneStep({ pending, role, onGoToSignIn }: P
           onChangeText={step.setCode}
           keyboardType="number-pad"
           returnKeyType="done"
-          inputAccessoryViewID={KEYBOARD_DONE_ID}
+          inputAccessoryViewID={REGISTRATION_CODE_DONE_ID}
           textContentType="oneTimeCode"
           autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
           autoFocus
           editable={step.canVerify}
           style={[styles.input, step.error ? styles.inputError : null]}
         />
+        <KeyboardDoneBar nativeID={REGISTRATION_CODE_DONE_ID} testID="registration-code-done" />
         {step.error ? errorBox(step.error, step.hint) : null}
       </View>
 

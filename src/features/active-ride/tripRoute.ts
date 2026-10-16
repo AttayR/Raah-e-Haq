@@ -145,11 +145,13 @@ export interface TripRoute {
   route: LatLng[];
   /** The route still ahead of the car (the line drawn on the map). */
   remaining: LatLng[];
+  /** The ride's stops still to visit, in route order: the stop pins (stable while unchanged). */
+  stops: LatLng[];
 }
 
 /**
- * The trip's drop-off and route for the passenger map while `active` (the trip has started).
- * Leaving the trip (or a new ride) drops the route.
+ * The trip's drop-off, route and remaining stops for the passenger map while `active` (the trip
+ * has started). Leaving the trip (or a new ride) drops the route.
  */
 export const useTripRoute = (
   active: boolean,
@@ -169,12 +171,17 @@ export const useTripRoute = (
   const driver = useMemo(() => (rideId === null ? null : toPoint(carLat, carLng)), [rideId, carLat, carLng]);
 
   // The active stops (waypoints); their ids are the effect's input, so a completed stop counts.
+  // T-550: they are also the stop pins, read from the ride (not the booking form, which is empty
+  // after a reopen), so a completed stop's pin goes. Kept as the same array while they do not
+  // change, so the memoised map does not re-render on every car position.
   const stopsNow = rideId === null ? [] : activeStops({ stops: ride?.stops ?? [] });
   const stopsKey = stopsNow.map((stop) => stop.id).join(',');
-  const stopsRef = useRef<LatLng[]>([]);
-  stopsRef.current = stopsNow
+  const stopPoints = stopsNow
     .map((stop) => toPoint(stop.latitude, stop.longitude))
     .filter((point): point is LatLng => point !== null);
+  const stopPointsKey = `${stopsKey}|${stopPoints.map((p) => `${p.latitude},${p.longitude}`).join(';')}`;
+  const stopsRef = useRef<{ key: string; points: LatLng[] }>({ key: '|', points: EMPTY });
+  if (stopsRef.current.key !== stopPointsKey) stopsRef.current = { key: stopPointsKey, points: stopPoints };
   const requestedStopsKey = useRef<string | null>(null);
 
   const lastRequestAt = useRef<number | null>(null);
@@ -202,7 +209,7 @@ export const useTripRoute = (
       driver,
       pickup,
       dropoff,
-      stops: stopsRef.current,
+      stops: stopsRef.current.points,
       stopsKey,
       requestedStopsKey: requestedStopsKey.current,
     });
@@ -215,5 +222,6 @@ export const useTripRoute = (
 
   const route = rideId === null ? EMPTY : routeCoordinates;
   const remaining = useMemo(() => (route.length > 1 ? remainingRoute(route, driver) : route), [route, driver]);
-  return { dropoff, route, remaining };
+  const stops = rideId === null ? EMPTY : stopsRef.current.points;
+  return { dropoff, route, remaining, stops };
 };

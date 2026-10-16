@@ -28,7 +28,13 @@ import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 import AuthKeyboardScroll from '../../features/auth/components/AuthKeyboardScroll';
 import { styles } from './PhoneAuthScreen.styles';
-import { EmailFallback, KEYBOARD_DONE_ID, KeyboardDoneBar, PhoneAuthHeader } from './PhoneAuthParts';
+import {
+  CODE_INPUT_DONE_ID,
+  EmailFallback,
+  KeyboardDoneBar,
+  PHONE_INPUT_DONE_ID,
+  PhoneAuthHeader,
+} from './PhoneAuthParts';
 
 type AuthStep = 'phone' | 'verification';
 
@@ -245,11 +251,12 @@ export default function PhoneAuthScreen() {
           }}
           keyboardType="phone-pad"
           returnKeyType="done"
-          inputAccessoryViewID={KEYBOARD_DONE_ID}
+          inputAccessoryViewID={PHONE_INPUT_DONE_ID}
           autoFocus
           style={[styles.input, phoneError && styles.inputError]}
           maxLength={13}
         />
+        <KeyboardDoneBar nativeID={PHONE_INPUT_DONE_ID} testID="phone-auth-phone-done" />
         {phoneError ? (
           <View style={styles.errorContainer}>
             <Icon name="error" size={16} color="#ef4444" />
@@ -308,12 +315,13 @@ export default function PhoneAuthScreen() {
           }}
           keyboardType="number-pad"
           returnKeyType="done"
-          inputAccessoryViewID={KEYBOARD_DONE_ID}
+          inputAccessoryViewID={CODE_INPUT_DONE_ID}
           textContentType="oneTimeCode"
           autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
           autoFocus
           style={[styles.input, otpError && styles.inputError]}
         />
+        <KeyboardDoneBar nativeID={CODE_INPUT_DONE_ID} testID="phone-auth-code-done" />
         {otpError ? (
           <View style={styles.errorContainer}>
             <Icon name="error" size={16} color="#ef4444" />
@@ -384,7 +392,6 @@ export default function PhoneAuthScreen() {
           </View>
         </AuthKeyboardScroll>
       </ImageBackground>
-      <KeyboardDoneBar />
     </SafeAreaView>
   );
 }

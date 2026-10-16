@@ -545,7 +545,8 @@ export interface ProfileUpdateRequest {
   gender?: 'male' | 'female' | 'other';
   /** YYYY-MM-DD; a driver's must be 18+ (BE-68). */
   date_of_birth?: string;
-  address?: string;
+  /** null clears the saved address (BE-101). */
+  address?: string | null;
   bio?: string | null;
 }
 
