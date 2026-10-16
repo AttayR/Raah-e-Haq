@@ -1,3 +1,20 @@
+diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm
+index f152dab..fe96738 100644
+--- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm
++++ b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm
+@@ -67,6 +67,12 @@ - (void)didMoveToWindow
+     if (self.nativeId) {
+       _textInput = RCTFindTextInputWithNativeId(self.window, self.nativeId);
+       _textInput.inputAccessoryView = _contentView;
++      // Raah-e-Haq T-551: an autoFocus input that mounts in the same commit becomes first
++      // responder in its own didMoveToWindow, before this bar attaches; the keyboard keeps the
++      // input views it read at focus, so without a reload the bar never shows.
++      if (_textInput.isFirstResponder) {
++        [_textInput reloadInputViews];
++      }
+     } else {
+       _textInput = RCTFindTextInputWithNativeId(_contentView, nil);
+     }
 diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
 index b5d7242..9c6ffef 100644
 --- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm

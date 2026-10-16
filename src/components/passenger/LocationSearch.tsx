@@ -14,6 +14,26 @@ type Suggestion = { id: string; title: string; subtitle: string; icon: string; c
 export const suggestionAddress = (s: Pick<Suggestion, 'title' | 'subtitle'>): string =>
   s.subtitle && s.subtitle !== s.title ? `${s.title}, ${s.subtitle}` : s.title;
 
+/**
+ * The field's text after the passenger edits a label that typing replaces ("Current location",
+ * T-551): text typed before, after or inside the label keeps only what was typed, one deleted
+ * character (Backspace) empties the field, anything else (the selected label replaced) is kept.
+ */
+export const replaceLabelEdit = (label: string, typed: string): string => {
+  if (typed.length > label.length) {
+    let start = 0;
+    while (start < label.length && typed[start] === label[start]) start += 1;
+    const tail = label.slice(start);
+    return typed.endsWith(tail) ? typed.slice(start, typed.length - tail.length) : typed;
+  }
+  if (typed.length === label.length - 1) {
+    let start = 0;
+    while (start < typed.length && typed[start] === label[start]) start += 1;
+    if (label.slice(start + 1) === typed.slice(start)) return '';
+  }
+  return typed;
+};
+
 /** Autocomplete state: nothing asked yet, waiting, answered (maybe empty), or failed. */
 export type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
 
@@ -44,6 +64,11 @@ type Props = {
   onChooseOnMap?: () => void;
   /** Rank suggestions near this point (the rider or the pickup); results stay in Pakistan anyway. */
   near?: PlacesBias;
+  /**
+   * Labels, not addresses ("Current location", "Pinned on map"): while the field shows one, focus
+   * selects it and typing replaces it instead of adding to it (T-551).
+   */
+  replaceOnType?: string | readonly string[];
 };
 
 const PLACEHOLDER = { pickup: 'Pickup location', destination: 'Where to?' } as const;
@@ -74,6 +99,7 @@ const LocationSearch: React.FC<Props> = ({
   leadingIcon,
   onChooseOnMap,
   near,
+  replaceOnType,
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
@@ -166,7 +192,14 @@ const LocationSearch: React.FC<Props> = ({
     onSelect(s);
   };
 
-  const changeText = (q: string) => {
+  const labels: readonly string[] = replaceOnType === undefined ? [] : typeof replaceOnType === 'string' ? [replaceOnType] : replaceOnType;
+  // Read at focus time: the label is selected, so the first keystroke replaces it.
+  const showsLabel = !edited && labels.includes(text);
+
+  const changeText = (typed: string) => {
+    // Covers a lost selection (a tap that placed the cursor): typing never adds to the label.
+    const label = edited ? undefined : labels.find((l) => l === textRef.current);
+    const q = label ? replaceLabelEdit(label, typed) : typed;
     setEdited(true);
     setText(q);
     onChangeQuery?.(q);
@@ -204,6 +237,7 @@ const LocationSearch: React.FC<Props> = ({
           maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
           returnKeyType="search"
           autoCorrect={false}
+          selectTextOnFocus={showsLabel}
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
         />

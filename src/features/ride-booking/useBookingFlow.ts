@@ -13,6 +13,8 @@ import type { BookingPrefillState } from './prefill';
 export type BookingStage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
 
 const STAGE_ORDER: BookingStage[] = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
+/** The route is drawn from the vehicle step on; an earlier step shows no route (T-551). */
+const ROUTE_FROM = STAGE_ORDER.indexOf('vehicle');
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -116,16 +118,26 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     clearRoute();
   }, [clearRoute, setPickupQuery, setDestQuery]);
 
-  /** Back steps through the booking; a ride stays in Redux, so Back then leaves the screen. */
+  /**
+   * Back steps through the booking; a ride stays in Redux, so Back then leaves the screen. Back
+   * to a search step drops the old route: the next pick draws a new one (T-551).
+   */
   const stepBack = useCallback((): boolean => {
     const currentIndex = STAGE_ORDER.indexOf(stage);
     if (currentIndex > 0 && !rideShown) {
+      if (currentIndex - 1 < ROUTE_FROM) clearRoute();
       setStage(STAGE_ORDER[currentIndex - 1]);
       setError(null);
       return true;
     }
     return false;
-  }, [stage, rideShown]);
+  }, [stage, rideShown, clearRoute]);
+
+  /** The vehicle step's edit chips: back to that search, without the old route (T-551). */
+  const editPoint = useCallback((target: 'pickup' | 'destination') => {
+    clearRoute();
+    setStage(target);
+  }, [clearRoute]);
 
   // Pickup at the passenger's position; its address is resolved and kept with the point.
   const pickupAtCurrentLocation = useCallback(async () => {
@@ -148,6 +160,12 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     setMapPick(target);
   }, []);
 
+  // A re-picked pickup or destination keeps the stops already on the trip (T-551).
+  const routeVia = useCallback((from: LatLng, to: LatLng) => {
+    if (stops.length > 0) fetchRouteWithWaypoints(from, stops, to);
+    else fetchRoute(from, to);
+  }, [stops, fetchRoute, fetchRouteWithWaypoints]);
+
   const updateStops = useCallback((ns: BookingPlace[]) => {
     if (!pickup || !destination) return;
     setStops(ns);
@@ -163,12 +181,12 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     // The field keeps the picked address (Back to this step shows it, not the old text).
     setPickupQuery(address);
     if (destination && routeIfReady) {
-      fetchRoute(c, destination);
+      routeVia(c, destination);
       setStage('vehicle');
     } else {
       setStage('destination');
     }
-  }, [destination, fetchRoute, setPickupQuery]);
+  }, [destination, routeVia, setPickupQuery]);
 
   /** A destination picked in the search: the route from the pickup (else the passenger's position). */
   const selectDestination = useCallback((c: LatLng, address: string, fallbackToGps: boolean) => {
@@ -181,20 +199,20 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     setDestination({ ...c, address });
     setDestQuery(address);
     if (from) {
-      fetchRoute(from, c);
+      routeVia(from, c);
       setStage('vehicle');
     } else {
       setStage(fallbackToGps ? 'vehicle' : 'pickup');
     }
-  }, [pickup, currentLocation, fetchRoute, setPickupQuery, setDestQuery]);
+  }, [pickup, currentLocation, routeVia, setPickupQuery, setDestQuery]);
 
   const pickCurrentLocation = useCallback(async () => {
     const cur = await pickupAtCurrentLocation();
     if (cur && destination) {
-      fetchRoute(cur, destination);
+      routeVia(cur, destination);
       setStage('vehicle');
     }
-  }, [pickupAtCurrentLocation, destination, fetchRoute]);
+  }, [pickupAtCurrentLocation, destination, routeVia]);
 
   return {
     pickup,
@@ -218,6 +236,7 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     onPressMap,
     resetSelection,
     stepBack,
+    editPoint,
     pickupAtCurrentLocation,
     chooseOnMap,
     updateStops,

@@ -43,3 +43,6 @@ export const BOOKING_COPY = {
   locationRetry: 'Try again',
   locationOpenSettings: 'Open settings',
 } as const;
+
+/** Field texts that are labels, not addresses: typing in the field replaces them (T-551). */
+export const LOCATION_FIELD_LABELS: readonly string[] = [BOOKING_COPY.currentLocation, BOOKING_COPY.pinnedOnMap];

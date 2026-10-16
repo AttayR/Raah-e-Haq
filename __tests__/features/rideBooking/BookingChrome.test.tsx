@@ -13,7 +13,7 @@ import { BookingSheet } from '../../../src/features/ride-booking/components/Book
 import { NearbyDriverMarkers } from '../../../src/components/passenger/NearbyDrivers';
 import { useKeyboardHeight } from '../../../src/hooks/useKeyboardHeight';
 import { AppText } from '../../../src/components/ui/AppText';
-import LocationSearch from '../../../src/components/passenger/LocationSearch';
+import LocationSearch, { replaceLabelEdit } from '../../../src/components/passenger/LocationSearch';
 import { fetchAutocomplete } from '../../../src/services/placesService';
 
 jest.mock('../../../src/services/placesService', () => ({
@@ -188,6 +188,66 @@ describe('LocationSearch states', () => {
     fireEvent.changeText(getByTestId('location-search-destination'), 'Liberty');
     expect(await findByText("Search isn't working right now.")).toBeTruthy();
     expect(getByTestId('location-search-on-map')).toBeTruthy();
+  });
+
+  describe('"Current location" is replaced by typing, not added to (T-551)', () => {
+    const Pickup: React.FC<{ onChangeQuery?: (q: string) => void }> = ({ onChangeQuery }) => (
+      <LocationSearch mode="pickup" query="Current location" replaceOnType="Current location" onChangeQuery={onChangeQuery} onSelect={jest.fn()} />
+    );
+
+    it('focus selects the label; once typed in, focus no longer selects', () => {
+      mockAutocomplete.mockResolvedValue([]);
+      const { getByTestId } = render(<Pickup />);
+      const input = getByTestId('location-search-pickup');
+      expect(input.props.selectTextOnFocus).toBe(true);
+      fireEvent.changeText(input, 'G');
+      expect(input.props.selectTextOnFocus).toBe(false);
+    });
+
+    it('a keystroke after the label keeps only what was typed', () => {
+      mockAutocomplete.mockResolvedValue([]);
+      const onChangeQuery = jest.fn();
+      const { getByTestId } = render(<Pickup onChangeQuery={onChangeQuery} />);
+      const input = getByTestId('location-search-pickup');
+      fireEvent.changeText(input, 'Current locationG');
+      expect(input.props.value).toBe('G');
+      expect(onChangeQuery).toHaveBeenLastCalledWith('G');
+      // Later keystrokes are ordinary typing.
+      fireEvent.changeText(input, 'Ga');
+      expect(input.props.value).toBe('Ga');
+    });
+
+    it('a field without the label types as before', () => {
+      const { getByTestId } = render(
+        <LocationSearch mode="pickup" query="Gulberg III" replaceOnType="Current location" onSelect={jest.fn()} />,
+      );
+      const input = getByTestId('location-search-pickup');
+      expect(input.props.selectTextOnFocus).toBe(false);
+      fireEvent.changeText(input, 'Gulberg III, Lahore');
+      expect(input.props.value).toBe('Gulberg III, Lahore');
+    });
+
+    it('"Pinned on map" is replaced the same way, in the destination field too', () => {
+      const labels = ['Current location', 'Pinned on map'];
+      const { getByTestId } = render(
+        <LocationSearch mode="destination" query="Pinned on map" replaceOnType={labels} onSelect={jest.fn()} />,
+      );
+      const input = getByTestId('location-search-destination');
+      expect(input.props.selectTextOnFocus).toBe(true);
+      fireEvent.changeText(input, 'Pinned on mapLiberty');
+      expect(input.props.value).toBe('Liberty');
+    });
+
+    it.each([
+      ['Current locationGaddafi Stadium', 'Gaddafi Stadium'],
+      ['GCurrent location', 'G'],
+      ['CurrentG location', 'G'],
+      ['Current locatio', ''],
+      ['G', 'G'],
+      ['Current location', 'Current location'],
+    ])('replaceLabelEdit(%p) is %p', (typed, expected) => {
+      expect(replaceLabelEdit('Current location', typed)).toBe(expected);
+    });
   });
 
   it('results: rows, no empty or error state', async () => {

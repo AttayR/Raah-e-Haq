@@ -12,6 +12,7 @@ import type { useFareEstimates, useVehicleTypes } from '../hooks';
 import type { BookingFlow, BookingStage } from '../useBookingFlow';
 import { FareStage, MAX_STOPS, VehicleStage } from './BookingStages';
 import { ChooseOnMapButton } from './MapPick';
+import { LOCATION_FIELD_LABELS } from '../copy';
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -94,6 +95,7 @@ export const BookingStageContent: React.FC<Props> = ({
             onFocusChange={onFocusChange}
             onChooseOnMap={() => chooseOnMap('pickup')}
             near={currentLocation}
+            replaceOnType={LOCATION_FIELD_LABELS}
             onSelect={(s) => flow.selectPickup(s.coords, suggestionAddress(s), false)}
           />
           {!compact && <ChooseOnMapButton onPress={() => setMapPick('pickup')} />}
@@ -109,6 +111,7 @@ export const BookingStageContent: React.FC<Props> = ({
             onFocusChange={onFocusChange}
             onChooseOnMap={() => chooseOnMap('destination')}
             near={pickup ?? currentLocation}
+            replaceOnType={LOCATION_FIELD_LABELS}
             onSelect={(s) => flow.selectDestination(s.coords, suggestionAddress(s), true)}
           />
           {!compact && <ChooseOnMapButton onPress={() => setMapPick('destination')} />}
@@ -127,8 +130,8 @@ export const BookingStageContent: React.FC<Props> = ({
             flow.setSelectedVehicle(id);
             setStage('fare');
           }}
-          onEditPickup={() => setStage('pickup')}
-          onEditDestination={() => setStage('destination')}
+          onEditPickup={() => flow.editPoint('pickup')}
+          onEditDestination={() => flow.editPoint('destination')}
           onSwap={flow.swapPickupDrop}
           canEditStops={!!(pickup && destination)}
           stops={stops}

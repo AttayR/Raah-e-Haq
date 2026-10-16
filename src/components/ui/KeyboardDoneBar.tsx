@@ -20,6 +20,8 @@ export type KeyboardDoneBarProps = {
  * On Fabric an InputAccessoryView attaches only to the first input in the window with its
  * `nativeID`, so do not share one bar between several inputs. Use this directly only for an
  * input that is not a TextField: one bar per input, a unique `nativeID`, rendered next to it.
+ * Render it after its input: the bar looks the input up when it mounts. An autoFocus input is
+ * already focused by then; the patched native view reloads its keyboard so the bar shows (T-551).
  */
 export function KeyboardDoneBar({ nativeID, label, testID }: KeyboardDoneBarProps) {
   const { theme } = useAppTheme();

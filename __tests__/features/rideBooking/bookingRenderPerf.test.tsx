@@ -300,6 +300,60 @@ describe('useBookingFlow field text (T-534 review)', () => {
     expect(result.current.destField.text).toBe('Gulberg III, Lahore');
     expect(result.current.pickup).toMatchObject(DHA);
   });
+
+  it('Back from the vehicle step clears the old route; Back from fare keeps it (T-551)', () => {
+    const d = directions();
+    const { result } = renderHook(() => useBookingFlow({ prefill, currentLocation: GPS, rideShown: false, directions: d }));
+    act(() => result.current.selectPickup(GULBERG, 'Gulberg III, Lahore', true));
+    act(() => result.current.selectDestination(DHA, 'DHA Phase 5, Lahore', false));
+    expect(result.current.stage).toBe('vehicle');
+    act(() => result.current.setStage('fare'));
+    act(() => {
+      result.current.stepBack();
+    });
+    expect(result.current.stage).toBe('vehicle');
+    expect(d.clearRoute).not.toHaveBeenCalled();
+    act(() => {
+      result.current.stepBack();
+    });
+    expect(result.current.stage).toBe('destination');
+    expect(d.clearRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('a pickup or destination re-picked after Back keeps the stops in the route (T-551)', () => {
+    const d = directions();
+    const { result } = renderHook(() => useBookingFlow({ prefill, currentLocation: GPS, rideShown: false, directions: d }));
+    const STOP = { latitude: 31.49, longitude: 74.37, address: 'Model Town, Lahore' };
+    const JOHAR = { latitude: 31.46, longitude: 74.27 };
+    act(() => result.current.selectPickup(GULBERG, 'Gulberg III, Lahore', true));
+    act(() => result.current.selectDestination(DHA, 'DHA Phase 5, Lahore', false));
+    expect(d.fetchRoute).toHaveBeenCalledTimes(1); // no stops yet: the plain route
+    act(() => result.current.updateStops([STOP]));
+    act(() => {
+      result.current.stepBack();
+    });
+    d.fetchRoute.mockClear();
+    d.fetchRouteWithWaypoints.mockClear();
+    act(() => result.current.selectDestination(JOHAR, 'Johar Town, Lahore', false));
+    expect(d.fetchRouteWithWaypoints).toHaveBeenLastCalledWith(expect.objectContaining(GULBERG), [STOP], JOHAR);
+    act(() => result.current.editPoint('pickup'));
+    act(() => result.current.selectPickup(GPS, 'Mall Road, Lahore', true));
+    expect(d.fetchRouteWithWaypoints).toHaveBeenLastCalledWith(GPS, [STOP], expect.objectContaining(JOHAR));
+    expect(d.fetchRoute).not.toHaveBeenCalled();
+  });
+
+  it('the vehicle step edit chips go back to the search without the old route (T-551)', () => {
+    const d = directions();
+    const { result } = renderHook(() => useBookingFlow({ prefill, currentLocation: GPS, rideShown: false, directions: d }));
+    act(() => result.current.selectDestination(DHA, 'DHA Phase 5, Lahore', true));
+    expect(result.current.stage).toBe('vehicle');
+    act(() => result.current.editPoint('pickup'));
+    expect(result.current.stage).toBe('pickup');
+    expect(d.clearRoute).toHaveBeenCalledTimes(1);
+    act(() => result.current.editPoint('destination'));
+    expect(result.current.stage).toBe('destination');
+    expect(d.clearRoute).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('useBookingMapCamera ready fallback (T-534 review)', () => {
