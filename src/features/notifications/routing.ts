@@ -30,6 +30,8 @@ export interface TargetSource {
   rideId: number | null;
   /** BE-85 `requeued`: the cancelled-by-driver ride is back in the queue (passenger: still live). */
   requeued?: boolean;
+  /** BE-93 push `ride_status`: the ride's API status when the push was sent (null when absent). */
+  rideStatus?: string | null;
 }
 
 const ENDED_RIDE_TYPES = new Set(['ride_completed', 'ride_cancelled']);
@@ -37,7 +39,7 @@ const ENDED_RIDE_TYPES = new Set(['ride_completed', 'ride_cancelled']);
 const WALLET_TYPES = new Set(['topup_succeeded', 'topup_failed']);
 
 export const resolveNotificationTarget = (
-  { category, type, rideId, requeued = false }: TargetSource,
+  { category, type, rideId, requeued = false, rideStatus = null }: TargetSource,
   role: NotificationRole,
 ): NotificationTarget => {
   if ((category === 'chat' || type === 'chat_message') && rideId !== null) {
@@ -57,8 +59,9 @@ export const resolveNotificationTarget = (
     return { kind: 'ride', rideId };
   }
   // T-521: "Your driver cancelled. Your ride is back in the queue" opens the live ride (finding
-  // another driver), not the history.
-  if (type === 'ride_cancelled' && requeued) return { kind: 'ride', rideId };
+  // another driver), not the history. T-546: a push says so with requeued "true", or with the
+  // ride back in `requested` (BE-93 ride_status).
+  if (type === 'ride_cancelled' && (requeued || rideStatus === 'requested')) return { kind: 'ride', rideId };
   if (type !== null && ENDED_RIDE_TYPES.has(type)) return { kind: 'rideHistory' };
   return { kind: 'ride', rideId };
 };

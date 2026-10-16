@@ -85,6 +85,8 @@ const TYPE_ICONS: Record<string, IconName> = {
   referral_reward: 'promo',
   bonus: 'promo',
   refund: 'refund',
+  // BE-91: an admin's goodwill refund (not cash-backed) reads as a refund too.
+  goodwill_refund: 'refund',
   reversal: 'refund',
   opening_balance: 'wallet',
   topup: 'topUp',

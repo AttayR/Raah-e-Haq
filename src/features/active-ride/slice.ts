@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, type PayloadAction, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type RideRequest, type RideResource } from '../../services/rideService';
 import type { RideRatingFields } from '../rating/types';
 import { toThunkRejection, type ThunkRejection } from '../../core/api/errors';
@@ -116,6 +116,22 @@ export const refreshActiveRide = createAsyncThunk<RideResource, number, ThunkCon
   },
   { condition: (_, { getState }) => !getState().activeRide.isRefreshing },
 );
+
+/**
+ * A tapped passenger ride push (T-546): the push only says where to go, so the ride is read again
+ * from the server. The ride held here is re-read (GET /rides/{id}); with no ride held yet (cold
+ * start, or the screen cleared it) the in-progress ride is restored instead.
+ */
+export const refetchActiveRideForPush =
+  (rideId: number | null): ThunkAction<void, SliceRoot, unknown, UnknownAction> =>
+  (dispatch, getState) => {
+    const ride = getState().activeRide.ride;
+    if (rideId !== null && ride?.id === rideId) {
+      dispatch(refreshActiveRide(rideId));
+    } else if (!ride) {
+      dispatch(restoreActiveRide());
+    }
+  };
 
 /** POST /rides/{id}/cancel; on success the active ride is the cancelled ride (not in progress). */
 export const cancelActiveRide = createAsyncThunk<RideResource, number, ThunkConfig>(

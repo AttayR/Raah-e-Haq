@@ -23,8 +23,13 @@ import {
   notificationsStale,
   type NotificationsState,
 } from './slice';
+import { refetchActiveRideForPush, type ActiveRideState } from '../active-ride/slice';
 
-type SliceRoot = { notifications: NotificationsState };
+type SliceRoot = {
+  notifications: NotificationsState;
+  activeRide: ActiveRideState;
+  apiAuth?: { user: { id: number } | null };
+};
 type NotificationsDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
 type RemoteMessage = FirebaseMessagingTypes.RemoteMessage;
 
@@ -43,7 +48,8 @@ export const __resetInitialNotificationForTests = (): void => {
  * - a foreground push shows the in-app toast (with "View") and refreshes the badge and list;
  *   a chat push for the thread that is on screen shows nothing and marks its row read (T-544);
  * - a tapped push (background or cold start) marks its row read and opens its target
- *   (data.ride_id / category / type, see routing.ts).
+ *   (data.ride_id / category / type / ride_status / requeued, see routing.ts); a passenger's
+ *   live ride is re-read from the server on the way (T-546).
  * Every listener is removed on unmount (sign-out).
  */
 export const usePushNotifications = (role: NotificationRole): void => {
@@ -68,8 +74,12 @@ export const usePushNotifications = (role: NotificationRole): void => {
       const payload = toPushPayload(message.data);
       dispatch(notificationsStale());
       markReadAndCount(payload.notificationId);
+      const target = resolveNotificationTarget(payload, role);
+      // T-546: the live ride screen shows the server's ride, not what the push said (e.g. a
+      // requeued cancel is "finding a driver" again).
+      if (role === 'passenger' && target.kind === 'ride') dispatch(refetchActiveRideForPush(target.rideId));
       // Mounted by PassengerStack and DriverStack, which both register RideChat (T-510).
-      openNotificationTarget(navigationRef.current, role, resolveNotificationTarget(payload, role), 'push', {
+      openNotificationTarget(navigationRef.current, role, target, 'push', {
         chatThreadAvailable: true,
       });
     };

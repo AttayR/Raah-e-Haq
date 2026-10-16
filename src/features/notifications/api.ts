@@ -115,7 +115,10 @@ export const toPreferencesBody = (changes: Partial<NotificationPreferences>): Re
   return body;
 };
 
-/** The FCM `data` of a push (strings on the wire). */
+/**
+ * The FCM `data` of a push (strings on the wire). BE-93 adds `ride_status` to ride pushes and
+ * `requeued` ("true" | "false") to `ride_cancelled`; older pushes without them read null / false.
+ */
 export const toPushPayload = (raw: unknown): PushPayload => {
   const data = isRecord(raw) ? raw : {};
   return {
@@ -123,6 +126,8 @@ export const toPushPayload = (raw: unknown): PushPayload => {
     rideId: toId(data.ride_id),
     category: toCategory(data.category),
     type: toText(data.type),
+    rideStatus: toText(data.ride_status),
+    requeued: data.requeued === 'true',
   };
 };
 

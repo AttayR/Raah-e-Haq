@@ -108,8 +108,26 @@ describe('toPushPayload', () => {
   it('parses the string FCM data', () => {
     expect(
       toPushPayload({ notification_id: '15', ride_id: '7', category: 'ride', type: 'driver_arrived' }),
-    ).toEqual({ notificationId: 15, rideId: 7, category: 'ride', type: 'driver_arrived' });
-    expect(toPushPayload(undefined)).toEqual({ notificationId: null, rideId: null, category: 'system', type: null });
+    ).toEqual({ notificationId: 15, rideId: 7, category: 'ride', type: 'driver_arrived', rideStatus: null, requeued: false });
+    expect(toPushPayload(undefined)).toEqual({
+      notificationId: null,
+      rideId: null,
+      category: 'system',
+      type: null,
+      rideStatus: null,
+      requeued: false,
+    });
+  });
+
+  it('T-546 (BE-93): reads ride_status and requeued, which is true only for the string "true"', () => {
+    const push = (extra: Record<string, unknown>) =>
+      toPushPayload({ notification_id: '15', ride_id: '7', category: 'ride', type: 'ride_cancelled', ...extra });
+    expect(push({ ride_status: 'requested', requeued: 'true' })).toMatchObject({ rideStatus: 'requested', requeued: true });
+    expect(push({ ride_status: 'cancelled', requeued: 'false' })).toMatchObject({ rideStatus: 'cancelled', requeued: false });
+    // FCM data are strings: anything else is not "true".
+    expect(push({ requeued: '1' }).requeued).toBe(false);
+    expect(push({ requeued: 'TRUE' }).requeued).toBe(false);
+    expect(push({ ride_status: '' }).rideStatus).toBeNull();
   });
 });
 

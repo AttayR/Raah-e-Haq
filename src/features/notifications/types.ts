@@ -70,6 +70,10 @@ export interface PushPayload {
   rideId: number | null;
   category: NotificationCategory;
   type: string | null;
+  /** BE-93: the ride's API status when the push was sent (`requested`, `cancelled`, ...); null on older pushes. */
+  rideStatus: string | null;
+  /** BE-93, `ride_cancelled` only: "true" when a driver's cancel put the ride back in the queue. */
+  requeued: boolean;
 }
 
 export type DevicePlatform = 'ios' | 'android';

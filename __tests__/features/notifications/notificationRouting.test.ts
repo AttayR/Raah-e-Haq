@@ -35,6 +35,28 @@ describe('resolveNotificationTarget', () => {
     );
   });
 
+  it('T-546 (BE-93): a passenger ride_cancelled back in the queue opens the live ride', () => {
+    const cancelled = (extra: { requeued?: boolean; rideStatus?: string | null }) =>
+      resolveNotificationTarget({ category: 'ride', type: 'ride_cancelled', rideId: 3, ...extra }, 'passenger');
+    expect(cancelled({ requeued: true, rideStatus: 'requested' })).toEqual({ kind: 'ride', rideId: 3 });
+    expect(cancelled({ rideStatus: 'requested' })).toEqual({ kind: 'ride', rideId: 3 });
+    expect(cancelled({ requeued: true })).toEqual({ kind: 'ride', rideId: 3 });
+    // A real cancel, and an older push without the keys, open the history as before.
+    expect(cancelled({ requeued: false, rideStatus: 'cancelled' }).kind).toBe('rideHistory');
+    expect(cancelled({}).kind).toBe('rideHistory');
+    expect(cancelled({ rideStatus: null }).kind).toBe('rideHistory');
+    // ride_status only matters on ride_cancelled; the driver who cancelled goes Home.
+    expect(
+      resolveNotificationTarget({ category: 'ride', type: 'ride_completed', rideId: 3, rideStatus: 'requested' }, 'passenger').kind,
+    ).toBe('rideHistory');
+    expect(
+      resolveNotificationTarget(
+        { category: 'ride', type: 'ride_cancelled', rideId: 3, requeued: true, rideStatus: 'requested' },
+        'driver',
+      ).kind,
+    ).toBe('home');
+  });
+
   it('driver: new request opens the request feed; a cancelled ride opens Home; a stop change opens the ride', () => {
     expect(resolveNotificationTarget({ category: 'ride', type: 'new_ride_request', rideId: 3 }, 'driver').kind).toBe(
       'rideRequests',

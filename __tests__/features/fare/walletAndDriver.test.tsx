@@ -20,7 +20,9 @@ import { CommissionCard } from '../../../src/features/wallet/components/Commissi
 import { IncomingRequestCard } from '../../../src/components/driver/IncomingRequestCard';
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
-import { makeRide } from '../../../test-utils/rideFixtures';
+import { makeRide, makeRideRequest } from '../../../test-utils/rideFixtures';
+import { useActiveRideActions } from '../../../src/features/active-ride/hooks';
+import { dialog, dialogStore } from '../../../src/core/dialog';
 import { noShowAtOf, noShowFeeOf, useNoShowReady } from '../../../src/features/driver-ride/noShow';
 import { cancellationChargeText, driverSplitRows } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
@@ -98,10 +100,25 @@ describe('wallet (BE-85 amount owed, new ledger types)', () => {
     ['cancellation_compensation_release', 'Cancellation pay (released)', 'clock'],
     ['fare_dispute_charge', 'Fare dispute recovery', 'dispute'],
     ['refund', 'Refund', 'refund'],
+    // T-546 (BE-91): an admin's goodwill refund has its own type, shown as a refund.
+    ['goodwill_refund', 'Refund', 'refund'],
   ])('%s has its own label and icon', (type, label, icon) => {
     const item = toTransaction(rawTransaction({ type, label: 'Server label' }));
     expect(item?.label).toBe(label);
     expect(item && transactionIcon(item)).toBe(icon);
+  });
+
+  it('T-546: a goodwill refund is a credit, so the "In" filter lists it with refunds', async () => {
+    const goodwill = toTransaction(rawTransaction({ type: 'goodwill_refund', direction: 'credit', label: 'Refund' }));
+    expect(goodwill?.direction).toBe('credit');
+    mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: 100 })));
+    mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1)));
+    renderWallet('passenger');
+    await waitFor(() => expect(screen.getByTestId('wallet-balance-card')).toBeTruthy());
+    fireEvent.press(screen.getByText('Money in'));
+    await waitFor(() =>
+      expect(mock.history.get.some((r) => r.url === '/wallet/transactions' && r.params?.direction === 'credit')).toBe(true),
+    );
   });
 
   it('keeps the server label for other types', () => {
@@ -117,6 +134,37 @@ describe('wallet (BE-85 amount owed, new ledger types)', () => {
     fireEvent.press(screen.getByTestId('wallet-owed-top-up'));
     // T-543: Add money opens with the amount owed filled in.
     expect(mockNavigate).toHaveBeenCalledWith('AddMoney', { amount: 200 });
+  });
+
+  it('T-546 (BE-91): the booking block shows and prefills the error amount_owed, not the wallet debt', async () => {
+    // A driver-passenger: the wallet owes Rs 900 in all (commission included), but only Rs 200
+    // is passenger-side debt, which is what POST /rides reports.
+    mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: -900, amount_owed: 900 })));
+    mock.onPost('/rides').reply(403, {
+      success: false,
+      message: 'You owe Rs 200. Top up your wallet to book a ride',
+      error: { code: 'PASSENGER_BALANCE_OWED', message: 'You owe Rs 200. Top up your wallet to book a ride', amount_owed: 200, limit: 150 },
+    });
+    const onBalanceOwed = jest.fn();
+    const store = configureStore({ reducer: rootReducer });
+    const { result } = renderHook(() => useActiveRideActions({ onBalanceOwed }), {
+      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+    });
+
+    let refused: unknown = null;
+    await act(async () => {
+      await result.current.requestRide(makeRideRequest()).catch((error: unknown) => {
+        refused = error;
+      });
+    });
+    expect(refused).not.toBeNull();
+    const current = dialogStore.getCurrent();
+    expect(current).toMatchObject({ title: 'You owe Rs 200' });
+    await act(async () => {
+      if (current) dialog.answer(current.id, true);
+    });
+    await waitFor(() => expect(onBalanceOwed).toHaveBeenCalledWith(200));
+    expect(mock.history.get.some((r) => r.url === '/wallet')).toBe(false);
   });
 
   it('no owed banner when nothing is owed', async () => {
