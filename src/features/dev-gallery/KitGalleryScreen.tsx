@@ -9,6 +9,7 @@ import { FormatSection, HapticsSection } from './sections/FormatSection';
 import { ICON_PART_COUNT, IconSection } from './sections/IconSection';
 import { ButtonSection } from './sections/ButtonSection';
 import { FieldSection } from './sections/FieldSection';
+import { DoneBarSection } from './sections/DoneBarSection';
 import { ProfileSection } from './sections/ProfileSection';
 import { DialogSection, FeedbackSection, StatesSection } from './sections/FeedbackSections';
 import { SheetSection } from './sections/SheetSection';
@@ -56,6 +57,7 @@ const SECTIONS: Section[] = [
   ['buttons3', () => <ButtonSection part={3} />],
   ['fields1', () => <FieldSection part={1} />],
   ['fields2', () => <FieldSection part={2} />],
+  ['donebar', () => <DoneBarSection />],
   ['selection', () => <SelectionSection />],
   ['badges', () => <BadgeSection />],
   ['headers', () => <HeaderSection />],

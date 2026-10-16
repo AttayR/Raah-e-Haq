@@ -99,7 +99,10 @@ describe('validateProfileForm', () => {
 
   it('fields the server cannot clear may not be emptied; unchanged fields are not checked', () => {
     const { initial, form } = edit(passenger, { name: ' ', address: '', email: '' });
-    expect(Object.keys(validateProfileForm(form, initial, passenger, NOW)).sort()).toEqual(['address', 'email', 'name']);
+    const errors = validateProfileForm(form, initial, passenger, NOW);
+    expect(Object.keys(errors).sort()).toEqual(['address', 'email', 'name']);
+    // T-548: the server refuses an empty address (`sometimes|string`), so the message says why.
+    expect(errors.address).toBe("A saved address can't be removed yet. Enter a new address or put the saved one back.");
     // An old driver profile under 18 that is not edited is not re-validated.
     const old = { ...driver, date_of_birth: '2010-01-01' };
     const untouched = edit(old, { name: 'Other' });

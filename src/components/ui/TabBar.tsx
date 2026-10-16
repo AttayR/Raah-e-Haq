@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { interpolate, useAnimatedStyle, useDerivedValue, withTiming } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { haptics } from '../../core/haptics';
@@ -45,6 +45,12 @@ const k = componentTokens.tabBar;
  * `onPrimarySoft`, 600 label in `primaryText`. Inactive: outline glyph and 500 label in
  * `textMuted`. A count Badge sits on the pill's top-end corner. Changing tab fires the
  * `selection` haptic. Reduced motion: the pill appears without animating.
+ *
+ * The pill is a Reanimated CSS transition on plain React style (T-548), so its resting state
+ * always comes from `active`. It used to be a shared value + `useAnimatedStyle`, whose React
+ * props carry the mount-time values: whenever Reanimated's overlay of the latest animated values
+ * was lost (seen after a theme switch re-rendered every tab), the next React commit put the pill
+ * back where it was at mount, so it stayed on a tab that was no longer active.
  */
 export function TabBar({
   items,
@@ -91,19 +97,21 @@ export function TabBar({
   );
 }
 
+/** The pill's resting state for `active`, animated to by a CSS transition (none under reduced motion). */
+export const pillStyleFor = (active: boolean, reduce: boolean) => ({
+  opacity: active ? 1 : 0,
+  width: active ? k.indicatorWidth : k.indicatorWidthFrom,
+  transitionProperty: ['opacity', 'width'] as const,
+  transitionDuration: reduce ? 0 : motion.fast.duration,
+  transitionTimingFunction: 'ease-out' as const,
+});
+
 type ButtonProps = { item: TabBarItem; active: boolean; onPress: () => void; onLongPress?: () => void };
 
 function TabBarButton({ item, active, onPress, onLongPress }: ButtonProps) {
   const { theme } = useAppTheme();
   const reduce = useReducedMotion();
-  const progress = useDerivedValue(
-    () => withTiming(active ? 1 : 0, { duration: reduce ? 0 : motion.fast.duration }),
-    [active, reduce],
-  );
-  const pillStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    width: interpolate(progress.value, [0, 1], [k.indicatorWidthFrom, k.indicatorWidth]),
-  }));
+  const pillStyle = pillStyleFor(active, reduce);
   const badge = item.badgeCount ?? 0;
   const label = badge > 0 && item.badgeAccessibilityLabel ? item.badgeAccessibilityLabel : item.label;
 
@@ -120,7 +128,7 @@ function TabBarButton({ item, active, onPress, onLongPress }: ButtonProps) {
       <View style={styles.indicator}>
         <Animated.View
           style={[styles.pill, { backgroundColor: theme.colors.primarySoft }, pillStyle]}
-          testID={active ? `tab-${item.key}-pill` : undefined}
+          testID={`tab-${item.key}-pill`}
         />
         <Icon
           name={active ? item.activeIcon : item.icon}

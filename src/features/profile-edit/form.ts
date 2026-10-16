@@ -135,7 +135,9 @@ export const validateProfileForm = (
   }
   if (changed(form, initial, 'address')) {
     const address = form.address.trim();
-    if (!address) errors.address = 'profileEdit.addressRequired';
+    // PUT /profile has `address: sometimes|string` (not nullable), so "" or null is refused with a
+    // raw "must be a string" (T-548). Until the server accepts clearing, say so plainly here.
+    if (!address) errors.address = 'profileEdit.addressCannotClear';
     else if (address.length > ADDRESS_MAX) errors.address = 'profileEdit.addressTooLong';
   }
   if (form.bio.trim().length > BIO_MAX) errors.bio = 'profileEdit.bioTooLong';

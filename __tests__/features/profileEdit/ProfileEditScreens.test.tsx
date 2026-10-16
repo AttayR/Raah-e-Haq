@@ -143,13 +143,30 @@ describe('Edit profile', () => {
     await renderWith(<ProfileEditScreen />, driver);
     const scroll = screen.getByTestId('profile-edit-scroll');
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
-    // The Done bar (InputAccessoryView) serves the number pad (date of birth) and the multiline bio.
-    const doneId = screen.getByTestId('profile-edit-dob-input').props.inputAccessoryViewID;
-    expect(doneId).toBeTruthy();
-    expect(screen.getByTestId('profile-edit-bio-input').props.inputAccessoryViewID).toBe(doneId);
-    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    // T-548: the number pad (date of birth) and the multiline bio each get their own Done bar
+    // (Fabric attaches a shared one to the first input only); Address gets none.
+    const dobId = screen.getByTestId('profile-edit-dob-input').props.inputAccessoryViewID;
+    const bioId = screen.getByTestId('profile-edit-bio-input').props.inputAccessoryViewID;
+    expect(dobId).toBeTruthy();
+    expect(bioId).toBeTruthy();
+    expect(bioId).not.toBe(dobId);
+    expect(screen.getByTestId('profile-edit-address-input').props.inputAccessoryViewID).toBeUndefined();
+    expect(screen.getByTestId('profile-edit-dob-done')).toBeTruthy();
+    expect(screen.getByTestId('profile-edit-bio-done')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Done' })).toHaveLength(2);
     // The sticky Save bar stays outside the scroll view.
     expect(screen.getByTestId('profile-edit-scroll')).not.toContainElement(screen.getByTestId('profile-edit-save'));
+  });
+
+  it('T-548: clearing a saved address explains it cannot be removed yet and sends nothing', async () => {
+    await renderWith(<ProfileEditScreen />, rider);
+    fireEvent.changeText(screen.getByTestId('profile-edit-address-input'), '   ');
+    await flush();
+    await press('profile-edit-save');
+    expect(screen.getByTestId('profile-edit-address-error')).toHaveTextContent(
+      "A saved address can't be removed yet. Enter a new address or put the saved one back.",
+    );
+    expect(mock.history.put).toHaveLength(0);
   });
 
   it('T-545: the phone helper sits under the row at full width (not cut next to "Change number")', async () => {

@@ -8,7 +8,6 @@ import {
   Button,
   Header,
   KeyboardAwareScrollView,
-  KeyboardDoneBar,
   ListGroup,
   ListItem,
   Screen,
@@ -24,9 +23,6 @@ import { layout, space } from '../../../theme';
 import { ADDRESS_MAX, BIO_MAX, EMAIL_MAX, GENDERS, NAME_MAX, type Gender } from '../form';
 import { useProfileEditForm } from '../useProfileEditForm';
 import { CHANGE_PHONE_ROUTE, type ProfileEditNavigator } from '../navigation';
-
-/** The iOS Done bar for the number pad (date of birth) and the multiline bio, which have no return key. */
-const KEYBOARD_DONE_ID = 'profileEditKeyboardDone';
 
 const GENDER_OPTIONS = GENDERS.map((value) => ({
   value,
@@ -172,7 +168,8 @@ export default function ProfileEditScreen() {
           onChangeText={(text) => setField('dateOfBirth', formatIsoDateInput(text))}
           keyboardType="number-pad"
           maxLength={10}
-          inputAccessoryViewID={KEYBOARD_DONE_ID}
+          // The number pad and the multiline bio have no return key: each gets its own iOS Done bar.
+          doneBar
           error={errors.dateOfBirth}
           disabled={edit.saving}
           testID="profile-edit-dob"
@@ -195,7 +192,7 @@ export default function ProfileEditScreen() {
           onChangeText={(text) => setField('bio', text)}
           maxLength={BIO_MAX}
           multiline
-          inputAccessoryViewID={KEYBOARD_DONE_ID}
+          doneBar
           error={errors.bio}
           disabled={edit.saving}
           testID="profile-edit-bio"
@@ -216,7 +213,6 @@ export default function ProfileEditScreen() {
           testID="profile-edit-save"
         />
       </View>
-      <KeyboardDoneBar nativeID={KEYBOARD_DONE_ID} label={t('profileEdit.keyboardDone')} testID="profile-edit-keyboard-done" />
     </Screen>
   );
 }

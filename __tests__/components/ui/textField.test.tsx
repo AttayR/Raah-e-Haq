@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import {
   AccessibilityInfo,
+  InputAccessoryView,
+  Keyboard,
   StyleSheet,
   useColorScheme,
   type StyleProp,
@@ -229,5 +231,47 @@ describe('OtpInput', () => {
 
   it('fits a 375pt iPhone SE row: 6×48 + 5×8 ≤ 343', () => {
     expect(6 * 48 + 5 * 8).toBeLessThanOrEqual(375 - 32);
+  });
+});
+
+describe('TextField doneBar (T-548)', () => {
+  it('each field with doneBar gets its own iOS Done bar by a unique id; fields without it get none', async () => {
+    await renderThemed(
+      <>
+        <TextField value="" onChangeText={() => {}} label="Date of birth" keyboardType="number-pad" doneBar testID="dob" />
+        <TextField value="" onChangeText={() => {}} label="Address" testID="address" />
+        <TextField value="" onChangeText={() => {}} label="About you" multiline doneBar testID="bio" />
+      </>,
+    );
+    const dobId = screen.getByTestId('dob-input').props.inputAccessoryViewID;
+    const bioId = screen.getByTestId('bio-input').props.inputAccessoryViewID;
+    expect(dobId).toBeTruthy();
+    expect(bioId).toBeTruthy();
+    // Fabric attaches an InputAccessoryView to only the first input with its id: never share one.
+    expect(bioId).not.toBe(dobId);
+    expect(screen.getByTestId('address-input').props.inputAccessoryViewID).toBeUndefined();
+    const bars = screen.UNSAFE_getAllByType(InputAccessoryView).map(bar => bar.props.nativeID);
+    expect(bars).toEqual([dobId, bioId]);
+    expect(screen.queryByTestId('address-done')).toBeNull();
+  });
+
+  it('the bar reads "Done" as a button and closes the keyboard; doneBar overrides inputAccessoryViewID', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+    await renderThemed(
+      <TextField value="" onChangeText={() => {}} label="About you" multiline doneBar inputAccessoryViewID="shared" testID="bio" />,
+    );
+    expect(screen.getByTestId('bio-input').props.inputAccessoryViewID).not.toBe('shared');
+    const done = screen.getByTestId('bio-done');
+    expect(done.props.accessibilityRole).toBe('button');
+    expect(done.props.accessibilityLabel).toBe('Done');
+    fireEvent.press(done);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    dismiss.mockRestore();
+  });
+
+  it('a field without doneBar passes its own inputAccessoryViewID through', async () => {
+    await renderThemed(<TextField value="" onChangeText={() => {}} label="Amount" inputAccessoryViewID="amountDone" testID="amount" />);
+    expect(screen.getByTestId('amount-input').props.inputAccessoryViewID).toBe('amountDone');
+    expect(screen.UNSAFE_queryAllByType(InputAccessoryView)).toHaveLength(0);
   });
 });

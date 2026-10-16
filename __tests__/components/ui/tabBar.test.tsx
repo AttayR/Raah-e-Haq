@@ -8,9 +8,9 @@ import React from 'react';
 import { StyleSheet, useColorScheme, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import HapticFeedback from 'react-native-haptic-feedback';
-import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
+import { ThemeProvider, useAppTheme } from '../../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme, componentTokens, textStyles } from '../../../src/theme';
-import { FilterChips, TabBar, type TabBarItem } from '../../../src/components/ui';
+import { FilterChips, TabBar, pillStyleFor, type TabBarItem } from '../../../src/components/ui';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
@@ -98,6 +98,48 @@ describe('TabBar', () => {
     fireEvent.press(screen.getByTestId('tab-Home'));
     expect(onSelect).toHaveBeenLastCalledWith('Home');
     expect(HapticFeedback.trigger).not.toHaveBeenCalled();
+  });
+
+  it('T-548: the pill follows the active tab after a theme switch (resting state from React, CSS transition)', async () => {
+    mockScheme.mockReturnValue('light');
+    let switchTheme: (mode: 'light' | 'dark') => void = () => {};
+    let select: (key: string) => void = () => {};
+    function Harness() {
+      const { setScheme } = useAppTheme();
+      const [active, setActive] = React.useState('Account');
+      switchTheme = setScheme;
+      select = setActive;
+      return <TabBar items={ITEMS} activeKey={active} onSelect={setActive} />;
+    }
+    render(
+      <ThemeProvider>
+        <Harness />
+      </ThemeProvider>,
+    );
+    await act(async () => {});
+    const pill = (key: string) => flat(screen.getByTestId(`tab-${key}-pill`).props.style);
+    const { indicatorWidth, indicatorWidthFrom } = componentTokens.tabBar;
+    expect(pill('Account')).toMatchObject({ opacity: 1, width: indicatorWidth });
+    expect(pill('Home')).toMatchObject({ opacity: 0, width: indicatorWidthFrom });
+
+    // QA B04: switch the theme on Account, then go to Inbox.
+    await act(async () => switchTheme('dark'));
+    expect(pill('Account').backgroundColor).toBe(DarkTheme.colors.primarySoft);
+    await act(async () => select('Inbox'));
+    expect(pill('Inbox')).toMatchObject({ opacity: 1, width: indicatorWidth });
+    ITEMS.filter(item => item.key !== 'Inbox').forEach(item => {
+      expect(pill(item.key)).toMatchObject({ opacity: 0, width: indicatorWidthFrom });
+    });
+    // Animated by a transition on the plain style (no shared value whose mount-time value React re-sends).
+    expect(pill('Inbox')).toMatchObject({ transitionProperty: ['opacity', 'width'], transitionDuration: 150 });
+
+    await act(async () => switchTheme('light'));
+    await act(async () => select('Home'));
+    expect(pill('Home')).toMatchObject({ opacity: 1, backgroundColor: LightTheme.colors.primarySoft });
+    expect(pill('Inbox').opacity).toBe(0);
+    expect(pill('Account').opacity).toBe(0);
+    // Reduced motion: the pill appears without animating.
+    expect(pillStyleFor(true, true)).toMatchObject({ opacity: 1, transitionDuration: 0 });
   });
 
   it('hidden renders nothing (incoming request, full-screen flows)', async () => {

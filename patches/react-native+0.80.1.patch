@@ -1,0 +1,34 @@
+diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
+index b5d7242..9c6ffef 100644
+--- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
++++ b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
+@@ -298,7 +298,15 @@ - (void)updateProps:(const Props::Shared &)props oldProps:(const Props::Shared &
+   }
+ 
+   if (newTextInputProps.inputAccessoryViewID != oldTextInputProps.inputAccessoryViewID) {
+-    _backedTextInputView.inputAccessoryViewID = RCTNSStringFromString(newTextInputProps.inputAccessoryViewID);
++    // Raah-e-Haq T-548: nil (not @"") when the id is removed, and drop the accessory view the old
++    // id attached (it belongs to another InputAccessoryView, often an unmounted one when this view
++    // was recycled), so `setDefaultInputAccessoryView` below starts from a clean state.
++    _backedTextInputView.inputAccessoryViewID =
++        RCTNSStringFromStringNilIfEmpty(newTextInputProps.inputAccessoryViewID);
++    if (!_backedTextInputView.inputAccessoryViewID) {
++      _backedTextInputView.inputAccessoryView = nil;
++      _hasInputAccessoryView = NO;
++    }
+   }
+ 
+   if (newTextInputProps.inputAccessoryViewButtonLabel != oldTextInputProps.inputAccessoryViewButtonLabel) {
+@@ -378,6 +386,12 @@ - (void)prepareForRecycle
+   _ignoreNextTextInputCall = NO;
+   _didMoveToWindow = NO;
+   [_backedTextInputView resignFirstResponder];
++  // Raah-e-Haq T-548: a custom accessory view (InputAccessoryView by nativeID) belongs to the
++  // previous owner of this recycled view; without this the next TextInput that reuses the view
++  // shows a stale bar. The default number-pad toolbar is kept in sync by `_hasInputAccessoryView`.
++  if (_backedTextInputView.inputAccessoryViewID) {
++    _backedTextInputView.inputAccessoryView = nil;
++  }
+ }
+ 
+ #pragma mark - RCTBackedTextInputDelegate

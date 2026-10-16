@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useId, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { t } from '../../i18n';
@@ -13,6 +13,7 @@ import {
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
+import { KeyboardDoneBar } from './KeyboardDoneBar';
 import { useKeyboardReveal } from './keyboardReveal';
 // No maxLength on `phone`: a pasted "+92 300 1234567" must reach the normaliser whole (it caps at 10).
 import { formatNationalPhone, toNationalDigits } from './phoneInput';
@@ -35,6 +36,13 @@ export type TextFieldProps = Omit<
   /** Trailing clear button while there is text. Default: on for `search`, off otherwise. */
   clearable?: boolean;
   disabled?: boolean;
+  /**
+   * iOS "Done" bar above the keyboard, for inputs without a return key (number pad, multiline).
+   * The field renders its own bar with a unique `nativeID` (T-548): on Fabric an
+   * InputAccessoryView attaches to only the first input in the window with its id, so one bar
+   * shared by several fields shows on just one of them. Overrides `inputAccessoryViewID`.
+   */
+  doneBar?: boolean;
   testID?: string;
 };
 
@@ -61,6 +69,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     leadingIcon,
     clearable,
     disabled = false,
+    doneBar = false,
     multiline = false,
     testID,
     accessibilityLabel,
@@ -77,6 +86,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   // Inside a keyboard-aware scroll view the whole field (label to error) stays above the keyboard (T-545).
   const reveal = useKeyboardReveal();
   const containerRef = useRef<View>(null);
+  const doneBarId = `textFieldDone${useId()}`;
 
   const isPhone = variant === 'phone';
   const isSearch = variant === 'search';
@@ -146,6 +156,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           ref={ref}
           {...inputProps}
           testID={testID ? `${testID}-input` : undefined}
+          inputAccessoryViewID={doneBar ? doneBarId : inputProps.inputAccessoryViewID}
           value={isPhone ? formatNationalPhone(value) : value}
           onChangeText={handleChange}
           editable={!disabled}
@@ -214,6 +225,10 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         <AppText variant="caption" color="textSecondary" style={styles.helperOnly}>
           {helper}
         </AppText>
+      ) : null}
+      {/* After the input, so the bar finds it when both mount in the same commit. */}
+      {doneBar ? (
+        <KeyboardDoneBar nativeID={doneBarId} label={t('kit.keyboardDone')} testID={testID ? `${testID}-done` : undefined} />
       ) : null}
     </View>
   );
