@@ -4,7 +4,8 @@ import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { toast } from '../../core/toast';
 import { t } from '../../i18n';
 import { AC_CODES, acApi } from './api';
-import type { AcReportResult, VehicleAcSummary } from './types';
+import { CACHE_TTL } from '../../core/api/queryCache';
+import type { AcReportResult, RegistrationVehicleRules, VehicleAcSummary } from './types';
 
 const useMountedRef = () => {
   const mounted = useRef(true);
@@ -128,3 +129,17 @@ export const useVehicleAc = (enabled: boolean): VehicleAcState => {
 
   return { ...remote, saving, saveError, setHasAc };
 };
+
+const loadRegistrationRules = (): Promise<RegistrationVehicleRules> => acApi.getRegistrationVehicleRules();
+
+/**
+ * Driver registration, vehicle step (BE-105): the AC minimum model year and the accepted year
+ * range from GET /public/vehicle-types `meta`. One read per hour (shared cache); while it loads
+ * or when it fails the step keeps the local year range and the server's 422 stays the check.
+ */
+export const useRegistrationVehicleRules = (): RegistrationVehicleRules | null =>
+  useRemoteData<RegistrationVehicleRules>({
+    fetch: loadRegistrationRules,
+    fallbackError: t('ac.saveFailed'),
+    cache: { name: 'public/vehicle-types/registration-meta', ttlMs: CACHE_TTL.vehicleTypes },
+  }).data;

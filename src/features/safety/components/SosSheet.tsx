@@ -80,6 +80,9 @@ export function SosSheet({ visible, onClose, role, sos, position, share, onAddCo
 
   // BE-87: the same alert as a women's-safety case (or an upgrade of one already sent).
   const womenSent = sos.category === 'women_safety';
+  // BE-105: 200 created:false means the alert already open (general or women's safety) became
+  // the women's-safety case; no second incident was made.
+  const womenUpgraded = womenSent && sos.result?.created === false;
   const alertWomenSafety = useCallback(async () => {
     const yes = await confirm({
       title: t('safety.womenSafetyConfirmTitle'),
@@ -149,7 +152,7 @@ export function SosSheet({ visible, onClose, role, sos, position, share, onAddCo
           <ListItem
             icon="womenMode"
             title={t('safety.womenSafety')}
-            subtitle={womenSent ? t('safety.womenSafetySent') : t('safety.womenSafetyBody')}
+            subtitle={womenUpgraded ? t('safety.womenSafetyUpgraded') : womenSent ? t('safety.womenSafetySent') : t('safety.womenSafetyBody')}
             onPress={sending || womenSent ? undefined : alertWomenSafety}
             disabled={sending}
             chevron={!sending && !womenSent}

@@ -35,6 +35,25 @@ export interface WomenModeSummary {
 
 export type WomenModeAction = 'keep_waiting' | 'allow_any_driver';
 
+/** A safety incident's review state (SafetyIncident statuses). */
+export type SafetyReportStatus = 'open' | 'acknowledged' | 'resolved';
+
+/** The passenger's latest women's-safety report on a ride (a post-ride report or a women's-safety SOS). */
+export interface SafetyReport {
+  category: string;
+  status: SafetyReportStatus;
+  createdAt: string | null;
+}
+
+/**
+ * Ride `safety_report` (BE-105, the passenger only): whether "Report a women's-safety issue" shows
+ * (the server applies the window and the driver rule) and the report already made, if any.
+ */
+export interface SafetyReportState {
+  canReport: boolean;
+  report: SafetyReport | null;
+}
+
 /** GET /rides/nearby-drivers?female_driver_only=1 for the pickup. */
 export type FemaleAvailability =
   | { status: 'idle' }

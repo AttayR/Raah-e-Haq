@@ -43,6 +43,8 @@ export interface SosResult {
   created: boolean;
   incidentId: number | null;
   incidentStatus: string | null;
+  /** `general` | `women_safety` (BE-87); a 200 created:false women_safety answer upgraded the open one (BE-105). */
+  incidentCategory: string | null;
   emergencyNumbers: EmergencyNumber[];
   emergencyContacts: EmergencyContact[];
   shareUrl: string | null;

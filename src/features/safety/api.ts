@@ -86,6 +86,7 @@ export const toSosResult = (raw: unknown): SosResult => {
     created: data.created === true,
     incidentId: readId(incident.id),
     incidentStatus: readText(incident.status),
+    incidentCategory: readText(incident.category),
     emergencyNumbers: toEmergencyNumbers(data.emergency_numbers),
     emergencyContacts: toContacts(data.emergency_contacts),
     shareUrl: toShareableUrl(data.share_url),

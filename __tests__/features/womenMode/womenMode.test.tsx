@@ -15,10 +15,9 @@ import { toast } from '../../../src/core/toast';
 import { normalizeUser } from '../../../src/core/auth/normalizeUser';
 import { toStoredUser } from '../../../src/core/auth/storedUser';
 import { buildRideRequest } from '../../../src/features/ride-booking/buildRideRequest';
-import { toDriverWomenMode, toFemaleDriverRequest, toWomenModeSummary } from '../../../src/features/women-mode/api';
+import { toDriverWomenMode, toFemaleDriverRequest, toSafetyReportState, toWomenModeSummary } from '../../../src/features/women-mode/api';
 import {
   availabilityCellKey,
-  canReportSafetyAfterRide,
   femaleDriverOptionOf,
   shouldAskFallback,
   snoozeAfterKeepWaiting,
@@ -124,13 +123,14 @@ describe('profile and rules', () => {
     });
   });
 
-  it('post-ride report: an ended ride with a driver, up to 7 days after it ended', () => {
-    const now = Date.parse('2026-10-16T10:00:00Z');
-    const ride = { status: 'completed', driverId: 5, completedAt: '2026-10-10T10:00:00Z', cancelledAt: null };
-    expect(canReportSafetyAfterRide(ride, now)).toBe(true);
-    expect(canReportSafetyAfterRide({ ...ride, completedAt: '2026-10-08T10:00:00Z' }, now)).toBe(false);
-    expect(canReportSafetyAfterRide({ ...ride, driverId: null }, now)).toBe(false);
-    expect(canReportSafetyAfterRide({ ...ride, status: 'started' }, now)).toBe(false);
+  it('BE-105: maps ride safety_report (the server decides; a made report wins over can_report)', () => {
+    expect(toSafetyReportState(undefined)).toBeNull();
+    expect(toSafetyReportState({ can_report: true, report: null })).toEqual({ canReport: true, report: null });
+    expect(toSafetyReportState({ can_report: false })).toEqual({ canReport: false, report: null });
+    expect(
+      toSafetyReportState({ can_report: true, report: { category: 'women_safety', status: 'acknowledged', created_at: '2026-10-16T10:00:00+05:00' } }),
+    ).toEqual({ canReport: false, report: { category: 'women_safety', status: 'acknowledged', createdAt: '2026-10-16T10:00:00+05:00' } });
+    expect(toSafetyReportState({ can_report: false, report: { status: 'weird' } })?.report?.status).toBe('open');
   });
 
   it('books with female_driver_only only when chosen', () => {
@@ -362,7 +362,8 @@ describe("women's safety", () => {
       message: 'Report sent. Our safety team reviews it first.',
       data: { created: true, incident: { id: 2, status: 'open', category: 'women_safety', source: 'report' } },
     });
-    render(<SafetyReportSection rideId={41} canReport />);
+    const onReported = jest.fn();
+    render(<SafetyReportSection rideId={41} state={{ canReport: true, report: null }} onReported={onReported} />);
     fireEvent.press(screen.getByTestId('safety-report-button'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('safety-report-submit'));
@@ -376,11 +377,26 @@ describe("women's safety", () => {
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ category: 'women_safety', note: 'He made me uncomfortable' });
     expect(toast.success).toHaveBeenCalledWith('Report sent. Our safety team reviews it first.');
     await waitFor(() => expect(screen.getByTestId('safety-report-sent')).toBeTruthy());
+    expect(screen.getByTestId('safety-report-status')).toHaveTextContent("Women's-safety report sent · Received");
+    expect(onReported).toHaveBeenCalledTimes(1);
+  });
+
+  it('BE-105: a report already made shows its status (also after reopening), no button', () => {
+    const { rerender } = render(
+      <SafetyReportSection rideId={41} state={{ canReport: false, report: { category: 'women_safety', status: 'acknowledged', createdAt: null } }} />,
+    );
+    expect(screen.queryByTestId('safety-report-button')).toBeNull();
+    expect(screen.getByTestId('safety-report-status')).toHaveTextContent("Women's-safety report sent · Our safety team is on it");
+    rerender(<SafetyReportSection rideId={41} state={{ canReport: false, report: { category: 'women_safety', status: 'resolved', createdAt: null } }} />);
+    expect(screen.getByTestId('safety-report-status')).toHaveTextContent("Women's-safety report sent · Reviewed");
+    rerender(<SafetyReportSection rideId={43} state={{ canReport: false, report: null }} />);
+    expect(screen.queryByTestId('safety-report-sent')).toBeNull();
+    expect(screen.queryByTestId('safety-report-button')).toBeNull();
   });
 
   it('a closed window says so and the button goes; nothing outside the window', async () => {
     mock.onPost('/rides/41/safety-report').reply(409, { success: false, error: { code: 'REPORT_WINDOW_CLOSED', message: 'x' } });
-    const { rerender } = render(<SafetyReportSection rideId={41} canReport />);
+    const { rerender } = render(<SafetyReportSection rideId={41} state={{ canReport: true, report: null }} />);
     fireEvent.press(screen.getByTestId('safety-report-button'));
     fireEvent.changeText(screen.getByTestId('safety-report-note'), 'Something happened');
     await act(async () => {
@@ -390,7 +406,7 @@ describe("women's safety", () => {
       'This ride ended too long ago to report here. Contact support, or call 15 if you are in danger.',
     );
     await waitFor(() => expect(screen.queryByTestId('safety-report-button')).toBeNull());
-    rerender(<SafetyReportSection rideId={42} canReport={false} />);
+    rerender(<SafetyReportSection rideId={42} state={{ canReport: false, report: null }} />);
     expect(screen.queryByTestId('safety-report-button')).toBeNull();
   });
 

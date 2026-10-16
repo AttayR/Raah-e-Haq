@@ -7,6 +7,7 @@
 import type { MyRating } from '../rating/types';
 import type { DriverFareSplit, FareLock, OverchargeState } from '../fare/types';
 import type { AcReportState } from '../ac/types';
+import type { SafetyReportState } from '../women-mode/types';
 
 export type RideStatus = 'requested' | 'accepted' | 'arrived' | 'started' | 'completed' | 'cancelled';
 
@@ -105,6 +106,8 @@ export interface Ride {
   isAc: boolean;
   /** BE-86, passenger only, AC rides: "AC not working" button and report. */
   acReport: AcReportState | null;
+  /** BE-105, passenger only: "Report a women's-safety issue" button and the report already made. */
+  safetyReport: SafetyReportState | null;
 }
 
 export type { Page } from '../../core/api/types';

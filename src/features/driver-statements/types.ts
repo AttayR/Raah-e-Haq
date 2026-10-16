@@ -47,16 +47,18 @@ export interface WeeklyStatement {
 }
 
 export interface DriverStrike {
-  /** List key (the server id; overcharge strikes may come without one). */
+  /** List key (the server id; passenger-report strikes come without one). */
   key: string;
-  /** `overcharge_report` | `driver_cancel` (unknown kinds are kept). */
+  /** `overcharge_report` | `ac_not_working` | `driver_cancel` (unknown kinds are kept). */
   kind: string;
   status: 'active' | 'voided';
   /** Still counts towards the review threshold. */
   counts: boolean;
+  /** ISO time, or `YYYY-MM-DD` for a passenger-report strike (BE-105). */
   countsUntil: string | null;
+  /** ISO time, or `YYYY-MM-DD` for a passenger-report strike (BE-105). */
   createdAt: string | null;
-  /** Shown for a cancel strike only; never for an overcharge strike. */
+  /** Shown for a cancel strike only; never for a passenger-report strike (overcharge, AC). */
   reason: string | null;
 }
 

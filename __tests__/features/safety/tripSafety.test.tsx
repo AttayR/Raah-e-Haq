@@ -170,6 +170,22 @@ describe('SOS sheet', () => {
     expect(screen.getByTestId('sos-women-safety')).toHaveTextContent(/Women's-safety alert sent/);
   });
 
+  it("[T-558] Women's safety alert answered 200 created:false says the open alert was upgraded", async () => {
+    const body = sosBody();
+    mock.onPost('/rides/41/sos').reply(200, {
+      ...body,
+      message: 'SOS already sent. Our safety team has been alerted.',
+      data: { ...body.data, created: false, incident: { id: 5, status: 'open', category: 'women_safety', source: 'sos' } },
+    });
+    await renderSafety();
+    fireEvent.press(screen.getByTestId('trip-safety-sos'));
+    unsubscribe = answerDialogs(true);
+    fireEvent.press(screen.getByTestId('sos-women-safety'));
+    await flush();
+    expect(mock.history.post.filter((r) => r.url === '/rides/41/sos')).toHaveLength(1);
+    expect(screen.getByTestId('sos-women-safety')).toHaveTextContent(/Alert already sent. It is now a women's-safety case/);
+  });
+
   it('no emergency contacts: the alert is sent and the sheet offers to add contacts', async () => {
     mock.onPost('/rides/41/sos').reply(201, sosBody([]));
     await renderSafety();

@@ -29,6 +29,19 @@ export interface AcReportResult {
   message: string | null;
 }
 
+/**
+ * GET /public/vehicle-types `meta` for driver registration (BE-105): which vehicle type may
+ * declare AC and from which model year, and the accepted model-year range.
+ */
+export interface RegistrationVehicleRules {
+  /** The type that may declare AC (`car`). */
+  acVehicleType: string;
+  /** Oldest model year that may declare AC; null when the server did not say. */
+  acMinVehicleYear: number | null;
+  /** Accepted model years (inclusive); null when the server did not say. */
+  vehicleYear: { min: number; max: number } | null;
+}
+
 /** `vehicle.ac_status` of the driver's car. */
 export type VehicleAcStatus = 'none' | 'pending' | 'approved' | 'rejected' | 'suspended';
 

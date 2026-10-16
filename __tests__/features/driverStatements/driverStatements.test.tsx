@@ -10,7 +10,7 @@ import { apiClient } from '../../../src/services/api';
 import { calendarDate, shiftDate, toDriverStrikes, toWeeklyStatement } from '../../../src/features/driver-statements/api';
 import { nextIsCurrent } from '../../../src/features/driver-statements/hooks';
 import WeeklyStatementScreen, { statementLineKey } from '../../../src/features/driver-statements/screens/WeeklyStatementScreen';
-import DriverStrikesScreen, { strikeKindLabel } from '../../../src/features/driver-statements/screens/DriverStrikesScreen';
+import DriverStrikesScreen, { strikeDate, strikeKindLabel } from '../../../src/features/driver-statements/screens/DriverStrikesScreen';
 import { envelope } from '../../../test-utils/rideFixtures';
 
 jest.mock('@react-navigation/native', () => ({
@@ -80,6 +80,29 @@ describe('statement and strike readers', () => {
     expect(strikeKindLabel('overcharge_report')).toBe('Fare report upheld');
     expect(strikeKindLabel('some_new_kind')).toBe('Some new kind');
   });
+
+  it('BE-105: an AC strike is treated like an overcharge strike (no id, ride or reason; unique keys)', () => {
+    const data = toDriverStrikes({
+      strikes: [
+        { id: 3, kind: 'ac_not_working', reason: 'Passenger said AC off', ride: { id: 12, ride_id: 'R-1' }, status: 'active', counts: true, counts_until: '2026-11-14', created_at: '2026-10-15' },
+        { kind: 'ac_not_working', status: 'active', counts: true, counts_until: '2026-11-14', created_at: '2026-10-15' },
+      ],
+    });
+    expect(data.strikes[0]).toEqual({
+      key: 'ac_not_working-2026-10-15-0',
+      kind: 'ac_not_working',
+      status: 'active',
+      counts: true,
+      countsUntil: '2026-11-14',
+      createdAt: '2026-10-15',
+      reason: null,
+    });
+    expect(data.strikes[1].key).toBe('ac_not_working-2026-10-15-1');
+    expect(JSON.stringify(data.strikes)).not.toContain('R-1');
+    expect(strikeDate('2026-10-15')).toBe('15 Oct 2026');
+    expect(strikeDate('2026-13-01')).toBe('');
+    expect(strikeDate(null)).toBe('');
+  });
 });
 
 describe('WeeklyStatementScreen', () => {
@@ -146,15 +169,28 @@ describe('DriverStrikesScreen', () => {
         review_threshold: 3,
         window_days: 30,
         under_review: true,
-        strikes: [{ id: 7, kind: 'overcharge_report', status: 'active', counts: true, counts_until: '2026-11-14T12:00:00+00:00', created_at: '2026-10-15T12:00:00+00:00' }],
+        // BE-105 shape for passenger-report strikes: no id, ride or reason; dates only.
+        strikes: [
+          { kind: 'overcharge_report', status: 'active', counts: true, counts_until: '2026-11-14', created_at: '2026-10-15' },
+          { kind: 'ac_not_working', status: 'active', counts: true, counts_until: '2026-11-14', created_at: '2026-10-15' },
+          { kind: 'ac_not_working', status: 'active', counts: false, counts_until: '2026-10-01', created_at: '2026-09-01' },
+          { id: 9, kind: 'driver_cancel', reason: 'Cancelled after accepting', status: 'active', counts: true, counts_until: '2026-11-13T12:00:00+05:00', created_at: '2026-10-14T12:00:00+05:00' },
+        ],
       }),
     );
     render(<DriverStrikesScreen />);
     await waitFor(() => expect(screen.getByTestId('strikes-under-review')).toBeTruthy());
     screen.getByText('3 of 3 active strikes in the last 30 days');
     screen.getByText('Fare report upheld');
-    expect(screen.queryByTestId('strike-7-reason')).toBeNull();
-    expect(screen.getByTestId('strike-7-status')).toBeTruthy();
+    expect(screen.getAllByText('AC not working (confirmed)')).toHaveLength(2);
+    // Date-only strings read as that calendar date, without a time.
+    expect(screen.getByTestId('strike-overcharge_report-2026-10-15-0-date')).toHaveTextContent('15 Oct 2026');
+    expect(screen.getByTestId('strike-overcharge_report-2026-10-15-0-status')).toHaveTextContent('Counts until 14 Nov 2026');
+    expect(screen.getByTestId('strike-ac_not_working-2026-10-15-1-status')).toHaveTextContent('Counts until 14 Nov 2026');
+    expect(screen.getByTestId('strike-ac_not_working-2026-09-01-2-status')).toHaveTextContent('No longer counts');
+    expect(screen.queryByTestId('strike-overcharge_report-2026-10-15-0-reason')).toBeNull();
+    expect(screen.queryByTestId('strike-ac_not_working-2026-10-15-1-reason')).toBeNull();
+    expect(screen.getByTestId('strike-9-reason')).toHaveTextContent('Cancelled after accepting');
   });
 
   it('empty and error states', async () => {

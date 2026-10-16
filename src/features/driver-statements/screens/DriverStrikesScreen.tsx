@@ -5,7 +5,7 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Badge, Banner, Card, EmptyState, ErrorState, Header, Icon, Screen, SkeletonList, type IconName } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
-import { formatDateTime } from '../../wallet/format';
+import { formatCalendarDate, formatDateTime } from '../../wallet/format';
 import { useDriverStrikes } from '../hooks';
 import type { DriverStrike } from '../types';
 
@@ -19,11 +19,20 @@ export const strikeKindLabel = (kind: string): string => {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : kind;
 };
 
+/**
+ * A strike's date: BE-105 sends passenger-report strikes (overcharge, AC) as `YYYY-MM-DD` only,
+ * shown as the date without a time; other strikes carry an ISO time.
+ */
+export const strikeDate = (value: string | null): string => {
+  if (!value) return '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatCalendarDate(value) : formatDateTime(value);
+};
+
 /** Counts until a date / no longer counts / voided. */
 export const strikeStatus = (strike: DriverStrike): { label: string; tone: 'warning' | 'neutral' } => {
   if (strike.status === 'voided') return { label: t('strikes.statusVoided'), tone: 'neutral' };
   if (strike.counts) {
-    const until = strike.countsUntil ? formatDateTime(strike.countsUntil) : '';
+    const until = strikeDate(strike.countsUntil);
     return { label: until ? t('strikes.statusCounts', { date: until }) : t('strikes.statusCountsPlain'), tone: 'warning' };
   }
   return { label: t('strikes.statusExpired'), tone: 'neutral' };
@@ -40,11 +49,11 @@ function StrikeRow({ strike }: { strike: DriverStrike }) {
         <View style={styles.flex}>
           <AppText variant="bodyStrong">{strikeKindLabel(strike.kind)}</AppText>
           {strike.createdAt ? (
-            <AppText variant="caption" color="textMuted">
-              {formatDateTime(strike.createdAt)}
+            <AppText variant="caption" color="textMuted" testID={`strike-${strike.key}-date`}>
+              {strikeDate(strike.createdAt)}
             </AppText>
           ) : null}
-          {/* BE-82: an overcharge strike is date, kind and status only (mapped without a reason). */}
+          {/* BE-82 / BE-105: a passenger-report strike is date, kind and status only (mapped without a reason). */}
           {strike.reason ? (
             <AppText variant="bodySmall" color="textSecondary" testID={`strike-${strike.key}-reason`}>
               {strike.reason}

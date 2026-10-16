@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -11,10 +11,12 @@ import { BrandColors } from '../../../theme/colors';
 import { Icon } from '../../../components/ui/Icon';
 import ThemedTextInput from '../../../components/ThemedTextInput';
 import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth/registration/registrationForm';
-import { isStepFieldRequired, maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
+import { isStepFieldRequired, maxVehicleYear, MIN_VEHICLE_YEAR, validateStepField } from '../../../schemas/registrationSchema';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
 import { RegistrationAcSwitch } from '../../../features/ac/components/RegistrationAcSwitch';
+import { acAllowedFor, vehicleYearOptions } from '../../../features/ac/api';
+import { useRegistrationVehicleRules } from '../../../features/ac/hooks';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -48,11 +50,6 @@ const vehicleColors = [
   'Orange', 'Brown', 'Gold', 'Purple', 'Pink', 'Other'
 ];
 
-/** The newest 20 model years the backend accepts (BE-29: up to next year, AUTH-12). */
-const vehicleYearOptions = (): string[] => {
-  const max = maxVehicleYear();
-  return Array.from({ length: 20 }, (_, i) => (max - i).toString());
-};
 
 export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleInfoStepProps) {
   const [localErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -62,6 +59,14 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
   const [showLicenseTypeDropdown, setShowLicenseTypeDropdown] = useState(false);
   const [showExperienceDropdown, setShowExperienceDropdown] = useState(false);
   const anchor = useFieldAnchor();
+  // BE-105: the server's year range and AC minimum year (null until loaded or on an older server).
+  const vehicleRules = useRegistrationVehicleRules();
+  // Rules that arrive after an old year was picked with AC on turn the declaration off.
+  const acTooOld = data ? acAllowedFor(vehicleRules, data.vehicleType, data.vehicleYear).tooOld : false;
+  const hasAc = data?.vehicleHasAc === true;
+  useEffect(() => {
+    if (acTooOld && hasAc) onDataChange({ vehicleHasAc: false });
+  }, [acTooOld, hasAc, onDataChange]);
 
   // Safety check for undefined data
   if (!data) {
@@ -74,7 +79,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
 
   // Schema errors from Next (T-201) plus the ones found on blur.
   const validationErrors = mergeStepErrors(errors, localErrors);
-  const vehicleYears = vehicleYearOptions();
+  // The newest 20 model years the backend accepts (BE-29 / BE-105 meta.vehicle_year, AUTH-12).
+  const vehicleYears = vehicleYearOptions(vehicleRules?.vehicleYear ?? null, maxVehicleYear(), MIN_VEHICLE_YEAR);
+  const acRule = acAllowedFor(vehicleRules, data.vehicleType, data.vehicleYear);
 
   const formatVehicleNumber = (value: string): string => {
     if (!value) return '';
@@ -129,7 +136,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
   };
 
   const handleYearSelect = (year: string) => {
-    onDataChange({ vehicleYear: year });
+    // BE-105: a year older than the AC minimum turns the AC declaration off.
+    const tooOld = acAllowedFor(vehicleRules, data.vehicleType, year).tooOld;
+    onDataChange(tooOld && data.vehicleHasAc ? { vehicleYear: year, vehicleHasAc: false } : { vehicleYear: year });
     setShowYearDropdown(false);
     setValidationErrors(prev => ({ ...prev, vehicleYear: '' }));
   };
@@ -364,13 +373,15 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           </View>
         </View>
 
-        {/* BE-86: optional AC declaration, cars only (an admin checks it before AC rides). */}
-        {data.vehicleType === 'car' && (
+        {/* BE-86: optional AC declaration, cars only (an admin checks it before AC rides).
+            BE-105: off and disabled below the server's AC minimum year; the 422 stays the check. */}
+        {acRule.shown && (
           <View style={styles.inputGroup} ref={anchor('vehicleHasAc')}>
             <RegistrationAcSwitch
               value={data.vehicleHasAc}
               onChange={(on) => onDataChange({ vehicleHasAc: on })}
               error={validationErrors.vehicleHasAc}
+              tooOldMinYear={acRule.tooOld ? vehicleRules?.acMinVehicleYear ?? null : null}
             />
           </View>
         )}

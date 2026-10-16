@@ -378,6 +378,32 @@ describe('RideDetailsScreen', () => {
     await waitFor(() => expect(mock.history.get).toHaveLength(1));
   });
 
+  it("BE-105: the women's-safety report entry follows ride.safety_report (button, then status after reopening)", async () => {
+    mockParams = { rideId: 41 };
+    mock.onGet('/rides/41').replyOnce(200, envelope(rawRide({ safety_report: { can_report: true, report: null } })));
+    show(RideDetailsScreen);
+    expect(await screen.findByTestId('ride-details-safety-report-button')).toBeTruthy();
+    screen.unmount();
+
+    // Reopened after reporting: no button, the report and its status instead.
+    mock.onGet('/rides/41').replyOnce(
+      200,
+      envelope(rawRide({ safety_report: { can_report: false, report: { category: 'women_safety', status: 'open', created_at: '2026-01-01T10:00:00+05:00' } } })),
+    );
+    show(RideDetailsScreen);
+    expect(await screen.findByTestId('ride-details-safety-report-status')).toHaveTextContent("Women's-safety report sent · Received");
+    expect(screen.queryByTestId('ride-details-safety-report-button')).toBeNull();
+    screen.unmount();
+
+    // Outside the window (or no driver): the server says no, nothing shows; no block, nothing either.
+    mock.onGet('/rides/41').replyOnce(200, envelope(rawRide({ safety_report: { can_report: false, report: null } })));
+    show(RideDetailsScreen);
+    expect(await screen.findByTestId('ride-details-summary')).toBeTruthy();
+    await waitFor(() => expect(mock.history.get).toHaveLength(3));
+    expect(screen.queryByTestId('ride-details-safety-report-button')).toBeNull();
+    expect(screen.queryByTestId('ride-details-safety-report-sent')).toBeNull();
+  });
+
   it('403/404: "This ride isn\'t available" with Back', async () => {
     mockParams = { rideId: 99 };
     mock.onGet('/rides/99').reply(403, { success: false, error: { code: 'FORBIDDEN', message: 'You are not allowed to view this ride' } });

@@ -4,6 +4,7 @@ import type {
   AcReport,
   AcReportResult,
   AcReportState,
+  RegistrationVehicleRules,
   VehicleAcProblem,
   VehicleAcStatus,
   VehicleAcSummary,
@@ -15,6 +16,8 @@ import type {
  *   NOT_AC_RIDE / NO_DRIVER / REPORT_WINDOW_CLOSED / ALREADY_REPORTED; 404 for an outsider)
  * - GET  /driver/vehicle/ac            -> data: {vehicle, min_vehicle_year, serves_ac_rides, problems}
  * - POST /driver/vehicle/ac {has_ac}   -> the same (422 NOT_A_CAR / VEHICLE_TOO_OLD, 409 NO_VEHICLE)
+ * - GET  /public/vehicle-types        -> meta.ac {vehicle_type, min_vehicle_year} and
+ *   meta.vehicle_year {min, max} for the registration AC switch (BE-105)
  * Ride objects carry `is_ac` and, for the passenger, `ac_report {can_report, report}`.
  */
 
@@ -63,6 +66,54 @@ export const toAcReport = (raw: unknown): AcReport | null => {
 export const toAcReportState = (raw: unknown): AcReportState | null => {
   if (!isRecord(raw)) return null;
   return { canReport: raw.can_report === true, report: toAcReport(raw.report) };
+};
+
+const year = (value: unknown): number | null => {
+  const n = whole(value);
+  return n !== null && n >= 1900 && n <= 9999 ? n : null;
+};
+
+/** `meta.ac` and `meta.vehicle_year` of GET /public/vehicle-types (BE-105); unknown parts stay null. */
+export const toRegistrationVehicleRules = (body: unknown): RegistrationVehicleRules => {
+  const meta = isRecord(body) && isRecord(body.meta) ? body.meta : {};
+  const ac = isRecord(meta.ac) ? meta.ac : {};
+  const range = isRecord(meta.vehicle_year) ? meta.vehicle_year : {};
+  const min = year(range.min);
+  const max = year(range.max);
+  return {
+    acVehicleType: readText(ac.vehicle_type) ?? 'car',
+    acMinVehicleYear: year(ac.min_vehicle_year),
+    vehicleYear: min !== null && max !== null && min <= max ? { min, max } : null,
+  };
+};
+
+/** The newest `count` model years, newest first, inside the server's range when it gave one. */
+export const vehicleYearOptions = (
+  range: { min: number; max: number } | null,
+  fallbackMax: number,
+  fallbackMin: number,
+  count: number = 20,
+): string[] => {
+  const max = range?.max ?? fallbackMax;
+  const min = range?.min ?? fallbackMin;
+  const length = Math.max(0, Math.min(count, max - min + 1));
+  return Array.from({ length }, (_, i) => String(max - i));
+};
+
+/**
+ * Whether the AC switch may be turned on for this vehicle: the AC type, and (when both are
+ * known) a model year at or after the AC minimum. The server checks again (422 vehicle_has_ac).
+ */
+export const acAllowedFor = (
+  rules: RegistrationVehicleRules | null,
+  vehicleType: string,
+  vehicleYear: string,
+): { shown: boolean; tooOld: boolean } => {
+  const acType = rules?.acVehicleType ?? 'car';
+  if (vehicleType !== acType) return { shown: false, tooOld: false };
+  const chosen = /^\d{4}$/.test(vehicleYear) ? Number(vehicleYear) : null;
+  const min = rules?.acMinVehicleYear ?? null;
+  return { shown: true, tooOld: chosen !== null && min !== null && chosen < min };
 };
 
 const AC_STATUSES: ReadonlyArray<VehicleAcStatus> = ['none', 'pending', 'approved', 'rejected', 'suspended'];
@@ -116,5 +167,12 @@ export const acApi = {
 
   async setVehicleAc(hasAc: boolean): Promise<VehicleAcSummary> {
     return toVehicleAcSummary(unwrap(await apiService.post<unknown>('/driver/vehicle/ac', { has_ac: hasAc })));
+  },
+
+  /** GET /public/vehicle-types (no token needed): only its registration `meta` is read here. */
+  async getRegistrationVehicleRules(): Promise<RegistrationVehicleRules> {
+    const body = await apiService.get<unknown>('/public/vehicle-types');
+    unwrap(body);
+    return toRegistrationVehicleRules(body);
   },
 };

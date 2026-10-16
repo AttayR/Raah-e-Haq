@@ -75,23 +75,28 @@ export const toWeeklyStatement = (raw: unknown): WeeklyStatement => {
 const STRIKE_STATUSES = ['active', 'voided'] as const;
 
 /**
- * One strike. An upheld overcharge strike is shown as date, kind and status only (BE-82: the
- * driver is never told who reported or which ride), so its reason and ride are never kept even
- * if a server sent them.
+ * Strikes that come from a passenger's report (BE-82 overcharge, BE-86 AC not working). BE-105:
+ * the server sends these as `{kind, status, counts, counts_until, created_at}` only, both dates
+ * `YYYY-MM-DD` (no id, ride, reason or exact time), so the driver cannot tell who reported. A
+ * reason or id is never kept for them even if a server sent one.
  */
-export const toDriverStrike = (raw: unknown): DriverStrike | null => {
+export const PASSENGER_REPORT_STRIKE_KINDS: ReadonlySet<string> = new Set(['overcharge_report', 'ac_not_working']);
+
+/** One strike; `index` keeps list keys unique for id-less strikes on the same day. */
+export const toDriverStrike = (raw: unknown, index: number = 0): DriverStrike | null => {
   if (!isRecord(raw)) return null;
   const kind = readText(raw.kind) ?? 'other';
   const createdAt = readText(raw.created_at);
-  const overcharge = kind === 'overcharge_report';
+  const passengerReport = PASSENGER_REPORT_STRIKE_KINDS.has(kind);
+  const id = passengerReport ? null : readId(raw.id);
   return {
-    key: String(readId(raw.id) ?? `${kind}-${createdAt ?? ''}`),
+    key: id !== null ? String(id) : `${kind}-${createdAt ?? ''}-${index}`,
     kind,
     status: readOneOf(raw.status, STRIKE_STATUSES, 'active'),
     counts: raw.counts === true,
     countsUntil: readText(raw.counts_until),
     createdAt,
-    reason: overcharge ? null : readText(raw.reason),
+    reason: passengerReport ? null : readText(raw.reason),
   };
 };
 
@@ -102,7 +107,9 @@ export const toDriverStrikes = (raw: unknown): DriverStrikes => {
     reviewThreshold: Math.max(1, count(data.review_threshold) || 3),
     windowDays: Math.max(1, count(data.window_days) || 30),
     underReview: data.under_review === true,
-    strikes: list(data.strikes, toDriverStrike),
+    strikes: (Array.isArray(data.strikes) ? data.strikes : [])
+      .map((item: unknown, index) => toDriverStrike(item, index))
+      .filter((item): item is DriverStrike => item !== null),
   };
 };
 

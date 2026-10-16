@@ -82,21 +82,3 @@ export const snoozeAfterKeepWaiting = (summary: WomenModeSummary | null, nowMs: 
   const next = summary?.askFallbackAt ? Date.parse(summary.askFallbackAt) : NaN;
   return Number.isFinite(next) ? Math.max(next, nowMs + DISMISS_SNOOZE_MS) : nowMs + DISMISS_SNOOZE_MS * 2;
 };
-
-/** The server's report window after a ride ends (config safety.reports.window_days). */
-export const SAFETY_REPORT_WINDOW_DAYS = 7;
-
-/**
- * The post-ride "Report a women's-safety issue" button: an ended ride that had a driver, within
- * the window after it ended. The server checks again (409 REPORT_WINDOW_CLOSED / NO_DRIVER).
- */
-export const canReportSafetyAfterRide = (
-  ride: { status: string; driverId: number | null; completedAt: string | null; cancelledAt: string | null },
-  nowMs: number,
-  windowDays: number = SAFETY_REPORT_WINDOW_DAYS,
-): boolean => {
-  if (ride.driverId === null) return false;
-  const endedAt = ride.status === 'completed' ? ride.completedAt : ride.status === 'cancelled' ? ride.cancelledAt : null;
-  const ended = endedAt ? Date.parse(endedAt) : NaN;
-  return Number.isFinite(ended) && nowMs - ended <= windowDays * 24 * 60 * 60_000;
-};

@@ -587,6 +587,7 @@ export const en = {
     womenSafetyConfirmTitle: "Send a women's-safety alert?",
     womenSafetyConfirmBody: 'The Raah-e-Haq safety team sees your trip and location first and acts at once. Your {other} is not told.',
     womenSafetySent: "Women's-safety alert sent. Our safety team is on it.",
+    womenSafetyUpgraded: "Alert already sent. It is now a women's-safety case and our safety team is on it.",
     noContactsTitle: 'No emergency contacts yet',
     noContactsBody: 'Add up to 3 people in Account so you can alert them in one tap.',
     addContacts: 'Add emergency contacts',
@@ -1019,6 +1020,7 @@ export const en = {
     // Registration (vehicle step).
     registerLabel: 'My car has working AC',
     registerHint: 'Optional. Our team checks it before you get AC rides.',
+    registerTooOld: 'AC rides need a car from {year} or newer.',
     acRequired: 'This is an AC ride. Only a car with an approved AC can take it.',
   },
   /** BE-87: women mode (female driver request, fallback choice, women's-safety reports). */
@@ -1057,7 +1059,11 @@ export const en = {
     reportCancel: 'Cancel',
     reportSent: 'Report sent. Our safety team reviews it first.',
     reportAlready: 'You already reported this ride. Our safety team is reviewing it.',
-    reportDone: "Women's-safety report sent",
+    // BE-105: the report's status from the ride's safety_report.
+    reportDoneStatus: "Women's-safety report sent · {status}",
+    reportStatusOpen: 'Received',
+    reportStatusAcknowledged: 'Our safety team is on it',
+    reportStatusResolved: 'Reviewed',
     reportWindowClosed: 'This ride ended too long ago to report here. Contact support, or call 15 if you are in danger.',
     reportNoDriver: 'This ride has no driver to report.',
     reportFailed: "Couldn't send the report. Please try again.",

@@ -3,6 +3,8 @@ import { isRecord, readOneOf, readText } from '../../core/api/read';
 import type {
   DriverWomenMode,
   FemaleDriverRequest,
+  SafetyReportState,
+  SafetyReportStatus,
   WomenModeAction,
   WomenModeState,
   WomenModeSummary,
@@ -19,6 +21,8 @@ import type {
  * - ride `women_mode {state, can_allow_any_driver, ask_fallback_at, ...}` (passenger only)
  * - POST /rides/{id}/women-mode {action: keep_waiting | allow_any_driver} -> data: RideResource
  * - POST /rides/{id}/safety-report {category: women_safety, note} -> 201 new / 200 already made
+ * - ride `safety_report {can_report, report: {category, status, created_at} | null}` (passenger
+ *   only, BE-105): the server decides when the report button shows
  * A ride the caller is not part of answers 404.
  */
 
@@ -67,6 +71,21 @@ export const toWomenModeSummary = (raw: unknown): WomenModeSummary | null => {
     canAllowAnyDriver: raw.can_allow_any_driver === true,
     releasedAt: readText(raw.released_at),
   };
+};
+
+const SAFETY_REPORT_STATUSES: ReadonlyArray<SafetyReportStatus> = ['open', 'acknowledged', 'resolved'];
+
+/** Ride `safety_report`; null when absent (drivers, older servers). */
+export const toSafetyReportState = (raw: unknown): SafetyReportState | null => {
+  if (!isRecord(raw)) return null;
+  const report = isRecord(raw.report)
+    ? {
+        category: readText(raw.report.category) ?? SAFETY_CATEGORY,
+        status: readOneOf(raw.report.status, SAFETY_REPORT_STATUSES, 'open'),
+        createdAt: readText(raw.report.created_at),
+      }
+    : null;
+  return { canReport: report === null && raw.can_report === true, report };
 };
 
 export interface AvailabilityQuery {

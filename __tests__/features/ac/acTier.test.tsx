@@ -16,11 +16,16 @@ import { RegistrationAcSwitch } from '../../../src/features/ac/components/Regist
 import { acReportRefusal } from '../../../src/features/ac/hooks';
 import { acReportStatusText } from '../../../src/features/ac/format';
 import {
+  acAllowedFor,
   buildAcReportBody,
   isAcRide,
   toAcReportState,
+  toRegistrationVehicleRules,
   toVehicleAcSummary,
+  vehicleYearOptions,
 } from '../../../src/features/ac/api';
+import VehicleInfoStep from '../../../src/screens/Auth/steps/VehicleInfoStep';
+import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { normalizeFareEstimates, normalizeVehicleTypes } from '../../../src/features/ride-booking/api';
 import { toVehicleOptions } from '../../../src/features/ride-booking/vehicleOptions';
 import { VehicleOptionCard } from '../../../src/components/ui';
@@ -320,6 +325,68 @@ describe('registration and driver bits', () => {
     expect(screen.getByTestId('registration-ac-error').props.children).toBe('AC rides need a car from 2010 or newer.');
     fireEvent(screen.getByTestId('registration-ac-switch'), 'onValueChange', true);
     expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('BE-105: reads meta.ac and meta.vehicle_year; unknown parts stay null', () => {
+    const body = {
+      success: true,
+      data: [],
+      meta: { fare_notice: null, ac: { vehicle_type: 'car', min_vehicle_year: 2010 }, vehicle_year: { min: 1980, max: 2027 } },
+    };
+    expect(toRegistrationVehicleRules(body)).toEqual({ acVehicleType: 'car', acMinVehicleYear: 2010, vehicleYear: { min: 1980, max: 2027 } });
+    expect(toRegistrationVehicleRules({ success: true, data: [] })).toEqual({ acVehicleType: 'car', acMinVehicleYear: null, vehicleYear: null });
+    expect(toRegistrationVehicleRules({ meta: { vehicle_year: { min: 2030, max: 2027 } } }).vehicleYear).toBeNull();
+  });
+
+  it('BE-105: year options follow the server range (newest 20), with the local range as fallback', () => {
+    expect(vehicleYearOptions({ min: 1980, max: 2027 }, 2030, 1980).slice(0, 2)).toEqual(['2027', '2026']);
+    expect(vehicleYearOptions({ min: 1980, max: 2027 }, 2030, 1980)).toHaveLength(20);
+    expect(vehicleYearOptions({ min: 2020, max: 2027 }, 2030, 1980)).toEqual(['2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020']);
+    expect(vehicleYearOptions(null, 2027, 1980)[0]).toBe('2027');
+  });
+
+  it('BE-105: the AC switch shows for the AC type and is blocked below the minimum year', () => {
+    const rules = { acVehicleType: 'car', acMinVehicleYear: 2010, vehicleYear: null };
+    expect(acAllowedFor(rules, 'bike', '2020')).toEqual({ shown: false, tooOld: false });
+    expect(acAllowedFor(rules, 'car', '2009')).toEqual({ shown: true, tooOld: true });
+    expect(acAllowedFor(rules, 'car', '2010')).toEqual({ shown: true, tooOld: false });
+    expect(acAllowedFor(rules, 'car', '')).toEqual({ shown: true, tooOld: false });
+    // Not loaded / older server: shown for a car, the 422 stays the check.
+    expect(acAllowedFor(null, 'car', '1999')).toEqual({ shown: true, tooOld: false });
+  });
+
+  it('BE-105: a too-old car shows the switch off and disabled with the minimum year', () => {
+    const onChange = jest.fn();
+    render(<RegistrationAcSwitch value onChange={onChange} error="server said no" tooOldMinYear={2010} />);
+    expect(screen.getByTestId('registration-ac-hint')).toHaveTextContent('AC rides need a car from 2010 or newer.');
+    const toggle = screen.getByTestId('registration-ac-switch');
+    expect(toggle.props.accessibilityState).toMatchObject({ checked: false, disabled: true });
+    expect(screen.queryByTestId('registration-ac-error')).toBeNull();
+  });
+
+  it('BE-105: the vehicle step gates the AC switch by meta.ac.min_vehicle_year and turns AC off for an old year', async () => {
+    mock.onGet('/public/vehicle-types').reply(200, {
+      success: true,
+      data: [],
+      meta: { ac: { vehicle_type: 'car', min_vehicle_year: 2010 }, vehicle_year: { min: 1980, max: 2027 } },
+    });
+    const onDataChange = jest.fn();
+    const form = { ...driverForm, vehicleYear: '2015' };
+    const { rerender } = render(
+      <ThemeProvider>
+        <VehicleInfoStep data={form} onDataChange={onDataChange} errors={{}} />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('registration-ac-hint')).toHaveTextContent(/^Optional\./));
+    await waitFor(() => expect(mock.history.get.filter((r) => r.url === '/public/vehicle-types')).toHaveLength(1));
+    expect(onDataChange).not.toHaveBeenCalledWith({ vehicleHasAc: false });
+    rerender(
+      <ThemeProvider>
+        <VehicleInfoStep data={{ ...form, vehicleYear: '2005' }} onDataChange={onDataChange} errors={{}} />
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(onDataChange).toHaveBeenCalledWith({ vehicleHasAc: false }));
+    expect(screen.getByTestId('registration-ac-hint')).toHaveTextContent('AC rides need a car from 2010 or newer.');
   });
 
   it('labels a confirmed AC strike and the AC accept refusal', () => {

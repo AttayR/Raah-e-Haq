@@ -5,6 +5,7 @@ import { toRideRatingState } from '../rating/api';
 import { firstNameOf } from '../../utils/format';
 import { driverSplitOf, fareExtrasOf, fareLockOf, toOverchargeState } from '../fare/api';
 import { isAcRide, toAcReportState } from '../ac/api';
+import { toSafetyReportState } from '../women-mode/api';
 import type {
   CancellationReason,
   Page,
@@ -144,6 +145,7 @@ export const toRide = (raw: unknown): Ride | null => {
     split: driverSplitOf(raw),
     isAc: isAcRide(raw),
     acReport: toAcReportState(raw.ac_report),
+    safetyReport: toSafetyReportState(raw.safety_report),
   };
 };
 

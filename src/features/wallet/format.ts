@@ -40,6 +40,17 @@ export const formatDateTime = (iso: string): string => {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}, ${formatTime(iso)}`;
 };
 
+/**
+ * "16 Oct 2026" for a date-only `YYYY-MM-DD` (read as the calendar date it names, never shifted
+ * by the device's timezone); "" if it is not one.
+ */
+export const formatCalendarDate = (date: string): string => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const month = match ? MONTHS[Number(match[2]) - 1] : undefined;
+  if (!match || !month) return '';
+  return `${Number(match[3])} ${month} ${match[1]}`;
+};
+
 export interface TransactionSection {
   key: string;
   title: string;
