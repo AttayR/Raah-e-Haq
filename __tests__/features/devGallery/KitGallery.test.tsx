@@ -34,8 +34,10 @@ describe('KitGalleryScreen', () => {
     expect(screen.queryByText('Below AA')).toBeNull();
   });
 
+  // T-541: only the first and the UI-R2 test need every section; the rest render one, since a
+  // full gallery render is the heaviest render in the test run.
   it('shows formatter output', async () => {
-    await renderThemed(<KitGalleryScreen onClose={jest.fn()} />);
+    await renderThemed(<KitGalleryScreen onClose={jest.fn()} only="format" />);
     expect(screen.getByTestId('gallery-format-formatMoney(1200)')).toHaveTextContent('Rs 1,200');
     expect(screen.getByTestId('gallery-format-formatMoney(null)')).toHaveTextContent('""');
   });
@@ -96,7 +98,7 @@ describe('KitGalleryScreen', () => {
 
   it('closes from the labelled close button', async () => {
     const onClose = jest.fn();
-    await renderThemed(<KitGalleryScreen onClose={onClose} />);
+    await renderThemed(<KitGalleryScreen onClose={onClose} only="format" />);
     fireEvent.press(screen.getByLabelText('Close the UI kit gallery'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -105,7 +107,18 @@ describe('KitGalleryScreen', () => {
 describe('DevKitGalleryHost', () => {
   const addMenuItem = jest.spyOn(DevSettings, 'addMenuItem').mockImplementation(() => {});
 
-  beforeEach(() => addMenuItem.mockClear());
+  // The host is under test, not the sections: the -RHKitGallerySection launch argument keeps
+  // the opened gallery to one section (T-541).
+  let openOnLaunch = false;
+  beforeEach(() => {
+    addMenuItem.mockClear();
+    openOnLaunch = false;
+    mockSettingsGet.mockImplementation(key => {
+      if (key === 'RHKitGallerySection') return 'format';
+      return key === 'RHOpenKitGallery' && openOnLaunch ? 'YES' : undefined;
+    });
+  });
+  afterAll(() => mockSettingsGet.mockImplementation(() => undefined));
 
   it('adds a dev-menu item that opens the gallery over the app', async () => {
     await renderThemed(
@@ -125,7 +138,7 @@ describe('DevKitGalleryHost', () => {
   });
 
   it('opens on start with the iOS -RHOpenKitGallery YES launch argument', async () => {
-    mockSettingsGet.mockReturnValueOnce('YES');
+    openOnLaunch = true;
     await renderThemed(
       <DevKitGalleryHost enabled>
         <Text>app</Text>
@@ -133,12 +146,15 @@ describe('DevKitGalleryHost', () => {
     );
     expect(mockSettingsGet).toHaveBeenCalledWith('RHOpenKitGallery');
     expect(screen.getByTestId('kit-gallery')).toBeTruthy();
+    // -RHKitGallerySection format: that section alone.
+    expect(screen.getByTestId('gallery-format-formatMoney(1200)')).toBeTruthy();
+    expect(screen.queryByTestId('gallery-type-h1')).toBeNull();
   });
 
   it('pushes the themed status bar once shown and pops it on close', async () => {
     const push = jest.spyOn(StatusBar, 'pushStackEntry');
     const pop = jest.spyOn(StatusBar, 'popStackEntry');
-    mockSettingsGet.mockReturnValueOnce('YES');
+    openOnLaunch = true;
     await renderThemed(
       <DevKitGalleryHost enabled>
         <Text>app</Text>

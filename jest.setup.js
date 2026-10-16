@@ -9,6 +9,16 @@
 // Reanimated's mock needs that real module (serializableMappingCache, createSerializable).
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
+// T-541: findBy* / waitFor give up after asyncUtilTimeout. With real timers that is wall-clock
+// time, and the first render after data arrives can load lazy React Native modules (see the
+// testTimeout note in jest.config.js), so the 1 s default failed under load ("Unable to find
+// an element with testID: wallet-add-money"). With fake timers it is fake time and not affected
+// by load; a passing wait still resolves at its first passing check. Kept well under
+// testTimeout so a wait that never passes reports its own error, not a bare test timeout.
+// Only the config module is required: the package entry would load react-native before a test
+// file's jest.mock of a react-native internal (useColorScheme, Appearance...) is registered.
+require('@testing-library/react-native/build/config').configure({asyncUtilTimeout: 5000});
+
 // T-536: the in-memory GET cache is module state; every test starts with it empty. A test that
 // mocks the module (or resets the registry) gets its own fresh copy, so a missing export is fine.
 beforeEach(() => {

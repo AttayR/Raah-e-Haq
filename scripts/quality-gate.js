@@ -12,6 +12,9 @@
  *   node scripts/quality-gate.js --init     write the baseline from scratch
  *   node scripts/quality-gate.js --json     machine-readable output
  *
+ * Jest only counts as passing when the run executed every test file that `jest --listTests`
+ * finds and each of them ran at least one test (T-541); failing tests are listed by name.
+ *
  * The baseline only ever goes down. Every fix should leave the numbers equal or lower,
  * and once Jest (or the release bundle) passes it must keep passing.
  */
@@ -67,10 +70,103 @@ function eslint() {
   return {errors, warnings, byFile};
 }
 
+// T-541: the run must execute every test file Jest can find. Watchman is off for both the
+// listing and the run: its watch root is the main checkout, which holds every agent worktree
+// (and its node_modules), so it recrawls constantly and a crawl that misses files would drop
+// suites without any error. The listing and the run are separate processes, so a suite that
+// silently goes missing in between (or a run that is cut short) still shows up as a mismatch.
+function expectedTestFiles() {
+  const {code, stdout, out} = run('npx', ['jest', '--listTests', '--json', '--no-watchman']);
+  try {
+    const files = JSON.parse(stdout.slice(stdout.indexOf('[')));
+    if (code === 0 && Array.isArray(files) && files.length) {
+      return {files: files.map(f => path.relative(ROOT, f)).sort()};
+    }
+  } catch (e) {
+    // reported below
+  }
+  return {error: `could not list the test files: ${out.split('\n').filter(Boolean).slice(-3).join(' ')}`};
+}
+
+// Pure: checks a Jest --json report (absolute file names) against the listed test files
+// (relative to root). Exported for its tests.
+function checkJestReport(report, expectedFiles, root = ROOT) {
+  const problems = [];
+  const ran = (report.testResults || []).map(r => path.relative(root, r.name)).sort();
+  const ranSet = new Set(ran);
+  const expectedSet = new Set(expectedFiles);
+  const missing = expectedFiles.filter(f => !ranSet.has(f));
+  const extra = ran.filter(f => !expectedSet.has(f));
+  if (missing.length) {
+    problems.push(`${missing.length} of ${expectedFiles.length} test files did not run: ${missing.slice(0, 5).join(', ')}`);
+  }
+  if (extra.length) {
+    problems.push(`ran ${extra.length} test files that the listing did not have: ${extra.slice(0, 5).join(', ')}`);
+  }
+  const empty = (report.testResults || [])
+    .filter(r => !(r.assertionResults || []).some(a => a.status === 'passed' || a.status === 'failed'))
+    .map(r => path.relative(root, r.name));
+  if (empty.length) {
+    problems.push(`test files that ran no test: ${empty.slice(0, 5).join(', ')}`);
+  }
+  if (report.numRuntimeErrorTestSuites) {
+    problems.push(`${report.numRuntimeErrorTestSuites} test files failed to run`);
+  }
+  if (report.wasInterrupted) {
+    problems.push('the run was interrupted');
+  }
+  const failedTests = [];
+  for (const r of report.testResults || []) {
+    const file = path.relative(root, r.name);
+    const failed = (r.assertionResults || []).filter(a => a.status === 'failed');
+    failed.forEach(a => failedTests.push(`${file} > ${a.fullName}`));
+    if (!failed.length && r.status === 'failed') {
+      const why = String(r.message || '').split('\n').map(l => l.trim()).find(Boolean) || 'failed to run';
+      failedTests.push(`${file} (${why.slice(0, 200)})`);
+    }
+  }
+  return {problems, failedTests};
+}
+
 function jest() {
-  const {code, out} = run('npx', ['jest', '--ci', '--silent']);
+  const expected = expectedTestFiles();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-jest-'));
+  const outputFile = path.join(dir, 'jest.json');
+  let report = null;
+  let code;
+  let out;
+  try {
+    ({code, out} = run('npx', ['jest', '--ci', '--silent', '--no-watchman', '--json', `--outputFile=${outputFile}`]));
+    try {
+      report = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+    } catch (e) {
+      report = null;
+    }
+  } finally {
+    fs.rmSync(dir, {recursive: true, force: true});
+  }
   const m = out.match(/Tests:\s+(.*)/);
-  return {passing: code === 0, summary: m ? m[1].trim() : out.split('\n').slice(-6).join(' ')};
+  const summary = m ? m[1].trim() : out.split('\n').slice(-6).join(' ');
+  const problems = [];
+  let failedTests = [];
+  if (expected.error) {
+    problems.push(expected.error);
+  }
+  if (!report) {
+    problems.push('Jest wrote no JSON report');
+  } else if (expected.files) {
+    const checked = checkJestReport(report, expected.files);
+    problems.push(...checked.problems);
+    failedTests = checked.failedTests;
+  }
+  const suites = report ? `${report.numTotalTestSuites} files` : '? files';
+  const skipped = report ? report.numPendingTests + report.numTodoTests : 0;
+  return {
+    passing: code === 0 && Boolean(report && report.success) && problems.length === 0,
+    summary: `${summary} (${suites}${skipped ? `, ${skipped} skipped` : ''})`,
+    problems,
+    failedTests,
+  };
 }
 
 // Dev-only modules that must never reach a release bundle (PERF-08, T-531). The host stays:
@@ -170,7 +266,8 @@ function main() {
     regressions.push(`ESLint warnings rose ${base.eslintWarnings} -> ${current.eslintWarnings}`);
   }
   if (base.jestPassing && !current.jestPassing) {
-    regressions.push(`Jest was passing and now fails: ${tests.summary}`);
+    const why = tests.problems.length ? `; ${tests.problems.join('; ')}` : '';
+    regressions.push(`Jest was passing and now fails: ${tests.summary}${why}`);
   }
   if (base.bundleOk && !current.bundleOk) {
     regressions.push(`Release bundle was building and now fails: ${bundled.failures.join('; ')}`);
@@ -181,6 +278,8 @@ function main() {
     current,
     regressions,
     jestSummary: tests.summary,
+    jestProblems: tests.problems,
+    jestFailedTests: tests.failedTests,
     bundleFailures: bundled.failures,
     tsSample: ts.sample,
     tsByFile: ts.byFile,
@@ -198,6 +297,11 @@ function main() {
     console.log(row('Jest passing', base.jestPassing, current.jestPassing));
     console.log(row('Bundle ok', Boolean(base.bundleOk), current.bundleOk));
     console.log(`  Jest: ${tests.summary}`);
+    tests.problems.forEach(p => console.log(`  Jest: ${p}`));
+    tests.failedTests.slice(0, 20).forEach(t => console.log(`  Failed: ${t}`));
+    if (tests.failedTests.length > 20) {
+      console.log(`  Failed: ... and ${tests.failedTests.length - 20} more`);
+    }
     bundled.failures.forEach(f => console.log(`  Bundle: ${f}`));
     if (regressions.length) {
       console.log('\nFAIL');
@@ -225,4 +329,8 @@ function main() {
   process.exit(regressions.length ? 1 : 0);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {checkJestReport};
