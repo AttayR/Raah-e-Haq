@@ -94,6 +94,9 @@ const toEarningsRide = (raw: unknown): EarningsRide | null => {
     completedAt: readText(raw.completed_at),
     distanceKm: readNumberOrNull(raw.distance_km),
     durationMinutes: readNumberOrNull(raw.duration_minutes),
+    quotedDistanceKm: readNumberOrNull(raw.quoted_distance_km),
+    quotedDurationMinutes: readNumberOrNull(raw.quoted_duration_minutes),
+    fareLocked: raw.fare_locked === true,
     totalFare: readNumberOrNull(raw.fare) ?? readNumber(raw.total_fare),
     platformCommission: readNumber(raw.platform_commission),
     // BE-84: `driver_net` is the same number as `driver_earnings`; prefer it when sent.

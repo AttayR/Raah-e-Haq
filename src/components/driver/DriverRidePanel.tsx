@@ -86,7 +86,6 @@ export const DriverRidePanel: React.FC<Props> = ({
   bottomInset = 0,
 }) => {
   const { theme } = useAppTheme();
-  const busy = pendingAction !== null;
   const userAction = pendingAction !== null && pendingAction !== 'refresh' && pendingAction !== 'restore';
   const stops = activeStops(ride);
   const nextStop = step === 'on_trip' ? stops[0] ?? null : null;
@@ -226,12 +225,14 @@ export const DriverRidePanel: React.FC<Props> = ({
               variant="destructiveSoft"
               size="lg"
               onPress={onNoShow}
-              disabled={busy}
+              // T-557: like the step, a background read does not disable it (the cancel takes
+              // the read over); it still only opens the confirm sheet.
+              disabled={userAction}
               testID="driver-ride-no-show"
             />
           ) : null}
           {cancellable ? (
-            <Button label={COPY.cancel} variant="destructiveSoft" size="lg" onPress={onCancel} disabled={busy} testID="driver-ride-cancel" />
+            <Button label={COPY.cancel} variant="destructiveSoft" size="lg" onPress={onCancel} disabled={userAction} testID="driver-ride-cancel" />
           ) : null}
         </View>
       ) : null}

@@ -244,6 +244,8 @@ export function ReceiptCard({ ride, viewer }: SectionProps) {
         distanceKm={ride.distanceKm}
         durationMin={ride.durationMinutes}
         fareLocked={ride.fareLock !== null}
+        quotedDistanceKm={ride.quotedDistanceKm}
+        quotedDurationMin={ride.quotedDurationMinutes}
         totalLabel={C.total}
         extraRows={[...driverRows, ...info]}
       />

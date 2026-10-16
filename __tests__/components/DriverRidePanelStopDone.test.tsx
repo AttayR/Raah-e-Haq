@@ -64,3 +64,61 @@ describe('DriverRidePanel "Stop done" during a background read (T-556)', () => {
     expect(onCompleteStop).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * T-557: Cancel and "Passenger didn't come" were disabled for the background read too, so a tap
+ * in that window did nothing. They now only open the confirm sheet, during a read as well; the
+ * driver's own request in flight still disables them.
+ */
+const renderPickup = (
+  pendingAction: DriverRideAction | null,
+  handlers: { onCancel?: () => void; onNoShow?: () => void },
+  step: 'to_pickup' | 'at_pickup',
+) =>
+  render(
+    <DriverRidePanel
+      ride={makeRide({ id: 41, status: step === 'to_pickup' ? 'accepted' : 'arrived' })}
+      step={step}
+      pendingAction={pendingAction}
+      canCall={false}
+      canNavigate={false}
+      onCall={noop}
+      onNavigate={noop}
+      onArrived={noop}
+      onStart={noop}
+      onComplete={noop}
+      onCompleteStop={noop}
+      onCancel={handlers.onCancel ?? noop}
+      onNoShow={handlers.onNoShow}
+    />,
+  );
+
+describe('DriverRidePanel Cancel / No-show during a background read (T-557)', () => {
+  it.each(['refresh', 'restore'] as const)('Cancel opens the confirm sheet while a %s runs', (read) => {
+    const onCancel = jest.fn();
+    const { getByTestId } = renderPickup(read, { onCancel }, 'to_pickup');
+    const button = getByTestId('driver-ride-cancel');
+    expect(button.props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
+    fireEvent.press(button);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['refresh', 'restore'] as const)('"Passenger didn\'t come" opens the confirm sheet while a %s runs', (read) => {
+    const onNoShow = jest.fn();
+    const { getByTestId } = renderPickup(read, { onNoShow }, 'at_pickup');
+    fireEvent.press(getByTestId('driver-ride-no-show'));
+    expect(onNoShow).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['cancel', 'arrived'] as const)('both stay disabled while the driver\'s own %s runs', (own) => {
+    const onCancel = jest.fn();
+    const onNoShow = jest.fn();
+    const toPickup = renderPickup(own, { onCancel }, 'to_pickup');
+    fireEvent.press(toPickup.getByTestId('driver-ride-cancel'));
+    toPickup.unmount();
+    const atPickup = renderPickup(own, { onNoShow }, 'at_pickup');
+    fireEvent.press(atPickup.getByTestId('driver-ride-no-show'));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onNoShow).not.toHaveBeenCalled();
+  });
+});

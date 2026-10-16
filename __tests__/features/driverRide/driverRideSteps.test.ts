@@ -125,6 +125,10 @@ describe('toRideSummary', () => {
       durationMinutes: 18,
       paymentMethod: 'cash',
       breakdown: { base: 50, distance: 210.5, time: 54, stops: 25, minFareAdjustment: 0, bookingFee: null, offerAdjustment: null, waiting: null },
+      // T-557: not locked, and no BE-103 quote on this ride.
+      fareLocked: false,
+      quotedDistanceKm: null,
+      quotedDurationMinutes: null,
     });
   });
 

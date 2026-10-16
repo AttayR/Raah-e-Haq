@@ -65,6 +65,11 @@ export interface EarningsRide {
   completedAt: string | null;
   distanceKm: number | null;
   durationMinutes: number | null;
+  /** BE-103: the booking quote's km and minutes (null before BE-103 or from older servers). */
+  quotedDistanceKm: number | null;
+  quotedDurationMinutes: number | null;
+  /** BE-103 `fare_locked`: the fare was locked at accept (BE-82); false from older servers. */
+  fareLocked: boolean;
   totalFare: number;
   platformCommission: number;
   driverEarnings: number;

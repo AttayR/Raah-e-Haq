@@ -127,6 +127,11 @@ export interface DriverRideSummary {
   distanceKm: number | null;
   durationMinutes: number | null;
   paymentMethod: string | null;
+  /** T-557: the fare was locked at accept (BE-82): distance and time are the booking quote's. */
+  fareLocked: boolean;
+  /** BE-103: the quoted km and minutes (null before BE-103). */
+  quotedDistanceKm: number | null;
+  quotedDurationMinutes: number | null;
 }
 
 export const toRideSummary = (ride: RideResource): DriverRideSummary => {
@@ -151,5 +156,8 @@ export const toRideSummary = (ride: RideResource): DriverRideSummary => {
     distanceKm: toNumber(ride.distance_km),
     durationMinutes: toNumber(ride.duration_minutes),
     paymentMethod: typeof ride.payment_method === 'string' && ride.payment_method ? ride.payment_method : null,
+    fareLocked: ride.fare_locked === true,
+    quotedDistanceKm: toNumber(ride.quoted_distance_km),
+    quotedDurationMinutes: toNumber(ride.quoted_duration_minutes),
   };
 };

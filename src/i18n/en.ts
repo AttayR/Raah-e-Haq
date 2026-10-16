@@ -259,6 +259,9 @@ export const en = {
     // trip as driven, so the measured minutes/km are not shown next to those amounts.
     fareTimeLocked: 'Time (quoted at booking)',
     fareDistanceLocked: 'Distance (quoted at booking)',
+    // T-557: BE-103 keeps the quoted minutes and km, so a locked receipt names them.
+    fareTimeQuoted: 'Time (quoted {duration})',
+    fareDistanceQuoted: 'Distance (quoted {distance})',
     fareStops: 'Stops',
     fareMinimum: 'Minimum fare adjustment',
     fareDiscount: 'Discount',
@@ -782,6 +785,10 @@ export const en = {
     estimated: 'Estimated from the current fare until the trip ends.',
     cancelFeeShare: 'The passenger was charged {amount} for this cancellation. Your share shows in your wallet once it is credited.',
     rideFareSplit: 'Fare {fare} · commission {rate}% = {commission}',
+    // T-557: an Earnings row whose fare was locked at accept (BE-82/BE-103).
+    rideFareSplitLocked: 'Locked fare {fare} · commission {rate}% = {commission}',
+    rideFareLocked: 'Locked fare {fare} · commission {commission}',
+    rideQuotedDistance: 'Quoted {distance}',
   },
   /** Wallet ledger type labels the app writes itself (T-521); other types keep the server label. */
   walletTypes: {

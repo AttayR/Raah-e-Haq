@@ -117,6 +117,8 @@ export const toRide = (raw: unknown): Ride | null => {
     platformCommission: readNumberOrNull(raw.platform_commission),
     distanceKm: readNumberOrNull(raw.distance_km),
     durationMinutes: readNumberOrNull(raw.duration_minutes),
+    quotedDistanceKm: readNumberOrNull(raw.quoted_distance_km),
+    quotedDurationMinutes: readNumberOrNull(raw.quoted_duration_minutes),
     // Cash only (B-08): a ride without a method was paid in cash.
     paymentMethod: readText(raw.payment_method) ?? 'cash',
     paymentStatus: readText(raw.payment_status),

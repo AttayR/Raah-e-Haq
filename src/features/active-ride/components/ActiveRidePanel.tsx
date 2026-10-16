@@ -25,6 +25,7 @@ import { FareLockBadge, WaitingTimer } from '../../fare/components/FareBits';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
 import { fareLockOf, toFarePolicy, toOverchargeState } from '../../fare/api';
 import { cancellationFeeText } from '../../fare/format';
+import { readNumberOrNull } from '../../../core/api/read';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -195,6 +196,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           distanceKm={ride?.distance_km ?? null}
           durationMin={ride?.duration_minutes ?? null}
           fareLocked={ride?.fare_locked === true}
+          quotedDistanceKm={readNumberOrNull(ride?.quoted_distance_km)}
+          quotedDurationMin={readNumberOrNull(ride?.quoted_duration_minutes)}
           totalLabel={ACTIVE_RIDE_COPY.finalFareLabel}
           footnote={fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
         />

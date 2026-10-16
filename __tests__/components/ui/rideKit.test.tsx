@@ -207,6 +207,22 @@ describe.each([
     expect(screen.queryByText('Time · 2 min')).toBeNull();
   });
 
+  it('T-557: a locked fare names the BE-103 quoted minutes and km when the server sends them', () => {
+    const rows = fareBreakdownRows(
+      { distance: 120, time: 54 },
+      { distanceKm: 0.4, durationMin: 2, fareLocked: true, quotedDistanceKm: 5.24, quotedDurationMin: 18 },
+    );
+    expect(rows.map(r => r.label)).toEqual(['Distance (quoted 5.2 km)', 'Time (quoted 18 min)']);
+    // Null quote (a ride completed before BE-103): the plain locked label.
+    expect(
+      fareBreakdownRows({ time: 54 }, { durationMin: 2, fareLocked: true, quotedDistanceKm: null, quotedDurationMin: null })[0].label,
+    ).toBe('Time (quoted at booking)');
+    // A metered ride ignores the quote.
+    expect(fareBreakdownRows({ time: 54 }, { durationMin: 20, quotedDurationMin: 18 })[0].label).toBe('Time · 20 min');
+    render(<FareBreakdown testID="quoted" breakdown={{ time: 54 }} total={320} durationMin={2} fareLocked quotedDurationMin={18} />);
+    expect(screen.getByText('Time (quoted 18 min)')).toBeTruthy();
+  });
+
   it('PersonCard: driver shape (vehicle line, plate pill, highlighted when arrived) and passenger shape (New rider, actions)', () => {
     const onCall = jest.fn();
     const { rerender } = render(

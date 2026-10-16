@@ -16,6 +16,7 @@ import {
   advanceDriverRide,
   cancelDriverRide,
   clearDriverActiveRide,
+  isSupersededReadRejection,
   refreshDriverRide,
   restoreDriverRide,
   selectDriverActiveRide,
@@ -312,6 +313,8 @@ export const useDriverRideStatusPolling = (enabled: boolean): void => {
     // Skipped: another request for this ride is in flight; try again next interval.
     if (action.meta.condition) return 'continue';
     const payload = action.payload;
+    // T-557: a driver's step took this read over; not a failure, so no back-off.
+    if (isSupersededReadRejection(payload)) return 'continue';
     if (isStaleSessionRejection(payload)) return 'stop';
     throw payload ? pollFailureOf(payload) : new Error(DRIVER_RIDE_COPY.refreshFailed);
   }, [dispatch, rideId]);

@@ -9,6 +9,7 @@ import { formatMoney, formatSignedMoney } from '../../utils/format';
 import { driverSplitOf } from '../../features/fare/api';
 import { formatRate } from '../../features/fare/format';
 import { t } from '../../i18n';
+import { lockedDistanceLabel, lockedTimeLabel } from '../ui/ride/FareBreakdown';
 
 type Props = {
   ride: RideResource;
@@ -30,8 +31,17 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
   const rows: Array<{ key: string; label: string; value: number | null }> = summary.breakdown
     ? [
         { key: 'base', label: COPY.base, value: summary.breakdown.base },
-        { key: 'distance', label: COPY.distance, value: summary.breakdown.distance },
-        { key: 'time', label: COPY.time, value: summary.breakdown.time },
+        // T-557: a locked fare (BE-82) charged the quote's km and minutes, not the trip as driven.
+        {
+          key: 'distance',
+          label: summary.fareLocked ? lockedDistanceLabel(summary.quotedDistanceKm) : COPY.distance,
+          value: summary.breakdown.distance,
+        },
+        {
+          key: 'time',
+          label: summary.fareLocked ? lockedTimeLabel(summary.quotedDurationMinutes) : COPY.time,
+          value: summary.breakdown.time,
+        },
         { key: 'stops', label: COPY.stopsFare, value: summary.breakdown.stops },
         { key: 'min', label: COPY.minFareAdjustment, value: summary.breakdown.minFareAdjustment },
         { key: 'bookingFee', label: t('ride.fareBookingFee'), value: summary.breakdown.bookingFee },

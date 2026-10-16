@@ -23,7 +23,8 @@ import { invalidateStatsForRide } from '../stats/invalidate';
  * double tap sends one request and a late answer never overwrites a newer one. T-556 (QA
  * 2026-10-16: one "Stop done" tap ignored): a driver's step is never skipped for a background
  * read (the ~8 s poll, the foreground refresh, the restore). It takes over, and the read's
- * answer, older than the step, is dropped (`pendingRequestId`).
+ * answer, older than the step, is dropped (`pendingRequestId`). T-557: the driver's cancel
+ * (and "Passenger didn't come") takes over a background read the same way.
  *
  * Not persisted; `resetApp` (logout) clears it through the root reducer, and every thunk drops
  * an answer that arrives after a logout (session epoch).
@@ -51,22 +52,41 @@ const isBackgroundRead = (action: DriverRideAction | null): boolean => action ==
 const isFreeForStep = (state: SliceRoot): boolean =>
   isIdle(state) || isBackgroundRead(state.driverRide.pendingAction);
 
+/** T-557: the code of a background read a driver's step (or cancel) took over while it ran. */
+export const SUPERSEDED_READ_CODE = 'driver_ride_read_superseded';
+
+const supersededReadRejection = (): ThunkRejection => ({
+  message: DRIVER_RIDE_COPY.refreshFailed,
+  kind: 'cancelled',
+  code: SUPERSEDED_READ_CODE,
+  fieldErrors: {},
+});
+
+/** True for a read whose answer was dropped because a driver's step took it over (T-557). */
+export const isSupersededReadRejection = (payload: ThunkRejection | undefined): boolean =>
+  payload?.code === SUPERSEDED_READ_CODE;
+
 /**
  * The thunk body every request shares: an answer that arrives after a logout is dropped
- * (session epoch), and a failure becomes a display-safe ThunkRejection.
+ * (session epoch), and a failure becomes a display-safe ThunkRejection. `superseded` (reads
+ * only) says a driver's step took the request over, so its answer, success or failure, is
+ * reported as superseded instead (T-557: the poll then neither stops nor backs off).
  */
 const runGuarded = async <Rejected>(
   request: () => Promise<RideResource>,
   rejectWithValue: (value: ThunkRejection) => Rejected,
   fallback: string,
+  superseded: () => boolean = () => false,
 ): Promise<RideResource | Rejected> => {
   const startedIn = currentSessionEpoch();
   try {
     const ride = await request();
     if (isStaleSession(startedIn)) return rejectWithValue(staleSessionRejection());
     invalidateStatsForRide(ride);
+    if (superseded()) return rejectWithValue(supersededReadRejection());
     return ride;
   } catch (error) {
+    if (!isStaleSession(startedIn) && superseded()) return rejectWithValue(supersededReadRejection());
     return rejectWithValue(toThunkRejection(error, fallback));
   }
 };
@@ -109,8 +129,14 @@ export const advanceDriverRide = createAsyncThunk<RideResource, AdvanceDriverRid
 /** GET /rides/{id}: the latest server copy (on screen mount, foreground, or after a 409). */
 export const refreshDriverRide = createAsyncThunk<RideResource, number, ThunkConfig>(
   'driverRide/refresh',
-  (rideId, { rejectWithValue }) =>
-    runGuarded(() => driverRideApi.get(rideId), rejectWithValue, DRIVER_RIDE_COPY.refreshFailed),
+  (rideId, { rejectWithValue, getState, requestId }) =>
+    runGuarded(
+      () => driverRideApi.get(rideId),
+      rejectWithValue,
+      DRIVER_RIDE_COPY.refreshFailed,
+      // T-557: a driver's step began while this read ran; its answer predates that step.
+      () => getState().driverRide.pendingRequestId !== requestId,
+    ),
   { condition: (_, { getState }) => isIdle(getState()) },
 );
 
@@ -125,12 +151,16 @@ export const restoreDriverRide = createAsyncThunk<RideResource, number, ThunkCon
   { condition: (_, { getState }) => isIdle(getState()) },
 );
 
-/** POST /rides/{id}/cancel {note}: the driver gives the ride up before the trip starts. */
+/**
+ * POST /rides/{id}/cancel {note}: the driver gives the ride up before the trip starts (a normal
+ * cancel or, after the wait, "Passenger didn't come"). T-557: like a step, it takes over a
+ * background read; a second cancel, or one during a step, is still skipped.
+ */
 export const cancelDriverRide = createAsyncThunk<RideResource, { rideId: number; note: string }, ThunkConfig>(
   'driverRide/cancel',
   ({ rideId, note }, { rejectWithValue }) =>
     runGuarded(() => driverRideApi.cancel(rideId, note.trim()), rejectWithValue, DRIVER_RIDE_COPY.actionFailed),
-  { condition: (_, { getState }) => isIdle(getState()) },
+  { condition: (_, { getState }) => isFreeForStep(getState()) },
 );
 
 const isCurrent = (state: DriverRideState, rideId: number): boolean => state.ride?.id === rideId;

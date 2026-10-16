@@ -39,6 +39,21 @@ export type FareRow = {
 const present = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
 
 /**
+ * T-557 (BE-103): the label of a locked ride's distance amount, "Distance (quoted 5.2 km)" with
+ * the quoted km, else "Distance (quoted at booking)" (rides completed before BE-103).
+ */
+export const lockedDistanceLabel = (quotedKm: number | null | undefined): string =>
+  present(quotedKm) && quotedKm >= 0
+    ? t('ride.fareDistanceQuoted', { distance: formatDistance(quotedKm) })
+    : t('ride.fareDistanceLocked');
+
+/** T-557 (BE-103): "Time (quoted 18 min)", else "Time (quoted at booking)". */
+export const lockedTimeLabel = (quotedMin: number | null | undefined): string =>
+  present(quotedMin) && quotedMin >= 0
+    ? t('ride.fareTimeQuoted', { duration: formatDuration(quotedMin) })
+    : t('ride.fareTimeLocked');
+
+/**
  * The rows the API returned (§5.26): base, distance, time; stops, the minimum-fare adjustment,
  * the booking fee and waiting only when > 0; the offer (T-521) and a discount only when not 0.
  * Nothing is invented.
@@ -51,6 +66,10 @@ export function fareBreakdownRows(
     currency?: string | null;
     /** T-556: the fare was locked at accept (BE-82): the time and distance amounts are the quote's. */
     fareLocked?: boolean;
+    /** T-557 (BE-103 `quoted_distance_km`): the quote's km, shown on a locked fare's distance line. */
+    quotedDistanceKm?: number | null;
+    /** T-557 (BE-103 `quoted_duration_minutes`): the quote's minutes, on a locked fare's time line. */
+    quotedDurationMin?: number | null;
   } = {},
 ): FareRow[] {
   if (!breakdown) return [];
@@ -61,7 +80,7 @@ export function fareBreakdownRows(
     rows.push({
       key: 'distance',
       label: context.fareLocked
-        ? t('ride.fareDistanceLocked')
+        ? lockedDistanceLabel(context.quotedDistanceKm)
         : present(context.distanceKm)
           ? t('ride.fareDistance', { distance: formatDistance(context.distanceKm) })
           : t('ride.fareDistancePlain'),
@@ -74,8 +93,9 @@ export function fareBreakdownRows(
       // T-556 (QA 2026-10-16): a locked ride charged its 18 quoted minutes under "Time · 2 min"
       // (the trip as driven). The server keeps only the driven minutes, so the label says the
       // amount is the booking quote instead of showing a number that does not match it.
+      // T-557: BE-103 keeps the quoted minutes, so they are named when the server sends them.
       label: context.fareLocked
-        ? t('ride.fareTimeLocked')
+        ? lockedTimeLabel(context.quotedDurationMin)
         : present(context.durationMin)
           ? t('ride.fareTime', { duration: formatDuration(context.durationMin) })
           : t('ride.fareTimePlain'),
@@ -128,6 +148,9 @@ export type FareBreakdownProps = {
   durationMin?: number | null;
   /** T-556: the ride's fare was locked at accept (BE-82 `fare_locked`). */
   fareLocked?: boolean;
+  /** T-557: BE-103 quoted km and minutes, named on a locked fare's lines when present. */
+  quotedDistanceKm?: number | null;
+  quotedDurationMin?: number | null;
   /** "Total" by default; "Estimated total", "Final fare" where the screen says so. */
   totalLabel?: string;
   /** Rows after the total: payment, the driver's platform fee and earnings. */
@@ -151,6 +174,8 @@ export function FareBreakdown({
   distanceKm,
   durationMin,
   fareLocked = false,
+  quotedDistanceKm = null,
+  quotedDurationMin = null,
   totalLabel = t('ride.fareTotal'),
   extraRows = [],
   footnote,
@@ -158,7 +183,14 @@ export function FareBreakdown({
   testID,
 }: FareBreakdownProps) {
   const { theme } = useAppTheme();
-  const rows = fareBreakdownRows(breakdown, { distanceKm, durationMin, currency, fareLocked });
+  const rows = fareBreakdownRows(breakdown, {
+    distanceKm,
+    durationMin,
+    currency,
+    fareLocked,
+    quotedDistanceKm,
+    quotedDurationMin,
+  });
   const divider = { borderTopWidth: theme.borderWidth.hairline, borderTopColor: theme.colors.border };
   const body = (
     <>

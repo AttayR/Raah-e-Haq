@@ -12,6 +12,7 @@ import { acceptRideRequest } from '../../../src/features/driver-requests/slice';
 import {
   advanceDriverRide,
   cancelDriverRide,
+  isSupersededReadRejection,
   refreshDriverRide,
   restoreDriverRide,
   selectDriverActiveRide,
@@ -128,6 +129,62 @@ describe('advanceDriverRide', () => {
     const skipped = await store.dispatch(refreshDriverRide(41));
     expect(refreshDriverRide.rejected.match(skipped) && skipped.meta.condition).toBe(true);
     await start;
+  });
+
+  it('T-557: a read a step took over reports itself superseded, success or failure', async () => {
+    mock.onGet('/rides/41').replyOnce(() => new Promise((resolve) => setTimeout(() => resolve([200, envelope(makeRide({ status: 'accepted' }))]), 30)));
+    mock.onPost('/rides/41/arrived').reply(200, envelope(makeRide({ status: 'arrived' })));
+    const store = storeWithRide(makeRide({ status: 'accepted' }));
+    const read = store.dispatch(refreshDriverRide(41));
+    await store.dispatch(advanceDriverRide({ rideId: 41, action: 'arrived' }));
+    const answered = await read;
+    expect(refreshDriverRide.rejected.match(answered) && isSupersededReadRejection(answered.payload)).toBe(true);
+    expect(selectDriverActiveRide(store.getState())?.status).toBe('arrived');
+
+    mock.onGet('/rides/41').replyOnce(() => new Promise((resolve) => setTimeout(() => resolve([500, { success: false }]), 30)));
+    mock.onPost('/rides/41/start').reply(200, envelope(makeRide({ status: 'started' })));
+    const failing = store.dispatch(refreshDriverRide(41));
+    await store.dispatch(advanceDriverRide({ rideId: 41, action: 'start' }));
+    const failed = await failing;
+    expect(refreshDriverRide.rejected.match(failed) && isSupersededReadRejection(failed.payload)).toBe(true);
+
+    // A read nobody took over is not superseded.
+    mock.onGet('/rides/41').replyOnce(200, envelope(makeRide({ status: 'started' })));
+    const own = await store.dispatch(refreshDriverRide(41));
+    expect(refreshDriverRide.fulfilled.match(own)).toBe(true);
+  });
+
+  it('T-557: a cancel during a background read is sent, and the older read answer is dropped', async () => {
+    mock.onGet('/rides/41').replyOnce(() => new Promise((resolve) => setTimeout(() => resolve([200, envelope(makeRide({ status: 'arrived' }))]), 30)));
+    mock.onPost('/rides/41/cancel').reply(() => new Promise((resolve) => setTimeout(() => resolve([200, envelope(makeRide({ status: 'cancelled' }))]), 10)));
+    const store = storeWithRide(makeRide({ status: 'arrived' }));
+
+    const read = store.dispatch(refreshDriverRide(41));
+    const cancel = store.dispatch(cancelDriverRide({ rideId: 41, note: 'Passenger did not come' }));
+    expect(store.getState().driverRide.pendingAction).toBe('cancel');
+    // No double submit: a second cancel while the first runs is skipped.
+    const second = await store.dispatch(cancelDriverRide({ rideId: 41, note: 'Passenger did not come' }));
+    expect(cancelDriverRide.rejected.match(second) && second.meta.condition).toBe(true);
+
+    // Before T-557 the cancel was skipped (a rejected condition) while the read ran.
+    expect(cancelDriverRide.fulfilled.match(await cancel)).toBe(true);
+    expect(mock.history.post.map((r) => r.url)).toEqual(['/rides/41/cancel']);
+    expect(selectDriverActiveRide(store.getState())).toBeNull();
+
+    await read;
+    // The read predates the cancel: it does not bring the ride back.
+    expect(selectDriverActiveRide(store.getState())).toBeNull();
+    expect(store.getState().driverRide.pendingAction).toBeNull();
+  });
+
+  it('T-557: a cancel while a step runs is still skipped', async () => {
+    mock.onPost('/rides/41/arrived').reply(() => new Promise((resolve) => setTimeout(() => resolve([200, envelope(makeRide({ status: 'arrived' }))]), 10)));
+    const store = storeWithRide(makeRide({ status: 'accepted' }));
+    const step = store.dispatch(advanceDriverRide({ rideId: 41, action: 'arrived' }));
+    const cancel = await store.dispatch(cancelDriverRide({ rideId: 41, note: 'Changed my mind' }));
+    expect(cancelDriverRide.rejected.match(cancel) && cancel.meta.condition).toBe(true);
+    await step;
+    expect(mock.history.post.map((r) => r.url)).toEqual(['/rides/41/arrived']);
   });
 
   it('sends one request on a double tap', async () => {

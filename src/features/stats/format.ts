@@ -110,16 +110,32 @@ export const shortPlace = (address: string | null): string | null => {
 
 /**
  * "Fare Rs 300 · commission 20% = Rs 60" (BE-84 rate and amount); older rows without a rate say
- * "Fare Rs 300 · commission Rs 60" from the stored platform commission.
+ * "Fare Rs 300 · commission Rs 60" from the stored platform commission. T-557: a fare locked at
+ * accept (BE-103 `fare_locked`) reads "Locked fare Rs 300 · …".
  */
-export const fareSplitText = (ride: EarningsRide, money: (amount: number) => string): string =>
-  ride.commissionRate !== null && ride.commissionAmount !== null
-    ? t('driverFare.rideFareSplit', {
-        fare: money(ride.totalFare),
-        rate: formatRate(ride.commissionRate),
-        commission: money(ride.commissionAmount),
-      })
+export const fareSplitText = (ride: EarningsRide, money: (amount: number) => string): string => {
+  if (ride.commissionRate !== null && ride.commissionAmount !== null) {
+    return t(ride.fareLocked ? 'driverFare.rideFareSplitLocked' : 'driverFare.rideFareSplit', {
+      fare: money(ride.totalFare),
+      rate: formatRate(ride.commissionRate),
+      commission: money(ride.commissionAmount),
+    });
+  }
+  return ride.fareLocked
+    ? t('driverFare.rideFareLocked', { fare: money(ride.totalFare), commission: money(ride.platformCommission) })
     : STATS_COPY.rideFare(money(ride.totalFare), money(ride.platformCommission));
+};
+
+/**
+ * The row's distance: the trip as driven, or, for a locked fare with the BE-103 quote, the quoted
+ * km the fare was charged for ("Quoted 5.2 km").
+ */
+const rideDistanceText = (ride: EarningsRide): string | null => {
+  if (ride.fareLocked && ride.quotedDistanceKm !== null && ride.quotedDistanceKm > 0) {
+    return t('driverFare.rideQuotedDistance', { distance: formatDistanceKm(ride.quotedDistanceKm) });
+  }
+  return ride.distanceKm !== null && ride.distanceKm > 0 ? formatDistanceKm(ride.distanceKm) : null;
+};
 
 /**
  * One trip on the Earnings list (T-514): the title is the route ("Gulberg → Liberty Market")
@@ -138,7 +154,7 @@ export const earningsRideText = (
   const title = route ?? when ?? STATS_COPY.tripFallback;
   const subtitle = [
     route ? when : null,
-    ride.distanceKm !== null && ride.distanceKm > 0 ? formatDistanceKm(ride.distanceKm) : null,
+    rideDistanceText(ride),
     fareSplitText(ride, money),
   ]
     .filter(Boolean)

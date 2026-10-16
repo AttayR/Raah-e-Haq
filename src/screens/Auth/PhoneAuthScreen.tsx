@@ -231,6 +231,8 @@ export default function PhoneAuthScreen() {
   };
 
   // T-556: the header back: from the code step back to the number, else out of the screen.
+  // T-557: on the number step with nowhere to go back to, there is no back button at all.
+  const canLeave = navigation.canGoBack();
   const handleHeaderBack = () => {
     if (currentStep === 'verification') {
       handleBackToPhone();
@@ -238,6 +240,7 @@ export default function PhoneAuthScreen() {
       navigation.goBack();
     }
   };
+  const headerBack = currentStep === 'verification' || canLeave ? handleHeaderBack : undefined;
 
   // Back to Login on its Email tab (AUTH-18), not a new Login on the Phone tab.
   const renderEmailFallback = () =>
@@ -396,7 +399,7 @@ export default function PhoneAuthScreen() {
           title={currentStep === 'phone' ? COPY.header.phoneTitle : COPY.header.codeTitle}
           subtitle={currentStep === 'phone' ? COPY.header.phoneSubtitle : COPY.header.codeSubtitle}
           compact={keyboardUp}
-          onBack={handleHeaderBack}
+          onBack={headerBack}
         />
 
         {/* Scrollable Content */}

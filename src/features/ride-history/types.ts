@@ -70,6 +70,9 @@ export interface Ride {
   platformCommission: number | null;
   distanceKm: number | null;
   durationMinutes: number | null;
+  /** BE-103: the booking quote's km and minutes (null before BE-103); a locked fare charged these. */
+  quotedDistanceKm: number | null;
+  quotedDurationMinutes: number | null;
   paymentMethod: string;
   paymentStatus: string | null;
   passenger: RidePerson | null;

@@ -197,6 +197,39 @@ describe('useDriverRideStatusPolling (T-413)', () => {
     expect(getRide).toHaveBeenCalledTimes(4);
   });
 
+  it('T-557: a poll a driver step took over does not back off, even when its read failed', async () => {
+    const ride = makeRide({ status: 'accepted' });
+    let failRead: (error: unknown) => void = () => undefined;
+    getRide
+      .mockImplementationOnce(
+        () =>
+          new Promise<RideResource>((_, reject) => {
+            failRead = reject;
+          }),
+      )
+      .mockResolvedValue({ ...ride, status: 'arrived' });
+    jest.spyOn(driverRideApi, 'arrived').mockResolvedValue({ ...ride, status: 'arrived' });
+    const { store } = renderPoller(ride);
+
+    await advance(DRIVER_RIDE_POLL_INTERVAL_MS);
+    expect(getRide).toHaveBeenCalledTimes(1);
+    expect(store.getState().driverRide.pendingAction).toBe('refresh');
+
+    // The driver taps "I've arrived" while the poll's read is in flight: the step takes over.
+    await act(async () => {
+      await store.dispatch(advanceDriverRide({ rideId: 41, action: 'arrived' }));
+    });
+    await act(async () => failRead(new ApiError({ kind: 'server', status: 500, message: 'oops' })));
+    await flush();
+    expect(selectDriverActiveRide(store.getState())?.status).toBe('arrived');
+
+    // The normal 8 s, not the doubled 16 s of a failure.
+    await advance(DRIVER_RIDE_POLL_INTERVAL_MS - 1);
+    expect(getRide).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(getRide).toHaveBeenCalledTimes(2);
+  });
+
   it('stops when the ride is taken away (403 drops it from the slice)', async () => {
     const ride = makeRide({ status: 'accepted' });
     getRide.mockRejectedValue(

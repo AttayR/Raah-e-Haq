@@ -146,6 +146,12 @@ export interface RideResource {
   fare_locked?: boolean;
   accepted_fare?: number | string | null;
   fare_locked_at?: string | null;
+  /**
+   * BE-103: the booking quote's km (a decimal string) and minutes, kept after completion; null on
+   * rides completed before BE-103. A locked fare charged these, not the trip as driven.
+   */
+  quoted_distance_km?: number | string | null;
+  quoted_duration_minutes?: number | null;
   waiting_minutes?: number | null;
   waiting_fee?: number | string | null;
   arrival_verified?: boolean;
