@@ -8,8 +8,9 @@ import { radius, space } from '../../../theme';
 import type { RideResource } from '../../../services/rideService';
 import { formatCountdown } from '../../safety/pin';
 import { activeRideReplaced, refreshActiveRide, type ActiveRideState } from '../../active-ride/slice';
-import { useParcelResend, useSecondsUntil } from '../hooks';
+import { useParcelOptions, useParcelResend, useSecondsUntil } from '../hooks';
 import { itemLine, receiverLine } from '../format';
+import { needsReasonLabels, parcelOutcome } from '../receipt';
 import { resendState } from '../rules';
 import type { ParcelView } from '../types';
 import { ParcelTimeline } from './ParcelTimeline';
@@ -62,6 +63,26 @@ function CodeStatus({ parcel, rideId }: { parcel: ParcelView; rideId: number }) 
 }
 
 /**
+ * T-561: a parcel the rider refused at the pickup says so with the reason's label (from the
+ * cached GET /parcels/options; the key, readable, until it loads or when the list lacks it).
+ */
+function RefusalNotice({ parcel }: { parcel: ParcelView }) {
+  const wanted = needsReasonLabels(parcel) && parcel.status === 'cancelled';
+  const options = useParcelOptions(wanted);
+  const outcome = wanted ? parcelOutcome(parcel, options.data) : null;
+  if (!outcome || outcome.kind !== 'refused') return null;
+  return (
+    <Banner
+      tone="danger"
+      icon="parcel"
+      title={outcome.title}
+      text={outcome.reason ? t('parcel.outcomeReason', { reason: outcome.reason }) : t('parcel.senderRefused')}
+      testID="parcel-refused"
+    />
+  );
+}
+
+/**
  * The sender's parcel on the live ride panel (T-522, BE-88): the status timeline, the receiver
  * (name, masked number) and the item, the pickup photo (a short-lived signed URL; absent before
  * pickup or once it is scrubbed), the delivery code's state with "Send the code again", and the
@@ -73,6 +94,7 @@ export function ParcelSenderSection({ parcel, rideId }: { parcel: ParcelView; ri
   return (
     <View style={styles.block} testID="parcel-sender">
       <ParcelTimeline parcel={parcel} />
+      <RefusalNotice parcel={parcel} />
       {receiver || item ? (
         <Card>
           <View style={styles.details}>

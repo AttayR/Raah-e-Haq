@@ -80,6 +80,9 @@ const VEHICLE_LABEL: Record<string, string> = {
   bike: 'Bike',
   rickshaw: 'Rickshaw',
   van: 'Van',
+  // T-561: the BE-86 / BE-88 tiers by their names, not their keys ("Car ac").
+  car_ac: 'Car AC',
+  parcel: 'Parcel',
 };
 
 /** "car" -> "Car"; an unknown key is shown title-cased, never as a raw code. */

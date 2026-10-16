@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnectionRecovered } from '../../core/api/connectivity';
 import { toApiError } from '../../core/api/errors';
-import { CACHE_TTL, cacheVersion, readCache, writeCache } from '../../core/api/queryCache';
+import { CACHE_TTL, cacheAgeMs, cacheVersion, readCache, writeCache } from '../../core/api/queryCache';
 import type { VehicleTypeKey } from '../../services/rideService';
 import {
   fetchFareEstimates,
@@ -46,19 +46,27 @@ const cachedVehicleTypes = (): VehicleTypesState | null => {
  * the fuel adjustment in force (BE-60 `meta.fare_notice`), or null. T-536: a read from the last
  * hour is reused from the cache (the catalogue rarely changes; every fare comes from the
  * server's estimate anyway); a retry always asks the server.
+ *
+ * T-561: `refreshWhen` (a screen's focus) re-reads the catalogue quietly, over what is shown,
+ * when the last read is older than CACHE_TTL.vehicleTypesRecheck, so a tier an admin just
+ * switched on (Car AC, Parcel) shows within minutes, not after the hour. One read at a time;
+ * a failed quiet read keeps what is shown.
  */
-export const useVehicleTypes = () => {
+export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
+  const refreshWhen = options.refreshWhen ?? false;
   const [cachedOnMount] = useState(cachedVehicleTypes);
   const [state, setState] = useState<VehicleTypesState>(
     () => cachedOnMount ?? { status: 'loading', data: null, error: null, notice: null },
   );
   const [attempt, setAttempt] = useState(0);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     // Shown from the cache on the first frame: no request until a retry.
     if (attempt === 0 && cachedOnMount) return undefined;
     const controller = new AbortController();
     const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
+    inFlight.current = true;
     setState((s) => ({ ...s, status: 'loading', error: null }));
     fetchVehicleTypes(controller.signal)
       .then((catalogue) => {
@@ -69,9 +77,38 @@ export const useVehicleTypes = () => {
         if (!controller.signal.aborted) {
           setState({ status: 'error', data: null, error: errorText(error, BOOKING_COPY.vehicleTypesFailed), notice: null });
         }
+      })
+      .finally(() => {
+        inFlight.current = false;
       });
-    return () => controller.abort();
+    return () => {
+      inFlight.current = false;
+      controller.abort();
+    };
   }, [attempt, cachedOnMount]);
+
+  useEffect(() => {
+    if (!refreshWhen || inFlight.current) return undefined;
+    // Read a moment ago (here, on Home or on the booking screen): nothing to ask.
+    const age = cacheAgeMs(VEHICLE_TYPES_CACHE_KEY);
+    if (age !== null && age < CACHE_TTL.vehicleTypesRecheck) return undefined;
+    const controller = new AbortController();
+    const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
+    inFlight.current = true;
+    fetchVehicleTypes(controller.signal)
+      .then((catalogue) => {
+        writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
+        setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        inFlight.current = false;
+      });
+    return () => {
+      inFlight.current = false;
+      controller.abort();
+    };
+  }, [refreshWhen]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   useRetryOnRecovery(state.status, retry);

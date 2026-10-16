@@ -48,6 +48,8 @@ export function ParcelDetailsSection({ options, draft, errors, update }: Props) 
           value={draft.receiverPhone}
           onChangeText={(digits) => update('receiverPhone', digits, 'receiverPhone')}
           error={errors.receiverPhone}
+          // T-561: the phone pad has no return key; the Done bar closes it (iOS).
+          doneBar
           testID="parcel-receiver-phone"
         />
       </View>

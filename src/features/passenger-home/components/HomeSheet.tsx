@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Banner, Button, Chip, ListGroup, ListItem } from '../../../components/ui';
+import { AppText, Banner, Button, Chip } from '../../../components/ui';
 import { SavedPlaceChips } from '../../saved-places/components/SavedPlaceChips';
 import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
@@ -56,7 +56,7 @@ type BodyProps = {
 
 /**
  * Home sheet body (UI-R4 structure; UI-R9 refines the content): "Where to?" (pushes Booking),
- * the shortcut chip row, then at `half`/`full` the location notice and recent rides, only when
+ * the shortcut chip row ("Send a parcel" first while the tier is on, T-561), then at `half`/`full` the location notice and recent rides, only when
  * the API returned some. The chip row holds the saved places (T-516, BE-14), "+ Add" and the
  * full list.
  */
@@ -102,15 +102,28 @@ export function HomeSheetBody({
           onAdd={onAddPlace}
           onOpenAll={onSavedPlaces}
           leading={
-            locationOff ? (
-              <Chip
-                icon="locationOff"
-                tone="primary"
-                label={t('home.turnOnLocation')}
-                onPress={onEnableLocation}
-                testID="home-location-chip"
-              />
-            ) : null
+            <>
+              {locationOff ? (
+                <Chip
+                  icon="locationOff"
+                  tone="primary"
+                  label={t('home.turnOnLocation')}
+                  onPress={onEnableLocation}
+                  testID="home-location-chip"
+                />
+              ) : null}
+              {/* T-561: in the peek chip row, so it shows without expanding the sheet. */}
+              {onSendParcel && !liveRide ? (
+                <Chip
+                  icon="parcel"
+                  tone="primary"
+                  label={t('parcel.homeEntryTitle')}
+                  onPress={onSendParcel}
+                  accessibilityLabel={`${t('parcel.homeEntryTitle')}, ${t('parcel.homeEntrySubtitle')}`}
+                  testID="home-send-parcel"
+                />
+              ) : null}
+            </>
           }
         />
       </View>
@@ -124,17 +137,6 @@ export function HomeSheetBody({
             action={{ label: t('home.turnOnLocation'), onPress: onEnableLocation, testID: 'home-location-enable' }}
             testID="home-location-banner"
           />
-        ) : null}
-        {onSendParcel && !liveRide ? (
-          <ListGroup>
-            <ListItem
-              icon="parcel"
-              title={t('parcel.homeEntryTitle')}
-              subtitle={t('parcel.homeEntrySubtitle')}
-              onPress={onSendParcel}
-              testID="home-send-parcel"
-            />
-          </ListGroup>
         ) : null}
         <RecentRidesCard rides={recentRides} onSeeAll={onSeeAllRides} onOpen={onOpenRide} />
       </View>

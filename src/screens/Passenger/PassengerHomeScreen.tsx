@@ -102,8 +102,9 @@ export default function PassengerHomeScreen() {
     [navigation, saved.places, saved.maxOther],
   );
 
-  // BE-88: "Send a parcel" only while the parcel tier is on (the cached vehicle catalogue says so).
-  const parcelAvailable = useParcelAvailable();
+  // BE-88: "Send a parcel" only while the parcel tier is on (the cached vehicle catalogue says so;
+  // T-561: re-read on focus once it is a few minutes old, so a newly activated tier shows soon).
+  const parcelAvailable = useParcelAvailable(isFocused);
 
   const {
     isInitialized: notificationsInitialized,

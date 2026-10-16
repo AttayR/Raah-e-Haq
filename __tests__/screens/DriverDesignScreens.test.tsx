@@ -31,6 +31,10 @@ import type { RideResource } from '../../src/services/rideService';
 import { makeRide } from '../../test-utils/rideFixtures';
 import { toast } from '../../src/core/toast';
 import { PHOTO_TOAST_OFFSET } from '../../src/features/profile-photo/useProfilePhoto';
+import { clearQueryCache } from '../../src/core/api/queryCache';
+import { parcelApi } from '../../src/features/parcel/api';
+import { showParcelOptInRow } from '../../src/features/parcel/hooks';
+import type { ParcelOptIn } from '../../src/features/parcel/types';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -382,6 +386,48 @@ describe('DriverSettingsScreen', () => {
     expect(openSettings).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('driver-settings-phone-notifications'));
     expect(openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  // T-561 (QA T-522 #5): the Parcels row follows any approved bike, not the first vehicle type.
+  describe('Parcel deliveries row', () => {
+    const summary = (over: Partial<ParcelOptIn>): ParcelOptIn => ({
+      optedIn: false,
+      optedInAt: null,
+      hasApprovedBike: false,
+      tierActive: true,
+      getsParcelRequests: false,
+      prohibitedItems: [],
+      rulesVersion: '2026-10-16',
+      ...over,
+    });
+    beforeEach(() => clearQueryCache());
+
+    it('a car driver with an approved bike as a second vehicle sees it', async () => {
+      const read = jest.spyOn(parcelApi, 'getOptIn').mockResolvedValue(summary({ hasApprovedBike: true }));
+      await renderScreen(DriverSettingsScreen, {}, null, { vehicle_type: 'car' });
+      expect(await screen.findByTestId('driver-settings-parcels')).toBeTruthy();
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+
+    it('a car driver without an approved bike (and not opted in) does not', async () => {
+      jest.spyOn(parcelApi, 'getOptIn').mockResolvedValue(summary({}));
+      await renderScreen(DriverSettingsScreen, {}, null, { vehicle_type: 'car' });
+      expect(screen.queryByTestId('driver-settings-parcels')).toBeNull();
+    });
+
+    it('a bike driver sees it without asking the server', async () => {
+      const read = jest.spyOn(parcelApi, 'getOptIn').mockResolvedValue(summary({}));
+      await renderScreen(DriverSettingsScreen, {}, null, { vehicle_type: 'bike' });
+      expect(screen.getByTestId('driver-settings-parcels')).toBeTruthy();
+      expect(read).not.toHaveBeenCalled();
+    });
+
+    it('the rule: a bike profile, else an approved bike or an earlier opt-in', () => {
+      expect(showParcelOptInRow(null, 'bike')).toBe(true);
+      expect(showParcelOptInRow(null, 'car')).toBe(false);
+      expect(showParcelOptInRow(summary({ optedIn: true }), 'car')).toBe(true);
+      expect(showParcelOptInRow(summary({ hasApprovedBike: true }), 'rickshaw')).toBe(true);
+    });
   });
 
   it('appearance control switches to dark and persists the choice', async () => {

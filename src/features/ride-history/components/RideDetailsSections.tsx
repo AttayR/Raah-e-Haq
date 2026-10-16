@@ -107,7 +107,12 @@ export function CancellationCard({ ride, viewer }: SectionProps) {
   return (
     <Card testID="ride-details-cancellation">
       <CardTitle>{C.cancellation}</CardTitle>
-      <AppText variant="body">{cancellationText(ride.cancellationReason, viewer)}</AppText>
+      <AppText variant="body" testID="ride-details-cancellation-text">
+        {/* T-561: a parcel refused at the pickup is said as such, not as a plain driver cancel. */}
+        {ride.parcel?.refusalReason
+          ? t(viewer === 'driver' ? 'parcel.driverRefusedReceipt' : 'parcel.senderRefused')
+          : cancellationText(ride.cancellationReason, viewer)}
+      </AppText>
       {ride.cancellationNote ? (
         <AppText variant="bodySmall" color="textSecondary" style={styles.metrics} testID="ride-details-cancellation-note">
           {`${C.cancellationNote}: ${ride.cancellationNote}`}

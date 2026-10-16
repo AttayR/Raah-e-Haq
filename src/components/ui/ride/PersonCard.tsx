@@ -152,7 +152,15 @@ export function PersonCard({
               plateHighlighted ? { borderWidth: theme.borderWidth.focus, borderColor: c.primary } : null,
             ]}
           >
-            <AppText variant="numeric" numberOfLines={1} style={styles.plateText} testID={plateTestID}>
+            {/* T-561: a long plate shrinks to fit (never cut off: it is how the car is found). */}
+            <AppText
+              variant="numeric"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={PLATE_MIN_FONT_SCALE}
+              style={styles.plateText}
+              testID={plateTestID}
+            >
               {plate}
             </AppText>
           </View>
@@ -173,6 +181,9 @@ export function PersonCard({
   return <Card testID={testID}>{body}</Card>;
 }
 
+/** The smallest a long plate is drawn (of the numeric size) before it would be cut off. */
+export const PLATE_MIN_FONT_SCALE = 0.6;
+
 const styles = StyleSheet.create({
   wrap: { gap: space[4] },
   top: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
@@ -184,7 +195,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    maxWidth: '40%',
+    maxWidth: '45%',
   },
   plateText: { letterSpacing: p.plateLetterSpacing },
   actions: { flexDirection: 'row', gap: p.actionGap },

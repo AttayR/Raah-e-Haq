@@ -1,11 +1,12 @@
 import React from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PassengerStackParamList } from '../../../app/navigation/stacks/PassengerStack';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Banner, Button, EmptyState, ErrorState, Header, Screen, SkeletonList } from '../../../components/ui';
+import { AppText, Banner, Button, EmptyState, ErrorState, Header, KeyboardAwareScrollView, Screen, SkeletonList } from '../../../components/ui';
+import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { useNativeLocation } from '../../../hooks/useNativeLocation';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
@@ -107,19 +108,16 @@ export default function SendParcelScreen() {
   }
 
   const ready = !!opts && opts.tierActive;
+  // T-561: while typing (a place search, the receiver's number) the footer steps aside, so the
+  // suggestions and the field keep the space above the keyboard; it is back once it closes.
+  const keyboardUp = useKeyboardVisible();
   return (
     <Screen testID="send-parcel" keyboardAvoiding>
       <Header tone="background" title={t('parcel.screenTitle')} backLabel={t('parcel.back')} onBack={() => navigation.goBack()} testID="send-parcel-header" />
-      <ScrollView
-        style={styles.flex}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        showsVerticalScrollIndicator={false}
-      >
+      <KeyboardAwareScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} testID="send-parcel-scroll">
         {body}
-      </ScrollView>
-      {ready ? (
+      </KeyboardAwareScrollView>
+      {ready && !keyboardUp ? (
         <View
           style={[styles.footer, { paddingBottom: insets.bottom + space[3], borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
           testID="send-parcel-footer"

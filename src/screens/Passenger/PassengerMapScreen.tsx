@@ -179,7 +179,8 @@ const PassengerMapScreen = () => {
   );
 
   // Vehicle catalogue (GET /public/vehicle-types) and one server estimate per route (BE-05).
-  const vehicleTypes = useVehicleTypes();
+  // T-561: a catalogue a few minutes old is re-read quietly, so a tier just switched on shows.
+  const vehicleTypes = useVehicleTypes({ refreshWhen: isFocused });
   const estimates = useFareEstimates(pickup, destination, stops);
   // BE-83: the passenger's offer for the selected quote (starts at the server fare).
   const offer = useFareOffer(estimateFor(estimates.data, flow.selectedVehicle)?.offer_band ?? null);

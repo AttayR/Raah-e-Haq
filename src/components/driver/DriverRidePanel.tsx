@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { AddressPair, AppText, Banner, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
+import { AcBadge, AddressPair, AppText, Badge, Banner, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
 import { space } from '../../theme';
 import type { RideResource } from '../../services/rideService';
 import { firstNameOf } from '../../utils/format';
@@ -13,6 +13,7 @@ import { t } from '../../i18n';
 import { WaitingTimer } from '../../features/fare/components/FareBits';
 import { toFarePolicy } from '../../features/fare/api';
 import { DriverParcelSection } from '../../features/parcel/components/DriverParcelSection';
+import { isAcRide } from '../../features/ac/api';
 import type { DriverParcelPanel } from '../../features/parcel/useDriverParcel';
 import { FOOTER_GAP, FOOTER_SIDE_PADDING, footerRowLabels } from '../../features/driver-ride/footerLayout';
 
@@ -100,6 +101,8 @@ export const DriverRidePanel: React.FC<Props> = ({
   const stops = activeStops(ride);
   const nextStop = step === 'on_trip' ? stops[0] ?? null : null;
   const progress = rideProgressStep(ride.status);
+  const ac = isAcRide(ride);
+  const womenMode = ride.female_driver_only === true;
 
   let primary: { label: string; onPress: () => void; testID: string } | null = null;
   if (step === 'to_pickup') primary = { label: COPY.arrived, onPress: onArrived, testID: 'driver-ride-arrived' };
@@ -194,9 +197,14 @@ export const DriverRidePanel: React.FC<Props> = ({
         contentContainerStyle={[styles.content, hasFooter ? null : footerPad]}
         testID="driver-ride-panel-scroll"
       >
-        <AppText variant="h3" accessibilityRole="header" testID="driver-ride-title">
-          {TITLES[step] ?? COPY.unknown}
-        </AppText>
+        <View style={styles.titleRow}>
+          <AppText variant="h3" accessibilityRole="header" style={styles.title} testID="driver-ride-title">
+            {TITLES[step] ?? COPY.unknown}
+          </AppText>
+          {/* T-561: the AC tier (BE-86) and a women-mode ride (BE-87, when the server says so). */}
+          {ac ? <AcBadge testID="driver-ride-ac" /> : null}
+          {womenMode ? <Badge label={t('womenMode.rideBadge')} tone="info" testID="driver-ride-women-mode" /> : null}
+        </View>
         {progress !== null ? <RideProgress step={progress} testID="driver-ride-progress" /> : null}
 
         <PersonCard
@@ -292,6 +300,8 @@ const styles = StyleSheet.create({
   sheet: { flexShrink: 1 },
   scroll: { flexGrow: 0, flexShrink: 1 },
   content: { padding: space[5], gap: space[4] },
+  titleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] },
+  title: { flexShrink: 1 },
   footer: { paddingHorizontal: FOOTER_SIDE_PADDING, paddingTop: space[3], gap: FOOTER_GAP, borderTopWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', gap: FOOTER_GAP },
   rowItem: { flex: 1, minWidth: 0 },

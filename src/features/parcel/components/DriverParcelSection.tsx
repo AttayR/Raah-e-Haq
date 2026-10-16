@@ -28,7 +28,8 @@ type Props = {
 /**
  * What the driver sees of a parcel on the ride panel (T-522, BE-88): the item and declared
  * value, the receiver (name and masked number, never the number itself), the cash to collect
- * from the sender at the pickup (there is no cash on delivery), a call through the bridge and
+ * from the sender at the pickup (there is no cash on delivery) and, after the pickup, that it
+ * was paid (T-561), a call through the bridge and
  * "Send the code again" while the parcel is with the driver, and the code's block state.
  */
 export function DriverParcelSection({ parcel, fare, onCallReceiver, callingReceiver, onResend, resending, resendDisabled = false, resendAvailableAt }: Props) {
@@ -64,13 +65,23 @@ export function DriverParcelSection({ parcel, fare, onCallReceiver, callingRecei
         </AppText>
       ) : null}
 
-      {fare !== null && (atOrBeforePickup || parcel.status === 'picked_up') ? (
+      {fare !== null && atOrBeforePickup ? (
         <Banner
           tone={parcel.status === 'arrived' ? 'warning' : 'info'}
           icon="cash"
           title={t('parcel.collectCash', { amount: formatMoney(fare) })}
           text={t('parcel.collectCashBody')}
           testID="driver-parcel-collect"
+        />
+      ) : null}
+      {/* T-561: once picked up the sender has paid; nothing is collected at the drop-off. */}
+      {fare !== null && (parcel.status === 'picked_up' || parcel.status === 'returning') ? (
+        <Banner
+          tone="success"
+          icon="cash"
+          title={t('parcel.collectedCash', { amount: formatMoney(fare) })}
+          text={t('parcel.collectedCashBody')}
+          testID="driver-parcel-collected"
         />
       ) : null}
 

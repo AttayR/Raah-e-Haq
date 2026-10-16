@@ -33,7 +33,9 @@ import { WomenModeSearching } from '../../women-mode/components/WomenModeSearchi
 import { parcelOf } from '../../parcel/api';
 import { parcelStatusText } from '../../parcel/rules';
 import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection';
+import type { ParcelView } from '../../parcel/types';
 import { readNumberOrNull } from '../../../core/api/read';
+import { formatMoney } from '../../../utils/format';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -71,19 +73,27 @@ const toNumberOrNull = (value: unknown): number | null => {
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
 };
 
-const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null): string | null => {
+/** T-561: the sender hands the parcel over and pays the locked (else quoted) fare at the pickup. */
+const handOverText = (ride: RideResource | null): string => {
+  const fare = toNumberOrNull(ride?.accepted_fare) ?? toNumberOrNull(ride?.total_fare);
+  return fare !== null ? t('parcel.senderHandOver', { amount: formatMoney(fare) }) : t('parcel.senderHandOverNoFare');
+};
+
+const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null, parcel: ParcelView | null): string | null => {
   switch (state.stage) {
     case 'searching':
       return state.notice === 'driver_cancelled' ? ACTIVE_RIDE_COPY.driverCancelledRequeued : ACTIVE_RIDE_COPY.searchingMessage;
     case 'driver_arrived':
-      return ACTIVE_RIDE_COPY.driverArrivedMessage;
+      return parcel ? handOverText(ride) : ACTIVE_RIDE_COPY.driverArrivedMessage;
     case 'completed':
       return ACTIVE_RIDE_COPY.completedMessage;
     case 'cancelled': {
       if (!ride) return ACTIVE_RIDE_COPY.cancelledBySystem;
+      // T-561: a parcel the rider refused says so (the reason is on the parcel block below).
+      const outcome = parcel?.refusalReason ? t('parcel.senderRefused') : CANCELLED_BY_TEXT[cancelledByOf(ride)];
       // BE-85: a late-cancel or no-show fee the passenger was charged is said with the outcome.
       const fee = cancellationFeeText(toNumberOrNull(ride.cancellation_fee), ride.cancellation_charge_reason ?? null);
-      return fee ? `${CANCELLED_BY_TEXT[cancelledByOf(ride)]} ${fee}` : CANCELLED_BY_TEXT[cancelledByOf(ride)];
+      return fee ? `${outcome} ${fee}` : outcome;
     }
     default:
       return null;
@@ -116,7 +126,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   // simply no Message action.
   const navigation: RideChatNavigator | undefined = useContext(NavigationContext);
   const { stage } = stageState;
-  const subtitle = subtitleOf(stageState, ride);
+  // BE-88: a parcel says its own step (picked up, returning…) and shows the sender's block.
+  const parcel = parcelOf(ride);
+  const subtitle = subtitleOf(stageState, ride, parcel);
   const hasDriver = !!ride?.driver && (stage === 'driver_en_route' || stage === 'driver_arrived' || stage === 'in_trip');
   const fare = stage === 'completed' && ride ? fareSummaryOf(ride) : null;
   const finished = stage === 'completed' || stage === 'cancelled';
@@ -132,8 +144,6 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const acReport = ride && ac ? toAcReportState(ride.ac_report) : null;
   // BE-81: the start PIN, only while the server sends it (accepted / arrived).
   const pin = driver ? ridePinOf(ride) : null;
-  // BE-88: a parcel says its own step (picked up, returning…) and shows the sender's block.
-  const parcel = parcelOf(ride);
   const title = parcel && !warn ? parcelStatusText(parcel.status) : warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage];
   const actions: PersonAction[] = [];
   if (driver && onCall) {
@@ -222,7 +232,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           quotedDistanceKm={readNumberOrNull(ride?.quoted_distance_km)}
           quotedDurationMin={readNumberOrNull(ride?.quoted_duration_minutes)}
           totalLabel={ACTIVE_RIDE_COPY.finalFareLabel}
-          footnote={fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
+          // T-561: a parcel was paid in cash at the pickup, not at the end.
+          footnote={parcel ? t('parcel.senderPaidAtPickup') : fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
         />
       ) : null}
 

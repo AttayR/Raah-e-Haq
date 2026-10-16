@@ -9,6 +9,7 @@ import { formatMoney, formatSignedMoney } from '../../utils/format';
 import { driverSplitOf } from '../../features/fare/api';
 import { formatRate } from '../../features/fare/format';
 import { t } from '../../i18n';
+import { isParcelRide } from '../../features/parcel/api';
 import { lockedDistanceLabel, lockedTimeLabel } from '../ui/ride/FareBreakdown';
 
 type Props = {
@@ -28,6 +29,12 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const summary = toRideSummary(ride);
   const isCash = summary.paymentMethod === null || summary.paymentMethod === 'cash';
+  // T-561: a parcel's sender paid in cash at the pickup; nothing is collected at the end.
+  const collectText = isParcelRide(ride)
+    ? t('parcel.summaryCollected')
+    : isCash
+      ? COPY.collectCash
+      : `${COPY.collectOther} ${summary.paymentMethod}`;
   const rows: Array<{ key: string; label: string; value: number | null }> = summary.breakdown
     ? [
         { key: 'base', label: COPY.base, value: summary.breakdown.base },
@@ -61,7 +68,7 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
           <Text style={styles.label}>{COPY.totalFare}</Text>
           <Text style={styles.total} testID="driver-ride-total">{money(summary.totalFare)}</Text>
           <Text style={styles.collect} testID="driver-ride-collect">
-            {isCash ? COPY.collectCash : `${COPY.collectOther} ${summary.paymentMethod}`}
+            {collectText}
           </Text>
         </View>
       )}

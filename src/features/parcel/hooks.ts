@@ -34,10 +34,11 @@ export const useParcelOptions = (enabled = true): RemoteData<ParcelOptions> =>
 
 /**
  * "Send a parcel" shows only while the admin has the parcel tier on: the bookable catalogue
- * (GET /public/vehicle-types, cached for the booking screen too) lists it.
+ * (GET /public/vehicle-types, cached for the booking screen too) lists it. T-561: `focused`
+ * re-reads a catalogue older than a couple of minutes, so a tier just switched on shows soon.
  */
-export const useParcelAvailable = (): boolean => {
-  const catalogue = useVehicleTypes();
+export const useParcelAvailable = (focused = false): boolean => {
+  const catalogue = useVehicleTypes({ refreshWhen: focused });
   return (catalogue.data ?? []).some(isParcelType);
 };
 
@@ -153,9 +154,30 @@ export interface ParcelOptInState extends RemoteData<ParcelOptIn> {
   setEnabled: (enabled: boolean) => Promise<void>;
 }
 
+/**
+ * T-561: GET /driver/parcels/opt-in is shared by the Account row and the opt-in screen. A read
+ * from the last minute is reused (a tab switch asks nothing); a save updates it.
+ */
+const PARCEL_OPT_IN_CACHE = { name: 'driver/parcels/opt-in', ttlMs: 60 * 1000 } as const;
+
+const readOptIn = () => parcelApi.getOptIn();
+
+/**
+ * T-561: whether the driver's Account shows "Parcel deliveries": a bike driver (the profile's
+ * vehicle type; the screen explains a bike still under review), and, from the server's answer,
+ * any driver with an approved bike among their vehicles (not only the first one) or already
+ * opted in (so they can switch it off).
+ */
+export const showParcelOptInRow = (summary: ParcelOptIn | null, vehicleType: string | null | undefined): boolean =>
+  !vehicleType || vehicleType === 'bike' || (!!summary && (summary.hasApprovedBike || summary.optedIn));
+
+/** The Account row's read of the opt-in summary (on focus, cached for a minute). */
+export const useParcelOptInSummary = (enabled: boolean): ParcelOptIn | null =>
+  useRemoteData({ fetch: readOptIn, fallbackError: t('parcel.optInLoadFailed'), enabled, cache: PARCEL_OPT_IN_CACHE }).data;
+
 /** Driver Account → Parcel deliveries (GET/POST /driver/parcels/opt-in), read on focus. */
 export const useParcelOptIn = (enabled: boolean): ParcelOptInState => {
-  const remote = useRemoteData({ fetch: parcelApi.getOptIn, fallbackError: t('parcel.optInLoadFailed'), enabled });
+  const remote = useRemoteData({ fetch: readOptIn, fallbackError: t('parcel.optInLoadFailed'), enabled, cache: PARCEL_OPT_IN_CACHE });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const mounted = useMounted();

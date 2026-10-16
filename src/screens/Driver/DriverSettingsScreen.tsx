@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { I18nManager, Linking, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { RootState } from '../../store';
@@ -14,6 +14,7 @@ import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { DRIVER_SETTINGS_COPY } from '../../components/driver/settings/copy';
 import { AccountChecks } from '../../features/profile-edit';
 import { DriverWomenModeRow } from '../../features/women-mode/components/DriverWomenModeRow';
+import { showParcelOptInRow, useParcelOptInSummary } from '../../features/parcel/hooks';
 import { layout, space } from '../../theme';
 
 /**
@@ -37,6 +38,9 @@ const DriverSettingsScreen = () => {
   const scrollRef = useRef<Animated.ScrollView>(null);
   useTabScrollReset(scrollRef);
   const title = t('nav.account');
+  const isFocused = useIsFocused();
+  // T-561: only a driver whose profile type is not a bike needs the server's word on other vehicles.
+  const parcelOptIn = useParcelOptInSummary(isFocused && !showParcelOptInRow(null, user?.vehicle_type));
 
   return (
     <Screen testID="driver-settings">
@@ -110,8 +114,8 @@ const DriverSettingsScreen = () => {
               />
             ) : null}
             <DriverWomenModeRow raw={user?.women_mode} />
-            {/* BE-88: parcels go by bike (no row for a car or rickshaw driver). */}
-            {!user?.vehicle_type || user.vehicle_type === 'bike' ? (
+            {/* BE-88: parcels go by bike. T-561: any approved bike counts, not only the first vehicle. */}
+            {showParcelOptInRow(parcelOptIn, user?.vehicle_type) ? (
               <ListItem
                 icon="parcel"
                 title={t('parcel.optInRowTitle')}

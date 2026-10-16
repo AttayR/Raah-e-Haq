@@ -1061,6 +1061,8 @@ export const en = {
     driverRowTitle: 'Women mode',
     driverVerified: 'Verified: you can get women-mode requests',
     driverSuspended: 'Paused while our team reviews a report',
+    // T-561: the driver's active ride (neutral wording).
+    rideBadge: 'Women mode ride',
     // Post-ride women's-safety report.
     reportButton: "Report a women's-safety issue",
     reportTitle: "Report a women's-safety issue",
@@ -1171,6 +1173,12 @@ export const en = {
     returnCodeTitle: 'Your return code',
     returnCodeBody: 'Tell the rider this code when they hand the parcel back to you.',
     returnCodeA11y: 'Return code {code}',
+    // T-561: the sender's live panel at the pickup, after a refusal and once the trip ended.
+    senderHandOver: 'Hand the parcel to the rider and pay {amount} in cash.',
+    senderHandOverNoFare: 'Hand the parcel to the rider and pay the fare in cash.',
+    senderRefused: 'The rider refused your parcel at the pickup.',
+    senderPaidAtPickup: 'Paid in cash at the pickup',
+    driverRefusedReceipt: 'You refused the parcel at the pickup.',
     // Ride receipt (T-559).
     receiptTitle: 'Parcel',
     receiptValue: 'Declared value',
@@ -1194,6 +1202,10 @@ export const en = {
     requestItem: '{item} · {size}',
     collectCash: 'Collect {amount} in cash from the sender',
     collectCashBody: 'The sender pays at the pickup. Nothing is collected from the receiver.',
+    // T-561: after the pickup the fare is already paid.
+    collectedCash: '{amount} was paid in cash at the pickup',
+    collectedCashBody: 'Nothing is collected from the receiver.',
+    summaryCollected: 'Paid in cash at the pickup',
     item: 'Parcel',
     declaredValue: 'Declared value {amount}',
     receiver: 'Receiver',

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import LocationSearch, { suggestionAddress } from '../../../components/passenger/LocationSearch';
-import { AppText, Button, ListGroup, ListItem } from '../../../components/ui';
+import { AppText, Button, KeyboardRevealGroup, ListGroup, ListItem } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { space } from '../../../theme';
 import type { BookingPlace } from '../../ride-booking/buildRideRequest';
@@ -29,7 +29,8 @@ function RoutePoint({ label, place, placeLabel, searchPlaceholder, changeA11y, i
   const title = placeLabel ?? place?.address ?? null;
 
   return (
-    <View style={styles.point}>
+    // T-561: the label, the search field and its suggestions are kept in view above the keyboard.
+    <KeyboardRevealGroup style={styles.point} testID={`${testID}-group`}>
       <AppText variant="label" color="textSecondary">
         {label}
       </AppText>
@@ -71,7 +72,7 @@ function RoutePoint({ label, place, placeLabel, searchPlaceholder, changeA11y, i
           {error}
         </AppText>
       ) : null}
-    </View>
+    </KeyboardRevealGroup>
   );
 }
 

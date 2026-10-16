@@ -16,6 +16,8 @@ import { currentSessionEpoch, onSessionEpochChange } from '../../store/sessionEp
 /** How long each kind of data counts as fresh (PERF-19). */
 export const CACHE_TTL = {
   vehicleTypes: 60 * 60 * 1000,
+  /** T-561: on Home / booking focus the catalogue is read again once it is older than this. */
+  vehicleTypesRecheck: 2 * 60 * 1000,
   savedPlaces: 60 * 1000,
   stats: 60 * 1000,
   directions: 5 * 60 * 1000,
@@ -81,6 +83,17 @@ export const readCache = <T>(key: string, ttlMs: number): { value: T } | null =>
     return null;
   }
   return { value: entry.value as T };
+};
+
+/**
+ * T-561: how old the stored value of `key` is (ms), or null when there is none from this
+ * session. Unlike readCache it never drops the entry, so a "recheck when older than" test keeps
+ * the value for readers with a longer TTL.
+ */
+export const cacheAgeMs = (key: string): number | null => {
+  const entry = entries.get(key);
+  if (!entry || entry.epoch !== currentSessionEpoch()) return null;
+  return Date.now() - entry.storedAt;
 };
 
 /**
