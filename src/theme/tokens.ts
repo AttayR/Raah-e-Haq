@@ -41,6 +41,10 @@ export type SemanticColors = {
   /** [UI-R2] pressed `destructive` / `destructiveSoft` buttons. */
   dangerPressed: string;
   dangerSoftPressed: string;
+  /** [T-545] disabled filled Button fill (solid, no opacity, so the label stays readable in dark mode). */
+  fillDisabled: string;
+  /** [T-545] disabled Button label and icon (≥4.5:1 on `fillDisabled`, `background` and `surface`). */
+  textDisabled: string;
   info: string;
   infoSoft: string;
   accent: string;
@@ -92,6 +96,8 @@ export const lightColors: SemanticColors = {
   dangerFill: extra.danger,
   dangerPressed: extra.dangerPressed,
   dangerSoftPressed: extra.dangerSoftPressed,
+  fillDisabled: neutral[200],
+  textDisabled: neutral[600],
   info: extra.info,
   infoSoft: extra.infoSoft,
   accent: saffron[500],
@@ -141,6 +147,8 @@ export const darkColors: SemanticColors = {
   dangerFill: extra.dangerFillDark,
   dangerPressed: extra.dangerPressedDark,
   dangerSoftPressed: extra.dangerSoftPressedDark,
+  fillDisabled: dark[700],
+  textDisabled: dark[300],
   info: extra.infoDark,
   infoSoft: extra.infoSoftDark,
   accent: saffron[500],

@@ -25,6 +25,8 @@ export const PASSENGER_SETTINGS_COPY = {
   email: 'Email',
   gender: 'Gender',
   dateOfBirth: 'Date of birth',
+  address: 'Address',
+  bio: 'About',
   verified: 'Verified',
   noDetails: 'No personal details yet',
 } as const;

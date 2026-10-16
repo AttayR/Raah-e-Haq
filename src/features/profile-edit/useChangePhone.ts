@@ -159,6 +159,9 @@ export function useChangePhone(user: User | null, onDone: () => void) {
           // Cancelled or verified elsewhere: start again from the number.
           setPendingPhone(null);
           setStep('number');
+        } else if (rejection?.status === 422) {
+          // A wrong code: empty the boxes so the next try starts fresh (T-545); the message stays.
+          setCodeState('');
         }
         handleRefusal(rejection, t('phoneChange.verifyFailed'));
       }),

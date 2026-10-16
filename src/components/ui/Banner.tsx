@@ -17,6 +17,12 @@ export type BannerProps = {
   text: string;
   /** Optional trailing text action ("Retry", "Update"). */
   action?: { label: string; onPress: () => void; testID?: string };
+  /**
+   * Where the action sits: `end` (default, a short line like "Retry") or `below` the text, so a
+   * long message (an email address, a phone number) keeps the full width and never wraps mid-word
+   * in a narrow column (T-545).
+   */
+  actionPlacement?: 'end' | 'below';
   style?: StyleProp<ViewStyle>;
   testID?: string;
 };
@@ -41,9 +47,25 @@ const defaultIcons: Record<BannerTone, IconName> = {
  * `bodySmall` text in the tone colour (≥4.5:1 on its soft fill in both modes, §1.5), an optional
  * `label` title and a trailing text action. Warning and danger banners are announced politely.
  */
-export function Banner({ tone = 'info', icon, title, text, action, style, testID }: BannerProps) {
+export function Banner({ tone = 'info', icon, title, text, action, actionPlacement = 'end', style, testID }: BannerProps) {
   const { theme } = useAppTheme();
   const urgent = tone === 'warning' || tone === 'danger';
+  const below = actionPlacement === 'below';
+  const actionButton = action ? (
+    <Pressable
+      onPress={action.onPress}
+      accessibilityRole="button"
+      accessibilityLabel={action.label}
+      // 24 visual + 10 slop each side = a 44 target.
+      hitSlop={10}
+      style={below ? styles.actionBelow : styles.action}
+      testID={action.testID}
+    >
+      <AppText variant="buttonSmall" color={tone} numberOfLines={below ? undefined : 1}>
+        {action.label}
+      </AppText>
+    </Pressable>
+  ) : null;
   return (
     <View
       testID={testID}
@@ -51,31 +73,20 @@ export function Banner({ tone = 'info', icon, title, text, action, style, testID
       style={[styles.banner, { backgroundColor: theme.colors[fills[tone]] }, style]}
     >
       <Icon name={icon ?? defaultIcons[tone]} size={20} color={tone} />
-      <View style={styles.text} accessible accessibilityRole={urgent ? 'alert' : 'text'}>
-        {title ? (
-          <AppText variant="label" color={tone}>
-            {title}
+      <View style={styles.text}>
+        <View accessible accessibilityRole={urgent ? 'alert' : 'text'} style={styles.copy}>
+          {title ? (
+            <AppText variant="label" color={tone}>
+              {title}
+            </AppText>
+          ) : null}
+          <AppText variant="bodySmall" color={tone}>
+            {text}
           </AppText>
-        ) : null}
-        <AppText variant="bodySmall" color={tone}>
-          {text}
-        </AppText>
+        </View>
+        {below ? actionButton : null}
       </View>
-      {action ? (
-        <Pressable
-          onPress={action.onPress}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          // 24 visual + 10 slop each side = a 44 target.
-          hitSlop={10}
-          style={styles.action}
-          testID={action.testID}
-        >
-          <AppText variant="buttonSmall" color={tone} numberOfLines={1}>
-            {action.label}
-          </AppText>
-        </Pressable>
-      ) : null}
+      {below ? null : actionButton}
     </View>
   );
 }
@@ -104,6 +115,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[4],
     borderRadius: radius.md,
   },
-  text: { flex: 1, minWidth: 0, gap: space[1] / 2 },
+  text: { flex: 1, minWidth: 0, gap: space[2] },
+  copy: { gap: space[1] / 2 },
   action: { minHeight: space[6], justifyContent: 'center', alignSelf: 'center' },
+  actionBelow: { minHeight: space[6], justifyContent: 'center', alignSelf: 'flex-start' },
 });

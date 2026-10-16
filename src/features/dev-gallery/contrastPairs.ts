@@ -63,6 +63,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   bgUnder('dangerFill', 'onPrimary', 'text'),
   bgUnder('dangerPressed', 'onPrimary', 'text'),
   bgUnder('dangerSoftPressed', 'danger', 'text'),
+  bgUnder('fillDisabled', 'textDisabled', 'text'),
+  fgOn('textDisabled', 'fillDisabled', 'text'),
   fgOn('info', 'surface', 'text'),
   bgUnder('infoSoft', 'info', 'text'),
   bgUnder('accent', 'onAccent', 'text'),

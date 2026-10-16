@@ -9,6 +9,8 @@ import { Icon, type IconName } from './Icon';
 export type ListItemProps = {
   title: string;
   subtitle?: string;
+  /** Subtitle line cap (default 2); 0 shows all of it (a bio or an address on Profile, T-545). */
+  subtitleNumberOfLines?: number;
   /** Optional third line in `caption` `textMuted` (dates, meta). */
   meta?: string;
   /**
@@ -48,6 +50,7 @@ export type ListItemProps = {
 export function ListItem({
   title,
   subtitle,
+  subtitleNumberOfLines = 2,
   meta,
   variant = 'settings',
   icon,
@@ -90,7 +93,7 @@ export function ListItem({
           {title}
         </AppText>
         {subtitle ? (
-          <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
+          <AppText variant="bodySmall" color="textSecondary" numberOfLines={subtitleNumberOfLines}>
             {subtitle}
           </AppText>
         ) : null}

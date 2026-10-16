@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useState } from 'react';
+import React, { forwardRef, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { t } from '../../i18n';
@@ -13,6 +13,7 @@ import {
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
+import { useKeyboardReveal } from './keyboardReveal';
 // No maxLength on `phone`: a pasted "+92 300 1234567" must reach the normaliser whole (it caps at 10).
 import { formatNationalPhone, toNationalDigits } from './phoneInput';
 
@@ -73,6 +74,9 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   const c = theme.colors;
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  // Inside a keyboard-aware scroll view the whole field (label to error) stays above the keyboard (T-545).
+  const reveal = useKeyboardReveal();
+  const containerRef = useRef<View>(null);
 
   const isPhone = variant === 'phone';
   const isSearch = variant === 'search';
@@ -91,6 +95,12 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       AccessibilityInfo.announceForAccessibility(t('kit.errorA11y', { message: error }));
     }
   }, [error]);
+  // A new error scrolls its field into view (the first one wins when several appear at once).
+  const hadError = useRef(hasError);
+  useEffect(() => {
+    if (hasError && !hadError.current) reveal?.error(containerRef.current);
+    hadError.current = hasError;
+  }, [hasError, reveal]);
   const fill = focused && !isSearch ? c.surface : c.surfaceAlt;
   const name = [accessibilityLabel ?? label ?? inputProps.placeholder, hasError ? t('kit.errorA11y', { message: error as string }) : null]
     .filter(Boolean)
@@ -99,7 +109,12 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   const handleChange = (text: string) => onChangeText(isPhone ? toNationalDigits(text) : text);
 
   return (
-    <View style={[styles.container, disabled && styles.disabled]} testID={testID}>
+    <View
+      ref={containerRef}
+      style={[styles.container, disabled && styles.disabled]}
+      onLayout={focused ? () => reveal?.layoutChanged(containerRef.current) : undefined}
+      testID={testID}
+    >
       {label ? (
         <AppText variant="label" color="textSecondary" style={styles.label}>
           {label}
@@ -150,10 +165,12 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           accessibilityState={{ disabled }}
           onFocus={e => {
             setFocused(true);
+            reveal?.focus(containerRef.current);
             onFocus?.(e);
           }}
           onBlur={e => {
             setFocused(false);
+            reveal?.blur(containerRef.current);
             onBlur?.(e);
           }}
           style={[

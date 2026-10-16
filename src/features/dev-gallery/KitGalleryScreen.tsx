@@ -9,6 +9,7 @@ import { FormatSection, HapticsSection } from './sections/FormatSection';
 import { ICON_PART_COUNT, IconSection } from './sections/IconSection';
 import { ButtonSection } from './sections/ButtonSection';
 import { FieldSection } from './sections/FieldSection';
+import { ProfileSection } from './sections/ProfileSection';
 import { DialogSection, FeedbackSection, StatesSection } from './sections/FeedbackSections';
 import { SheetSection } from './sections/SheetSection';
 import {
@@ -60,6 +61,7 @@ const SECTIONS: Section[] = [
   ['headers', () => <HeaderSection />],
   ['cards', () => <CardSection />],
   ['lists', () => <ListSection />],
+  ['profile', () => <ProfileSection />],
   ['feedback', () => <FeedbackSection />],
   ['states', () => <StatesSection />],
   ['dialog', () => <DialogSection />],

@@ -6,6 +6,7 @@ export const DRIVER_SETTINGS_COPY = {
   accountGroup: 'Account',
   editProfile: 'Edit profile',
   editProfileSubtitle: 'Update your personal information',
+  openProfileHint: 'Opens your profile',
   documents: 'Vehicle & documents',
   documentsSubtitle: 'Review status and re-upload rejected photos',
   rideHistory: 'Ride history',

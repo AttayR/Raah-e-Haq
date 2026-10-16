@@ -56,7 +56,8 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * Button (DESIGN_SYSTEM §5.4, v1.1 pill radius). Pressed: pressed fill + 0.98 scale (§6.1, none
- * with reduced motion). Disabled: 0.4 opacity, no press feedback. Loading: spinner, busy, no taps.
+ * with reduced motion). Disabled: solid `fillDisabled` (filled variants) and `textDisabled` label,
+ * no press feedback (T-545; was 0.4 opacity). Loading: spinner, busy, no taps.
  * `sm` (36 visual) gets vertical hit slop so its target is still 44.
  */
 export function Button({
@@ -92,7 +93,18 @@ export function Button({
     onPress();
   }, [haptic, inactive, onPress]);
 
-  const fill = pressed && !inactive ? theme.colors[tone.pressed] : tone.fill ? theme.colors[tone.fill] : 'transparent';
+  // Disabled (T-545): solid `fillDisabled` + `textDisabled` instead of 0.4 opacity, so the label stays
+  // readable in dark mode (navy at 0.4 on near-black was ~2.6:1). Loading keeps the live colours.
+  const fill = disabled
+    ? tone.fill
+      ? theme.colors.fillDisabled
+      : 'transparent'
+    : pressed && !inactive
+      ? theme.colors[tone.pressed]
+      : tone.fill
+        ? theme.colors[tone.fill]
+        : 'transparent';
+  const textColor: TextColor = disabled ? 'textDisabled' : tone.text;
 
   return (
     <AnimatedPressable
@@ -117,8 +129,9 @@ export function Button({
         { minHeight: dims.height, paddingHorizontal: dims.padding },
         fullWidth ? styles.full : styles.hug,
         { backgroundColor: fill },
-        tone.border ? { borderWidth: theme.borderWidth.thin, borderColor: theme.colors.borderStrong } : null,
-        disabled && styles.disabled,
+        tone.border
+          ? { borderWidth: theme.borderWidth.thin, borderColor: disabled ? theme.colors.border : theme.colors.borderStrong }
+          : null,
         press.animatedStyle,
       ]}
     >
@@ -128,11 +141,11 @@ export function Button({
         testID={testID ? `${testID}-content` : undefined}
         importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}
       >
-        {leadingIcon ? <Icon name={leadingIcon} size={dims.icon} color={tone.text} /> : null}
-        <AppText variant={dims.text} color={tone.text} numberOfLines={1} style={styles.label}>
+        {leadingIcon ? <Icon name={leadingIcon} size={dims.icon} color={textColor} /> : null}
+        <AppText variant={dims.text} color={textColor} numberOfLines={1} style={styles.label}>
           {label}
         </AppText>
-        {trailingIcon ? <Icon name={trailingIcon} size={dims.icon} color={tone.text} /> : null}
+        {trailingIcon ? <Icon name={trailingIcon} size={dims.icon} color={textColor} /> : null}
       </View>
       {loading ? (
         <View style={styles.spinner} pointerEvents="none">
@@ -156,5 +169,4 @@ const styles = StyleSheet.create({
   label: { flexShrink: 1 },
   hidden: { opacity: 0 },
   spinner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  disabled: { opacity: componentTokens.state.disabledOpacity },
 });

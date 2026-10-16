@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +15,7 @@ import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { layout, type StatusBarStyle } from '../../theme';
 import { keyboardAvoidingProps } from './keyboard';
+import { KeyboardRevealProvider, type RevealScrollable } from './keyboardReveal';
 
 export type ScreenProps = React.PropsWithChildren<{
   /** Wraps content in a ScrollView (taps reach inputs while the keyboard is up). */
@@ -72,6 +73,8 @@ export function Screen({
   const { theme } = useAppTheme();
   const background = { backgroundColor: theme.colors.background };
   const avoid = keyboardAvoiding ?? scroll;
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  const getScroll = useCallback((): RevealScrollable | null => scrollRef.current, []);
 
   const refresh =
     refreshControl ??
@@ -86,6 +89,7 @@ export function Screen({
 
   const body = scroll ? (
     <Animated.ScrollView
+      ref={scrollRef}
       style={styles.root}
       contentContainerStyle={[styles.scrollContent, contentStyle]}
       keyboardShouldPersistTaps="handled"
@@ -96,7 +100,8 @@ export function Screen({
       scrollEventThrottle={16}
       testID={testID ? `${testID}-scroll` : undefined}
     >
-      {children}
+      {/* The focused TextField stays above the keyboard (T-545, keyboardReveal.tsx). */}
+      <KeyboardRevealProvider getScroll={getScroll}>{children}</KeyboardRevealProvider>
     </Animated.ScrollView>
   ) : (
     <View style={[styles.root, contentStyle]}>{children}</View>

@@ -6,6 +6,7 @@
  * waiting for its link, confirm your email after a warning).
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -16,6 +17,7 @@ import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import ProfileEditScreen from '../../../src/features/profile-edit/screens/ProfileEditScreen';
 import ChangePhoneScreen from '../../../src/features/profile-edit/screens/ChangePhoneScreen';
 import { AccountChecks } from '../../../src/features/profile-edit';
+import { ProfileInfoList, profileInfoRows } from '../../../src/components/passenger/settings/ProfileInfoList';
 import { dialog, dialogStore } from '../../../src/core/dialog';
 import { toast } from '../../../src/core/toast';
 
@@ -137,6 +139,28 @@ describe('Edit profile', () => {
     expect(mock.history.put).toHaveLength(0);
   });
 
+  it('T-545: the form scrolls the focused field above the keyboard; number pad and bio get the iOS Done bar', async () => {
+    await renderWith(<ProfileEditScreen />, driver);
+    const scroll = screen.getByTestId('profile-edit-scroll');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    // The Done bar (InputAccessoryView) serves the number pad (date of birth) and the multiline bio.
+    const doneId = screen.getByTestId('profile-edit-dob-input').props.inputAccessoryViewID;
+    expect(doneId).toBeTruthy();
+    expect(screen.getByTestId('profile-edit-bio-input').props.inputAccessoryViewID).toBe(doneId);
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    // The sticky Save bar stays outside the scroll view.
+    expect(screen.getByTestId('profile-edit-scroll')).not.toContainElement(screen.getByTestId('profile-edit-save'));
+  });
+
+  it('T-545: the phone helper sits under the row at full width (not cut next to "Change number")', async () => {
+    await renderWith(<ProfileEditScreen />, rider);
+    expect(screen.getByTestId('profile-edit-phone-helper')).toHaveTextContent(
+      'Your number changes only after you enter the code we text to the new one.',
+    );
+    expect(screen.getByTestId('profile-edit-phone')).not.toContainElement(screen.getByTestId('profile-edit-phone-helper'));
+    expect(screen.getByTestId('profile-edit-change-phone').props.accessibilityHint).toMatch(/code we text/);
+  });
+
   it('a new email asks for the current password; a refused password shows under it and keeps the session', async () => {
     mock.onPut('/profile').reply(422, {
       success: false,
@@ -220,10 +244,13 @@ describe('Change number', () => {
     expect(screen.getByText('Invalid or expired code.')).toBeTruthy();
     expect(store.getState().apiAuth.isAuthenticated).toBe(true);
     expect(mockGoBack).not.toHaveBeenCalled();
+    // T-545: the wrong code is cleared (the message stays), so the next code starts from empty boxes.
+    expect(screen.getByTestId('change-phone-code-input').props.value).toBe('');
+    expect(screen.getByTestId('change-phone-verify')).toBeDisabled();
 
-    // A full code typed over the wrong one does not auto-submit (OtpInput); Verify does.
+    // The next full code submits on its own (OtpInput completion).
     fireEvent.changeText(screen.getByTestId('change-phone-code-input'), '123456');
-    await press('change-phone-verify');
+    await flush();
     expect(JSON.parse(mock.history.post[2].data)).toEqual({ otp_code: '123456' });
     expect(toast.success).toHaveBeenCalledWith('Your number is verified.');
     expect(mockGoBack).toHaveBeenCalledTimes(1);
@@ -317,11 +344,41 @@ describe('Account banners', () => {
     expect(toast.error).toHaveBeenCalledWith('You asked for several links. Please try again in a few minutes.');
   });
 
+  it('T-545: the pending-email action sits under the text, so the address keeps the full width', async () => {
+    const user = { ...rider, pending_email: 'passenger@raah-e-haq.com.pk' };
+    await renderWith(<AccountChecks user={user} onOpenPhone={jest.fn()} />, user);
+    const banner = screen.getByTestId('account-checks-pending-email');
+    const action = screen.getByTestId('account-checks-pending-email-action');
+    expect(banner).toContainElement(action);
+    expect(StyleSheet.flatten(action.props.style)).toMatchObject({ alignSelf: 'flex-start' });
+  });
+
   it('Account tab mode shows only the number banner', async () => {
     const user = { ...rider, phone: null, email_verified: false, pending_email: 'next@example.test' };
     await renderWith(<AccountChecks user={user} onOpenPhone={jest.fn()} phoneOnly />, user);
     expect(screen.getByTestId('account-checks-verify-phone')).toBeTruthy();
     expect(screen.queryByTestId('account-checks-confirm-email')).toBeNull();
     expect(screen.queryByTestId('account-checks-pending-email')).toBeNull();
+  });
+});
+
+describe('Profile personal info (T-545)', () => {
+  it('shows address and bio in full for both roles when the profile has them', async () => {
+    const bio = 'I drive mornings in Gulberg and DHA. '.repeat(6).trim();
+    for (const user of [rider, driver]) {
+      const withText = { ...user, bio };
+      await renderWith(<ProfileInfoList user={withText} />, withText);
+      expect(screen.getByTestId('passenger-profile-address')).toHaveTextContent(/House 1, Street 2, Lahore/);
+      const bioText = screen.getByText(bio);
+      expect(bioText.props.numberOfLines).toBe(0);
+      screen.unmount();
+    }
+  });
+
+  it('leaves out blank address and bio', () => {
+    const keys = profileInfoRows({ ...rider, address: '  ', bio: undefined }).map((row) => row.key);
+    expect(keys).not.toContain('address');
+    expect(keys).not.toContain('bio');
+    expect(profileInfoRows({ ...rider, bio: 'Hi' }).map((row) => row.key)).toEqual(['phone', 'email', 'gender', 'dob', 'address', 'bio']);
   });
 });

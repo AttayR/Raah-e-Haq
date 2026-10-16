@@ -361,10 +361,13 @@ describe('DriverSettingsScreen', () => {
     expect(screen.queryByText('Help & support')).toBeNull();
   });
 
-  it('Edit profile opens Profile; Notifications opens the preferences screen (T-502); phone settings stays a row', async () => {
+  it('Edit profile opens the edit form and the profile card opens Profile (T-545); Notifications opens the preferences screen (T-502); phone settings stays a row', async () => {
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
     await renderScreen(DriverSettingsScreen);
     fireEvent.press(screen.getByRole('button', { name: 'Edit profile, Update your personal information' }));
+    expect(mockNavigate).toHaveBeenCalledWith('ProfileEdit');
+    expect(mockNavigate).not.toHaveBeenCalledWith('Profile');
+    fireEvent.press(screen.getByTestId('driver-settings-profile'));
     expect(mockNavigate).toHaveBeenCalledWith('Profile');
     fireEvent.press(screen.getByTestId('driver-settings-notifications'));
     expect(mockNavigate).toHaveBeenCalledWith('NotificationPreferences');

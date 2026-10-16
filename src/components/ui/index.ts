@@ -21,6 +21,8 @@ export * from './Header';
 export * from './Icon';
 export * from './IconButton';
 export * from './keyboard';
+export * from './keyboardReveal';
+export * from './KeyboardDoneBar';
 export * from './ListGroup';
 export * from './ListItem';
 export * from './MapControls';

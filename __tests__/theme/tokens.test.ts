@@ -66,6 +66,8 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   dangerFill: ['#C0262D', '#D23A40'],
   dangerPressed: ['#9E1F25', '#B3262C'],
   dangerSoftPressed: ['#FBDDDF', '#4D1B1E'],
+  fillDisabled: ['#DADFEA', '#2B3450'],
+  textDisabled: ['#4C556C', '#B7BFD0'],
   surfaceAltPressed: ['#DADFEA', '#2B3450'],
   primarySoftPressed: ['#DCE4F8', '#1A3496'],
   info: ['#1D58C4', '#7FA8F5'],
@@ -151,6 +153,9 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
     ['ratingStar', 'surface', 3.46, 8.5, 3],
     // Filled success button label (AdvancedRideRequestPanel submit, BrandButton success).
     ['onSuccess', 'success', 5.78, 9.23, 4.5],
+    // T-545: disabled Button label on its solid fill, and a disabled ghost/outline label on the page.
+    ['textDisabled', 'fillDisabled', 5.57, 6.7, 4.5],
+    ['textDisabled', 'background', 6.87, 10.37, 4.5],
   ];
 
   it.each(PAIRS)('%s on %s: light %d, dark %d', (fg, bg, light, darkRatio, min) => {

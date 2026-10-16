@@ -83,14 +83,38 @@ describe('Button', () => {
     expect(flat(screen.getByTestId('b').props.style).minHeight).toBe(56);
   });
 
-  it('disabled: 0.4 opacity, reported disabled, no press', async () => {
-    const onPress = jest.fn();
-    await renderThemed(<Button label="Go" disabled onPress={onPress} testID="b" />);
-    const button = screen.getByTestId('b');
-    expect(button.props.accessibilityState).toMatchObject({ disabled: true });
-    expect(flat(button.props.style).opacity).toBe(0.4);
-    fireEvent.press(button);
-    expect(onPress).not.toHaveBeenCalled();
+  it.each(['light', 'dark'] as const)(
+    'disabled (%s, T-545): solid fillDisabled + textDisabled label, no opacity, reported disabled, no press',
+    async (mode) => {
+      const onPress = jest.fn();
+      const theme = mode === 'dark' ? DarkTheme : LightTheme;
+      await renderThemed(<Button label="Go" disabled onPress={onPress} testID="b" />, mode);
+      const button = screen.getByTestId('b');
+      expect(button.props.accessibilityState).toMatchObject({ disabled: true });
+      expect(flat(button.props.style).opacity).toBeUndefined();
+      expect(flat(button.props.style).backgroundColor).toBe(theme.colors.fillDisabled);
+      expect(flat(screen.getByText('Go').props.style).color).toBe(theme.colors.textDisabled);
+      fireEvent.press(button);
+      expect(onPress).not.toHaveBeenCalled();
+    },
+  );
+
+  it('disabled ghost/outline: no fill, textDisabled label, outline border softens to border', async () => {
+    await renderThemed(
+      <>
+        <Button label="Ghost" variant="ghost" disabled onPress={jest.fn()} testID="g" />
+        <Button label="Outline" variant="outline" disabled onPress={jest.fn()} testID="o" />
+      </>,
+      'dark',
+    );
+    expect(flat(screen.getByTestId('g').props.style).backgroundColor).toBe('transparent');
+    expect(flat(screen.getByText('Ghost').props.style).color).toBe(DarkTheme.colors.textDisabled);
+    expect(flat(screen.getByTestId('o').props.style).borderColor).toBe(DarkTheme.colors.border);
+  });
+
+  it('loading keeps the live fill (not the disabled one)', async () => {
+    await renderThemed(<Button label="Go" loading onPress={jest.fn()} testID="b" />, 'dark');
+    expect(flat(screen.getByTestId('b').props.style).backgroundColor).toBe(DarkTheme.colors.primary);
   });
 
   it('loading: spinner instead of the label, busy, no press', async () => {

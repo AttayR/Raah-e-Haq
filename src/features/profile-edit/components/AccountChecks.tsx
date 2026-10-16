@@ -31,7 +31,8 @@ type Props = {
  * - an email waiting for its link (BE-38): "Cancel change" sends the current email back
  * - an unconfirmed email (BE-40, safe since BE-47): "Send link", after a warning that opening it
  *   signs out and may remove the number (BE-44); the 401 that follows is the one T-104 logout
- * Nothing shows when nothing is needed. No request is made until a banner is tapped.
+ * Nothing shows when nothing is needed. No request is made until a banner is tapped. Actions sit
+ * under the text, so an address or number keeps the full width (T-545).
  */
 export function AccountChecks({ user, onOpenPhone, phoneOnly = false, testID = 'account-checks' }: Props) {
   const dispatch = useAppDispatch();
@@ -100,6 +101,7 @@ export function AccountChecks({ user, onOpenPhone, phoneOnly = false, testID = '
         tone={user.phone ? 'info' : 'warning'}
         title={t('accountChecks.pendingPhoneTitle')}
         text={t('accountChecks.pendingPhoneBody', { phone: formatPkPhone(pendingPhone) })}
+        actionPlacement="below"
         action={{ label: t('accountChecks.pendingPhoneAction'), onPress: onOpenPhone, testID: `${testID}-pending-phone-action` }}
         testID={`${testID}-pending-phone`}
       />,
@@ -111,6 +113,7 @@ export function AccountChecks({ user, onOpenPhone, phoneOnly = false, testID = '
         tone="warning"
         title={t('accountChecks.verifyPhoneTitle')}
         text={t('accountChecks.verifyPhoneBody')}
+        actionPlacement="below"
         action={{ label: t('accountChecks.verifyPhoneAction'), onPress: onOpenPhone, testID: `${testID}-verify-phone-action` }}
         testID={`${testID}-verify-phone`}
       />,
@@ -124,6 +127,7 @@ export function AccountChecks({ user, onOpenPhone, phoneOnly = false, testID = '
         tone="info"
         title={t('accountChecks.pendingEmailTitle')}
         text={t('accountChecks.pendingEmailBody', { email: user.pending_email })}
+        actionPlacement="below"
         action={{ label: t('accountChecks.pendingEmailAction'), onPress: cancelEmailChange, testID: `${testID}-pending-email-action` }}
         testID={`${testID}-pending-email`}
       />,
@@ -136,6 +140,7 @@ export function AccountChecks({ user, onOpenPhone, phoneOnly = false, testID = '
         tone="warning"
         title={t('accountChecks.confirmEmailTitle')}
         text={t('accountChecks.confirmEmailBody', { email: currentEmail })}
+        actionPlacement="below"
         action={{ label: t('accountChecks.confirmEmailAction'), onPress: sendConfirmation, testID: `${testID}-confirm-email-action` }}
         testID={`${testID}-confirm-email`}
       />,

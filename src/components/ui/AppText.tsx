@@ -9,6 +9,7 @@ export type TextColor = Extract<
   | 'textPrimary'
   | 'textSecondary'
   | 'textMuted'
+  | 'textDisabled'
   | 'textInverse'
   | 'primaryText'
   | 'onPrimary'

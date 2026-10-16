@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { I18nManager, Linking, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -8,7 +8,7 @@ import type { DriverStackParamList } from '../../app/navigation/stacks/DriverSta
 import { RootState } from '../../store';
 import { useLogout } from '../../hooks/useLogout';
 import { useTabScrollReset } from '../../hooks/useTabScrollReset';
-import { AppText, Avatar, Badge, Card, Header, HeaderLargeTitle, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
+import { AppText, Avatar, Badge, Card, Header, HeaderLargeTitle, Icon, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { DRIVER_SETTINGS_COPY } from '../../components/driver/settings/copy';
@@ -17,7 +17,8 @@ import { layout, space } from '../../theme';
 
 /**
  * Driver Account tab (T-618 driver side, shared-settings spec; UI-R4: `large` Header that
- * collapses on scroll, DESIGN_SYSTEM §8.1). Every row leads somewhere: Edit profile opens Profile,
+ * collapses on scroll, DESIGN_SYSTEM §8.1). Every row leads somewhere: the profile card opens
+ * Profile and Edit profile the edit form (T-545, like the passenger Profile → Edit),
  * Vehicle & documents the documents list (T-203), Ride history its screen (T-501), Notifications
  * the push preferences (BE-11, T-502) with the phone's own settings as a second row, Sign out is
  * the shared confirm flow (T-102). Earnings is a tab and the wallet opens from it (UI-R4).
@@ -28,6 +29,7 @@ const DriverSettingsScreen = () => {
   const { user } = useSelector((state: RootState) => state.apiAuth);
   const { confirmLogout, isLoggingOut } = useLogout();
   const isActive = user?.status === 'active';
+  const statusLabel = isActive ? DRIVER_SETTINGS_COPY.statusApproved : DRIVER_SETTINGS_COPY.statusPending;
   const name = user?.name?.trim() || DRIVER_SETTINGS_COPY.driverFallbackName;
   const contact = user?.email || user?.phone || null;
   const { scrollY, onScroll } = useHeaderScroll();
@@ -49,7 +51,12 @@ const DriverSettingsScreen = () => {
       >
         <HeaderLargeTitle title={title} scrollY={scrollY} />
         <View style={styles.body}>
-          <Card testID="driver-settings-profile">
+          <Card
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityLabel={[name, contact, statusLabel].filter(Boolean).join(', ')}
+            accessibilityHint={DRIVER_SETTINGS_COPY.openProfileHint}
+            testID="driver-settings-profile"
+          >
             <View style={styles.profileRow}>
               <Avatar name={name} uri={user?.profile_image_url} size={56} />
               <View style={styles.profileText}>
@@ -64,10 +71,13 @@ const DriverSettingsScreen = () => {
                 <View style={styles.badgeRow}>
                   <Badge
                     tone={isActive ? 'success' : 'warning'}
-                    label={isActive ? DRIVER_SETTINGS_COPY.statusApproved : DRIVER_SETTINGS_COPY.statusPending}
+                    label={statusLabel}
                     testID="driver-settings-status"
                   />
                 </View>
+              </View>
+              <View style={I18nManager.isRTL ? styles.flip : null}>
+                <Icon name="chevronEnd" size={20} color="textMuted" />
               </View>
             </View>
           </Card>
@@ -78,7 +88,7 @@ const DriverSettingsScreen = () => {
               icon="account"
               title={DRIVER_SETTINGS_COPY.editProfile}
               subtitle={DRIVER_SETTINGS_COPY.editProfileSubtitle}
-              onPress={() => navigation.navigate('Profile')}
+              onPress={() => navigation.navigate('ProfileEdit')}
               testID="driver-settings-edit-profile"
             />
             <ListItem
@@ -147,6 +157,7 @@ const styles = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
   profileText: { flex: 1, minWidth: 0, gap: space[1] },
   badgeRow: { flexDirection: 'row', marginTop: space[1] },
+  flip: { transform: [{ scaleX: -1 }] },
 });
 
 export default DriverSettingsScreen;

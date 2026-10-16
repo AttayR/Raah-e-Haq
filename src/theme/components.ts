@@ -78,6 +78,8 @@ export const componentTokens = {
   },
   /** §5.6 OTP variant: 6 boxes, 48×56, 8 gap. */
   otp: { length: 6, boxWidth: 48, boxHeight: 56, gap: space[2] },
+  /** iOS "Done" bar above a number pad / multiline keyboard (T-509, kit in T-545). */
+  keyboardDoneBar: { buttonHeight: 32 },
   /** §5.10 SegmentedControl. */
   segmented: { segmentMinHeight: 44, trackPadding: space[1], thumbRadius: radius.sm, minimumFontScale: 0.85 },
   /** §5.11 Chip: 32 visual, padding 12, a 16 leading glyph. */
