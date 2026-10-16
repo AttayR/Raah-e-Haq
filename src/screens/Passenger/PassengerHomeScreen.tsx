@@ -31,6 +31,7 @@ import { bookingParamsFor } from '../../features/saved-places/navigation';
 import { selectInProgressRide } from '../../features/active-ride/slice';
 import { liveRideStatusText } from '../../features/active-ride/status';
 import { useParcelAvailable } from '../../features/parcel/hooks';
+import { parcelLiveStatusText } from '../../features/parcel/live';
 import { t } from '../../i18n';
 import { radius, space } from '../../theme';
 
@@ -62,10 +63,12 @@ export default function PassengerHomeScreen() {
   const user = useSelector((state: RootState) => state.apiAuth.user);
   // T-543: a ride in progress (booked, or restored at launch) gets "Return to your ride".
   const inProgressRide = useSelector(selectInProgressRide);
-  const liveRide = useMemo(
-    () => (inProgressRide ? { status: liveRideStatusText(inProgressRide.status) } : null),
-    [inProgressRide],
-  );
+  // T-559: a parcel says where the parcel is ("Rider at the pickup"), not "Driver on the way".
+  const liveRide = useMemo(() => {
+    if (!inProgressRide) return null;
+    const parcelStatus = parcelLiveStatusText(inProgressRide);
+    return parcelStatus ? { status: parcelStatus, parcel: true } : { status: liveRideStatusText(inProgressRide.status) };
+  }, [inProgressRide]);
   const [now, setNow] = useState(() => new Date());
 
   // T-315: no lookups while another screen covers Home; failures show in the sheet, no alerts.

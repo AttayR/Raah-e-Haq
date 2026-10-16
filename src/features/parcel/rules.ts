@@ -68,19 +68,22 @@ export type ParcelRequestResult = { ok: true; request: RideRequest } | { ok: fal
 
 /**
  * The POST /rides body of a parcel: the ride body (pickup, drop-off with their addresses) with
- * vehicle_type `parcel` and the `parcel` block. Never stops, an offer or a driver preference.
+ * vehicle_type `parcel` and the `parcel` block. Never stops or a driver preference. T-559: the
+ * sender's offer (BE-83 `offered_fare`, inside the parcel quote's band) only when it differs
+ * from the server fare (see offeredFareFor).
  */
 export const buildParcelRideRequest = (
   pickup: BookingPlace | null,
   dropoff: BookingPlace | null,
   draft: ParcelDraft,
   options: ParcelOptions,
+  offeredFare: number | null = null,
 ): ParcelRequestResult => {
   const errors = validateParcelDraft(draft, options);
   if (!pickup) errors.pickup = t('parcel.pickupRequired');
   if (!dropoff) errors.dropoff = t('parcel.dropoffRequired');
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  const built = buildRideRequest({ pickup, dropoff, vehicleType: options.vehicleType || PARCEL_TIER_KEY });
+  const built = buildRideRequest({ pickup, dropoff, vehicleType: options.vehicleType || PARCEL_TIER_KEY, offeredFare });
   if (!built.ok) return { ok: false, errors: {}, message: built.error };
   return { ok: true, request: { ...built.request, parcel: buildParcelBlock(draft, options) } };
 };

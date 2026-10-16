@@ -8,6 +8,7 @@ import type { MyRating } from '../rating/types';
 import type { DriverFareSplit, FareLock, OverchargeState } from '../fare/types';
 import type { AcReportState } from '../ac/types';
 import type { SafetyReportState } from '../women-mode/types';
+import type { ParcelView } from '../parcel/types';
 
 export type RideStatus = 'requested' | 'accepted' | 'arrived' | 'started' | 'completed' | 'cancelled';
 
@@ -108,6 +109,8 @@ export interface Ride {
   acReport: AcReportState | null;
   /** BE-105, passenger only: "Report a women's-safety issue" button and the report already made. */
   safetyReport: SafetyReportState | null;
+  /** BE-88 / T-559, sender and driver: the parcel block of a parcel ride (null: not a parcel). */
+  parcel: ParcelView | null;
 }
 
 export type { Page } from '../../core/api/types';

@@ -15,6 +15,7 @@ import { BOOKING_COPY } from '../ride-booking/copy';
 import { useFareEstimates } from '../ride-booking/hooks';
 import type { FareEstimate } from '../ride-booking/api';
 import { classifyRideRequestFailure } from '../ride-booking/rideRequestFailure';
+import { useFareOffer } from '../fare/hooks';
 import { isParcelType } from './api';
 import { EMPTY_PARCEL_DRAFT, buildParcelRideRequest, parcelFieldErrorsOf } from './rules';
 import type { ParcelDraft, ParcelField, ParcelFieldErrors, ParcelOptions } from './types';
@@ -40,7 +41,8 @@ export interface SendParcelHandlers {
  * The "Send a parcel" form state (T-522, BE-88): the pickup (the sender's position until they
  * choose another) and the drop-off, the draft, the server's parcel quote for that route, and the
  * booking (POST /rides with vehicle_type parcel and the `parcel` block). A 422 puts each message
- * under its field.
+ * under its field. T-559: the sender may offer a fare inside the parcel quote's band (BE-83, the
+ * same stepper as a ride); an out-of-band 422 moves the offer into the server's band.
  */
 export const useSendParcel = (options: ParcelOptions | null, currentLocation: LatLng | null, handlers: SendParcelHandlers) => {
   const dispatch = useDispatch<Dispatch>();
@@ -119,6 +121,9 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
     () => estimates.data?.estimates.find((e) => isParcelType(e) || (options !== null && e.vehicle_type === options.vehicleType)) ?? null,
     [estimates.data, options],
   );
+  const offer = useFareOffer(quote?.offer_band ?? null);
+  const offeredFare = offer.offeredFare;
+  const applyBand = offer.applyBand;
 
   const submit = useCallback(async () => {
     if (!options || inFlight.current) return;
@@ -129,7 +134,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
     let built: ReturnType<typeof buildParcelRideRequest>;
     try {
       const [p, d] = await withAddresses([pickup, dropoff], reverseGeocode);
-      built = buildParcelRideRequest(p, d, draft, options);
+      built = buildParcelRideRequest(p, d, draft, options, offeredFare);
     } catch {
       built = { ok: false, errors: {}, message: t('parcel.fixFields') };
     }
@@ -150,6 +155,13 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
         return;
       }
       const rejection = action.payload;
+      const failure = classifyRideRequestFailure(rejection, ACTIVE_RIDE_COPY.requestFailedFallback);
+      if (failure.kind === 'offer_out_of_band') {
+        // BE-83: the offer left the band (the fare moved); the stepper moves into the new band.
+        applyBand(failure.band);
+        setFormError(failure.message);
+        return;
+      }
       if (rejection?.kind === 'validation') {
         const mapped = parcelFieldErrorsOf(rejection);
         setErrors(mapped.fields);
@@ -160,7 +172,6 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
         setFormError(mapped.other ?? (mapped.rulesChanged ? t('parcel.rulesChanged') : t('parcel.fixFields')));
         return;
       }
-      const failure = classifyRideRequestFailure(rejection, ACTIVE_RIDE_COPY.requestFailedFallback);
       if (failure.kind === 'phone_not_verified') {
         showErrorModal(
           BOOKING_COPY.phoneNotVerifiedTitle,
@@ -178,7 +189,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       // Booked: the screen is replaced by the ride, so nothing is set after it is gone.
       if (mounted.current) setSubmitting(false);
     }
-  }, [options, pickup, dropoff, draft, dispatch, resetDeclaration]);
+  }, [options, pickup, dropoff, draft, offeredFare, applyBand, dispatch, resetDeclaration]);
 
   return {
     pickup,
@@ -192,6 +203,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
     formError,
     estimates,
     quote,
+    offer,
     submitting,
     submit,
   };

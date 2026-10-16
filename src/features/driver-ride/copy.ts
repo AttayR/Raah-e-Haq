@@ -38,6 +38,8 @@ export const DRIVER_RIDE_COPY = {
   complete: 'Complete trip',
   completeStop: 'Stop done',
   cancel: 'Cancel ride',
+  /** T-559: in the footer row on small phones. */
+  cancelShort: 'Cancel',
   working: 'Please wait…',
   done: 'Done',
   // Summary.

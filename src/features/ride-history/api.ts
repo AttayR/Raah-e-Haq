@@ -6,6 +6,7 @@ import { firstNameOf } from '../../utils/format';
 import { driverSplitOf, fareExtrasOf, fareLockOf, toOverchargeState } from '../fare/api';
 import { isAcRide, toAcReportState } from '../ac/api';
 import { toSafetyReportState } from '../women-mode/api';
+import { isParcelRide, toParcelView } from '../parcel/api';
 import type {
   CancellationReason,
   Page,
@@ -146,6 +147,7 @@ export const toRide = (raw: unknown): Ride | null => {
     isAc: isAcRide(raw),
     acReport: toAcReportState(raw.ac_report),
     safetyReport: toSafetyReportState(raw.safety_report),
+    parcel: isParcelRide(raw) ? toParcelView(raw.parcel) : null,
   };
 };
 

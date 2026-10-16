@@ -32,6 +32,7 @@ import { RideRatingSection } from '../../rating/components/RideRatingSection';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { SafetyReportSection } from '../../women-mode/components/SafetyReportSection';
+import { ParcelReceiptCard } from '../../parcel/components/ParcelReceiptCard';
 import type { RideRatingState } from '../../rating/types';
 import { useRideDetail, useRideViewer } from '../hooks';
 import type { RideHistoryRoutes } from '../navigation';
@@ -145,6 +146,10 @@ export default function RideDetailsScreen() {
           <SummaryCard ride={ride} viewer={viewer} />
           <CancellationCard ride={ride} viewer={viewer} />
           <RouteCard ride={ride} />
+          {ride.parcel ? (
+            // BE-88 / T-559: the parcel's outcome, item, masked receiver, its steps and the photo.
+            <ParcelReceiptCard parcel={ride.parcel} times={ride} />
+          ) : null}
           <PersonCard ride={ride} viewer={viewer} canMessage={canOpenChat(ride)} onMessage={onMessage} />
           <RideRatingSection
             rideId={ride.id}
@@ -172,7 +177,8 @@ export default function RideDetailsScreen() {
             <AcReportSection rideId={ride.id} state={ride.acReport} onReported={() => refresh()} testID="ride-details-ac-report" />
           ) : null}
           <ReceiptCard ride={ride} viewer={viewer} />
-          <TimelineCard ride={ride} />
+          {/* A parcel's steps are on its own card (picked up / delivered, not started / completed). */}
+          {ride.parcel ? null : <TimelineCard ride={ride} />}
           {viewer === 'passenger' && ride.safetyReport ? (
             // BE-87 / BE-105: a women's-safety report while the server allows it, then its status.
             <SafetyReportSection rideId={ride.id} state={ride.safetyReport} onReported={() => refresh()} testID="ride-details-safety-report" />

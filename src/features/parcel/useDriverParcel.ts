@@ -37,6 +37,8 @@ type Sheet = 'pickup' | 'deliver' | 'returned' | 'return' | 'refuse';
 /** One footer button of the driver panel. */
 export interface ParcelPanelAction {
   label: string;
+  /** T-559: shown when the footer row has no room for `label` (small phones). */
+  shortLabel?: string;
   onPress: () => void;
   testID: string;
   variant?: 'secondary' | 'destructiveSoft';
@@ -303,7 +305,7 @@ export const useDriverParcel = (options: {
     let secondary: ParcelPanelAction | null = null;
     if (step === 'at_pickup') {
       primary = { label: t('parcel.pickUp'), onPress: open('pickup'), testID: 'driver-parcel-pickup' };
-      secondary = { label: t('parcel.refuse'), onPress: open('refuse'), testID: 'driver-parcel-refuse', variant: 'destructiveSoft' };
+      secondary = { label: t('parcel.refuse'), shortLabel: t('parcel.refuseShort'), onPress: open('refuse'), testID: 'driver-parcel-refuse', variant: 'destructiveSoft' };
     } else if (step === 'on_trip' && parcel.status === 'returning') {
       primary = { label: t('parcel.handBack'), onPress: open('returned'), testID: 'driver-parcel-hand-back' };
     } else if (step === 'on_trip') {

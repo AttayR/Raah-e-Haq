@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AddressPair, AppText, Banner, Button, PersonCard, RideProgress, rideProgressStep, type PersonAction } from '../ui';
 import { space } from '../../theme';
@@ -14,6 +14,7 @@ import { WaitingTimer } from '../../features/fare/components/FareBits';
 import { toFarePolicy } from '../../features/fare/api';
 import { DriverParcelSection } from '../../features/parcel/components/DriverParcelSection';
 import type { DriverParcelPanel } from '../../features/parcel/useDriverParcel';
+import { FOOTER_GAP, FOOTER_SIDE_PADDING, footerRowLabels } from '../../features/driver-ride/footerLayout';
 
 type Props = {
   ride: RideResource;
@@ -94,6 +95,7 @@ export const DriverRidePanel: React.FC<Props> = ({
   parcel = null,
 }) => {
   const { theme } = useAppTheme();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
   const userAction = pendingAction !== null && pendingAction !== 'refresh' && pendingAction !== 'restore';
   const stops = activeStops(ride);
   const nextStop = step === 'on_trip' ? stops[0] ?? null : null;
@@ -138,6 +140,45 @@ export const DriverRidePanel: React.FC<Props> = ({
   const arrivalNotice = step === 'to_pickup' ? arrivalRefusal : null;
   const hasFooter = !!primary || !!secondary || cancellable || noShow || blockedNotice;
   const footerPad = { paddingBottom: bottomInset + space[4] };
+
+  // T-559: the actions under the step. Two or more (a parcel's Refuse next to Cancel / No-show)
+  // share one row so the footer never stacks three 56pt buttons on a small phone.
+  type Secondary = { key: string; label: string; shortLabel?: string; variant: 'secondary' | 'destructiveSoft'; onPress: () => void; testID: string };
+  const secondaries: Secondary[] = [];
+  if (secondary) {
+    secondaries.push({ key: 'parcel', label: secondary.label, shortLabel: secondary.shortLabel, variant: secondary.variant ?? 'secondary', onPress: secondary.onPress, testID: secondary.testID });
+  }
+  if (noShow && onNoShow) {
+    secondaries.push({ key: 'no-show', label: t('driverFare.noShowButton'), shortLabel: t('driverFare.noShowShort'), variant: 'destructiveSoft', onPress: onNoShow, testID: 'driver-ride-no-show' });
+  }
+  if (cancellable) {
+    secondaries.push({ key: 'cancel', label: COPY.cancel, shortLabel: COPY.cancelShort, variant: 'destructiveSoft', onPress: onCancel, testID: 'driver-ride-cancel' });
+  }
+  const inRow = secondaries.length > 1;
+  const rowLabels = inRow ? footerRowLabels(secondaries, windowWidth, fontScale) : secondaries.map(a => a.label);
+  const secondaryButtons = secondaries.map((action, index) => {
+    const button = (
+      <Button
+        key={action.key}
+        label={rowLabels[index]}
+        variant={action.variant}
+        size="lg"
+        onPress={action.onPress}
+        // T-557: a background read does not disable these (the cancel takes the read over);
+        // No-show and Cancel only open their confirm sheet.
+        disabled={userAction}
+        accessibilityLabel={action.label}
+        testID={action.testID}
+      />
+    );
+    return inRow ? (
+      <View key={action.key} style={styles.rowItem}>
+        {button}
+      </View>
+    ) : (
+      button
+    );
+  });
 
   return (
     <View
@@ -233,31 +274,13 @@ export const DriverRidePanel: React.FC<Props> = ({
               testID={primary.testID}
             />
           ) : null}
-          {secondary ? (
-            <Button
-              label={secondary.label}
-              variant={secondary.variant ?? 'secondary'}
-              size="lg"
-              onPress={secondary.onPress}
-              disabled={userAction}
-              testID={secondary.testID}
-            />
-          ) : null}
-          {noShow && onNoShow ? (
-            <Button
-              label={t('driverFare.noShowButton')}
-              variant="destructiveSoft"
-              size="lg"
-              onPress={onNoShow}
-              // T-557: like the step, a background read does not disable it (the cancel takes
-              // the read over); it still only opens the confirm sheet.
-              disabled={userAction}
-              testID="driver-ride-no-show"
-            />
-          ) : null}
-          {cancellable ? (
-            <Button label={COPY.cancel} variant="destructiveSoft" size="lg" onPress={onCancel} disabled={userAction} testID="driver-ride-cancel" />
-          ) : null}
+          {inRow ? (
+            <View style={styles.row} testID="driver-ride-footer-row">
+              {secondaryButtons}
+            </View>
+          ) : (
+            secondaryButtons
+          )}
         </View>
       ) : null}
     </View>
@@ -269,7 +292,9 @@ const styles = StyleSheet.create({
   sheet: { flexShrink: 1 },
   scroll: { flexGrow: 0, flexShrink: 1 },
   content: { padding: space[5], gap: space[4] },
-  footer: { paddingHorizontal: space[5], paddingTop: space[3], gap: space[3], borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: FOOTER_SIDE_PADDING, paddingTop: space[3], gap: FOOTER_GAP, borderTopWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: 'row', gap: FOOTER_GAP },
+  rowItem: { flex: 1, minWidth: 0 },
 });
 
 export default DriverRidePanel;

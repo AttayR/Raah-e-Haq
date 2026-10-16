@@ -11,6 +11,7 @@ import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import { formatMoney } from '../../../utils/format';
 import { topUpParamsFor } from '../../wallet/navigation';
+import { OfferStepper } from '../../fare/components/OfferStepper';
 import { ParcelDeclaration } from '../components/ParcelDeclaration';
 import { ParcelDetailsSection } from '../components/ParcelDetailsSection';
 import { ParcelRouteSection } from '../components/ParcelRouteSection';
@@ -19,9 +20,13 @@ import { useSendParcel, type SendParcelForm } from '../useSendParcel';
 
 type Nav = NativeStackNavigationProp<PassengerStackParamList>;
 
-/** The quote line above "Send parcel": the server's fare for this route, never a local guess. */
+/**
+ * The quote line above "Send parcel": the server's fare for this route, never a local guess, or
+ * the sender's offer inside the server's band (T-559, BE-83).
+ */
 function FareLine({ form }: { form: SendParcelForm }) {
-  const { estimates, quote } = form;
+  const { estimates, quote, offer } = form;
+  const amount = quote ? (offer.band ? offer.value ?? quote.fare : quote.fare) : null;
   let text: string | null = null;
   if (estimates.status === 'loading') text = t('parcel.fareLoading');
   else if (estimates.status === 'error') text = estimates.error ?? t('parcel.fareFailed');
@@ -31,9 +36,9 @@ function FareLine({ form }: { form: SendParcelForm }) {
       <AppText variant="label" color="textSecondary">
         {t('parcel.fareLabel')}
       </AppText>
-      {quote ? (
+      {quote && amount !== null ? (
         <AppText variant="numericL" testID="parcel-fare-amount">
-          {formatMoney(quote.fare, quote.currency)}
+          {formatMoney(amount, quote.currency)}
         </AppText>
       ) : text ? (
         <AppText variant="bodySmall" color={estimates.status === 'error' ? 'danger' : 'textSecondary'} testID="parcel-fare-status">
@@ -47,7 +52,7 @@ function FareLine({ form }: { form: SendParcelForm }) {
 /**
  * Passenger Home → "Send a parcel" (T-522, BE-88): pickup and drop-off, the receiver, what is
  * sent (category, size, declared value), the prohibited list with the declaration, and the
- * server's fare. "Send parcel" books a ride of type `parcel` (cash at the pickup, no stops, no
+ * server's fare, with an offer inside its band (T-559). "Send parcel" books a ride of type `parcel` (cash at the pickup, no stops, no
  * cash on delivery) and opens it on the booking screen. Every list and limit comes from
  * GET /parcels/options.
  */
@@ -91,6 +96,7 @@ export default function SendParcelScreen() {
           onChange={(on) => form.update('declarationAccepted', on, 'declaration')}
           error={form.errors.declaration}
         />
+        {form.quote && form.offer.band ? <OfferStepper offer={form.offer} testID="parcel-offer" /> : null}
         <Banner tone="info" icon="cash" text={t('parcel.noCod')} testID="send-parcel-cash" />
       </>
     );

@@ -45,9 +45,10 @@ type BodyProps = {
   onSeeAllRides: () => void;
   /**
    * A ride still in progress (T-543): "Return to your ride" takes the place of "Where to?" (a
-   * second booking is not possible anyway), with the ride's status line under it.
+   * second booking is not possible anyway), with the ride's status line under it. T-559: a
+   * parcel says "Track your parcel" with the parcel's own status words (`parcel: true`).
    */
-  liveRide?: { status: string } | null;
+  liveRide?: { status: string; parcel?: boolean } | null;
   onReturnToRide?: () => void;
   /** BE-88: "Send a parcel", only while the parcel tier is on (and no ride is in progress). */
   onSendParcel?: () => void;
@@ -79,9 +80,9 @@ export function HomeSheetBody({
       {liveRide && onReturnToRide ? (
         <View style={styles.live} testID="home-live-ride">
           <Button
-            label={t('home.returnToRide')}
+            label={liveRide.parcel ? t('parcel.homeReturn') : t('home.returnToRide')}
             size="lg"
-            leadingIcon="rides"
+            leadingIcon={liveRide.parcel ? 'parcel' : 'rides'}
             onPress={onReturnToRide}
             haptic="impactLight"
             accessibilityHint={liveRide.status}
