@@ -161,6 +161,9 @@ export const useDriverRideFlow = (): DriverRideFlow => {
         if (payload?.code === PIN_CODES.required || payload?.code === PIN_CODES.blocked) dispatch(refreshDriverRide(id));
         return;
       }
+      // T-554: a refused arrival (BE-64 not_near_pickup) is shown by the panel's banner
+      // (`arrivalRefusal`), so it gets no toast on top of it.
+      if (payload?.code === DRIVER_RIDE_CODES.notNearPickup) return;
       const { title, message } = driverRideRefusalToast(payload, DRIVER_RIDE_COPY.actionFailed);
       toast.error(title, message, DRIVER_RIDE_TOAST_OPTIONS);
       if (payload?.code && REFETCH_CODES.has(payload.code)) {

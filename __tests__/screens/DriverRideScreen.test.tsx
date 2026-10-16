@@ -150,7 +150,7 @@ describe('DriverRideScreen', () => {
     await waitFor(() => screen.getByTestId('driver-ride-cancelled'));
   });
 
-  it('a 422 not_near_pickup shows the server message with the distance and keeps the Arrived button (T-409)', async () => {
+  it('a 422 not_near_pickup shows the server message with the distance on the banner only, and keeps the Arrived button (T-409, T-554)', async () => {
     const errorSpy = jest.spyOn(toast, 'error').mockImplementation(() => '');
     const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger }));
     await settle(store);
@@ -161,12 +161,12 @@ describe('DriverRideScreen', () => {
     });
 
     fireEvent.press(screen.getByTestId('driver-ride-arrived'));
-    await waitFor(() =>
-      expect(errorSpy).toHaveBeenCalledWith('You are too far from the pickup point.', 'About 812 m away.', {
-        topOffset: 64,
-      }),
-    );
+    await waitFor(() => screen.getByTestId('driver-ride-arrival-refused'));
+    screen.getByText('You are too far from the pickup point.');
+    screen.getByText('About 812 m away.');
     await settle(store);
+    // T-554: the banner says it; no toast on top of it.
+    expect(errorSpy).not.toHaveBeenCalled();
 
     expect(screen.getByTestId('driver-ride-title').props.children).toBe('Head to pickup');
     expect(screen.getByTestId('driver-ride-arrived').props.accessibilityState).toMatchObject({ disabled: false });

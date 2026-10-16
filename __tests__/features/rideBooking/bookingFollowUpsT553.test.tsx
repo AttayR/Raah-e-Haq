@@ -7,7 +7,7 @@
  * - The vehicle step's trip card did not list the stops.
  */
 import React from 'react';
-import { Keyboard, Text } from 'react-native';
+import { Keyboard, Platform, Text } from 'react-native';
 import { act, fireEvent, render, renderHook } from '@testing-library/react-native';
 import LocationSearch from '../../../src/components/passenger/LocationSearch';
 import { KeyboardRevealContext, useKeyboardReveal, type KeyboardReveal } from '../../../src/components/ui/keyboardReveal';
@@ -96,6 +96,40 @@ describe('T-553: the booking sheet leaves compact mode', () => {
     act(() => result.current[1](true));
     act(() => keyboardListeners.keyboardDidHide());
     expect(result.current[0]).toBe(false);
+  });
+
+  describe('T-554: the keyboard hiding (Android Back) blurs the booking search field', () => {
+    const originalOS = Platform.OS;
+    const setOS = (os: typeof Platform.OS) => Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+    afterEach(() => setOS(originalOS));
+
+    it('on Android, when the search field was focused, so the next tap compacts the sheet again', () => {
+      setOS('android');
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+      const { result } = renderHook(() => useSearchFocus('home'));
+      act(() => result.current[1](true));
+      act(() => keyboardListeners.keyboardDidHide());
+      expect(result.current[0]).toBe(false);
+      expect(dismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('never when the search field was not focused (another input, e.g. chat, had the keyboard)', () => {
+      setOS('android');
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+      renderHook(() => useSearchFocus('home'));
+      act(() => keyboardListeners.keyboardDidHide());
+      expect(dismiss).not.toHaveBeenCalled();
+    });
+
+    it('never on iOS', () => {
+      setOS('ios');
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+      const { result } = renderHook(() => useSearchFocus('home'));
+      act(() => result.current[1](true));
+      act(() => keyboardListeners.keyboardDidHide());
+      expect(result.current[0]).toBe(false);
+      expect(dismiss).not.toHaveBeenCalled();
+    });
   });
 });
 
