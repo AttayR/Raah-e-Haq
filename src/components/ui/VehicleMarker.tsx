@@ -3,6 +3,7 @@ import { Image, StyleSheet } from 'react-native';
 import { Marker, type LatLng } from 'react-native-maps';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { useIsScreenActive } from '../../hooks/useIsScreenActive';
 import { componentTokens } from '../../theme';
 import { MARKER_SETTLE_MS, useMarkerTracking } from './ride/useMarkerTracking';
 import { useInterpolatedMarker } from './ride/useInterpolatedMarker';
@@ -79,8 +80,11 @@ export type VehicleMarkerProps = {
  * Debug), tracked until it has loaded and then frozen (`useMarkerTracking`); rotation and
  * position are marker properties, so animating them needs no view tracking and does not freeze
  * iOS Google Maps. No shadow (§5.21 b).
+ *
+ * T-535 (PERF-13): memoised, the animation commits at most ~30 times a second, and it stops
+ * while its screen is blurred or the app is in the background.
  */
-export const VehicleMarker: React.FC<VehicleMarkerProps> = ({
+const VehicleMarkerBase: React.FC<VehicleMarkerProps> = ({
   coordinate,
   vehicleType,
   heading,
@@ -95,6 +99,7 @@ export const VehicleMarker: React.FC<VehicleMarkerProps> = ({
 }) => {
   const { theme } = useAppTheme();
   const reduced = useReducedMotion();
+  const screenActive = useIsScreenActive();
   const kind = vehicleMarkerKind(vehicleType);
   const [loads, setLoads] = useState(0);
   const onLoad = useCallback(() => setLoads((n) => n + 1), []);
@@ -105,6 +110,7 @@ export const VehicleMarker: React.FC<VehicleMarkerProps> = ({
     expectedIntervalMs: updateIntervalMs,
     animate: (animate ?? !muted) && !reduced,
     inferHeading: inferHeading ?? !muted,
+    paused: !screenActive,
   });
   return (
     <Marker
@@ -127,6 +133,9 @@ export const VehicleMarker: React.FC<VehicleMarkerProps> = ({
     </Marker>
   );
 };
+
+export const VehicleMarker = React.memo(VehicleMarkerBase);
+VehicleMarker.displayName = 'VehicleMarker';
 
 const styles = StyleSheet.create({
   glyph: { width: m.size, height: m.size },

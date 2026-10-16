@@ -30,7 +30,8 @@ const PassengerBottomTabs = () => {
   );
 
   return (
-    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false, animation: 'none' }}>
+    // T-535 (PERF-14): a tab that is not shown stops rendering (its state is kept).
+    <Tab.Navigator tabBar={renderTabBar} screenOptions={{ headerShown: false, animation: 'none', freezeOnBlur: true }}>
       <Tab.Screen name="Home" component={PassengerHomeScreen} />
       <Tab.Screen name="Activity" component={ActivityScreen} />
       <Tab.Screen name="Inbox" component={PassengerInboxTab} />

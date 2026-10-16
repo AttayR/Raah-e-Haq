@@ -62,7 +62,8 @@ const DriverBottomTabs = ({ navigation }: Props) => {
           screenListeners={({ route }) => ({
             focus: () => setActiveTab(route.name),
           })}
-          screenOptions={{ headerShown: false, animation: 'none' }}
+          // T-535 (PERF-14): a tab that is not shown stops rendering (its state is kept).
+          screenOptions={{ headerShown: false, animation: 'none', freezeOnBlur: true }}
         >
           <Tab.Screen name="Drive" component={DriverDriveScreen} />
           <Tab.Screen name="Earnings" component={DriverEarningsScreen} />

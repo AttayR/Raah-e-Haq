@@ -89,7 +89,8 @@ const DriverStack = () => {
   usePushNotifications('driver');
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    // T-535 (PERF-14): screens deeper in the stack stop rendering until they are shown again.
+    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
       <Stack.Screen name="Profile" getComponent={loadDriverProfile} />
       <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />
@@ -97,7 +98,12 @@ const DriverStack = () => {
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       {/* The full-screen trip map (T-405): pushed over the tabs, so no tab bar. */}
-      <Stack.Screen name="DriverRide" component={DriverRideScreen} />
+      {/*
+        Not frozen: the live ride still reacts (cancel, taken away) while the chat is on top. Fabric
+        native-stack does not freeze the screen directly below the focused one anyway; this keeps
+        it so when another screen is pushed or those freeze rules change (see useMapMounted).
+      */}
+      <Stack.Screen name="DriverRide" component={DriverRideScreen} options={{ freezeOnBlur: false }} />
       <Stack.Screen name="NotificationPreferences" getComponent={loadNotificationPreferencesScreen} />
       <Stack.Screen name="DriverDocuments" getComponent={loadDriverDocumentsScreen} />
       <Stack.Screen name="Wallet" getComponent={loadWalletScreen} />

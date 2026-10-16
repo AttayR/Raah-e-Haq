@@ -3,6 +3,7 @@ import { motionPatterns } from '../../../theme';
 import {
   DEFAULT_THRESHOLDS,
   cumulativeMeters,
+  distanceMeters,
   easeRotation,
   headingForMove,
   motionDurationMs,
@@ -29,7 +30,25 @@ export interface InterpolatedMarkerOptions {
    * hop says nothing; a null heading keeps the last rotation (BE-76).
    */
   inferHeading?: boolean;
+  /**
+   * Stop the frame loop (T-535, PERF-13): the screen is blurred or the app is in the background.
+   * Updates still place the marker; on resume the motion continues from the clock (so a move
+   * that finished meanwhile lands at its end at once).
+   */
+  paused?: boolean;
 }
+
+/** T-535 (PERF-13): at most ~30 commits a second to the native marker. */
+export const MARKER_FRAME_MS = 33;
+/**
+ * A frame may run this much early (ms), so 60 Hz rAF jitter (frames at 15–18 ms) still gives a
+ * steady 30 fps instead of every third frame. The due time advances by MARKER_FRAME_MS per
+ * frame worked, so the average stays at 30 fps or less (also at 120 Hz).
+ */
+export const MARKER_FRAME_SLACK_MS = 8;
+/** A frame that moves less than this and turns less than MARKER_MIN_TURN_DEG is not committed. */
+export const MARKER_MIN_MOVE_M = 0.5;
+export const MARKER_MIN_TURN_DEG = 1;
 
 export interface InterpolatedMarker {
   coordinate: LatLng;
@@ -62,9 +81,12 @@ interface Motion {
  * - `animate` off (reduced motion): position and rotation jump.
  *
  * One requestAnimationFrame loop at a time; it is cancelled on every new update and on unmount.
+ * T-535 (PERF-13): the loop works at most every MARKER_FRAME_MS (≤ 30 fps), commits a frame
+ * only when it moves ≥ 0.5 m or turns ≥ 1° (the last frame always lands), and stops while
+ * `paused`.
  */
 export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedMarkerOptions): InterpolatedMarker {
-  const { heading, route = null, animate, inferHeading = true } = options;
+  const { heading, route = null, animate, inferHeading = true, paused = false } = options;
   const expected = options.expectedIntervalMs ?? motionPatterns.driverMarker.positionMs;
   const { latitude, longitude } = coordinate;
   const serverHeading = normalizeHeading(heading);
@@ -73,11 +95,18 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     coordinate: snapToRoute({ latitude, longitude }, route),
     rotation: serverHeading ?? 0,
   }));
+  /** What was last committed (rendered). */
   const shown = useRef(state);
+  /** Where the animation is (may be up to MARKER_MIN_MOVE_M / MARKER_MIN_TURN_DEG ahead of `shown`). */
+  const live = useRef(state);
   const lastTarget = useRef<LatLng | null>(null);
   const lastUpdateAt = useRef<number | null>(null);
   const targetRotation = useRef<number>(state.rotation);
   const frame = useRef<number | null>(null);
+  /** The running frame callback (also while paused, so it can resume); null when at rest. */
+  const activeStep = useRef<(() => void) | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   // Read inside the effect without making a new route array identity restart the motion.
   const routeRef = useRef(route);
   routeRef.current = route;
@@ -88,25 +117,42 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     () => () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
       frame.current = null;
+      activeStep.current = null;
     },
     [],
   );
+
+  // Pause: drop the pending frame and keep the step; resume: run it again.
+  useEffect(() => {
+    if (paused) {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+    } else if (activeStep.current !== null && frame.current === null) {
+      frame.current = requestAnimationFrame(activeStep.current);
+    }
+  }, [paused]);
 
   useEffect(() => {
     const target: LatLng = { latitude, longitude };
     const now = Date.now();
     const gap = lastUpdateAt.current === null ? null : now - lastUpdateAt.current;
     const previous = lastTarget.current;
-    const from = shown.current.coordinate;
+    const from = live.current.coordinate;
     const currentRoute = routeRef.current;
 
     const commit = (next: InterpolatedMarker) => {
       shown.current = next;
+      live.current = next;
       setState(next);
     };
     const stop = () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
       frame.current = null;
+      activeStep.current = null;
+    };
+    const schedule = (fn: () => void) => {
+      activeStep.current = fn;
+      frame.current = pausedRef.current ? null : requestAnimationFrame(fn);
     };
 
     lastUpdateAt.current = now;
@@ -118,7 +164,7 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
       // First position: place it (rotation from the server if it sent one).
       lastTarget.current = target;
       stop();
-      targetRotation.current = serverHeading ?? shown.current.rotation;
+      targetRotation.current = serverHeading ?? live.current.rotation;
       commit({ coordinate: snapToRoute(target, currentRoute), rotation: targetRotation.current });
       return;
     }
@@ -128,9 +174,9 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     if (!animate) {
       stop();
       if (plan.kind !== 'hold') lastTarget.current = target;
-      const rotation = moveHeading ?? shown.current.rotation;
+      const rotation = moveHeading ?? live.current.rotation;
       targetRotation.current = rotation;
-      const position = plan.kind === 'hold' ? shown.current.coordinate : snapToRoute(target, currentRoute);
+      const position = plan.kind === 'hold' ? live.current.coordinate : snapToRoute(target, currentRoute);
       commit({ coordinate: position, rotation });
       return;
     }
@@ -138,7 +184,7 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     if (plan.kind === 'jump') {
       stop();
       lastTarget.current = target;
-      targetRotation.current = serverHeading ?? shown.current.rotation;
+      targetRotation.current = serverHeading ?? live.current.rotation;
       commit({ coordinate: plan.to, rotation: targetRotation.current });
       return;
     }
@@ -146,7 +192,7 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     let motion: Motion | null = null;
     if (plan.kind === 'hold') {
       // A wobble: keep driving to the previous target; only a new server heading is taken.
-      if (serverHeading === null || frame.current !== null) return;
+      if (serverHeading === null || activeStep.current !== null) return;
       targetRotation.current = serverHeading;
     } else {
       lastTarget.current = target;
@@ -162,12 +208,20 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     }
 
     stop();
-    let lastFrameAt = now;
+    let lastFrameAt = now - MARKER_FRAME_MS;
+    let due = now;
     const step = () => {
       const t = Date.now();
+      if (t < due - MARKER_FRAME_SLACK_MS) {
+        // Faster than 30 fps: wait for a later frame.
+        schedule(step);
+        return;
+      }
+      // Next slot: one frame after this one's slot (or after now, when frames were dropped).
+      due = Math.max(due, t - MARKER_FRAME_SLACK_MS) + MARKER_FRAME_MS;
       const dt = t - lastFrameAt;
       lastFrameAt = t;
-      let position = shown.current.coordinate;
+      let position = live.current.coordinate;
       let done = true;
       if (motion) {
         const k = Math.min(1, (t - motion.start) / motion.duration);
@@ -180,12 +234,23 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
         if (wanted !== null) targetRotation.current = wanted;
         done = k >= 1;
       }
-      const rotation = easeRotation(shown.current.rotation, targetRotation.current, dt);
-      commit({ coordinate: position, rotation });
+      const rotation = easeRotation(live.current.rotation, targetRotation.current, dt);
+      const next = { coordinate: position, rotation };
       const turning = Math.abs(shortestTurn(rotation, targetRotation.current)) > 0.25;
-      frame.current = !done || turning ? requestAnimationFrame(step) : null;
+      const resting = done && !turning;
+      const visible =
+        distanceMeters(shown.current.coordinate, position) >= MARKER_MIN_MOVE_M ||
+        Math.abs(shortestTurn(shown.current.rotation, rotation)) >= MARKER_MIN_TURN_DEG;
+      if (resting || visible) commit(next);
+      else live.current = next;
+      if (resting) {
+        activeStep.current = null;
+        frame.current = null;
+      } else {
+        schedule(step);
+      }
     };
-    frame.current = requestAnimationFrame(step);
+    schedule(step);
     // serverHeading is derived from `heading`; listed so a heading-only change runs this.
   }, [animate, inferHeading, latitude, longitude, serverHeading]);
 

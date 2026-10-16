@@ -92,14 +92,20 @@ const PassengerStack = ({ navigation }: Props) => {
   usePushNotifications('passenger');
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    // T-535 (PERF-14): screens deeper in the stack stop rendering until they are shown again.
+    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
       <Stack.Screen name="Profile" getComponent={loadPassengerProfile} />
       <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />
       <Stack.Screen name="ChangePhone" getComponent={loadChangePhoneScreen} />
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
-      <Stack.Screen name="Booking" component={PassengerMapScreen} />
+      {/*
+        Not frozen: the live ride still reacts (cancel, finish) while the chat is on top. Fabric
+        native-stack does not freeze the screen directly below the focused one anyway; this keeps
+        it so when another screen is pushed or those freeze rules change (see useMapMounted).
+      */}
+      <Stack.Screen name="Booking" component={PassengerMapScreen} options={{ freezeOnBlur: false }} />
       <Stack.Screen name="RideDetails" getComponent={loadRideDetailsScreen} getId={rideDetailsScreenId} />
       <Stack.Screen name="FavoriteLocations" getComponent={loadSavedPlacesScreen} />
       <Stack.Screen name="SavedPlaceEditor" getComponent={loadSavedPlaceEditorScreen} />

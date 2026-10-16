@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import type { RootState } from '../../store';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useFollowCamera } from '../../hooks/useFollowCamera';
+import { useMapMounted } from '../../hooks/useMapMounted';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
@@ -37,6 +38,8 @@ export const DRIVE_PEEK_HEIGHT = 137;
 const CAMERA_SHEET_GAP = space[6];
 /** Neighbourhood zoom for the first fix and for "locate me". */
 const LOCATE_DELTA = 0.01;
+/** T-535 (PERF-14): the trip map replaces this one; only one Google Map lives at a time. */
+const MAP_ROUTES_ABOVE_DRIVE = ['DriverRide'] as const;
 
 /** RideResource coordinates arrive as decimal strings. */
 const toCoordinate = (lat: unknown, lng: unknown) => {
@@ -84,7 +87,9 @@ export default function DriverDriveScreen() {
   const recentRides = useMemo(() => toHomeRecentRides(recent.data ?? [], 'driver'), [recent.data]);
 
   const mapRef = useRef<SafeMapViewRef | null>(null);
+  const mapMounted = useMapMounted(MAP_ROUTES_ABOVE_DRIVE);
   const [mapReady, setMapReady] = useState(false);
+  const onMapReady = useCallback(() => setMapReady(true), []);
   const [mapHeight, setMapHeight] = useState(0);
   const [sheetHeight, setSheetHeight] = useState(DRIVE_PEEK_HEIGHT);
   const sheetAnimatedHeight = useSharedValue(0);
@@ -100,7 +105,16 @@ export default function DriverDriveScreen() {
     (point: { latitude: number; longitude: number }) => regionInViewport(point, viewport, LOCATE_DELTA),
     [viewport],
   );
-  const follow = useFollowCamera(mapRef, { point: location, ready: mapReady, regionFor });
+  // T-535: only while Drive is focused (no camera work under another tab or DriverRide).
+  const follow = useFollowCamera(mapRef, { point: location, ready: mapReady, regionFor, enabled: isFocused });
+  // A released map is not ready until it mounts again; it comes back following the driver
+  // (a pan before DriverRide opened does not carry over), so it centres once it is ready.
+  const { recentre } = follow;
+  useEffect(() => {
+    if (mapMounted) return;
+    setMapReady(false);
+    recentre();
+  }, [mapMounted, recentre]);
 
   const promptForLocation = useCallback(async () => {
     const open = await confirm({
@@ -132,40 +146,44 @@ export default function DriverDriveScreen() {
   return (
     <Screen edges={[]} testID="driver-drive">
       <View style={styles.fill} onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}>
-        <MapErrorBoundary>
-          <SafeMapView
-            ref={mapRef}
-            style={styles.fill}
-            initialRegion={
-              location
-                ? { ...location, latitudeDelta: LOCATE_DELTA, longitudeDelta: LOCATE_DELTA }
-                : MAPS_CONFIG.DEFAULT_REGION
-            }
-            customMapStyle={theme.mapStyle}
-            onMapReady={() => setMapReady(true)}
-            onRegionChangeComplete={follow.onRegionChangeComplete}
-            fallbackComponent={
-              <View style={styles.fill}>
-                <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>
-                  {t('home.mapLoading')}
-                </AppText>
-              </View>
-            }
-          >
-            {location ? (
-              // T-517: the driver's own vehicle, top-down, turning with the device course.
-              <VehicleMarker
-                coordinate={location}
-                heading={position?.heading}
-                vehicleType={currentRide?.vehicle_type ?? user?.vehicle_type}
-                title={t('ride.selfMarker')}
-                testID="drive-driver-marker"
-              />
-            ) : null}
-            {pickup ? <RideMarker kind="pickup" coordinate={pickup} /> : null}
-            {dropoff ? <RideMarker kind="dropoff" coordinate={dropoff} /> : null}
-          </SafeMapView>
-        </MapErrorBoundary>
+        {mapMounted ? (
+          <MapErrorBoundary>
+            <SafeMapView
+              ref={mapRef}
+              style={styles.fill}
+              initialRegion={
+                location
+                  ? { ...location, latitudeDelta: LOCATE_DELTA, longitudeDelta: LOCATE_DELTA }
+                  : MAPS_CONFIG.DEFAULT_REGION
+              }
+              customMapStyle={theme.mapStyle}
+              onMapReady={onMapReady}
+              onRegionChangeComplete={follow.onRegionChangeComplete}
+              fallbackComponent={
+                <View style={styles.fill}>
+                  <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>
+                    {t('home.mapLoading')}
+                  </AppText>
+                </View>
+              }
+            >
+              {location ? (
+                // T-517: the driver's own vehicle, top-down, turning with the device course.
+                <VehicleMarker
+                  coordinate={location}
+                  heading={position?.heading}
+                  vehicleType={currentRide?.vehicle_type ?? user?.vehicle_type}
+                  title={t('ride.selfMarker')}
+                  testID="drive-driver-marker"
+                />
+              ) : null}
+              {pickup ? <RideMarker kind="pickup" coordinate={pickup} /> : null}
+              {dropoff ? <RideMarker kind="dropoff" coordinate={dropoff} /> : null}
+            </SafeMapView>
+          </MapErrorBoundary>
+        ) : (
+          <View testID="drive-map-released" style={[styles.fill, { backgroundColor: theme.mapBackground }]} />
+        )}
       </View>
 
       <MapControls

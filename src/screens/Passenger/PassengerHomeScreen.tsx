@@ -12,6 +12,7 @@ import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { AppText, BottomSheet, MapControls, Screen, type SheetSnap } from '../../components/ui';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
+import { useMapMounted } from '../../hooks/useMapMounted';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import { NearbyDriverMarkers } from '../../components/passenger/NearbyDrivers';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
@@ -38,6 +39,8 @@ const GREETING_REFRESH_MS = 60_000;
 const CAMERA_SHEET_GAP = space[6];
 /** The rider's position dot (16, `primary` with a `surface` ring). */
 const USER_DOT = space[4];
+/** T-535 (PERF-14): the Booking map replaces this one; only one Google Map lives at a time. */
+const MAP_ROUTES_ABOVE_HOME = ['Booking'] as const;
 
 /**
  * Passenger Home (UI-R4, DESIGN_SYSTEM §8.1/§8.3; owner decision 2026-10-11: map-first, no Map
@@ -116,6 +119,7 @@ export default function PassengerHomeScreen() {
 
   // Map + camera: the rider sits in the middle of the part of the map above the sheet.
   const mapRef = useRef<SafeMapViewRef | null>(null);
+  const mapMounted = useMapMounted(MAP_ROUTES_ABOVE_HOME);
   const [mapReady, setMapReady] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
   const [sheet, setSheet] = useState<{ snap: SheetSnap; height: number }>({ snap: 'peek', height: HOME_PEEK_HEIGHT });
@@ -136,11 +140,19 @@ export default function PassengerHomeScreen() {
 
   // First fix once the map is ready; later fixes move the dot only, so a pan is not undone.
   const centredOnce = useRef(false);
+  // A released map comes back on the rider, like the first open.
+  useEffect(() => {
+    if (mapMounted) return;
+    setMapReady(false);
+    centredOnce.current = false;
+  }, [mapMounted]);
   useEffect(() => {
     if (centredOnce.current || !currentLocation || !mapReady) return;
     centredOnce.current = true;
     centre();
   }, [centre, currentLocation, mapReady]);
+
+  const onMapReady = useCallback(() => setMapReady(true), []);
 
   const onLocate = useCallback(() => {
     if (!currentLocation) {
@@ -161,39 +173,43 @@ export default function PassengerHomeScreen() {
   return (
     <Screen edges={[]} testID="passenger-home">
       <View style={styles.fill} onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}>
-        <MapErrorBoundary>
-          <SafeMapView
-            ref={mapRef}
-            style={styles.fill}
-            initialRegion={currentLocation ? regionInViewport(currentLocation, null) : MAPS_CONFIG.DEFAULT_REGION}
-            customMapStyle={theme.mapStyle}
-            onMapReady={() => setMapReady(true)}
-            fallbackComponent={
-              <View style={styles.fill}>
-                <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>
-                  {t('home.mapLoading')}
-                </AppText>
-              </View>
-            }
-          >
-            {currentLocation ? (
-              <Marker coordinate={currentLocation} anchor={{ x: 0.5, y: 0.5 }} testID="home-user-marker">
-                <View
-                  style={[
-                    styles.userDot,
-                    {
-                      backgroundColor: theme.colors.primary,
-                      borderColor: theme.colors.surface,
-                      borderWidth: theme.borderWidth.focus,
-                    },
-                    theme.elevation[1],
-                  ]}
-                />
-              </Marker>
-            ) : null}
-            <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />
-          </SafeMapView>
-        </MapErrorBoundary>
+        {mapMounted ? (
+          <MapErrorBoundary>
+            <SafeMapView
+              ref={mapRef}
+              style={styles.fill}
+              initialRegion={currentLocation ? regionInViewport(currentLocation, null) : MAPS_CONFIG.DEFAULT_REGION}
+              customMapStyle={theme.mapStyle}
+              onMapReady={onMapReady}
+              fallbackComponent={
+                <View style={styles.fill}>
+                  <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>
+                    {t('home.mapLoading')}
+                  </AppText>
+                </View>
+              }
+            >
+              {currentLocation ? (
+                <Marker coordinate={currentLocation} anchor={{ x: 0.5, y: 0.5 }} testID="home-user-marker">
+                  <View
+                    style={[
+                      styles.userDot,
+                      {
+                        backgroundColor: theme.colors.primary,
+                        borderColor: theme.colors.surface,
+                        borderWidth: theme.borderWidth.focus,
+                      },
+                      theme.elevation[1],
+                    ]}
+                  />
+                </Marker>
+              ) : null}
+              <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />
+            </SafeMapView>
+          </MapErrorBoundary>
+        ) : (
+          <View testID="home-map-released" style={[styles.fill, { backgroundColor: theme.mapBackground }]} />
+        )}
       </View>
 
       <MapControls

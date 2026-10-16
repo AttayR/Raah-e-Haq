@@ -23,7 +23,7 @@ export const nearbyDriverDescription = (driver: NearbyDriver): string =>
  * (BE-20). They turn to the BE-76 `heading` when it is sent; a null heading (standing, stale)
  * keeps the last rotation (north for a new marker), never the bearing of a grid hop (T-524).
  */
-export const NearbyDriverMarkers: React.FC<{ drivers: NearbyDriver[] }> = ({ drivers }) => (
+const NearbyDriverMarkersBase: React.FC<{ drivers: NearbyDriver[] }> = ({ drivers }) => (
   <>
     {drivers.map(driver => (
       <VehicleMarker
@@ -39,6 +39,10 @@ export const NearbyDriverMarkers: React.FC<{ drivers: NearbyDriver[] }> = ({ dri
     ))}
   </>
 );
+
+/** Memoised (T-535): a parent render with the same driver list sends nothing to the map. */
+export const NearbyDriverMarkers = React.memo(NearbyDriverMarkersBase);
+NearbyDriverMarkers.displayName = 'NearbyDriverMarkers';
 
 const statusText = (state: NearbyDriversState): string | null => {
   if (state.status === 'loading') return 'Finding drivers nearby…';

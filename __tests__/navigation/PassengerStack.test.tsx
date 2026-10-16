@@ -80,6 +80,20 @@ test('with no active ride the passenger lands on Home with exactly four tabs and
   expect(screen.getByTestId('tab-Home-pill')).toBeTruthy();
 });
 
+test('T-535: tabs and stack screens freeze when hidden; the live ride (Booking) does not', async () => {
+  mock.onGet('/rides').reply(200, page([]));
+  const store = makeStore();
+  const screen = renderPassengerApp(store);
+  await waitFor(() => expect(store.getState().activeRide.restoreStatus).toBe('done'));
+  expect(navRef.getCurrentOptions()).toMatchObject({ freezeOnBlur: true });
+
+  act(() => {
+    navRef.navigate('Passenger', { screen: 'Booking' });
+  });
+  expect(await screen.findByText('screen:Booking')).toBeTruthy();
+  expect(navRef.getCurrentOptions()).toMatchObject({ freezeOnBlur: false });
+});
+
 test('a tab press opens that tab', async () => {
   mock.onGet('/rides').reply(200, page([]));
   const store = makeStore();
