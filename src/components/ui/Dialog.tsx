@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BackHandler, Modal, PixelRatio, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { dialog, dialogStore } from '../../core/dialog';
+import { dialog, dialogStore, type DialogRequest } from '../../core/dialog';
 import { t } from '../../i18n';
 import { componentTokens, radius, space } from '../../theme';
 import { AppText } from './AppText';
 import { Button, type ButtonVariant } from './Button';
 import { ModalRoot } from './ModalRoot';
+import { useQueuedModal } from './modalQueue';
 
 export type DialogAction = {
   label: string;
@@ -100,6 +101,8 @@ export type DialogProps = DialogSurfaceProps & {
  */
 export function Dialog({ visible, onDismiss, inline = false, ...surface }: DialogProps) {
   const { theme } = useAppTheme();
+  // [T-562] The root Dialog is a native Modal too: it takes its turn with the modal sheets.
+  const modal = useQueuedModal(!inline && visible);
   // Android back answers "cancel" for the inline form too (a native Modal gets onRequestClose).
   useEffect(() => {
     if (!inline || !visible) return undefined;
@@ -131,11 +134,12 @@ export function Dialog({ visible, onDismiss, inline = false, ...surface }: Dialo
   }
   return (
     <Modal
-      visible={visible}
+      visible={modal.show}
       transparent
       animationType="fade"
       statusBarTranslucent
       onRequestClose={onDismiss ?? (() => undefined)}
+      onDismiss={modal.onDismiss}
     >
       <ModalRoot withDialogHost={false}>{content}</ModalRoot>
     </Modal>
@@ -158,28 +162,33 @@ export function DialogHost({ inline = false }: { inline?: boolean }) {
     setHostId(host.id);
     return host.unregister;
   }, [inline]);
-  if (!current || hostId === null || active !== hostId) {
+  // [T-562] The last request stays rendered (hidden) after its answer, so the Dialog closes with
+  // `visible={false}` and keeps its queue turn through the iOS fade-out instead of unmounting a
+  // presented Modal. A queued next request reuses the same Modal.
+  const last = useRef<DialogRequest | null>(null);
+  if (current) last.current = current;
+  const shown = current ?? last.current;
+  if (!shown || hostId === null || active !== hostId) {
     return null;
   }
-  const answer = (confirmed: boolean) => () => dialog.answer(current.id, confirmed);
+  const answer = (confirmed: boolean) => () => dialog.answer(shown.id, confirmed);
   const actions: DialogAction[] =
-    current.kind === 'alert'
-      ? [{ label: current.confirmLabel ?? t('common.done'), onPress: answer(true), testID: 'dialog-confirm' }]
+    shown.kind === 'alert'
+      ? [{ label: shown.confirmLabel ?? t('common.done'), onPress: answer(true), testID: 'dialog-confirm' }]
       : [
           {
-            label: current.confirmLabel ?? t('common.done'),
+            label: shown.confirmLabel ?? t('common.done'),
             onPress: answer(true),
-            variant: current.destructive ? 'destructive' : 'primary',
+            variant: shown.destructive ? 'destructive' : 'primary',
             testID: 'dialog-confirm',
           },
-          { label: current.cancelLabel ?? t('common.cancel'), onPress: answer(false), variant: 'ghost', testID: 'dialog-cancel' },
+          { label: shown.cancelLabel ?? t('common.cancel'), onPress: answer(false), variant: 'ghost', testID: 'dialog-cancel' },
         ];
   return (
     <Dialog
-      key={current.id}
-      visible
-      title={current.title}
-      body={current.body}
+      visible={current !== null}
+      title={shown.title}
+      body={shown.body}
       actions={actions}
       onDismiss={answer(false)}
       inline={inline}

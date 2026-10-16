@@ -6,6 +6,7 @@
 import React from 'react';
 import { Linking, Platform } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
+import * as Reanimated from 'react-native-reanimated';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -326,6 +327,50 @@ describe('DriverRideScreen', () => {
     expect(mockGoBack).toHaveBeenCalled();
     screen.unmount();
     expect(selectDriverActiveRide(store.getState())?.status).toBe('started');
+  });
+
+  it('[T-562] a parcel sheet slides out through visible when the ride stops being a parcel ride (never unmounted while up)', async () => {
+    // Springs run until the test finishes them, so "still sliding out" can be seen.
+    const running: Array<(finished?: boolean) => void> = [];
+    jest.spyOn(Reanimated, 'withSpring').mockImplementation(((toValue: number, _config: unknown, callback?: (finished?: boolean) => void) => {
+      if (callback) running.push(callback);
+      return toValue;
+    }) as unknown as typeof Reanimated.withSpring);
+    const finishSprings = () => act(() => running.splice(0).forEach(done => done(true)));
+    const parcel = {
+      status: 'picked_up',
+      item_category: 'documents',
+      item_category_label: 'Documents and papers',
+      size_class: 'small',
+      size_label: 'Small (fits in a bag)',
+      max_weight_kg: 2,
+      item_description: 'Two books',
+      declared_value: 2500,
+      receiver: { name: 'Sana Khan', phone: null, phone_masked: '+92300*****67' },
+      pickup_photo_url: null,
+      code: { digits: 6, purpose: 'delivery', sent: true, send_count: 1, sends_left: 2, sms_failed: false, can_resend: false, resend_available_at: null, attempts_left: 5, locked_until: null, blocked: false, delivery_blocked: false },
+      can_call_receiver: false,
+    };
+    const parcelRide = makeRide({ vehicle_type: 'parcel', is_parcel: true, status: 'started', driver_id: 5, passenger, parcel, fare: '180.00' } as Partial<RideResource>);
+    const { store, screen } = renderScreen(parcelRide);
+    await settle(store);
+    fireEvent.press(screen.getByTestId('driver-parcel-deliver'));
+    await act(async () => {});
+    screen.getByTestId('parcel-code-sheet');
+    finishSprings();
+
+    // The ride comes back without its parcel block: the panel goes, the open sheet must close
+    // with its animation (before, the sheets were unmounted with the Modal still presented).
+    serverRide = makeRide({ status: 'started', driver_id: 5, passenger });
+    act(() => {
+      store.dispatch(setDriverActiveRide(serverRide));
+    });
+    await act(async () => {});
+    expect(screen.queryByTestId('driver-parcel-deliver')).toBeNull();
+    expect(screen.getByTestId('parcel-code-sheet')).toBeTruthy(); // sliding out
+    finishSprings();
+    await act(async () => {});
+    expect(screen.queryByTestId('parcel-code-sheet')).toBeNull();
   });
 
   it('shows an empty state without a ride', () => {

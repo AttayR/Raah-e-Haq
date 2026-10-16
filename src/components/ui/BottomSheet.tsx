@@ -164,6 +164,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // content re-measure in that window must not re-place the sheet, which would cancel the close
   // animation, skip the unmount and leave an invisible Modal over the screen.
   const closing = useRef(false);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const restoreSnap = useRef<SheetSnap | null>(null);
   const containerRef = useRef(0);
   // Read when re-opening mid-close (a ref: a snap-height change must not re-run the visibility effect).
@@ -200,22 +202,46 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     onSnapChangeRef.current?.(snap.snap, snap.height);
   }, []);
 
-  const snapTo = useCallback(
-    (snap: SheetSnap) => {
-      const target = resolved.find(r => r.snap === snap) ?? resolved[resolved.length - 1];
-      if (!target) return;
-      animateTo(target.height, 0, undefined, containerRef.current);
-      settle(target);
-    },
-    [animateTo, resolved, settle],
-  );
-
   const unmount = useCallback(() => {
     closing.current = false;
     setMounted(false);
     currentRef.current = null;
     setCurrent(null);
   }, []);
+
+  // [T-562] A drag or a snapTo that lands on a snap during a close cancels the close animation
+  // (and with it the unmount). Clear `closing` then, or the sheet would stay up for good: every
+  // later keyboard event, re-measure and `visible={false}` would be ignored. If the parent still
+  // wants the sheet closed (`visible` false), finish the close instead of staying up.
+  // Returns true when the close goes on (the caller must not snap).
+  const takeOverClose = useCallback((): boolean => {
+    if (!closing.current) return false;
+    if (!visibleRef.current) {
+      animateTo(0, 0, unmount, containerRef.current);
+      return true;
+    }
+    closing.current = false;
+    return false;
+  }, [animateTo, unmount]);
+
+  const snapTo = useCallback(
+    (snap: SheetSnap) => {
+      const target = resolved.find(r => r.snap === snap) ?? resolved[resolved.length - 1];
+      if (!target || takeOverClose()) return;
+      animateTo(target.height, 0, undefined, containerRef.current);
+      settle(target);
+    },
+    [animateTo, resolved, settle, takeOverClose],
+  );
+
+  // [T-562] A drag released on a snap (not a close): it cancelled any running close spring.
+  const dragSettled = useCallback(
+    (target: ResolvedSnap) => {
+      if (takeOverClose()) return;
+      settle(target);
+    },
+    [settle, takeOverClose],
+  );
 
   const finishClose = useCallback(() => {
     unmount();
@@ -390,9 +416,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         }
         // `top` grows as the sheet moves down, so the finger's velocity carries over as is.
         animateTo(target.height, event.velocityY);
-        runOnJS(settle)(target);
+        runOnJS(dragSettled)(target);
       });
-  }, [animateTo, container, finishClose, markClosing, modal, resolved, settle, startTop, top]);
+  }, [animateTo, container, dragSettled, finishClose, markClosing, modal, resolved, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: top.value }] }));
   const scrimStyle = useAnimatedStyle(() => {

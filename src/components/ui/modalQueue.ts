@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 
 /**
  * [T-560] One native modal sheet at a time.
@@ -53,24 +54,64 @@ export const modalQueue = {
 /** True inside a native Modal's content (set by `ModalRoot`). */
 export const InsideModalContext = createContext(false);
 
+const noSubscription = () => () => {};
+const noTurn = (): number | null => null;
+
 /**
  * Whether a modal sheet that `wants` its Modal up may render it now. Nested sheets (inside a
  * Modal) never wait. The turn is held from the first render that wants it until the sheet stops
  * wanting it (its Modal unmounted), so the next sheet presents only after this one is dismissed.
+ *
+ * [T-562] Only a sheet that wants a turn listens to the queue: a closed sheet, a nested one and
+ * every map sheet (`wants` always false) never re-render when other sheets open or close.
  */
 export const useModalTurn = (wants: boolean): boolean => {
   const nested = useContext(InsideModalContext);
   const [ticket, setTicket] = useState<number | null>(null);
+  const queued = wants && !nested;
   useEffect(() => {
-    if (!wants || nested) return undefined;
+    if (!queued) return undefined;
     const mine = modalQueue.enter();
     setTicket(mine);
     return () => {
       modalQueue.leave(mine);
       setTicket(null);
     };
-  }, [nested, wants]);
-  const current = useSyncExternalStore(modalQueue.subscribe, modalQueue.current);
+  }, [queued]);
+  const current = useSyncExternalStore(
+    queued ? modalQueue.subscribe : noSubscription,
+    queued ? modalQueue.current : noTurn,
+  );
   if (nested) return wants;
   return wants && ticket !== null && current === ticket;
+};
+
+/** iOS reports `onDismiss` after its dismiss animation; this releases the turn if it never does. */
+export const MODAL_DISMISS_FALLBACK_MS = 1000;
+
+/**
+ * [T-562] The queue for a raw native `Modal` (the root Dialog, legacy sheets) that animates
+ * itself out: pass `show` as the Modal's `visible` and `onDismiss` as its `onDismiss`. The turn is
+ * held while the Modal is shown and, on iOS, until its dismiss animation has finished (`onDismiss`,
+ * or a fallback timer), because UIKit refuses to present the next Modal while one is still going
+ * away. Android removes its dialog window at once, so there the turn ends when `visible` does.
+ */
+export const useQueuedModal = (visible: boolean): { show: boolean; onDismiss: () => void } => {
+  // True from the first render that shows the Modal until it has been dismissed.
+  const [held, setHeld] = useState(false);
+  const turn = useModalTurn(visible || held);
+  const show = visible && turn;
+  // Set during render (not in an effect) so no render in between lets the turn go.
+  if (show && !held) setHeld(true);
+  useEffect(() => {
+    if (visible || !held) return undefined;
+    if (Platform.OS !== 'ios') {
+      setHeld(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setHeld(false), MODAL_DISMISS_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [held, visible]);
+  const onDismiss = useCallback(() => setHeld(false), []);
+  return { show, onDismiss };
 };

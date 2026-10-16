@@ -298,7 +298,8 @@ const DriverRideScreen: React.FC = () => {
         <DriverRideRatingPrompt active={isFocused && step === 'summary'} />
 
         <PinEntrySheet {...safety.pinSheet} />
-        {parcel.panel ? <DriverParcelSheets {...parcel.sheets} /> : null}
+        {/* T-562: always mounted; the sheets open and close through `visible` (never unmounted while up). */}
+        <DriverParcelSheets {...parcel.sheets} />
 
         <CancelReasonSheet
           visible={cancelMode !== null}

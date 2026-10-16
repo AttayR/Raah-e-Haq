@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,10 @@ import {
   Dimensions,
   TouchableOpacity,
   Modal,
-  StatusBar,
 } from 'react-native';
 import { Icon, type IconName } from './ui/Icon';
 import { BrandColors } from '../theme/colors';
+import { useQueuedModal } from './ui/modalQueue';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +41,8 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
+  // [T-562] One root Modal at a time (iOS): wait for any sheet or dialog still up.
+  const modal = useQueuedModal(config.visible);
 
   useEffect(() => {
     if (config.visible) {
@@ -190,11 +192,12 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
 
   return (
     <Modal
-      visible={config.visible}
+      visible={modal.show}
       transparent
       animationType="none"
       statusBarTranslucent
       onRequestClose={handleClose}
+      onDismiss={modal.onDismiss}
     >
       <Animated.View
         style={[

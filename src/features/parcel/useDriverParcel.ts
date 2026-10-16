@@ -60,6 +60,9 @@ export interface DriverParcelPanel {
   resendAvailableAt: string | null;
 }
 
+/** Stable empty list, so the memoised reason sheet does not re-render on every screen render. */
+const NO_REASONS: ParcelChoice[] = [];
+
 const PHOTO_PROBLEM: Record<Exclude<PickProblem, 'permission'>, TranslationKey> = {
   unavailable: 'parcel.cameraUnavailable',
   wrongType: 'parcel.photoWrongType',
@@ -337,13 +340,18 @@ export const useDriverParcel = (options: {
     if (!submitting) setSheet(null);
   }, [submitting]);
   const reasons: ParcelChoice[] =
-    sheet === 'refuse' ? parcelOptions.data?.refusalReasons ?? [] : parcelOptions.data?.returnReasons ?? [];
+    sheet === 'refuse' ? parcelOptions.data?.refusalReasons ?? NO_REASONS : parcelOptions.data?.returnReasons ?? NO_REASONS;
+
+  // [T-562] The sheets stay mounted (DriverParcelSheets is always rendered) and close through
+  // `visible`, so a ride that stops being a parcel ride animates an open sheet out instead of
+  // unmounting a presented Modal.
+  const onParcel = rideId !== null;
 
   return {
     panel,
     sheets: {
       pickup: {
-        visible: sheet === 'pickup' && step === 'at_pickup',
+        visible: onParcel && sheet === 'pickup' && step === 'at_pickup',
         photo,
         pinRequired: ride?.pin_required === true,
         pinBlocked: ride?.pin_blocked === true,
@@ -358,7 +366,7 @@ export const useDriverParcel = (options: {
         onClose: close,
       },
       code: {
-        visible: (sheet === 'deliver' || sheet === 'returned') && step === 'on_trip',
+        visible: onParcel && (sheet === 'deliver' || sheet === 'returned') && step === 'on_trip',
         purpose: sheet === 'returned' ? ('returned' as const) : ('deliver' as const),
         digits: parcel?.code?.digits ?? 6,
         submitting,
@@ -370,7 +378,7 @@ export const useDriverParcel = (options: {
         onClose: close,
       },
       reason: {
-        visible: reasonsWanted && (step === 'at_pickup' || step === 'on_trip'),
+        visible: onParcel && reasonsWanted && (step === 'at_pickup' || step === 'on_trip'),
         kind: sheet === 'refuse' ? ('refuse' as const) : ('return' as const),
         reasons,
         reasonsError: parcelOptions.status === 'failed' && !parcelOptions.data ? t('parcel.reasonsFailed') : null,

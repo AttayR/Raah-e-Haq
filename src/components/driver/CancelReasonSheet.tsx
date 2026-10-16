@@ -17,7 +17,8 @@ import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverCancelMode } from '../../features/driver-ride/noShow';
 import { t } from '../../i18n';
 import { formatMoney } from '../../utils/format';
-import { Banner } from '../ui';
+import { Banner, ModalRoot } from '../ui';
+import { useQueuedModal } from '../ui/modalQueue';
 
 type Props = {
   visible: boolean;
@@ -56,6 +57,8 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
   const valid = isValidCancelNote(note);
+  // [T-562] One root Modal at a time (iOS): wait for any sheet or dialog still up.
+  const modal = useQueuedModal(visible);
 
   useEffect(() => {
     if (!visible) {
@@ -72,71 +75,74 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.sheet} testID="cancel-reason-sheet">
-          <Text style={styles.title} accessibilityRole="header">{noShow ? t('driverFare.noShowTitle') : COPY.cancelTitle}</Text>
-          <Text style={styles.hint}>{noShow ? t('driverFare.noShowHint') : COPY.cancelHint}</Text>
-          {noShow ? (
-            noShowFee !== null && noShowFee > 0 ? (
-              <Banner
-                tone="info"
-                text={t('driverFare.noShowFee', { amount: formatMoney(noShowFee) })}
-                style={styles.notice}
-                testID="cancel-reason-no-show-fee"
-              />
-            ) : null
-          ) : noShowAvailable ? (
-            <Banner tone="info" text={t('driverFare.noShowPointer')} style={styles.notice} testID="cancel-reason-no-show-pointer" />
-          ) : (
-            <Banner tone="warning" text={t('driverFare.strikeWarning')} style={styles.notice} testID="cancel-reason-strike" />
-          )}
-          <TextInput
-            style={styles.input}
-            value={note}
-            onChangeText={setNote}
-            onBlur={() => setTouched(true)}
-            placeholder={COPY.cancelPlaceholder}
-            placeholderTextColor={theme.colors.textMuted}
-            maxLength={CANCEL_NOTE_MAX_LENGTH}
-            multiline
-            editable={!submitting}
-            accessibilityLabel={COPY.cancelTitle}
-            testID="cancel-reason-input"
-          />
-          <View style={styles.metaRow}>
-            <Text style={styles.error} testID="cancel-reason-error">
-              {touched && !valid ? COPY.cancelTooShort : ''}
-            </Text>
-            <Text style={styles.counter}>{`${note.length}/${CANCEL_NOTE_MAX_LENGTH}`}</Text>
+    <Modal visible={modal.show} transparent animationType="slide" onRequestClose={onClose} onDismiss={modal.onDismiss}>
+      {/* Dialogs and toasts asked for while the sheet is up show inside it. */}
+      <ModalRoot>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.sheet} testID="cancel-reason-sheet">
+            <Text style={styles.title} accessibilityRole="header">{noShow ? t('driverFare.noShowTitle') : COPY.cancelTitle}</Text>
+            <Text style={styles.hint}>{noShow ? t('driverFare.noShowHint') : COPY.cancelHint}</Text>
+            {noShow ? (
+              noShowFee !== null && noShowFee > 0 ? (
+                <Banner
+                  tone="info"
+                  text={t('driverFare.noShowFee', { amount: formatMoney(noShowFee) })}
+                  style={styles.notice}
+                  testID="cancel-reason-no-show-fee"
+                />
+              ) : null
+            ) : noShowAvailable ? (
+              <Banner tone="info" text={t('driverFare.noShowPointer')} style={styles.notice} testID="cancel-reason-no-show-pointer" />
+            ) : (
+              <Banner tone="warning" text={t('driverFare.strikeWarning')} style={styles.notice} testID="cancel-reason-strike" />
+            )}
+            <TextInput
+              style={styles.input}
+              value={note}
+              onChangeText={setNote}
+              onBlur={() => setTouched(true)}
+              placeholder={COPY.cancelPlaceholder}
+              placeholderTextColor={theme.colors.textMuted}
+              maxLength={CANCEL_NOTE_MAX_LENGTH}
+              multiline
+              editable={!submitting}
+              accessibilityLabel={COPY.cancelTitle}
+              testID="cancel-reason-input"
+            />
+            <View style={styles.metaRow}>
+              <Text style={styles.error} testID="cancel-reason-error">
+                {touched && !valid ? COPY.cancelTooShort : ''}
+              </Text>
+              <Text style={styles.counter}>{`${note.length}/${CANCEL_NOTE_MAX_LENGTH}`}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.submit, (!valid || submitting) && styles.disabled]}
+              onPress={submit}
+              disabled={submitting}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !valid || submitting, busy: submitting }}
+              testID="cancel-reason-submit"
+            >
+              {submitting && <ActivityIndicator size="small" color={theme.colors.onPrimary} style={styles.spinner} />}
+              <Text style={styles.submitText}>
+                {submitting ? COPY.working : noShow ? t('driverFare.noShowSubmit') : COPY.cancelSubmit}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.keep}
+              onPress={onClose}
+              disabled={submitting}
+              accessibilityRole="button"
+              testID="cancel-reason-keep"
+            >
+              <Text style={styles.keepText}>{COPY.cancelKeep}</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.submit, (!valid || submitting) && styles.disabled]}
-            onPress={submit}
-            disabled={submitting}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !valid || submitting, busy: submitting }}
-            testID="cancel-reason-submit"
-          >
-            {submitting && <ActivityIndicator size="small" color={theme.colors.onPrimary} style={styles.spinner} />}
-            <Text style={styles.submitText}>
-              {submitting ? COPY.working : noShow ? t('driverFare.noShowSubmit') : COPY.cancelSubmit}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.keep}
-            onPress={onClose}
-            disabled={submitting}
-            accessibilityRole="button"
-            testID="cancel-reason-keep"
-          >
-            <Text style={styles.keepText}>{COPY.cancelKeep}</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </ModalRoot>
     </Modal>
   );
 };
