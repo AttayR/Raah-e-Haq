@@ -16,6 +16,7 @@ import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import WalletScreen from '../../../src/features/wallet/screens/WalletScreen';
 import { toTransaction, toWallet } from '../../../src/features/wallet/api';
 import { transactionIcon } from '../../../src/features/wallet/format';
+import { passengerOwedBannerAmount, passengerOwedNote } from '../../../src/features/wallet/navigation';
 import { CommissionCard } from '../../../src/features/wallet/components/CommissionCard';
 import { IncomingRequestCard } from '../../../src/components/driver/IncomingRequestCard';
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
@@ -171,6 +172,99 @@ describe('wallet (BE-85 amount owed, new ledger types)', () => {
     mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: 0 })));
     mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1)));
     renderWallet('passenger');
+    await waitFor(() => expect(screen.getByTestId('wallet-balance-card')).toBeTruthy());
+    expect(screen.queryByTestId('wallet-amount-owed')).toBeNull();
+  });
+
+  it('T-547 (BE-100): reads passenger_amount_owed, max_owed_to_book and booking_blocked; null when absent', () => {
+    const wallet = toWallet(
+      rawWallet({ balance: -900, amount_owed: 900, passenger_amount_owed: 200, max_owed_to_book: 150, booking_blocked: true }),
+    );
+    expect(wallet).toMatchObject({ amountOwed: 900, passengerAmountOwed: 200, maxOwedToBook: 150, bookingBlocked: true });
+    expect(toWallet(rawWallet({ balance: -80 }))).toMatchObject({ passengerAmountOwed: null, maxOwedToBook: null, bookingBlocked: null });
+    expect(toWallet(rawWallet({ passenger_amount_owed: -5, booking_blocked: 'yes' }))).toMatchObject({
+      passengerAmountOwed: 0,
+      bookingBlocked: null,
+    });
+  });
+
+  it('T-547 (BE-100): a blocked dual-role passenger sees and prefills the passenger-side debt, not the commission', async () => {
+    mock.onGet('/wallet').reply(
+      200,
+      envelope(
+        rawWallet({
+          balance: -900,
+          amount_owed: 900,
+          commission_owed: 900,
+          passenger_amount_owed: 200,
+          max_owed_to_book: 150,
+          booking_blocked: true,
+          can_top_up: true,
+          top_up: topUp,
+        }),
+      ),
+    );
+    mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1)));
+    renderWallet('passenger');
+    await waitFor(() => expect(screen.getByTestId('wallet-amount-owed')).toBeTruthy());
+    screen.getByText('You owe Rs 200');
+    expect(screen.queryByText('You owe Rs 900')).toBeNull();
+    fireEvent.press(screen.getByTestId('wallet-owed-top-up'));
+    expect(mockNavigate).toHaveBeenCalledWith('AddMoney', { amount: 200 });
+  });
+
+  it('T-547 (BE-100): no banner while booking is not blocked, even with wallet debt', async () => {
+    // Driver commission only, or passenger fees still under the limit: booking is allowed.
+    mock.onGet('/wallet').reply(
+      200,
+      envelope(rawWallet({ balance: -600, amount_owed: 600, passenger_amount_owed: 100, max_owed_to_book: 150, booking_blocked: false })),
+    );
+    mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1)));
+    renderWallet('passenger');
+    await waitFor(() => expect(screen.getByTestId('wallet-balance-card')).toBeTruthy());
+    expect(screen.queryByTestId('wallet-amount-owed')).toBeNull();
+    // The softer info note: the fees and the limit, with no top-up action.
+    const note = screen.getByTestId('wallet-owed-note');
+    within(note).getByText('Rs 100 in fees will be settled from your next top-up. You can owe up to Rs 150 and still book.');
+    expect(screen.queryByTestId('wallet-owed-top-up')).toBeNull();
+  });
+
+  it('T-547: helper rules for the blocked banner and the under-limit note', () => {
+    const base = { amountOwed: 900, passengerAmountOwed: 200, maxOwedToBook: 150, bookingBlocked: true };
+    expect(passengerOwedBannerAmount(base)).toBe(200);
+    // Blocked but no passenger-side figure: hidden, never the whole-wallet debt (may include commission).
+    expect(passengerOwedBannerAmount({ ...base, passengerAmountOwed: null })).toBeNull();
+    expect(passengerOwedBannerAmount({ ...base, bookingBlocked: false })).toBeNull();
+    // Older backend: the BE-85 rule.
+    expect(passengerOwedBannerAmount({ amountOwed: 80, passengerAmountOwed: null, bookingBlocked: null })).toBe(80);
+    expect(passengerOwedBannerAmount({ amountOwed: 0, passengerAmountOwed: null, bookingBlocked: null })).toBeNull();
+
+    expect(passengerOwedNote({ passengerAmountOwed: 100, maxOwedToBook: 150, bookingBlocked: false })).toEqual({ owed: 100, limit: 150 });
+    expect(passengerOwedNote({ passengerAmountOwed: 100, maxOwedToBook: null, bookingBlocked: false })).toBeNull();
+    expect(passengerOwedNote({ passengerAmountOwed: 0, maxOwedToBook: 150, bookingBlocked: false })).toBeNull();
+    expect(passengerOwedNote({ passengerAmountOwed: 200, maxOwedToBook: 150, bookingBlocked: true })).toBeNull();
+    expect(passengerOwedNote({ passengerAmountOwed: null, maxOwedToBook: null, bookingBlocked: null })).toBeNull();
+  });
+
+  it('T-547: the driver wallet shows no under-limit note', async () => {
+    mock.onGet('/wallet').reply(
+      200,
+      envelope(rawWallet({ balance: -300, amount_owed: 300, commission_owed: 300, passenger_amount_owed: 100, max_owed_to_book: 150, booking_blocked: false })),
+    );
+    mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1)));
+    renderWallet('driver');
+    await waitFor(() => expect(screen.getByTestId('wallet-balance-card')).toBeTruthy());
+    expect(screen.queryByTestId('wallet-owed-note')).toBeNull();
+  });
+
+  it('T-547: the driver wallet shows no passenger banner even when blocked, and keeps commission_owed', async () => {
+    mock.onGet('/wallet').reply(
+      200,
+      envelope(rawWallet({ balance: -300, amount_owed: 300, commission_owed: 300, passenger_amount_owed: 200, booking_blocked: true })),
+    );
+    mock.onGet('/wallet/transactions').reply(200, envelope([], pageInfo(1, 1)));
+    mock.onGet('/wallet/settlements').reply(200, envelope([], pageInfo(1, 1)));
+    renderWallet('driver');
     await waitFor(() => expect(screen.getByTestId('wallet-balance-card')).toBeTruthy());
     expect(screen.queryByTestId('wallet-amount-owed')).toBeNull();
   });

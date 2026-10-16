@@ -23,7 +23,7 @@ import { BalanceCard } from '../components/BalanceCard';
 import { CommissionCard } from '../components/CommissionCard';
 import { TransactionRow } from '../components/TransactionRow';
 import { WALLET_COPY } from '../copy';
-import { ADD_MONEY_ROUTE, topUpParamsFor } from '../navigation';
+import { ADD_MONEY_ROUTE, passengerOwedBannerAmount, passengerOwedNote, topUpParamsFor } from '../navigation';
 import { groupByDay, type TransactionSection } from '../format';
 import { useCancelSettlement, useWallet, useWalletTransactions } from '../hooks';
 import type { Settlement, TransactionFilter, WalletTransaction } from '../types';
@@ -132,28 +132,42 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
     );
   }
 
+  const owedAmount = isDriver ? null : passengerOwedBannerAmount(walletData);
+  const owedNote = isDriver ? null : passengerOwedNote(walletData);
+
   const listHeader = (
     <View>
       {header}
       <View style={styles.headerBlock}>
         <BalanceCard wallet={walletData} isDriver={isDriver} />
-        {!isDriver && walletData.amountOwed > 0 ? (
-          // BE-85: a cancellation or no-show fee left the passenger owing; a top-up clears it.
+        {owedAmount !== null ? (
+          // BE-85/BE-100: cancellation or no-show fees block the next booking; a top-up clears them.
           <Banner
             tone="warning"
-            title={t('fare.owedTitle', { amount: formatMoney(walletData.amountOwed, { currency: walletData.currency }) })}
+            title={t('fare.owedTitle', { amount: formatMoney(owedAmount, { currency: walletData.currency }) })}
             text={t('fare.owedWalletBody')}
             action={
               walletData.canTopUp && walletData.topUp
                 ? {
                     label: t('fare.owedTopUp'),
                     // T-543: Add money opens with the amount owed filled in.
-                    onPress: () => navigation.navigate(ADD_MONEY_ROUTE, topUpParamsFor(walletData.amountOwed)),
+                    onPress: () => navigation.navigate(ADD_MONEY_ROUTE, topUpParamsFor(owedAmount)),
                     testID: 'wallet-owed-top-up',
                   }
                 : undefined
             }
             testID="wallet-amount-owed"
+          />
+        ) : null}
+        {owedNote ? (
+          // T-547 (BE-100): fees under the booking limit; booking still works, no top-up pressure.
+          <Banner
+            tone="info"
+            text={t('fare.owedUnderLimitNote', {
+              owed: formatMoney(owedNote.owed, { currency: walletData.currency }),
+              limit: formatMoney(owedNote.limit, { currency: walletData.currency }),
+            })}
+            testID="wallet-owed-note"
           />
         ) : null}
         {walletData.canTopUp && walletData.topUp ? (

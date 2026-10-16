@@ -41,6 +41,16 @@ export interface Wallet {
    * no-show fee; above the server's limit booking is refused until a top-up clears it.
    */
   amountOwed: number;
+  /**
+   * BE-100 `passenger_amount_owed`: the passenger-side debt only (cancellation / no-show fees; a
+   * driver's commission and top-ups left out), the figure the POST /rides booking block counts.
+   * Null on a backend without the field.
+   */
+  passengerAmountOwed: number | null;
+  /** BE-100 `max_owed_to_book`: the most (whole PKR) a passenger may owe and still book; null when absent. */
+  maxOwedToBook: number | null;
+  /** BE-100 `booking_blocked`: the next booking would be refused (always false for admins); null when absent. */
+  bookingBlocked: boolean | null;
   availableBalance: number;
   totalSpent: number;
   totalEarnings: number;

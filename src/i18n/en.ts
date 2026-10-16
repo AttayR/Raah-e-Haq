@@ -739,6 +739,8 @@ export const en = {
     owedTopUp: 'Top up',
     owedNotNow: 'Not now',
     owedWalletBody: 'From cancellation or no-show fees. Top up to clear it before your next booking.',
+    /** T-547 (BE-100): fees owed but still under the booking limit. */
+    owedUnderLimitNote: '{owed} in fees will be settled from your next top-up. You can owe up to {limit} and still book.',
     cancelFeeCharged: 'A cancellation fee of {amount} was charged to your wallet.',
     noShowFeeCharged: 'A no-show fee of {amount} was charged to your wallet.',
     /** Activity row amount of a cancelled ride that was charged a fee (T-543). */

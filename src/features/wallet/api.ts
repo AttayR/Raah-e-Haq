@@ -101,6 +101,11 @@ export const toTopUpConfig = (raw: unknown): TopUpConfig | null => {
   };
 };
 
+const nonNegativeOrNull = (value: unknown): number | null => {
+  const read = readNumberOrNull(value);
+  return read === null ? null : Math.max(0, read);
+};
+
 export const toWallet = (raw: unknown): Wallet => {
   const data = isRecord(raw) ? raw : {};
   const balance = readNumber(data.balance);
@@ -111,6 +116,9 @@ export const toWallet = (raw: unknown): Wallet => {
     // The contract defines it as max(0, -balance); read it, fall back to the rule.
     commissionOwed: Math.max(0, readNumberOrNull(data.commission_owed) ?? -balance),
     amountOwed: Math.max(0, readNumberOrNull(data.amount_owed) ?? -balance),
+    passengerAmountOwed: nonNegativeOrNull(data.passenger_amount_owed),
+    maxOwedToBook: nonNegativeOrNull(data.max_owed_to_book),
+    bookingBlocked: typeof data.booking_blocked === 'boolean' ? data.booking_blocked : null,
     availableBalance: Math.max(0, readNumber(data.available_balance)),
     totalSpent: readNumber(data.total_spent),
     totalEarnings: readNumber(data.total_earnings),
