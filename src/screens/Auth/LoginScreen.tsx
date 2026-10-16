@@ -17,7 +17,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { BrandColors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../components/ui/Icon';
 import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
@@ -246,7 +246,7 @@ export default function LoginScreen() {
                   <Icon 
                     name="phone" 
                     size={20} 
-                    color={loginMethod === 'phone' ? '#ffffff' : BrandColors.primary} 
+                    tint={loginMethod === 'phone' ? '#ffffff' : BrandColors.primary} 
                   />
                   <Text style={[
                     styles.toggleButtonText,
@@ -267,7 +267,7 @@ export default function LoginScreen() {
                   <Icon 
                     name="email" 
                     size={20} 
-                    color={loginMethod === 'email' ? '#ffffff' : BrandColors.primary} 
+                    tint={loginMethod === 'email' ? '#ffffff' : BrandColors.primary} 
                   />
                   <Text style={[
                     styles.toggleButtonText,
@@ -282,7 +282,7 @@ export default function LoginScreen() {
               {loginMethod === 'phone' && (
                 <View style={styles.phoneSection}>
                   <View style={styles.phoneIconContainer}>
-                    <Icon name="smartphone" size={48} color={BrandColors.primary} />
+                    <Icon name="smartphone" size={48} tint={BrandColors.primary} />
                   </View>
                   <Text style={styles.sectionTitle}>Sign in with Phone</Text>
                   <Text style={styles.sectionSubtitle}>
@@ -305,7 +305,7 @@ export default function LoginScreen() {
               {loginMethod === 'email' && (
                 <View style={styles.emailSection}>
                   <View style={styles.emailIconContainer}>
-                    <Icon name="email" size={48} color={BrandColors.primary} />
+                    <Icon name="email" size={48} tint={BrandColors.primary} />
                   </View>
                   <Text style={styles.sectionTitle}>Sign in with Email</Text>
                   <Text style={styles.sectionSubtitle}>
@@ -376,7 +376,7 @@ export default function LoginScreen() {
 
               {error && (
                 <View style={styles.errorContainer}>
-                  <Icon name="error" size={20} color="#ef4444" />
+                  <Icon name="error" size={20} tint="#ef4444" />
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
               )}

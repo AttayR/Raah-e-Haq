@@ -3,7 +3,7 @@ import { Alert, Platform, Text, View } from 'react-native';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../../app/navigation/stacks/AuthStack';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import ThemedTextInput from '../../../components/ThemedTextInput';
 import BrandButton from '../../../components/BrandButton';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -52,7 +52,7 @@ export default function RegistrationPhoneStep({ pending, role, onGoToSignIn }: P
 
   const errorBox = (text: string, extra?: string) => (
     <View style={styles.errorContainer} accessibilityRole="alert">
-      <Icon name="error" size={16} color={styles.errorText.color} />
+      <Icon name="error" size={16} tint={styles.errorText.color} />
       <Text style={styles.errorText}>{extra ? `${text}\n${extra}` : text}</Text>
     </View>
   );
@@ -73,7 +73,7 @@ export default function RegistrationPhoneStep({ pending, role, onGoToSignIn }: P
     return (
       <View style={styles.formCard}>
         <View style={styles.verificationIconContainer}>
-          <Icon name="verified-user" size={48} color={theme.colors.success} />
+          <Icon name="verified" size={48} color="success" />
         </View>
         <Text style={styles.sectionTitle}>{COPY.verify.doneTitle}</Text>
         <Text style={styles.sectionSubtitle}>{step.doneMessage}</Text>

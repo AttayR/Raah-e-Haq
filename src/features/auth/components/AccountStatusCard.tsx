@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import { Typography } from '../../../theme/typography';
 import type { AppTheme } from '../../../theme';
 import { SUPPORT_EMAIL } from '../../../config/support';
@@ -22,7 +22,7 @@ export default function AccountStatusCard({ view, colors }: Props) {
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
       <View style={[styles.iconRing, { borderColor: accent }]}>
-        <Icon name={view.icon} size={40} color={accent} />
+        <Icon name={view.icon} size={40} tint={accent} />
       </View>
       <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
         {view.title}
@@ -39,13 +39,13 @@ export default function AccountStatusCard({ view, colors }: Props) {
       <View style={styles.notes}>
         {view.notes.map(note => (
           <View key={note} style={styles.noteRow}>
-            <Icon name="chevron-right" size={18} color={colors.mutedText} />
+            <Icon name="chevronEnd" size={16} tint={colors.mutedText} />
             <Text style={[styles.noteText, { color: colors.mutedText }]}>{note}</Text>
           </View>
         ))}
         {view.showSupport ? (
           <View style={styles.noteRow}>
-            <Icon name="mail-outline" size={18} color={colors.mutedText} />
+            <Icon name="email" size={16} tint={colors.mutedText} />
             <Text style={[styles.noteText, { color: colors.mutedText }]}>
               {`${ACCOUNT_STATUS_COPY.supportPrefix} ${SUPPORT_EMAIL}`}
             </Text>

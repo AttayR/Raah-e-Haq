@@ -18,7 +18,7 @@ import { errorToastMessage, toast } from '../../core/toast';
 import { BrandColors } from '../../theme/colors';
 import OtpService, { OTP_LENGTH, formatCountdown, formatPkPhoneInput, sanitizeOtpInput } from '../../services/otpService';
 import { sendOtp, verifyOtp } from '../../store/thunks/apiThunks';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../components/ui/Icon';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
@@ -238,7 +238,7 @@ export default function PhoneAuthScreen() {
     <View style={styles.formCard}>
       {keyboardUp ? null : (
         <View style={styles.phoneIconContainer}>
-          <Icon name="smartphone" size={48} color={BrandColors.primary} />
+          <Icon name="smartphone" size={48} tint={BrandColors.primary} />
         </View>
       )}
       <Text style={styles.sectionTitle}>{COPY.phoneStep.title}</Text>
@@ -264,7 +264,7 @@ export default function PhoneAuthScreen() {
         <KeyboardDoneBar nativeID={PHONE_INPUT_DONE_ID} testID="phone-auth-phone-done" />
         {phoneError ? (
           <View style={styles.errorContainer}>
-            <Icon name="error" size={16} color="#ef4444" />
+            <Icon name="error" size={16} tint="#ef4444" />
             <Text style={styles.errorText}>{phoneError}</Text>
           </View>
         ) : null}
@@ -300,7 +300,7 @@ export default function PhoneAuthScreen() {
     <View style={styles.formCard}>
       {keyboardUp ? null : (
         <View style={styles.verificationIconContainer}>
-          <Icon name="verified-user" size={48} color={BrandColors.primary} />
+          <Icon name="verified" size={48} tint={BrandColors.primary} />
         </View>
       )}
       <Text style={styles.sectionTitle}>{COPY.codeStep.title}</Text>
@@ -329,7 +329,7 @@ export default function PhoneAuthScreen() {
         <KeyboardDoneBar nativeID={CODE_INPUT_DONE_ID} testID="phone-auth-code-done" />
         {otpError ? (
           <View style={styles.errorContainer}>
-            <Icon name="error" size={16} color="#ef4444" />
+            <Icon name="error" size={16} tint="#ef4444" />
             <Text style={styles.errorText}>{otpError}</Text>
           </View>
         ) : null}

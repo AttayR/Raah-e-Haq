@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../components/ui/Icon';
 import { useApiAuth } from '../../hooks/useApiAuth';
 import { useOtpTimers } from '../../hooks/useOtpTimers';
 import { BrandColors } from '../../theme/colors';
@@ -242,7 +242,7 @@ export default function RegistrationScreen() {
   const renderFormErrors = () =>
     formErrors.length > 0 ? (
       <View style={styles.formErrorBox} accessibilityRole="alert">
-        <Icon name="error" size={18} color={styles.formErrorText.color} />
+        <Icon name="error" size={16} tint={styles.formErrorText.color} />
         <View style={styles.formErrorList}>
           {formErrors.map((message) => (
             <Text key={message} style={styles.formErrorText}>
@@ -257,7 +257,7 @@ export default function RegistrationScreen() {
     <View style={styles.buttonContainerScrollable}>
       {stepIndex > 0 && (
         <TouchableOpacity style={styles.previousButton} onPress={handlePrevious} disabled={submitting}>
-          <Icon name="arrow-back" size={20} color={BrandColors.primary} />
+          <Icon name="arrowBack" size={20} tint={BrandColors.primary} />
           <Text style={styles.previousButtonText}>{COPY.form.previous}</Text>
         </TouchableOpacity>
       )}
@@ -282,7 +282,7 @@ export default function RegistrationScreen() {
       ) : (
         <TouchableOpacity style={styles.nextButton} onPress={handleNext} accessibilityRole="button">
           <Text style={styles.nextButtonText}>{COPY.form.next}</Text>
-          <Icon name="arrow-forward" size={20} color={styles.nextButtonText.color} />
+          <Icon name="arrowForward" size={20} tint={styles.nextButtonText.color} />
         </TouchableOpacity>
       )}
     </View>

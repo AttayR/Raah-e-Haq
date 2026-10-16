@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import type { User } from '../../../services/api';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { Typography } from '../../../theme/typography';
@@ -90,7 +90,7 @@ export default function AccountStatusScreen() {
               onPress={onCheckStatus}
               style={[styles.primaryButton, { backgroundColor: colors.primary }, checking && styles.dimmed]}
             >
-              {checking ? <ActivityIndicator color={ON_PRIMARY} /> : <Icon name="refresh" size={20} color={ON_PRIMARY} />}
+              {checking ? <ActivityIndicator color={ON_PRIMARY} /> : <Icon name="refresh" size={20} tint={ON_PRIMARY} />}
               <Text style={[styles.primaryText, { color: ON_PRIMARY }]}>
                 {checking ? ACCOUNT_STATUS_COPY.checking : ACCOUNT_STATUS_COPY.checkStatus}
               </Text>
@@ -104,7 +104,7 @@ export default function AccountStatusScreen() {
             onPress={confirmLogout}
             style={[styles.secondaryButton, { borderColor: colors.primaryText, backgroundColor: colors.surface }]}
           >
-            <Icon name="logout" size={20} color={colors.primaryText} />
+            <Icon name="logout" size={20} tint={colors.primaryText} />
             <Text style={[styles.secondaryText, { color: colors.primaryText }]}>
               {isLoggingOut ? ACCOUNT_STATUS_COPY.signingOut : ACCOUNT_STATUS_COPY.signOut}
             </Text>

@@ -58,6 +58,9 @@ describe('icon map', () => {
     expect(shouldMirrorIcon('chevronEnd', true)).toBe(true);
     expect(shouldMirrorIcon('back', false)).toBe(false);
     expect(shouldMirrorIcon('home', true)).toBe(false);
+    // T-533: the registration Back / Next arrows.
+    expect(shouldMirrorIcon('arrowBack', true)).toBe(true);
+    expect(shouldMirrorIcon('arrowForward', true)).toBe(true);
   });
 });
 

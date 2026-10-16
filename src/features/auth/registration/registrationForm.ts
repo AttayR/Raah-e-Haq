@@ -2,15 +2,17 @@
  * The registration form's data and steps (T-201). The screen holds one RegistrationFormData;
  * each step edits part of it and is validated by src/schemas/registrationSchema before Next.
  */
+import type { IconName } from '../../../components/ui/icons';
+
 export type RegistrationRole = 'driver' | 'passenger';
 
 export type RegistrationStep = 'personal' | 'vehicle' | 'documents' | 'review';
 
-export const REGISTRATION_STEPS: ReadonlyArray<{ key: RegistrationStep; title: string; icon: string }> = [
-  { key: 'personal', title: 'Personal Info', icon: 'person' },
-  { key: 'vehicle', title: 'Vehicle Info', icon: 'local-taxi' },
-  { key: 'documents', title: 'Documents', icon: 'description' },
-  { key: 'review', title: 'Review', icon: 'check-circle' },
+export const REGISTRATION_STEPS: ReadonlyArray<{ key: RegistrationStep; title: string; icon: IconName }> = [
+  { key: 'personal', title: 'Personal Info', icon: 'account' },
+  { key: 'vehicle', title: 'Vehicle Info', icon: 'car' },
+  { key: 'documents', title: 'Documents', icon: 'document' },
+  { key: 'review', title: 'Review', icon: 'check' },
 ];
 
 /**
@@ -19,10 +21,10 @@ export const REGISTRATION_STEPS: ReadonlyArray<{ key: RegistrationStep; title: s
  * TODO(T-203/T-302): load this list from GET /api/public/vehicle-types (BE-58) instead.
  */
 export const VEHICLE_TYPES = [
-  { id: 'car', label: 'Car', icon: 'directions-car', description: 'Sedan, Hatchback, SUV' },
-  { id: 'bike', label: 'Bike', icon: 'two-wheeler', description: 'Motorcycle, Scooter' },
-  { id: 'rickshaw', label: 'Rickshaw', icon: 'electric-rickshaw', description: 'Auto rickshaw, Qingqi' },
-  { id: 'van', label: 'Van', icon: 'airport-shuttle', description: 'Minivan, Hiace' },
+  { id: 'car', label: 'Car', icon: 'car', description: 'Sedan, Hatchback, SUV' },
+  { id: 'bike', label: 'Bike', icon: 'bike', description: 'Motorcycle, Scooter' },
+  { id: 'rickshaw', label: 'Rickshaw', icon: 'rickshaw', description: 'Auto rickshaw, Qingqi' },
+  { id: 'van', label: 'Van', icon: 'van', description: 'Minivan, Hiace' },
 ] as const;
 
 export type VehicleTypeId = (typeof VEHICLE_TYPES)[number]['id'];

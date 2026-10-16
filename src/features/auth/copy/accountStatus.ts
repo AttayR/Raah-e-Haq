@@ -16,11 +16,13 @@
  * - unsupportedRole    active, but admin or no role this app serves
  */
 
+import type { IconName } from '../../../components/ui/icons';
+
 export type AccountStatusTone = 'pending' | 'danger' | 'info';
 
 export interface AccountStatusVariantCopy {
-  /** MaterialIcons glyph name. */
-  icon: string;
+  /** Kit icon name (MaterialCommunityIcons, T-533). */
+  icon: IconName;
   tone: AccountStatusTone;
   /** Header line above the card. */
   heading: string;
@@ -48,7 +50,7 @@ export type AccountStatusVariant =
 
 export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatusVariantCopy> = {
   pendingDriver: {
-    icon: 'hourglass-empty',
+    icon: 'waiting',
     tone: 'pending',
     heading: 'Driver application',
     title: 'Application under review',
@@ -63,7 +65,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     showSupport: false,
   },
   pendingPassenger: {
-    icon: 'hourglass-empty',
+    icon: 'waiting',
     tone: 'pending',
     heading: 'Your account',
     title: 'Account awaiting approval',
@@ -73,7 +75,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     showSupport: false,
   },
   suspended: {
-    icon: 'pause-circle-filled',
+    icon: 'paused',
     tone: 'danger',
     heading: 'Your account',
     title: 'Account suspended',
@@ -83,7 +85,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     showSupport: true,
   },
   rejected: {
-    icon: 'cancel',
+    icon: 'failed',
     tone: 'danger',
     heading: 'Your account',
     title: 'Application not approved',
@@ -93,7 +95,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     showSupport: true,
   },
   inactive: {
-    icon: 'block',
+    icon: 'blocked',
     tone: 'danger',
     heading: 'Your account',
     title: 'Account deactivated',
@@ -103,7 +105,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     showSupport: true,
   },
   unverified: {
-    icon: 'help-outline',
+    icon: 'help',
     tone: 'info',
     heading: 'Your account',
     title: "We couldn't confirm your account",
@@ -114,7 +116,7 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     showSupport: true,
   },
   unsupportedRole: {
-    icon: 'admin-panel-settings',
+    icon: 'admin',
     tone: 'info',
     heading: 'Your account',
     title: 'This app is for passengers and drivers',

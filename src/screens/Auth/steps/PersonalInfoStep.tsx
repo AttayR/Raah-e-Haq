@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import ThemedTextInput from '../../../components/ThemedTextInput';
 import type { RegistrationFormData } from '../../../features/auth/registration/registrationForm';
 import { validateStepField } from '../../../schemas/registrationSchema';
@@ -189,7 +189,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.fullName && (
             <View style={styles.errorContainer} ref={anchor('fullName')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.fullName}</Text>
             </View>
           )}
@@ -210,7 +210,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.email && (
             <View style={styles.errorContainer} ref={anchor('email')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.email}</Text>
             </View>
           )}
@@ -228,7 +228,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.phoneNumber && (
             <View style={styles.errorContainer} ref={anchor('phoneNumber')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.phoneNumber}</Text>
             </View>
           )}
@@ -247,7 +247,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.cnic && (
             <View style={styles.errorContainer} ref={anchor('cnic')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.cnic}</Text>
             </View>
           )}
@@ -267,7 +267,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.address && (
             <View style={styles.errorContainer} ref={anchor('address')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.address}</Text>
             </View>
           )}
@@ -286,7 +286,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.dateOfBirth && (
             <View style={styles.errorContainer} ref={anchor('dateOfBirth')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.dateOfBirth}</Text>
             </View>
           )}
@@ -309,7 +309,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           </View>
           {validationErrors.gender && (
             <View style={styles.errorContainer} ref={anchor('gender')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.gender}</Text>
             </View>
           )}
@@ -336,9 +336,9 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
               onPress={() => setShowPassword(!showPassword)}
             >
               <Icon 
-                name={showPassword ? 'visibility-off' : 'visibility'} 
+                name={showPassword ? 'eyeOff' : 'eye'} 
                 size={20} 
-                color="#9ca3af" 
+                tint="#9ca3af" 
               />
             </TouchableOpacity>
           </View>
@@ -365,7 +365,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           
           {validationErrors.password && (
             <View style={styles.errorContainer} ref={anchor('password')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.password}</Text>
             </View>
           )}
@@ -387,15 +387,15 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             >
               <Icon 
-                name={showConfirmPassword ? 'visibility-off' : 'visibility'} 
+                name={showConfirmPassword ? 'eyeOff' : 'eye'} 
                 size={20} 
-                color="#9ca3af" 
+                tint="#9ca3af" 
               />
             </TouchableOpacity>
           </View>
           {validationErrors.confirmPassword && (
             <View style={styles.errorContainer} ref={anchor('confirmPassword')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.confirmPassword}</Text>
             </View>
           )}
@@ -418,7 +418,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.emergencyContactNumber && (
             <View style={styles.errorContainer} ref={anchor('emergencyContactNumber')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.emergencyContactNumber}</Text>
             </View>
           )}
@@ -436,7 +436,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           />
           {validationErrors.emergencyContactName && (
             <View style={styles.errorContainer} ref={anchor('emergencyContactName')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.emergencyContactName}</Text>
             </View>
           )}
@@ -460,7 +460,7 @@ export default function PersonalInfoStep({ data, onDataChange, errors }: Persona
           </View>
           {validationErrors.emergencyRelationship && (
             <View style={styles.errorContainer} ref={anchor('emergencyRelationship')}>
-              <Icon name="error" size={16} color={styles.errorText.color} />
+              <Icon name="error" size={16} tint={styles.errorText.color} />
               <Text style={styles.errorText}>{validationErrors.emergencyRelationship}</Text>
             </View>
           )}

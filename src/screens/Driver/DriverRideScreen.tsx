@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../components/ui/Icon';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
@@ -229,7 +229,7 @@ const DriverRideScreen: React.FC = () => {
           accessibilityLabel={COPY.back}
           testID="driver-ride-back"
         >
-          <Icon name="arrow-back" size={24} color={theme.colors.textPrimary} />
+          <Icon name="back" size={24} color="textPrimary" />
         </TouchableOpacity>
 
         <DriverRideSafetyButton

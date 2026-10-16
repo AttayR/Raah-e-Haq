@@ -1,6 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from './ui/Icon';
 import { BrandColors } from '../theme/colors';
 import { logger } from '../core/logging/logger';
 
@@ -97,7 +97,7 @@ export class MapErrorBoundary extends Component<Props, State> {
       return (
         <View style={styles.errorContainer}>
           <View style={styles.errorContent}>
-            <Icon name="map" size={64} color={BrandColors.primary} />
+            <Icon name="map" size={48} tint={BrandColors.primary} />
             <Text style={styles.errorTitle}>Map Error</Text>
             <Text style={styles.errorMessage}>
               There was an issue loading the map. Please try again.

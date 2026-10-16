@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 import { BrandColors } from '../../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import { logger } from '../../../core/logging/logger';
 import { mergeStepErrors } from './stepErrors';
 import { useFieldAnchor } from '../../../features/auth/registration/fieldAnchors';
@@ -169,9 +169,9 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         ) : (
           <View style={styles.imagePickerPlaceholder}>
             <Icon 
-              name={isUploading ? 'hourglass-empty' : 'add-a-photo'} 
+              name={isUploading ? 'waiting' : 'addPhoto'} 
               size={32} 
-              color={isUploading ? '#9ca3af' : BrandColors.primary} 
+              tint={isUploading ? '#9ca3af' : BrandColors.primary} 
             />
             <Text style={[styles.imagePickerText, isUploading && styles.imagePickerTextDisabled]}>
               {isUploading ? 'Uploading...' : 'Tap to select image'}
@@ -181,7 +181,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
       </TouchableOpacity>
       {errorMessage && (
         <View style={styles.errorContainer} ref={anchor(field)}>
-          <Icon name="error" size={16} color="#ef4444" />
+          <Icon name="error" size={16} tint="#ef4444" />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
@@ -222,15 +222,15 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
                   style={styles.removeButton}
                   onPress={() => removeVehiclePicture(index)}
                 >
-                  <Icon name="close" size={16} color="#ffffff" />
+                  <Icon name="close" size={16} tint="#ffffff" />
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.vehiclePicturePlaceholder}>
                 <Icon 
-                  name={isUploading ? 'hourglass-empty' : 'add'} 
+                  name={isUploading ? 'waiting' : 'add'} 
                   size={20} 
-                  color={isUploading ? '#9ca3af' : BrandColors.primary} 
+                  tint={isUploading ? '#9ca3af' : BrandColors.primary} 
                 />
               </View>
             )}
@@ -245,7 +245,7 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
       </Text>
       {validationErrors.vehiclePictures && (
         <View style={styles.errorContainer} ref={anchor('vehiclePictures')}>
-          <Icon name="error" size={16} color="#ef4444" />
+          <Icon name="error" size={16} tint="#ef4444" />
           <Text style={styles.errorText}>{validationErrors.vehiclePictures}</Text>
         </View>
       )}
@@ -294,19 +294,19 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
           <Text style={styles.guidelinesTitle}>Photo Guidelines</Text>
           <View style={styles.guidelinesList}>
             <View style={styles.guidelineItem}>
-              <Icon name="check-circle" size={16} color="#10b981" />
+              <Icon name="check" size={16} tint="#10b981" />
               <Text style={styles.guidelineText}>Use good lighting and clear focus</Text>
             </View>
             <View style={styles.guidelineItem}>
-              <Icon name="check-circle" size={16} color="#10b981" />
+              <Icon name="check" size={16} tint="#10b981" />
               <Text style={styles.guidelineText}>Ensure all text is readable</Text>
             </View>
             <View style={styles.guidelineItem}>
-              <Icon name="check-circle" size={16} color="#10b981" />
+              <Icon name="check" size={16} tint="#10b981" />
               <Text style={styles.guidelineText}>Avoid shadows and reflections</Text>
             </View>
             <View style={styles.guidelineItem}>
-              <Icon name="check-circle" size={16} color="#10b981" />
+              <Icon name="check" size={16} tint="#10b981" />
               <Text style={styles.guidelineText}>Make sure CNIC is fully visible</Text>
             </View>
           </View>
@@ -366,19 +366,19 @@ export default function DocumentsStep({ data, onDataChange, errors }: DocumentsS
         <Text style={styles.guidelinesTitle}>Photo Guidelines</Text>
         <View style={styles.guidelinesList}>
           <View style={styles.guidelineItem}>
-            <Icon name="check-circle" size={16} color="#10b981" />
+            <Icon name="check" size={16} tint="#10b981" />
             <Text style={styles.guidelineText}>Use good lighting and clear focus</Text>
           </View>
           <View style={styles.guidelineItem}>
-            <Icon name="check-circle" size={16} color="#10b981" />
+            <Icon name="check" size={16} tint="#10b981" />
             <Text style={styles.guidelineText}>Ensure all text is readable</Text>
           </View>
           <View style={styles.guidelineItem}>
-            <Icon name="check-circle" size={16} color="#10b981" />
+            <Icon name="check" size={16} tint="#10b981" />
             <Text style={styles.guidelineText}>Avoid shadows and reflections</Text>
           </View>
           <View style={styles.guidelineItem}>
-            <Icon name="check-circle" size={16} color="#10b981" />
+            <Icon name="check" size={16} tint="#10b981" />
             <Text style={styles.guidelineText}>Take pictures from different angles for vehicles</Text>
           </View>
         </View>

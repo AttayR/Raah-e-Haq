@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, Text, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../components/ui/Icon';
 import { REGISTRATION_STEPS } from '../../features/auth/registration/registrationForm';
 import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
 import { styles } from './RegistrationScreen.styles';
@@ -59,9 +59,9 @@ export default function RegistrationHeader({ title, subtitle, stepIndex }: Props
                     ]}
                   >
                     <Icon
-                      name={isCompleted ? 'check' : step.icon}
+                      name={isCompleted ? 'checkMark' : step.icon}
                       size={16}
-                      color={isCompleted || isActive ? styles.stepIconActive.color : styles.stepIconIdle.color}
+                      tint={isCompleted || isActive ? styles.stepIconActive.color : styles.stepIconIdle.color}
                     />
                   </View>
                   <Text style={[styles.stepTitle, isActive && styles.stepTitleActive]}>{step.title}</Text>

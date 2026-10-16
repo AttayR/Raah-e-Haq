@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
@@ -46,7 +46,7 @@ export const OffersRow: React.FC<Props> = ({ offers, onPressOffer }) => {
             onPress={() => onPressOffer?.(offer)}
             style={({ pressed }) => [styles.card, { width: cardWidth, backgroundColor: fill }, pressed ? styles.pressed : null]}
           >
-            <Icon name="local-offer" size={24} color={iconColor} />
+            <Icon name="promo" size={24} tint={iconColor} />
             <View style={styles.cardText}>
               <AppText variant="title" numberOfLines={2}>
                 {offer.title}

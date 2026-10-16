@@ -9,7 +9,7 @@ import {
   Modal,
   StatusBar,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon, type IconName } from './ui/Icon';
 import { BrandColors } from '../theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -168,18 +168,18 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
     }
   };
 
-  const getIcon = () => {
+  const getIcon = (): IconName => {
     switch (config.type) {
       case 'success':
-        return 'check-circle';
+        return 'check';
       case 'error':
         return 'error';
       case 'warning':
-        return 'warning';
+        return 'alertTriangle';
       case 'info':
         return 'info';
       case 'loading':
-        return 'hourglass-empty';
+        return 'waiting';
       default:
         return 'info';
     }
@@ -229,8 +229,7 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
               <Icon 
                 name={getIcon()} 
                 size={48} 
-                color={modalStyle.iconColor}
-                style={config.type === 'loading' ? styles.loadingIcon : undefined}
+                tint={modalStyle.iconColor}
               />
             </View>
 
@@ -273,7 +272,7 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
                 style={styles.closeButton}
                 onPress={handleClose}
               >
-                <Icon name="close" size={24} color="#6B7280" />
+                <Icon name="close" size={24} tint="#6B7280" />
               </TouchableOpacity>
             )}
           </View>
@@ -322,9 +321,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
-  },
-  loadingIcon: {
-    transform: [{ rotate: '0deg' }],
   },
   title: {
     fontSize: 24,

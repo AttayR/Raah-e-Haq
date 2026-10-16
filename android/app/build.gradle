@@ -192,17 +192,10 @@ dependencies {
         implementation jscFlavor
     }
 }
+// T-533 (PERF-05): the app draws one icon family, MaterialCommunityIcons (the kit Icon), so
+// only that font is copied into the APK.
 project.ext.vectoricons = [
-    iconFontNames: [ 
-        'MaterialCommunityIcons.ttf',
-        'MaterialIcons.ttf', 
-        'EvilIcons.ttf', 
-        'FontAwesome6_Solid.ttf',
-        'AntDesign.ttf',
-        'Entypo.ttf', 
-        'Fontisto.ttf',
-        'Ionicons.ttf'
-    ] // Specify font files
+    iconFontNames: ['MaterialCommunityIcons.ttf']
 ]
 
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")

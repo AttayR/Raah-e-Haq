@@ -136,12 +136,33 @@ export const iconGlyphs = {
   report: 'flag-outline',
   statement: 'calendar-week',
   dispute: 'scale-balance',
+  // T-533: the legacy MaterialIcons glyphs (auth, registration, error boundaries), so only the
+  // MDI font ships.
+  chevronUp: 'chevron-up',
+  arrowBack: 'arrow-left',
+  arrowForward: 'arrow-right',
+  error: 'alert-circle',
+  verified: 'shield-check',
+  smartphone: 'cellphone',
+  idCard: 'card-account-details-outline',
+  addPhoto: 'camera-plus-outline',
+  map: 'map-outline',
+  paused: 'pause-circle',
+  blocked: 'cancel',
+  admin: 'shield-account-outline',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;
 
 /** Glyphs that point along the reading direction and mirror in RTL (§7, §12.8). */
-export const directionalIcons: ReadonlySet<IconName> = new Set<IconName>(['back', 'chevronEnd', 'send', 'slideConfirm']);
+export const directionalIcons: ReadonlySet<IconName> = new Set<IconName>([
+  'back',
+  'chevronEnd',
+  'send',
+  'slideConfirm',
+  'arrowBack',
+  'arrowForward',
+]);
 
 /** Whether `name` should render mirrored for the given layout direction. */
 export const shouldMirrorIcon = (name: IconName, isRTL: boolean = I18nManager.isRTL): boolean =>

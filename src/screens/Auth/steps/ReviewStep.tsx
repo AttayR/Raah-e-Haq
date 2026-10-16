@@ -7,7 +7,7 @@ import {
   Image,
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import {
   VEHICLE_PHOTO_SLOTS,
   filledVehiclePhotoCount,
@@ -64,7 +64,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
   const renderPersonalInfo = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Icon name="person" size={20} color={BrandColors.primary} />
+        <Icon name="account" size={20} tint={BrandColors.primary} />
         <Text style={styles.sectionTitle}>Personal Information</Text>
       </View>
       <View style={styles.infoGrid}>
@@ -98,7 +98,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Icon name="local-taxi" size={20} color={BrandColors.primary} />
+          <Icon name="car" size={20} tint={BrandColors.primary} />
           <Text style={styles.sectionTitle}>Vehicle Information</Text>
         </View>
         <View style={styles.infoGrid}>
@@ -145,7 +145,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Icon name="description" size={20} color={BrandColors.primary} />
+          <Icon name="document" size={20} tint={BrandColors.primary} />
           <Text style={styles.sectionTitle}>Documents</Text>
         </View>
         <View style={styles.documentsGrid}>
@@ -156,14 +156,14 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                 <Image source={{ uri: data.driverPicture }} style={styles.documentImage} />
               ) : (
                 <View style={styles.documentPlaceholder}>
-                  <Icon name="person" size={24} color="#9ca3af" />
+                  <Icon name="account" size={24} tint="#9ca3af" />
                 </View>
               )}
               <View style={styles.documentStatus}>
                 <Icon 
-                  name={data.driverPicture ? 'check-circle' : 'error'} 
+                  name={data.driverPicture ? 'check' : 'error'} 
                   size={16} 
-                  color={data.driverPicture ? '#10b981' : '#ef4444'} 
+                  tint={data.driverPicture ? '#10b981' : '#ef4444'} 
                 />
               </View>
             </View>
@@ -176,14 +176,14 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                 <Image source={{ uri: data.cnicPicture }} style={styles.documentImage} />
               ) : (
                 <View style={styles.documentPlaceholder}>
-                  <Icon name="credit-card" size={24} color="#9ca3af" />
+                  <Icon name="idCard" size={24} tint="#9ca3af" />
                 </View>
               )}
               <View style={styles.documentStatus}>
                 <Icon 
-                  name={data.cnicPicture ? 'check-circle' : 'error'} 
+                  name={data.cnicPicture ? 'check' : 'error'} 
                   size={16} 
-                  color={data.cnicPicture ? '#10b981' : '#ef4444'} 
+                  tint={data.cnicPicture ? '#10b981' : '#ef4444'} 
                 />
               </View>
             </View>
@@ -196,14 +196,14 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                 <Image source={{ uri: data.cnicBackPicture }} style={styles.documentImage} />
               ) : (
                 <View style={styles.documentPlaceholder}>
-                  <Icon name="credit-card" size={24} color="#9ca3af" />
+                  <Icon name="idCard" size={24} tint="#9ca3af" />
                 </View>
               )}
               <View style={styles.documentStatus}>
                 <Icon
-                  name={data.cnicBackPicture ? 'check-circle' : 'error'}
+                  name={data.cnicBackPicture ? 'check' : 'error'}
                   size={16}
-                  color={data.cnicBackPicture ? '#10b981' : '#ef4444'}
+                  tint={data.cnicBackPicture ? '#10b981' : '#ef4444'}
                 />
               </View>
             </View>
@@ -221,22 +221,22 @@ export default function ReviewStep({ data }: ReviewStepProps) {
                       <Image key={label} source={{ uri }} style={styles.vehiclePicturePreview} accessibilityLabel={label} />
                     ) : (
                       <View key={label} style={styles.morePicturesIndicator} accessibilityLabel={label}>
-                        <Icon name="add-a-photo" size={16} color="#9ca3af" />
+                        <Icon name="addPhoto" size={16} tint="#9ca3af" />
                       </View>
                     );
                   })}
                 </View>
               ) : (
                 <View style={styles.noPicturesPlaceholder}>
-                  <Icon name="local-taxi" size={24} color="#9ca3af" />
+                  <Icon name="car" size={24} tint="#9ca3af" />
                   <Text style={styles.noPicturesText}>No pictures uploaded</Text>
                 </View>
               )}
               <View style={styles.documentStatus}>
                 <Icon 
-                  name={vehicleComplete ? 'check-circle' : 'error'} 
+                  name={vehicleComplete ? 'check' : 'error'} 
                   size={16} 
-                  color={vehicleComplete ? '#10b981' : '#ef4444'} 
+                  tint={vehicleComplete ? '#10b981' : '#ef4444'} 
                 />
               </View>
             </View>
@@ -252,14 +252,14 @@ export default function ReviewStep({ data }: ReviewStepProps) {
   const renderAccountType = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Icon name="account-circle" size={20} color={BrandColors.primary} />
+        <Icon name="accountCircle" size={20} tint={BrandColors.primary} />
         <Text style={styles.sectionTitle}>Account Type</Text>
       </View>
       <View style={styles.accountTypeCard}>
         <Icon 
-          name={data.role === 'driver' ? 'local-taxi' : 'person'} 
+          name={data.role === 'driver' ? 'car' : 'account'} 
           size={32} 
-          color={BrandColors.primary} 
+          tint={BrandColors.primary} 
         />
         <View style={styles.accountTypeInfo}>
           <Text style={styles.accountTypeTitle}>
@@ -321,9 +321,9 @@ export default function ReviewStep({ data }: ReviewStepProps) {
       <View style={styles.completionCard}>
         <View style={styles.completionHeader}>
           <Icon 
-            name={completionStatus.isComplete ? 'check-circle' : 'hourglass-empty'} 
+            name={completionStatus.isComplete ? 'check' : 'waiting'} 
             size={24} 
-            color={completionStatus.isComplete ? '#10b981' : '#f59e0b'} 
+            tint={completionStatus.isComplete ? '#10b981' : '#f59e0b'} 
           />
           <Text style={styles.completionTitle}>
             {completionStatus.isComplete ? 'Ready to Create Account' : 'Almost Complete'}
@@ -357,7 +357,7 @@ export default function ReviewStep({ data }: ReviewStepProps) {
       {/* Terms and Conditions */}
       <View style={styles.termsCard}>
         <View style={styles.termsHeader}>
-          <Icon name="info" size={20} color="#6b7280" />
+          <Icon name="info" size={20} tint="#6b7280" />
           <Text style={styles.termsTitle}>Terms & Conditions</Text>
         </View>
         <Text style={styles.termsText}>

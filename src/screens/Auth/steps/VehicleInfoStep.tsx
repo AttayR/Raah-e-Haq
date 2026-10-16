@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { BrandColors } from '../../../theme/colors';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Icon } from '../../../components/ui/Icon';
 import ThemedTextInput from '../../../components/ThemedTextInput';
 import { VEHICLE_TYPES, type RegistrationFormData } from '../../../features/auth/registration/registrationForm';
 import { isStepFieldRequired, maxVehicleYear, validateStepField } from '../../../schemas/registrationSchema';
@@ -137,7 +137,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
     return (
       <View style={styles.container}>
         <View style={styles.skipCard}>
-          <Icon name="check-circle" size={48} color="#10b981" />
+          <Icon name="check" size={48} tint="#10b981" />
           <Text style={styles.skipTitle}>Vehicle Information Skipped</Text>
           <Text style={styles.skipSubtitle}>
             As a passenger, you don't need to provide vehicle information. 
@@ -173,7 +173,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                 <Icon 
                   name={type.icon} 
                   size={24} 
-                  color={data.vehicleType === type.id ? '#ffffff' : BrandColors.primary} 
+                  tint={data.vehicleType === type.id ? '#ffffff' : BrandColors.primary} 
                 />
                 <Text style={[
                   styles.vehicleTypeLabel,
@@ -192,7 +192,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           </View>
           {validationErrors.vehicleType && (
             <View style={styles.errorContainer} ref={anchor('vehicleType')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.vehicleType}</Text>
             </View>
           )}
@@ -211,7 +211,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           />
           {validationErrors.vehicleNumber && (
             <View style={styles.errorContainer} ref={anchor('vehicleNumber')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.vehicleNumber}</Text>
             </View>
           )}
@@ -228,9 +228,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
               {data.vehicleBrand || 'Select vehicle brand'}
             </Text>
             <Icon 
-              name={showBrandDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} 
+              name={showBrandDropdown ? 'chevronUp' : 'chevronDown'} 
               size={20} 
-              color="#6b7280" 
+              tint="#6b7280" 
             />
           </TouchableOpacity>
           {showBrandDropdown && (
@@ -244,7 +244,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                   >
                     <Text style={styles.dropdownItemText}>{brand}</Text>
                     {data.vehicleBrand === brand && (
-                      <Icon name="check" size={20} color={BrandColors.primary} />
+                      <Icon name="checkMark" size={20} tint={BrandColors.primary} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -253,7 +253,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           )}
           {validationErrors.vehicleBrand && (
             <View style={styles.errorContainer} ref={anchor('vehicleBrand')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.vehicleBrand}</Text>
             </View>
           )}
@@ -271,7 +271,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           />
           {validationErrors.vehicleModel && (
             <View style={styles.errorContainer} ref={anchor('vehicleModel')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.vehicleModel}</Text>
             </View>
           )}
@@ -289,9 +289,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                 {data.vehicleYear || 'Year'}
               </Text>
               <Icon 
-                name={showYearDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} 
+                name={showYearDropdown ? 'chevronUp' : 'chevronDown'} 
                 size={20} 
-                color="#6b7280" 
+                tint="#6b7280" 
               />
             </TouchableOpacity>
             {showYearDropdown && (
@@ -305,7 +305,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                     >
                       <Text style={styles.dropdownItemText}>{year}</Text>
                       {data.vehicleYear === year && (
-                        <Icon name="check" size={20} color={BrandColors.primary} />
+                        <Icon name="checkMark" size={20} tint={BrandColors.primary} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -314,7 +314,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             )}
             {validationErrors.vehicleYear && (
               <View style={styles.errorContainer} ref={anchor('vehicleYear')}>
-                <Icon name="error" size={16} color="#ef4444" />
+                <Icon name="error" size={16} tint="#ef4444" />
                 <Text style={styles.errorText}>{validationErrors.vehicleYear}</Text>
               </View>
             )}
@@ -330,9 +330,9 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                 {data.vehicleColor || 'Color'}
               </Text>
               <Icon 
-                name={showColorDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} 
+                name={showColorDropdown ? 'chevronUp' : 'chevronDown'} 
                 size={20} 
-                color="#6b7280" 
+                tint="#6b7280" 
               />
             </TouchableOpacity>
             {showColorDropdown && (
@@ -347,7 +347,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                       <View style={[styles.colorIndicator, { backgroundColor: color.toLowerCase() }]} />
                       <Text style={styles.dropdownItemText}>{color}</Text>
                       {data.vehicleColor === color && (
-                        <Icon name="check" size={20} color={BrandColors.primary} />
+                        <Icon name="checkMark" size={20} tint={BrandColors.primary} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -356,7 +356,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             )}
             {validationErrors.vehicleColor && (
               <View style={styles.errorContainer} ref={anchor('vehicleColor')}>
-                <Icon name="error" size={16} color="#ef4444" />
+                <Icon name="error" size={16} tint="#ef4444" />
                 <Text style={styles.errorText}>{validationErrors.vehicleColor}</Text>
               </View>
             )}
@@ -374,7 +374,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           />
           {validationErrors.licensePlate && (
             <View style={styles.errorContainer} ref={anchor('licensePlate')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.licensePlate}</Text>
             </View>
           )}
@@ -389,7 +389,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           />
           {validationErrors.registrationNumber && (
             <View style={styles.errorContainer} ref={anchor('registrationNumber')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.registrationNumber}</Text>
             </View>
           )}
@@ -412,7 +412,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           />
           {validationErrors.licenseNumber && (
             <View style={styles.errorContainer} ref={anchor('licenseNumber')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.licenseNumber}</Text>
             </View>
           )}
@@ -428,7 +428,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             <Text style={[styles.dropdownText, !data.licenseType && styles.dropdownPlaceholder]}>
               {LICENSE_TYPES.find((t) => t.value === data.licenseType)?.label || 'Select license type'}
             </Text>
-            <Icon name={showLicenseTypeDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#6b7280" />
+            <Icon name={showLicenseTypeDropdown ? 'chevronUp' : 'chevronDown'} size={20} tint="#6b7280" />
           </TouchableOpacity>
           {showLicenseTypeDropdown && (
             <View style={styles.dropdownList}>
@@ -443,7 +443,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{opt.label}</Text>
-                    {data.licenseType === opt.value && <Icon name="check" size={20} color={BrandColors.primary} />}
+                    {data.licenseType === opt.value && <Icon name="checkMark" size={20} tint={BrandColors.primary} />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -451,7 +451,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           )}
           {validationErrors.licenseType && (
             <View style={styles.errorContainer} ref={anchor('licenseType')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.licenseType}</Text>
             </View>
           )}
@@ -466,7 +466,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           />
           {validationErrors.licenseExpiryDate && (
             <View style={styles.errorContainer} ref={anchor('licenseExpiryDate')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.licenseExpiryDate}</Text>
             </View>
           )}
@@ -480,7 +480,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             <Text style={[styles.dropdownText, !data.drivingExperience && styles.dropdownPlaceholder]}>
               {data.drivingExperience ? `${data.drivingExperience} years` : 'Select years'}
             </Text>
-            <Icon name={showExperienceDropdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#6b7280" />
+            <Icon name={showExperienceDropdown ? 'chevronUp' : 'chevronDown'} size={20} tint="#6b7280" />
           </TouchableOpacity>
           {showExperienceDropdown && (
             <View style={styles.dropdownList}>
@@ -495,7 +495,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
                     }}
                   >
                     <Text style={styles.dropdownItemText}>{y} years</Text>
-                    {data.drivingExperience === y && <Icon name="check" size={20} color={BrandColors.primary} />}
+                    {data.drivingExperience === y && <Icon name="checkMark" size={20} tint={BrandColors.primary} />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -503,7 +503,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
           )}
           {validationErrors.drivingExperience && (
             <View style={styles.errorContainer} ref={anchor('drivingExperience')}>
-              <Icon name="error" size={16} color="#ef4444" />
+              <Icon name="error" size={16} tint="#ef4444" />
               <Text style={styles.errorText}>{validationErrors.drivingExperience}</Text>
             </View>
           )}
@@ -523,7 +523,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             />
             {validationErrors.bankName && (
               <View style={styles.errorContainer} ref={anchor('bankName')}>
-                <Icon name="error" size={16} color="#ef4444" />
+                <Icon name="error" size={16} tint="#ef4444" />
                 <Text style={styles.errorText}>{validationErrors.bankName}</Text>
               </View>
             )}
@@ -538,7 +538,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             />
             {validationErrors.bankBranch && (
               <View style={styles.errorContainer} ref={anchor('bankBranch')}>
-                <Icon name="error" size={16} color="#ef4444" />
+                <Icon name="error" size={16} tint="#ef4444" />
                 <Text style={styles.errorText}>{validationErrors.bankBranch}</Text>
               </View>
             )}
@@ -554,7 +554,7 @@ export default function VehicleInfoStep({ data, onDataChange, errors }: VehicleI
             />
             {validationErrors.bankAccountNumber && (
               <View style={styles.errorContainer} ref={anchor('bankAccountNumber')}>
-                <Icon name="error" size={16} color="#ef4444" />
+                <Icon name="error" size={16} tint="#ef4444" />
                 <Text style={styles.errorText}>{validationErrors.bankAccountNumber}</Text>
               </View>
             )}

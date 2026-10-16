@@ -37,6 +37,27 @@ target 'RaaHeHaq' do
 rn_maps_path = '../node_modules/react-native-maps'
 pod 'react-native-maps/Google', :path => rn_maps_path
 
+  # T-533 (PERF-05): the RNVectorIcons pod copies all 19 of its TTFs into the app, but the app
+  # draws one family (MaterialCommunityIcons, the kit Icon). Drop the others from the generated
+  # "Copy Pods Resources" script and its input/output file lists. This runs after integration
+  # because CocoaPods writes the file lists then. Keep in sync with UIAppFonts (Info.plist) and
+  # android/app/build.gradle iconFontNames.
+  post_integrate do |installer|
+    kept_icon_fonts = ['MaterialCommunityIcons.ttf']
+    icon_fonts_dir = File.join(__dir__, '..', 'node_modules', 'react-native-vector-icons', 'Fonts')
+    dropped_icon_fonts = Dir.glob(File.join(icon_fonts_dir, '*.ttf')).map { |f| File.basename(f) } - kept_icon_fonts
+    installer.aggregate_targets.each do |aggregate|
+      Dir.glob(File.join(aggregate.support_files_dir.to_s, "#{aggregate.name}-resources*")).each do |path|
+        lines = File.readlines(path)
+        kept = lines.reject do |line|
+          next false unless line.include?('react-native-vector-icons/Fonts/') || line.include?('UNLOCALIZED_RESOURCES_FOLDER_PATH')
+          dropped_icon_fonts.any? { |font| line.rstrip.end_with?("/#{font}", "/#{font}\"") }
+        end
+        File.write(path, kept.join) if kept.length != lines.length
+      end
+    end
+  end
+
   post_install do |installer|
     # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
     react_native_post_install(
