@@ -17,12 +17,16 @@ import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/r
 import type { SavedPlaceEditorParams } from '../../../features/saved-places/navigation';
 import type { BookingParams } from '../../../features/ride-booking/prefill';
 import type { SafetyRoutes } from '../../../features/safety/navigation';
+import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
 import type { RootStackParamList } from '../RootNavigation';
 
 export type PassengerStackParamList = {
   /** Home · Activity · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
   PassengerTabs: NavigatorScreenParams<PassengerTabParamList> | undefined;
   Profile: undefined;
+  /** Profile → Edit profile and Change / Verify number (T-504b, BE-35/BE-38). */
+  ProfileEdit: ProfileEditRoutes['ProfileEdit'];
+  ChangePhone: ProfileEditRoutes['ChangePhone'];
   /** One ride's chat thread (T-510). */
   RideChat: RideChatParams;
   /**
@@ -54,6 +58,8 @@ export type PassengerStackParamList = {
  * T-531): the first screen paints without evaluating these screens and their imports.
  */
 const loadPassengerProfile = () => require('../../../screens/Passenger/Passengerprofile').default;
+const loadProfileEditScreen = () => require('../../../features/profile-edit/screens/ProfileEditScreen').default;
+const loadChangePhoneScreen = () => require('../../../features/profile-edit/screens/ChangePhoneScreen').default;
 const loadNotificationPreferencesScreen = () => require('../../../features/notifications/screens/NotificationPreferencesScreen').NotificationPreferencesScreen;
 const loadTransactionDetailScreen = () => require('../../../features/wallet/screens/TransactionDetailScreen').default;
 const loadAddMoneyScreen = () => require('../../../features/wallet/screens/AddMoneyScreen').default;
@@ -89,6 +95,8 @@ const PassengerStack = ({ navigation }: Props) => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
       <Stack.Screen name="Profile" getComponent={loadPassengerProfile} />
+      <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />
+      <Stack.Screen name="ChangePhone" getComponent={loadChangePhoneScreen} />
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       <Stack.Screen name="Booking" component={PassengerMapScreen} />

@@ -12,6 +12,7 @@ import { AppText, Avatar, Badge, Card, Header, HeaderLargeTitle, ListGroup, List
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { DRIVER_SETTINGS_COPY } from '../../components/driver/settings/copy';
+import { AccountChecks } from '../../features/profile-edit';
 import { layout, space } from '../../theme';
 
 /**
@@ -70,6 +71,7 @@ const DriverSettingsScreen = () => {
               </View>
             </View>
           </Card>
+          <AccountChecks user={user} phoneOnly onOpenPhone={() => navigation.navigate('ChangePhone')} testID="driver-settings-checks" />
 
           <ListGroup title={DRIVER_SETTINGS_COPY.accountGroup}>
             <ListItem

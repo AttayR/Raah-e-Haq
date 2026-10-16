@@ -12,7 +12,9 @@ import {
   OtpSentInfo,
   User,
   type MultipartFile,
+  type ProfileUpdateRequest,
 } from '../../services/api';
+import type { ApiResponse } from '../../core/api/types';
 import { authStorage } from '../../services/authStorage';
 import { unwrap, toApiError, toThunkRejection, ThunkRejection, ApiError } from '../../core/api/errors';
 import {
@@ -404,19 +406,119 @@ export const getUserProfile = createAsyncThunk<
   }
 );
 
-export const updateUserProfile = createAsyncThunk<User, Partial<User>, ThunkConfig>(
+const serverMessage = (body: { message?: unknown } | null | undefined): string | null =>
+  typeof body?.message === 'string' && body.message.trim().length > 0 ? body.message : null;
+
+/**
+ * A profile change the server accepted (T-504b): the new profile (it replaces the signed-in
+ * user) and the server's `message` (BE-38: "To change your email, open the link we sent...").
+ */
+export interface ProfileChangeResult {
+  user: User;
+  message: string | null;
+}
+
+/** The profile in `body.data` stored as the signed-in user, or null when the session ended meanwhile. */
+const keepProfile = async (body: ApiResponse<unknown>, startedIn: number): Promise<ProfileChangeResult | null> => {
+  const user = requireUser(unwrap(body));
+  if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
+    return null;
+  }
+  return { user, message: serverMessage(body) };
+};
+
+/**
+ * PUT /profile (T-504b): only the changed fields, never the phone (BE-35). It has no global
+ * loading or error state: the edit form owns its saving state and field errors.
+ */
+export const updateUserProfile = createAsyncThunk<ProfileChangeResult, ProfileUpdateRequest, ThunkConfig>(
   'auth/updateUserProfile',
   async (userData, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
       // BE-29: PUT /profile returns the profile itself as `data` (not `{ user }`).
-      const user = requireUser(unwrap(await apiService.updateProfile(userData)));
-      if (!(await authStorage.saveUser(user, startedIn)) || isStaleSession(startedIn)) {
-        return rejectWithValue(staleSessionRejection());
-      }
-      return user;
+      const result = await keepProfile(await apiService.updateProfile(userData), startedIn);
+      return result ?? rejectWithValue(staleSessionRejection());
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Profile update failed'));
+    }
+  }
+);
+
+/** POST /profile/phone accepted: the profile (with `pending_phone`) and the code's lifetime. */
+export interface PhoneChangeRequested extends ProfileChangeResult {
+  phone: string;
+  /** False when the number was already this account's verified one (nothing to verify, BE-35). */
+  codeSent: boolean;
+  expiresIn: number;
+}
+
+/**
+ * BE-35: start (or resend) a number change. The code goes to the new number; the account's own
+ * number stays until verifyPhoneChange. An echoed otp_code (local backend) is dropped here.
+ * 429 `otp_cooldown` / `otp_send_limit` and 503 `sms_unavailable` carry `retryAfter`.
+ */
+export const requestPhoneChange = createAsyncThunk<PhoneChangeRequested, string, ThunkConfig>(
+  'auth/requestPhoneChange',
+  async (phone, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const body = await apiService.requestPhoneChange(phone);
+      const result = await keepProfile(body, startedIn);
+      if (!result) {
+        return rejectWithValue(staleSessionRejection());
+      }
+      const sent = body.phone_verification;
+      return {
+        ...result,
+        phone: typeof sent?.phone === 'string' ? sent.phone : phone,
+        codeSent: sent !== undefined && sent.code_sent !== false,
+        expiresIn: typeof sent?.expires_in === 'number' ? sent.expires_in : 0,
+      };
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Could not send a code to this number'));
+    }
+  }
+);
+
+/** BE-35: verify the code sent to `pending_phone`; it becomes the account's number. A 422 never signs out. */
+export const verifyPhoneChange = createAsyncThunk<ProfileChangeResult, string, ThunkConfig>(
+  'auth/verifyPhoneChange',
+  async (otpCode, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const result = await keepProfile(await apiService.verifyPhoneChange(otpCode), startedIn);
+      return result ?? rejectWithValue(staleSessionRejection());
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Phone verification failed'));
+    }
+  }
+);
+
+/** BE-35: DELETE /profile/phone/pending; the account's number stays as it is. */
+export const cancelPhoneChange = createAsyncThunk<ProfileChangeResult, void, ThunkConfig>(
+  'auth/cancelPhoneChange',
+  async (_, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const result = await keepProfile(await apiService.cancelPhoneChange(), startedIn);
+      return result ?? rejectWithValue(staleSessionRejection());
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Could not cancel the number change'));
+    }
+  }
+);
+
+/** BE-40: a new confirmation link to the unconfirmed email. The server's message says what happened. */
+export const resendEmailConfirmation = createAsyncThunk<ProfileChangeResult, void, ThunkConfig>(
+  'auth/resendEmailConfirmation',
+  async (_, { rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const result = await keepProfile(await apiService.resendEmailConfirmation(), startedIn);
+      return result ?? rejectWithValue(staleSessionRejection());
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Could not send the confirmation link'));
     }
   }
 );
@@ -435,9 +537,6 @@ export interface ProfilePhotoResult {
   /** BE-94: e.g. "Photo submitted for review. Your current photo stays until it is approved." */
   message: string | null;
 }
-
-const serverMessage = (body: { message?: unknown } | null | undefined): string | null =>
-  typeof body?.message === 'string' && body.message.trim().length > 0 ? body.message : null;
 
 /**
  * T-504: POST /profile/avatar. The response is the owner's profile with the new

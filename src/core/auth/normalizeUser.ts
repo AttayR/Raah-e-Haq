@@ -86,6 +86,7 @@ type OptionalStringField = (typeof OPTIONAL_STRING_FIELDS)[number];
 
 const NULLABLE_STRING_FIELDS = [
   'pending_phone',
+  'pending_email',
   'phone_verified_at',
   'rejection_reason',
   // BE-94: the served photo (null after DELETE /profile/avatar) and a driver's pending one.
@@ -169,6 +170,9 @@ export function normalizeUser(raw: unknown): User | null {
       user[field] = value;
     }
   });
+  if (typeof raw.email_verified === 'boolean') {
+    user.email_verified = raw.email_verified;
+  }
   if ('profile_image_review' in raw) {
     user.profile_image_review = toPhotoReviewStatus(raw.profile_image_review);
   }

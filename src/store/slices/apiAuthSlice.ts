@@ -13,6 +13,10 @@ import {
   updateUserProfile,
   uploadProfilePhoto,
   removeProfilePhoto,
+  requestPhoneChange,
+  verifyPhoneChange,
+  cancelPhoneChange,
+  resendEmailConfirmation,
   initializeAuth,
   revalidateSession,
   isStaleSessionRejection,
@@ -342,36 +346,26 @@ const authSlice = createSlice({
         state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
       });
 
-    // Update User Profile
-    builder
-      .addCase(updateUserProfile.pending, (state) => {
-        state.status = 'loading';
-        state.error = null;
-      })
-      .addCase(updateUserProfile.fulfilled, (state, action) => {
+    // Profile photo (T-504) and profile fields, phone and email (T-504b): only a success touches
+    // the store. Progress and failure belong to the editing screen, so no other screen shows a
+    // spinner or an error, and the sign-in screens' status is never reused for a profile save.
+    builder.addMatcher(
+      isAnyOf(
+        uploadProfilePhoto.fulfilled,
+        removeProfilePhoto.fulfilled,
+        updateUserProfile.fulfilled,
+        requestPhoneChange.fulfilled,
+        verifyPhoneChange.fulfilled,
+        cancelPhoneChange.fulfilled,
+        resendEmailConfirmation.fulfilled,
+      ),
+      (state, action) => {
         if (!state.isAuthenticated) {
           return;
         }
-        state.status = 'succeeded';
-        state.user = action.payload;
-        state.error = null;
-      })
-      .addCase(updateUserProfile.rejected, (state, action) => {
-        if (isStaleSessionRejection(action.payload)) {
-          return;
-        }
-        state.status = 'failed';
-        state.error = rejectionMessage(action.payload, action.error.message || 'Something went wrong');
-      });
-
-    // Profile photo (T-504): only a success touches the store. Progress and failure belong to
-    // the photo editor, so no other screen shows a spinner or an error while it uploads.
-    builder.addMatcher(isAnyOf(uploadProfilePhoto.fulfilled, removeProfilePhoto.fulfilled), (state, action) => {
-      if (!state.isAuthenticated) {
-        return;
-      }
-      state.user = action.payload.user;
-    });
+        state.user = action.payload.user;
+      },
+    );
   },
 });
 

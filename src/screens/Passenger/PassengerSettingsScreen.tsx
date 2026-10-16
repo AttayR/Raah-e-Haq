@@ -15,6 +15,7 @@ import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { ProfileSummaryCard } from '../../components/passenger/settings/ProfileSummaryCard';
 import { PASSENGER_SETTINGS_COPY as COPY } from '../../components/passenger/settings/copy';
+import { AccountChecks } from '../../features/profile-edit';
 import { layout, space } from '../../theme';
 
 /**
@@ -65,6 +66,7 @@ const PassengerSettingsScreen = () => {
         <HeaderLargeTitle title={title} scrollY={scrollY} />
         <View style={styles.body}>
           <ProfileSummaryCard user={user} onPress={() => navigation.navigate('Profile')} />
+          <AccountChecks user={user} phoneOnly onOpenPhone={() => navigation.navigate('ChangePhone')} testID="passenger-settings-checks" />
 
           <ListGroup title={COPY.accountGroup}>
             <ListItem

@@ -303,6 +303,10 @@ export interface User {
   phone: string | null;
   pending_phone?: string | null;
   phone_verified_at?: string | null;
+  /** BE-38: a requested email change, applied only when the link mailed to it is opened. */
+  pending_email?: string | null;
+  /** BE-40: whether the current email was proven (signup link, password reset, confirmed change). */
+  email_verified?: boolean;
   status: AccountStatus;
   /** BE-32: why the account was rejected or suspended, when the server sends it. */
   rejection_reason?: string | null;
@@ -527,6 +531,27 @@ export interface PhoneCodeSentResponse {
   code?: string;
   message?: string;
   retry_after?: number;
+}
+
+/**
+ * PUT /profile (T-504b): only the fields the form changed. The phone is never sent here (BE-35:
+ * a number changes through POST /profile/phone; re-sending the current one would cancel a
+ * pending change). A new email waits in `pending_email` and needs `current_password` (BE-38).
+ */
+export interface ProfileUpdateRequest {
+  name?: string;
+  email?: string;
+  current_password?: string;
+  gender?: 'male' | 'female' | 'other';
+  /** YYYY-MM-DD; a driver's must be 18+ (BE-68). */
+  date_of_birth?: string;
+  address?: string;
+  bio?: string | null;
+}
+
+/** POST /profile/phone 200 (BE-35): the profile (with `pending_phone`) and the code that went out. */
+export interface ProfilePhoneChangeResponse extends ApiResponse<ApiUser> {
+  phone_verification?: PhoneCodeSentResponse;
 }
 
 export interface ForgotPasswordRequest {
@@ -771,8 +796,39 @@ class ApiService {
   // PUT /profile (there is no PUT /auth/profile). BE-29: data is the owner's profile (the same
   // shape as GET /auth/profile, with `role`, `roles[]` and `languages[]`), not wrapped in
   // `{ user }`; callers pass it through normalizeUser. A new phone waits in pending_phone (BE-35).
-  async updateProfile(userData: Partial<User>): Promise<ApiResponse<ApiUser>> {
+  async updateProfile(userData: ProfileUpdateRequest): Promise<ApiResponse<ApiUser>> {
     const response = await apiClient.put('/profile', userData);
+    return response.data;
+  }
+
+  /**
+   * POST /profile/phone (BE-35): `phone` (E.164) goes to `pending_phone` and gets a code; the
+   * account's number stays until POST /profile/phone/verify. The same number again resends.
+   * 429 `otp_cooldown` / `otp_send_limit` (10 phone codes per account a day) + `retry_after`.
+   */
+  async requestPhoneChange(phone: string): Promise<ProfilePhoneChangeResponse> {
+    const response = await apiClient.post('/profile/phone', { phone });
+    return response.data;
+  }
+
+  /** POST /profile/phone/verify (BE-35): a wrong code is 422 `invalid_code`, never a sign-out. */
+  async verifyPhoneChange(otpCode: string): Promise<ApiResponse<ApiUser>> {
+    const response = await apiClient.post('/profile/phone/verify', { otp_code: otpCode });
+    return response.data;
+  }
+
+  /** DELETE /profile/phone/pending (BE-35): drops `pending_phone`; the account's number stays. */
+  async cancelPhoneChange(): Promise<ApiResponse<ApiUser>> {
+    const response = await apiClient.delete('/profile/phone/pending');
+    return response.data;
+  }
+
+  /**
+   * POST /profile/email/resend-confirmation (BE-40): a new link to the unconfirmed current email.
+   * The answer is the same whether or not a mail went out; 429 after 3 in 10 minutes.
+   */
+  async resendEmailConfirmation(): Promise<ApiResponse<ApiUser>> {
+    const response = await apiClient.post('/profile/email/resend-confirmation');
     return response.data;
   }
 

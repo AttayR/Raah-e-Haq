@@ -57,7 +57,7 @@ export const latestBirthDateForAge = (years: number, now: Date = new Date()): st
 };
 
 /** A real calendar date in YYYY-MM-DD (rejects 2026-02-30). */
-const isIsoDate = (value: string | undefined): boolean => {
+export const isIsoDate = (value: string | undefined): boolean => {
   if (!value || !ISO_DATE.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));

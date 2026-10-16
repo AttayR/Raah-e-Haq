@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useAppDispatch, type RootState } from '../../store';
 import { getUserProfile } from '../../store/thunks/apiThunks';
-import { AppText, Badge, IconButton, ListGroup, ListItem, Screen, StatTile } from '../../components/ui';
+import { AppText, Badge, Button, IconButton, ListGroup, ListItem, Screen, StatTile } from '../../components/ui';
 import { ownPhotoUri, PhotoReviewBanner, ProfilePhotoEditor, toPhotoReview } from '../../features/profile-photo';
 import { ProfileInfoList } from '../../components/passenger/settings/ProfileInfoList';
 import { formatCalendarDate, formatMonthYear } from '../../components/passenger/settings/format';
@@ -13,6 +13,8 @@ import { useMyVehicles } from '../../features/driver-profile/hooks';
 import { VehicleCard } from '../../features/driver-profile/components/VehicleCard';
 import { toDriverProfileStats } from '../../features/driver-profile/format';
 import { DRIVER_PROFILE_COPY as COPY } from '../../features/driver-profile/copy';
+import { AccountChecks, CHANGE_PHONE_ROUTE, PROFILE_EDIT_ROUTE, type ProfileEditNavigator } from '../../features/profile-edit';
+import { t } from '../../i18n';
 import { space } from '../../theme';
 
 /**
@@ -22,10 +24,11 @@ import { space } from '../../theme';
  * for review shows here labelled "Under review" while riders keep seeing the approved one), the
  * lifetime stats from GET /me/stats (rating "New" until rated, trips, earnings in PKR), the
  * personal info the server sent, the vehicle from GET /profile/documents and the licence from
- * the profile. Nothing is hardcoded; editing the other fields comes with T-504.
+ * the profile. Nothing is hardcoded. "Edit" opens the profile form and the banners say what the
+ * account still needs (verify the number, confirm the email; T-504b).
  */
 const DriverProfile = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<ProfileEditNavigator>();
   const isFocused = useIsFocused();
   const { user } = useSelector((state: RootState) => state.apiAuth);
   const stats = useMyStats(isFocused, COPY.statsFailed);
@@ -55,6 +58,15 @@ const DriverProfile = () => {
         <AppText variant="h2" accessibilityRole="header" style={styles.title}>
           {COPY.title}
         </AppText>
+        <Button
+          variant="ghost"
+          size="sm"
+          fullWidth={false}
+          label={t('profileEdit.edit')}
+          accessibilityLabel={t('profileEdit.editA11y')}
+          onPress={() => navigation.navigate(PROFILE_EDIT_ROUTE)}
+          testID="driver-profile-edit"
+        />
       </View>
 
       <View style={styles.identity} testID="driver-profile-identity">
@@ -80,6 +92,8 @@ const DriverProfile = () => {
         />
         <PhotoReviewBanner review={photoReview} />
       </View>
+
+      <AccountChecks user={user} onOpenPhone={() => navigation.navigate(CHANGE_PHONE_ROUTE)} testID="driver-profile-checks" />
 
       <View>
         <View style={styles.stats}>

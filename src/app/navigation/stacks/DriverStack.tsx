@@ -14,12 +14,16 @@ import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
 import { rideDetailsScreenId, type RideHistoryRoutes } from '../../../features/ride-history/navigation';
 import type { SafetyRoutes } from '../../../features/safety/navigation';
+import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
 import type { DriverStatementRoutes } from '../../../features/driver-statements/navigation';
 
 export type DriverStackParamList = {
   /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
   DriverTabs: NavigatorScreenParams<DriverTabParamList> | undefined;
   Profile: undefined;
+  /** Profile → Edit profile and Change / Verify number (T-504b, BE-35/BE-38). */
+  ProfileEdit: ProfileEditRoutes['ProfileEdit'];
+  ChangePhone: ProfileEditRoutes['ChangePhone'];
   /** One ride's chat thread (T-510). */
   RideChat: RideChatParams;
   /** The driver's current ride (T-405); it reads the ride from the driverRide slice. */
@@ -53,6 +57,8 @@ export type DriverStackParamList = {
  * T-531): the first screen paints without evaluating these screens and their imports.
  */
 const loadDriverProfile = () => require('../../../screens/Driver/DriverProfile').default;
+const loadProfileEditScreen = () => require('../../../features/profile-edit/screens/ProfileEditScreen').default;
+const loadChangePhoneScreen = () => require('../../../features/profile-edit/screens/ChangePhoneScreen').default;
 const loadNotificationPreferencesScreen = () => require('../../../features/notifications/screens/NotificationPreferencesScreen').NotificationPreferencesScreen;
 const loadDriverDocumentsScreen = () => require('../../../features/driverDocuments/screens/DriverDocumentsScreen').DriverDocumentsScreen;
 const loadWalletScreen = () => require('../../../features/wallet/screens/WalletScreen').default;
@@ -86,6 +92,8 @@ const DriverStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
       <Stack.Screen name="Profile" getComponent={loadDriverProfile} />
+      <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />
+      <Stack.Screen name="ChangePhone" getComponent={loadChangePhoneScreen} />
       {/* One screen per ride: another ride's thread never reuses this one's state. */}
       <Stack.Screen name="RideChat" component={ChatThreadScreen} getId={rideChatScreenId} />
       {/* The full-screen trip map (T-405): pushed over the tabs, so no tab bar. */}
