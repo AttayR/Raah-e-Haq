@@ -224,6 +224,22 @@ export const componentTokens = {
     /** Window heights below this (iPhone SE: 667) use the compact choice cards and upload tiles. */
     compactWindowHeight: 700,
   },
+  /**
+   * UI-R6 auth (spec auth-login, auth-phone-otp): the logo badge (72, 56 on small phones; §4) on a
+   * white circle in both themes (the artwork needs a light ground) and the space above it.
+   */
+  auth: {
+    logoBadge: 72,
+    logoBadgeCompact: 56,
+    logo: 48,
+    logoCompact: 36,
+    topSpace: space[8],
+    topSpaceCompact: space[4],
+    /** Window heights below this (iPhone SE: 667) use the compact badge and an `h2` title. */
+    compactWindowHeight: 700,
+    /** Reserved height of the success glyph circle in the forgot-password sheet. */
+    sentGlyph: 64,
+  },
 } as const;
 
 export type ComponentTokens = typeof componentTokens;

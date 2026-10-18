@@ -1,40 +1,42 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  StatusBar, 
-  ImageBackground, 
-  TouchableOpacity,
-  Image,
-  Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import AuthKeyboardScroll from '../../features/auth/components/AuthKeyboardScroll';
-import BrandButton from '../../components/BrandButton';
-import ThemedTextInput from '../../components/ThemedTextInput';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AppText, Button, KeyboardAwareScrollView, Screen, SegmentedControl } from '../../components/ui';
 import { useApiAuth } from '../../hooks/useApiAuth';
-import { BrandColors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Icon } from '../../components/ui/Icon';
 import { toast } from '../../core/toast';
+import { haptics } from '../../core/haptics';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
 import { routesHome } from '../../core/auth/normalizeUser';
-import { loginUser } from '../../store/thunks/apiThunks';
+import { forgotPassword, loginUser } from '../../store/thunks/apiThunks';
+import { layout, space } from '../../theme';
+import AuthIntro from '../../features/auth/components/AuthIntro';
+import LoginEmailForm from '../../features/auth/components/LoginEmailForm';
+import ForgotPasswordSheet, { type ForgotPasswordResult } from '../../features/auth/components/ForgotPasswordSheet';
+import { LOGIN_COPY as COPY } from '../../features/auth/copy/login';
+import { inlineLoginErrors, validateLogin, type LoginFieldErrors } from '../../features/auth/loginValidation';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
 
 type LoginMethod = 'phone' | 'email';
 
-const { width: screenWidth } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
+const METHODS = [
+  { value: 'phone', label: COPY.methods.phone },
+  { value: 'email', label: COPY.methods.email },
+] as const;
 
+/**
+ * Sign in (UI-R6, spec auth-login; absorbs T-603). Form archetype on the theme background, no
+ * hero or wallpaper: logo badge, title, Phone | Email segments, then "New to Raah-e-Haq? Create
+ * account" at the end of the content (pinned to the bottom on tall screens, after the form on
+ * short ones, so nothing clips it). The kit scroll view keeps the focused field above the
+ * keyboard and lets the first tap with the keyboard up reach the button (T-204).
+ */
 export default function LoginScreen() {
-  const navigation = useNavigation<any>();
-  const { login, error, isLoading, clearAuthError, forgotPasswordRequest } = useApiAuth();
-  
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const { login, isLoading, clearAuthError, forgotPasswordRequest } = useApiAuth();
+
   const route = useRoute<RouteProp<AuthStackParamList, 'Login'>>();
   const [loginMethod, setLoginMethod] = useState<LoginMethod>(route.params?.method ?? 'phone');
 
@@ -45,51 +47,30 @@ export default function LoginScreen() {
       setLoginMethod(route.params.method);
     }
   }, [route.params]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   // One sign-in at a time: a second tap lands before isLoading re-renders the button (T-107).
   const signInInFlight = useRef(false);
 
   // The auth error is shared with PhoneAuth and Signup: clear it whenever Login is shown
-  // again (mount and every focus, e.g. back from PhoneAuth), so an old banner never shows.
+  // again (mount and every focus, e.g. back from PhoneAuth), so an old one never shows.
   useEffect(() => {
     clearAuthError();
     return navigation.addListener('focus', () => clearAuthError());
   }, [navigation, clearAuthError]);
 
-  // Validation functions
-  const validateEmail = (emailValue: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(emailValue);
-  };
-
-  const validatePassword = (passwordValue: string): boolean => {
-    return passwordValue.length >= 6;
-  };
-
-  const clearValidationErrors = () => {
-    setValidationErrors({});
-  };
-
-  const handlePhoneSignIn = () => {
+  const go = (target: 'PhoneAuth' | 'Signup') => {
     try {
-      clearValidationErrors();
-      navigation.navigate('PhoneAuth');
+      setFieldErrors({});
+      navigation.navigate(target);
     } catch (err) {
       logger.error('Navigation error:', err);
-      toast.error('Unable to navigate to phone authentication');
-    }
-  };
-
-  const handleCreateAccount = () => {
-    try {
-      clearValidationErrors();
-      navigation.navigate('Signup');
-    } catch (err) {
-      logger.error('Navigation error:', err);
-      toast.error('Unable to navigate to signup');
+      toast.error(COPY.toasts.navigation);
     }
   };
 
@@ -99,618 +80,168 @@ export default function LoginScreen() {
     }
     signInInFlight.current = true;
     try {
-      clearValidationErrors();
       clearAuthError();
-
-      // Validation
-      const errors: {[key: string]: string} = {};
-      
-      if (!email.trim()) {
-        errors.email = 'Email is required';
-      } else if (!validateEmail(email.trim())) {
-        errors.email = 'Please enter a valid email address';
-      }
-      
-      // The password is sent exactly as typed: spaces can be part of it (T-204, AUTH-14).
-      if (!password) {
-        errors.password = 'Password is required';
-      } else if (!validatePassword(password)) {
-        errors.password = 'Password must be at least 6 characters';
-      }
-
-      if (Object.keys(errors).length > 0) {
-        setValidationErrors(errors);
+      const errors = validateLogin(email, password);
+      setFieldErrors(errors);
+      if (errors.email || errors.password) {
+        haptics.notificationError();
         return;
       }
 
-      logger.debug('🔐 Starting login process...');
-      
+      setSubmitting(true);
+      // The password is sent exactly as typed: spaces can be part of it (T-204, AUTH-14).
       const result = await login({ email: email.trim(), password });
-      
-      logger.debug('🔍 Result type:', result.type);
-      
+
       if (loginUser.fulfilled.match(result)) {
-        logger.debug('✅ Login successful!');
         // Only when it opens a home screen: a pending/blocked/admin account lands on account
         // status, which explains itself (T-106). Navigation is handled by AuthFlow.
         if (routesHome(result.payload.user)) {
-          toast.success('Login successful!');
+          toast.success(COPY.toasts.success);
         }
-      } else {
-        logger.debug('❌ Login failed');
-        const rejection = loginUser.rejected.match(result) ? result.payload : undefined;
-        logger.debug('🚨 Error details:', { kind: rejection?.kind, status: rejection?.status, code: rejection?.code });
-        // 403 ACCOUNT_*: the server's message, plus the rejection reason as the second line (T-106).
-        const { message, reason } = accountRefusalParts(rejection, 'Login failed. Please try again.');
-        toast.error(message, reason ?? undefined, reason ? { duration: REFUSAL_TOAST_DURATION_MS } : undefined);
+        return;
       }
-    } catch (err: any) {
+
+      haptics.notificationError();
+      const rejection = loginUser.rejected.match(result) ? result.payload : undefined;
+      logger.debug('Login failed', { kind: rejection?.kind, status: rejection?.status, code: rejection?.code });
+      // One message per failure (T-603): wrong credentials next to the fields, anything else a toast.
+      const inline = inlineLoginErrors(rejection, COPY.toasts.failed);
+      if (inline) {
+        setFieldErrors(inline);
+        return;
+      }
+      // 403 ACCOUNT_*: the server's message, plus the rejection reason as the second line (T-106).
+      const { message, reason } = accountRefusalParts(rejection, COPY.toasts.failed);
+      toast.error(message, reason ?? undefined, reason ? { duration: REFUSAL_TOAST_DURATION_MS } : undefined);
+    } catch (err: unknown) {
       logger.error('Email sign in error:', err);
-      toast.error('An unexpected error occurred. Please try again.');
+      toast.error(COPY.toasts.unexpected);
     } finally {
       signInInFlight.current = false;
+      setSubmitting(false);
     }
   };
 
-  const handleForgotPassword = async () => {
-    try {
-      clearValidationErrors();
-      clearAuthError();
-      
-      if (!email.trim()) {
-        setValidationErrors({ email: 'Please enter your email first' });
-        return;
-      }
-
-      if (!validateEmail(email.trim())) {
-        setValidationErrors({ email: 'Please enter a valid email address' });
-        return;
-      }
-
-      const result = await forgotPasswordRequest(email.trim());
-      
-      if (result.type.endsWith('/fulfilled')) {
-        toast.success('Password reset email sent! Please check your inbox.');
-      } else {
-        toast.error(rejectionMessage(result.payload, 'Failed to send password reset email. Please try again.'));
-      }
-    } catch (err: any) {
-      logger.error('Password reset error:', err);
-      toast.error('Failed to send password reset email. Please try again.');
+  const requestReset = async (address: string): Promise<ForgotPasswordResult> => {
+    clearAuthError();
+    const result = await forgotPasswordRequest(address);
+    if (forgotPassword.fulfilled.match(result)) {
+      return { ok: true, message: result.payload || null };
     }
+    return { ok: false, message: rejectionMessage(result.payload, COPY.forgot.failed) };
   };
 
-  const handleLoginMethodChange = (method: LoginMethod) => {
-    try {
-      clearValidationErrors();
-      // An error from the other method must not show under this one.
-      clearAuthError();
-      setLoginMethod(method);
-    } catch (err) {
-      logger.error('Login method change error:', err);
-    }
+  const changeMethod = (method: LoginMethod) => {
+    setFieldErrors({});
+    // An error from the other method must not show under this one.
+    clearAuthError();
+    setLoginMethod(method);
   };
+
+  const busy = submitting || isLoading;
 
   return (
-    // Top edge only: the navy band sits under the status bar / Dynamic Island; the scroll
-    // content pads itself above the home indicator (T-204).
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={BrandColors.primary}
-        translucent={false}
-      />
-      <ImageBackground
-        source={require('../../assets/images/background_raahe_haq.png')}
-        style={styles.backgroundImage}
-        resizeMode="cover"
+    <Screen keyboardAvoiding edges={['top', 'bottom']} testID="login">
+      <KeyboardAwareScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        testID="login-scroll"
       >
-        <AuthKeyboardScroll>
-          {/* Header scrolls with the form, so the keyboard leaves room for the inputs */}
-          <View style={styles.header}>
-            {/* Decorative Circles */}
-            <View style={styles.decorativeCircle1} />
-            <View style={styles.decorativeCircle2} />
-            <View style={styles.decorativeCircle3} />
-            <View style={styles.decorativeCircle4} />
-            <View style={styles.decorativeCircle5} />
-
-            <View style={styles.logoContainer}>
-              <View style={styles.logoWrapper}>
-                <Image 
-                  source={require('../../assets/images/logo.png')} 
-                  style={styles.logoImage}
-                  resizeMode="contain"
+        <View style={styles.main}>
+          <AuthIntro logo title={COPY.title} subtitle={COPY.subtitle} testID="login-intro" />
+          <View style={styles.form}>
+            <SegmentedControl
+              options={METHODS}
+              value={loginMethod}
+              onChange={changeMethod}
+              accessibilityLabel={COPY.methodA11y}
+              disabled={busy}
+              testID="login-method"
+            />
+            {loginMethod === 'phone' ? (
+              <View style={styles.phone} testID="login-phone">
+                <AppText variant="bodySmall" color="textSecondary">
+                  {COPY.phone.hint}
+                </AppText>
+                <Button
+                  label={COPY.phone.action}
+                  size="lg"
+                  onPress={() => go('PhoneAuth')}
+                  disabled={busy}
+                  trailingIcon="arrowForward"
+                  testID="login-phone-continue"
                 />
               </View>
-              <Text style={styles.title}>Welcome to RaaH-E-Haq</Text>
-              <Text style={styles.subtitle}>
-                Sign in to your account or create a new one
-              </Text>
-            </View>
+            ) : (
+              <LoginEmailForm
+                email={email}
+                password={password}
+                onEmailChange={(text) => {
+                  setEmail(text);
+                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                }}
+                onPasswordChange={(text) => {
+                  setPassword(text);
+                  if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                }}
+                errors={fieldErrors}
+                submitting={submitting}
+                onSubmit={handleEmailSignIn}
+                onForgotPassword={() => setForgotOpen(true)}
+              />
+            )}
           </View>
+        </View>
 
-          <View style={styles.container}>
-            {/* Login Form Card */}
-            <View style={styles.formCard}>
-              {/* Login Method Toggle */}
-              <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    loginMethod === 'phone' ? styles.toggleButtonActive : styles.toggleButtonInactive
-                  ]}
-                  onPress={() => handleLoginMethodChange('phone')}
-                  activeOpacity={0.7}
-                >
-                  <Icon 
-                    name="phone" 
-                    size={20} 
-                    tint={loginMethod === 'phone' ? '#ffffff' : BrandColors.primary} 
-                  />
-                  <Text style={[
-                    styles.toggleButtonText,
-                    loginMethod === 'phone' ? styles.toggleButtonTextActive : styles.toggleButtonTextInactive
-                  ]} numberOfLines={1}>
-                    Phone
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    loginMethod === 'email' ? styles.toggleButtonActive : styles.toggleButtonInactive
-                  ]}
-                  onPress={() => handleLoginMethodChange('email')}
-                  activeOpacity={0.7}
-                >
-                  <Icon 
-                    name="email" 
-                    size={20} 
-                    tint={loginMethod === 'email' ? '#ffffff' : BrandColors.primary} 
-                  />
-                  <Text style={[
-                    styles.toggleButtonText,
-                    loginMethod === 'email' ? styles.toggleButtonTextActive : styles.toggleButtonTextInactive
-                  ]} numberOfLines={1}>
-                    Email
-                  </Text>
-                </TouchableOpacity>
-              </View>
+        <View style={styles.footer} testID="login-footer">
+          <AppText variant="bodySmall" color="textSecondary">
+            {COPY.footer.prompt}
+          </AppText>
+          <Button
+            label={COPY.footer.action}
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
+            onPress={() => go('Signup')}
+            disabled={busy}
+            testID="login-create-account"
+          />
+        </View>
+      </KeyboardAwareScrollView>
 
-              {/* Phone Login */}
-              {loginMethod === 'phone' && (
-                <View style={styles.phoneSection}>
-                  <View style={styles.phoneIconContainer}>
-                    <Icon name="smartphone" size={48} tint={BrandColors.primary} />
-                  </View>
-                  <Text style={styles.sectionTitle}>Sign in with Phone</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    We'll send you a verification code
-                  </Text>
-                  <View style={styles.buttonContainer}>
-                    <BrandButton
-                      title="Sign in with Phone"
-                      onPress={handlePhoneSignIn}
-                      variant="primary"
-                      style={styles.primaryButton}
-                      disabled={isLoading}
-                      textStyle={styles.buttonText}
-                    />
-                  </View>
-                </View>
-              )}
-
-              {/* Email Login */}
-              {loginMethod === 'email' && (
-                <View style={styles.emailSection}>
-                  <View style={styles.emailIconContainer}>
-                    <Icon name="email" size={48} tint={BrandColors.primary} />
-                  </View>
-                  <Text style={styles.sectionTitle}>Sign in with Email</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    Enter your email and password
-                  </Text>
-                  
-                  <View style={styles.inputContainer}>
-                    <ThemedTextInput
-                      placeholder="Email"
-                      value={email}
-                      onChangeText={(text) => {
-                        setEmail(text);
-                        if (validationErrors.email) {
-                          setValidationErrors(prev => ({ ...prev, email: '' }));
-                        }
-                      }}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      autoComplete="email"
-                      style={styles.input}
-                    />
-                    {validationErrors.email && (
-                      <Text style={styles.errorText}>{validationErrors.email}</Text>
-                    )}
-                  </View>
-                  
-                  <View style={styles.inputContainer}>
-                    <ThemedTextInput
-                      placeholder="Password"
-                      value={password}
-                      onChangeText={(text) => {
-                        setPassword(text);
-                        if (validationErrors.password) {
-                          setValidationErrors(prev => ({ ...prev, password: '' }));
-                        }
-                      }}
-                      secureTextEntry
-                      style={styles.input}
-                    />
-                    {validationErrors.password && (
-                      <Text style={styles.errorText}>{validationErrors.password}</Text>
-                    )}
-                  </View>
-                  
-                  <View style={styles.buttonContainer}>
-                    <BrandButton
-                      title={isLoading ? 'Signing in...' : 'Sign in with Email'}
-                      onPress={handleEmailSignIn}
-                      variant="primary"
-                      disabled={isLoading}
-                      style={styles.primaryButton}
-                      textStyle={styles.buttonText}
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={handleForgotPassword}
-                    style={styles.forgotPasswordContainer}
-                    disabled={isLoading}
-                  >
-                    <Text style={[styles.forgotPasswordText, isLoading && styles.disabledText]}>
-                      Forgot Password?
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {error && (
-                <View style={styles.errorContainer}>
-                  <Icon name="error" size={20} tint="#ef4444" />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Create Account Section */}
-            <View style={styles.createAccountCard}>
-              <Text style={styles.createAccountTitle}>New to RaaH-E-Haq?</Text>
-              <Text style={styles.createAccountSubtitle}>
-                Create an account to get started
-              </Text>
-              <View style={styles.buttonContainer}>
-                <BrandButton
-                  title="Create New Account"
-                  onPress={handleCreateAccount}
-                  variant="secondary"
-                  style={styles.createAccountButton}
-                  disabled={isLoading}
-                  textStyle={styles.buttonText}
-                />
-              </View>
-            </View>
-          </View>
-        </AuthKeyboardScroll>
-      </ImageBackground>
-    </SafeAreaView>
+      <ForgotPasswordSheet
+        visible={forgotOpen}
+        initialEmail={email}
+        onClose={() => setForgotOpen(false)}
+        onSubmit={requestReset}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BrandColors.primary,
-  },
-  backgroundImage: {
-    flex: 1,
+  flex: { flex: 1 },
+  // flexGrow + space-between: the footer sits at the bottom on tall screens and follows the form
+  // (min 32 below it) when the content is taller than the screen (font scaling, small phones).
+  content: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
     width: '100%',
-    height: '100%',
-  },
-  header: {
-    backgroundColor: BrandColors.primary,
-    paddingTop: 18,
-    paddingHorizontal: 18,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    position: 'relative',
-    overflow: 'hidden',
-    zIndex: 10,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: isSmallScreen ? 16 : 20,
-    paddingTop: 28,
-    maxWidth: 500,
+    maxWidth: layout.contentMaxWidth,
     alignSelf: 'center',
-    width: '100%',
+    paddingHorizontal: layout.gutter,
+    paddingBottom: space[4],
+    gap: space[8],
   },
-  decorativeCircle1: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    top: -30,
-    right: -30,
-  },
-  decorativeCircle2: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    top: 20,
-    left: -20,
-  },
-  decorativeCircle3: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    bottom: 10,
-    right: 50,
-  },
-  decorativeCircle4: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    top: 60,
-    right: 80,
-  },
-  decorativeCircle5: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    bottom: -20,
-    left: 30,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  logoWrapper: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  logoImage: {
-    width: 52,
-    height: 52,
-  },
-  title: {
-    ...Typography.display,
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    ...Typography.subtitle,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-  },
-  formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: isSmallScreen ? 20 : 25,
-    padding: isSmallScreen ? 20 : 28,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    width: '100%',
-  },
-  toggleContainer: {
+  main: { gap: space[8] },
+  form: { gap: space[6] },
+  phone: { gap: space[6] },
+  footer: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 15,
-    padding: 6,
-    marginBottom: 28,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  toggleButton: {
-    flex: 1,
-    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: isSmallScreen ? 12 : 14,
-    paddingHorizontal: isSmallScreen ? 16 : 20,
-    borderRadius: 12,
-    gap: isSmallScreen ? 8 : 10,
-    minHeight: 44,
-  },
-  toggleButtonActive: {
-    backgroundColor: BrandColors.primary,
-  },
-  toggleButtonInactive: {
-    backgroundColor: 'transparent',
-  },
-  toggleButtonText: {
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  toggleButtonTextActive: {
-    color: '#ffffff',
-  },
-  toggleButtonTextInactive: {
-    color: BrandColors.primary,
-  },
-  phoneSection: {
-    alignItems: 'center',
-  },
-  emailSection: {
-    alignItems: 'center',
-  },
-  phoneIconContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-    shadowColor: BrandColors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  emailIconContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-    shadowColor: BrandColors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  sectionTitle: {
-    ...Typography.title,
-    color: '#1f2937',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  sectionSubtitle: {
-    ...Typography.subtitle,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  inputContainer: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  input: {
-    marginBottom: 4,
-  },
-  buttonContainer: {
-    width: '100%',
-    marginBottom: 16,
-  },
-  primaryButton: {
-    width: '100%',
-    minHeight: isSmallScreen ? 48 : 50,
-  },
-  buttonText: {
-    ...Typography.button,
-    fontSize: isSmallScreen ? 14 : 16,
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  forgotPasswordContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  forgotPasswordText: {
-    ...Typography.body,
-    color: BrandColors.primary,
-  },
-  disabledText: {
-    color: '#9ca3af',
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 16,
-    gap: 8,
-    width: '100%',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'left',
-  },
-  createAccountCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 25,
-    padding: 28,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  createAccountTitle: {
-    ...Typography.title,
-    color: '#1f2937',
-    marginBottom: 6,
-  },
-  createAccountSubtitle: {
-    ...Typography.subtitle,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  createAccountButton: {
-    width: '100%',
-    minHeight: isSmallScreen ? 48 : 50,
+    gap: space[1],
   },
 });

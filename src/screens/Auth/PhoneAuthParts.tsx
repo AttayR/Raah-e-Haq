@@ -1,107 +1,138 @@
 import React from 'react';
-import { Image, InputAccessoryView, Keyboard, Platform, Pressable, Text, View } from 'react-native';
-import BrandButton from '../../components/BrandButton';
-import { Icon } from '../../components/ui/Icon';
-import { useAppTheme } from '../../app/providers/ThemeProvider';
+import { Platform, StyleSheet, View } from 'react-native';
+import { AppText, Button, TextField } from '../../components/ui';
+import { OTP_LENGTH } from '../../services/otpService';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
-import { styles } from './PhoneAuthScreen.styles';
+import { space } from '../../theme';
 
 /**
- * The number pad has no return key on iOS, so each such input gets its own Done bar with its own
- * id, rendered next to it (T-550): on Fabric an InputAccessoryView attaches only to the first
- * input in the window with its id, so one screen-level bar shared by the phone and the code
- * input could show on only one of them. The bar mounts and unmounts with its input.
+ * Sections of PhoneAuthScreen (UI-R6, spec auth-phone-otp), kit only. Each number-pad field
+ * renders its own iOS Done bar with its own id (`doneBar`, T-548/T-550): on Fabric an
+ * InputAccessoryView attaches only to the first input in the window with its id.
  */
-export const PHONE_INPUT_DONE_ID = 'phoneAuthPhoneDone';
-export const CODE_INPUT_DONE_ID = 'phoneAuthCodeDone';
-
-interface KeyboardDoneBarProps {
-  /** The input points its `inputAccessoryViewID` at this; one bar per input. */
-  nativeID: string;
-  testID?: string;
-}
-
-/** iOS "Done" bar above the number pad, so the keyboard can always be closed (AUTH-18). */
-export function KeyboardDoneBar({ nativeID, testID }: KeyboardDoneBarProps) {
-  const { theme } = useAppTheme();
-  if (Platform.OS !== 'ios') {
-    return null;
-  }
-  return (
-    <InputAccessoryView nativeID={nativeID}>
-      <View style={[styles.doneBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
-        <Pressable
-          onPress={Keyboard.dismiss}
-          accessibilityRole="button"
-          hitSlop={8}
-          style={styles.doneButton}
-          testID={testID}
-        >
-          <Text style={[styles.doneText, { color: theme.colors.primaryText }]}>{COPY.keyboard.done}</Text>
-        </Pressable>
-      </View>
-    </InputAccessoryView>
-  );
-}
-
-interface HeaderProps {
-  title: string;
-  subtitle: string;
-  /** Keyboard up: only the title, so the card and its button fit above the keyboard. */
-  compact: boolean;
-  /** T-556: the top-start back button (the screen had no way back but a swipe). */
-  onBack?: () => void;
-}
-
-/** Brand header. Tapping it closes the keyboard (it sits outside the scroll view). */
-export function PhoneAuthHeader({ title, subtitle, compact, onBack }: HeaderProps) {
-  return (
-    <Pressable onPress={Keyboard.dismiss} accessible={false}>
-      <View style={[styles.fixedHeader, compact && styles.fixedHeaderCompact]}>
-        {onBack ? (
-          <Pressable
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel={COPY.header.back}
-            hitSlop={4}
-            style={styles.headerBack}
-            testID="phone-auth-back"
-          >
-            <Icon name="back" size={24} tint={styles.headerBackIcon.color} />
-          </Pressable>
-        ) : null}
-        <View style={styles.decorativeCircle1} />
-        <View style={styles.decorativeCircle2} />
-        <View style={styles.decorativeCircle3} />
-        <View style={styles.decorativeCircle4} />
-        <View style={styles.decorativeCircle5} />
-
-        <View style={styles.logoContainer}>
-          {compact ? null : (
-            <View style={styles.logoWrapper}>
-              <Image source={require('../../assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
-            </View>
-          )}
-          <Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>
-          {compact ? null : <Text style={styles.subtitle}>{subtitle}</Text>}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
 
 /** BE-28 otp_ip_limit / otp_verify_limit: phone sign-in is capped, so email is offered. */
 export function EmailFallback({ onPress }: { onPress: () => void }) {
   return (
-    <View style={styles.emailFallback}>
-      <Text style={styles.emailFallbackText}>{COPY.emailFallback.hint}</Text>
-      <BrandButton
-        title={COPY.emailFallback.action}
-        onPress={onPress}
-        variant="secondary"
-        style={styles.emailFallbackButton}
-        textStyle={styles.buttonText}
-      />
+    <View style={styles.fallback} testID="phone-auth-email-fallback">
+      <AppText variant="bodySmall" color="textSecondary">
+        {COPY.emailFallback.hint}
+      </AppText>
+      <Button label={COPY.emailFallback.action} variant="secondary" onPress={onPress} testID="phone-auth-email-login" />
     </View>
   );
 }
+
+interface PhoneStepProps {
+  /** National digits (no +92, no leading 0), as the kit phone field reports them. */
+  digits: string;
+  onChange: (digits: string) => void;
+  error: string;
+  disabled: boolean;
+  onSubmit: () => void;
+  emailFallback: React.ReactNode;
+}
+
+/** The number: kit phone field with the fixed +92 prefix; Send sits in the sticky footer. */
+export function PhoneNumberStep({ digits, onChange, error, disabled, onSubmit, emailFallback }: PhoneStepProps) {
+  return (
+    <View style={styles.body}>
+      <TextField
+        variant="phone"
+        label={COPY.phoneStep.label}
+        helper={COPY.phoneStep.helper}
+        value={digits}
+        onChangeText={onChange}
+        returnKeyType="done"
+        onSubmitEditing={onSubmit}
+        autoFocus
+        doneBar
+        disabled={disabled}
+        error={error || undefined}
+        testID="phone-auth-phone"
+      />
+      {emailFallback}
+    </View>
+  );
+}
+
+interface CodeStepProps {
+  code: string;
+  onChange: (code: string) => void;
+  error: string;
+  expiryText: string;
+  expiryAlert: boolean;
+  /** Verify is off (burned code): the field is read-only too. */
+  locked: boolean;
+  resendIn: string | null;
+  resending: boolean;
+  onResend: () => void;
+  onChangeNumber: () => void;
+  emailFallback: React.ReactNode;
+}
+
+/** The code: expiry line, the code field, Resend (or its countdown) and "Change number". */
+export function PhoneCodeStep({
+  code,
+  onChange,
+  error,
+  expiryText,
+  expiryAlert,
+  locked,
+  resendIn,
+  resending,
+  onResend,
+  onChangeNumber,
+  emailFallback,
+}: CodeStepProps) {
+  return (
+    <View style={styles.body}>
+      <AppText
+        variant="caption"
+        color={expiryAlert ? 'danger' : 'textMuted'}
+        accessibilityLiveRegion="polite"
+        testID="phone-auth-expiry"
+      >
+        {expiryText}
+      </AppText>
+      <TextField
+        label={COPY.codeStep.label}
+        placeholder={COPY.codeStep.placeholder(OTP_LENGTH)}
+        value={code}
+        onChangeText={onChange}
+        keyboardType="number-pad"
+        returnKeyType="done"
+        textContentType="oneTimeCode"
+        autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+        autoFocus
+        doneBar
+        disabled={locked}
+        error={error || undefined}
+        testID="phone-auth-code"
+      />
+      {emailFallback}
+      <View style={styles.actions}>
+        {resendIn !== null ? (
+          <AppText variant="bodySmall" color="textSecondary" align="center" testID="phone-auth-resend-countdown">
+            {COPY.codeStep.resendIn(resendIn)}
+          </AppText>
+        ) : (
+          <Button
+            label={resending ? COPY.codeStep.resending : COPY.codeStep.resend}
+            variant="secondary"
+            onPress={onResend}
+            loading={resending}
+            testID="phone-auth-resend"
+          />
+        )}
+        <Button label={COPY.codeStep.changePhone} variant="ghost" onPress={onChangeNumber} testID="phone-auth-change-number" />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  body: { gap: space[4] },
+  fallback: { gap: space[2] },
+  actions: { gap: space[2], marginTop: space[2] },
+});

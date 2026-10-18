@@ -55,7 +55,6 @@ test('a rehydrated, not yet initialised session renders only the splash', () => 
   );
 
   expect(screen.getByTestId('app-splash')).toBeTruthy();
-  expect(screen.queryByText('Welcome to RaaH-E-Haq')).toBeNull();
   expect(screen.queryByText('route:auth')).toBeNull();
   expect(screen.queryByText('route:home')).toBeNull();
   screen.unmount();

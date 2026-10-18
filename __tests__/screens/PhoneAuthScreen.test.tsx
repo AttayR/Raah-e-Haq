@@ -12,8 +12,7 @@ import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import apiAuthReducer from '../../src/store/slices/apiAuthSlice';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
-import { Keyboard, ScrollView } from 'react-native';
-import { CODE_INPUT_DONE_ID, PHONE_INPUT_DONE_ID } from '../../src/screens/Auth/PhoneAuthParts';
+import { ImageBackground, Keyboard, ScrollView } from 'react-native';
 
 // The real store module starts redux-persist (a timer that outlives the test); the screen
 // only needs the typed hooks, so they are pointed at the test store's Provider.
@@ -50,8 +49,11 @@ const renderScreen = async () => {
   return store;
 };
 
+/** The kit phone field (+92 prefix): a pasted "+923001234567" is normalised to its 10 digits. */
+const phoneInput = () => screen.getByTestId('phone-auth-phone-input');
+
 const sendCode = async () => {
-  fireEvent.changeText(screen.getByPlaceholderText('Enter phone number'), PHONE);
+  fireEvent.changeText(phoneInput(), PHONE);
   fireEvent.press(screen.getByText('Send Code'));
 };
 
@@ -80,11 +82,11 @@ describe('PhoneAuthScreen (T-101)', () => {
     await renderScreen();
     expect(screen.getByLabelText('Back')).toBeTruthy();
     await sendCode();
-    await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Enter the code')).toBeTruthy());
 
     fireEvent.press(screen.getByTestId('phone-auth-back'));
-    expect(screen.getByText('Phone Verification')).toBeTruthy();
-    expect(screen.queryByText('Enter verification code')).toBeNull();
+    expect(screen.getByText('Sign in with your phone')).toBeTruthy();
+    expect(screen.queryByText('Enter the code')).toBeNull();
     expect(mockGoBack).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('phone-auth-back'));
@@ -98,10 +100,10 @@ describe('PhoneAuthScreen (T-101)', () => {
       await renderScreen();
       expect(screen.queryByTestId('phone-auth-back')).toBeNull();
       await sendCode();
-      await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
+      await waitFor(() => expect(screen.getByText('Enter the code')).toBeTruthy());
 
       fireEvent.press(screen.getByTestId('phone-auth-back'));
-      expect(screen.getByText('Phone Verification')).toBeTruthy();
+      expect(screen.getByText('Sign in with your phone')).toBeTruthy();
       expect(screen.queryByTestId('phone-auth-back')).toBeNull();
     } finally {
       mockCanGoBack.mockReturnValue(true);
@@ -113,7 +115,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     const store = await renderScreen();
     await sendCode();
 
-    await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Enter the code')).toBeTruthy());
     expect(screen.queryByText(LOCAL_CODE)).toBeNull();
     expect(screen.queryByText(/Use This OTP/i)).toBeNull();
     expect(screen.queryByText(/Test Code/i)).toBeNull();
@@ -129,14 +131,14 @@ describe('PhoneAuthScreen (T-101)', () => {
       return [200, { success: true, message: 'OTP sent successfully', data: { phone: PHONE, expires_in: 60 } }];
     });
     await renderScreen();
-    const input = screen.getByPlaceholderText('Enter phone number');
+    const input = phoneInput();
     const button = screen.getByText('Send Code');
     // The tap lands before the typed text re-renders the screen (fast typing on a device).
     await act(async () => {
       fireEvent.changeText(input, PHONE);
       fireEvent.press(button);
     });
-    await waitFor(() => expect(screen.getByText('Enter verification code')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Enter the code')).toBeTruthy());
     expect(screen.queryByText(/must be in/i)).toBeNull();
     expect(sentBody).toEqual(expect.objectContaining({ phone: PHONE }));
   });
@@ -174,7 +176,7 @@ describe('PhoneAuthScreen (T-101)', () => {
     fireEvent.changeText(input, '123 456');
     expect(screen.getByPlaceholderText('6-digit code').props.value).toBe('123456');
 
-    // The header title also reads "Verify Code"; the button is the last match.
+    // The last match is the button (the footer renders after the form).
     const verifyButtons = screen.getAllByText('Verify Code');
     fireEvent.press(verifyButtons[verifyButtons.length - 1]);
     await waitFor(() => expect(screen.getAllByText('Invalid or expired OTP').length).toBeGreaterThan(0));
@@ -258,6 +260,8 @@ describe('PhoneAuthScreen (T-101)', () => {
           expect.objectContaining({ duration: expect.any(Number) }),
         ),
       );
+      // T-603: shown once — the toast only, no inline copy under the code field.
+      expect(screen.queryByTestId('phone-auth-code-error')).toBeNull();
     });
   });
 
@@ -436,7 +440,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       await sendCode();
       await waitFor(() => expect(screen.getByText('Send Code (10:00)')).toBeTruthy());
 
-      fireEvent.changeText(screen.getByPlaceholderText('Enter phone number'), OTHER_PHONE);
+      fireEvent.changeText(phoneInput(), OTHER_PHONE);
       expect(screen.getByText('Send Code (10:00)')).toBeTruthy();
       expect(isDisabled(sendButton())).toBe(true);
       fireEvent.press(sendButton());
@@ -457,7 +461,7 @@ describe('PhoneAuthScreen (T-101)', () => {
       await renderScreen();
       await sendCode();
       await waitFor(() => expect(screen.getByText('Send Code (50s)')).toBeTruthy());
-      fireEvent.changeText(screen.getByPlaceholderText('Enter phone number'), OTHER_PHONE);
+      fireEvent.changeText(phoneInput(), OTHER_PHONE);
       expect(screen.getByText('Send Code')).toBeTruthy();
       expect(isDisabled(sendButton())).toBe(false);
     });
@@ -495,7 +499,8 @@ describe('PhoneAuthScreen (T-101)', () => {
       const dismiss = jest.spyOn(Keyboard, 'dismiss');
       replyLocalSend();
       await renderScreen();
-      expect(screen.getByPlaceholderText('Enter phone number').props.inputAccessoryViewID).toBe(PHONE_INPUT_DONE_ID);
+      const phoneBarId = phoneInput().props.inputAccessoryViewID;
+      expect(phoneBarId).toEqual(expect.any(String));
       expect(screen.getAllByText('Done')).toHaveLength(1);
       fireEvent.press(screen.getByTestId('phone-auth-phone-done'));
       expect(dismiss).toHaveBeenCalledTimes(1);
@@ -504,14 +509,62 @@ describe('PhoneAuthScreen (T-101)', () => {
       await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
       // Fabric attaches a bar to the first input with its id only: the code input has its own
       // id and its own bar, and the phone step's bar left with the phone input.
-      expect(CODE_INPUT_DONE_ID).not.toBe(PHONE_INPUT_DONE_ID);
-      expect(screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID).toBe(CODE_INPUT_DONE_ID);
+      const codeBarId = screen.getByPlaceholderText('6-digit code').props.inputAccessoryViewID;
+      expect(codeBarId).toEqual(expect.any(String));
+      expect(codeBarId).not.toBe(phoneBarId);
       expect(screen.queryByTestId('phone-auth-phone-done')).toBeNull();
       expect(screen.getAllByText('Done')).toHaveLength(1);
       fireEvent.press(screen.getByTestId('phone-auth-code-done'));
       expect(dismiss).toHaveBeenCalledTimes(2);
       // The first tap on Verify acts instead of only closing the keyboard.
       expect(screen.UNSAFE_getByType(ScrollView).props.keyboardShouldPersistTaps).toBe('handled');
+    });
+  });
+
+  describe('UI-R6: kit layout, one message per failure', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('has no wallpaper and keeps Send in the sticky footer', async () => {
+      await renderScreen();
+      expect(screen.UNSAFE_queryAllByType(ImageBackground)).toHaveLength(0);
+      expect(screen.getByTestId('phone-auth-footer')).toBeTruthy();
+      expect(screen.getByTestId('phone-auth-send')).toBeTruthy();
+    });
+
+    it('an incomplete number explains itself under the field, without a toast or a request', async () => {
+      const error = jest.spyOn(toast, 'error');
+      await renderScreen();
+      fireEvent.changeText(phoneInput(), '30012');
+      expect(phoneInput().props.value).toBe('300 12');
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('phone-auth-send'));
+      });
+      expect(screen.getByTestId('phone-auth-phone-error').props.children).toBe(
+        'Enter your 10-digit mobile number, like 300 1234567.',
+      );
+      expect(mock.history.post).toHaveLength(0);
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it('a send refusal shows once, under the field (no toast)', async () => {
+      const error = jest.spyOn(toast, 'error');
+      const message = 'Please wait before requesting another code.';
+      mock.onPost('/auth/send-otp').reply(429, { success: false, message, code: 'otp_cooldown', retry_after: 50 });
+      await renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByTestId('phone-auth-phone-error').props.children).toBe(message));
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it('the code step names the number it was sent to and offers Change number', async () => {
+      replyLocalSend();
+      await renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByText('Enter the code')).toBeTruthy());
+      expect(screen.getByText('If +92 300 1234567 has an account, enter the code from the SMS.')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('phone-auth-change-number'));
+      expect(screen.getByText('Sign in with your phone')).toBeTruthy();
+      expect(phoneInput().props.value).toBe('300 1234567');
     });
   });
 });

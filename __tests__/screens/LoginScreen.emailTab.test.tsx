@@ -42,21 +42,21 @@ describe('LoginScreen tab from route params', () => {
   it('opens on the Phone tab by default', async () => {
     mockParams = undefined;
     await renderLogin();
-    expect(screen.getAllByText('Sign in with Phone').length).toBeGreaterThan(0);
-    expect(screen.queryByPlaceholderText('Email')).toBeNull();
+    expect(screen.getByText('Continue with phone')).toBeTruthy();
+    expect(screen.queryByTestId('login-email-input')).toBeNull();
   });
 
   it("opens on the Email tab for method 'email'", async () => {
     mockParams = { method: 'email' };
     await renderLogin();
-    expect(screen.getByPlaceholderText('Email')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Password')).toBeTruthy();
+    expect(screen.getByTestId('login-email-input')).toBeTruthy();
+    expect(screen.getByTestId('login-password-input')).toBeTruthy();
   });
 
   it('the email input has no autocorrect or capitals, an email keyboard and autofill (QA T-201)', async () => {
     mockParams = { method: 'email' };
     await renderLogin();
-    expect(screen.getByPlaceholderText('Email').props).toMatchObject({
+    expect(screen.getByTestId('login-email-input').props).toMatchObject({
       autoCorrect: false,
       autoCapitalize: 'none',
       keyboardType: 'email-address',
@@ -84,23 +84,21 @@ describe('LoginScreen auth UX (T-204)', () => {
     mockParams = { method: 'email' };
     mock.onPost('/auth/login').reply(401, { success: false, message: 'Invalid credentials' });
     await renderLogin();
-    fireEvent.changeText(screen.getByPlaceholderText('Email'), ' rider@example.test ');
-    fireEvent.changeText(screen.getByPlaceholderText('Password'), '  pass word ');
+    fireEvent.changeText(screen.getByTestId('login-email-input'), ' rider@example.test ');
+    fireEvent.changeText(screen.getByTestId('login-password-input'), '  pass word ');
     await act(async () => {
-      // The section title and the button share the text; the button is the last one.
-      const matches = screen.getAllByText('Sign in with Email');
-      fireEvent.press(matches[matches.length - 1]);
+      fireEvent.press(screen.getByTestId('login-submit'));
     });
     await waitFor(() => expect(mock.history.post).toHaveLength(1));
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ email: 'rider@example.test', password: '  pass word ' });
   });
 
-  it('scrolls the whole form (header included) in one keyboard-aware scroller', async () => {
+  it('scrolls the whole form (logo included) in one keyboard-aware scroller', async () => {
     mockParams = { method: 'email' };
     await renderLogin();
     const scrolls = screen.UNSAFE_getAllByType(ScrollView);
     expect(scrolls).toHaveLength(1);
     expect(scrolls[0].props.keyboardShouldPersistTaps).toBe('handled');
-    expect(screen.getByTestId('auth-keyboard-avoiding')).toBeTruthy();
+    expect(screen.getByTestId('login-keyboard-avoider')).toBeTruthy();
   });
 });

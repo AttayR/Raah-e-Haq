@@ -7,23 +7,21 @@
  */
 export const PHONE_AUTH_COPY = {
   header: {
-    phoneTitle: 'Phone Verification',
-    phoneSubtitle: 'Enter your phone number to get started',
-    codeTitle: 'Verify Code',
-    codeSubtitle: 'Enter your verification code',
     back: 'Back',
   },
   phoneStep: {
-    title: 'Enter your phone number',
-    subtitle: "We'll send you a verification code",
-    placeholder: 'Enter phone number',
+    title: 'Sign in with your phone',
+    subtitle: 'Enter your Pakistani mobile number.',
+    label: 'Mobile number',
+    helper: "We'll text you a 6-digit code.",
     send: 'Send Code',
     sending: 'Sending...',
     sendIn: (countdown: string) => `Send Code (${countdown})`,
-    invalidPhone: 'Invalid phone number',
+    invalidPhone: 'Enter your 10-digit mobile number, like 300 1234567.',
   },
   codeStep: {
-    title: 'Enter verification code',
+    title: 'Enter the code',
+    label: 'Verification code',
     /** BE-27: known and unknown numbers get the same answer, so this never claims a code was sent. */
     subtitle: (phone: string) => `If ${phone} has an account, enter the code from the SMS.`,
     placeholder: (length: number) => `${length}-digit code`,
@@ -36,16 +34,13 @@ export const PHONE_AUTH_COPY = {
     resend: 'Resend Code',
     resending: 'Resending...',
     resendIn: (countdown: string) => `Resend code in ${countdown}`,
-    changePhone: 'Change Phone Number',
+    changePhone: 'Change number',
     invalidCode: 'Invalid OTP code',
   },
   /** BE-28 otp_ip_limit / otp_verify_limit: phone sign-in is capped for today. */
   emailFallback: {
     hint: 'You can still sign in with your email and password.',
     action: 'Sign in with email',
-  },
-  keyboard: {
-    done: 'Done',
   },
   /** Used only when the send response has no message; the server's message is shown first. */
   toasts: {

@@ -28,6 +28,6 @@ test('App renders the signed-out Login screen without throwing', async () => {
   const { default: App } = require('../App') as typeof import('../App');
   const screen = render(<App />);
   // PersistGate rehydrates from the (mocked, empty) AsyncStorage; signed out, so Login mounts.
-  await waitFor(() => expect(screen.getByText('Welcome to RaaH-E-Haq')).toBeTruthy());
+  await waitFor(() => expect(screen.getByText('Sign in to Raah-e-Haq')).toBeTruthy());
   screen.unmount();
 }, COLD_TRANSFORM_TIMEOUT_MS);
