@@ -155,12 +155,19 @@ export const parcelStatusText = (status: ParcelStatus): string => t(STEP_LABEL[s
 /**
  * The timeline: requested → accepted → arrived → picked up → delivered, or with a return
  * … → picked up → returning → returned. A cancelled parcel shows the steps it reached and then
- * "Cancelled". The last reached step is `current` until the parcel is done.
+ * "Cancelled": T-563, a parcel refused at the pickup (BE-88 refuses only once the rider has
+ * arrived) keeps accepted and arrived. The last reached step is `current` until the parcel is done.
  */
-export const parcelTimeline = (parcel: Pick<ParcelView, 'status' | 'pickedUpAt' | 'returnStartedAt'>): ParcelTimelineStep[] => {
+export const parcelTimeline = (
+  parcel: Pick<ParcelView, 'status' | 'pickedUpAt' | 'returnStartedAt'> & Partial<Pick<ParcelView, 'refusalReason'>>,
+): ParcelTimelineStep[] => {
   const { status } = parcel;
   if (status === 'cancelled') {
-    const reached: ParcelStatus[] = parcel.pickedUpAt ? ['requested', 'accepted', 'arrived', 'picked_up'] : ['requested'];
+    const reached: ParcelStatus[] = parcel.pickedUpAt
+      ? ['requested', 'accepted', 'arrived', 'picked_up']
+      : parcel.refusalReason
+        ? ['requested', 'accepted', 'arrived']
+        : ['requested'];
     return [
       ...reached.map((key) => ({ key, label: parcelStatusText(key), state: 'done' as const })),
       { key: 'cancelled', label: parcelStatusText('cancelled'), state: 'current' },
@@ -175,6 +182,16 @@ export const parcelTimeline = (parcel: Pick<ParcelView, 'status' | 'pickedUpAt' 
     state: index < at || (finished && index === at) ? 'done' : index === at ? 'current' : 'upcoming',
   }));
 };
+
+/**
+ * T-563: a cancelled parcel was never paid (the sender pays the rider at the pickup), so there is
+ * nothing the rider could have overcharged: no "asked for more?" button. A report already made
+ * keeps its status.
+ */
+export const parcelOverchargeState = <S extends { canReport: boolean }>(
+  state: S | null,
+  parcel: Pick<ParcelView, 'status'> | null,
+): S | null => (state && state.canReport && parcel?.status === 'cancelled' ? { ...state, canReport: false } : state);
 
 /** Seconds until `iso` (0 when it has passed or is missing). */
 export const secondsUntil = (iso: string | null, now: number): number => {

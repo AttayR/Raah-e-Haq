@@ -18,6 +18,8 @@ export const CACHE_TTL = {
   vehicleTypes: 60 * 60 * 1000,
   /** T-561: on Home / booking focus the catalogue is read again once it is older than this. */
   vehicleTypesRecheck: 2 * 60 * 1000,
+  /** T-563: after a failed quiet re-read, the next focus waits this long before asking again. */
+  vehicleTypesRecheckBackoff: 30 * 1000,
   savedPlaces: 60 * 1000,
   stats: 60 * 1000,
   directions: 5 * 60 * 1000,

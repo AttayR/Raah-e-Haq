@@ -268,7 +268,7 @@ const DriverRideScreen: React.FC = () => {
             {step === 'summary' ? (
               <DriverRideSummary ride={ride} onDone={onDone} />
             ) : (
-              <DriverRideCancelledCard onDone={onDone} />
+              <DriverRideCancelledCard onDone={onDone} parcel={parcel.panel?.parcel ?? null} />
             )}
           </ScrollView>
         ) : (

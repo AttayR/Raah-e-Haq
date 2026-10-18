@@ -31,7 +31,7 @@ import { AcReportSection } from '../../ac/components/AcReportSection';
 import { isAcRide, toAcReportState } from '../../ac/api';
 import { WomenModeSearching } from '../../women-mode/components/WomenModeSearching';
 import { parcelOf } from '../../parcel/api';
-import { parcelStatusText } from '../../parcel/rules';
+import { parcelOverchargeState, parcelStatusText } from '../../parcel/rules';
 import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection';
 import type { ParcelView } from '../../parcel/types';
 import { readNumberOrNull } from '../../../core/api/read';
@@ -142,7 +142,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const driver = hasDriver && ride ? driverCardOf(ride) : null;
   // BE-82: the fare is final once a driver accepted; BE-85: the waiting timer after a verified arrival.
   const lock = hasDriver ? fareLockOf(ride) : null;
-  const overcharge = ride ? toOverchargeState(ride.overcharge_report) : null;
+  // T-563: never on a cancelled (refused) parcel; it was not paid.
+  const overcharge = ride ? parcelOverchargeState(toOverchargeState(ride.overcharge_report), parcel) : null;
   // BE-86: the AC tier's badge and, for an AC ride, "AC not working?".
   const ac = isAcRide(ride);
   const acReport = ride && ac ? toAcReportState(ride.ac_report) : null;

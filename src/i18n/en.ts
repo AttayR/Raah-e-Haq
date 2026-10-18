@@ -1227,6 +1227,11 @@ export const en = {
     returnStartedDone: 'Return started. Ask the sender for the return code',
     returnedDone: 'Parcel returned to the sender',
     refusedDone: 'Parcel refused. No strike was recorded',
+    // T-563: the driver's ride screen once the parcel ended without a delivery.
+    driverRefusedTitle: 'Parcel refused',
+    driverRefusedBody: 'You refused this parcel at the pickup. The ride is cancelled with no strike, and you can take new requests.',
+    driverCancelledTitle: 'Parcel cancelled',
+    driverCancelledBody: 'This parcel was cancelled and is no longer assigned to you.',
     // Pickup sheet.
     pickupTitle: 'Pick up the parcel',
     pickupBody: 'Check the parcel, then take a clear photo of it. The receiver then gets the delivery code by SMS.',

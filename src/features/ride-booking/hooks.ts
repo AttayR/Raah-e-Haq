@@ -50,7 +50,9 @@ const cachedVehicleTypes = (): VehicleTypesState | null => {
  * T-561: `refreshWhen` (a screen's focus) re-reads the catalogue quietly, over what is shown,
  * when the last read is older than CACHE_TTL.vehicleTypesRecheck, so a tier an admin just
  * switched on (Car AC, Parcel) shows within minutes, not after the hour. One read at a time;
- * a failed quiet read keeps what is shown.
+ * a failed quiet read keeps what is shown. T-563: the first load / a manual retry and the quiet
+ * re-read track their own request (one ending never frees the other), and after a failed quiet
+ * read the next focus waits CACHE_TTL.vehicleTypesRecheckBackoff before asking again.
  */
 export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
   const refreshWhen = options.refreshWhen ?? false;
@@ -59,18 +61,25 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
     () => cachedOnMount ?? { status: 'loading', data: null, error: null, notice: null },
   );
   const [attempt, setAttempt] = useState(0);
-  const inFlight = useRef(false);
+  /** The first load or a manual retry is in flight. */
+  const loadInFlight = useRef(false);
+  /** A quiet re-read (refreshWhen) is in flight. */
+  const quietInFlight = useRef(false);
+  /** When the last quiet re-read failed (null after a success). */
+  const quietFailedAt = useRef<number | null>(null);
 
   useEffect(() => {
     // Shown from the cache on the first frame: no request until a retry.
     if (attempt === 0 && cachedOnMount) return undefined;
     const controller = new AbortController();
     const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
-    inFlight.current = true;
+    let current = true;
+    loadInFlight.current = true;
     setState((s) => ({ ...s, status: 'loading', error: null }));
     fetchVehicleTypes(controller.signal)
       .then((catalogue) => {
         writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
+        quietFailedAt.current = null;
         setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
       })
       .catch((error) => {
@@ -79,33 +88,43 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
         }
       })
       .finally(() => {
-        inFlight.current = false;
+        // A newer retry owns the flag once this one was replaced.
+        if (current) loadInFlight.current = false;
       });
     return () => {
-      inFlight.current = false;
+      current = false;
+      loadInFlight.current = false;
       controller.abort();
     };
   }, [attempt, cachedOnMount]);
 
   useEffect(() => {
-    if (!refreshWhen || inFlight.current) return undefined;
+    if (!refreshWhen || loadInFlight.current || quietInFlight.current) return undefined;
     // Read a moment ago (here, on Home or on the booking screen): nothing to ask.
     const age = cacheAgeMs(VEHICLE_TYPES_CACHE_KEY);
     if (age !== null && age < CACHE_TTL.vehicleTypesRecheck) return undefined;
+    // The last quiet read failed a moment ago: no new request on every focus.
+    const failedAt = quietFailedAt.current;
+    if (failedAt !== null && Date.now() - failedAt < CACHE_TTL.vehicleTypesRecheckBackoff) return undefined;
     const controller = new AbortController();
     const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
-    inFlight.current = true;
+    let current = true;
+    quietInFlight.current = true;
     fetchVehicleTypes(controller.signal)
       .then((catalogue) => {
         writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
+        quietFailedAt.current = null;
         setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!controller.signal.aborted) quietFailedAt.current = Date.now();
+      })
       .finally(() => {
-        inFlight.current = false;
+        if (current) quietInFlight.current = false;
       });
     return () => {
-      inFlight.current = false;
+      current = false;
+      quietInFlight.current = false;
       controller.abort();
     };
   }, [refreshWhen]);

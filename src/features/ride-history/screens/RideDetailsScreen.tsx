@@ -30,6 +30,7 @@ import { RIDE_HISTORY_COPY } from '../copy';
 import { canOpenChat, otherParty } from '../format';
 import { RideRatingSection } from '../../rating/components/RideRatingSection';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
+import { parcelOverchargeState } from '../../parcel/rules';
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { SafetyReportSection } from '../../women-mode/components/SafetyReportSection';
 import { ParcelReceiptCard } from '../../parcel/components/ParcelReceiptCard';
@@ -164,7 +165,7 @@ export default function RideDetailsScreen() {
             // BE-82: "Driver asked for more?" for 24 h after the ride, then the report's status.
             <OverchargeReportSection
               rideId={ride.id}
-              state={ride.overcharge}
+              state={parcelOverchargeState(ride.overcharge, ride.parcel)}
               fare={ride.fareLock?.acceptedFare ?? ride.totalFare}
               onReported={() => {
                 refresh();
