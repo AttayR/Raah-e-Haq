@@ -239,8 +239,14 @@ export const useDriverParcel = (options: {
 
   // [T-565] The submit callbacks hang on the sheet's own purpose / kind, not on `sheet`: opening
   // another sheet must not hand the closed (memoised) code and reason sheets new props.
-  const codePurpose = sheet === 'returned' ? ('returned' as const) : ('deliver' as const);
-  const reasonKind = sheet === 'refuse' ? ('refuse' as const) : ('return' as const);
+  // [T-568] The purpose / kind is the one the sheet last opened with, kept after it closes: a
+  // "Hand back" code sheet or a "Refuse parcel" reason sheet slides out with its own title and
+  // reasons instead of turning into the deliver / return sheet on the way out. Set during render
+  // (own state), so the render that opens a sheet already carries its purpose.
+  const [codePurpose, setCodePurpose] = useState<'deliver' | 'returned'>('deliver');
+  const [reasonKind, setReasonKind] = useState<'refuse' | 'return'>('return');
+  if ((sheet === 'deliver' || sheet === 'returned') && sheet !== codePurpose) setCodePurpose(sheet);
+  if ((sheet === 'refuse' || sheet === 'return') && sheet !== reasonKind) setReasonKind(sheet);
 
   const submitCode = useCallback(
     async (code: string) => {
@@ -343,7 +349,7 @@ export const useDriverParcel = (options: {
     if (!submitting) setSheet(null);
   }, [submitting]);
   const reasons: ParcelChoice[] =
-    sheet === 'refuse' ? parcelOptions.data?.refusalReasons ?? NO_REASONS : parcelOptions.data?.returnReasons ?? NO_REASONS;
+    reasonKind === 'refuse' ? parcelOptions.data?.refusalReasons ?? NO_REASONS : parcelOptions.data?.returnReasons ?? NO_REASONS;
 
   // [T-562] The sheets stay mounted (DriverParcelSheets is always rendered) and close through
   // `visible`, so a ride that stops being a parcel ride animates an open sheet out instead of

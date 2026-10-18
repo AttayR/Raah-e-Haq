@@ -182,9 +182,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         'worklet';
         if (ok && done) runOnJS(done)();
       };
+      // [T-568] A close (height 0) ends when the sheet first reaches the bottom edge. The snap
+      // spring is underdamped and only settles ~0.8 s after it starts, long after the sheet is out
+      // of sight: until then the invisible Modal stayed up and swallowed the next taps (QA N1),
+      // and the next sheet or dialog waited for it. Clamping cuts the close at ~0.22 s.
       top.value = reduce
         ? withTiming(target, { duration: reducedMotion.sheetSnap.duration, easing: swapEasing }, finished)
-        : withSpring(target, { ...springs.sheet, velocity }, finished);
+        : withSpring(target, { ...springs.sheet, velocity, overshootClamping: height <= 0 }, finished);
     },
     [container, reduce, top],
   );

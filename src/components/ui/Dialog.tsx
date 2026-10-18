@@ -103,6 +103,12 @@ export function Dialog({ visible, onDismiss, inline = false, ...surface }: Dialo
   const { theme } = useAppTheme();
   // [T-562] The root Dialog is a native Modal too: it takes its turn with the modal sheets.
   const modal = useQueuedModal(!inline && visible);
+  // [T-568] While the Modal is hidden (fading out on iOS, or waiting for its turn) it keeps the
+  // text and buttons it last showed: a new confirm() queued during the fade-out must not swap the
+  // fading dialog's text. The new request's text appears when the Modal presents again.
+  const shownSurface = useRef(surface);
+  if (inline || modal.show) shownSurface.current = surface;
+  const rendered = inline ? surface : shownSurface.current;
   // Android back answers "cancel" for the inline form too (a native Modal gets onRequestClose).
   useEffect(() => {
     if (!inline || !visible) return undefined;
@@ -123,9 +129,9 @@ export function Dialog({ visible, onDismiss, inline = false, ...surface }: Dialo
         accessibilityLabel={t('common.close')}
         importantForAccessibility="no"
         accessibilityElementsHidden
-        testID={surface.testID ? `${surface.testID}-scrim` : undefined}
+        testID={rendered.testID ? `${rendered.testID}-scrim` : undefined}
       />
-      <DialogSurface {...surface} />
+      <DialogSurface {...rendered} />
     </View>
   );
 

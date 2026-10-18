@@ -119,11 +119,14 @@ export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
   const [snoozedUntil, setSnoozedUntil] = useState<number | null>(null);
   const choice = useWomenModeChoice(rideId);
 
-  // A new ride starts clean.
+  // A new ride starts clean. [T-568] So does a new search on the same ride (a re-queue after the
+  // driver cancelled): this stays mounted for the whole ride now (T-565), so the last search's
+  // answer and snooze must not hold the sheet back when the server asks again.
   useEffect(() => {
+    if (!searching) return;
     setAnswered(null);
     setSnoozedUntil(null);
-  }, [rideId]);
+  }, [rideId, searching]);
 
   const server = toWomenModeSummary(raw);
   const mine = answered && answered.rideId === rideId ? answered : null;
@@ -158,6 +161,12 @@ export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
   };
 
   const released = summary?.state === 'released';
+  // [T-568] The sheet's text while it slides out: the one it showed while up (a driver taking the
+  // ride turns the state to `matched`, which must not swap the wording on the way out). Set
+  // during render (own state), so the render that opens the sheet already has the right text.
+  const noneNearbyNow = summary?.state === 'no_female_drivers_nearby';
+  const [noneNearby, setNoneNearby] = useState(noneNearbyNow);
+  if (showSheet && noneNearby !== noneNearbyNow) setNoneNearby(noneNearbyNow);
   // [T-565] The sheet sits outside the status block and is always rendered, so it closes through
   // `visible` when the ride is matched, released or no longer searching.
   return (
@@ -206,7 +215,7 @@ export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
       ) : null}
       <FallbackSheet
         visible={showSheet}
-        noneNearby={summary?.state === 'no_female_drivers_nearby'}
+        noneNearby={noneNearby}
         pending={choice.pending}
         error={choice.error}
         onChoose={action => {
