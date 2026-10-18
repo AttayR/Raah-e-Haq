@@ -928,3 +928,23 @@ POST `/auth/register` and PUT `/profile` answer **422** with `errors.name` when 
 The lists live in `config/ratings.php` (`parcel_tags`) like the ride tags; the app must not hardcode them.
 
 `POST /rides/{id}/rate` (body and errors unchanged): on a ride with `vehicle_type: "parcel"` the tags are checked against `parcel_tags.<role>` for the star band; on any other ride against `tags.<role>` only, so a parcel-only key there is 422 `errors.tags.N`. For app builds before T-569, a parcel ride **also** accepts the ride tag keys while `RATING_PARCEL_ACCEPTS_RIDE_TAGS=true` (default); the server will turn this off once every build sends parcel tags, so T-569 should send only parcel keys on parcel rides. Some keys (`polite`, `on_time`, `late`, `rude`) exist in both sets with the same meaning. The admin ride page labels parcel tags on parcel rides.
+
+### BE-108: vehicle makes per vehicle type (2026-10-18, app follow-up of T-570)
+
+GET `/public/vehicle-types` (no auth, backward compatible: nothing removed or renamed) gains:
+
+- **`meta.vehicle_makes`**: an object keyed by vehicle kind (`car`, `bike`, `rickshaw`, `van`), each a list of make names. Same shape as the app's static `VEHICLE_MAKES_BY_TYPE`. Every vehicle kind is present **whether or not it is active** (with or without `include_inactive`), so registration can always use it. Ride tiers (`car_ac`, `parcel`) are never keys here.
+- **`data[].makes`**: the same list on each item (`[]` for `car_ac` and `parcel`).
+- `"Other"` is always present exactly once and **last** in every list (the server enforces it, whatever the admin enters).
+- Seeded with the exact lists the app shipped with (`config/vehicle_makes.php`, copied into the rate card by migration `2026_10_18_120000_add_makes_to_vehicle_types_table`). Admins edit them on Admin → Fares and commission → Edit (car, bike, rickshaw, van): one make per line, up to 60 makes, 40 characters each, letters/digits/space and `. & ' - /`, no duplicates (case ignored). Audited like other rate-card edits.
+
+```json
+{ "success": true, "message": "Vehicle types",
+  "data": [ { "key": "bike", "label": "Bike", "...": "...", "makes": ["Honda", "Yamaha", "Suzuki", "United", "Road Prince", "Super Power", "Unique", "Super Star", "Hi-Speed", "Metro", "Crown", "Benelli", "Other"] } ],
+  "meta": { "fare_notice": null, "ac": { "vehicle_type": "car", "min_vehicle_year": 2012 }, "vehicle_year": { "min": 1980, "max": 2027 },
+            "vehicle_makes": { "car": ["Toyota", "...", "Other"], "bike": ["Honda", "...", "Other"], "rickshaw": ["Sazgar", "...", "Other"], "van": ["Suzuki", "...", "Other"] } } }
+```
+
+Registration is unchanged: `vehicle_make` stays free text (`required|string|max:100`), so a make not (or no longer) in the list is still accepted.
+
+App follow-up: the driver wizard's Make list reads `meta.vehicle_makes[vehicleType]` (from the catalogue the registration flow already loads with `include_inactive=1`); fall back to the static `VEHICLE_MAKES_BY_TYPE` when the key is missing (older server) or the request failed. Keep clearing a chosen make that is not in the new type's list.
