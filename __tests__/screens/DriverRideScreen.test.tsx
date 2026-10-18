@@ -16,6 +16,7 @@ import { selectDriverActiveRide, setDriverActiveRide } from '../../src/features/
 import type { RideResource, RideStopResource } from '../../src/services/rideService';
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
 import { envelope, makeRide } from '../../test-utils/rideFixtures';
+import { settleCancelSheet } from '../../test-utils/cancelSheet';
 import { toast } from '../../src/core/toast';
 import locationTrackingService from '../../src/services/locationTrackingService';
 
@@ -223,6 +224,7 @@ describe('DriverRideScreen', () => {
     mock.onPost('/rides/41/cancel').reply(200, envelope(makeRide({ status: 'cancelled' })));
 
     fireEvent.press(screen.getByTestId('driver-ride-cancel'));
+    const clock = settleCancelSheet();
     fireEvent.changeText(screen.getByTestId('cancel-reason-input'), 'no');
     fireEvent.press(screen.getByTestId('cancel-reason-submit'));
     expect(screen.getByTestId('cancel-reason-error').props.children).toBe('Please write at least 3 characters.');
@@ -234,6 +236,7 @@ describe('DriverRideScreen', () => {
     await waitFor(() => expect(selectDriverActiveRide(store.getState())).toBeNull());
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ note: 'Flat tyre' });
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    clock.mockRestore();
   });
 
   it('[T-520] Call asks POST /call and dials the masked number; Navigate opens the maps app', async () => {

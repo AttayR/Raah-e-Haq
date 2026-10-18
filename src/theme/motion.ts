@@ -80,6 +80,12 @@ export const motionPatterns = {
   },
   incomingRequestCountdownMs: 15000,
   sheetContentSwap: { duration: 250, translateY: 8 },
+  /**
+   * [T-573] A modal sheet's destructive button (cancel, no-show) ignores taps for this long after
+   * the sheet starts to rise: the `sheet` spring settles in ~0.33 s, and until then a tap aimed at
+   * the button that opened it, or at "Keep", can land on the destructive button moving past.
+   */
+  destructiveArmMs: 350,
   toast: {
     in: { duration: 250, easing: standard, translateY: -16 },
     out: { duration: 200, easing: accelerate, translateY: -8 },

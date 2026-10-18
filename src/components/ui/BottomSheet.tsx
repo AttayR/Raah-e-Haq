@@ -60,6 +60,13 @@ export type BottomSheetProps = React.PropsWithChildren<{
   /** Modal mode only. */
   visible?: boolean;
   onClose?: () => void;
+  /**
+   * [T-573] Modal mode: false while the scrim, Android back and a drag down must not close the
+   * sheet (a request in flight). `close()` from a ref still closes it. Default true.
+   */
+  dismissible?: boolean;
+  /** [T-573] Modal mode: the sheet has left the screen (its Modal unmounted), however it closed. */
+  onHidden?: () => void;
   onSnapChange?: (snap: SheetSnap, height: number) => void;
   /** Written with the visible height on every frame (camera padding, controls that ride the sheet). */
   animatedHeight?: SharedValue<number>;
@@ -102,6 +109,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     initialSnap,
     visible = true,
     onClose,
+    dismissible = true,
+    onHidden,
     onSnapChange,
     animatedHeight,
     header,
@@ -208,6 +217,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     onSnapChangeRef.current?.(snap.snap, snap.height);
   }, []);
 
+  const onHiddenRef = useRef(onHidden);
+  onHiddenRef.current = onHidden;
   const unmount = useCallback(() => {
     closing.current = false;
     setClosingUI(false);
@@ -219,6 +230,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     // next presentation at full height with a blank half (QA 2026-10-18 bug 6).
     setKeyboardHeight(0);
     restoreSnap.current = null;
+    onHiddenRef.current?.();
   }, []);
 
   /**
@@ -290,6 +302,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   }, [animateTo, beginClose, finishClose, modal, resolved, snapTo]);
 
   useImperativeHandle(ref, () => ({ snapTo, close }), [close, snapTo]);
+
+  // [T-573] Scrim taps and Android back close only a dismissible sheet.
+  const requestClose = useCallback(() => {
+    if (dismissible) close();
+  }, [close, dismissible]);
 
   // Modal visibility from the parent.
   useEffect(() => {
@@ -433,7 +450,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       .onEnd(event => {
         if (!lowest) return;
         const height = container.value - top.value;
-        const target = releaseTarget(height, event.velocityY, resolved, modal);
+        const released = releaseTarget(height, event.velocityY, resolved, modal);
+        // [T-573] A sheet that may not be dismissed springs back to its lowest snap instead.
+        const target = released === 'close' && !dismissible ? lowest : released;
         if (target === 'close') {
           runOnJS(beginClose)();
           animateTo(0, event.velocityY, finishClose);
@@ -443,7 +462,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         animateTo(target.height, event.velocityY);
         runOnJS(dragSettled)(target);
       });
-  }, [animateTo, beginClose, container, dragSettled, finishClose, modal, resolved, startTop, top]);
+  }, [animateTo, beginClose, container, dismissible, dragSettled, finishClose, modal, resolved, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: top.value }] }));
   const scrimStyle = useAnimatedStyle(() => {
@@ -574,7 +593,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     return null;
   }
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={close}>
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={requestClose}>
       <ModalRoot>
         {/* [T-571] From the start of a close, taps go nowhere in the sheet (no re-close, no
             second press on its buttons); the Modal itself goes as soon as the sheet is out. */}
@@ -582,7 +601,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.overlay }, scrimStyle]}>
             <Pressable
               style={styles.fill}
-              onPress={close}
+              onPress={requestClose}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
               testID={testID ? `${testID}-scrim` : undefined}

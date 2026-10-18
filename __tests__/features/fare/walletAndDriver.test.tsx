@@ -22,6 +22,7 @@ import { IncomingRequestCard } from '../../../src/components/driver/IncomingRequ
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
 import { makeRide, makeRideRequest } from '../../../test-utils/rideFixtures';
+import { settleCancelSheet } from '../../../test-utils/cancelSheet';
 import { useActiveRideActions } from '../../../src/features/active-ride/hooks';
 import { dialog, dialogStore } from '../../../src/core/dialog';
 import { noShowAtOf, noShowFeeOf, useNoShowReady } from '../../../src/features/driver-ride/noShow';
@@ -330,8 +331,10 @@ describe('driver cancel (BE-85 strikes and no-shows)', () => {
     expect(screen.queryByTestId('cancel-reason-strike')).toBeNull();
     screen.getByText("Passenger didn't come?");
     screen.getByText('The passenger is charged the Rs 50 no-show fee. Your share shows in your wallet once it is credited.');
+    const clock = settleCancelSheet();
     fireEvent.press(screen.getByTestId('cancel-reason-submit'));
     expect(onSubmit).toHaveBeenCalledWith('The passenger did not come to the pickup.');
+    clock.mockRestore();
 
     rerender(<CancelReasonSheet visible mode="no_show" noShowFee={null} submitting={false} onSubmit={onSubmit} onClose={jest.fn()} />);
     expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();

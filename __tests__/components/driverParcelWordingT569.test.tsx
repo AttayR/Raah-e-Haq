@@ -8,6 +8,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { DriverRidePanel } from '../../src/components/driver/DriverRidePanel';
 import { CancelReasonSheet } from '../../src/components/driver/CancelReasonSheet';
 import { makeRide } from '../../test-utils/rideFixtures';
+import { settleCancelSheet } from '../../test-utils/cancelSheet';
 
 const noop = () => undefined;
 
@@ -59,8 +60,10 @@ describe('cancel / no-show sheet on a parcel ride (T-569)', () => {
     screen.getByText("Sender didn't come?");
     screen.getByText('You waited at the pickup, so no strike is recorded. The sender sees this note.');
     screen.getByText('The sender is charged the Rs 50 no-show fee. Your share shows in your wallet once it is credited.');
+    const clock = settleCancelSheet();
     fireEvent.press(screen.getByTestId('cancel-reason-submit'));
     expect(onSubmit).toHaveBeenCalledWith('The sender did not come to the pickup.');
+    clock.mockRestore();
   });
 
   it('a cancel says the sender sees the reason; the pointer names "Sender didn\'t come"', () => {

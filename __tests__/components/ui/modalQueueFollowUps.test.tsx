@@ -4,7 +4,7 @@
  *   the queue, so other sheets opening and closing never re-render it.
  * - A drag or snapTo that lands on a snap during a close clears the `closing` guard (or finishes
  *   the close when the parent still wants the sheet closed); before, the sheet stayed up for good.
- * - The root Dialog and the raw Modals (CancelReasonSheet, ModernModal) take their turn too, and
+ * - The root Dialog, the legacy ModernModal and the driver cancel sheet (a kit sheet since T-573) take their turn too, and
  *   on iOS keep it until their dismiss animation has finished.
  */
 import React, { Profiler, createRef } from 'react';
