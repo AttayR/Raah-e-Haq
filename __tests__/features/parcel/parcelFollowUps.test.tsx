@@ -383,7 +383,7 @@ describe('3. the driver pickup footer on small phones', () => {
     atPickup(320, onNoShow);
     expect(screen.queryByTestId('driver-ride-cancel')).toBeNull();
     expect(label('driver-ride-no-show')).toBe('No-show');
-    expect(screen.getByTestId('driver-ride-no-show').props.accessibilityLabel).toBe("Passenger didn't come");
+    expect(screen.getByTestId('driver-ride-no-show').props.accessibilityLabel).toBe("Sender didn't come"); // T-569: a parcel ride waits for the sender
     fireEvent.press(screen.getByTestId('driver-ride-no-show'));
     expect(onNoShow).toHaveBeenCalled();
   });

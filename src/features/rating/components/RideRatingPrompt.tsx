@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { readText } from '../../../core/api/read';
 import type { RideResource } from '../../../services/rideService';
 import { firstNameOf } from '../../../utils/format';
+import { isParcelRide } from '../../parcel/api';
 import { NOT_RATABLE, toRideRatingFields } from '../api';
 import { useRatingPrompt } from '../hooks';
 import type { RaterRole, RideRatingFields, RideRatingState } from '../types';
@@ -64,6 +65,7 @@ export function RideRatingPrompt({ ride, role, active, onRatingChange }: Props) 
       role={role}
       personName={person.name}
       photoUri={person.photoUri}
+      parcel={isParcelRide(shown)}
       onRated={apply}
       onStale={onStale}
       onSkip={dismiss}

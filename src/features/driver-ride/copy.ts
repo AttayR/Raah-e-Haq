@@ -23,6 +23,8 @@ export const DRIVER_RIDE_COPY = {
   rideInProgress: 'Ride in progress',
   // Labels.
   passengerFallback: 'Passenger',
+  /** T-569: the person on a parcel ride is the sender. */
+  senderFallback: 'Sender',
   noRating: 'New rider',
   pickup: 'Pickup',
   dropoff: 'Drop-off',
@@ -32,6 +34,8 @@ export const DRIVER_RIDE_COPY = {
   callA11y: 'Call the passenger',
   message: 'Message',
   messageA11y: 'Message the passenger',
+  callA11yParcel: 'Call the sender',
+  messageA11yParcel: 'Message the sender',
   navigate: 'Navigate',
   navigateA11y: 'Open directions in the maps app',
   // Actions.
@@ -60,6 +64,8 @@ export const DRIVER_RIDE_COPY = {
   cancelTitle: 'Why are you cancelling?',
   cancelHint: 'The passenger will see this reason.',
   cancelPlaceholder: 'For example: the passenger is not at the pickup',
+  cancelHintParcel: 'The sender will see this reason.',
+  cancelPlaceholderParcel: 'For example: the sender is not at the pickup',
   cancelTooShort: 'Please write at least 3 characters.',
   cancelSubmit: 'Cancel ride',
   cancelKeep: 'Keep ride',

@@ -366,3 +366,75 @@ describe('ride details rating section', () => {
     expect(screen.queryByTestId('ride-details-rating')).toBeNull();
   });
 });
+
+describe('BE-107 parcel rides (T-569)', () => {
+  const PARCEL_TAGS = {
+    passenger: {
+      positive: [{ key: 'careful_handling', label: 'Handled with care' }],
+      negative: [{ key: 'item_damaged', label: 'Item damaged' }],
+    },
+    driver: {
+      positive: [{ key: 'ready_at_pickup', label: 'Ready at pickup' }],
+      negative: [{ key: 'poorly_packed', label: 'Poorly packed' }],
+    },
+  };
+  const serveParcelTags = () => {
+    mock.onGet('/rating-tags').reply(200, { success: true, data: { ...TAGS, parcel_tags: PARCEL_TAGS } });
+  };
+
+  it('the sender rates the rider with the parcel tags and sends only parcel keys', async () => {
+    serveParcelTags();
+    mock.onPost('/rides/12/rate').reply(201, { success: true, data: { my_rating: { ...RATED, tags: ['careful_handling'] }, can_rate: false } });
+    await renderSheet({ parcel: true, personName: null });
+    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Your rider');
+    expect(screen.getByText('How was the delivery?')).toBeTruthy();
+    rate(5);
+    expect(screen.getByText('Handled with care')).toBeTruthy();
+    expect(screen.queryByText('Clean car')).toBeNull();
+    await press('rate-ride-tag-careful_handling');
+    await press('rate-ride-submit');
+    expect(mock.history.post[0].data).toBe('{"stars":5,"tags":["careful_handling"]}');
+  });
+
+  it('the rider rates the sender with the rider list; "Your sender" as the fallback', async () => {
+    serveParcelTags();
+    await renderSheet({ parcel: true, role: 'driver', personName: null });
+    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Your sender');
+    rate(2);
+    expect(screen.getByText('Poorly packed')).toBeTruthy();
+    expect(screen.queryByText('Kept me waiting')).toBeNull();
+  });
+
+  it('an older server without parcel_tags: the parcel sheet offers the ride tags', async () => {
+    await renderSheet({ parcel: true });
+    rate(5);
+    expect(screen.getByText('Clean car')).toBeTruthy();
+  });
+
+  it('the driver prompt on a parcel ride (vehicle_type parcel) uses the parcel tags', async () => {
+    serveParcelTags();
+    await renderPrompt(makeStore(completedRide({ vehicle_type: 'parcel' })), <DriverRideRatingPrompt active />);
+    rate(5);
+    expect(screen.getByText('Ready at pickup')).toBeTruthy();
+    expect(screen.queryByText('Polite')).toBeNull();
+  });
+
+  it('ride details label a parcel rating from the parcel lists', async () => {
+    serveParcelTags();
+    render(
+      <ThemeProvider>
+        <RideRatingSection
+          rideId={12}
+          role="passenger"
+          parcel
+          myRating={{ stars: 5, tags: ['careful_handling'], comment: null, createdAt: null }}
+          canRate={false}
+          personName="Bilal"
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    );
+    await flush();
+    expect(screen.getByText('Handled with care')).toBeTruthy();
+  });
+});

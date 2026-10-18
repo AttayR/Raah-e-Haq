@@ -14,7 +14,8 @@ import type {
 /**
  * Ride rating (T-505, BE-07; docs/api/CONTRACT_NOTES.md), all through the shared axios client:
  * - GET  /rating-tags       -> data: { window_days, max_tags, max_comment_length,
- *                              positive_min_stars, negative_max_stars, tags: { passenger, driver } }
+ *                              positive_min_stars, negative_max_stars, tags: { passenger, driver },
+ *                              parcel_tags?: { passenger, driver } }  (BE-107, parcel rides)
  * - POST /rides/{id}/rate   -> 201 data: { my_rating, can_rate: false }
  * - GET  /rides/{id}        -> the ride, read here only for `my_rating` / `can_rate`
  * Refusals arrive as ApiErrors with `error.code` (RATING_CODES); a 422 without a code is validation.
@@ -73,6 +74,10 @@ export const toRatingConfig = (raw: unknown): RatingConfig => {
     positiveMinStars: positiveInt(data.positive_min_stars, RATING_DEFAULTS.positiveMinStars),
     negativeMaxStars: positiveInt(data.negative_max_stars, RATING_DEFAULTS.negativeMaxStars),
     tags: { passenger: toBands(tags.passenger), driver: toBands(tags.driver) },
+    // BE-107: an older server sends no `parcel_tags`; the parcel sheet then offers `tags`.
+    parcelTags: isRecord(data.parcel_tags)
+      ? { passenger: toBands(data.parcel_tags.passenger), driver: toBands(data.parcel_tags.driver) }
+      : null,
   };
 };
 

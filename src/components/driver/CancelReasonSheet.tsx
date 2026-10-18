@@ -38,6 +38,8 @@ type Props = {
    * replaced by a pointer to "Passenger didn't come".
    */
   noShowAvailable?: boolean;
+  /** T-569: a parcel ride, where the sender (not a passenger) sees the note. */
+  parcel?: boolean;
 };
 
 /** True when the trimmed note fits the server's 3-500 characters (BE-04 driverCancel). */
@@ -50,7 +52,7 @@ export const isValidCancelNote = (note: string): boolean => {
  * Asks the driver why they cancel (T-405). The server requires a note of 3-500 characters and
  * shows it to the passenger; the sheet will not submit anything shorter.
  */
-export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubmit, onClose, mode = 'strike', noShowFee = null, noShowAvailable = false }) => {
+export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubmit, onClose, mode = 'strike', noShowFee = null, noShowAvailable = false, parcel = false }) => {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const noShow = mode === 'no_show';
@@ -65,9 +67,9 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
       setNote('');
       setTouched(false);
     } else if (noShow) {
-      setNote(t('driverFare.noShowNote'));
+      setNote(parcel ? t('driverFare.noShowNoteParcel') : t('driverFare.noShowNote'));
     }
-  }, [visible, noShow]);
+  }, [visible, noShow, parcel]);
 
   const submit = () => {
     setTouched(true);
@@ -83,19 +85,25 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.sheet} testID="cancel-reason-sheet">
-            <Text style={styles.title} accessibilityRole="header">{noShow ? t('driverFare.noShowTitle') : COPY.cancelTitle}</Text>
-            <Text style={styles.hint}>{noShow ? t('driverFare.noShowHint') : COPY.cancelHint}</Text>
+            <Text style={styles.title} accessibilityRole="header">{noShow ? (parcel ? t('driverFare.noShowTitleParcel') : t('driverFare.noShowTitle')) : COPY.cancelTitle}</Text>
+            <Text style={styles.hint}>{noShow
+                ? parcel
+                  ? t('driverFare.noShowHintParcel')
+                  : t('driverFare.noShowHint')
+                : parcel
+                  ? COPY.cancelHintParcel
+                  : COPY.cancelHint}</Text>
             {noShow ? (
               noShowFee !== null && noShowFee > 0 ? (
                 <Banner
                   tone="info"
-                  text={t('driverFare.noShowFee', { amount: formatMoney(noShowFee) })}
+                  text={t(parcel ? 'driverFare.noShowFeeParcel' : 'driverFare.noShowFee', { amount: formatMoney(noShowFee) })}
                   style={styles.notice}
                   testID="cancel-reason-no-show-fee"
                 />
               ) : null
             ) : noShowAvailable ? (
-              <Banner tone="info" text={t('driverFare.noShowPointer')} style={styles.notice} testID="cancel-reason-no-show-pointer" />
+              <Banner tone="info" text={parcel ? t('driverFare.noShowPointerParcel') : t('driverFare.noShowPointer')} style={styles.notice} testID="cancel-reason-no-show-pointer" />
             ) : (
               <Banner tone="warning" text={t('driverFare.strikeWarning')} style={styles.notice} testID="cancel-reason-strike" />
             )}
@@ -104,7 +112,7 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
               value={note}
               onChangeText={setNote}
               onBlur={() => setTouched(true)}
-              placeholder={COPY.cancelPlaceholder}
+              placeholder={parcel ? COPY.cancelPlaceholderParcel : COPY.cancelPlaceholder}
               placeholderTextColor={theme.colors.textMuted}
               maxLength={CANCEL_NOTE_MAX_LENGTH}
               multiline

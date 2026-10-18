@@ -110,6 +110,54 @@ describe('mapping', () => {
   });
 });
 
+describe('BE-107 parcel tags (T-569)', () => {
+  const parcelTags = {
+    passenger: {
+      positive: [
+        { key: 'careful_handling', label: 'Handled with care' },
+        { key: 'on_time', label: 'On time' },
+      ],
+      negative: [{ key: 'item_damaged', label: 'Item damaged' }],
+    },
+    driver: {
+      positive: [{ key: 'ready_at_pickup', label: 'Ready at pickup' }],
+      negative: [{ key: 'poorly_packed', label: 'Poorly packed' }],
+    },
+  };
+  const withParcel = toRatingConfig(rawTags({ parcel_tags: parcelTags }));
+  const keys = (cfg: typeof config, role: 'passenger' | 'driver', stars: number, parcel: boolean) =>
+    tagsForStars(cfg, role, stars, parcel).map((tag) => tag.key);
+
+  it('maps data.parcel_tags per rater role; absent parcel_tags is null', () => {
+    expect(withParcel.parcelTags?.passenger.positive.map((tag) => tag.key)).toEqual(['careful_handling', 'on_time']);
+    expect(withParcel.parcelTags?.driver).toEqual({
+      positive: [{ key: 'ready_at_pickup', label: 'Ready at pickup' }],
+      negative: [{ key: 'poorly_packed', label: 'Poorly packed' }],
+    });
+    expect(config.parcelTags).toBeNull();
+  });
+
+  it('a parcel ride offers only parcel keys: sender rates the rider, rider rates the sender', () => {
+    expect(keys(withParcel, 'passenger', 4, true)).toEqual(['careful_handling', 'on_time', 'item_damaged']);
+    expect(keys(withParcel, 'driver', 5, true)).toEqual(['ready_at_pickup']);
+    expect(keys(withParcel, 'driver', 2, true)).toEqual(['poorly_packed']);
+  });
+
+  it('a normal ride keeps the ride tags even when parcel_tags exist', () => {
+    expect(keys(withParcel, 'passenger', 5, false)).toEqual(['clean_car', 'safe_driving', 'friendly', 'on_time']);
+    expect(keys(withParcel, 'driver', 5, false)).toEqual(['polite']);
+  });
+
+  it('an older server without parcel_tags: a parcel ride falls back to the ride tags', () => {
+    expect(keys(config, 'passenger', 5, true)).toEqual(['clean_car', 'safe_driving', 'friendly', 'on_time']);
+  });
+
+  it('labels a parcel rating from the parcel lists', () => {
+    expect(tagLabels(withParcel, 'passenger', ['careful_handling', 'clean_car'], true)).toEqual(['Handled with care']);
+    expect(tagLabels(withParcel, 'passenger', ['careful_handling', 'clean_car'])).toEqual(['Clean car']);
+  });
+});
+
 describe('star bands and tags', () => {
   const keys = (stars: number, role: 'passenger' | 'driver' = 'passenger') => tagsForStars(config, role, stars).map((tag) => tag.key);
 

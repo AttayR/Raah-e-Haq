@@ -31,6 +31,7 @@ import { PinEntrySheet } from '../../features/safety/components/PinEntrySheet';
 import { noShowFeeOf, useNoShowReady, type DriverCancelMode } from '../../features/driver-ride/noShow';
 import { DriverRideSafetyButton } from '../../features/safety/components/RideSafety';
 import { DriverParcelSheets, useDriverParcel } from '../../features/parcel/driver';
+import { isParcelRide } from '../../features/parcel/api';
 import {
   activeStops,
   mapsDirectionsUrl,
@@ -306,6 +307,7 @@ const DriverRideScreen: React.FC = () => {
           mode={cancelMode ?? 'strike'}
           noShowFee={noShowFeeOf(ride)}
           noShowAvailable={noShowReady}
+          parcel={isParcelRide(ride)}
           submitting={pendingAction === 'cancel'}
           onSubmit={onCancel}
           onClose={() => setCancelMode(null)}

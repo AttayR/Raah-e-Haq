@@ -33,6 +33,7 @@ import { OverchargeReportSection } from '../../fare/components/OverchargeReport'
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { SafetyReportSection } from '../../women-mode/components/SafetyReportSection';
 import { ParcelReceiptCard } from '../../parcel/components/ParcelReceiptCard';
+import { isParcelRide } from '../../parcel/api';
 import type { RideRatingState } from '../../rating/types';
 import { useRideDetail, useRideViewer } from '../hooks';
 import type { RideHistoryRoutes } from '../navigation';
@@ -158,6 +159,7 @@ export default function RideDetailsScreen() {
             canRate={ride.canRate}
             personName={rated?.name ?? null}
             photoUri={rated?.profileImageUrl ?? null}
+            parcel={isParcelRide({ vehicle_type: ride.vehicleType }) || ride.parcel !== null}
             onChange={onRatingChange}
           />
           {viewer === 'passenger' ? (

@@ -1,15 +1,23 @@
 import { firstFieldMessages, toApiError } from '../../core/api/errors';
 import { t } from '../../i18n';
 import { RATING_CODES } from './api';
-import type { RaterRole, RatingConfig, RatingTag } from './types';
+import type { RaterRole, RatingConfig, RatingTag, RatingTagBands } from './types';
+
+/**
+ * The tag lists for the rater on this ride: BE-107 `parcel_tags[role]` on a parcel ride (the
+ * server checks a parcel rating against those), else `tags[role]`. A server without
+ * `parcel_tags` gets the ride tags, which it still accepts on a parcel ride.
+ */
+export const bandsFor = (config: RatingConfig, role: RaterRole, parcel: boolean): RatingTagBands =>
+  (parcel ? config.parcelTags?.[role] : undefined) ?? config.tags[role];
 
 /**
  * The tags offered for `stars` (BE-07): positive from `positive_min_stars` up, negative up to
  * `negative_max_stars` (so 4 stars shows both). No stars yet: no tags.
  */
-export const tagsForStars = (config: RatingConfig | null, role: RaterRole, stars: number): RatingTag[] => {
+export const tagsForStars = (config: RatingConfig | null, role: RaterRole, stars: number, parcel = false): RatingTag[] => {
   if (!config || stars < 1) return [];
-  const bands = config.tags[role];
+  const bands = bandsFor(config, role, parcel);
   const tags: RatingTag[] = [];
   if (stars >= config.positiveMinStars) tags.push(...bands.positive);
   if (stars <= config.negativeMaxStars) tags.push(...bands.negative);
@@ -35,9 +43,9 @@ export const toggleTag = (selected: ReadonlyArray<string>, key: string, maxTags:
 };
 
 /** Labels of `keys` for the rater's role, in order; a key the server no longer lists is left out. */
-export const tagLabels = (config: RatingConfig | null, role: RaterRole, keys: ReadonlyArray<string>): string[] => {
+export const tagLabels = (config: RatingConfig | null, role: RaterRole, keys: ReadonlyArray<string>, parcel = false): string[] => {
   if (!config) return [];
-  const bands = config.tags[role];
+  const bands = bandsFor(config, role, parcel);
   const byKey = new Map([...bands.positive, ...bands.negative].map((tag) => [tag.key, tag.label]));
   return keys.map((key) => byKey.get(key)).filter((label): label is string => !!label);
 };

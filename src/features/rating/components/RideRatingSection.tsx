@@ -18,6 +18,8 @@ type Props = {
   /** The person being rated (first name), for the sheet. */
   personName: string | null;
   photoUri?: string | null;
+  /** BE-107 / T-569: a parcel ride (parcel tag labels and sheet). */
+  parcel?: boolean;
   /** The ride's new rating state (after a rating, or the re-read after a 409 / window closed). */
   onChange: (state: RideRatingState) => void;
 };
@@ -41,7 +43,7 @@ function Stars({ value }: { value: number }) {
  * comment) once `my_rating` exists, or "Rate this trip" while `can_rate`, which opens the same
  * rating sheet as the after-ride prompt. Nothing while neither applies.
  */
-export function RideRatingSection({ rideId, role, myRating, canRate, personName, photoUri, onChange }: Props) {
+export function RideRatingSection({ rideId, role, myRating, canRate, personName, photoUri, parcel = false, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const hasTags = !!myRating && myRating.tags.length > 0;
   const { config } = useRatingConfig(hasTags);
@@ -57,7 +59,7 @@ export function RideRatingSection({ rideId, role, myRating, canRate, personName,
 
   let body: React.ReactElement | null = null;
   if (myRating) {
-    const labels = tagLabels(config, role, myRating.tags);
+    const labels = tagLabels(config, role, myRating.tags, parcel);
     body = (
       <Card testID="ride-details-rating">
         <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.title}>
@@ -107,6 +109,7 @@ export function RideRatingSection({ rideId, role, myRating, canRate, personName,
         role={role}
         personName={personName}
         photoUri={photoUri}
+        parcel={parcel}
         onRated={apply}
         onStale={onStale}
         onSkip={() => setOpen(false)}

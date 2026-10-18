@@ -14,6 +14,7 @@ import { WaitingTimer } from '../../features/fare/components/FareBits';
 import { toFarePolicy } from '../../features/fare/api';
 import { DriverParcelSection } from '../../features/parcel/components/DriverParcelSection';
 import { isAcRide } from '../../features/ac/api';
+import { isParcelRide } from '../../features/parcel/api';
 import type { DriverParcelPanel } from '../../features/parcel/useDriverParcel';
 import { FOOTER_GAP, FOOTER_SIDE_PADDING, footerRowLabels } from '../../features/driver-ride/footerLayout';
 
@@ -103,6 +104,8 @@ export const DriverRidePanel: React.FC<Props> = ({
   const progress = rideProgressStep(ride.status);
   const ac = isAcRide(ride);
   const womenMode = ride.female_driver_only === true;
+  // T-569: on a parcel ride the person on the card is the sender (labels, fallback, no-show).
+  const parcelRide = !!parcel || isParcelRide(ride);
 
   let primary: { label: string; onPress: () => void; testID: string } | null = null;
   if (step === 'to_pickup') primary = { label: COPY.arrived, onPress: onArrived, testID: 'driver-ride-arrived' };
@@ -123,7 +126,7 @@ export const DriverRidePanel: React.FC<Props> = ({
       key: 'call',
       icon: 'phone',
       label: calling ? t('safety.calling') : COPY.call,
-      accessibilityLabel: COPY.callA11y,
+      accessibilityLabel: parcelRide ? COPY.callA11yParcel : COPY.callA11y,
       accessibilityHint: t('safety.callA11yHint'),
       onPress: onCall,
       disabled: calling,
@@ -131,7 +134,7 @@ export const DriverRidePanel: React.FC<Props> = ({
     });
   }
   if (onMessage) {
-    actions.push({ key: 'message', icon: 'chat', label: COPY.message, accessibilityLabel: COPY.messageA11y, onPress: onMessage, testID: 'driver-ride-message' });
+    actions.push({ key: 'message', icon: 'chat', label: COPY.message, accessibilityLabel: parcelRide ? COPY.messageA11yParcel : COPY.messageA11y, onPress: onMessage, testID: 'driver-ride-message' });
   }
   if (canNavigate) {
     actions.push({ key: 'navigate', icon: 'navigate', label: COPY.navigate, accessibilityLabel: COPY.navigateA11y, onPress: onNavigate, testID: 'driver-ride-navigate' });
@@ -152,7 +155,7 @@ export const DriverRidePanel: React.FC<Props> = ({
     secondaries.push({ key: 'parcel', label: secondary.label, shortLabel: secondary.shortLabel, variant: secondary.variant ?? 'secondary', onPress: secondary.onPress, testID: secondary.testID });
   }
   if (noShow && onNoShow) {
-    secondaries.push({ key: 'no-show', label: t('driverFare.noShowButton'), shortLabel: t('driverFare.noShowShort'), variant: 'destructiveSoft', onPress: onNoShow, testID: 'driver-ride-no-show' });
+    secondaries.push({ key: 'no-show', label: parcelRide ? t('driverFare.noShowButtonParcel') : t('driverFare.noShowButton'), shortLabel: t('driverFare.noShowShort'), variant: 'destructiveSoft', onPress: onNoShow, testID: 'driver-ride-no-show' });
   }
   if (cancellable) {
     secondaries.push({ key: 'cancel', label: COPY.cancel, shortLabel: COPY.cancelShort, variant: 'destructiveSoft', onPress: onCancel, testID: 'driver-ride-cancel' });
@@ -200,7 +203,7 @@ export const DriverRidePanel: React.FC<Props> = ({
         <View style={styles.titleRow}>
           <AppText variant="h3" accessibilityRole="header" style={styles.title} testID="driver-ride-title">
             {/* T-567: a parcel pickup waits for the sender, not a passenger. */}
-            {step === 'at_pickup' && parcel ? COPY.atPickupParcel : TITLES[step] ?? COPY.unknown}
+            {step === 'at_pickup' && parcelRide ? COPY.atPickupParcel : TITLES[step] ?? COPY.unknown}
           </AppText>
           {/* T-561: the AC tier (BE-86) and a women-mode ride (BE-87, when the server says so). */}
           {ac ? <AcBadge testID="driver-ride-ac" /> : null}
@@ -213,7 +216,7 @@ export const DriverRidePanel: React.FC<Props> = ({
           // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
           name={firstNameOf(ride.passenger?.name)}
           photoUri={ride.passenger?.profile_image_url ?? null}
-          fallbackName={COPY.passengerFallback}
+          fallbackName={parcelRide ? COPY.senderFallback : COPY.passengerFallback}
           rating={riderRating(ride.passenger?.rating)}
           newRatingLabel={COPY.noRating}
           actions={actions}

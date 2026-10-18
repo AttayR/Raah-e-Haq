@@ -463,9 +463,14 @@ export const en = {
    */
   rating: {
     title: 'How was your trip?',
+    /** BE-107 / T-569: the same sheet after a parcel ride. */
+    titleParcel: 'How was the delivery?',
     sheetA11y: 'Rate your trip',
     yourDriver: 'Your driver',
     yourPassenger: 'Your passenger',
+    /** Parcel rides: the sender rates the rider, the rider rates the sender. */
+    yourRider: 'Your rider',
+    yourSender: 'Your sender',
     starsHint: 'Tap a star to rate',
     tagsGood: 'What went well?',
     tagsBad: 'What could be better?',
@@ -802,6 +807,13 @@ export const en = {
     noShowPointer: "You waited long enough at the pickup, so this cancel records no strike. Use \"Passenger didn't come\" next time.",
     noShowNote: 'The passenger did not come to the pickup.',
     noShowSubmit: 'Cancel as no-show',
+    /** T-569: the same no-show on a parcel ride, where the sender hands the parcel over. */
+    noShowButtonParcel: "Sender didn't come",
+    noShowTitleParcel: "Sender didn't come?",
+    noShowHintParcel: 'You waited at the pickup, so no strike is recorded. The sender sees this note.',
+    noShowFeeParcel: 'The sender is charged the {amount} no-show fee. Your share shows in your wallet once it is credited.',
+    noShowPointerParcel: "You waited long enough at the pickup, so this cancel records no strike. Use \"Sender didn't come\" next time.",
+    noShowNoteParcel: 'The sender did not come to the pickup.',
     fare: 'Fare',
     bookingFee: 'Booking fee (platform)',
     commission: 'Commission ({rate}%)',

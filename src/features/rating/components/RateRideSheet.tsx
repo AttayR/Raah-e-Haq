@@ -18,6 +18,11 @@ export type RateRideSheetProps = {
   /** The person being rated (first name from the ride card); null shows "Your driver" / "Your passenger". */
   personName: string | null;
   photoUri?: string | null;
+  /**
+   * BE-107 / T-569: a parcel ride. The sheet offers the parcel tags (`parcel_tags[role]`, the
+   * ride tags on an older server) and names the other side "Your rider" / "Your sender".
+   */
+  parcel?: boolean;
   /** 201: the ride's new rating state. The host updates the ride and closes the sheet. */
   onRated: (state: RideRatingState) => void;
   /** 409 / window closed: the ride was re-read (null when that failed). The host closes quietly. */
@@ -40,7 +45,7 @@ const tagsTitle = (config: RatingConfig, stars: number): string => {
  * `stars` is sent as a JSON integer. A 409 / window-closed answer closes the sheet quietly
  * (the host re-reads the ride); other failures show inline above Submit, which retries.
  */
-export function RateRideSheet({ visible, rideId, role, personName, photoUri, onRated, onStale, onSkip }: RateRideSheetProps) {
+export function RateRideSheet({ visible, rideId, role, personName, photoUri, parcel = false, onRated, onStale, onSkip }: RateRideSheetProps) {
   const { config, status, reload } = useRatingConfig(visible);
   // [T-519] While the comment is being typed the header shrinks to the name, so the comment box
   // and Submit / Skip stay visible above the keyboard (the kit grows the sheet and scrolls to it).
@@ -57,19 +62,25 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, onR
   );
   const { submit, submitting, error } = useRateRide({ rideId, onRated: handleRated, onStale });
 
-  const offered = useMemo(() => tagsForStars(config, role, stars), [config, role, stars]);
+  const offered = useMemo(() => tagsForStars(config, role, stars, parcel), [config, role, stars, parcel]);
   const maxTags = config?.maxTags ?? RATING_DEFAULTS.maxTags;
   const maxComment = config?.maxCommentLength ?? RATING_DEFAULTS.maxCommentLength;
-  const fallbackName = role === 'passenger' ? t('rating.yourDriver') : t('rating.yourPassenger');
+  const fallbackName = parcel
+    ? role === 'passenger'
+      ? t('rating.yourRider')
+      : t('rating.yourSender')
+    : role === 'passenger'
+      ? t('rating.yourDriver')
+      : t('rating.yourPassenger');
   const name = personName || fallbackName;
 
   const onStars = useCallback(
     (next: number) => {
       setStars(next);
       // Tags of a band the new star count no longer offers are dropped (the server refuses them).
-      setSelected((current) => keepAllowedTags(current, tagsForStars(config, role, next)));
+      setSelected((current) => keepAllowedTags(current, tagsForStars(config, role, next, parcel)));
     },
-    [config, role],
+    [config, role, parcel],
   );
 
   const onSubmit = () => {
@@ -107,7 +118,7 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, onR
               {name}
             </AppText>
             <AppText variant="bodySmall" color="textSecondary" align="center" accessibilityRole="header">
-              {t('rating.title')}
+              {parcel ? t('rating.titleParcel') : t('rating.title')}
             </AppText>
           </View>
         )

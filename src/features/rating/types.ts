@@ -20,7 +20,11 @@ export interface RatingTagBands {
   negative: RatingTag[];
 }
 
-/** GET /rating-tags. `tags` is keyed by the rater's role. */
+/**
+ * GET /rating-tags. `tags` is keyed by the rater's role. BE-107: `parcelTags` (same shape) holds
+ * the parcel lists: `passenger` = the sender rating the rider, `driver` = the rider rating the
+ * sender; null when the server is older and sends no `parcel_tags`.
+ */
 export interface RatingConfig {
   windowDays: number;
   maxTags: number;
@@ -30,6 +34,7 @@ export interface RatingConfig {
   /** Negative tags show up to this many stars. */
   negativeMaxStars: number;
   tags: Record<RaterRole, RatingTagBands>;
+  parcelTags: Record<RaterRole, RatingTagBands> | null;
 }
 
 /** The caller's own rating of a ride (`my_rating`). */
