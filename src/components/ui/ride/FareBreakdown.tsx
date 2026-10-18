@@ -34,7 +34,15 @@ export type FareRow = {
   tone?: Extract<TextColor, 'success' | 'textPrimary' | 'textSecondary'>;
   /** Bold row in the same style as the total (driver "Your earnings"). */
   strong?: boolean;
+  /**
+   * T-567: a long unbroken value (the ride code) stays on one line, takes the room the label
+   * does not need and shrinks to fit instead of wrapping its last character.
+   */
+  fit?: boolean;
 };
+
+/** One line for a `fit` value: shrink to fit, never wrap (T-567). */
+export const FIT_VALUE_PROPS = { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 } as const;
 
 const present = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
 
@@ -129,10 +137,21 @@ export function fareBreakdownRows(
 function Row({ row, testID }: { row: FareRow; testID?: string }) {
   return (
     <View style={styles.row} testID={testID}>
-      <AppText variant={row.strong ? 'bodyStrong' : 'bodySmall'} color={row.strong ? 'textPrimary' : 'textSecondary'} style={styles.label}>
+      <AppText
+        variant={row.strong ? 'bodyStrong' : 'bodySmall'}
+        color={row.strong ? 'textPrimary' : 'textSecondary'}
+        style={row.fit ? styles.fitLabel : styles.label}
+      >
         {row.label}
       </AppText>
-      <AppText variant="numeric" color={row.tone ?? 'textPrimary'} align="end" style={styles.value} selectable>
+      <AppText
+        variant="numeric"
+        color={row.tone ?? 'textPrimary'}
+        align="end"
+        style={row.fit ? styles.fitValue : styles.value}
+        selectable
+        {...(row.fit ? FIT_VALUE_PROPS : null)}
+      >
         {row.value}
       </AppText>
     </View>
@@ -232,4 +251,6 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: f.rowMinHeight + space[3], paddingTop: space[1] },
   label: { flex: 1, minWidth: 0 },
   value: { flexShrink: 0, maxWidth: '55%' },
+  fitLabel: { flexShrink: 0 },
+  fitValue: { flex: 1, minWidth: 0 },
 });

@@ -323,8 +323,10 @@ describe('RegistrationScreen (T-201)', () => {
         screen.getByText('Enter the code sent by SMS to +923009990001.'),
       ).toBeTruthy(),
     );
-    // T-564: one short line, not the server's long message (it ran past two lines over the subtitle).
-    expect(successToast).toHaveBeenCalledWith('Registration received');
+    // T-567: confirmed inline on the code step, no toast over the Verify title and subtitle.
+    expect(screen.getByTestId('registration-received')).toBeTruthy();
+    expect(screen.getByText('Registration received')).toBeTruthy();
+    expect(successToast).not.toHaveBeenCalled();
     successToast.mockRestore();
     // A passenger has no approval wait to mention.
     expect(screen.queryByTestId('registration-driver-approval-hint')).toBeNull();

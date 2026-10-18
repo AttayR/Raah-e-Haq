@@ -15,7 +15,7 @@ import { rootReducer } from '../../../src/store/rootReducer';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { rideHistoryApi, toRide } from '../../../src/features/ride-history/api';
 import { canOpenChat, CHAT_READ_WINDOW_HOURS, rideAmountText } from '../../../src/features/ride-history/format';
-import { ReceiptCard } from '../../../src/features/ride-history/components/RideDetailsSections';
+import { ReceiptCard, receiptPaymentStatus } from '../../../src/features/ride-history/components/RideDetailsSections';
 import RideHistoryScreen from '../../../src/features/ride-history/screens/RideHistoryScreen';
 import RideDetailsScreen from '../../../src/features/ride-history/screens/RideDetailsScreen';
 import type { Ride } from '../../../src/features/ride-history/types';
@@ -213,6 +213,43 @@ describe('ride format', () => {
     await receipt(ride({ status: 'cancelled' }), 'passenger');
     expect(screen.queryByText('Total')).toBeNull();
     expect(screen.queryByText('Base fare')).toBeNull();
+  });
+
+  it('[T-567] a cancelled ride with no fee says "No charge" as its payment status, never "Pending"', async () => {
+    expect(receiptPaymentStatus(ride({ status: 'cancelled', payment_status: 'pending' }))).toBe('No charge');
+    expect(receiptPaymentStatus(ride({ status: 'cancelled', payment_status: 'pending', cancellation_fee: 0 }))).toBe('No charge');
+    // A cancel fee is still owed: the server's status stays.
+    expect(receiptPaymentStatus(ride({ status: 'cancelled', payment_status: 'pending', cancellation_fee: '50.00' }))).toBe('Pending');
+    expect(receiptPaymentStatus(ride())).toBe('Paid');
+    expect(receiptPaymentStatus(ride({ payment_status: null }))).toBeNull();
+
+    render(
+      <ThemeProvider>
+        <ReceiptCard
+          ride={ride({ status: 'cancelled', payment_status: 'pending', ride_id: 'RIDE-01M56ZS5EGCN0X09WBNM5TW3K1' })}
+          viewer="passenger"
+        />
+      </ThemeProvider>,
+    );
+    expect(within(await screen.findByTestId('ride-details-receipt-status')).getByText('No charge')).toBeTruthy();
+    expect(screen.queryByText('Pending')).toBeNull();
+    // T-567: the long ride code stays on one line and shrinks to fit (no wrapped last digit).
+    const code = within(screen.getByTestId('ride-details-receipt-code')).getByText('RIDE-01M56ZS5EGCN0X09WBNM5TW3K1');
+    expect(code.props.numberOfLines).toBe(1);
+    expect(code.props.adjustsFontSizeToFit).toBe(true);
+  });
+
+  it('[T-567] a completed receipt keeps the ride code on one line too', async () => {
+    render(
+      <ThemeProvider>
+        <ReceiptCard ride={ride({ ride_id: 'RIDE-01M56ZS5EGCN0X09WBNM5TW3K1' })} viewer="passenger" />
+      </ThemeProvider>,
+    );
+    const code = await screen.findByText('RIDE-01M56ZS5EGCN0X09WBNM5TW3K1');
+    expect(code.props.numberOfLines).toBe(1);
+    expect(code.props.adjustsFontSizeToFit).toBe(true);
+    // Other values keep their normal wrapping.
+    expect(screen.getByText('Rs 470').props.numberOfLines).toBeUndefined();
   });
 
   it('the chat can be opened while active and for the read window after the ride ends', () => {

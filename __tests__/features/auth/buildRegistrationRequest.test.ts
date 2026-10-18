@@ -142,4 +142,34 @@ describe('buildRegistrationRequest', () => {
     expect(request).not.toHaveProperty('license_number');
     expect(request).not.toHaveProperty('license_image');
   });
+
+  it('sends the driver emergency contact name and relation (T-567), not only the number', () => {
+    const request = buildRegistrationRequest({
+      ...form,
+      role: 'driver',
+      vehicleType: 'car',
+      emergencyContactNumber: '0301 2345678',
+      emergencyContactName: '  Ali Raza ',
+      emergencyRelationship: 'brother',
+    });
+    expect(request).toMatchObject({
+      emergency_contact: '0301 2345678',
+      emergency_contact_name: 'Ali Raza',
+      emergency_contact_relation: 'brother',
+    });
+    expect(request).not.toHaveProperty('passenger_emergency_contact_name');
+  });
+
+  it('leaves blank driver emergency name and relation out (never "")', () => {
+    const request = buildRegistrationRequest({ ...form, role: 'driver', emergencyContactName: ' ', emergencyRelationship: '' });
+    expect(request).not.toHaveProperty('emergency_contact_name');
+    expect(request).not.toHaveProperty('emergency_contact_relation');
+  });
+
+  it('a passenger still sends the passenger_* emergency fields only', () => {
+    const request = buildRegistrationRequest(form);
+    expect(request.passenger_emergency_contact_name).toBe('Test Contact');
+    expect(request.passenger_emergency_contact_relation).toBe('father');
+    expect(request).not.toHaveProperty('emergency_contact_name');
+  });
 });

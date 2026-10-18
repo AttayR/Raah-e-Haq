@@ -107,6 +107,8 @@ export default function RegistrationPhoneStep({ pending, role, onGoToSignIn }: P
 
   return (
     <View style={styles.wrap}>
+      {/* T-567: the registration confirmation sits inline, never as a toast over the title. */}
+      <Banner tone="success" text={COPY.verify.received} testID="registration-received" />
       <View style={styles.titleBlock}>
         <AppText variant="h2" accessibilityRole="header">
           {COPY.verify.title}

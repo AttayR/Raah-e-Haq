@@ -33,6 +33,17 @@ const optionalImages = (images: Record<keyof DriverImages, string | undefined>):
   return picked;
 };
 
+/** Only the text fields that were filled in: a blank one is left out, never sent as "". */
+const optionalText = <K extends string>(fields: Record<K, string>): Partial<Record<K, string>> => {
+  const filled: Partial<Record<K, string>> = {};
+  (Object.keys(fields) as K[]).forEach((field) => {
+    if (fields[field]) {
+      filled[field] = fields[field];
+    }
+  });
+  return filled;
+};
+
 /** Vehicle photos by slot index (VEHICLE_PHOTO_SLOTS order); an empty slot is skipped later. */
 const vehicleImages = (pictures: readonly string[]) => {
   const [front, back, left, right] = VEHICLE_PHOTO_SLOTS.map((_, index) => pictures[index]);
@@ -93,6 +104,12 @@ export function buildRegistrationRequest(form: RegistrationFormData): RegisterWi
       ...vehicleImages(form.vehiclePictures),
     }),
     preferred_payment: PREFERRED_PAYMENT,
+    // T-567: the driver's emergency contact name and relation (BE-106), not only the number.
+    // Left out when blank: the server takes them as optional for drivers.
+    ...optionalText({
+      emergency_contact_name: form.emergencyContactName.trim(),
+      emergency_contact_relation: form.emergencyRelationship,
+    }),
     license_type: form.licenseType,
     license_expiry_date: form.licenseExpiryDate,
     license_plate: form.licensePlate || form.vehicleNumber,

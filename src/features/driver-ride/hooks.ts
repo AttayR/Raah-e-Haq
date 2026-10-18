@@ -28,6 +28,7 @@ import {
 } from './slice';
 import { isRestorableDriverRide, rideStep, type DriverRideStep } from './steps';
 import { PIN_CODES, isPinRefusalCode, pinRefusalOf, type PinRefusal } from '../safety/pin';
+import { isParcelRide } from '../parcel/api';
 
 // Typed locally (not useAppDispatch) so these hooks never import the store singleton.
 type SliceRoot = { driverRide: DriverRideState; driverStatus: DriverStatusState };
@@ -146,6 +147,7 @@ export const useDriverRideFlow = (): DriverRideFlow => {
   const pendingAction = useSelector(selectDriverRidePendingAction);
   const rideId = ride?.id ?? null;
   const step = rideStep(ride);
+  const parcel = isParcelRide(ride);
   const [arrivalRefusal, setArrivalRefusal] = useState<DriverRideToastText | null>(null);
 
   // A new ride or step (arrived elsewhere, cancelled) drops the old refusal.
@@ -192,13 +194,15 @@ export const useDriverRideFlow = (): DriverRideFlow => {
     async (arg: AdvanceDriverRideArg): Promise<{ ok: boolean; payload?: ThunkRejection }> => {
       const action = await dispatch(advanceDriverRide(arg));
       if (advanceDriverRide.fulfilled.match(action)) {
-        toast.success(SUCCESS_COPY[arg.action], undefined, DRIVER_RIDE_TOAST_OPTIONS);
+        // T-567: at a parcel pickup it is the sender who was told.
+        const text = arg.action === 'arrived' && parcel ? DRIVER_RIDE_COPY.arrivedDoneParcel : SUCCESS_COPY[arg.action];
+        toast.success(text, undefined, DRIVER_RIDE_TOAST_OPTIONS);
         return { ok: true };
       }
       handleRefusal(action.payload, !!action.meta.condition, arg.rideId);
       return { ok: false, payload: action.meta.condition ? undefined : action.payload };
     },
-    [dispatch, handleRefusal],
+    [dispatch, handleRefusal, parcel],
   );
 
   const advance = useCallback(

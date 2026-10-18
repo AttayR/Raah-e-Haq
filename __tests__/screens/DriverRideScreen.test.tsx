@@ -373,6 +373,34 @@ describe('DriverRideScreen', () => {
     expect(screen.queryByTestId('parcel-code-sheet')).toBeNull();
   });
 
+  it('[T-567] at a parcel pickup the driver waits for the sender, and the arrival toast names the sender', async () => {
+    const success = jest.spyOn(toast, 'success');
+    const parcel = {
+      status: 'accepted',
+      item_category: 'documents',
+      item_category_label: 'Documents and papers',
+      size_class: 'small',
+      size_label: 'Small (fits in a bag)',
+      max_weight_kg: 2,
+      item_description: 'Two books',
+      declared_value: 2500,
+      receiver: { name: 'Sana Khan', phone: null, phone_masked: '+92300*****67' },
+      pickup_photo_url: null,
+      code: null,
+      can_call_receiver: false,
+    };
+    const parcelRide = (status: string) =>
+      makeRide({ vehicle_type: 'parcel', is_parcel: true, status, driver_id: 5, passenger, parcel, fare: '180.00' } as Partial<RideResource>);
+    const { store, screen } = renderScreen(parcelRide('accepted'));
+    await settle(store);
+    mock.onPost('/rides/41/arrived').reply(200, envelope(parcelRide('arrived')));
+    serverRide = parcelRide('arrived');
+    fireEvent.press(screen.getByTestId('driver-ride-arrived'));
+    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for the sender'));
+    expect(success).toHaveBeenCalledWith('The sender knows you have arrived.', undefined, expect.anything());
+    expect(success).not.toHaveBeenCalledWith('The passenger knows you have arrived.', undefined, expect.anything());
+  });
+
   it('shows an empty state without a ride', () => {
     const store = configureStore({ reducer: rootReducer });
     const screen = render(

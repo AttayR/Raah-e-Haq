@@ -9,6 +9,8 @@ export const DRIVER_RIDE_COPY = {
   // Step titles.
   toPickup: 'Head to pickup',
   atPickup: 'Waiting for the passenger',
+  /** T-567: a parcel pickup waits for the sender, not a passenger. */
+  atPickupParcel: 'Waiting for the sender',
   onTrip: 'On trip',
   summary: 'Trip complete',
   cancelled: 'Ride cancelled',
@@ -63,6 +65,8 @@ export const DRIVER_RIDE_COPY = {
   cancelKeep: 'Keep ride',
   // Toasts.
   arrivedDone: 'The passenger knows you have arrived.',
+  /** T-567: the parcel sender is told instead. */
+  arrivedDoneParcel: 'The sender knows you have arrived.',
   startedDone: 'Trip started.',
   completedDone: 'Trip complete.',
   stopDone: 'Stop marked as done.',

@@ -414,6 +414,9 @@ export interface RegisterRequest {
   cnic: string;
   address: string;
   emergency_contact: string;
+  /** Driver (T-567/BE-106): the emergency contact's name and relation; passengers use passenger_*. */
+  emergency_contact_name?: string;
+  emergency_contact_relation?: string;
   date_of_birth?: string; // YYYY-MM-DD
   gender?: 'male' | 'female' | 'other';
   license_number?: string;
@@ -631,6 +634,8 @@ class ApiService {
       if (userData.preferred_payment) formData.append('preferred_payment', userData.preferred_payment);
 
       if (userData.user_type === 'driver') {
+        if (userData.emergency_contact_name) formData.append('emergency_contact_name', userData.emergency_contact_name);
+        if (userData.emergency_contact_relation) formData.append('emergency_contact_relation', userData.emergency_contact_relation);
         if (userData.license_type) formData.append('license_type', userData.license_type);
         if (userData.license_expiry_date) formData.append('license_expiry_date', userData.license_expiry_date);
         if (userData.license_plate) formData.append('license_plate', userData.license_plate);

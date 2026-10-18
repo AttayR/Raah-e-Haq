@@ -6,6 +6,7 @@ import {
   AppText,
   Card,
   FareBreakdown,
+  FIT_VALUE_PROPS,
   PersonCard as KitPersonCard,
   RideStatusPill,
   RideTimeline,
@@ -24,17 +25,32 @@ import { cancellationFeeText, formatRate } from '../../fare/format';
 type SectionProps = { ride: Ride; viewer: RideViewer };
 
 /** A label/value line inside a card, with a hairline between lines. */
-function Row({ label, value, strong, first, testID }: { label: string; value: string; strong?: boolean; first?: boolean; testID?: string }) {
+function Row({
+  label,
+  value,
+  strong,
+  first,
+  fit,
+  testID,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  first?: boolean;
+  /** T-567: one line that shrinks to fit (the ride code), never a wrapped last character. */
+  fit?: boolean;
+  testID?: string;
+}) {
   const { theme } = useAppTheme();
   return (
     <View
       style={[styles.row, first ? null : { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border }]}
       testID={testID}
     >
-      <AppText variant={strong ? 'bodyStrong' : 'bodySmall'} color={strong ? 'textPrimary' : 'textSecondary'} style={styles.rowLabel}>
+      <AppText variant={strong ? 'bodyStrong' : 'bodySmall'} color={strong ? 'textPrimary' : 'textSecondary'} style={fit ? styles.fitLabel : styles.rowLabel}>
         {label}
       </AppText>
-      <AppText variant={strong ? 'numeric' : 'bodySmall'} align="end" style={styles.rowValue} selectable>
+      <AppText variant={strong ? 'numeric' : 'bodySmall'} align="end" style={styles.rowValue} selectable {...(fit ? FIT_VALUE_PROPS : null)}>
         {value}
       </AppText>
     </View>
@@ -203,22 +219,33 @@ export const driverSplitRows = (ride: Pick<Ride, 'split' | 'platformCommission' 
 };
 
 /**
+ * T-567: the receipt's payment status. A cancelled ride that cost nothing (no BE-85 fee) has
+ * nothing to pay, so it says "No charge" rather than the server's leftover "pending"; a cancel
+ * fee keeps the server's status (the passenger still owes it). Null when the server sends none.
+ */
+export const receiptPaymentStatus = (ride: Pick<Ride, 'status' | 'paymentStatus' | 'cancellationFee'>): string | null => {
+  if (ride.status === 'cancelled' && (ride.cancellationFee === null || ride.cancellationFee <= 0)) return C.noCharge;
+  return titleCase(ride.paymentStatus);
+};
+
+/**
  * The receipt: the server's fare lines and total as the kit FareBreakdown (§5.26; the driver also
  * sees the platform fee and their earnings), then payment and the ride code. A cancelled ride has
  * no fare lines.
  */
 export function ReceiptCard({ ride, viewer }: SectionProps) {
+  const paymentStatus = receiptPaymentStatus(ride);
   const info: FareRow[] = [
     { key: 'method', label: C.paymentMethod, value: C.paymentCash[viewer] },
-    ...(ride.paymentStatus ? [{ key: 'status', label: C.paymentStatus, value: titleCase(ride.paymentStatus) ?? '' }] : []),
-    ...(ride.rideCode ? [{ key: 'code', label: C.rideCode, value: ride.rideCode }] : []),
+    ...(paymentStatus ? [{ key: 'status', label: C.paymentStatus, value: paymentStatus }] : []),
+    ...(ride.rideCode ? [{ key: 'code', label: C.rideCode, value: ride.rideCode, fit: true }] : []),
   ];
   if (ride.status === 'cancelled') {
     return (
       <Card testID="ride-details-receipt-card">
         <CardTitle>{C.receipt}</CardTitle>
         {info.map((row, index) => (
-          <Row key={row.key} label={row.label} value={row.value} first={index === 0} testID={`ride-details-receipt-${row.key}`} />
+          <Row key={row.key} label={row.label} value={row.value} fit={row.fit} first={index === 0} testID={`ride-details-receipt-${row.key}`} />
         ))}
       </Card>
     );
@@ -287,4 +314,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[2] },
   rowLabel: { flexShrink: 0, maxWidth: '55%' },
   rowValue: { flex: 1, minWidth: 0 },
+  fitLabel: { flexShrink: 0 },
 });

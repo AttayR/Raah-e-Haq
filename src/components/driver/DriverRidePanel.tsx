@@ -199,7 +199,8 @@ export const DriverRidePanel: React.FC<Props> = ({
       >
         <View style={styles.titleRow}>
           <AppText variant="h3" accessibilityRole="header" style={styles.title} testID="driver-ride-title">
-            {TITLES[step] ?? COPY.unknown}
+            {/* T-567: a parcel pickup waits for the sender, not a passenger. */}
+            {step === 'at_pickup' && parcel ? COPY.atPickupParcel : TITLES[step] ?? COPY.unknown}
           </AppText>
           {/* T-561: the AC tier (BE-86) and a women-mode ride (BE-87, when the server says so). */}
           {ac ? <AcBadge testID="driver-ride-ac" /> : null}

@@ -92,6 +92,29 @@ describe('registerWithImages (driver)', () => {
   });
 });
 
+describe('registerWithImages (emergency contact, T-567)', () => {
+  const textParts = (append: jest.SpyInstance) =>
+    Object.fromEntries(append.mock.calls.filter(([, value]) => typeof value === 'string'));
+
+  it('a driver sends emergency_contact_name and emergency_contact_relation', async () => {
+    const append = jest.spyOn(FormData.prototype, 'append');
+    await apiService.registerWithImages({ ...driver, emergency_contact_name: 'Ali Raza', emergency_contact_relation: 'brother' });
+    expect(textParts(append)).toMatchObject({
+      emergency_contact: '+923009990002',
+      emergency_contact_name: 'Ali Raza',
+      emergency_contact_relation: 'brother',
+    });
+  });
+
+  it('a driver without a name or relation sends neither field', async () => {
+    const append = jest.spyOn(FormData.prototype, 'append');
+    await apiService.registerWithImages(driver);
+    const parts = textParts(append);
+    expect(parts).not.toHaveProperty('emergency_contact_name');
+    expect(parts).not.toHaveProperty('emergency_contact_relation');
+  });
+});
+
 describe('toMultipartFile', () => {
   it('names the part from the URI and infers the type', () => {
     expect(toMultipartFile(undefined, 'x.jpg')).toBeUndefined();

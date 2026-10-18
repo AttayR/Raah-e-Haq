@@ -10,9 +10,16 @@ import {
 } from 'react-native';
 import { Icon, type IconName } from './ui/Icon';
 import { BrandColors } from '../theme/colors';
+import { space } from '../theme';
 import { useQueuedModal } from './ui/modalQueue';
 
 const { width, height } = Dimensions.get('window');
+
+/**
+ * T-567: an action label ("Verify number") stays on one line in its half-width pill and shrinks a
+ * little when it must, instead of wrapping to two lines.
+ */
+const ACTION_LABEL_PROPS = { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.8 } as const;
 
 export interface ModernModalConfig {
   visible: boolean;
@@ -249,7 +256,7 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
                   style={[styles.button, styles.secondaryButton]}
                   onPress={config.secondaryAction.onPress}
                 >
-                  <Text style={styles.secondaryButtonText}>
+                  <Text style={styles.secondaryButtonText} {...ACTION_LABEL_PROPS}>
                     {config.secondaryAction.label}
                   </Text>
                 </TouchableOpacity>
@@ -260,7 +267,7 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
                   style={[styles.button, styles.primaryButton, { backgroundColor: modalStyle.primaryColor }]}
                   onPress={config.primaryAction.onPress}
                 >
-                  <Text style={styles.primaryButtonText}>
+                  <Text style={styles.primaryButtonText} {...ACTION_LABEL_PROPS}>
                     {config.primaryAction.label}
                   </Text>
                 </TouchableOpacity>
@@ -347,7 +354,8 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     paddingVertical: 16,
-    paddingHorizontal: 24,
+    // T-567: 12 (was 24) leaves the label room in a half-width pill on a 375 pt screen.
+    paddingHorizontal: space[3],
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -371,11 +379,13 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   secondaryButtonText: {
     color: '#374151',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   closeButton: {
     position: 'absolute',
