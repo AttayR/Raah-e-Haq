@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { Button, Header, KeyboardAwareScrollView, Screen, formatNationalPhone } from '../../components/ui';
 import { useApiAuth } from '../../hooks/useApiAuth';
-import { useOtpTimers } from '../../hooks/useOtpTimers';
+import { OTP_RESEND_COOLDOWN_SECONDS, useOtpTimers } from '../../hooks/useOtpTimers';
 import { errorToastMessage, toast } from '../../core/toast';
 import { haptics } from '../../core/haptics';
 import OtpService, { OTP_LENGTH, formatCountdown, sanitizeOtpInput } from '../../services/otpService';
@@ -16,6 +16,7 @@ import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
 import { refusedAccountStatus, routesHome } from '../../core/auth/normalizeUser';
 import { classifyOtpRefusal, isGlobalOtpRefusal, type OtpRefusalLike } from '../../features/auth/otpRefusal';
+import { activeOtpSendHold, rememberOtpSendHold, resetOtpSendHold } from '../../features/auth/otpSendHold';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import AuthIntro from '../../features/auth/components/AuthIntro';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
@@ -40,11 +41,16 @@ export default function PhoneAuthScreen() {
   const { sendOtpToPhone, verifyOtpCode, isLoading, clearAuthError } = useApiAuth();
   const { resendIn, expiresIn, isExpired, codeSent, blockResend, expireCode, clearCode } = useOtpTimers();
 
+  // T-570: a send hold from an earlier visit (inside the cooldown) comes back, so Send shows its
+  // countdown instead of an enabled button whose first tap only earns a 429. A per-number hold
+  // brings its number back; a global one (every number held) leaves the field empty.
+  const [initialHold] = useState(() => activeOtpSendHold());
+  const prefill = initialHold && !initialHold.global ? initialHold.phone : null;
   const [currentStep, setCurrentStep] = useState<AuthStep>('phone');
-  const [digits, setDigits] = useState('');
+  const [digits, setDigits] = useState(() => (prefill ? prefill.slice(3) : ''));
   // T-553 (QA: "Phone must be in +92… format" on a fast first Send code): the handlers read the
   // latest typed number here, not a render's possibly stale state.
-  const phoneRef = useRef('+92');
+  const phoneRef = useRef(prefill ?? '+92');
   const [verificationCode, setVerificationCode] = useState('');
   const [phoneError, setPhoneError] = useState<string>('');
   const [otpError, setOtpError] = useState<string>('');
@@ -55,13 +61,22 @@ export default function PhoneAuthScreen() {
   const [suggestEmail, setSuggestEmail] = useState(false);
   // The resend cooldown is per phone, so only that number is held back; a global refusal
   // (sms_unavailable, busy, otp_ip_limit) holds every number until retry_after (AUTH-18).
-  const [sendHold, setSendHold] = useState({ phone: '', global: false });
+  const [sendHold, setSendHold] = useState(() =>
+    initialHold ? { phone: initialHold.phone, global: initialHold.global } : { phone: '', global: false },
+  );
+  // T-570: the server's "code sent" message, inline above the code field (a toast covered the title).
+  const [sentNotice, setSentNotice] = useState('');
   const sendBlocked = resendIn > 0 && (sendHold.global || toE164(digits) === sendHold.phone);
   // One send/verify at a time: a second tap lands before isLoading re-renders the button.
   const inFlight = useRef(false);
 
   // The auth error is shared with Login: leaving this screen must not carry it over (T-107).
   useEffect(() => () => clearAuthError(), [clearAuthError]);
+
+  // T-570: restart the remembered hold's countdown on this screen's timers.
+  useEffect(() => {
+    if (initialHold) blockResend(initialHold.seconds);
+  }, [initialHold, blockResend]);
 
   // A code that ran out makes the last "Invalid or expired" refusal stale: the expiry line
   // says what to do now. A burned code keeps its message (AUTH-18).
@@ -73,8 +88,11 @@ export default function PhoneAuthScreen() {
 
   /** Holds sending for retry_after: this number only, or every number for a global refusal. */
   const holdSending = (phone: string, refusal?: OtpRefusalLike & { retryAfter?: number }) => {
-    blockResend(refusal?.retryAfter);
-    setSendHold({ phone, global: isGlobalOtpRefusal(refusal) });
+    const global = isGlobalOtpRefusal(refusal);
+    // The same seconds the countdown uses (60 s when retry_after is missing, 0 or negative).
+    const seconds = blockResend(refusal?.retryAfter);
+    setSendHold({ phone, global });
+    rememberOtpSendHold(phone, global, seconds);
   };
 
   /**
@@ -96,6 +114,7 @@ export default function PhoneAuthScreen() {
       if (sendOtp.fulfilled.match(result)) {
         codeSent(result.payload.expires_in);
         setSendHold({ phone, global: false });
+        rememberOtpSendHold(phone, false, OTP_RESEND_COOLDOWN_SECONDS);
         setCurrentStep('verification');
         setVerificationCode('');
         setCodeBurned(false);
@@ -103,7 +122,8 @@ export default function PhoneAuthScreen() {
         setPhoneError('');
         setOtpError('');
         // The server's message (the same for every number); never our own "code sent" claim.
-        toast.success(result.payload.message || (isResend ? COPY.toasts.resent : COPY.toasts.sent));
+        // T-570: inline on the code step, not a toast over its title (like T-567's banner).
+        setSentNotice(result.payload.message || (isResend ? COPY.toasts.resent : COPY.toasts.sent));
         return;
       }
 
@@ -163,6 +183,8 @@ export default function PhoneAuthScreen() {
 
       if (verifyOtp.fulfilled.match(result)) {
         clearCode();
+        // Signed in: the send hold has done its job and must not greet the next sign-in.
+        resetOtpSendHold();
         // Only when it opens a home screen; account status explains a pending/blocked account (T-106).
         if (routesHome(result.payload.user)) {
           toast.success(COPY.toasts.verified);
@@ -212,6 +234,7 @@ export default function PhoneAuthScreen() {
 
   const handleBackToPhone = () => {
     setCurrentStep('phone');
+    setSentNotice('');
     setVerificationCode('');
     setOtpError('');
     setCodeBurned(false);
@@ -272,6 +295,7 @@ export default function PhoneAuthScreen() {
               setOtpError('');
             }}
             error={otpError}
+            notice={sentNotice}
             expiryText={expiryText}
             expiryAlert={isExpired || codeBurned}
             locked={codeBurned}
@@ -335,7 +359,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: layout.gutter,
     paddingTop: space[2],
-    paddingBottom: space[6],
+    // T-570: room under "Change number" so the last action never sits flush on the sticky footer.
+    paddingBottom: space[8],
     gap: space[8],
   },
   footer: {

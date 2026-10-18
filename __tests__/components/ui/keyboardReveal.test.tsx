@@ -113,14 +113,17 @@ describe('revealInScroll', () => {
 
 describe('useKeyboardRevealController', () => {
   let showListener: (() => void) | null = null;
+  let frameListener: (() => void) | null = null;
   let removed = 0;
 
   beforeEach(() => {
     jest.useFakeTimers();
     showListener = null;
+    frameListener = null;
     removed = 0;
     jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, cb: () => void) => {
       if (event === 'keyboardDidShow') showListener = cb;
+      if (event === 'keyboardDidChangeFrame') frameListener = cb;
       return { remove: () => (removed += 1) };
     }) as unknown as typeof Keyboard.addListener);
     jest.spyOn(Keyboard, 'metrics').mockReturnValue(undefined);
@@ -163,7 +166,33 @@ describe('useKeyboardRevealController', () => {
     expect(scroll.scrollTo).toHaveBeenCalledTimes(1);
 
     hook.unmount();
-    expect(removed).toBe(1);
+    // keyboardDidShow and keyboardDidChangeFrame (T-570) are both removed.
+    expect(removed).toBe(2);
+  });
+
+  it('T-570: a keyboard frame change while a field is focused reveals it again; none while blurred or hidden', async () => {
+    const isVisible = jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
+    const { scroll, hidden, hook } = setup();
+    hook.result.current.focus(hidden);
+    await tick();
+    expect(scroll.scrollTo).toHaveBeenCalledTimes(1);
+
+    // The keyboard grew (suggestion bar, number pad → text keyboard).
+    act(() => frameListener?.());
+    await tick();
+    expect(scroll.scrollTo).toHaveBeenCalledTimes(2);
+
+    // A frame change as the keyboard leaves does nothing.
+    isVisible.mockReturnValue(false);
+    act(() => frameListener?.());
+    await tick();
+    expect(scroll.scrollTo).toHaveBeenCalledTimes(2);
+
+    isVisible.mockReturnValue(true);
+    hook.result.current.blur(hidden);
+    act(() => frameListener?.());
+    await tick();
+    expect(scroll.scrollTo).toHaveBeenCalledTimes(2);
   });
 
   it('focus with the keyboard up reveals after the delay; a layout change of the focused field reveals again', async () => {

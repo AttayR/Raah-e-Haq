@@ -50,7 +50,7 @@ export function useRegistrationWizard(initialRole?: RegistrationRole) {
   // T-202: the last 422, per form input (cleared when the input changes) and form-level.
   const [serverErrors, setServerErrors] = useState<StepErrors>({});
   const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [scrollTarget, setScrollTarget] = useState<{ field: string } | null>(null);
+  const [scrollTarget, setScrollTarget] = useState<{ fields: string[] } | null>(null);
   const [formData, setFormData] = useState<RegistrationFormData>(() =>
     initialRole ? { ...INITIAL_REGISTRATION_FORM, role: initialRole } : INITIAL_REGISTRATION_FORM,
   );
@@ -79,19 +79,41 @@ export function useRegistrationWizard(initialRole?: RegistrationRole) {
     return ref;
   }, []);
 
-  // After a 422 the page with the first error is rendered; then scroll to that field.
+  // After a 422, or a Continue / Create account the schema refused (T-570: the "fix the
+  // highlighted fields" toast must always point at a field in view), the page with the errors is
+  // rendered; then scroll to the topmost errored field on it. A new object each time, so the same
+  // field is scrolled to again after the user scrolled away.
   useEffect(() => {
     if (!scrollTarget) return undefined;
+    let cancelled = false;
     const frame = requestAnimationFrame(() => {
-      const node = anchors.current.get(scrollTarget.field);
       const container = containerRef.current;
-      if (!node || !container) return;
-      node.measureLayout(container, (_x, y) => {
-        const offset = containerY.current + y - FIELD_SCROLL_OFFSET;
+      if (!container) return;
+      const nodes = scrollTarget.fields
+        .map((field) => anchors.current.get(field))
+        .filter((node): node is View => node !== undefined);
+      Promise.all(
+        nodes.map(
+          (node) =>
+            new Promise<number | null>((resolve) =>
+              node.measureLayout(
+                container,
+                (_x, y) => resolve(y),
+                () => resolve(null),
+              ),
+            ),
+        ),
+      ).then((ys) => {
+        const measured = ys.filter((y): y is number => y !== null);
+        if (cancelled || measured.length === 0) return;
+        const offset = containerY.current + Math.min(...measured) - FIELD_SCROLL_OFFSET;
         scrollRef.current?.scrollTo({ y: Math.max(0, offset), animated: true });
       });
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [scrollTarget]);
 
   // A new page starts at the top (the 422 scroll above runs after this one).
@@ -147,7 +169,9 @@ export function useRegistrationWizard(initialRole?: RegistrationRole) {
     }
     const errors = validatePage(page, formData);
     setStepErrors(errors);
-    if (Object.keys(errors).length > 0) {
+    const errored = Object.keys(errors);
+    if (errored.length > 0) {
+      setScrollTarget({ fields: errored });
       toast.error(COPY.form.fixErrors);
       return;
     }
@@ -177,7 +201,7 @@ export function useRegistrationWizard(initialRole?: RegistrationRole) {
     if (mapped.step && mapped.firstField) {
       setStepErrors({});
       setPage(pageOfField(mapped.step, mapped.firstField));
-      setScrollTarget({ field: mapped.firstField });
+      setScrollTarget({ fields: [mapped.firstField] });
       toast.error(COPY.form.fixErrors);
     } else {
       toast.error(COPY.form.notAccepted);
@@ -191,6 +215,7 @@ export function useRegistrationWizard(initialRole?: RegistrationRole) {
     if (invalid) {
       setPage(invalid.page);
       setStepErrors(invalid.errors);
+      setScrollTarget({ fields: Object.keys(invalid.errors) });
       toast.error(COPY.form.fixErrors);
       return;
     }

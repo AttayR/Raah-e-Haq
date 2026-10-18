@@ -5,8 +5,8 @@ import {
   DRIVING_EXPERIENCE_OPTIONS,
   LICENSE_TYPES,
   REGISTRATION_FIELDS,
-  VEHICLE_BRANDS,
   VEHICLE_COLOURS,
+  vehicleMakesFor,
 } from '../../../features/auth/copy/registrationFields';
 import { formatIsoDateInput } from '../../../features/auth/registration/inputFormat';
 import { maxVehicleYear, MIN_VEHICLE_YEAR } from '../../../schemas/registrationSchema';
@@ -20,7 +20,6 @@ const V = REGISTRATION_FIELDS.vehicle;
 const L = REGISTRATION_FIELDS.licence;
 
 const toOptions = (values: readonly string[]) => values.map((value) => ({ value, label: value }));
-const BRAND_OPTIONS = toOptions(VEHICLE_BRANDS);
 const COLOUR_OPTIONS = toOptions(VEHICLE_COLOURS);
 const EXPERIENCE_OPTIONS = DRIVING_EXPERIENCE_OPTIONS.map((value) => ({ value, label: L.experienceValue(value) }));
 
@@ -53,6 +52,16 @@ export default function VehicleInfoStep(props: StepProps) {
 
   // The newest 20 model years the backend accepts (BE-29 / BE-105 meta.vehicle_year, AUTH-12).
   const yearOptions = toOptions(vehicleYearOptions(vehicleRules?.vehicleYear ?? null, maxVehicleYear(), MIN_VEHICLE_YEAR));
+
+  // T-570: the makes of the chosen type (bike makes for a bike); none until a type is chosen.
+  const makes = vehicleMakesFor(data.vehicleType);
+  const makeOptions = toOptions(makes);
+
+  const selectType = (type: string) => {
+    f.set('vehicleType', type);
+    // A make the new type does not list (Toyota after switching to Bike) is cleared, not kept.
+    if (data.vehicleBrand && !vehicleMakesFor(type).includes(data.vehicleBrand)) f.set('vehicleBrand', '');
+  };
 
   const selectYear = (year: string) => {
     // BE-105: a year older than the AC minimum turns the AC declaration off.
@@ -87,7 +96,7 @@ export default function VehicleInfoStep(props: StepProps) {
         <Anchored field="vehicleType">
           <View style={stepStyles.control}>
             <ControlLabel required={f.required('vehicleType')}>{V.type}</ControlLabel>
-            <VehicleTypePicker value={data.vehicleType} onChange={(id) => f.set('vehicleType', id)} accessibilityLabel={V.type} />
+            <VehicleTypePicker value={data.vehicleType} onChange={selectType} accessibilityLabel={V.type} />
             <FieldError message={errors.vehicleType} testID="registration-vehicle-type-error" />
           </View>
         </Anchored>
@@ -97,8 +106,10 @@ export default function VehicleInfoStep(props: StepProps) {
             required={f.required('vehicleBrand')}
             sheetTitle={V.makeSheet}
             value={data.vehicleBrand}
-            options={BRAND_OPTIONS}
+            options={makeOptions}
             onChange={(value) => f.set('vehicleBrand', value)}
+            disabled={makes.length === 0}
+            helper={makes.length === 0 ? V.makeNeedsType : undefined}
             error={errors.vehicleBrand}
             testID="registration-vehicle-make"
           />

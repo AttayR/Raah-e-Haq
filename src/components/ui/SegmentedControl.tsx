@@ -19,7 +19,7 @@ export type SegmentedControlProps<T extends string> = {
 
 /**
  * Segmented control (DESIGN_SYSTEM §5.10): `surfaceAlt` track, padding 4, `surface` thumb
- * (dark: `surfaceRaised`). Each segment is a 44pt-high radio target; labels are one line, capped
+ * (dark: `surfaceRaised` with a 1pt `borderStrong` outline, T-570). Each segment is a 44pt-high radio target; labels are one line, capped
  * by AppText's font-scale multiplier (UI-R4: no adjustsFontSizeToFit, see below).
  * Changing the selection fires the `selection` haptic (§6.11); re-tapping the current one is a no-op.
  */
@@ -32,7 +32,14 @@ export function SegmentedControl<T extends string>({
   testID,
 }: SegmentedControlProps<T>) {
   const { theme } = useAppTheme();
-  const thumb = theme.mode === 'dark' ? theme.colors.surfaceRaised : theme.colors.surface;
+  const dark = theme.mode === 'dark';
+  const thumb = dark ? theme.colors.surfaceRaised : theme.colors.surface;
+  // T-570 (QA 2026-10-18): in dark mode `surfaceRaised` on the `surfaceAlt` track is ~1.2:1 and
+  // the shadow does not show, so the selected pill was hard to see. It gets a 1pt `borderStrong`
+  // outline (≥3:1 on the track, WCAG non-text). Every segment carries the same 1pt border in the
+  // track colour, so selecting never shifts the labels.
+  const selectedBorder = dark ? theme.colors.borderStrong : thumb;
+  const restingBorder = theme.colors.surfaceAlt;
   return (
     <View
       testID={testID}
@@ -56,7 +63,11 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="radio"
             accessibilityLabel={`${accessibilityLabel}, ${option.label}`}
             accessibilityState={{ selected, checked: selected, disabled }}
-            style={[styles.segment, selected ? [{ backgroundColor: thumb }, theme.elevation[1]] : null]}
+            style={[
+              styles.segment,
+              { borderWidth: theme.borderWidth.thin, borderColor: selected ? selectedBorder : restingBorder },
+              selected ? [{ backgroundColor: thumb }, theme.elevation[1]] : null,
+            ]}
           >
             {/* [UI-R4] No adjustsFontSizeToFit: iOS fitted the label at the first (0-wide) layout
                 inside list headers and it stayed ~3pt. Font scaling is capped by AppText's

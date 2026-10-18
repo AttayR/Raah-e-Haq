@@ -12,6 +12,7 @@ import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import apiAuthReducer from '../../src/store/slices/apiAuthSlice';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
+import { activeOtpSendHold, resetOtpSendHold } from '../../src/features/auth/otpSendHold';
 import { ImageBackground, Keyboard, ScrollView } from 'react-native';
 
 // The real store module starts redux-persist (a timer that outlives the test); the screen
@@ -67,6 +68,8 @@ const replyLocalSend = () =>
 beforeEach(() => {
   jest.useFakeTimers();
   mock = new MockAdapter(apiClient);
+  // T-570: the send hold is remembered across visits (module memory); each test starts clean.
+  resetOtpSendHold();
 });
 
 afterEach(() => {
@@ -239,6 +242,8 @@ describe('PhoneAuthScreen (T-101)', () => {
       });
       const verifiedToasts = success.mock.calls.filter(([title]) => title === 'Phone number verified successfully!');
       expect(verifiedToasts.length > 0).toBe(shown);
+      // T-570: a successful verify forgets the send hold.
+      expect(activeOtpSendHold()).toBeNull();
     });
 
     it('403 ACCOUNT_REJECTED: the toast keeps the reason as its second line', async () => {
@@ -411,13 +416,14 @@ describe('PhoneAuthScreen (T-101)', () => {
 
     afterEach(() => jest.restoreAllMocks());
 
-    it('send success toasts the server message, never our own "code sent" claim', async () => {
+    it('send success shows the server message inline (T-570: no toast over the title), never our own "code sent" claim', async () => {
       const success = jest.spyOn(toast, 'success');
       mock.onPost('/auth/send-otp').reply(200, { success: true, message: SERVER_SENT, data: { phone: PHONE, expires_in: 60 } });
       await renderScreen();
       await sendCode();
-      await waitFor(() => expect(success).toHaveBeenCalledWith(SERVER_SENT));
-      expect(success).not.toHaveBeenCalledWith('OTP sent successfully');
+      await waitFor(() => expect(screen.getByTestId('phone-auth-sent-notice')).toHaveTextContent(new RegExp(`${SERVER_SENT}$`)));
+      expect(success).not.toHaveBeenCalled();
+      expect(screen.queryByText('OTP sent successfully')).toBeNull();
       expect(screen.queryByText(/We sent a code/)).toBeNull();
     });
 
@@ -426,8 +432,63 @@ describe('PhoneAuthScreen (T-101)', () => {
       mock.onPost('/auth/send-otp').reply(200, { success: true, data: { phone: PHONE, expires_in: 60 } });
       await renderScreen();
       await sendCode();
-      await waitFor(() => expect(success).toHaveBeenCalledTimes(1));
-      expect(success.mock.calls[0][0]).toMatch(/^If this number is registered/);
+      await waitFor(() => expect(screen.getByTestId('phone-auth-sent-notice')).toHaveTextContent(/If this number is registered/));
+      expect(success).not.toHaveBeenCalled();
+    });
+
+    it('T-570: Change number clears the notice; re-entering within the cooldown shows the number and its countdown', async () => {
+      replyLocalSend();
+      await renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByTestId('phone-auth-sent-notice')).toBeTruthy());
+      fireEvent.press(screen.getByTestId('phone-auth-change-number'));
+      expect(screen.queryByTestId('phone-auth-sent-notice')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+      screen.unmount();
+      await renderScreen();
+      // The number comes back with its hold: Send says how long, instead of a silent first tap.
+      expect(phoneInput().props.value).toMatch(/300\s?1234567/);
+      expect(screen.getByText('Send Code (45s)')).toBeTruthy();
+      expect(isDisabled(sendButton())).toBe(true);
+      fireEvent.changeText(phoneInput(), OTHER_PHONE);
+      expect(isDisabled(sendButton())).toBe(false);
+
+      act(() => {
+        jest.advanceTimersByTime(45_000);
+      });
+      fireEvent.changeText(phoneInput(), PHONE);
+      expect(screen.getByText('Send Code')).toBeTruthy();
+      expect(mock.history.post.filter(r => r.url === '/auth/send-otp')).toHaveLength(1);
+    });
+
+    it('T-570: a global hold comes back without a prefilled number and still holds every number', async () => {
+      mock.onPost('/auth/send-otp').reply(503, {
+        success: false,
+        message: 'Phone verification is temporarily unavailable. Please try again later.',
+        code: 'sms_unavailable',
+        retry_after: 120,
+      });
+      await renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByText('Send Code (2:00)')).toBeTruthy());
+      screen.unmount();
+
+      await renderScreen();
+      expect(phoneInput().props.value).toBe('');
+      expect(isDisabled(sendButton())).toBe(true);
+      fireEvent.changeText(phoneInput(), OTHER_PHONE);
+      expect(isDisabled(sendButton())).toBe(true);
+    });
+
+    it('T-570: a refusal with retry_after 0 is remembered with the 60 s fallback, like the countdown', async () => {
+      mock.onPost('/auth/send-otp').reply(429, { success: false, message: 'Please wait.', code: 'otp_cooldown', retry_after: 0 });
+      await renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByText('Send Code (1:00)')).toBeTruthy());
+      expect(activeOtpSendHold()).toEqual({ phone: PHONE, global: false, seconds: 60 });
     });
 
     it.each([

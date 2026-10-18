@@ -43,6 +43,7 @@ export const REGISTRATION_FIELDS = {
     type: 'Vehicle type',
     make: 'Make',
     makeSheet: 'Choose the make',
+    makeNeedsType: 'Choose the vehicle type first.',
     model: 'Model',
     modelPlaceholder: 'e.g. Corolla, Alto, CD 70',
     year: 'Year',
@@ -117,10 +118,31 @@ export const LICENSE_TYPES = [
 
 export const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '20', '25', '30'];
 
-export const VEHICLE_BRANDS = [
-  'Toyota', 'Honda', 'Suzuki', 'Nissan', 'Mitsubishi', 'Hyundai', 'Kia', 'Ford', 'Chevrolet', 'BMW',
-  'Mercedes-Benz', 'Audi', 'Volkswagen', 'Mazda', 'Subaru', 'Lexus', 'Infiniti', 'Acura', 'Other',
-];
+/**
+ * T-570 (QA 2026-10-18): the Make list follows the vehicle type, so a bike shows bike makes.
+ * The server keeps no make catalogue (vehicle_brand is free text, max 100; GET /vehicle-types has
+ * no makes), so this is a static config of makes sold in Pakistan, keyed by the vehicle type id
+ * (registrationForm VEHICLE_TYPES). Each list ends with 'Other'. A server catalogue is a backend
+ * follow-up; until then edit the lists here.
+ */
+export const VEHICLE_MAKES_BY_TYPE: Readonly<Record<string, readonly string[]>> = {
+  car: [
+    'Toyota', 'Honda', 'Suzuki', 'KIA', 'Hyundai', 'Changan', 'MG', 'Haval', 'Proton', 'Nissan',
+    'Mitsubishi', 'Daihatsu', 'Mercedes-Benz', 'BMW', 'Audi', 'Lexus', 'Other',
+  ],
+  bike: [
+    'Honda', 'Yamaha', 'Suzuki', 'United', 'Road Prince', 'Super Power', 'Unique', 'Super Star',
+    'Hi-Speed', 'Metro', 'Crown', 'Benelli', 'Other',
+  ],
+  rickshaw: [
+    'Sazgar', 'New Asia', 'Tez Raftar', 'Siwa', 'United', 'Road Prince', 'Super Power', 'Unique',
+    'Other',
+  ],
+  van: ['Suzuki', 'Toyota', 'Changan', 'FAW', 'Hyundai', 'KIA', 'Daihatsu', 'Nissan', 'Other'],
+};
+
+/** The makes for a vehicle type; none until a known type is chosen. */
+export const vehicleMakesFor = (vehicleType: string): readonly string[] => VEHICLE_MAKES_BY_TYPE[vehicleType] ?? [];
 
 export const VEHICLE_COLOURS = [
   'White', 'Black', 'Silver', 'Gray', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Brown', 'Gold',

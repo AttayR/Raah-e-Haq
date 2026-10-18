@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { StyleSheet, View, type TextInput } from 'react-native';
-import { Button, TextField } from '../../../components/ui';
+import { Button, KeyboardRevealGroup, TextField } from '../../../components/ui';
 import { space } from '../../../theme';
 import { LOGIN_COPY } from '../copy/login';
 import type { LoginFieldErrors } from '../loginValidation';
@@ -36,7 +36,9 @@ export default function LoginEmailForm({
 }: Props) {
   const passwordRef = useRef<TextInput>(null);
   return (
-    <View style={styles.wrap} testID="login-email-form">
+    // T-570 (QA 2026-10-18 #4): one reveal group, so focusing either field scrolls the fields,
+    // "Forgot password?" and "Sign in" above the keyboard together, not just the focused field.
+    <KeyboardRevealGroup style={styles.wrap} testID="login-email-form">
       <View style={styles.fields}>
         <TextField
           label={COPY.emailLabel}
@@ -92,7 +94,7 @@ export default function LoginEmailForm({
         haptic="impactLight"
         testID="login-submit"
       />
-    </View>
+    </KeyboardRevealGroup>
   );
 }
 

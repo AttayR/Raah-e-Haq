@@ -145,8 +145,15 @@ export function useKeyboardRevealController(getScroll: () => RevealScrollable | 
     const show = Keyboard.addListener('keyboardDidShow', () => {
       if (focused.current) schedule(focused.current);
     });
+    // T-570: the keyboard can grow while it is up (focus moves from a number pad to a text field,
+    // the iOS suggestion bar appears): reveal the focused field again once the new frame settles,
+    // or a field near the end (Payout's account number) ends up under the sticky action bar.
+    const frame = Keyboard.addListener('keyboardDidChangeFrame', () => {
+      if (focused.current && Keyboard.isVisible()) schedule(focused.current);
+    });
     return () => {
       show.remove();
+      frame.remove();
       if (timer.current) clearTimeout(timer.current);
     };
   }, [schedule]);

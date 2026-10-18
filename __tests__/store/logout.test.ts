@@ -18,6 +18,7 @@ import { logout, LOGOUT_REQUEST_TIMEOUT_MS, SessionThunkExtra } from '../../src/
 import { loginUser } from '../../src/store/thunks/apiThunks';
 import { createActiveRide, liveShareStarted } from '../../src/features/active-ride/slice';
 import type { User } from '../../src/services/api';
+import { activeOtpSendHold, rememberOtpSendHold } from '../../src/features/auth/otpSendHold';
 import { makeRide, makeRideRequest } from '../../test-utils/rideFixtures';
 
 const user: User = {
@@ -201,6 +202,17 @@ describe('logout thunk (T-102)', () => {
 
     expect(logout.fulfilled.match(result)).toBe(true);
     await expectFullySignedOut(store, extra);
+  });
+
+  it('[T-570] forgets the phone-code send hold, even offline', async () => {
+    const { store } = makeStore();
+    await signIn(store);
+    rememberOtpSendHold('+923001234567', false, 60);
+    mock.onPost('/auth/logout').networkError();
+
+    await store.dispatch(logout());
+
+    expect(activeOtpSendHold()).toBeNull();
   });
 
   it('still signs out locally when the token is already invalid (401)', async () => {

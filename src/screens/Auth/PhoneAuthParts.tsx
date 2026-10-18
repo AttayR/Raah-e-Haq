@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { AppText, Button, TextField } from '../../components/ui';
+import { AppText, Banner, Button, KeyboardRevealGroup, TextField } from '../../components/ui';
 import { OTP_LENGTH } from '../../services/otpService';
 import { PHONE_AUTH_COPY as COPY } from '../../features/auth/copy/phoneAuth';
 import { space } from '../../theme';
@@ -60,6 +60,8 @@ interface CodeStepProps {
   code: string;
   onChange: (code: string) => void;
   error: string;
+  /** T-570: the server's "code sent" message, shown inline (a toast covered the title). */
+  notice: string;
   expiryText: string;
   expiryAlert: boolean;
   /** Verify is off (burned code): the field is read-only too. */
@@ -71,11 +73,17 @@ interface CodeStepProps {
   emailFallback: React.ReactNode;
 }
 
-/** The code: expiry line, the code field, Resend (or its countdown) and "Change number". */
+/**
+ * The code: the server's "code sent" notice, expiry line, the code field, Resend (or its
+ * countdown) and "Change number". T-570: the field and its actions are one reveal group, so with
+ * the keyboard up "Change number" is scrolled into view above the sticky Verify together with the
+ * field. The notice gives way to a refusal or an expired code (one message at a time).
+ */
 export function PhoneCodeStep({
   code,
   onChange,
   error,
+  notice,
   expiryText,
   expiryAlert,
   locked,
@@ -87,6 +95,7 @@ export function PhoneCodeStep({
 }: CodeStepProps) {
   return (
     <View style={styles.body}>
+      {notice && !error && !expiryAlert ? <Banner tone="info" text={notice} testID="phone-auth-sent-notice" /> : null}
       <AppText
         variant="caption"
         color={expiryAlert ? 'danger' : 'textMuted'}
@@ -95,38 +104,40 @@ export function PhoneCodeStep({
       >
         {expiryText}
       </AppText>
-      <TextField
-        label={COPY.codeStep.label}
-        placeholder={COPY.codeStep.placeholder(OTP_LENGTH)}
-        value={code}
-        onChangeText={onChange}
-        keyboardType="number-pad"
-        returnKeyType="done"
-        textContentType="oneTimeCode"
-        autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
-        autoFocus
-        doneBar
-        disabled={locked}
-        error={error || undefined}
-        testID="phone-auth-code"
-      />
-      {emailFallback}
-      <View style={styles.actions}>
-        {resendIn !== null ? (
-          <AppText variant="bodySmall" color="textSecondary" align="center" testID="phone-auth-resend-countdown">
-            {COPY.codeStep.resendIn(resendIn)}
-          </AppText>
-        ) : (
-          <Button
-            label={resending ? COPY.codeStep.resending : COPY.codeStep.resend}
-            variant="secondary"
-            onPress={onResend}
-            loading={resending}
-            testID="phone-auth-resend"
-          />
-        )}
-        <Button label={COPY.codeStep.changePhone} variant="ghost" onPress={onChangeNumber} testID="phone-auth-change-number" />
-      </View>
+      <KeyboardRevealGroup style={styles.body} testID="phone-auth-code-group">
+        <TextField
+          label={COPY.codeStep.label}
+          placeholder={COPY.codeStep.placeholder(OTP_LENGTH)}
+          value={code}
+          onChangeText={onChange}
+          keyboardType="number-pad"
+          returnKeyType="done"
+          textContentType="oneTimeCode"
+          autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+          autoFocus
+          doneBar
+          disabled={locked}
+          error={error || undefined}
+          testID="phone-auth-code"
+        />
+        {emailFallback}
+        <View style={styles.actions}>
+          {resendIn !== null ? (
+            <AppText variant="bodySmall" color="textSecondary" align="center" testID="phone-auth-resend-countdown">
+              {COPY.codeStep.resendIn(resendIn)}
+            </AppText>
+          ) : (
+            <Button
+              label={resending ? COPY.codeStep.resending : COPY.codeStep.resend}
+              variant="secondary"
+              onPress={onResend}
+              loading={resending}
+              testID="phone-auth-resend"
+            />
+          )}
+          <Button label={COPY.codeStep.changePhone} variant="ghost" onPress={onChangeNumber} testID="phone-auth-change-number" />
+        </View>
+      </KeyboardRevealGroup>
     </View>
   );
 }

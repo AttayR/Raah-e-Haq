@@ -13,6 +13,7 @@ import type { User } from '../../services/api';
 import { logger } from '../../core/logging/logger';
 import { safetyApi } from '../../features/safety/api';
 import { isRecord, readId } from '../../core/api/read';
+import { resetOtpSendHold } from '../../features/auth/otpSendHold';
 
 /** Injected by the store (thunk extraArgument) so this file never imports the store itself. */
 export interface SessionThunkExtra {
@@ -107,6 +108,8 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
       // Pre-T-502 builds cached the notification list under this key.
       await step('clear cached notifications', () => AsyncStorage.removeItem(LEGACY_NOTIFICATIONS_CACHE_KEY));
     } finally {
+      // T-570: the phone-code send hold (in memory) belongs to this user's sign-in.
+      resetOtpSendHold();
       dispatch(resetApp());
       await step('purge persisted state', () => extra.purgePersistedState());
     }

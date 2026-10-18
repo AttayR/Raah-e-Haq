@@ -37,11 +37,16 @@ export function useOtpTimers() {
     setResendAt(t + OTP_RESEND_COOLDOWN_SECONDS * 1000);
   }, []);
 
-  /** The server refused a send (429): block resending for retry_after seconds. */
-  const blockResend = useCallback((retryAfterSeconds?: number | null) => {
+  /**
+   * The server refused a send (429): block resending for retry_after seconds (the 60 s cooldown
+   * when it is missing, 0 or negative). Returns the seconds applied (T-570: remembered as is).
+   */
+  const blockResend = useCallback((retryAfterSeconds?: number | null): number => {
     const t = Date.now();
+    const seconds = positiveOr(retryAfterSeconds, OTP_RESEND_COOLDOWN_SECONDS);
     setNow(t);
-    setResendAt(t + positiveOr(retryAfterSeconds, OTP_RESEND_COOLDOWN_SECONDS) * 1000);
+    setResendAt(t + seconds * 1000);
+    return seconds;
   }, []);
 
   /** The current code can no longer be used (e.g. too many wrong attempts). */
