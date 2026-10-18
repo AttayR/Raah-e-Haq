@@ -165,6 +165,12 @@ export default function RegistrationPhoneStep({ pending, role, onGoToSignIn }: P
       <AppText variant="caption" color="textSecondary">
         {COPY.verify.signInHint}
       </AppText>
+      {/* T-564: the approval wait the register message used to carry in its toast. */}
+      {role === 'driver' ? (
+        <AppText variant="caption" color="textSecondary" testID="registration-driver-approval-hint">
+          {COPY.verify.driverApprovalHint}
+        </AppText>
+      ) : null}
       <AppText variant="caption" color="textSecondary">
         {COPY.verify.wrongNumber}
       </AppText>

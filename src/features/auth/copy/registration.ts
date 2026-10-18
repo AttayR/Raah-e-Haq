@@ -1,7 +1,8 @@
 /**
  * User-facing copy of the registration form and its phone step (T-201). Server text (the
- * BE-35/BE-38 `message` of register, phone/verify and phone/resend) is shown as sent; these
- * strings only frame it or stand in when a response has none. Code-entry strings shared with
+ * BE-35/BE-38 `message` of phone/verify and phone/resend) is shown as sent; these strings only
+ * frame it or stand in when a response has none. Register's own long message is replaced by
+ * `form.received` plus the code step's lines (T-564). Code-entry strings shared with
  * phone sign-in come from PHONE_AUTH_COPY.
  */
 export const REGISTRATION_COPY = {
@@ -9,6 +10,8 @@ export const REGISTRATION_COPY = {
     progress: (step: number, of: number) => `Step ${step} of ${of}`,
     /** A backend from before BE-35 (no phone step): the old success message. */
     created: 'Your account has been created successfully! Please wait for admin approval.',
+    /** T-564: register answered with a code step (one line, so it never covers the subtitle). */
+    received: 'Registration received',
     fixErrors: 'Please fix the highlighted fields.',
     /** T-202: a 422 whose fields no input shows; the messages are listed above the action bar. */
     notAccepted: 'Your details could not be accepted. See the message below.',

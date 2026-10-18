@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { Keyboard, StyleSheet } from 'react-native';
-import { act, fireEvent, render, renderHook } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, within } from '@testing-library/react-native';
 import { DarkTheme, LightTheme, type AppTheme } from '../../../src/theme';
 import { MapTopControls } from '../../../src/features/ride-booking/components/MapTopControls';
 import { TripSummaryCard } from '../../../src/features/ride-booking/components/TripSummaryCard';
@@ -98,6 +98,34 @@ describe.each([
     expect(onHeightChange).toHaveBeenCalledWith(320);
     act(() => keyboardListeners.keyboardWillShow?.({ endCoordinates: { height: 291 } }));
     expect(StyleSheet.flatten(getByTestId('booking-sheet').props.style)).toMatchObject({ bottom: 291 });
+  });
+
+  it('sheet footer (T-564): pinned under the scroll, insets.bottom + 8 below it, 8 above the keyboard', () => {
+    const onDone = jest.fn();
+    const { getByTestId, getByText } = render(
+      <BookingSheet maxHeightRatio={0.5} footer={<AppText onPress={onDone}>Done</AppText>}>
+        <AppText>Receipt</AppText>
+      </BookingSheet>,
+    );
+    const footer = getByTestId('booking-sheet-footer');
+    // Clear of the 34 pt home indicator, and outside the scroll (so long content never cuts it off).
+    expect(StyleSheet.flatten(footer.props.style)).toMatchObject({ paddingBottom: 42, paddingTop: 12, paddingHorizontal: 16 });
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-scroll').props.contentContainerStyle).paddingBottom).toBe(16);
+    expect(within(getByTestId('booking-sheet-scroll')).queryByText('Done')).toBeNull();
+    fireEvent.press(getByText('Done'));
+    expect(onDone).toHaveBeenCalledTimes(1);
+    act(() => keyboardListeners.keyboardWillShow?.({ endCoordinates: { height: 291 } }));
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-footer').props.style).paddingBottom).toBe(8);
+  });
+
+  it('sheet without a footer keeps the inset under its content', () => {
+    const { getByTestId, queryByTestId } = render(
+      <BookingSheet>
+        <AppText>content</AppText>
+      </BookingSheet>,
+    );
+    expect(queryByTestId('booking-sheet-footer')).toBeNull();
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-scroll').props.contentContainerStyle).paddingBottom).toBe(50);
   });
 
   it('sheet: maxHeightRatio caps the height while the keyboard is down', () => {

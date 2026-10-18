@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
-import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
+import ActiveRidePanel, { ActiveRideDoneButton, isPassengerRideFinished } from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
 import type { RideResource } from '../../../src/services/rideService';
 import { makeRide } from '../../../test-utils/rideFixtures';
@@ -156,5 +156,26 @@ describe('ActiveRidePanel', () => {
     const { getByText, getByTestId } = renderPanel(ride, stateOf(ride));
     expect(getByText(text)).toBeTruthy();
     expect(getByTestId('active-ride-done')).toBeTruthy();
+  });
+
+  it('T-564: without onDone (booking map) the panel leaves Done to the sheet footer', () => {
+    const ride = makeRide({ status: 'completed' });
+    const { queryByTestId } = render(<ActiveRidePanel stageState={stateOf(ride)} ride={ride} onCancel={jest.fn()} />);
+    expect(queryByTestId('active-ride-done')).toBeNull();
+    const onPress = jest.fn();
+    const footer = render(<ActiveRideDoneButton onPress={onPress} />);
+    fireEvent.press(footer.getByTestId('active-ride-done'));
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(footer.getByText('Done')).toBeTruthy();
+  });
+
+  it.each([
+    ['completed', true],
+    ['cancelled', true],
+    ['in_trip', false],
+    ['searching', false],
+    [null, false],
+  ] as const)('isPassengerRideFinished(%s) is %s', (stage, finished) => {
+    expect(isPassengerRideFinished(stage)).toBe(finished);
   });
 });

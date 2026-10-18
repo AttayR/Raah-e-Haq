@@ -32,7 +32,6 @@ type Props = {
   onCancelRide: () => void;
   ride: RideResource | null;
   rideStage: PassengerRideStageState | null;
-  onDone: () => void;
   onCall?: () => void;
   calling: boolean;
   busy: boolean;
@@ -40,7 +39,8 @@ type Props = {
 
 /**
  * The step shown in the booking sheet (T-534 split of PassengerMapScreen): the two-field start,
- * the pickup or destination search, vehicle, fare, and the ride itself.
+ * the pickup or destination search, vehicle, fare, and the ride itself. A finished ride's Done is
+ * the sheet footer's (PassengerMapScreen, T-564).
  */
 export const BookingStageContent: React.FC<Props> = ({
   flow,
@@ -56,7 +56,6 @@ export const BookingStageContent: React.FC<Props> = ({
   onCancelRide,
   ride,
   rideStage,
-  onDone,
   onCall,
   calling,
   busy,
@@ -170,7 +169,6 @@ export const BookingStageContent: React.FC<Props> = ({
           stageState={rideStage ?? { rideId: null, stage: 'searching', notice: null }}
           ride={ride}
           onCancel={onCancelRide}
-          onDone={onDone}
           onCall={onCall}
           calling={calling}
           safety={ride ? <PassengerTripSafety ride={ride} position={currentLocation} /> : null}

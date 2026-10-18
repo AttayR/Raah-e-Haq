@@ -65,7 +65,7 @@ export const REGISTRATION_FIELDS = {
     expiryPlaceholder: 'YYYY-MM-DD',
     expiryHelper: 'Must not be expired. Type the digits, e.g. 20300115.',
     experience: 'Driving experience',
-    experienceValue: (years: string) => `${years} years`,
+    experienceValue: (years: string) => (years === '1' ? '1 year' : `${years} years`),
   },
   payout: {
     bankName: 'Bank name',

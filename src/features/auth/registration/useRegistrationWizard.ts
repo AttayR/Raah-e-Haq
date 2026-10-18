@@ -208,7 +208,9 @@ export function useRegistrationWizard(initialRole?: RegistrationRole) {
           // BE-35/BE-38: the same answer for a new and a taken email; the code step decides.
           const role = outcome.role === 'driver' || outcome.role === 'passenger' ? outcome.role : formData.role;
           setPhoneStep({ pending: outcome.phoneVerification, role });
-          if (outcome.message) toast.success(outcome.message);
+          // T-564: a one-line toast. The server's long message ran past the toast's two lines and
+          // covered the code step's subtitle, which already says where the code went.
+          toast.success(COPY.form.received);
           return;
         }
         // A backend from before BE-35: no phone step.

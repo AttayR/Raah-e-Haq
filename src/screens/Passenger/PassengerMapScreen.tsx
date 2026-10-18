@@ -27,6 +27,7 @@ import { PassengerRideRatingPrompt } from '../../features/rating/components/Ride
 import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
 import { useRideMapRoutes, useTripRoute } from '../../features/active-ride/tripRoute';
 import { RideRecentreButton } from '../../features/active-ride/components/RideRecentreButton';
+import { ActiveRideDoneButton, isPassengerRideFinished } from '../../features/active-ride/components/ActiveRidePanel';
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
@@ -344,7 +345,11 @@ const PassengerMapScreen = () => {
         />
         <RideRecentreButton visible={rideCamera.paused} onPress={rideCamera.recentre} />
 
-        <BookingSheet onHeightChange={setSheetHeight} maxHeightRatio={sheetRatio}>
+        <BookingSheet
+          onHeightChange={setSheetHeight}
+          maxHeightRatio={sheetRatio}
+          footer={rideShown && isPassengerRideFinished(rideStage?.stage) ? <ActiveRideDoneButton onPress={finishRide} /> : null}
+        >
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
           {shownStage !== 'requesting' && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
           {!rideShown && !compact && <StageChips stage={shownStage} />}
@@ -366,7 +371,6 @@ const PassengerMapScreen = () => {
             onCancelRide={handleCancelRide}
             ride={currentRide}
             rideStage={rideStage}
-            onDone={finishRide}
             onCall={canCallOn(currentRide) ? rideCall.call : undefined}
             calling={rideCall.calling}
             busy={isLoading || rideSubmitting}

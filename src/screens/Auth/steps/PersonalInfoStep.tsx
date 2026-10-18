@@ -33,7 +33,8 @@ export default function PersonalInfoStep(props: StepProps) {
       <FormGroup>
         <Anchored field="fullName">
           <TextField
-            label={f.label(COPY.fullName, 'fullName')}
+            label={COPY.fullName}
+            required={f.required('fullName')}
             placeholder={COPY.fullNamePlaceholder}
             value={data.fullName}
             onChangeText={(value) => f.set('fullName', value)}
@@ -47,7 +48,8 @@ export default function PersonalInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="email">
           <TextField
-            label={f.label(COPY.email, 'email')}
+            label={COPY.email}
+            required={f.required('email')}
             placeholder={COPY.emailPlaceholder}
             value={data.email}
             onChangeText={(value) => f.set('email', value)}
@@ -64,7 +66,8 @@ export default function PersonalInfoStep(props: StepProps) {
         <Anchored field="phoneNumber">
           <TextField
             variant="phone"
-            label={f.label(COPY.phone, 'phoneNumber')}
+            label={COPY.phone}
+            required={f.required('phoneNumber')}
             value={toPhoneField(data.phoneNumber)}
             onChangeText={(digits) => f.set('phoneNumber', fromPhoneField(digits))}
             onBlur={() => f.blur('phoneNumber')}
@@ -76,7 +79,8 @@ export default function PersonalInfoStep(props: StepProps) {
         <Anchored field="password">
           <TextField
             variant="password"
-            label={f.label(COPY.password, 'password')}
+            label={COPY.password}
+            required={f.required('password')}
             placeholder={COPY.passwordPlaceholder}
             helper={COPY.passwordHelper}
             value={data.password}
@@ -92,7 +96,8 @@ export default function PersonalInfoStep(props: StepProps) {
         <Anchored field="confirmPassword">
           <TextField
             variant="password"
-            label={f.label(COPY.confirmPassword, 'confirmPassword')}
+            label={COPY.confirmPassword}
+            required={f.required('confirmPassword')}
             placeholder={COPY.confirmPasswordPlaceholder}
             value={data.confirmPassword}
             onChangeText={(value) => f.set('confirmPassword', value)}
@@ -105,7 +110,8 @@ export default function PersonalInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="cnic">
           <TextField
-            label={f.label(COPY.cnic, 'cnic')}
+            label={COPY.cnic}
+            required={f.required('cnic')}
             placeholder={COPY.cnicPlaceholder}
             value={data.cnic}
             onChangeText={(value) => f.set('cnic', formatCnicInput(value))}
@@ -119,7 +125,8 @@ export default function PersonalInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="dateOfBirth">
           <TextField
-            label={f.label(COPY.dob, 'dateOfBirth')}
+            label={COPY.dob}
+            required={f.required('dateOfBirth')}
             placeholder={COPY.dobPlaceholder}
             helper={data.role === 'driver' ? COPY.dobDriverHelper : COPY.dobHelper}
             value={data.dateOfBirth}
@@ -135,7 +142,7 @@ export default function PersonalInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="gender">
           <View style={stepStyles.control}>
-            <ControlLabel>{f.label(COPY.gender, 'gender')}</ControlLabel>
+            <ControlLabel required={f.required('gender')}>{COPY.gender}</ControlLabel>
             <SegmentedControl<Gender>
               options={GENDER_OPTIONS}
               value={data.gender}
@@ -148,7 +155,8 @@ export default function PersonalInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="address">
           <TextField
-            label={f.label(COPY.address, 'address')}
+            label={COPY.address}
+            required={f.required('address')}
             placeholder={COPY.addressPlaceholder}
             value={data.address}
             onChangeText={(value) => f.set('address', value)}

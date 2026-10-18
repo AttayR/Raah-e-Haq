@@ -11,6 +11,7 @@ import {
   textStyles,
 } from '../../theme';
 import { AppText } from './AppText';
+import { FieldLabel } from './FieldLabel';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
 import { KeyboardDoneBar } from './KeyboardDoneBar';
@@ -28,6 +29,8 @@ export type TextFieldProps = Omit<
   /** For `phone` this receives the national digits only (no spaces, no +92, no leading 0). */
   onChangeText: (text: string) => void;
   label?: string;
+  /** Required field: a `danger` `*` after the label and "required" in the spoken name (T-564). */
+  required?: boolean;
   helper?: string;
   /** Error message: 2pt `danger` border, the message under the field, read with the label. */
   error?: string | null;
@@ -63,6 +66,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     value,
     onChangeText,
     label,
+    required = false,
     helper,
     error,
     variant = 'default',
@@ -112,7 +116,11 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     hadError.current = hasError;
   }, [hasError, reveal]);
   const fill = focused && !isSearch ? c.surface : c.surfaceAlt;
-  const name = [accessibilityLabel ?? label ?? inputProps.placeholder, hasError ? t('kit.errorA11y', { message: error as string }) : null]
+  const name = [
+    accessibilityLabel ?? label ?? inputProps.placeholder,
+    required ? t('kit.requiredA11y') : null,
+    hasError ? t('kit.errorA11y', { message: error as string }) : null,
+  ]
     .filter(Boolean)
     .join(', ');
 
@@ -126,9 +134,9 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       testID={testID}
     >
       {label ? (
-        <AppText variant="label" color="textSecondary" style={styles.label}>
+        <FieldLabel required={required} style={styles.label}>
           {label}
-        </AppText>
+        </FieldLabel>
       ) : null}
       <View
         testID={testID ? `${testID}-field` : undefined}

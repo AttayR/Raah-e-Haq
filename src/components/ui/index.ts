@@ -17,6 +17,7 @@ export * from './Dialog';
 export * from './EmptyState';
 export * from './FilterChips';
 export * from './ErrorState';
+export * from './FieldLabel';
 export * from './Header';
 export * from './Icon';
 export * from './IconButton';

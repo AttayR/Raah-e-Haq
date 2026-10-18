@@ -64,14 +64,7 @@ export default function DocumentsStep(props: StepProps) {
       </FormGroup>
       <Anchored field="vehiclePictures">
         <View style={stepStyles.control}>
-          <View style={styles.labelRow}>
-            <ControlLabel>{D.vehiclePhotos}</ControlLabel>
-            {f.required('vehiclePictures') ? (
-              <AppText variant="label" color="danger">
-                *
-              </AppText>
-            ) : null}
-          </View>
+          <ControlLabel required={f.required('vehiclePictures')}>{D.vehiclePhotos}</ControlLabel>
           <AppText variant="caption" color="textSecondary">
             {D.vehiclePhotosHint}
           </AppText>
@@ -102,7 +95,6 @@ export default function DocumentsStep(props: StepProps) {
 }
 
 const styles = StyleSheet.create({
-  labelRow: { flexDirection: 'row', gap: space[1] },
   // Two sides per row on every phone (4 across is too small to check a plate on an SE).
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   slot: { flexBasis: '45%', flexGrow: 1 },

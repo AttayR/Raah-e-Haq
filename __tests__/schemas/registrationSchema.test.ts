@@ -12,6 +12,7 @@ import {
   validateStep,
   validateStepField,
 } from '../../src/schemas/registrationSchema';
+import { REGISTRATION_FIELDS } from '../../src/features/auth/copy/registrationFields';
 import {
   INITIAL_REGISTRATION_FORM,
   type RegistrationFormData,
@@ -304,5 +305,31 @@ describe('T-207: drivers are 18+ and hold a driving licence', () => {
     expect(isStepFieldRequired('documents', 'licenseFrontPicture', 'passenger')).toBe(false);
     expect(validateStep('vehicle', validPassenger)).toEqual({});
     expect(validateStep('documents', validPassenger)).toEqual({});
+  });
+});
+
+describe('T-564: emergency contact name and experience copy', () => {
+  const nameError = 'Use letters only (spaces, dots, apostrophes and hyphens are fine)';
+
+  it.each(['Ayesha Khan', "Mehr-un-Nisa O'Brien", 'Dr. Ali', 'عائشہ خان'])('accepts the name %s', (name) => {
+    expect(validateStepField('personal', 'emergencyContactName', { ...validPassenger, emergencyContactName: name })).toBeUndefined();
+  });
+
+  it.each(['Ali 2', '12345', 'Ali@home', '-Ali', 'Ali_Khan'])('refuses the name %s (passenger and driver)', (name) => {
+    expect(validateStepField('personal', 'emergencyContactName', { ...validPassenger, emergencyContactName: name })).toBe(nameError);
+    expect(validateStepField('personal', 'emergencyContactName', { ...validDriver, emergencyContactName: name })).toBe(nameError);
+  });
+
+  it('an empty name is still only "required" for passengers and fine for drivers', () => {
+    expect(validateStepField('personal', 'emergencyContactName', { ...validPassenger, emergencyContactName: '' })).toBe(
+      'Emergency contact name is required',
+    );
+    expect(validateStepField('personal', 'emergencyContactName', { ...validDriver, emergencyContactName: '' })).toBeUndefined();
+  });
+
+  it('driving experience: "1 year", then plural', () => {
+    expect(REGISTRATION_FIELDS.licence.experienceValue('1')).toBe('1 year');
+    expect(REGISTRATION_FIELDS.licence.experienceValue('2')).toBe('2 years');
+    expect(REGISTRATION_FIELDS.licence.experienceValue('30')).toBe('30 years');
   });
 });

@@ -4,6 +4,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { t } from '../../i18n';
 import { componentTokens, radius, space } from '../../theme';
 import { AppText } from './AppText';
+import { FieldLabel } from './FieldLabel';
 import { BottomSheet, type BottomSheetHandle } from './BottomSheet';
 import { Icon } from './Icon';
 import { ListItem } from './ListItem';
@@ -11,7 +12,10 @@ import { ListItem } from './ListItem';
 export type SelectOption = { value: string; label: string };
 
 export type SelectFieldProps = {
+  /** The field's name; the sheet title too unless `sheetTitle` is given. Never includes a `*`. */
   label: string;
+  /** Required field: a `danger` `*` after the label (not in the sheet title) (T-564). */
+  required?: boolean;
   value: string;
   options: ReadonlyArray<SelectOption>;
   onChange: (value: string) => void;
@@ -35,6 +39,7 @@ const k = componentTokens.textField;
  */
 export function SelectField({
   label,
+  required = false,
   value,
   options,
   onChange,
@@ -58,6 +63,7 @@ export function SelectField({
   const hasError = !!error;
   const name = [
     label,
+    required ? t('kit.requiredA11y') : null,
     chosen?.label,
     hasError ? t('kit.errorA11y', { message: error as string }) : null,
   ]
@@ -66,9 +72,9 @@ export function SelectField({
 
   return (
     <View style={styles.container} testID={testID}>
-      <AppText variant="label" color="textSecondary" style={styles.label}>
+      <FieldLabel required={required} style={styles.label}>
         {label}
-      </AppText>
+      </FieldLabel>
       <Pressable
         testID={testID ? `${testID}-field` : undefined}
         onPress={openSheet}

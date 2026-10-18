@@ -105,7 +105,11 @@ type Props = {
   stageState: PassengerRideStageState;
   ride: RideResource | null;
   onCancel: () => void;
-  onDone: () => void;
+  /**
+   * Shows Done inside the panel once the ride is over. The booking map leaves it out and pins
+   * `ActiveRideDoneButton` in the sheet footer instead (T-564), clear of the home indicator.
+   */
+  onDone?: () => void;
   /** A masked call (T-520, BE-78 `contact.can_call`); no Call action without it. */
   onCall?: () => void;
   /** POST /rides/{id}/call is in flight. */
@@ -131,7 +135,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const subtitle = subtitleOf(stageState, ride, parcel);
   const hasDriver = !!ride?.driver && (stage === 'driver_en_route' || stage === 'driver_arrived' || stage === 'in_trip');
   const fare = stage === 'completed' && ride ? fareSummaryOf(ride) : null;
-  const finished = stage === 'completed' || stage === 'cancelled';
+  const finished = isPassengerRideFinished(stage);
   const warn = stage === 'searching' && stageState.notice === 'driver_cancelled';
   const step = STAGE_STEP[stage] ?? (ride ? rideProgressStep(ride.status) : null);
 
@@ -257,10 +261,19 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           testID="active-ride-cancel"
         />
       ) : null}
-      {finished ? <Button label={ACTIVE_RIDE_COPY.done} size="lg" onPress={onDone} testID="active-ride-done" /> : null}
+      {finished && onDone ? <ActiveRideDoneButton onPress={onDone} /> : null}
     </View>
   );
 };
+
+/** The ride is over (completed or cancelled): the passenger closes the panel with Done. */
+export const isPassengerRideFinished = (stage: PassengerRideStage | null | undefined): boolean =>
+  stage === 'completed' || stage === 'cancelled';
+
+/** The finished ride's single primary action (in the panel, or pinned in the map sheet footer). */
+export const ActiveRideDoneButton: React.FC<{ onPress: () => void }> = ({ onPress }) => (
+  <Button label={ACTIVE_RIDE_COPY.done} size="lg" onPress={onPress} testID="active-ride-done" />
+);
 
 type LatLng = { latitude: number; longitude: number };
 

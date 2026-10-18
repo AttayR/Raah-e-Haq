@@ -19,7 +19,8 @@ export default function PayoutStep(props: StepProps) {
       <FormGroup>
         <Anchored field="bankName">
           <TextField
-            label={f.label(P.bankName, 'bankName')}
+            label={P.bankName}
+            required={f.required('bankName')}
             placeholder={P.bankNamePlaceholder}
             value={data.bankName}
             onChangeText={(value) => f.set('bankName', value)}
@@ -31,7 +32,8 @@ export default function PayoutStep(props: StepProps) {
         </Anchored>
         <Anchored field="bankBranch">
           <TextField
-            label={f.label(P.bankBranch, 'bankBranch')}
+            label={P.bankBranch}
+            required={f.required('bankBranch')}
             placeholder={P.bankBranchPlaceholder}
             value={data.bankBranch}
             onChangeText={(value) => f.set('bankBranch', value)}
@@ -43,7 +45,8 @@ export default function PayoutStep(props: StepProps) {
         </Anchored>
         <Anchored field="bankAccountNumber">
           <TextField
-            label={f.label(P.account, 'bankAccountNumber')}
+            label={P.account}
+            required={f.required('bankAccountNumber')}
             placeholder={P.accountPlaceholder}
             value={data.bankAccountNumber}
             onChangeText={(value) => f.set('bankAccountNumber', value.toUpperCase())}

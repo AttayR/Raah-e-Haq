@@ -312,6 +312,7 @@ describe('RegistrationScreen (T-201)', () => {
         },
       ];
     });
+    const successToast = jest.spyOn(toast, 'success');
     const store = await renderScreen();
     goToReview();
 
@@ -322,6 +323,11 @@ describe('RegistrationScreen (T-201)', () => {
         screen.getByText('Enter the code sent by SMS to +923009990001.'),
       ).toBeTruthy(),
     );
+    // T-564: one short line, not the server's long message (it ran past two lines over the subtitle).
+    expect(successToast).toHaveBeenCalledWith('Registration received');
+    successToast.mockRestore();
+    // A passenger has no approval wait to mention.
+    expect(screen.queryByTestId('registration-driver-approval-hint')).toBeNull();
     expect(sentPhone).toBe('+923009990001');
     expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy();
     expect(mockNavigate).not.toHaveBeenCalled();

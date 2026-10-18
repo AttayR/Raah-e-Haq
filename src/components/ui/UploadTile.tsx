@@ -4,6 +4,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { t } from '../../i18n';
 import { componentTokens, radius, space } from '../../theme';
 import { AppText } from './AppText';
+import { FieldLabel } from './FieldLabel';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
 
@@ -73,16 +74,9 @@ export function UploadTile({
   return (
     <View style={[styles.wrap, square && styles.squareWrap, style]}>
       {square ? null : (
-        <View style={styles.labelRow}>
-          <AppText variant="label" color="textSecondary">
-            {label}
-          </AppText>
-          {required ? (
-            <AppText variant="label" color="danger">
-              *
-            </AppText>
-          ) : null}
-        </View>
+        <FieldLabel required={required} style={styles.label}>
+          {label}
+        </FieldLabel>
       )}
       <View>
         <Pressable
@@ -157,7 +151,7 @@ export function UploadTile({
 const styles = StyleSheet.create({
   wrap: { alignSelf: 'stretch' },
   squareWrap: { flex: 1, minWidth: k.squareMin },
-  labelRow: { flexDirection: 'row', gap: space[1], marginBottom: componentTokens.textField.labelGap },
+  label: { marginBottom: componentTokens.textField.labelGap },
   tile: {
     borderRadius: radius.lg,
     borderWidth: k.border,

@@ -69,7 +69,8 @@ export default function VehicleInfoStep(props: StepProps) {
   ) => (
     <Anchored field={field}>
       <TextField
-        label={f.label(label, field)}
+        label={label}
+        required={f.required(field)}
         placeholder={placeholder}
         value={data[field]}
         onChangeText={(value) => f.set(field, value)}
@@ -85,14 +86,15 @@ export default function VehicleInfoStep(props: StepProps) {
       <FormGroup title={V.group}>
         <Anchored field="vehicleType">
           <View style={stepStyles.control}>
-            <ControlLabel>{f.label(V.type, 'vehicleType')}</ControlLabel>
+            <ControlLabel required={f.required('vehicleType')}>{V.type}</ControlLabel>
             <VehicleTypePicker value={data.vehicleType} onChange={(id) => f.set('vehicleType', id)} accessibilityLabel={V.type} />
             <FieldError message={errors.vehicleType} testID="registration-vehicle-type-error" />
           </View>
         </Anchored>
         <Anchored field="vehicleBrand">
           <SelectField
-            label={f.label(V.make, 'vehicleBrand')}
+            label={V.make}
+            required={f.required('vehicleBrand')}
             sheetTitle={V.makeSheet}
             value={data.vehicleBrand}
             options={BRAND_OPTIONS}
@@ -104,7 +106,8 @@ export default function VehicleInfoStep(props: StepProps) {
         {text('vehicleModel', V.model, V.modelPlaceholder, { testID: 'registration-vehicle-model' })}
         <Anchored field="vehicleYear">
           <SelectField
-            label={f.label(V.year, 'vehicleYear')}
+            label={V.year}
+            required={f.required('vehicleYear')}
             sheetTitle={V.yearSheet}
             value={data.vehicleYear}
             options={yearOptions}
@@ -115,7 +118,8 @@ export default function VehicleInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="vehicleColor">
           <SelectField
-            label={f.label(V.colour, 'vehicleColor')}
+            label={V.colour}
+            required={f.required('vehicleColor')}
             sheetTitle={V.colourSheet}
             value={data.vehicleColor}
             options={COLOUR_OPTIONS}
@@ -138,7 +142,8 @@ export default function VehicleInfoStep(props: StepProps) {
         ) : null}
         <Anchored field="vehicleNumber">
           <TextField
-            label={f.label(V.vehicleNumber, 'vehicleNumber')}
+            label={V.vehicleNumber}
+            required={f.required('vehicleNumber')}
             placeholder={V.vehicleNumberPlaceholder}
             value={data.vehicleNumber}
             onChangeText={(value) => f.set('vehicleNumber', formatVehicleNumber(value))}
@@ -171,7 +176,8 @@ export default function VehicleInfoStep(props: StepProps) {
         })}
         <Anchored field="licenseType">
           <SelectField
-            label={f.label(L.type, 'licenseType')}
+            label={L.type}
+            required={f.required('licenseType')}
             value={data.licenseType}
             options={LICENSE_TYPES}
             onChange={(value) => f.set('licenseType', value)}
@@ -181,7 +187,8 @@ export default function VehicleInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="licenseExpiryDate">
           <TextField
-            label={f.label(L.expiry, 'licenseExpiryDate')}
+            label={L.expiry}
+            required={f.required('licenseExpiryDate')}
             placeholder={L.expiryPlaceholder}
             helper={L.expiryHelper}
             value={data.licenseExpiryDate}
@@ -196,7 +203,8 @@ export default function VehicleInfoStep(props: StepProps) {
         </Anchored>
         <Anchored field="drivingExperience">
           <SelectField
-            label={f.label(L.experience, 'drivingExperience')}
+            label={L.experience}
+            required={f.required('drivingExperience')}
             value={data.drivingExperience}
             options={EXPERIENCE_OPTIONS}
             onChange={(value) => f.set('drivingExperience', value)}

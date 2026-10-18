@@ -289,6 +289,13 @@ describe('RegistrationPhoneStep', () => {
     expect(screen.getByText('Wrong number? Open the link we emailed you, sign in, then change it in Profile.')).toBeTruthy();
   });
 
+  it('T-564: a driver is told about the approval wait on the code step (no longer in the toast)', async () => {
+    await renderStep(sent, 'driver');
+    expect(screen.getByTestId('registration-driver-approval-hint')).toHaveTextContent(
+      'Driver accounts can sign in once an admin approves them.',
+    );
+  });
+
   it('asks before leaving while the code is entered (back, swipe, Go to Sign In)', async () => {
     await renderStep();
 

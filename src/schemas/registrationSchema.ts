@@ -66,6 +66,13 @@ export const isIsoDate = (value: string | undefined): boolean => {
 
 export const EMERGENCY_RELATIONS = ['father', 'mother', 'spouse', 'brother', 'sister', 'friend', 'other'] as const;
 
+/**
+ * A person's name: letters (any script, with their marks), spaces, dots, apostrophes and hyphens,
+ * starting with a letter (T-564; the same rule as the parcel receiver name).
+ */
+export const PERSON_NAME = /^[\p{L}\p{M}][\p{L}\p{M}\s.'-]*$/u;
+const PERSON_NAME_MESSAGE = 'Use letters only (spaces, dots, apostrophes and hyphens are fine)';
+
 const requiredText = (label: string, max: number) =>
   yup.string().trim().required(`${label} is required`).max(max, `${label} must be at most ${max} characters`);
 
@@ -132,7 +139,11 @@ const personalBase = {
     .required('Please confirm your password')
     .oneOf([yup.ref('password')], 'Passwords do not match'),
   emergencyContactNumber: yup.string().trim().max(20, 'Emergency contact number must be at most 20 characters'),
-  emergencyContactName: yup.string().trim().max(100, 'Emergency contact name must be at most 100 characters'),
+  emergencyContactName: yup
+    .string()
+    .trim()
+    .max(100, 'Emergency contact name must be at most 100 characters')
+    .test('person-name', PERSON_NAME_MESSAGE, (value) => !value || PERSON_NAME.test(value)),
   emergencyRelationship: yup.string(),
 };
 
@@ -144,7 +155,11 @@ const passengerPersonal = yup.object({
     'Enter a valid phone number',
     (value) => !value || /^\+?[0-9\s-]{10,20}$/.test(value),
   ),
-  emergencyContactName: requiredText('Emergency contact name', 100),
+  emergencyContactName: requiredText('Emergency contact name', 100).test(
+    'person-name',
+    PERSON_NAME_MESSAGE,
+    (value) => !value || PERSON_NAME.test(value),
+  ),
   emergencyRelationship: yup
     .string()
     .required('Relationship is required')

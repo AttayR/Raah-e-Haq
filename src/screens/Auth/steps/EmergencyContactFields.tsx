@@ -28,7 +28,8 @@ export default function EmergencyContactFields({ data, fields: f }: Props) {
     <FormGroup title={COPY.group} helper={COPY.groupHelper}>
       <Anchored field="emergencyContactName">
         <TextField
-          label={f.label(COPY.name, 'emergencyContactName')}
+          label={COPY.name}
+          required={f.required('emergencyContactName')}
           placeholder={COPY.namePlaceholder}
           value={data.emergencyContactName}
           onChangeText={(value) => f.set('emergencyContactName', value)}
@@ -41,7 +42,8 @@ export default function EmergencyContactFields({ data, fields: f }: Props) {
       <Anchored field="emergencyContactNumber">
         <TextField
           variant="phone"
-          label={f.label(COPY.phone, 'emergencyContactNumber')}
+          label={COPY.phone}
+          required={f.required('emergencyContactNumber')}
           value={toPhoneField(data.emergencyContactNumber)}
           onChangeText={(digits) => f.set('emergencyContactNumber', fromPhoneField(digits))}
           onBlur={() => f.blur('emergencyContactNumber')}
@@ -54,7 +56,7 @@ export default function EmergencyContactFields({ data, fields: f }: Props) {
       </Anchored>
       <Anchored field="emergencyRelationship">
         <View style={stepStyles.control}>
-          <ControlLabel>{f.label(COPY.relationship, 'emergencyRelationship')}</ControlLabel>
+          <ControlLabel required={f.required('emergencyRelationship')}>{COPY.relationship}</ControlLabel>
           <AppText variant="caption" color="textSecondary">
             {COPY.relationshipHint}
           </AppText>

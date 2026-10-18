@@ -25,6 +25,12 @@ type Props = {
    * vehicle / fare / ride steps (DESIGN_SYSTEM 5.14). Content scrolls inside.
    */
   maxHeightRatio?: number;
+  /**
+   * The step's single primary action, pinned under the scrolling content and above the home
+   * indicator (DESIGN_SYSTEM §5.14/§9 map pattern, T-564): 12 above it, `max(insets.bottom + 8,
+   * 16)` below it, 8 above the keyboard. Long content scrolls behind it, so it is never cut off.
+   */
+  footer?: React.ReactNode;
   testID?: string;
 };
 
@@ -38,7 +44,7 @@ type Props = {
  * visible part of the sheet (the kit keyboard reveal), e.g. the stop search at the end of the
  * vehicle step.
  */
-export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHeightRatio, testID = 'booking-sheet' }) => {
+export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHeightRatio, footer, testID = 'booking-sheet' }) => {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -93,11 +99,19 @@ export const BookingSheet: React.FC<Props> = ({ children, onHeightChange, maxHei
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: (keyboardUp ? 0 : insets.bottom) + space[4] },
+          { paddingBottom: (keyboardUp || footer ? 0 : insets.bottom) + space[4] },
         ]}
       >
         <KeyboardRevealProvider getScroll={getScroll}>{children}</KeyboardRevealProvider>
       </ScrollView>
+      {footer ? (
+        <View
+          style={[styles.footer, { paddingBottom: keyboardUp ? space[2] : Math.max(insets.bottom + space[2], space[4]) }]}
+          testID={`${testID}-footer`}
+        >
+          {footer}
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -116,6 +130,7 @@ const styles = StyleSheet.create({
   handle: { width: componentTokens.sheet.handleWidth, height: componentTokens.sheet.handleHeight, borderRadius: radius.pill },
   scroll: { flexGrow: 0 },
   content: { paddingHorizontal: space[4], gap: space[3] },
+  footer: { paddingHorizontal: space[4], paddingTop: space[3] },
 });
 
 export default BookingSheet;
