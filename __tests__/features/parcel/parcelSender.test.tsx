@@ -431,7 +431,7 @@ describe('the sender live parcel', () => {
     expect(screen.getAllByText('Coming back to you')).toHaveLength(2);
     expect(screen.getByTestId('active-ride-parcel')).toBeTruthy();
     expect(screen.getByTestId('parcel-timeline-returning-current')).toBeTruthy();
-    expect(screen.getByTestId('parcel-sender-receiver').props.children).toBe('Receiver: Sana Khan · +92300*****67');
+    expect(screen.getByTestId('parcel-sender-receiver').props.children).toBe('Receiver: Sana Khan · •••• 67');
     expect(screen.getByTestId('parcel-return-code-value').props.children).toBe('482913');
     expect(screen.getByTestId('parcel-pickup-photo')).toBeTruthy();
     // Coming back: no delivery code to resend.

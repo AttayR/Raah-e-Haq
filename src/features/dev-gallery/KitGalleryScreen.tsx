@@ -24,6 +24,7 @@ import {
   RideVehiclesSection,
 } from './sections/RideSections';
 import { DriverRidePreview, TripAssignedPreview } from './sections/RideScreenPreviews';
+import { ActivityHistoryPreview, ActivityRowsPreview } from './sections/ActivityPreviews';
 import { REGISTRATION_PREVIEWS } from './sections/RegistrationPreviews';
 import { VehicleMotionSection } from './sections/VehicleMotionSection';
 import {
@@ -102,6 +103,10 @@ const SCREEN_PREVIEWS: Section[] = [
   ['screen-wallet-skeleton', () => <WalletSkeletonPreview />],
   ['screen-wallet-error', () => <WalletErrorPreview />],
   ['screen-wallet-empty', () => <WalletEmptyPreview />],
+  ['screen-history-loading', () => <ActivityHistoryPreview state="loading" />],
+  ['screen-history-empty', () => <ActivityHistoryPreview state="empty" />],
+  ['screen-history-error', () => <ActivityHistoryPreview state="error" />],
+  ['screen-history-rows', () => <ActivityRowsPreview />],
   ['screen-settlements', () => <SettlementsPreview state="loaded" />],
   ['screen-settlements-skeleton', () => <SettlementsPreview state="skeleton" />],
   ['screen-settlements-empty', () => <SettlementsPreview state="empty" />],

@@ -97,6 +97,8 @@ export const iconGlyphs = {
   // Profile photo (T-504).
   camera: 'camera-outline',
   photoLibrary: 'image-multiple-outline',
+  // UI-R15: photo placeholder (parcel pickup photo while loading or failed).
+  image: 'image-outline',
   document: 'file-document-outline',
   lock: 'lock-outline',
   eye: 'eye-outline',

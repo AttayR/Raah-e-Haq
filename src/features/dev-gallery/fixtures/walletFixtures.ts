@@ -71,6 +71,9 @@ export const galleryDriverWallet: Wallet = toWallet(
 
 export const galleryPassengerWallet: Wallet = toWallet(rawWallet({ total_spent: 0 }));
 
+/** UI-R15: a new passenger (Rs 0, nothing spent) for the empty wallet preview. */
+export const galleryEmptyPassengerWallet: Wallet = toWallet(rawWallet({ balance: 0, total_spent: 0 }));
+
 export const galleryTransactions: WalletTransaction[] = [
   rawTransaction({ id: 1 }),
   rawTransaction({

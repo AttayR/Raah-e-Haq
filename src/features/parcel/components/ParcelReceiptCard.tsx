@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
-import { AppText, Badge, Card, RideTimeline, type BadgeTone } from '../../../components/ui';
+import { useAppTheme } from '../../../app/providers/ThemeProvider';
+import { AppText, Badge, Card, Icon, RideTimeline, type BadgeTone } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { radius, space } from '../../../theme';
 import { formatMoney } from '../../../utils/format';
@@ -29,6 +30,36 @@ function Line({ label, value, testID }: { label: string; value: string; testID: 
       <AppText variant="bodySmall" align="end" style={styles.lineValue}>
         {value}
       </AppText>
+    </View>
+  );
+}
+
+/**
+ * The pickup photo (UI-R15): a `surfaceAlt` block with the image glyph until the signed URL has
+ * loaded, and in its place if it fails, so the card never shows a black box.
+ */
+function PickupPhoto({ uri }: { uri: string }) {
+  const { theme } = useAppTheme();
+  const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  return (
+    <View style={[styles.photo, { backgroundColor: theme.colors.surfaceAlt }]} testID="ride-details-parcel-photo-frame">
+      {state !== 'failed' ? (
+        <Image
+          source={{ uri }}
+          style={[StyleSheet.absoluteFill, state === 'loaded' ? null : styles.hidden]}
+          resizeMode="cover"
+          onLoad={() => setState('loaded')}
+          onError={() => setState('failed')}
+          accessible
+          accessibilityLabel={t('parcel.receiptPhotoA11y')}
+          testID="ride-details-parcel-photo"
+        />
+      ) : null}
+      {state !== 'loaded' ? (
+        <View style={styles.photoPlaceholder} pointerEvents="none" testID={`ride-details-parcel-photo-${state}`}>
+          <Icon name="image" size={32} color="textMuted" />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -85,14 +116,7 @@ export function ParcelReceiptCard({ parcel, times }: { parcel: ParcelView; times
             <AppText variant="label" color="textSecondary">
               {t('parcel.pickupPhoto')}
             </AppText>
-            <Image
-              source={{ uri: parcel.pickupPhotoUrl }}
-              style={styles.photo}
-              resizeMode="cover"
-              accessible
-              accessibilityLabel={t('parcel.receiptPhotoA11y')}
-              testID="ride-details-parcel-photo"
-            />
+            <PickupPhoto uri={parcel.pickupPhotoUrl} />
           </View>
         ) : null}
         {photo === 'removed' ? (
@@ -112,5 +136,7 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[1] },
   lineLabel: { flexShrink: 0, maxWidth: '45%' },
   lineValue: { flex: 1, minWidth: 0 },
-  photo: { width: '100%', height: PHOTO_HEIGHT, borderRadius: radius.md },
+  photo: { width: '100%', height: PHOTO_HEIGHT, borderRadius: radius.md, overflow: 'hidden' },
+  hidden: { opacity: 0 },
+  photoPlaceholder: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
 });

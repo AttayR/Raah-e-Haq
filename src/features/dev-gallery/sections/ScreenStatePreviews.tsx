@@ -8,6 +8,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  FilterChips,
   Header,
   HeaderLargeTitle,
   ListGroup,
@@ -36,8 +37,10 @@ import { SettlementRow } from '../../wallet/components/SettlementRow';
 import { TransactionRow } from '../../wallet/components/TransactionRow';
 import { WALLET_COPY } from '../../wallet/copy';
 import { validateSettlementForm } from '../../wallet/settlementForm';
+import type { Wallet } from '../../wallet/types';
 import {
   galleryDriverWallet,
+  galleryEmptyPassengerWallet,
   galleryPassengerWallet,
   gallerySettlements,
   galleryTransactions,
@@ -84,8 +87,8 @@ const FILTERS = [
   { value: 'debit', label: WALLET_COPY.filterOut },
 ] as const;
 
-function WalletTop({ driver }: { driver: boolean }) {
-  const wallet = driver ? galleryDriverWallet : galleryPassengerWallet;
+function WalletTop({ driver, wallet: given }: { driver: boolean; wallet?: Wallet }) {
+  const wallet = given ?? (driver ? galleryDriverWallet : galleryPassengerWallet);
   return (
     <View style={styles.block}>
       <BalanceCard wallet={wallet} isDriver={driver} />
@@ -114,7 +117,8 @@ function WalletTop({ driver }: { driver: boolean }) {
       >
         {WALLET_COPY.transactions}
       </AppText>
-      <SegmentedControl
+      {/* UI-R15: the live wallet filters are FilterChips, not a segmented control. */}
+      <FilterChips
         options={FILTERS}
         value="all"
         onChange={noop}
@@ -168,20 +172,34 @@ export function WalletErrorPreview() {
   );
 }
 
+const ACTIVITY_SEGMENTS = [
+  { value: 'rides', label: t('activity.rides') },
+  { value: 'wallet', label: t('activity.wallet') },
+] as const;
+
+/** UI-R15: a new passenger's wallet as it appears in Activity › Wallet (Rs 0, empty ledger). */
 export function WalletEmptyPreview() {
   const ready = useAfterModalSlide();
   return (
     <Screen testID="preview-wallet-empty">
-      <WalletHeader />
+      <Header variant="large" inlineTitle title={t('activity.title')} tone="background" />
+      <View style={styles.segments}>
+        <SegmentedControl
+          options={ACTIVITY_SEGMENTS}
+          value="wallet"
+          onChange={noop}
+          accessibilityLabel={t('activity.segmentLabel')}
+        />
+      </View>
       {ready ? (
         <FlatList
           data={[]}
           renderItem={null}
-          ListHeaderComponent={<WalletTop driver={false} />}
+          ListHeaderComponent={<WalletTop driver={false} wallet={galleryEmptyPassengerWallet} />}
           ListEmptyComponent={
             <EmptyState
               placement="center"
-              icon="receipt"
+              icon="activity"
               title={WALLET_COPY.emptyTitle}
               body={WALLET_COPY.emptyBody}
             />
@@ -385,6 +403,7 @@ const styles = StyleSheet.create({
     paddingBottom: space[8],
   },
   grow: { flexGrow: 1 },
+  segments: { paddingHorizontal: layout.gutter, paddingBottom: space[3] },
   block: {
     paddingHorizontal: space[4],
     paddingTop: space[2],

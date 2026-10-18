@@ -56,6 +56,12 @@ export interface RideVehicle {
   licensePlate: string | null;
 }
 
+/** A map point (same shape as react-native-maps `LatLng`). */
+export interface RidePoint {
+  latitude: number;
+  longitude: number;
+}
+
 export interface Ride {
   id: number;
   /** Public ride code ("RH…"). */
@@ -65,6 +71,9 @@ export interface Ride {
   driverId: number | null;
   pickupAddress: string;
   dropoffAddress: string;
+  /** UI-R15: the pickup and drop-off points for the receipt's static map; null when absent. */
+  pickupLocation: RidePoint | null;
+  dropoffLocation: RidePoint | null;
   stops: RideStop[];
   vehicleType: string | null;
   totalFare: number;

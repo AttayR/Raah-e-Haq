@@ -135,7 +135,7 @@ export const componentTokens = {
      * Placeholder heights that mirror real blocks at rest (1.0x font) so nothing jumps when data
      * arrives: wallet BalanceCard, EarningsHero, ride details cards, transaction detail card.
      */
-    heights: { walletHero: 152, earningsHero: 132, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
+    heights: { walletHero: 152, earningsHero: 132, rideHistoryRow: 114, activitySummary: 54, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
   },
   /** UI-R5 ride components (§5.21–5.31, §6.5/§6.7, §12.5). */
   ride: {
@@ -179,6 +179,9 @@ export const componentTokens = {
     fare: { rowMinHeight: 32 },
     /** §5.27/§5.28/§12.5 person card. */
     person: { avatar: 56, plateHeight: 28, plateLetterSpacing: 0.5, actionHeight: 56, actionIcon: 24, actionGap: space[2] },
+    /** UI-R15 ride details: the non-interactive static map at the top of the receipt. */
+    /** `edgeTop` keeps the pins below the top edge (and the city label Google draws there). */
+    staticMap: { height: 180, minDelta: 0.01, padding: 2.2, edgeTop: space[8], edge: space[4] },
     /** §5.24 progress: 4pt track, 4 segments 4 apart. */
     progress: { track: 4, segmentGap: space[1], timelineDot: 10 },
     /** §5.22 rating stars. */

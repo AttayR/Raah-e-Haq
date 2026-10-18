@@ -17,6 +17,8 @@ export const RIDE_HISTORY_COPY = {
   } as Record<RideViewer, string>,
   emptyFilteredTitle: { completed: 'No completed rides', cancelled: 'No cancelled rides' },
   endOfList: "That's all your rides",
+  emptyAction: 'Book a ride',
+  emptyActionHint: 'Opens Where to?',
   noCharge: 'No charge',
   stops: (n: number) => (n === 1 ? '+1 stop' : `+${n} stops`),
   rowLabel: (date: string, status: string, from: string, to: string, amount: string) =>
@@ -55,10 +57,18 @@ export const RIDE_HISTORY_COPY = {
   cancellation: 'Cancellation',
   cancellationNote: 'Note',
   noChargeCancelled: 'Cancelled rides are not charged.',
+  cancellationFeeLabel: 'Cancellation fee',
+  // UI-R15 share receipt.
+  share: 'Share receipt',
+  shareHeading: 'Raah-e-Haq ride receipt',
+  shareFrom: (address: string) => `From: ${address}`,
+  shareTo: (address: string) => `To: ${address}`,
+  shareStop: (n: number, address: string) => `Stop ${n}: ${address}`,
+  shareTotal: (amount: string, payment: string) => `Total: ${amount} · ${payment}`,
 } as const;
 
 export const RIDE_STATUS_LABEL: Record<RideStatus, string> = {
-  requested: 'Requested',
+  requested: 'Finding driver',
   accepted: 'Driver on the way',
   arrived: 'Driver arrived',
   started: 'On trip',

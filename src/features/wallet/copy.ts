@@ -98,6 +98,9 @@ const TYPE_LABEL_KEYS: ReadonlyMap<string, TranslationKey> = new Map<string, Tra
   ['refund', 'walletTypes.refund'],
   // BE-91: goodwill refunds got their own type; the owner sees the same "Refund".
   ['goodwill_refund', 'walletTypes.refund'],
+  // UI-R15: the ride ledger rows in the app's own sentence case, never "Ride Payment (cash)".
+  ['ride_payment', 'walletTypes.ride_payment'],
+  ['driver_earning', 'walletTypes.driver_earning'],
 ]);
 
 /** The i18n label of a ledger type the app labels itself, else null (use the server's `label`). */

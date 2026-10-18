@@ -81,9 +81,9 @@ export const transactionAmountText = (item: Pick<WalletTransaction, 'amount' | '
   return formatMoney(amount, { currency, sign: 'never' });
 };
 
-/** Credit green, debit red, informational neutral (contract: direction colouring). */
+/** Credit green; debit and informational in `textPrimary` (UI-R15: normal spending is never red; the minus sign carries the direction). */
 export const transactionAmountColor = (item: Pick<WalletTransaction, 'direction'>): TextColor =>
-  item.direction === 'credit' ? 'success' : item.direction === 'debit' ? 'danger' : 'textPrimary';
+  item.direction === 'credit' ? 'success' : 'textPrimary';
 
 const TYPE_ICONS: Record<string, IconName> = {
   ride_payment: 'rides',

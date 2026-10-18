@@ -17,7 +17,8 @@ export const TransactionRow = memo(function TransactionRow({ item, onPress }: Pr
   const { theme } = useAppTheme();
   const amount = transactionAmountText(item);
   const time = formatTime(item.createdAt);
-  const subtitle = [time, item.ride?.rideCode].filter(Boolean).join(' · ');
+  // UI-R15: time only; the ride reference belongs to the transaction detail and ride details.
+  const subtitle = time;
   const struck = item.reversed ? styles.struck : null;
   return (
     <Pressable

@@ -211,10 +211,21 @@ describe('1. the parcel on the ride receipt', () => {
     expect(await screen.findByTestId('ride-details-parcel')).toBeTruthy();
     expect(screen.getByTestId('ride-details-parcel-outcome-delivered')).toBeTruthy();
     expect(screen.getByText('Documents and papers · Small (fits in a bag)')).toBeTruthy();
-    expect(screen.getByText('Sana Khan · +92300*****67')).toBeTruthy();
+    expect(screen.getByText('Sana Khan · •••• 67')).toBeTruthy();
     expect(screen.getByTestId('ride-details-parcel-step-picked_up')).toBeTruthy();
     expect(screen.getByTestId('ride-details-parcel-step-delivered')).toBeTruthy();
     expect(screen.getByTestId('ride-details-parcel-photo').props.source).toEqual({ uri: 'https://example.test/signed/photo.jpg' });
+    // UI-R15: a surfaceAlt placeholder with the image glyph until it loads, gone after; a failed load keeps it (never black).
+    expect(screen.getByTestId('ride-details-parcel-photo-loading')).toBeTruthy();
+    act(() => {
+      screen.getByTestId('ride-details-parcel-photo').props.onLoad();
+    });
+    expect(screen.queryByTestId('ride-details-parcel-photo-loading')).toBeNull();
+    act(() => {
+      screen.getByTestId('ride-details-parcel-photo').props.onError();
+    });
+    expect(screen.getByTestId('ride-details-parcel-photo-failed')).toBeTruthy();
+    expect(screen.queryByTestId('ride-details-parcel-photo')).toBeNull();
     expect(screen.queryByTestId('ride-details-timeline')).toBeNull();
     expect(allText()).not.toContain(RECEIVER_PHONE);
     // No reason to label: the options are not read.

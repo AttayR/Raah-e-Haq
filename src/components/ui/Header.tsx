@@ -40,6 +40,12 @@ export type HeaderProps = {
   scrollY?: SharedValue<number>;
   /** Bar fill: `surface` (default) or `background`, matching the screen until scrolled. */
   tone?: 'surface' | 'background';
+  /**
+   * `large` only (UI-R15): the `h1` title sits in the 56 bar itself instead of under an empty bar,
+   * and does not collapse. For tab roots whose controls (segments, filters) stay pinned under the
+   * header, so the content starts high on the first screen.
+   */
+  inlineTitle?: boolean;
   /** Overlay only: top of the floating controls. Default `insets.top + 8`. */
   overlayTop?: number;
   /** The back button gets `${testID}-back`. */
@@ -106,13 +112,15 @@ export function Header({
   scrollY,
   tone = 'surface',
   overlayTop,
+  inlineTitle = false,
   testID,
 }: HeaderProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const fallback = useSharedValue(0);
   const y = scrollY ?? fallback;
-  const collapsible = variant === 'large' && !!scrollY;
+  const inline = variant === 'large' && inlineTitle;
+  const collapsible = variant === 'large' && !!scrollY && !inline;
 
   const hairlineVisible = useDerivedValue(() =>
     withTiming(y.value > h.hairlineScrollThreshold ? 1 : 0, { duration: motion.fast.duration }),
@@ -170,7 +178,11 @@ export function Header({
       <View style={[styles.bar, !onBack && styles.barNoBack]}>
         {backButton}
         <Animated.View style={[styles.titleSlot, onBack ? styles.titleAfterBack : null, barTitleStyle]}>
-          {showBarTitle && title ? (
+          {inline && title ? (
+            <AppText variant="h1" numberOfLines={1} accessibilityRole="header" testID={testID ? `${testID}-title` : undefined}>
+              {title}
+            </AppText>
+          ) : showBarTitle && title ? (
             <AppText
               variant="title"
               numberOfLines={1}
@@ -185,7 +197,7 @@ export function Header({
         </Animated.View>
         <View style={styles.trailing}>{trailing}</View>
       </View>
-      {variant === 'large' && !scrollY && title ? <HeaderLargeTitle title={title} /> : null}
+      {variant === 'large' && !scrollY && !inline && title ? <HeaderLargeTitle title={title} /> : null}
       <Animated.View
         style={[
           styles.hairline,

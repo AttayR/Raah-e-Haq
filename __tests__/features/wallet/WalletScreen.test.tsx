@@ -9,7 +9,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { dialog, dialogStore } from '../../../src/core/dialog';
 import MockAdapter from 'axios-mock-adapter';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiClient, type User } from '../../../src/services/api';
@@ -119,6 +119,9 @@ describe('WalletScreen (passenger)', () => {
     expect(credit.props.children).toBe('+Rs 500');
     expect(StyleSheet.flatten(credit.props.style).color).toBe(LightTheme.colors.success);
     expect(screen.getByTestId('wallet-transaction-2-amount').props.children).toBe('Rs 300');
+    // UI-R15: the app's own sentence-case label and the time only (no ride code in the row).
+    expect(within(screen.getByTestId('wallet-transaction-2')).getByText('Ride payment')).toBeTruthy();
+    expect(within(screen.getByTestId('wallet-transaction-2')).queryByText(/RH-TEST1/)).toBeNull();
     const reversed = screen.getByTestId('wallet-transaction-3-amount');
     expect(reversed.props.children).toBe(`${MINUS}Rs 50`);
     expect(StyleSheet.flatten(reversed.props.style).textDecorationLine).toBe('line-through');

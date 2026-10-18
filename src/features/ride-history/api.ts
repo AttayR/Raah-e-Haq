@@ -11,6 +11,7 @@ import type {
   CancellationReason,
   Page,
   Ride,
+  RidePoint,
   RideFareBreakdown,
   RideHistoryFilter,
   RidePerson,
@@ -97,6 +98,15 @@ const toStops = (raw: unknown): RideStop[] =>
     .filter((stop): stop is RideStop => stop !== null)
     .sort((a, b) => a.order - b.order);
 
+/** A valid latitude/longitude pair (numbers or numeric strings), else null; 0,0 counts as absent. */
+const pointOf = (lat: unknown, lng: unknown): RidePoint | null => {
+  const latitude = readNumberOrNull(lat);
+  const longitude = readNumberOrNull(lng);
+  if (latitude === null || longitude === null) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180 || (latitude === 0 && longitude === 0)) return null;
+  return { latitude, longitude };
+};
+
 /** One RideResource; null without a usable id. */
 export const toRide = (raw: unknown): Ride | null => {
   if (!isRecord(raw)) return null;
@@ -112,6 +122,8 @@ export const toRide = (raw: unknown): Ride | null => {
     driverId: readId(raw.driver_id),
     pickupAddress: readText(raw.pickup_address) ?? '',
     dropoffAddress: readText(raw.dropoff_address) ?? '',
+    pickupLocation: pointOf(raw.pickup_latitude, raw.pickup_longitude),
+    dropoffLocation: pointOf(raw.dropoff_latitude, raw.dropoff_longitude),
     stops: toStops(raw.stops),
     vehicleType: readText(raw.vehicle_type),
     totalFare: readNumber(raw.total_fare),

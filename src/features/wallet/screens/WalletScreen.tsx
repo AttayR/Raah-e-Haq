@@ -14,7 +14,9 @@ import {
   FilterChips,
   Header,
   Screen,
+  ScrollHairline,
   SkeletonList,
+  useHeaderScroll,
 } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { formatMoney } from '../../../core/format/money';
@@ -39,10 +41,6 @@ const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<WalletT
 export type WalletBodyProps = {
   /** True while the wallet is on screen (loads then, quietly again on each return). */
   visible: boolean;
-  /** Rendered above the balance (Activity's large title and segments); scrolls with the list. */
-  header?: React.ReactElement;
-  /** `useHeaderScroll().onScroll`, so a large title collapses into the bar. */
-  onScroll?: React.ComponentProps<typeof Animated.FlatList>['onScroll'];
 };
 
 /**
@@ -50,10 +48,11 @@ export type WalletBodyProps = {
  * note, and the ledger from GET /wallet/transactions grouped by day with a direction filter,
  * pull to refresh and infinite scroll. Drivers also get the commission owed, "Pay commission"
  * and their payment reports. Rides stay cash; "Add money" (T-515, BE-74) appears when the server
- * says `can_top_up`. The body is also the passenger's Activity › Wallet (UI-R4); the driver
- * opens the screen from Earnings.
+ * says `can_top_up`. The body is also the passenger's Activity › Wallet (UI-R4), under the
+ * pinned Rides | Wallet segments with a hairline once it scrolls (UI-R15); the driver opens the
+ * screen from Earnings.
  */
-export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
+export function WalletBody({ visible }: WalletBodyProps) {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const isDriver = useSelector((state: RootState) => state.apiAuth.user?.role === 'driver');
@@ -63,6 +62,7 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
   const list = useWalletTransactions(filter, visible);
   const { cancel, cancellingId } = useCancelSettlement();
   const sections = useMemo(() => groupByDay(list.items), [list.items]);
+  const { scrollY, onScroll } = useHeaderScroll();
 
   const { data: walletData, refresh: refreshWallet } = wallet;
   const { refresh: refreshList, reload: reloadList } = list;
@@ -113,7 +113,6 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
     const failed = wallet.status === 'failed';
     return (
       <View style={styles.fill}>
-        {header}
         {failed ? (
           <ErrorState
             title={WALLET_COPY.loadFailed}
@@ -137,7 +136,6 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
 
   const listHeader = (
     <View>
-      {header}
       <View style={styles.headerBlock}>
         <BalanceCard wallet={walletData} isDriver={isDriver} />
         {owedAmount !== null ? (
@@ -243,7 +241,7 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
     return (
       <EmptyState
         placement="center"
-        icon="receipt"
+        icon="activity"
         title={filtered ? WALLET_COPY.emptyFilteredTitle : WALLET_COPY.emptyTitle}
         body={filtered ? WALLET_COPY.emptyFilteredBody : WALLET_COPY.emptyBody}
         testID="wallet-transactions-empty"
@@ -273,31 +271,34 @@ export function WalletBody({ visible, header, onScroll }: WalletBodyProps) {
   };
 
   return (
-    <AnimatedSectionList
-      testID="wallet-transactions"
-      sections={sections}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={renderItem}
-      renderSectionHeader={renderSectionHeader}
-      stickySectionHeadersEnabled
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      style={styles.fill}
-      ListHeaderComponent={listHeader}
-      ListEmptyComponent={renderEmpty}
-      ListFooterComponent={renderFooter}
-      contentContainerStyle={[styles.content, sections.length === 0 && styles.contentEmpty]}
-      onEndReached={list.hasMore && !list.loadMoreError ? list.loadMore : undefined}
-      onEndReachedThreshold={0.5}
-      refreshControl={
-        <RefreshControl
-          refreshing={pulling}
-          onRefresh={onRefresh}
-          tintColor={theme.colors.primary}
-          colors={[theme.colors.primary]}
-        />
-      }
-    />
+    <View style={styles.fill}>
+      <ScrollHairline scrollY={scrollY} testID="wallet-hairline" />
+      <AnimatedSectionList
+        testID="wallet-transactions"
+        sections={sections}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        style={styles.fill}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={renderEmpty}
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={[styles.content, sections.length === 0 && styles.contentEmpty]}
+        onEndReached={list.hasMore && !list.loadMoreError ? list.loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={pulling}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        }
+      />
+    </View>
   );
 }
 
@@ -325,6 +326,6 @@ const styles = StyleSheet.create({
   contentEmpty: { flexGrow: 1 },
   headerBlock: { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[3], gap: space[3] },
   sectionTitle: { marginTop: space[3] },
-  dayHeader: { minHeight: 32, justifyContent: 'center', paddingHorizontal: space[4] },
+  dayHeader: { minHeight: space[8], justifyContent: 'center', paddingHorizontal: space[4] },
   footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },
 });

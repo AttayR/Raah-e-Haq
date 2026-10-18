@@ -31,6 +31,7 @@ export * from './ModalRoot';
 export * from './OtpInput';
 export * from './phoneInput';
 export * from './Screen';
+export * from './ScrollHairline';
 export * from './SectionHeader';
 export * from './SegmentedControl';
 export * from './SelectField';

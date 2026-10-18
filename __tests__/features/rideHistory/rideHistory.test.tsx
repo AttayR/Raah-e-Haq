@@ -14,7 +14,11 @@ import { apiClient, type User } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { rideHistoryApi, toRide } from '../../../src/features/ride-history/api';
-import { canOpenChat, CHAT_READ_WINDOW_HOURS, rideAmountText } from '../../../src/features/ride-history/format';
+import { canOpenChat, CHAT_READ_WINDOW_HOURS, groupRidesByDay, receiptShareText, rideAmountText } from '../../../src/features/ride-history/format';
+import { staticMapRegion } from '../../../src/features/ride-history/components/RideStaticMap';
+import { shortMaskedPhone } from '../../../src/features/parcel/format';
+import { Share, StyleSheet } from 'react-native';
+import { LightTheme } from '../../../src/theme';
 import { ReceiptCard, receiptPaymentStatus } from '../../../src/features/ride-history/components/RideDetailsSections';
 import RideHistoryScreen from '../../../src/features/ride-history/screens/RideHistoryScreen';
 import RideDetailsScreen from '../../../src/features/ride-history/screens/RideDetailsScreen';
@@ -264,6 +268,55 @@ describe('ride format', () => {
 });
 
 describe('RideHistoryScreen', () => {
+  it('UI-R15: groups rides by local day (Today / Yesterday / date), keeping the order', () => {
+    const now = new Date(2026, 9, 18, 15, 0);
+    const at = (d: number, h: number) => new Date(2026, 9, d, h, 0).toISOString();
+    const sections = groupRidesByDay(
+      [
+        ride({ id: 1, completed_at: at(18, 14) }),
+        ride({ id: 2, completed_at: at(18, 9) }),
+        ride({ id: 3, completed_at: at(17, 20) }),
+        ride({ id: 4, status: 'cancelled', completed_at: null, cancelled_at: at(28, 9).replace('2026-10', '2026-09') }),
+      ],
+      now,
+    );
+    expect(sections.map((s) => s.title)).toEqual(['Today', 'Yesterday', expect.stringMatching(/^\w{3}, \d{1,2} \w{3}$/)]);
+    expect(sections.map((s) => s.data.map((r) => r.id))).toEqual([[1, 2], [3], [4]]);
+    expect(groupRidesByDay([ride({ id: 5, completed_at: 'not a date', requested_at: null, created_at: null })], now)[0].title).toBe('');
+  });
+
+  it('UI-R15: dense row: day header, time and vehicle, a status pill only when not simply completed', async () => {
+    const today = new Date();
+    today.setHours(9, 26, 0, 0);
+    mock.onGet('/rides').reply(
+      200,
+      envelope(
+        [
+          rawRide({ completed_at: today.toISOString() }),
+          rawRide({ id: 42, status: 'cancelled', completed_at: null, cancelled_at: today.toISOString() }),
+        ],
+        pageInfo(1, 1, 2),
+      ),
+    );
+    show(RideHistoryScreen);
+    expect(await screen.findByTestId('ride-history-row-41')).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Today' })).toBeTruthy();
+    expect(screen.getAllByText('9:26 AM')).toHaveLength(2);
+    expect(screen.getAllByText(' · Car')).toHaveLength(2);
+    expect(screen.queryByTestId('ride-history-row-41-status')).toBeNull();
+    expect(screen.getByTestId('ride-history-row-42-status')).toBeTruthy();
+    // The filter chips sit outside the scrolling list (pinned), with the hairline under them.
+    expect(screen.getByTestId('ride-history-filter')).toBeTruthy();
+    expect(screen.getByTestId('ride-history-hairline', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('UI-R15: the driver empty state has no "Book a ride" action', async () => {
+    mock.onGet('/rides').reply(200, envelope([], pageInfo(1, 1, 0)));
+    show(RideHistoryScreen, 'driver');
+    expect(await screen.findByText('No trips yet')).toBeTruthy();
+    expect(screen.queryByTestId('ride-history-empty-book')).toBeNull();
+  });
+
   it('shows loading, then the rides from the API (no demo rides); a tap opens RideDetails', async () => {
     let respond: (value: [number, unknown]) => void = () => undefined;
     mock.onGet('/rides').reply(() => new Promise((resolve) => (respond = resolve)));
@@ -458,5 +511,120 @@ describe('RideDetailsScreen', () => {
     await waitFor(() => expect(screen.getByTestId('ride-details-error')).toBeTruthy());
     fireEvent.press(screen.getByTestId('ride-details-error-retry'));
     expect(await screen.findByTestId('ride-details-summary')).toBeTruthy();
+  });
+});
+
+describe('UI-R15 review fixes', () => {
+  it('an in-progress ride shows its status pill only ("Finding driver"), no amount', async () => {
+    mock.onGet('/rides').reply(200, envelope([rawRide({ id: 51, status: 'requested', completed_at: null })], pageInfo(1, 1, 1)));
+    show(RideHistoryScreen);
+    expect(await screen.findByTestId('ride-history-row-51')).toBeTruthy();
+    expect(within(screen.getByTestId('ride-history-row-51-status')).getByText('Finding driver')).toBeTruthy();
+    expect(screen.queryByTestId('ride-history-row-51-amount')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('ride-history-row-51-time').props.style)).toEqual(expect.objectContaining({ flexShrink: 0 }));
+  });
+
+  it('reads the pickup and drop-off points; 0,0 and missing values are no point', () => {
+    const withPoints = ride({ pickup_latitude: '31.5204', pickup_longitude: '74.3587', dropoff_latitude: 31.51, dropoff_longitude: 74.35 });
+    expect(withPoints.pickupLocation).toEqual({ latitude: 31.5204, longitude: 74.3587 });
+    expect(withPoints.dropoffLocation).toEqual({ latitude: 31.51, longitude: 74.35 });
+    expect(ride({ pickup_latitude: 0, pickup_longitude: 0 }).pickupLocation).toBeNull();
+    expect(ride().dropoffLocation).toBeNull();
+    expect(staticMapRegion([])).toBeNull();
+    const pickup = withPoints.pickupLocation;
+    const dropoff = withPoints.dropoffLocation;
+    if (!pickup || !dropoff) throw new Error('points expected');
+    const region = staticMapRegion([pickup, dropoff]);
+    expect(region?.latitude).toBeCloseTo(31.5152, 4);
+    expect(region?.latitudeDelta).toBeGreaterThanOrEqual(0.01);
+  });
+
+  it('the receipt shows a static map with both pins from the ride itself (one request)', async () => {
+    mockParams = { rideId: 41 };
+    mock.onGet('/rides/41').reply(
+      200,
+      envelope(rawRide({ pickup_latitude: 31.52, pickup_longitude: 74.35, dropoff_latitude: 31.51, dropoff_longitude: 74.34 })),
+    );
+    show(RideDetailsScreen);
+    const map = await screen.findByTestId('ride-details-map');
+    expect(map.props.pointerEvents).toBe('none');
+    expect(screen.getByTestId('ride-details-map-pickup', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('ride-details-map-dropoff', { includeHiddenElements: true })).toBeTruthy();
+    expect(mock.history.get).toHaveLength(1);
+  });
+
+  it('without coordinates the receipt shows the map fallback block', async () => {
+    mockParams = { rideId: 41 };
+    mock.onGet('/rides/41').reply(200, envelope(rawRide()));
+    show(RideDetailsScreen);
+    expect(await screen.findByTestId('ride-details-map-fallback')).toBeTruthy();
+  });
+
+  it('Share sends a text receipt with no names or phone numbers', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    mockParams = { rideId: 41 };
+    mock.onGet('/rides/41').reply(200, envelope(rawRide()));
+    show(RideDetailsScreen);
+    fireEvent.press(await screen.findByTestId('ride-details-share'));
+    expect(share).toHaveBeenCalledTimes(1);
+    const content = share.mock.calls[0][0];
+    const message = 'message' in content && content.message ? content.message : '';
+    expect(message).toContain('Raah-e-Haq ride receipt');
+    expect(message).toContain('From: Iqbal Town, Lahore');
+    expect(message).toContain('To: Liberty Market, Lahore');
+    expect(message).toContain('Total: Rs 470');
+    expect(message).toContain('RH-TEST41');
+    [DRIVER_PHONE, PASSENGER_PHONE, 'Bilal', 'Ayesha', 'LEA-1234'].forEach((secret) => {
+      expect(message).not.toContain(secret);
+    });
+    share.mockRestore();
+  });
+
+  it('a cancelled ride receipt text says "No charge", not a total', () => {
+    const text = receiptShareText(ride({ status: 'cancelled', completed_at: null, cancelled_at: '2026-10-10T09:10:00+05:00' }), 'passenger');
+    expect(text).toContain('No charge');
+    expect(text).not.toContain('Total:');
+  });
+
+  it('a masked phone shows its last two digits only', () => {
+    expect(shortMaskedPhone('+92300*****67')).toBe('•••• 67');
+    expect(shortMaskedPhone('**********09')).toBe('•••• 09');
+    expect(shortMaskedPhone('*****')).toBeNull();
+    expect(shortMaskedPhone(null)).toBeNull();
+  });
+});
+
+describe('UI-R15 re-review fixes', () => {
+  it('a charged cancellation fee reads in textPrimary on the row; "No charge" stays muted', async () => {
+    mock.onGet('/rides').reply(
+      200,
+      envelope(
+        [
+          rawRide({ id: 61, status: 'cancelled', completed_at: null, cancelled_at: '2026-10-10T09:10:00+05:00', cancellation_fee: '30.00' }),
+          rawRide({ id: 62, status: 'cancelled', completed_at: null, cancelled_at: '2026-10-10T09:00:00+05:00' }),
+        ],
+        pageInfo(1, 1, 2),
+      ),
+    );
+    show(RideHistoryScreen);
+    const fee = await screen.findByTestId('ride-history-row-61-amount');
+    expect(fee.props.children).toBe('Rs 30 fee');
+    expect(StyleSheet.flatten(fee.props.style).color).toBe(LightTheme.colors.textPrimary);
+    const free = screen.getByTestId('ride-history-row-62-amount');
+    expect(free.props.children).toBe('No charge');
+    expect(StyleSheet.flatten(free.props.style).color).toBe(LightTheme.colors.textMuted);
+  });
+
+  it('a cancelled ride with a fee shows the fee as the amount with a "Cancellation fee" label', async () => {
+    mockParams = { rideId: 41 };
+    mock.onGet('/rides/41').reply(
+      200,
+      envelope(rawRide({ status: 'cancelled', completed_at: null, cancelled_at: '2026-10-10T09:10:00+05:00', cancellation_fee: '30.00' })),
+    );
+    show(RideDetailsScreen);
+    const amount = await screen.findByTestId('ride-details-amount');
+    expect(amount.props.children).toBe('Rs 30');
+    expect(StyleSheet.flatten(amount.props.style).color).toBe(LightTheme.colors.textPrimary);
+    expect(screen.getByTestId('ride-details-fee-label').props.children).toBe('Cancellation fee');
   });
 });

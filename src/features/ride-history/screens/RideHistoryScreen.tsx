@@ -1,12 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, EmptyState, ErrorState, FilterChips, Header, Screen, SkeletonList } from '../../../components/ui';
+import {
+  AppText,
+  Button,
+  FilterChips,
+  Header,
+  Screen,
+  ScrollHairline,
+  useHeaderScroll,
+} from '../../../components/ui';
 import { layout, space } from '../../../theme';
 import { RideHistoryRow } from '../components/RideHistoryRow';
+import { RideHistoryState } from '../components/RideHistoryStates';
 import { RIDE_HISTORY_COPY } from '../copy';
+import { groupRidesByDay, type RideSection } from '../format';
 import { useRideHistory, useRideViewer } from '../hooks';
 import { useOpenRide } from '../../active-ride/useOpenRide';
 import type { Ride, RideHistoryFilter } from '../types';
@@ -17,28 +27,38 @@ const FILTERS = [
   { value: 'cancelled', label: RIDE_HISTORY_COPY.filterCancelled },
 ] as const;
 
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<Ride, RideSection>);
+
 export type RideHistoryListProps = {
   /** True while the list is on screen (loads then, and again on each return). */
   visible: boolean;
-  /** Rendered above the filter (Activity's large title, segments and stats); scrolls with the list. */
-  header?: React.ReactElement;
-  /** `useHeaderScroll().onScroll`, so a large title collapses into the bar. */
-  onScroll?: React.ComponentProps<typeof Animated.FlatList>['onScroll'];
+  /** Scrolls above the first day (Activity's summary strip); the filter chips stay pinned. */
+  summary?: React.ReactElement | null;
+  /** Called on pull to refresh, so the host can re-read what it shows above the list. */
+  onRefresh?: () => void;
 };
 
 /**
- * Ride history for both roles (T-501, BE-01): GET /rides scoped to the signed-in user, newest
- * first, with an All / Completed / Cancelled filter, pull to refresh and infinite scroll.
- * Passengers see the fare, drivers their earnings. Tapping a ride opens RideDetails (a
- * passenger's ride in progress opens the live ride instead, T-543). The list
- * is also the passenger's Activity › Rides (UI-R4); the driver opens it from Account.
+ * Ride history for both roles (T-501, BE-01; UI-R15 layout): GET /rides scoped to the signed-in
+ * user, newest first, grouped by day under sticky "Today / Yesterday / Mon, 28 Sep" headers. The
+ * All / Completed / Cancelled chips stay pinned above the list with a hairline once it scrolls;
+ * pull to refresh and infinite scroll. Passengers see the fare, drivers their earnings. Tapping a
+ * ride opens RideDetails (a passenger's ride in progress opens the live ride instead, T-543).
+ * The list is the passenger's Activity › Rides; the driver opens it from Account.
  */
-export function RideHistoryList({ visible, header, onScroll }: RideHistoryListProps) {
+export function RideHistoryList({ visible, summary, onRefresh: onHostRefresh }: RideHistoryListProps) {
   const { theme } = useAppTheme();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const viewer = useRideViewer();
   const [filter, setFilter] = useState<RideHistoryFilter>('all');
   const list = useRideHistory(filter, visible);
   const { refresh, reload, loadMore } = list;
+  const sections = useMemo(() => groupRidesByDay(list.items), [list.items]);
+  const { scrollY, onScroll } = useHeaderScroll();
+
+  useEffect(() => {
+    scrollY.value = 0;
+  }, [filter, scrollY]);
 
   // The spinner shows for a pull only.
   const [pulling, setPulling] = useState(false);
@@ -48,7 +68,8 @@ export function RideHistoryList({ visible, header, onScroll }: RideHistoryListPr
   const onRefresh = useCallback(() => {
     setPulling(true);
     refresh();
-  }, [refresh]);
+    onHostRefresh?.();
+  }, [refresh, onHostRefresh]);
 
   // A passenger's ride still in progress opens the live ride, a finished one its details (T-543).
   const openRide = useOpenRide(viewer);
@@ -64,50 +85,41 @@ export function RideHistoryList({ visible, header, onScroll }: RideHistoryListPr
     [viewer, onOpen],
   );
 
-  const listHeader = (
-    <View>
-      {header}
-      <View style={styles.headerBlock}>
-        <FilterChips<RideHistoryFilter>
-          options={FILTERS}
-          value={filter}
-          onChange={setFilter}
-          accessibilityLabel={RIDE_HISTORY_COPY.filterLabel}
-          testID="ride-history-filter"
-        />
+  const background = theme.colors.background;
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: RideSection }) =>
+      section.title ? (
+        <View style={[styles.dayHeader, { backgroundColor: background }]} testID={`ride-history-day-${section.key}`}>
+          <AppText variant="caption" color="textMuted" accessibilityRole="header">
+            {section.title}
+          </AppText>
+        </View>
+      ) : null,
+    [background],
+  );
+
+  const listHeader =
+    summary || (list.error && list.items.length > 0) ? (
+      <View style={styles.listHeader}>
+        {summary}
         {list.error && list.items.length > 0 ? (
           <AppText variant="bodySmall" color="danger" testID="ride-history-refresh-error">
             {list.error}
           </AppText>
         ) : null}
       </View>
-    </View>
-  );
+    ) : null;
 
-  const renderEmpty = () => {
-    if (list.status === 'loading') return <SkeletonList rows={5} testID="ride-history-loading" />;
-    if (list.status === 'failed') {
-      return (
-        <ErrorState
-          title={RIDE_HISTORY_COPY.loadFailed}
-          body={list.error ?? undefined}
-          placement="center"
-          retryLabel={RIDE_HISTORY_COPY.retry}
-          onRetry={reload}
-          testID="ride-history-error"
-        />
-      );
-    }
-    return (
-      <EmptyState
-        placement="center"
-        icon="rides"
-        title={filter === 'all' ? RIDE_HISTORY_COPY.emptyTitle[viewer] : RIDE_HISTORY_COPY.emptyFilteredTitle[filter]}
-        body={filter === 'all' ? RIDE_HISTORY_COPY.emptyBody[viewer] : undefined}
-        testID="ride-history-empty"
-      />
-    );
-  };
+  const renderEmpty = () => (
+    <RideHistoryState
+      kind={list.status === 'loading' ? 'loading' : list.status === 'failed' ? 'error' : 'empty'}
+      viewer={viewer}
+      filter={filter}
+      error={list.error}
+      onRetry={reload}
+      onBook={() => navigation.navigate('Booking')}
+    />
+  );
 
   const renderFooter = () => {
     if (list.status === 'loadingMore') {
@@ -140,25 +152,41 @@ export function RideHistoryList({ visible, header, onScroll }: RideHistoryListPr
   };
 
   return (
-    <Animated.FlatList
-      testID="ride-history-list"
-      style={styles.list}
-      data={list.items}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={renderItem}
-      ItemSeparatorComponent={Separator}
-      ListHeaderComponent={listHeader}
-      ListEmptyComponent={renderEmpty}
-      ListFooterComponent={renderFooter}
-      contentContainerStyle={[styles.content, list.items.length === 0 && styles.contentEmpty]}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      onEndReached={list.hasMore && !list.loadMoreError ? loadMore : undefined}
-      onEndReachedThreshold={0.5}
-      refreshControl={
-        <RefreshControl refreshing={pulling} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
-      }
-    />
+    <View style={styles.fill}>
+      <View style={styles.pinned}>
+        <FilterChips<RideHistoryFilter>
+          options={FILTERS}
+          value={filter}
+          onChange={setFilter}
+          accessibilityLabel={RIDE_HISTORY_COPY.filterLabel}
+          testID="ride-history-filter"
+        />
+      </View>
+      <ScrollHairline scrollY={scrollY} testID="ride-history-hairline" />
+      <AnimatedSectionList
+        testID="ride-history-list"
+        style={styles.fill}
+        sections={sections}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled
+        ItemSeparatorComponent={Separator}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={renderEmpty}
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={[styles.content, sections.length === 0 && styles.contentEmpty]}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        initialNumToRender={8}
+        windowSize={7}
+        onEndReached={list.hasMore && !list.loadMoreError ? loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl refreshing={pulling} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
+        }
+      />
+    </View>
   );
 }
 
@@ -185,10 +213,12 @@ function Separator() {
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1 },
+  fill: { flex: 1 },
+  pinned: { paddingHorizontal: layout.gutter, paddingTop: space[1], paddingBottom: space[3] },
   content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   contentEmpty: { flexGrow: 1 },
-  headerBlock: { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[3], gap: space[3] },
-  separator: { height: space[3] },
+  listHeader: { paddingHorizontal: layout.gutter, paddingTop: space[3], gap: space[3] },
+  dayHeader: { minHeight: space[8], justifyContent: 'center', paddingHorizontal: layout.gutter, paddingTop: space[2] },
+  separator: { height: space[2] },
   footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },
 });

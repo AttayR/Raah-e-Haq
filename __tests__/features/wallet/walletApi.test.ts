@@ -107,7 +107,7 @@ describe('row format', () => {
     expect(transactionAmountText(credit)).toBe('+Rs 500');
     expect(transactionAmountColor(credit)).toBe('success');
     expect(transactionAmountText(debit)).toBe(`${MINUS}Rs 58`);
-    expect(transactionAmountColor(debit)).toBe('danger');
+    expect(transactionAmountColor(debit)).toBe('textPrimary');
     expect(transactionAmountText(none)).toBe('Rs 300');
     expect(transactionAmountColor(none)).toBe('textPrimary');
     expect(transactionIcon(none)).toBe('rides');

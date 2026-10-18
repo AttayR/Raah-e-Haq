@@ -251,6 +251,9 @@ export const en = {
     dropoffA11y: 'Drop-off: {address}',
     stopA11y: 'Stop {n}: {address}',
     pickupMarker: 'Pickup',
+    /** UI-R15 receipt map. */
+    routeMapA11y: 'Map of the pickup and drop-off',
+    mapUnavailable: 'Map not available for this ride',
     dropoffMarker: 'Drop-off',
     stopMarker: 'Stop {n}',
     driverMarker: 'Your driver',
@@ -441,6 +444,13 @@ export const en = {
     segmentLabel: 'Activity',
     rides: 'Rides',
     wallet: 'Wallet',
+    /** UI-R15: the slim summary strip over the ride list (values from GET /me/stats). */
+    summaryA11y: 'Your ride summary',
+    summaryRides: 'Rides',
+    summaryRating: 'Rating',
+    summaryDistance: 'Distance',
+    summarySpent: 'Spent',
+    summaryLoading: 'Loading your ride summary',
   },
   /** Driver Earnings tab (UI-R4): the earnings screen plus the wallet/commission entry. */
   earnings: {
@@ -833,6 +843,8 @@ export const en = {
     cancellation_compensation_release: 'Cancellation pay (released)',
     fare_dispute_charge: 'Fare dispute recovery',
     refund: 'Refund',
+    ride_payment: 'Ride payment',
+    driver_earning: 'Ride earning',
   },
   /** Driver weekly statement (T-521, BE-84 GET /driver/statements). */
   statements: {

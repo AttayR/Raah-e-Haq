@@ -34,9 +34,9 @@ export function BalanceCard({ wallet, isDriver }: Props) {
       <AppText
         variant="numericXL"
         color={text}
+        // UI-R15: no adjustsFontSizeToFit; on iOS (new arch) it shrank the balance to a few
+        // points in this card. 34pt fits a seven-figure balance on an SE.
         numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
         testID="wallet-balance"
       >
         {balance}

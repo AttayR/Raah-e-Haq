@@ -158,6 +158,9 @@ export function RideTimeline({ entries, cancelled = false, testID }: { entries: 
   );
 }
 
+/** Rail top so the 10pt dot centres on the first `bodySmall` line. */
+const RAIL_TOP = space[1] + 1;
+
 const styles = StyleSheet.create({
   wrap: { gap: space[2] },
   track: { flexDirection: 'row', gap: g.segmentGap },
@@ -165,9 +168,11 @@ const styles = StyleSheet.create({
   labels: { flexDirection: 'row', gap: g.segmentGap },
   label: { flex: 1, minWidth: 0 },
   entry: { flexDirection: 'row', gap: space[3] },
-  entryRail: { width: g.timelineDot, alignItems: 'center', paddingTop: space[1] + 1 },
+  entryRail: { width: g.timelineDot, alignItems: 'center', paddingTop: RAIL_TOP },
   entryDot: { width: g.timelineDot, height: g.timelineDot, borderRadius: radius.pill },
-  entryLine: { flex: 1, width: 2, marginTop: space[1] },
+  // UI-R15: the connector runs from this dot into the next entry's top padding, so it meets the
+  // next dot with no gap (it used to stop 4pt short at both ends).
+  entryLine: { flex: 1, width: 2, marginBottom: -RAIL_TOP },
   entryText: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   entryGap: { paddingBottom: space[4] },
   flex: { flex: 1, minWidth: 0 },

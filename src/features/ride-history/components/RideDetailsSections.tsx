@@ -7,16 +7,18 @@ import {
   Card,
   FareBreakdown,
   FIT_VALUE_PROPS,
+  Icon,
   PersonCard as KitPersonCard,
   RideStatusPill,
   RideTimeline,
+  vehicleIconName,
   type FareRow,
 } from '../../../components/ui';
 import { formatDistance, formatDuration } from '../../../utils/format';
 import { space } from '../../../theme';
-import { cancellationText, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL } from '../copy';
+import { cancellationText, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
 import { formatMoney } from '../../../utils/format';
-import { formatDateTime, otherParty, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
+import { formatDateTime, isChargedFee, otherParty, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
 import type { Ride, RideViewer } from '../types';
 import { t } from '../../../i18n';
 import { FareLockBadge } from '../../fare/components/FareBits';
@@ -71,6 +73,8 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
     .filter(Boolean)
     .join(' · ');
   const cancelled = ride.status === 'cancelled';
+  const chargedFee = isChargedFee(ride, viewer);
+  const vehicle = vehicleLabel(ride.vehicleType);
   return (
     <Card testID="ride-details-summary">
       <View style={styles.topRow}>
@@ -79,24 +83,48 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
           {formatDateTime(rideTime(ride))}
         </AppText>
       </View>
-      <AppText
-        variant={cancelled ? 'title' : 'numericXL'}
-        color={cancelled ? 'textMuted' : 'textPrimary'}
+<AppText
+        variant={cancelled && !chargedFee ? 'title' : 'numericXL'}
+        color={cancelled && !chargedFee ? 'textMuted' : 'textPrimary'}
         style={styles.amount}
         numberOfLines={1}
         testID="ride-details-amount"
       >
-        {rideAmountText(ride, viewer)}
+        {chargedFee && ride.cancellationFee !== null ? formatMoney(ride.cancellationFee) : rideAmountText(ride, viewer)}
       </AppText>
+      {chargedFee ? (
+        // UI-R15: a charged fee reads as money taken, labelled under the amount.
+        <AppText variant="bodySmall" color="textSecondary" testID="ride-details-fee-label">
+          {C.cancellationFeeLabel}
+        </AppText>
+      ) : null}
       {!cancelled ? (
         <AppText variant="bodySmall" color="textSecondary">
           {[C.paymentCash[viewer], titleCase(ride.paymentStatus)].filter(Boolean).join(' · ')}
         </AppText>
       ) : null}
-      {metrics ? (
-        <AppText variant="bodySmall" color="textSecondary" style={styles.metrics} testID="ride-details-metrics">
-          {metrics}
-        </AppText>
+      {vehicle || metrics ? (
+        // UI-R15: the same vehicle glyph and label as the history row, then distance and time.
+        <View style={[styles.metaRow, styles.metrics]}>
+          {vehicle ? (
+            <>
+              <Icon name={vehicleIconName(ride.vehicleType)} size={20} color="textSecondary" testID="ride-details-vehicle-icon" />
+              <AppText variant="bodySmall" color="textSecondary" numberOfLines={1} testID="ride-details-vehicle">
+                {vehicle}
+              </AppText>
+              {metrics ? (
+                <AppText variant="bodySmall" color="textMuted" importantForAccessibility="no">
+                  ·
+                </AppText>
+              ) : null}
+            </>
+          ) : null}
+          {metrics ? (
+            <AppText variant="bodySmall" color="textSecondary" style={styles.flex} testID="ride-details-metrics">
+              {metrics}
+            </AppText>
+          ) : null}
+        </View>
       ) : null}
       {!cancelled && ride.fareLock ? (
         <View style={styles.metrics}>
@@ -310,6 +338,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   amount: { marginTop: space[3], marginBottom: space[1] },
   metrics: { marginTop: space[2] },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] },
   cardTitle: { marginBottom: space[2] },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[2] },
   rowLabel: { flexShrink: 0, maxWidth: '55%' },

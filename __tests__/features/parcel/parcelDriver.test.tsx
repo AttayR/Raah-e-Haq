@@ -210,7 +210,7 @@ describe('the driver panel on a parcel', () => {
     expect(screen.getByTestId('driver-parcel-refuse')).toBeTruthy();
     expect(screen.queryByTestId('driver-ride-start')).toBeNull();
     expect(screen.getByText('Collect Rs 180 in cash from the sender')).toBeTruthy();
-    expect(screen.getByTestId('driver-parcel-receiver').props.children).toBe('Receiver: Sana Khan · +92300*****67');
+    expect(screen.getByTestId('driver-parcel-receiver').props.children).toBe('Receiver: Sana Khan · •••• 67');
   });
 
   it('with the parcel: Deliver and Return; coming back: Hand back; a blocked code leaves the return', () => {

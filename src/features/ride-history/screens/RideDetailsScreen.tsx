@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { RefreshControl, Share, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -10,6 +10,7 @@ import {
   ErrorState,
   Header,
   Screen,
+  Skeleton,
   SkeletonCard,
   SkeletonGroup,
   useHeaderScroll,
@@ -27,7 +28,8 @@ import {
   TimelineCard,
 } from '../components/RideDetailsSections';
 import { RIDE_HISTORY_COPY } from '../copy';
-import { canOpenChat, otherParty } from '../format';
+import { canOpenChat, otherParty, receiptShareText } from '../format';
+import { RideStaticMap } from '../components/RideStaticMap';
 import { RideRatingSection } from '../../rating/components/RideRatingSection';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
 import { AcReportSection } from '../../ac/components/AcReportSection';
@@ -62,6 +64,12 @@ export default function RideDetailsScreen() {
     [setData, shownRide],
   );
 
+  // UI-R15: share a text receipt (no names or numbers) through the OS share sheet.
+  const onShare = useCallback(() => {
+    if (!shownRide) return;
+    Share.share({ message: receiptShareText(shownRide, viewer) }).catch(() => undefined);
+  }, [shownRide, viewer]);
+
   // The header stays above the scrolling content, so Back is always reachable (T-543).
   const { scrollY, onScroll } = useHeaderScroll();
   const header = (
@@ -70,6 +78,11 @@ export default function RideDetailsScreen() {
       title={RIDE_HISTORY_COPY.detailsTitle}
       backLabel={RIDE_HISTORY_COPY.back}
       onBack={() => navigation.goBack()}
+      actions={
+        shownRide
+          ? [{ icon: 'share', onPress: onShare, accessibilityLabel: RIDE_HISTORY_COPY.share, testID: 'ride-details-share' }]
+          : []
+      }
       scrollY={scrollY}
       testID="ride-details"
     />
@@ -101,10 +114,13 @@ export default function RideDetailsScreen() {
       );
     } else {
       body = (
-        <SkeletonGroup testID="ride-details-loading" style={styles.skeleton}>
-          <SkeletonCard height={skeletonHeights.rideSummary} />
-          <SkeletonCard height={skeletonHeights.rideRoute} />
-          <SkeletonCard height={skeletonHeights.rideReceipt} />
+        <SkeletonGroup testID="ride-details-loading">
+          <Skeleton shape="block" height={componentTokens.ride.staticMap.height} />
+          <View style={styles.skeleton}>
+            <SkeletonCard height={skeletonHeights.rideSummary} />
+            <SkeletonCard height={skeletonHeights.rideRoute} />
+            <SkeletonCard height={skeletonHeights.rideReceipt} />
+          </View>
         </SkeletonGroup>
       );
     }
@@ -138,6 +154,7 @@ export default function RideDetailsScreen() {
           />
         }
       >
+        <RideStaticMap pickup={ride.pickupLocation} dropoff={ride.dropoffLocation} />
         <View style={styles.body}>
           {status === 'failed' && error ? (
             <AppText variant="bodySmall" color="danger" testID="ride-details-refresh-error">
@@ -196,7 +213,8 @@ export default function RideDetailsScreen() {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: space[8] },
-  body: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[3], width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
-  skeleton: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[3] },
+  body: { paddingHorizontal: space[4], paddingTop: space[4], gap: space[3], width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
+  // Under the full-width map placeholder, 16 to the cards like the loaded screen.
+  skeleton: { paddingHorizontal: space[4], paddingTop: space[4], gap: space[3] },
   unavailable: { flexGrow: 1, alignItems: 'center', paddingBottom: space[8] },
 });
