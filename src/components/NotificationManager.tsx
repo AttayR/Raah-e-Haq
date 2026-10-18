@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import ModernModal, { ModernModalConfig } from './ModernModal';
 import { toast, type ToastAction } from '../core/toast';
@@ -158,6 +158,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) =
     modalConfig = null;
   };
 
+  // [T-565] The last modal stays rendered (hidden) after it is closed, like DialogHost: the Modal
+  // closes with `visible={false}` and keeps its queue turn through the iOS dismiss, instead of
+  // unmounting a presented Modal (which let the next sheet present while UIKit was still busy).
+  const lastModal = useRef<ModernModalConfig | null>(null);
+  if (currentModal) lastModal.current = currentModal;
+  const shownModal = currentModal ?? lastModal.current;
+
   return (
     <View style={styles.container}>
       {children}
@@ -169,9 +176,9 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ children }) =
       <DialogHost />
 
       {/* Legacy modal (ModernModal; removed in UI-R19) */}
-      {currentModal && (
+      {shownModal && (
         <ModernModal
-          config={currentModal}
+          config={currentModal ?? { ...shownModal, visible: false }}
           onClose={handleModalClose}
         />
       )}

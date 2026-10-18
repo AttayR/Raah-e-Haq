@@ -258,6 +258,33 @@ describe('1. the parcel on the ride receipt', () => {
     expect(screen.getByTestId('ride-details-parcel-step-refused')).toBeTruthy();
     expect(screen.queryByTestId('ride-details-parcel-photo-removed')).toBeNull();
   });
+
+  // T-566 (BE-106): the receipt follows the server's can_report only, also on a cancelled parcel.
+  it.each([
+    [false, 'refused, nothing paid'],
+    [true, 'cancelled with a fee'],
+  ])('a cancelled parcel offers "Driver asked for more?" only when can_report is %s (%s)', async (canReport) => {
+    mockParams = { rideId: 51 };
+    mock.onGet('/parcels/options').reply(200, envelope(rawOptions));
+    mock.onGet('/rides/51').reply(200, envelope(rawParcelRide(endedParcel({
+      status: 'cancelled',
+      pickup_photo_url: null,
+      picked_up_at: null,
+      delivered_at: null,
+      refusal_reason: canReport ? null : 'prohibited_item',
+    }), {
+      status: 'cancelled',
+      started_at: null,
+      completed_at: null,
+      cancelled_at: '2026-10-16T10:05:00+05:00',
+      cancellation_reason: canReport ? 'passenger' : 'driver',
+      overcharge_report: { can_report: canReport, report: null },
+    })));
+    showDetails('passenger');
+    expect(await screen.findByTestId('ride-details-parcel')).toBeTruthy();
+    if (canReport) expect(screen.getByTestId('ride-details-overcharge-button')).toBeTruthy();
+    else expect(screen.queryByTestId('ride-details-overcharge')).toBeNull();
+  });
 });
 
 describe('2. Home "Track your parcel"', () => {

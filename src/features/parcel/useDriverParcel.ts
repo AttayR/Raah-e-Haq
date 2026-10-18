@@ -237,11 +237,15 @@ export const useDriverParcel = (options: {
     generalRefusal(payload, true);
   }, [photo, ride?.pin_required, pin, run, refresh, generalRefusal]);
 
+  // [T-565] The submit callbacks hang on the sheet's own purpose / kind, not on `sheet`: opening
+  // another sheet must not hand the closed (memoised) code and reason sheets new props.
+  const codePurpose = sheet === 'returned' ? ('returned' as const) : ('deliver' as const);
+  const reasonKind = sheet === 'refuse' ? ('refuse' as const) : ('return' as const);
+
   const submitCode = useCallback(
     async (code: string) => {
-      const purpose = sheet === 'returned' ? 'returned' : 'deliver';
       setCodeError(null);
-      const result = await run({ step: purpose, code });
+      const result = await run({ step: codePurpose, code });
       if (result.ok) {
         setSheet(null);
         return;
@@ -261,24 +265,23 @@ export const useDriverParcel = (options: {
         if (refusal.refresh) refresh();
       }
     },
-    [sheet, run, refresh],
+    [codePurpose, run, refresh],
   );
 
   const submitReason = useCallback(
     async (reason: string, note: string) => {
-      const kind = sheet === 'refuse' ? 'refuse' : 'return';
-      const result = await run({ step: kind, reason, note });
+      const result = await run({ step: reasonKind, reason, note });
       if (result.ok) {
         setSheet(null);
         // A refused parcel ends the ride: the driver is free again.
-        if (kind === 'refuse') dispatch(loadDriverStatus());
+        if (reasonKind === 'refuse') dispatch(loadDriverStatus());
         return;
       }
       if (!result.payload) return;
       setSheet(null);
       generalRefusal(result.payload, true);
     },
-    [sheet, run, dispatch, generalRefusal],
+    [reasonKind, run, dispatch, generalRefusal],
   );
 
   // Guarded like a step's answer: never over a step in flight, an ended ride or another ride.
@@ -367,7 +370,7 @@ export const useDriverParcel = (options: {
       },
       code: {
         visible: onParcel && (sheet === 'deliver' || sheet === 'returned') && step === 'on_trip',
-        purpose: sheet === 'returned' ? ('returned' as const) : ('deliver' as const),
+        purpose: codePurpose,
         digits: parcel?.code?.digits ?? 6,
         submitting,
         error: codeError,
@@ -379,7 +382,7 @@ export const useDriverParcel = (options: {
       },
       reason: {
         visible: onParcel && reasonsWanted && (step === 'at_pickup' || step === 'on_trip'),
-        kind: sheet === 'refuse' ? ('refuse' as const) : ('return' as const),
+        kind: reasonKind,
         reasons,
         reasonsError: parcelOptions.status === 'failed' && !parcelOptions.data ? t('parcel.reasonsFailed') : null,
         submitting,

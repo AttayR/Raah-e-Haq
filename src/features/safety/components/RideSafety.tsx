@@ -48,54 +48,60 @@ export function PassengerTripSafety({ ride, position }: Props) {
   const close = useCallback(() => setOpen(false), []);
   const openContacts = useOpenContacts(close);
 
-  if (!isSosAvailable(ride)) return null;
+  const available = isSosAvailable(ride);
 
+  // [T-565] The SOS sheet stays mounted when the safety row goes (30 min after the ride): it
+  // closes through `visible` instead of unmounting a presented Modal.
   return (
-    <View style={styles.column} testID="trip-safety">
-      <View style={styles.row}>
-        <View style={styles.cell}>
-          <Button
-            label={t('safety.sosButton')}
-            accessibilityLabel={t('safety.sosButtonA11y')}
-            variant="destructiveSoft"
-            leadingIcon="sos"
-            onPress={() => {
-              haptics.impactLight();
-              setOpen(true);
-            }}
-            testID="trip-safety-sos"
-          />
-        </View>
-        {shareable ? (
-          <View style={styles.cell}>
-            <Button
-              label={share.link ? t('safety.sharing') : t('safety.shareTrip')}
-              accessibilityLabel={
-                share.link ? t('safety.sharing') : t('safety.shareTripA11y')
-              }
-              variant="secondary"
-              leadingIcon="share"
-              onPress={share.start}
-              loading={share.busy}
-              testID="trip-safety-share"
-            />
+    <>
+      {available ? (
+        <View style={styles.column} testID="trip-safety">
+          <View style={styles.row}>
+            <View style={styles.cell}>
+              <Button
+                label={t('safety.sosButton')}
+                accessibilityLabel={t('safety.sosButtonA11y')}
+                variant="destructiveSoft"
+                leadingIcon="sos"
+                onPress={() => {
+                  haptics.impactLight();
+                  setOpen(true);
+                }}
+                testID="trip-safety-sos"
+              />
+            </View>
+            {shareable ? (
+              <View style={styles.cell}>
+                <Button
+                  label={share.link ? t('safety.sharing') : t('safety.shareTrip')}
+                  accessibilityLabel={
+                    share.link ? t('safety.sharing') : t('safety.shareTripA11y')
+                  }
+                  variant="secondary"
+                  leadingIcon="share"
+                  onPress={share.start}
+                  loading={share.busy}
+                  testID="trip-safety-share"
+                />
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </View>
-      {shareable && share.link ? (
-        <Button
-          label={t('safety.stopSharing')}
-          accessibilityLabel={t('safety.stopSharingA11y')}
-          variant="ghost"
-          size="sm"
-          leadingIcon="shareOff"
-          onPress={share.stop}
-          disabled={share.busy}
-          testID="trip-safety-stop-sharing"
-        />
+          {shareable && share.link ? (
+            <Button
+              label={t('safety.stopSharing')}
+              accessibilityLabel={t('safety.stopSharingA11y')}
+              variant="ghost"
+              size="sm"
+              leadingIcon="shareOff"
+              onPress={share.stop}
+              disabled={share.busy}
+              testID="trip-safety-stop-sharing"
+            />
+          ) : null}
+        </View>
       ) : null}
       <SosSheet
-        visible={open}
+        visible={open && available}
         onClose={close}
         role="passenger"
         sos={sos}
@@ -103,7 +109,7 @@ export function PassengerTripSafety({ ride, position }: Props) {
         share={shareable ? share : null}
         onAddContacts={openContacts}
       />
-    </View>
+    </>
   );
 }
 
@@ -122,31 +128,36 @@ export function DriverRideSafetyButton({
   const close = useCallback(() => setOpen(false), []);
   const openContacts = useOpenContacts(close);
 
-  if (!isSosAvailable(ride)) return null;
+  const available = isSosAvailable(ride);
 
+  // [T-565] As above: the sheet is always rendered and closes through `visible`.
   return (
-    <View style={style}>
-      <IconButton
-        icon="sos"
-        variant="floating"
-        size={size}
-        iconColor="danger"
-        onPress={() => {
-          haptics.impactLight();
-          setOpen(true);
-        }}
-        accessibilityLabel={t('safety.sosButtonA11y')}
-        testID="driver-ride-sos"
-      />
+    <>
+      {available ? (
+        <View style={style}>
+          <IconButton
+            icon="sos"
+            variant="floating"
+            size={size}
+            iconColor="danger"
+            onPress={() => {
+              haptics.impactLight();
+              setOpen(true);
+            }}
+            accessibilityLabel={t('safety.sosButtonA11y')}
+            testID="driver-ride-sos"
+          />
+        </View>
+      ) : null}
       <SosSheet
-        visible={open}
+        visible={open && available}
         onClose={close}
         role="driver"
         sos={sos}
         position={position}
         onAddContacts={openContacts}
       />
-    </View>
+    </>
   );
 }
 

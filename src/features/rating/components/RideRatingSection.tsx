@@ -55,9 +55,10 @@ export function RideRatingSection({ rideId, role, myRating, canRate, personName,
   );
   const onStale = useCallback((state: RideRatingState | null) => apply(state ?? NOT_RATABLE), [apply]);
 
+  let body: React.ReactElement | null = null;
   if (myRating) {
     const labels = tagLabels(config, role, myRating.tags);
-    return (
+    body = (
       <Card testID="ride-details-rating">
         <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.title}>
           {t('rating.yourRating')}
@@ -77,11 +78,8 @@ export function RideRatingSection({ rideId, role, myRating, canRate, personName,
         ) : null}
       </Card>
     );
-  }
-
-  if (!canRate) return null;
-  return (
-    <>
+  } else if (canRate) {
+    body = (
       <Card testID="ride-details-rate">
         <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.title}>
           {t('rating.yourRating')}
@@ -95,8 +93,16 @@ export function RideRatingSection({ rideId, role, myRating, canRate, personName,
           testID="ride-details-rate-button"
         />
       </Card>
+    );
+  }
+
+  // [T-565] The sheet stays mounted when the section turns into "Your rating" (or goes): it closes
+  // through `visible` and slides out instead of unmounting a presented Modal.
+  return (
+    <>
+      {body}
       <RateRideSheet
-        visible={open}
+        visible={open && canRate && !myRating}
         rideId={rideId}
         role={role}
         personName={personName}

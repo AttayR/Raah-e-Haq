@@ -31,7 +31,7 @@ import { AcReportSection } from '../../ac/components/AcReportSection';
 import { isAcRide, toAcReportState } from '../../ac/api';
 import { WomenModeSearching } from '../../women-mode/components/WomenModeSearching';
 import { parcelOf } from '../../parcel/api';
-import { parcelOverchargeState, parcelStatusText } from '../../parcel/rules';
+import { parcelStatusText } from '../../parcel/rules';
 import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection';
 import type { ParcelView } from '../../parcel/types';
 import { readNumberOrNull } from '../../../core/api/read';
@@ -142,8 +142,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const driver = hasDriver && ride ? driverCardOf(ride) : null;
   // BE-82: the fare is final once a driver accepted; BE-85: the waiting timer after a verified arrival.
   const lock = hasDriver ? fareLockOf(ride) : null;
-  // T-563: never on a cancelled (refused) parcel; it was not paid.
-  const overcharge = ride ? parcelOverchargeState(toOverchargeState(ride.overcharge_report), parcel) : null;
+  // BE-106 / T-566: the server decides (can_report is false on an unpaid cancelled parcel).
+  const overcharge = ride ? toOverchargeState(ride.overcharge_report) : null;
   // BE-86: the AC tier's badge and, for an AC ride, "AC not working?".
   const ac = isAcRide(ride);
   const acReport = ride && ac ? toAcReportState(ride.ac_report) : null;
@@ -196,7 +196,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       {parcel && ride ? <ParcelSenderSection parcel={parcel} rideId={ride.id} /> : null}
 
       {/* BE-87: "Looking for a female driver" and the keep-waiting / allow-any choice. */}
-      {stage === 'searching' && ride?.women_mode ? <WomenModeSearching rideId={ride.id} raw={ride.women_mode} /> : null}
+      {/* T-565: mounted for the whole ride, so its choice sheet slides out when a driver takes it. */}
+      {ride ? <WomenModeSearching rideId={ride.id} raw={ride.women_mode} searching={stage === 'searching'} /> : null}
 
       {driver ? (
         <PersonCard
@@ -251,7 +252,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
         />
       ) : null}
 
-      {ride && acReport ? <AcReportSection rideId={ride.id} state={acReport} testID="active-ride-ac-report" /> : null}
+      {ride ? <AcReportSection rideId={ride.id} state={acReport} testID="active-ride-ac-report" /> : null}
 
       {canPassengerCancel(stage) ? (
         <Button

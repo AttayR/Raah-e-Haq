@@ -143,39 +143,45 @@ export function OverchargeReportSection({ rideId, state, fare, onReported, testI
     if (serverCanReport === false) setLocal(null);
   }, [serverCanReport]);
   const shown = local && local.rideId === rideId && serverCanReport !== false ? local.state : state;
-  if (!shown || (!shown.canReport && !shown.report)) return null;
-  const { report } = shown;
+  const report = shown?.report ?? null;
+  const canReport = shown?.canReport === true;
+  // [T-565] The sheet stays mounted while the section changes or goes (a report made, the window
+  // closed): it closes through `visible` and slides out instead of unmounting a presented Modal.
   return (
-    <View style={styles.section} testID={testID}>
-      {report ? (
-        <Card variant="outlined" testID={`${testID}-status`}>
-          <View style={styles.statusRow}>
-            <Icon name="report" size={20} color="textSecondary" />
-            <View style={styles.flex}>
-              <AppText variant="label">{t('fare.reportStatusTitle')}</AppText>
-              <AppText variant="bodySmall" color="textSecondary" testID={`${testID}-status-text`}>
-                {reportStatusText(report)}
-              </AppText>
-              {report.askedAmount !== null ? (
-                <AppText variant="caption" color="textMuted">
-                  {t('fare.reportAsked', { amount: formatMoney(report.askedAmount) })}
-                </AppText>
-              ) : null}
-            </View>
-          </View>
-        </Card>
-      ) : null}
-      {shown.canReport ? (
-        <Button
-          label={t('fare.reportButton')}
-          variant="outline"
-          leadingIcon="report"
-          onPress={() => setOpen(true)}
-          testID={`${testID}-button`}
-        />
+    <>
+      {canReport || report ? (
+        <View style={styles.section} testID={testID}>
+          {report ? (
+            <Card variant="outlined" testID={`${testID}-status`}>
+              <View style={styles.statusRow}>
+                <Icon name="report" size={20} color="textSecondary" />
+                <View style={styles.flex}>
+                  <AppText variant="label">{t('fare.reportStatusTitle')}</AppText>
+                  <AppText variant="bodySmall" color="textSecondary" testID={`${testID}-status-text`}>
+                    {reportStatusText(report)}
+                  </AppText>
+                  {report.askedAmount !== null ? (
+                    <AppText variant="caption" color="textMuted">
+                      {t('fare.reportAsked', { amount: formatMoney(report.askedAmount) })}
+                    </AppText>
+                  ) : null}
+                </View>
+              </View>
+            </Card>
+          ) : null}
+          {canReport ? (
+            <Button
+              label={t('fare.reportButton')}
+              variant="outline"
+              leadingIcon="report"
+              onPress={() => setOpen(true)}
+              testID={`${testID}-button`}
+            />
+          ) : null}
+        </View>
       ) : null}
       <OverchargeReportSheet
-        visible={open}
+        visible={open && canReport}
         fare={fare}
         submitting={action.submitting}
         error={action.error}
@@ -184,7 +190,7 @@ export function OverchargeReportSection({ rideId, state, fare, onReported, testI
         }}
         onClose={() => setOpen(false)}
       />
-    </View>
+    </>
   );
 }
 

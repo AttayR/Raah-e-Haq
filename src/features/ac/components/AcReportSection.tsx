@@ -101,34 +101,40 @@ export function AcReportSection({ rideId, state, onReported, testID = 'ac-report
     if (serverCanReport === false) setLocal(null);
   }, [serverCanReport]);
   const shown = local && local.rideId === rideId && serverCanReport !== false ? local.state : state;
-  if (!shown || (!shown.canReport && !shown.report)) return null;
-  const { report } = shown;
+  const report = shown?.report ?? null;
+  const canReport = shown?.canReport === true;
+  // [T-565] The sheet stays mounted while the section changes or goes (a report made, the window
+  // closed): it closes through `visible` and slides out instead of unmounting a presented Modal.
   return (
-    <View style={styles.section} testID={testID}>
-      {report ? (
-        <Card variant="outlined" testID={`${testID}-status`}>
-          <View style={styles.statusRow}>
-            <Icon name="ac" size={20} color="textSecondary" />
-            <View style={styles.flex}>
-              <AppText variant="label">{t('ac.reportStatusTitle')}</AppText>
-              <AppText variant="bodySmall" color="textSecondary" testID={`${testID}-status-text`}>
-                {acReportStatusText(report)}
-              </AppText>
-            </View>
-          </View>
-        </Card>
-      ) : null}
-      {shown.canReport ? (
-        <Button
-          label={t('ac.reportButton')}
-          variant="outline"
-          leadingIcon="ac"
-          onPress={() => setOpen(true)}
-          testID={`${testID}-button`}
-        />
+    <>
+      {canReport || report ? (
+        <View style={styles.section} testID={testID}>
+          {report ? (
+            <Card variant="outlined" testID={`${testID}-status`}>
+              <View style={styles.statusRow}>
+                <Icon name="ac" size={20} color="textSecondary" />
+                <View style={styles.flex}>
+                  <AppText variant="label">{t('ac.reportStatusTitle')}</AppText>
+                  <AppText variant="bodySmall" color="textSecondary" testID={`${testID}-status-text`}>
+                    {acReportStatusText(report)}
+                  </AppText>
+                </View>
+              </View>
+            </Card>
+          ) : null}
+          {canReport ? (
+            <Button
+              label={t('ac.reportButton')}
+              variant="outline"
+              leadingIcon="ac"
+              onPress={() => setOpen(true)}
+              testID={`${testID}-button`}
+            />
+          ) : null}
+        </View>
       ) : null}
       <AcReportSheet
-        visible={open}
+        visible={open && canReport}
         submitting={action.submitting}
         error={action.error}
         onSubmit={(note) => {
@@ -136,7 +142,7 @@ export function AcReportSection({ rideId, state, onReported, testID = 'ac-report
         }}
         onClose={() => setOpen(false)}
       />
-    </View>
+    </>
   );
 }
 

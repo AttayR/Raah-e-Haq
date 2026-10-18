@@ -68,9 +68,10 @@ export const EMERGENCY_RELATIONS = ['father', 'mother', 'spouse', 'brother', 'si
 
 /**
  * A person's name: letters (any script, with their marks), spaces, dots, apostrophes and hyphens,
- * starting with a letter (T-564; the same rule as the parcel receiver name).
+ * starting with a letter (T-564). T-566: plain spaces only (`\p{Zs}`, no tabs or newlines), the
+ * server's BE-106 PersonNameFormat pattern.
  */
-export const PERSON_NAME = /^[\p{L}\p{M}][\p{L}\p{M}\s.'-]*$/u;
+export const PERSON_NAME = /^[\p{L}\p{M}][\p{L}\p{M}\p{Zs}.'-]*$/u;
 const PERSON_NAME_MESSAGE = 'Use letters only (spaces, dots, apostrophes and hyphens are fine)';
 
 const requiredText = (label: string, max: number) =>

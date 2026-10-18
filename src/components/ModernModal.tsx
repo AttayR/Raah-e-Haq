@@ -43,12 +43,13 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
   const slideAnim = useRef(new Animated.Value(height)).current;
   // [T-562] One root Modal at a time (iOS): wait for any sheet or dialog still up.
   const modal = useQueuedModal(config.visible);
+  const animationType = config.animationType || 'scale';
 
+  // [T-565] The entrance runs when the Modal actually presents (its queue turn), not when it is
+  // asked for: a modal waiting behind a sheet would otherwise finish its animation unseen.
   useEffect(() => {
-    if (config.visible) {
+    if (modal.show) {
       // Show animation
-      const animationType = config.animationType || 'scale';
-      
       if (animationType === 'scale') {
         Animated.parallel([
           Animated.timing(fadeAnim, {
@@ -86,8 +87,6 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
       }
     } else {
       // Hide animation
-      const animationType = config.animationType || 'scale';
-      
       if (animationType === 'scale') {
         Animated.parallel([
           Animated.timing(fadeAnim, {
@@ -122,7 +121,7 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
         }).start();
       }
     }
-  }, [config.visible]);
+  }, [modal.show, animationType, fadeAnim, scaleAnim, slideAnim]);
 
   const handleClose = () => {
     onClose();
@@ -188,7 +187,6 @@ const ModernModal: React.FC<ModernModalProps> = ({ config, onClose }) => {
   };
 
   const modalStyle = getModalStyle();
-  const animationType = config.animationType || 'scale';
 
   return (
     <Modal

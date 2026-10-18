@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { readText } from '../../../core/api/read';
 import type { RideResource } from '../../../services/rideService';
@@ -49,13 +49,18 @@ export function RideRatingPrompt({ ride, role, active, onRatingChange }: Props) 
   );
   const onStale = useCallback((state: RideRatingState | null) => apply(state ?? NOT_RATABLE), [apply]);
 
-  if (!ride) return null;
-  const person = ratedPerson(ride, role);
+  // [T-565] The last ride stays rendered (closed) when the ride is cleared, so an open sheet
+  // slides out through `visible` instead of unmounting a presented Modal.
+  const lastRide = useRef(ride);
+  if (ride) lastRide.current = ride;
+  const shown = ride ?? lastRide.current;
+  if (!shown) return null;
+  const person = ratedPerson(shown, role);
   return (
     <RateRideSheet
-      key={ride.id}
+      key={shown.id}
       visible={visible}
-      rideId={ride.id}
+      rideId={shown.id}
       role={role}
       personName={person.name}
       photoUri={person.photoUri}

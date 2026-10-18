@@ -320,6 +320,16 @@ describe('T-564: emergency contact name and experience copy', () => {
     expect(validateStepField('personal', 'emergencyContactName', { ...validDriver, emergencyContactName: name })).toBe(nameError);
   });
 
+  // T-566: plain spaces only, like the server (BE-106 `\p{Zs}`): a tab or a newline inside is refused.
+  it.each(['Ayesha\tKhan', 'Ayesha\nKhan', 'Ayesha\r\nKhan'])('refuses a name with a tab or newline inside (%j)', (name) => {
+    expect(validateStepField('personal', 'emergencyContactName', { ...validPassenger, emergencyContactName: name })).toBe(nameError);
+    expect(validateStepField('personal', 'emergencyContactName', { ...validDriver, emergencyContactName: name })).toBe(nameError);
+  });
+
+  it('accepts a no-break space between names (a Unicode space separator, as on the server)', () => {
+    expect(validateStepField('personal', 'emergencyContactName', { ...validPassenger, emergencyContactName: 'Ayesha\u00a0Khan' })).toBeUndefined();
+  });
+
   it('an empty name is still only "required" for passengers and fine for drivers', () => {
     expect(validateStepField('personal', 'emergencyContactName', { ...validPassenger, emergencyContactName: '' })).toBe(
       'Emergency contact name is required',

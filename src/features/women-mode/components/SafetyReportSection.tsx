@@ -90,7 +90,7 @@ export function SafetyReportSheet({ visible, submitting, error, onSubmit, onClos
 type SectionProps = {
   rideId: number;
   /** Ride `safety_report` (BE-105): the server decides when the button shows. */
-  state: SafetyReportState;
+  state: SafetyReportState | null;
   /** After a report was made (or found already made): reload the ride. */
   onReported?: () => void;
   testID?: string;
@@ -122,9 +122,11 @@ export function SafetyReportSection({ rideId, state, onReported, testID = 'safet
   });
   const finished = done && done.rideId === rideId ? done : null;
   // The server's report wins; right after sending, an open one is shown until the reload lands.
-  const reportStatus: SafetyReportStatus | null = state.report?.status ?? (finished?.reported ? 'open' : null);
+  const reportStatus: SafetyReportStatus | null = state?.report?.status ?? (finished?.reported ? 'open' : null);
+  const canReport = !reportStatus && state?.canReport === true && !finished;
+  let body: React.ReactElement | null = null;
   if (reportStatus) {
-    return (
+    body = (
       <Card variant="outlined" testID={`${testID}-sent`}>
         <View style={styles.row}>
           <Icon name="shield" size={20} color="success" />
@@ -134,19 +136,26 @@ export function SafetyReportSection({ rideId, state, onReported, testID = 'safet
         </View>
       </Card>
     );
+  } else if (canReport) {
+    body = (
+      <View testID={testID}>
+        <Button
+          label={t('womenMode.reportButton')}
+          variant="outline"
+          leadingIcon="womenMode"
+          onPress={() => setOpen(true)}
+          testID={`${testID}-button`}
+        />
+      </View>
+    );
   }
-  if (!state.canReport || finished) return null;
+  // [T-565] The sheet stays mounted when the button turns into the "report sent" line (or goes):
+  // it closes through `visible` and slides out instead of unmounting a presented Modal.
   return (
-    <View testID={testID}>
-      <Button
-        label={t('womenMode.reportButton')}
-        variant="outline"
-        leadingIcon="womenMode"
-        onPress={() => setOpen(true)}
-        testID={`${testID}-button`}
-      />
+    <>
+      {body}
       <SafetyReportSheet
-        visible={open}
+        visible={open && canReport}
         submitting={action.submitting}
         error={action.error}
         onSubmit={(note) => {
@@ -154,7 +163,7 @@ export function SafetyReportSection({ rideId, state, onReported, testID = 'safet
         }}
         onClose={() => setOpen(false)}
       />
-    </View>
+    </>
   );
 }
 

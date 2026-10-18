@@ -99,19 +99,27 @@ export const MODAL_DISMISS_FALLBACK_MS = 1000;
 export const useQueuedModal = (visible: boolean): { show: boolean; onDismiss: () => void } => {
   // True from the first render that shows the Modal until it has been dismissed.
   const [held, setHeld] = useState(false);
+  // [T-565] True from the render that hides a shown Modal until its dismiss has finished. A Modal
+  // asked for again meanwhile (a new confirm() during the dialog fade-out) waits for `onDismiss`:
+  // UIKit cannot present it again while it is still going away.
+  const [dismissing, setDismissing] = useState(false);
   const turn = useModalTurn(visible || held);
-  const show = visible && turn;
+  const show = visible && turn && !dismissing;
   // Set during render (not in an effect) so no render in between lets the turn go.
   if (show && !held) setHeld(true);
+  if (held && !visible && !dismissing) setDismissing(true);
+  const release = useCallback(() => {
+    setHeld(false);
+    setDismissing(false);
+  }, []);
   useEffect(() => {
-    if (visible || !held) return undefined;
+    if (!dismissing) return undefined;
     if (Platform.OS !== 'ios') {
-      setHeld(false);
+      release();
       return undefined;
     }
-    const timer = setTimeout(() => setHeld(false), MODAL_DISMISS_FALLBACK_MS);
+    const timer = setTimeout(release, MODAL_DISMISS_FALLBACK_MS);
     return () => clearTimeout(timer);
-  }, [held, visible]);
-  const onDismiss = useCallback(() => setHeld(false), []);
-  return { show, onDismiss };
+  }, [dismissing, release]);
+  return { show, onDismiss: release };
 };

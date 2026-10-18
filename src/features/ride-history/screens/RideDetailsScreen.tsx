@@ -30,7 +30,6 @@ import { RIDE_HISTORY_COPY } from '../copy';
 import { canOpenChat, otherParty } from '../format';
 import { RideRatingSection } from '../../rating/components/RideRatingSection';
 import { OverchargeReportSection } from '../../fare/components/OverchargeReport';
-import { parcelOverchargeState } from '../../parcel/rules';
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { SafetyReportSection } from '../../women-mode/components/SafetyReportSection';
 import { ParcelReceiptCard } from '../../parcel/components/ParcelReceiptCard';
@@ -163,9 +162,10 @@ export default function RideDetailsScreen() {
           />
           {viewer === 'passenger' ? (
             // BE-82: "Driver asked for more?" for 24 h after the ride, then the report's status.
+            // BE-106 / T-566: shown only when the server's can_report says so.
             <OverchargeReportSection
               rideId={ride.id}
-              state={parcelOverchargeState(ride.overcharge, ride.parcel)}
+              state={ride.overcharge}
               fare={ride.fareLock?.acceptedFare ?? ride.totalFare}
               onReported={() => {
                 refresh();
@@ -173,16 +173,17 @@ export default function RideDetailsScreen() {
               testID="ride-details-overcharge"
             />
           ) : null}
-          {viewer === 'passenger' && ride.acReport ? (
-            // BE-86: "AC not working?" on an AC ride, then the report's refund status.
-            <AcReportSection rideId={ride.id} state={ride.acReport} onReported={() => refresh()} testID="ride-details-ac-report" />
+          {viewer === 'passenger' ? (
+            // BE-86: "AC not working?" on an AC ride, then the report's refund status. T-565: mounted
+            // without a report state too, so its sheet never unmounts while it is up.
+            <AcReportSection rideId={ride.id} state={ride.acReport ?? null} onReported={() => refresh()} testID="ride-details-ac-report" />
           ) : null}
           <ReceiptCard ride={ride} viewer={viewer} />
           {/* A parcel's steps are on its own card (picked up / delivered, not started / completed). */}
           {ride.parcel ? null : <TimelineCard ride={ride} />}
-          {viewer === 'passenger' && ride.safetyReport ? (
+          {viewer === 'passenger' ? (
             // BE-87 / BE-105: a women's-safety report while the server allows it, then its status.
-            <SafetyReportSection rideId={ride.id} state={ride.safetyReport} onReported={() => refresh()} testID="ride-details-safety-report" />
+            <SafetyReportSection rideId={ride.id} state={ride.safetyReport ?? null} onReported={() => refresh()} testID="ride-details-safety-report" />
           ) : null}
         </View>
       </Animated.ScrollView>

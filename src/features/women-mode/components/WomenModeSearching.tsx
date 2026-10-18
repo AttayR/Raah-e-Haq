@@ -17,6 +17,12 @@ type Props = {
   rideId: number;
   /** Ride `women_mode` as the server sent it (raw); nothing renders without it. */
   raw: unknown;
+  /**
+   * [T-565] The ride is still searching. The panel keeps this mounted for the whole ride, so an
+   * open choice sheet closes through `visible` (slides out) when a driver takes the ride instead
+   * of being unmounted while it is up.
+   */
+  searching?: boolean;
 };
 
 /** The choice sheet: "Keep waiting" or "Allow any driver". Nothing changes without an answer. */
@@ -103,7 +109,7 @@ function FallbackSheet({
  * released (a poll that left before the answer cannot bring the sheet back). An inline answer
  * that fails says why under the status line.
  */
-export function WomenModeSearching({ rideId, raw }: Props) {
+export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
   const [answered, setAnswered] = useState<{
     rideId: number;
     raw: unknown;
@@ -133,14 +139,14 @@ export function WomenModeSearching({ rideId, raw }: Props) {
       : null;
   const summary = fresh ?? server;
   const asking =
+    searching &&
     !!summary &&
     summary.canAllowAnyDriver &&
     (summary.state === 'no_female_drivers_nearby' ||
       summary.state === 'ask_fallback');
   // Re-check the snooze while one is set (a small ticking leaf; nothing else re-renders).
   const now = useNow(asking && snoozedUntil !== null, 5000);
-  if (!summary) return null;
-  const showSheet = shouldAskFallback(summary, now, snoozedUntil);
+  const showSheet = searching && shouldAskFallback(summary, now, snoozedUntil);
 
   const choose = async (action: WomenModeAction) => {
     const next = await choice.choose(action);
@@ -151,59 +157,64 @@ export function WomenModeSearching({ rideId, raw }: Props) {
       setSnoozedUntil(snoozeAfterKeepWaiting(next, Date.now()));
   };
 
-  if (summary.state === 'matched') return null;
-  const released = summary.state === 'released';
+  const released = summary?.state === 'released';
+  // [T-565] The sheet sits outside the status block and is always rendered, so it closes through
+  // `visible` when the ride is matched, released or no longer searching.
   return (
-    <View style={styles.wrap}>
-      <View style={styles.row} testID="women-mode-status">
-        <Icon
-          name="womenMode"
-          size={20}
-          color={released ? 'textSecondary' : 'primaryText'}
-        />
-        <AppText
-          variant="bodySmall"
-          color="textSecondary"
-          style={styles.flex}
-          testID="women-mode-status-text"
-        >
-          {released ? t('womenMode.released') : t('womenMode.searching')}
-        </AppText>
-        {summary.canAllowAnyDriver && !showSheet ? (
-          <Button
-            label={t('womenMode.allowAny')}
-            variant="ghost"
-            size="sm"
-            fullWidth={false}
-            onPress={() => {
-              choose('allow_any_driver');
-            }}
-            disabled={choice.pending !== null}
-            testID="women-mode-allow-any-inline"
-          />
-        ) : null}
-        <FallbackSheet
-          visible={showSheet}
-          noneNearby={summary.state === 'no_female_drivers_nearby'}
-          pending={choice.pending}
-          error={choice.error}
-          onChoose={action => {
-            choose(action);
-          }}
-          onClose={() => setSnoozedUntil(Date.now() + DISMISS_SNOOZE_MS)}
-        />
-      </View>
-      {choice.error && !showSheet ? (
-        <AppText
-          variant="bodySmall"
-          color="danger"
-          accessibilityLiveRegion="polite"
-          testID="women-mode-inline-error"
-        >
-          {choice.error}
-        </AppText>
+    <>
+      {searching && summary && summary.state !== 'matched' ? (
+        <View style={styles.wrap}>
+          <View style={styles.row} testID="women-mode-status">
+            <Icon
+              name="womenMode"
+              size={20}
+              color={released ? 'textSecondary' : 'primaryText'}
+            />
+            <AppText
+              variant="bodySmall"
+              color="textSecondary"
+              style={styles.flex}
+              testID="women-mode-status-text"
+            >
+              {released ? t('womenMode.released') : t('womenMode.searching')}
+            </AppText>
+            {summary.canAllowAnyDriver && !showSheet ? (
+              <Button
+                label={t('womenMode.allowAny')}
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={() => {
+                  choose('allow_any_driver');
+                }}
+                disabled={choice.pending !== null}
+                testID="women-mode-allow-any-inline"
+              />
+            ) : null}
+          </View>
+          {choice.error && !showSheet ? (
+            <AppText
+              variant="bodySmall"
+              color="danger"
+              accessibilityLiveRegion="polite"
+              testID="women-mode-inline-error"
+            >
+              {choice.error}
+            </AppText>
+          ) : null}
+        </View>
       ) : null}
-    </View>
+      <FallbackSheet
+        visible={showSheet}
+        noneNearby={summary?.state === 'no_female_drivers_nearby'}
+        pending={choice.pending}
+        error={choice.error}
+        onChoose={action => {
+          choose(action);
+        }}
+        onClose={() => setSnoozedUntil(Date.now() + DISMISS_SNOOZE_MS)}
+      />
+    </>
   );
 }
 

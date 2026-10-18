@@ -1,7 +1,8 @@
 /**
  * T-563 (T-561 follow-ups, docs/qa-reports/2026-10-16-t-560-r7-561-qa, screenshots 11 and 12):
- * 1. a refused parcel (sender) keeps the accepted / arrived steps and offers no "Driver asked
- *    for more?" (nothing was paid); a report already made keeps its status;
+ * 1. a refused parcel (sender) keeps the accepted / arrived steps; T-566 (BE-106): "Driver asked
+ *    for more?" follows the server's `can_report` only (false on an unpaid cancelled parcel, true
+ *    on a fee-charged one or a cancelled normal ride); a report already made keeps its status;
  * 2. the driver who refused a parcel sees a parcel message, not "Ride cancelled / no longer
  *    assigned to you";
  * 3. useVehicleTypes: a manual retry and the quiet focus re-read never free each other's
@@ -17,7 +18,7 @@ import { rootReducer } from '../../../src/store/rootReducer';
 import { CACHE_TTL, clearQueryCache } from '../../../src/core/api/queryCache';
 import { toast } from '../../../src/core/toast';
 import { toParcelView } from '../../../src/features/parcel/api';
-import { parcelOverchargeState, parcelTimeline } from '../../../src/features/parcel/rules';
+import { parcelTimeline } from '../../../src/features/parcel/rules';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
 import { driverCancelledCopy } from '../../../src/components/driver/DriverRideCancelledCard';
@@ -77,8 +78,8 @@ const refusedRide = (over: Partial<RideResource> = {}) =>
   parcelRide(parcelBlock({ status: 'cancelled', refusal_reason: 'over_size' }), {
     status: 'cancelled',
     cancellation_reason: 'driver',
-    // What the server sends today: the button is offered on the cancelled parcel.
-    overcharge_report: { can_report: true, report: null },
+    // BE-106: nothing was paid on a refused parcel, so the server offers no report.
+    overcharge_report: { can_report: false, report: null },
     ...over,
   });
 
@@ -108,7 +109,7 @@ describe('1. the sender of a refused parcel', () => {
     expect(steps({ status: 'cancelled' })).toEqual(['requested:done', 'cancelled:current']);
   });
 
-  it('live panel: no "Driver asked for more?" and the timeline shows accepted / arrived', () => {
+  it('live panel: no "Driver asked for more?" when the server says can_report false; the timeline shows accepted / arrived', () => {
     mock.onGet('/parcels/options').reply(200, envelope({ refusal_reasons: [{ key: 'over_size', label: 'Larger than declared' }] }));
     showPanel(refusedRide());
     expect(screen.queryByTestId('active-ride-overcharge-button')).toBeNull();
@@ -118,7 +119,25 @@ describe('1. the sender of a refused parcel', () => {
     expect(screen.getByTestId('parcel-timeline-cancelled-current')).toBeTruthy();
   });
 
-  it('a delivered parcel and a normal ride still offer the report', () => {
+  it('T-566: a cancelled parcel the server lets the sender report (a fee was charged) shows the button', () => {
+    mock.onGet('/parcels/options').reply(200, envelope({ refusal_reasons: [] }));
+    showPanel(
+      parcelRide(parcelBlock({ status: 'cancelled' }), {
+        status: 'cancelled',
+        cancellation_reason: 'passenger',
+        cancellation_fee: '50.00',
+        overcharge_report: { can_report: true, report: null },
+      }),
+    );
+    expect(screen.getByTestId('active-ride-overcharge-button')).toBeTruthy();
+  });
+
+  it('T-566: a cancelled normal ride keeps the report', () => {
+    showPanel(makeRide({ status: 'cancelled', driver_id: 5, cancellation_reason: 'passenger', overcharge_report: { can_report: true, report: null } }));
+    expect(screen.getByTestId('active-ride-overcharge-button')).toBeTruthy();
+  });
+
+  it('a delivered parcel still offers the report', () => {
     showPanel(
       parcelRide(parcelBlock({ status: 'delivered', picked_up_at: '2026-10-16T10:00:00Z' }), {
         status: 'completed',
@@ -128,16 +147,18 @@ describe('1. the sender of a refused parcel', () => {
     expect(screen.getByTestId('active-ride-overcharge-button')).toBeTruthy();
   });
 
-  it('a report already made on the parcel keeps its status (receipt and panel share the rule)', () => {
-    const report = { id: 1 } as unknown as never;
-    const cancelled = toParcelView(parcelBlock({ status: 'cancelled', refusal_reason: 'over_size' }));
-    expect(parcelOverchargeState({ canReport: true, report }, cancelled)).toEqual({ canReport: false, report });
-    expect(parcelOverchargeState({ canReport: true, report: null }, toParcelView(parcelBlock({ status: 'delivered' })))).toEqual({
-      canReport: true,
-      report: null,
-    });
-    expect(parcelOverchargeState({ canReport: true, report: null }, null)).toEqual({ canReport: true, report: null });
-    expect(parcelOverchargeState(null, cancelled)).toBeNull();
+  it('a report already made on a refused parcel keeps its status, without the button', () => {
+    mock.onGet('/parcels/options').reply(200, envelope({ refusal_reasons: [] }));
+    showPanel(
+      refusedRide({
+        overcharge_report: {
+          can_report: false,
+          report: { id: 3, status: 'open', asked_amount: 250, refund_amount: null, created_at: '2026-10-16T10:05:00Z' },
+        },
+      }),
+    );
+    expect(screen.getByTestId('active-ride-overcharge-status')).toBeTruthy();
+    expect(screen.queryByTestId('active-ride-overcharge-button')).toBeNull();
   });
 });
 

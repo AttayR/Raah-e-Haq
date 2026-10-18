@@ -67,12 +67,15 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
   const quietInFlight = useRef(false);
   /** When the last quiet re-read failed (null after a success). */
   const quietFailedAt = useRef<number | null>(null);
+  /** [T-565] Counts the quiet re-reads that loaded, so a failed retry can tell one landed meanwhile. */
+  const quietLoads = useRef(0);
 
   useEffect(() => {
     // Shown from the cache on the first frame: no request until a retry.
     if (attempt === 0 && cachedOnMount) return undefined;
     const controller = new AbortController();
     const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
+    const quietLoadsAtStart = quietLoads.current;
     let current = true;
     loadInFlight.current = true;
     setState((s) => ({ ...s, status: 'loading', error: null }));
@@ -83,9 +86,10 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
         setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
       })
       .catch((error) => {
-        if (!controller.signal.aborted) {
-          setState({ status: 'error', data: null, error: errorText(error, BOOKING_COPY.vehicleTypesFailed), notice: null });
-        }
+        if (controller.signal.aborted) return;
+        // A quiet re-read loaded the catalogue while this one ran: keep what it showed.
+        if (quietLoads.current !== quietLoadsAtStart) return;
+        setState({ status: 'error', data: null, error: errorText(error, BOOKING_COPY.vehicleTypesFailed), notice: null });
       })
       .finally(() => {
         // A newer retry owns the flag once this one was replaced.
@@ -114,6 +118,7 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
       .then((catalogue) => {
         writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
         quietFailedAt.current = null;
+        quietLoads.current += 1;
         setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
       })
       .catch(() => {

@@ -183,16 +183,6 @@ export const parcelTimeline = (
   }));
 };
 
-/**
- * T-563: a cancelled parcel was never paid (the sender pays the rider at the pickup), so there is
- * nothing the rider could have overcharged: no "asked for more?" button. A report already made
- * keeps its status.
- */
-export const parcelOverchargeState = <S extends { canReport: boolean }>(
-  state: S | null,
-  parcel: Pick<ParcelView, 'status'> | null,
-): S | null => (state && state.canReport && parcel?.status === 'cancelled' ? { ...state, canReport: false } : state);
-
 /** Seconds until `iso` (0 when it has passed or is missing). */
 export const secondsUntil = (iso: string | null, now: number): number => {
   if (!iso) return 0;
