@@ -40,6 +40,37 @@ export interface RegistrationVehicleRules {
   acMinVehicleYear: number | null;
   /** Accepted model years (inclusive); null when the server did not say. */
   vehicleYear: { min: number; max: number } | null;
+  /** BE-108: the Make list per vehicle kind; null when the server sent none (older server). */
+  vehicleMakes: VehicleMakesByKind | null;
+}
+
+/** BE-108: make names per vehicle kind (`car`, `bike`, `rickshaw`, `van`), each ending in "Other". */
+export type VehicleMakesByKind = Readonly<Record<string, readonly string[]>>;
+
+/** The vehicle kinds GET /public/vehicle-types always lists in `meta.vehicle_makes` (BE-108). */
+export type VehicleMakeKind = 'car' | 'bike' | 'rickshaw' | 'van';
+
+/** One item of GET /public/vehicle-types `data` as sent; only the parts registration reads. */
+export interface PublicVehicleTypeWire {
+  key: string;
+  label?: string;
+  /** BE-108: the makes of this kind (`[]` for the car_ac and parcel tiers). */
+  makes?: string[];
+}
+
+/** GET /public/vehicle-types `meta` as sent (BE-60, BE-105, BE-108). */
+export interface PublicVehicleTypesMetaWire {
+  ac?: { vehicle_type?: string; min_vehicle_year?: number | null };
+  vehicle_year?: { min?: number; max?: number };
+  /** BE-108: every vehicle kind is present (active or not); ride tiers are never keys. */
+  vehicle_makes?: Partial<Record<VehicleMakeKind, string[]>>;
+}
+
+/** The whole GET /public/vehicle-types body as sent (read defensively by toRegistrationVehicleRules). */
+export interface PublicVehicleTypesWire {
+  success?: boolean;
+  data?: PublicVehicleTypeWire[];
+  meta?: PublicVehicleTypesMetaWire;
 }
 
 /** `vehicle.ac_status` of the driver's car. */

@@ -333,8 +333,8 @@ describe('registration and driver bits', () => {
       data: [],
       meta: { fare_notice: null, ac: { vehicle_type: 'car', min_vehicle_year: 2010 }, vehicle_year: { min: 1980, max: 2027 } },
     };
-    expect(toRegistrationVehicleRules(body)).toEqual({ acVehicleType: 'car', acMinVehicleYear: 2010, vehicleYear: { min: 1980, max: 2027 } });
-    expect(toRegistrationVehicleRules({ success: true, data: [] })).toEqual({ acVehicleType: 'car', acMinVehicleYear: null, vehicleYear: null });
+    expect(toRegistrationVehicleRules(body)).toEqual({ acVehicleType: 'car', acMinVehicleYear: 2010, vehicleYear: { min: 1980, max: 2027 }, vehicleMakes: null });
+    expect(toRegistrationVehicleRules({ success: true, data: [] })).toEqual({ acVehicleType: 'car', acMinVehicleYear: null, vehicleYear: null, vehicleMakes: null });
     expect(toRegistrationVehicleRules({ meta: { vehicle_year: { min: 2030, max: 2027 } } }).vehicleYear).toBeNull();
   });
 
@@ -346,7 +346,7 @@ describe('registration and driver bits', () => {
   });
 
   it('BE-105: the AC switch shows for the AC type and is blocked below the minimum year', () => {
-    const rules = { acVehicleType: 'car', acMinVehicleYear: 2010, vehicleYear: null };
+    const rules = { acVehicleType: 'car', acMinVehicleYear: 2010, vehicleYear: null, vehicleMakes: null };
     expect(acAllowedFor(rules, 'bike', '2020')).toEqual({ shown: false, tooOld: false });
     expect(acAllowedFor(rules, 'car', '2009')).toEqual({ shown: true, tooOld: true });
     expect(acAllowedFor(rules, 'car', '2010')).toEqual({ shown: true, tooOld: false });

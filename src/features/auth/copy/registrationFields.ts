@@ -120,10 +120,10 @@ export const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8
 
 /**
  * T-570 (QA 2026-10-18): the Make list follows the vehicle type, so a bike shows bike makes.
- * The server keeps no make catalogue (vehicle_brand is free text, max 100; GET /vehicle-types has
- * no makes), so this is a static config of makes sold in Pakistan, keyed by the vehicle type id
- * (registrationForm VEHICLE_TYPES). Each list ends with 'Other'. A server catalogue is a backend
- * follow-up; until then edit the lists here.
+ * T-572 / BE-108: the server's lists (GET /public/vehicle-types `meta.vehicle_makes`, admin
+ * editable) are used when present; these static lists (the ones the server was seeded with) stand
+ * in while it loads, on an older server or when the request fails. Keyed by the vehicle type id
+ * (registrationForm VEHICLE_TYPES); each list ends with 'Other'. vehicle_brand stays free text.
  */
 export const VEHICLE_MAKES_BY_TYPE: Readonly<Record<string, readonly string[]>> = {
   car: [
@@ -141,8 +141,21 @@ export const VEHICLE_MAKES_BY_TYPE: Readonly<Record<string, readonly string[]>> 
   van: ['Suzuki', 'Toyota', 'Changan', 'FAW', 'Hyundai', 'KIA', 'Daihatsu', 'Nissan', 'Other'],
 };
 
-/** The makes for a vehicle type; none until a known type is chosen. */
-export const vehicleMakesFor = (vehicleType: string): readonly string[] => VEHICLE_MAKES_BY_TYPE[vehicleType] ?? [];
+const ownList = (lists: Readonly<Record<string, readonly string[]>> | null | undefined, key: string) =>
+  lists && Object.prototype.hasOwnProperty.call(lists, key) ? lists[key] : undefined;
+
+/**
+ * The makes for a vehicle type; none until a known type is chosen. `serverMakes` (BE-108) wins
+ * when it has a non-empty list for the type, else the static list.
+ */
+export const vehicleMakesFor = (
+  vehicleType: string,
+  serverMakes?: Readonly<Record<string, readonly string[]>> | null,
+): readonly string[] => {
+  const server = ownList(serverMakes, vehicleType);
+  if (server && server.length > 0) return server;
+  return ownList(VEHICLE_MAKES_BY_TYPE, vehicleType) ?? [];
+};
 
 export const VEHICLE_COLOURS = [
   'White', 'Black', 'Silver', 'Gray', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Brown', 'Gold',

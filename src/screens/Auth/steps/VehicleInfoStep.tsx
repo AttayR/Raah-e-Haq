@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { SelectField, TextField } from '../../../components/ui';
 import {
@@ -54,13 +54,15 @@ export default function VehicleInfoStep(props: StepProps) {
   const yearOptions = toOptions(vehicleYearOptions(vehicleRules?.vehicleYear ?? null, maxVehicleYear(), MIN_VEHICLE_YEAR));
 
   // T-570: the makes of the chosen type (bike makes for a bike); none until a type is chosen.
-  const makes = vehicleMakesFor(data.vehicleType);
-  const makeOptions = toOptions(makes);
+  // T-572 / BE-108: the server's list from the same cached read, else the static list.
+  const serverMakes = vehicleRules?.vehicleMakes ?? null;
+  const makes = vehicleMakesFor(data.vehicleType, serverMakes);
+  const makeOptions = useMemo(() => toOptions(makes), [makes]);
 
   const selectType = (type: string) => {
     f.set('vehicleType', type);
     // A make the new type does not list (Toyota after switching to Bike) is cleared, not kept.
-    if (data.vehicleBrand && !vehicleMakesFor(type).includes(data.vehicleBrand)) f.set('vehicleBrand', '');
+    if (data.vehicleBrand && !vehicleMakesFor(type, serverMakes).includes(data.vehicleBrand)) f.set('vehicleBrand', '');
   };
 
   const selectYear = (year: string) => {

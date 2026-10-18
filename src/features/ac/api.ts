@@ -4,10 +4,12 @@ import type {
   AcReport,
   AcReportResult,
   AcReportState,
+  PublicVehicleTypesWire,
   RegistrationVehicleRules,
   VehicleAcProblem,
   VehicleAcStatus,
   VehicleAcSummary,
+  VehicleMakesByKind,
 } from './types';
 
 /**
@@ -17,7 +19,8 @@ import type {
  * - GET  /driver/vehicle/ac            -> data: {vehicle, min_vehicle_year, serves_ac_rides, problems}
  * - POST /driver/vehicle/ac {has_ac}   -> the same (422 NOT_A_CAR / VEHICLE_TOO_OLD, 409 NO_VEHICLE)
  * - GET  /public/vehicle-types        -> meta.ac {vehicle_type, min_vehicle_year} and
- *   meta.vehicle_year {min, max} for the registration AC switch (BE-105)
+ *   meta.vehicle_year {min, max} for the registration AC switch (BE-105), and
+ *   meta.vehicle_makes {car, bike, rickshaw, van} / data[].makes for the Make list (BE-108)
  * Ride objects carry `is_ac` and, for the passenger, `ac_report {can_report, report}`.
  */
 
@@ -73,7 +76,48 @@ const year = (value: unknown): number | null => {
   return n !== null && n >= 1900 && n <= 9999 ? n : null;
 };
 
-/** `meta.ac` and `meta.vehicle_year` of GET /public/vehicle-types (BE-105); unknown parts stay null. */
+/** A list of make names: trimmed non-empty strings, first spelling kept; null when none. */
+const toMakeList = (raw: unknown): string[] | null => {
+  if (!Array.isArray(raw)) return null;
+  const seen = new Set<string>();
+  const makes = raw.flatMap((item): string[] => {
+    const name = readText(item)?.trim();
+    if (!name || seen.has(name.toLowerCase())) return [];
+    seen.add(name.toLowerCase());
+    return [name];
+  });
+  return makes.length > 0 ? makes : null;
+};
+
+const KIND_KEY = /^[a-z][a-z0-9_]*$/;
+
+/**
+ * BE-108: the Make list per vehicle kind from `meta.vehicle_makes`, else from `data[].makes`
+ * (same lists). A kind with no usable list is left out so the app's static list stands in.
+ */
+export const toVehicleMakes = (body: unknown): VehicleMakesByKind | null => {
+  const envelope = isRecord(body) ? body : {};
+  const meta = isRecord(envelope.meta) ? envelope.meta : {};
+  const fromMeta = isRecord(meta.vehicle_makes) ? meta.vehicle_makes : {};
+  const entries = new Map<string, string[]>();
+  Object.keys(fromMeta).forEach((kind) => {
+    const makes = KIND_KEY.test(kind) ? toMakeList(fromMeta[kind]) : null;
+    if (makes) entries.set(kind, makes);
+  });
+  (Array.isArray(envelope.data) ? envelope.data : []).forEach((item) => {
+    if (!isRecord(item)) return;
+    const kind = readText(item.key);
+    if (!kind || !KIND_KEY.test(kind) || entries.has(kind)) return;
+    const makes = toMakeList(item.makes);
+    if (makes) entries.set(kind, makes);
+  });
+  return entries.size > 0 ? Object.fromEntries(entries) : null;
+};
+
+/**
+ * `meta.ac`, `meta.vehicle_year` (BE-105) and the makes (BE-108) of GET /public/vehicle-types;
+ * unknown parts stay null.
+ */
 export const toRegistrationVehicleRules = (body: unknown): RegistrationVehicleRules => {
   const meta = isRecord(body) && isRecord(body.meta) ? body.meta : {};
   const ac = isRecord(meta.ac) ? meta.ac : {};
@@ -84,6 +128,7 @@ export const toRegistrationVehicleRules = (body: unknown): RegistrationVehicleRu
     acVehicleType: readText(ac.vehicle_type) ?? 'car',
     acMinVehicleYear: year(ac.min_vehicle_year),
     vehicleYear: min !== null && max !== null && min <= max ? { min, max } : null,
+    vehicleMakes: toVehicleMakes(body),
   };
 };
 
@@ -169,9 +214,9 @@ export const acApi = {
     return toVehicleAcSummary(unwrap(await apiService.post<unknown>('/driver/vehicle/ac', { has_ac: hasAc })));
   },
 
-  /** GET /public/vehicle-types (no token needed): only its registration `meta` is read here. */
+  /** GET /public/vehicle-types (no token needed): only its registration `meta` and makes are read here. */
   async getRegistrationVehicleRules(): Promise<RegistrationVehicleRules> {
-    const body = await apiService.get<unknown>('/public/vehicle-types');
+    const body = await apiService.get<PublicVehicleTypesWire['data']>('/public/vehicle-types');
     unwrap(body);
     return toRegistrationVehicleRules(body);
   },
