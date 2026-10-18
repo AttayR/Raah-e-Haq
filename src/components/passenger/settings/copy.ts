@@ -1,7 +1,8 @@
 import type { AccountStatus } from '../../../services/api';
+import { localizedCopy } from '../../../i18n/localizedCopy';
 
 /** Static copy for the passenger Account tab and Profile view (T-618; the tab title is `nav.account`, UI-R4). */
-export const PASSENGER_SETTINGS_COPY = {
+export const PASSENGER_SETTINGS_COPY = localizedCopy({
   passengerFallbackName: 'Rider',
   roleLabel: 'Rider',
   openProfileHint: 'Opens your profile',
@@ -29,7 +30,7 @@ export const PASSENGER_SETTINGS_COPY = {
   bio: 'About',
   verified: 'Verified',
   noDetails: 'No personal details yet',
-} as const;
+} as const);
 
 /**
  * The one word for an account status, shared by the Settings card and the Profile view so the

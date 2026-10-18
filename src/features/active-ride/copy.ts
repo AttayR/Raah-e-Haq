@@ -1,9 +1,11 @@
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /**
  * User-facing copy of the active-ride flow (T-301). Static strings only, kept in one place so
  * they can move into the i18n catalogue (Urdu) as one unit. Server messages (a refused
  * request, a validation error) come from the API and are never written here.
  */
-export const ACTIVE_RIDE_COPY = {
+export const ACTIVE_RIDE_COPY = localizedCopy({
   requestingTitle: 'Creating Ride Request',
   requestingMessage: 'Please wait while we process your request…',
   requestFailedTitle: 'Ride Request Failed',
@@ -38,4 +40,4 @@ export const ACTIVE_RIDE_COPY = {
   cancelConfirmMessage: 'Are you sure you want to cancel this ride?',
   keepRide: 'Keep Ride',
   cancelFailedTitle: 'Error',
-} as const;
+} as const);

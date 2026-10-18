@@ -31,3 +31,20 @@ test('App renders the signed-out Login screen without throwing', async () => {
   await waitFor(() => expect(screen.getByText('Sign in to Raah-e-Haq')).toBeTruthy());
   screen.unmount();
 }, COLD_TRANSFORM_TIMEOUT_MS);
+
+test('a language switch re-renders the app in the new language and keeps the open screen (T-523)', async () => {
+  const { default: App } = require('../App') as typeof import('../App');
+  const { changeLanguage, resetLanguagePreferenceForTests } =
+    require('../src/i18n/languagePreference') as typeof import('../src/i18n/languagePreference');
+  const { fireEvent } = require('@testing-library/react-native') as typeof import('@testing-library/react-native');
+  const screen = render(<App />);
+  await waitFor(() => expect(screen.getByText('Continue with phone')).toBeTruthy());
+  fireEvent.press(screen.getByText('Continue with phone'));
+  await waitFor(() => expect(screen.getByText('Sign in with your phone')).toBeTruthy());
+  act(() => changeLanguage('ur-Latn'));
+  // Same screen (navigation state kept across the remount), now in Roman Urdu.
+  await waitFor(() => expect(screen.getByText('Apne phone se sign in karein')).toBeTruthy());
+  expect(screen.queryByText('Sign in with your phone')).toBeNull();
+  screen.unmount();
+  resetLanguagePreferenceForTests();
+}, COLD_TRANSFORM_TIMEOUT_MS);

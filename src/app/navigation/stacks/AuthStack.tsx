@@ -16,11 +16,13 @@ export type AuthStackParamList = {
  */
 const loadSignupScreen = () => require('../../../screens/Auth/SignupScreen').default;
 
+import { localeScreenLayout } from '../localeScreenLayout';
+
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export default function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} screenLayout={localeScreenLayout}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" getComponent={loadSignupScreen} />
       <Stack.Screen name="PhoneAuth" component={PhoneAuthScreen} />

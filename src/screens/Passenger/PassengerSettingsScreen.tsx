@@ -13,6 +13,7 @@ import { useTabScrollReset } from '../../hooks/useTabScrollReset';
 import { Header, HeaderLargeTitle, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
+import { LanguageRow } from '../../components/driver/settings/LanguageRow';
 import { ProfileSummaryCard } from '../../components/passenger/settings/ProfileSummaryCard';
 import { PASSENGER_SETTINGS_COPY as COPY } from '../../components/passenger/settings/copy';
 import { AccountChecks } from '../../features/profile-edit';
@@ -106,6 +107,7 @@ const PassengerSettingsScreen = () => {
 
           <ListGroup title={COPY.appGroup}>
             <AppearanceRow />
+            <LanguageRow />
           </ListGroup>
 
           <ListGroup>

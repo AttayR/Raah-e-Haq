@@ -11,6 +11,7 @@ import { useTabScrollReset } from '../../hooks/useTabScrollReset';
 import { AppText, Avatar, Badge, Card, Header, HeaderLargeTitle, Icon, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
+import { LanguageRow } from '../../components/driver/settings/LanguageRow';
 import { DRIVER_SETTINGS_COPY } from '../../components/driver/settings/copy';
 import { AccountChecks } from '../../features/profile-edit';
 import { DriverWomenModeRow } from '../../features/women-mode/components/DriverWomenModeRow';
@@ -158,6 +159,7 @@ const DriverSettingsScreen = () => {
 
           <ListGroup title={DRIVER_SETTINGS_COPY.appGroup}>
             <AppearanceRow />
+            <LanguageRow />
           </ListGroup>
 
           <ListGroup>

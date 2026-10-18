@@ -1,8 +1,10 @@
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /**
  * Static copy for the driver ride screen (T-405). Every number (fare, earnings, distance) comes
  * from the server's RideResource; only labels live here.
  */
-export const DRIVER_RIDE_COPY = {
+export const DRIVER_RIDE_COPY = localizedCopy({
   screenA11y: 'Current ride',
   back: 'Back',
   recentreA11y: 'Show the route to your next point',
@@ -90,4 +92,4 @@ export const DRIVER_RIDE_COPY = {
   aboutAway: 'About {distance} away.',
   metres: '{m} m',
   navigateFailed: 'Could not open the maps app.',
-} as const;
+} as const);

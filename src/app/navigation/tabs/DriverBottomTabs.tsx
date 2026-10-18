@@ -13,6 +13,8 @@ import { IncomingRequestShownContext } from '../../../features/driver-requests/o
 import { componentTokens } from '../../../theme';
 import type { DriverStackParamList } from '../stacks/DriverStack';
 import { DRIVER_TABS, RoleTabBar } from './RoleTabBar';
+import { localeScreenLayout } from '../localeScreenLayout';
+import { useLocale } from '../../../i18n/languagePreference';
 
 /** DESIGN_SYSTEM §8.1: Drive · Earnings · Inbox · Account (no Map tab, UI-R4). */
 export type DriverTabParamList = {
@@ -47,11 +49,13 @@ const DriverBottomTabs = ({ navigation }: Props) => {
     [activeTab, navigation],
   );
 
+  // T-523: a new tab bar function after a language switch, so its labels re-render.
+  const locale = useLocale();
   const renderTabBar = useCallback(
     (props: BottomTabBarProps) => (
-      <RoleTabBar {...props} specs={DRIVER_TABS} inboxUnread={inboxUnread} hidden={requestShown} />
+      <RoleTabBar key={locale} {...props} specs={DRIVER_TABS} inboxUnread={inboxUnread} hidden={requestShown} />
     ),
-    [inboxUnread, requestShown],
+    [inboxUnread, requestShown, locale],
   );
 
   return (
@@ -64,6 +68,7 @@ const DriverBottomTabs = ({ navigation }: Props) => {
           })}
           // T-535 (PERF-14): a tab that is not shown stops rendering (its state is kept).
           screenOptions={{ headerShown: false, animation: 'none', freezeOnBlur: true }}
+          screenLayout={localeScreenLayout}
         >
           <Tab.Screen name="Drive" component={DriverDriveScreen} />
           <Tab.Screen name="Earnings" component={DriverEarningsScreen} />

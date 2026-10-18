@@ -1,5 +1,7 @@
+import { localizedCopy } from '../../../i18n/localizedCopy';
+
 /** Static copy for the driver Account tab (T-618, driver side; the title is `nav.account`, UI-R4). */
-export const DRIVER_SETTINGS_COPY = {
+export const DRIVER_SETTINGS_COPY = localizedCopy({
   driverFallbackName: 'Driver',
   statusApproved: 'Approved',
   statusPending: 'Pending',
@@ -22,4 +24,4 @@ export const DRIVER_SETTINGS_COPY = {
   appearanceDark: 'Dark',
   signOut: 'Sign out',
   signingOut: 'Signing out…',
-} as const;
+} as const);

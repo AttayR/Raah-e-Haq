@@ -3,13 +3,14 @@ import { StyleSheet, View } from 'react-native';
 import { useAppTheme, type AppearancePreference } from '../../../app/providers/ThemeProvider';
 import { AppText, Icon, SegmentedControl, type SegmentOption } from '../../ui';
 import { radius, space } from '../../../theme';
+import { perLocale } from '../../../i18n';
 import { DRIVER_SETTINGS_COPY } from './copy';
 
-const OPTIONS: ReadonlyArray<SegmentOption<AppearancePreference>> = [
+const options = perLocale((): ReadonlyArray<SegmentOption<AppearancePreference>> => [
   { value: 'system', label: DRIVER_SETTINGS_COPY.appearanceSystem },
   { value: 'light', label: DRIVER_SETTINGS_COPY.appearanceLight },
   { value: 'dark', label: DRIVER_SETTINGS_COPY.appearanceDark },
-];
+]);
 
 /**
  * Appearance setting (DESIGN_SYSTEM §1.6): System / Light / Dark, persisted by ThemeProvider
@@ -28,7 +29,7 @@ export function AppearanceRow() {
         </AppText>
       </View>
       <SegmentedControl
-        options={OPTIONS}
+        options={options()}
         value={scheme}
         onChange={setScheme}
         accessibilityLabel={DRIVER_SETTINGS_COPY.appearance}

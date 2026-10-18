@@ -7,16 +7,17 @@ import type { RegistrationFormData } from '../../../features/auth/registration/r
 import EmergencyContactFields, { fromPhoneField, toPhoneField } from './EmergencyContactFields';
 import PasswordStrength from './PasswordStrength';
 import { Anchored, ControlLabel, FieldError, FormGroup, stepStyles, useStepFields, type StepProps } from './stepParts';
+import { perLocale } from '../../../i18n';
 
 const COPY = REGISTRATION_FIELDS.personal;
 
 type Gender = RegistrationFormData['gender'];
 
-const GENDER_OPTIONS: ReadonlyArray<{ value: Gender; label: string }> = [
+const GENDER_OPTIONS = perLocale((): ReadonlyArray<{ value: Gender; label: string }> => [
   { value: 'male', label: COPY.genderMale },
   { value: 'female', label: COPY.genderFemale },
   { value: 'other', label: COPY.genderOther },
-];
+]);
 
 /**
  * Registration page "About you" (UI-R7, both roles): name, email, mobile, password, CNIC, date of
@@ -144,7 +145,7 @@ export default function PersonalInfoStep(props: StepProps) {
           <View style={stepStyles.control}>
             <ControlLabel required={f.required('gender')}>{COPY.gender}</ControlLabel>
             <SegmentedControl<Gender>
-              options={GENDER_OPTIONS}
+              options={GENDER_OPTIONS()}
               value={data.gender}
               onChange={(value) => f.set('gender', value)}
               accessibilityLabel={COPY.gender}

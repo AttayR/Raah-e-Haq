@@ -36,6 +36,19 @@ export const en = {
     title: 'Something went wrong',
     ok: 'OK',
   },
+  /**
+   * Language setting (T-523), Account → App on both roles. Each language is named in itself, so
+   * `english` and `romanUrdu` read the same in every language.
+   */
+  language: {
+    rowTitle: 'Language',
+    sheetTitle: 'Choose language',
+    hint: 'Opens the list of languages',
+    english: 'English',
+    romanUrdu: 'Roman Urdu',
+    englishHint: 'English',
+    romanUrduHint: 'Urdu in English letters',
+  },
   /** UI kit controls (UI-R2). */
   kit: {
     showPassword: 'Show password',
@@ -360,6 +373,14 @@ export const en = {
     turnOnLocation: 'Turn on location',
     mapLoading: 'Map loading…',
     returnToRide: 'Return to your ride',
+    // T-523: the sheet's greeting and "Where to?" entry.
+    whereTo: 'Where to?',
+    whereToA11y: 'Where to? Search destination',
+    greetingHello: 'Hello',
+    greetingMorning: 'Good morning',
+    greetingAfternoon: 'Good afternoon',
+    greetingEvening: 'Good evening',
+    greetingWithName: '{greeting}, {name}',
   },
   /** Saved places (T-516, BE-14): the list, the add/edit form and the Home chips. */
   savedPlaces: {

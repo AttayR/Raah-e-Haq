@@ -18,13 +18,14 @@ import ForgotPasswordSheet, { type ForgotPasswordResult } from '../../features/a
 import { LOGIN_COPY as COPY } from '../../features/auth/copy/login';
 import { inlineLoginErrors, validateLogin, type LoginFieldErrors } from '../../features/auth/loginValidation';
 import type { AuthStackParamList } from '../../app/navigation/stacks/AuthStack';
+import { perLocale } from '../../i18n';
 
 type LoginMethod = 'phone' | 'email';
 
-const METHODS = [
+const METHODS = perLocale(() => [
   { value: 'phone', label: COPY.methods.phone },
   { value: 'email', label: COPY.methods.email },
-] as const;
+] as const);
 
 /**
  * Sign in (UI-R6, spec auth-login; absorbs T-603). Form archetype on the theme background, no
@@ -152,7 +153,7 @@ export default function LoginScreen() {
           <AuthIntro logo title={COPY.title} subtitle={COPY.subtitle} testID="login-intro" />
           <View style={styles.form}>
             <SegmentedControl
-              options={METHODS}
+              options={METHODS()}
               value={loginMethod}
               onChange={changeMethod}
               accessibilityLabel={COPY.methodA11y}

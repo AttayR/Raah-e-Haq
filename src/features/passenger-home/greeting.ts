@@ -1,4 +1,5 @@
 import { firstNameOf } from '../../utils/format';
+import { t } from '../../i18n';
 /**
  * Passenger Home copy helpers (docs/design/screens/passenger-home.md, DESIGN_SYSTEM §7).
  */
@@ -12,10 +13,17 @@ export { firstNameOf };
  */
 export const greetingFor = (date: Date, name?: string | null): string => {
   const h = date.getHours();
-  const salutation =
-    h >= 22 || h < 5 ? 'Hello' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const salutation = t(
+    h >= 22 || h < 5
+      ? 'home.greetingHello'
+      : h < 12
+        ? 'home.greetingMorning'
+        : h < 17
+          ? 'home.greetingAfternoon'
+          : 'home.greetingEvening',
+  );
   const first = firstNameOf(name);
-  return first ? `${salutation}, ${first}` : salutation;
+  return first ? t('home.greetingWithName', { greeting: salutation, name: first }) : salutation;
 };
 
 /** A leading Google Plus Code ("G9C5+5F5, ..."), which riders cannot read as an address. */

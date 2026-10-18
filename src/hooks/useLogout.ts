@@ -8,6 +8,7 @@ import { logout, type SessionThunkExtra } from '../store/thunks/sessionThunks';
 // Typed locally (not useAppDispatch) so this hook does not import the store singleton.
 type LogoutDispatch = ThunkDispatch<unknown, SessionThunkExtra, UnknownAction>;
 
+/** English sign-out dialog text (tests and the dev gallery); the dialog itself reads `t()` when shown. */
 export const LOGOUT_CONFIRM_TITLE = t('signOut.title');
 export const LOGOUT_CONFIRM_MESSAGE = t('signOut.body');
 export const LOGOUT_CONFIRM_BUTTON = t('signOut.confirm');
@@ -44,9 +45,10 @@ export const useLogout = () => {
       return;
     }
     const confirmed = await confirm({
-      title: LOGOUT_CONFIRM_TITLE,
-      body: LOGOUT_CONFIRM_MESSAGE,
-      confirmLabel: LOGOUT_CONFIRM_BUTTON,
+      // Read at tap time, so the dialog follows a language switch (T-523).
+      title: t('signOut.title'),
+      body: t('signOut.body'),
+      confirmLabel: t('signOut.confirm'),
       destructive: true,
     });
     if (confirmed) {

@@ -8,6 +8,7 @@ import { space } from '../../../theme';
 import { NOTIFICATIONS_COPY } from '../copy';
 import { useNotificationPreferences } from '../hooks';
 import type { NotificationPreferenceKey } from '../types';
+import { perLocale } from '../../../i18n';
 
 type Row = { key: NotificationPreferenceKey; title: string; subtitle?: string };
 
@@ -15,12 +16,12 @@ type Row = { key: NotificationPreferenceKey; title: string; subtitle?: string };
  * Under the master switch. While push is off they are disabled and drawn off (no push is sent for
  * them then); their stored values are kept and show again when push is turned back on.
  */
-const CATEGORY_ROWS: readonly Row[] = [
+const CATEGORY_ROWS = perLocale((): readonly Row[] => [
   { key: 'rideUpdates', title: NOTIFICATIONS_COPY.prefRideUpdates, subtitle: NOTIFICATIONS_COPY.prefRideUpdatesSubtitle },
   { key: 'chat', title: NOTIFICATIONS_COPY.prefChat, subtitle: NOTIFICATIONS_COPY.prefChatSubtitle },
   { key: 'promotions', title: NOTIFICATIONS_COPY.prefPromotions },
   { key: 'soundAlerts', title: NOTIFICATIONS_COPY.prefSoundAlerts, subtitle: NOTIFICATIONS_COPY.prefSoundAlertsSubtitle },
-];
+]);
 
 /**
  * Settings → Notifications for both roles (T-502, BE-11): the five push switches from
@@ -102,7 +103,7 @@ export function NotificationPreferencesScreen() {
         <>
           <ListGroup title={NOTIFICATIONS_COPY.preferencesPushGroup}>
             {renderRow('pushEnabled', NOTIFICATIONS_COPY.prefPushEnabled, false, undefined, 'bell')}
-            {CATEGORY_ROWS.map((row) => renderRow(row.key, row.title, pushOff, row.subtitle))}
+            {CATEGORY_ROWS().map((row) => renderRow(row.key, row.title, pushOff, row.subtitle))}
           </ListGroup>
           <AppText variant="bodySmall" color="textSecondary" style={styles.hint}>
             {NOTIFICATIONS_COPY.preferencesHint}

@@ -23,7 +23,7 @@ export const BookingErrorBanner: React.FC<{ message: string; onDismiss: () => vo
       <AppText variant="bodySmall" color="danger" style={styles.bannerText}>
         {message}
       </AppText>
-      <IconButton icon="close" iconColor="danger" accessibilityLabel="Dismiss error" onPress={onDismiss} />
+      <IconButton icon="close" iconColor="danger" accessibilityLabel={BOOKING_COPY.dismissErrorA11y} onPress={onDismiss} />
     </View>
   );
 };

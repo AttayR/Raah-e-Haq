@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useIsFocused, useRoute, type RouteProp } from '@react-navigation/native';
 import { Header, HeaderLargeTitle, Screen, SegmentedControl, useHeaderScroll } from '../../components/ui';
-import { t } from '../../i18n';
+import { perLocale, t } from '../../i18n';
 import { layout, space } from '../../theme';
 import { ChatList } from '../chat/components/ChatList';
 import { NotificationsList } from '../notifications/components/NotificationsList';
@@ -14,10 +14,10 @@ export type InboxSegment = 'notifications' | 'messages';
 /** Tab params: a push or a notification row may open a given segment. */
 export type InboxParams = { segment?: InboxSegment };
 
-const SEGMENTS: ReadonlyArray<{ value: InboxSegment; label: string }> = [
+const SEGMENTS = perLocale((): ReadonlyArray<{ value: InboxSegment; label: string }> => [
   { value: 'notifications', label: t('inbox.notifications') },
   { value: 'messages', label: t('inbox.messages') },
-];
+]);
 
 type InboxRoute = RouteProp<{ Inbox: InboxParams | undefined }, 'Inbox'>;
 
@@ -53,7 +53,7 @@ export default function InboxScreen({ role }: { role: NotificationRole }) {
       <HeaderLargeTitle title={title} scrollY={scrollY} />
       <View style={styles.segments}>
         <SegmentedControl<InboxSegment>
-          options={SEGMENTS}
+          options={SEGMENTS()}
           value={segment}
           onChange={setSegment}
           accessibilityLabel={t('inbox.segmentLabel')}

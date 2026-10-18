@@ -4,6 +4,7 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
 import { Icon } from '../../../components/ui/Icon';
 import { radius, space } from '../../../theme';
+import { t } from '../../../i18n';
 
 /** The "Where to?" entry into booking (§8.3 Home sheet: 52 high, full width). */
 /** §8.3 peek arithmetic: the field is 52. */
@@ -17,7 +18,7 @@ export const WhereToBar: React.FC<{ onPress: () => void }> = ({ onPress }) => {
     <Pressable
       testID="home-where-to"
       accessibilityRole="button"
-      accessibilityLabel="Where to? Search destination"
+      accessibilityLabel={t('home.whereToA11y')}
       onPress={onPress}
       style={({ pressed }) => [
         styles.bar,
@@ -27,7 +28,7 @@ export const WhereToBar: React.FC<{ onPress: () => void }> = ({ onPress }) => {
     >
       <Icon name="search" size={24} color="textSecondary" />
       <AppText variant="title" numberOfLines={1} style={styles.label}>
-        Where to?
+        {t('home.whereTo')}
       </AppText>
     </Pressable>
   );

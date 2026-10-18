@@ -1,8 +1,10 @@
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /**
  * Static copy for the driver's incoming ride requests (T-403/T-404). Every number on the card
  * comes from GET /rides/pending; only labels live here.
  */
-export const DRIVER_REQUESTS_COPY = {
+export const DRIVER_REQUESTS_COPY = localizedCopy({
   title: 'New Ride Request',
   loading: 'Looking for ride requests…',
   empty: 'No ride requests nearby right now',
@@ -39,4 +41,4 @@ export const DRIVER_REQUESTS_COPY = {
   acceptNotAvailable: 'You are offline. Go online to accept rides.',
   acceptNoVehicle: 'You need an approved vehicle to accept rides.',
   phoneNotVerified: 'Verify your phone number to accept rides.',
-} as const;
+} as const);

@@ -83,6 +83,8 @@ const loadDriverStrikesScreen = () => require('../../../features/driver-statemen
 const loadVehicleAcScreen = () => require('../../../features/ac/screens/VehicleAcScreen').default;
 const loadParcelOptInScreen = () => require('../../../features/parcel/screens/ParcelOptInScreen').default;
 
+import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
+
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
 const DriverStack = () => {
@@ -98,8 +100,8 @@ const DriverStack = () => {
 
   return (
     // T-535 (PERF-14): screens deeper in the stack stop rendering until they are shown again.
-    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
-      <Stack.Screen name="DriverTabs" component={DriverBottomTabs} />
+    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }} screenLayout={localeScreenLayout}>
+      <Stack.Screen name="DriverTabs" component={DriverBottomTabs} layout={keepScreenMounted} />
       <Stack.Screen name="Profile" getComponent={loadDriverProfile} />
       <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />
       <Stack.Screen name="ChangePhone" getComponent={loadChangePhoneScreen} />

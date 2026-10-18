@@ -1,9 +1,11 @@
+import { localizedCopy } from '../../../i18n/localizedCopy';
+
 /**
  * Field labels, placeholders and helpers of the registration steps (UI-R7, spec
  * auth-registration). Validation messages stay in src/schemas/registrationSchema; server
  * messages (422) are shown as sent.
  */
-export const REGISTRATION_FIELDS = {
+export const REGISTRATION_FIELDS = localizedCopy({
   personal: {
     fullName: 'Full name',
     fullNamePlaceholder: 'Enter your full name',
@@ -105,7 +107,7 @@ export const REGISTRATION_FIELDS = {
     notProvided: 'Not provided',
     noPhoto: 'No photo',
   },
-} as const;
+} as const);
 
 /** Pakistani licence classes the backend accepts in `license_type` (max 10 characters). */
 export const LICENSE_TYPES = [

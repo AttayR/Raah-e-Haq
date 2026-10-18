@@ -12,6 +12,7 @@ import type { NotificationsList as NotificationsListState } from '../hooks';
 import { openNotificationTarget } from '../navigation';
 import { resolveNotificationTarget, type NotificationRole } from '../routing';
 import type { AppNotification, NotificationFilter } from '../types';
+import { perLocale } from '../../../i18n';
 
 export type NotificationsListProps = {
   role: NotificationRole;
@@ -23,10 +24,10 @@ export type NotificationsListProps = {
   onScroll?: React.ComponentProps<typeof Animated.FlatList>['onScroll'];
 };
 
-const FILTERS: ReadonlyArray<{ value: NotificationFilter; label: string }> = [
+const FILTERS = perLocale((): ReadonlyArray<{ value: NotificationFilter; label: string }> => [
   { value: 'all', label: NOTIFICATIONS_COPY.filterAll },
   { value: 'unread', label: NOTIFICATIONS_COPY.filterUnread },
-];
+]);
 
 /**
  * Inbox › Notifications for both roles (T-502, BE-11; UI-R4 moved it into the Inbox tab): GET
@@ -140,7 +141,7 @@ export function NotificationsList({ role, list, header, onScroll }: Notification
       {header}
       <View style={styles.controls}>
         <FilterChips<NotificationFilter>
-          options={FILTERS}
+          options={FILTERS()}
           value={filter}
           onChange={setFilter}
           accessibilityLabel={NOTIFICATIONS_COPY.filterLabel}

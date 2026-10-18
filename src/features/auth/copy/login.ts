@@ -1,9 +1,11 @@
+import { localizedCopy } from '../../../i18n/localizedCopy';
+
 /**
  * User-facing copy of the sign-in screen and the forgot-password sheet (UI-R6, specs auth-login
  * and auth-forgot-password). One place, so it can move into the i18n catalogue (Urdu) as a unit.
  * Server messages (wrong password, refusals, reset sent) are shown as sent; these only frame them.
  */
-export const LOGIN_COPY = {
+export const LOGIN_COPY = localizedCopy({
   brandName: 'Raah-e-Haq',
   title: 'Sign in to Raah-e-Haq',
   subtitle: 'Ride or drive with Raah-e-Haq.',
@@ -50,4 +52,4 @@ export const LOGIN_COPY = {
     failed: "Couldn't send the link. Try again.",
     sheetA11y: 'Reset your password',
   },
-} as const;
+} as const);

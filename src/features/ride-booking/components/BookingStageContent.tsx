@@ -13,7 +13,7 @@ import type { useFareEstimates, useVehicleTypes } from '../hooks';
 import type { BookingFlow, BookingStage } from '../useBookingFlow';
 import { FareStage, MAX_STOPS, VehicleStage } from './BookingStages';
 import { ChooseOnMapButton } from './MapPick';
-import { LOCATION_FIELD_LABELS } from '../copy';
+import { locationFieldLabels } from '../copy';
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -95,7 +95,7 @@ export const BookingStageContent: React.FC<Props> = ({
             onFocusChange={onFocusChange}
             onChooseOnMap={() => chooseOnMap('pickup')}
             near={currentLocation}
-            replaceOnType={LOCATION_FIELD_LABELS}
+            replaceOnType={locationFieldLabels()}
             onSelect={(s) => flow.selectPickup(s.coords, suggestionAddress(s), false)}
           />
           {!compact && <ChooseOnMapButton onPress={() => setMapPick('pickup')} />}
@@ -111,7 +111,7 @@ export const BookingStageContent: React.FC<Props> = ({
             onFocusChange={onFocusChange}
             onChooseOnMap={() => chooseOnMap('destination')}
             near={pickup ?? currentLocation}
-            replaceOnType={LOCATION_FIELD_LABELS}
+            replaceOnType={locationFieldLabels()}
             onSelect={(s) => flow.selectDestination(s.coords, suggestionAddress(s), true)}
           />
           {!compact && <ChooseOnMapButton onPress={() => setMapPick('destination')} />}

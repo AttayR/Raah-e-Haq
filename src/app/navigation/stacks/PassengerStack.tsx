@@ -75,6 +75,8 @@ const loadEmergencyContactsScreen = () => require('../../../features/safety/scre
 const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
 const loadSendParcelScreen = () => require('../../../features/parcel/screens/SendParcelScreen').default;
 
+import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
+
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Passenger'>;
@@ -97,8 +99,8 @@ const PassengerStack = ({ navigation }: Props) => {
 
   return (
     // T-535 (PERF-14): screens deeper in the stack stop rendering until they are shown again.
-    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
-      <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} />
+    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }} screenLayout={localeScreenLayout}>
+      <Stack.Screen name="PassengerTabs" component={PassengerBottomTabs} layout={keepScreenMounted} />
       <Stack.Screen name="Profile" getComponent={loadPassengerProfile} />
       <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />
       <Stack.Screen name="ChangePhone" getComponent={loadChangePhoneScreen} />

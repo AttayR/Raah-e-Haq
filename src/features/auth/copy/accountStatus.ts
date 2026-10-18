@@ -17,6 +17,7 @@
  */
 
 import type { IconName } from '../../../components/ui/icons';
+import { localizedCopy } from '../../../i18n/localizedCopy';
 
 export type AccountStatusTone = 'pending' | 'danger' | 'info';
 
@@ -48,7 +49,7 @@ export type AccountStatusVariant =
   | 'unverified'
   | 'unsupportedRole';
 
-export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatusVariantCopy> = {
+export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatusVariantCopy> = localizedCopy({
   pendingDriver: {
     icon: 'waiting',
     tone: 'pending',
@@ -126,9 +127,9 @@ export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatus
     canCheckStatus: false,
     showSupport: true,
   },
-};
+});
 
-export const ACCOUNT_STATUS_COPY = {
+export const ACCOUNT_STATUS_COPY = localizedCopy({
   checkStatus: 'Check Status',
   checking: 'Checking…',
   signOut: 'Sign Out',
@@ -144,4 +145,4 @@ export const ACCOUNT_STATUS_COPY = {
   supportPrefix: 'Support:',
   /** Fallback name in the header when the profile has none. */
   fallbackName: 'Welcome',
-} as const;
+} as const);

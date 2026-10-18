@@ -18,7 +18,7 @@ import {
   SkeletonList,
   useHeaderScroll,
 } from '../../../components/ui';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { formatMoney } from '../../../core/format/money';
 import { componentTokens, layout, space } from '../../../theme';
 import { BalanceCard } from '../components/BalanceCard';
@@ -30,11 +30,11 @@ import { groupByDay, type TransactionSection } from '../format';
 import { useCancelSettlement, useWallet, useWalletTransactions } from '../hooks';
 import type { Settlement, TransactionFilter, WalletTransaction } from '../types';
 
-const FILTERS = [
+const FILTERS = perLocale(() => [
   { value: 'all', label: WALLET_COPY.filterAll },
   { value: 'credit', label: WALLET_COPY.filterIn },
   { value: 'debit', label: WALLET_COPY.filterOut },
-] as const;
+] as const);
 
 const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<WalletTransaction, TransactionSection>);
 
@@ -208,7 +208,7 @@ export function WalletBody({ visible }: WalletBodyProps) {
           {WALLET_COPY.transactions}
         </AppText>
         <FilterChips<TransactionFilter>
-          options={FILTERS}
+          options={FILTERS()}
           value={filter}
           onChange={setFilter}
           accessibilityLabel={WALLET_COPY.filterLabel}

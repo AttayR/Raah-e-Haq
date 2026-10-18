@@ -1,7 +1,8 @@
 import { t, type TranslationKey } from '../../i18n';
+import { localizedCopy } from '../../i18n/localizedCopy';
 
 /** Static copy for the wallet (T-508). Amounts and entries come from GET /wallet (BE-09). */
-export const WALLET_COPY = {
+export const WALLET_COPY = localizedCopy({
   title: 'Wallet',
   back: 'Back',
   balanceLabel: 'Wallet balance',
@@ -84,7 +85,7 @@ export const WALLET_COPY = {
   settlementsEmptyBody: 'When you report a commission payment it shows here with its review.',
   settlementsFailed: "Couldn't load your payment reports",
   reviewNote: 'Reviewer note',
-} as const;
+} as const);
 
 /**
  * T-521: labels for the ledger types BE-82 / BE-85 added, said from the wallet owner's side. Other
@@ -109,25 +110,25 @@ export const transactionTypeLabel = (type: string): string | null => {
   return key ? t(key) : null;
 };
 
-export const SETTLEMENT_STATUS_LABEL = {
+export const SETTLEMENT_STATUS_LABEL = localizedCopy({
   pending: 'Waiting for review',
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
   reversed: 'Reversed by support',
-} as const;
+} as const);
 
-export const SETTLEMENT_METHOD_LABEL = {
+export const SETTLEMENT_METHOD_LABEL = localizedCopy({
   cash: 'Cash at office',
   bank_transfer: 'Bank transfer',
-} as const;
+} as const);
 
-export const SETTLEMENT_KIND_LABEL = {
+export const SETTLEMENT_KIND_LABEL = localizedCopy({
   commission_payment: 'Commission payment',
   payout: 'Payout',
-} as const;
+} as const);
 
-export const SETTLEMENT_FORM_ERRORS = {
+export const SETTLEMENT_FORM_ERRORS = localizedCopy({
   amountRequired: 'Enter the amount you paid.',
   amountInvalid: 'Enter an amount like 500 or 500.50.',
   amountMin: 'The amount must be at least Rs 1.',
@@ -138,4 +139,4 @@ export const SETTLEMENT_FORM_ERRORS = {
   referenceTooLong: 'Use 100 characters or fewer.',
   noteTooLong: 'Use 500 characters or fewer.',
   nothingOwed: 'You owe no commission right now.',
-} as const;
+} as const);

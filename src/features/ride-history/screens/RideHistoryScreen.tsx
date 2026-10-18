@@ -20,12 +20,13 @@ import { groupRidesByDay, type RideSection } from '../format';
 import { useRideHistory, useRideViewer } from '../hooks';
 import { useOpenRide } from '../../active-ride/useOpenRide';
 import type { Ride, RideHistoryFilter } from '../types';
+import { perLocale } from '../../../i18n';
 
-const FILTERS = [
+const FILTERS = perLocale(() => [
   { value: 'all', label: RIDE_HISTORY_COPY.filterAll },
   { value: 'completed', label: RIDE_HISTORY_COPY.filterCompleted },
   { value: 'cancelled', label: RIDE_HISTORY_COPY.filterCancelled },
-] as const;
+] as const);
 
 const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<Ride, RideSection>);
 
@@ -155,7 +156,7 @@ export function RideHistoryList({ visible, summary, onRefresh: onHostRefresh }: 
     <View style={styles.fill}>
       <View style={styles.pinned}>
         <FilterChips<RideHistoryFilter>
-          options={FILTERS}
+          options={FILTERS()}
           value={filter}
           onChange={setFilter}
           accessibilityLabel={RIDE_HISTORY_COPY.filterLabel}

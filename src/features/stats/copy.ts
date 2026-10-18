@@ -1,5 +1,7 @@
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /** Static copy for stats and driver earnings (T-506, T-507). Figures come from BE-08. */
-export const STATS_COPY = {
+export const STATS_COPY = localizedCopy({
   // Passenger Home stat tiles.
   ridesLabel: 'Total rides',
   ratingLabel: 'Your rating',
@@ -37,4 +39,4 @@ export const STATS_COPY = {
   rideFare: (fare: string, commission: string) => `Fare ${fare} · commission ${commission}`,
   openRideHint: 'Opens the ride details',
   tripFallback: 'Trip',
-} as const;
+} as const);

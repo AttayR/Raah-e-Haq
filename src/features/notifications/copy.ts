@@ -1,5 +1,7 @@
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /** Static copy for notifications (list, preferences, push) on both roles. */
-export const NOTIFICATIONS_COPY = {
+export const NOTIFICATIONS_COPY = localizedCopy({
   title: 'Notifications',
   back: 'Back',
   markAllRead: 'Mark all read',
@@ -39,4 +41,4 @@ export const NOTIFICATIONS_COPY = {
   preferencesSaveFailed: 'Could not save the change. Try again.',
   phoneSettings: 'Phone notification settings',
   phoneSettingsSubtitle: 'Allow or block alerts for Raah-e-Haq',
-} as const;
+} as const);

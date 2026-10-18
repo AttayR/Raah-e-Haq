@@ -13,7 +13,7 @@ import {
   type DriverStatusState,
 } from '../driver-status/slice';
 import { selectDriverActiveRide, type DriverRideState } from '../driver-ride/slice';
-import { t } from '../../i18n';
+import { perLocale, t } from '../../i18n';
 import { ACCEPT_RIDE_CODES, PENDING_RIDES_CODES, type LatLng, type PendingRideRequest } from './api';
 import { DRIVER_REQUESTS_COPY } from './copy';
 import {
@@ -131,7 +131,7 @@ export const usePendingRidePolling = ({ isFocused, location }: PendingRidePollin
   }, [dispatch, enabled]);
 };
 
-const ACCEPT_REFUSAL_COPY: Record<string, string> = {
+const ACCEPT_REFUSAL_COPY = perLocale((): Record<string, string> => ({
   [ACCEPT_RIDE_CODES.alreadyAccepted]: DRIVER_REQUESTS_COPY.alreadyAccepted,
   [ACCEPT_RIDE_CODES.notAvailable]: DRIVER_REQUESTS_COPY.rideNotAvailable,
   [ACCEPT_RIDE_CODES.driverOnRide]: DRIVER_REQUESTS_COPY.acceptOnRide,
@@ -140,11 +140,11 @@ const ACCEPT_REFUSAL_COPY: Record<string, string> = {
   [ACCEPT_RIDE_CODES.phoneNotVerified]: DRIVER_REQUESTS_COPY.phoneNotVerified,
   [ACCEPT_RIDE_CODES.acVehicleRequired]: t('ac.acRequired'),
   [ACCEPT_RIDE_CODES.femaleDriverRequired]: DRIVER_REQUESTS_COPY.rideNotAvailable,
-};
+}));
 
 /** The message for a refused accept: our copy for known codes, else the server's safe text. */
 export const acceptRefusalMessage = (payload: ThunkRejection | undefined): string => {
-  const known = payload?.code ? ACCEPT_REFUSAL_COPY[payload.code] : undefined;
+  const known = payload?.code ? ACCEPT_REFUSAL_COPY()[payload.code] : undefined;
   return known ?? rejectionMessage(payload, DRIVER_REQUESTS_COPY.acceptFailed);
 };
 
@@ -203,12 +203,12 @@ export const useRideRequestActions = (): RideRequestActions => {
   return { acceptingId, accept, reject };
 };
 
-const FEED_REFUSAL_COPY: Record<string, string> = {
+const FEED_REFUSAL_COPY = perLocale((): Record<string, string> => ({
   [PENDING_RIDES_CODES.locationRequired]: DRIVER_REQUESTS_COPY.locationRequired,
   [PENDING_RIDES_CODES.noApprovedVehicle]: DRIVER_REQUESTS_COPY.noApprovedVehicle,
   [PENDING_RIDES_CODES.driverNotAvailable]: DRIVER_REQUESTS_COPY.driverNotAvailable,
   [PENDING_RIDES_CODES.driverOnRide]: DRIVER_REQUESTS_COPY.driverOnRide,
-};
+}));
 
 export type RideRequestFeedView =
   | { kind: 'idle' }
@@ -236,7 +236,7 @@ export const useRideRequestFeed = (
   } else if (loadStatus === 'failed') {
     view = {
       kind: 'error',
-      message: (errorCode ? FEED_REFUSAL_COPY[errorCode] : undefined) ?? error ?? DRIVER_REQUESTS_COPY.loadFailed,
+      message: (errorCode ? FEED_REFUSAL_COPY()[errorCode] : undefined) ?? error ?? DRIVER_REQUESTS_COPY.loadFailed,
       canRetry: !errorCode || !STATUS_RELOAD_CODES.has(errorCode),
     };
   } else if (loadStatus === 'done') {

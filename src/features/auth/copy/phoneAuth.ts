@@ -1,3 +1,5 @@
+import { localizedCopy } from '../../../i18n/localizedCopy';
+
 /**
  * User-facing copy of the phone (OTP) sign-in screen (T-101, T-111).
  *
@@ -5,7 +7,7 @@
  * i18n catalogue (Urdu) as one unit. Server refusal text (BE-28 `message`) is never written
  * here: the screen shows it as sent, and these strings only frame it.
  */
-export const PHONE_AUTH_COPY = {
+export const PHONE_AUTH_COPY = localizedCopy({
   header: {
     back: 'Back',
   },
@@ -54,4 +56,4 @@ export const PHONE_AUTH_COPY = {
     verify: 'Failed to verify code',
     invalidCode: 'Invalid verification code',
   },
-} as const;
+} as const);

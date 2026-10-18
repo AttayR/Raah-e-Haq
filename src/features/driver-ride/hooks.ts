@@ -12,7 +12,7 @@ import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling'
 import { loadDriverStatus, selectDriverStatusState, type DriverStatusState } from '../driver-status/slice';
 import { DRIVER_RIDE_CODES, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
-import { t } from '../../i18n';
+import { perLocale, t } from '../../i18n';
 import {
   advanceDriverRide,
   cancelDriverRide,
@@ -46,12 +46,12 @@ const REFETCH_CODES: ReadonlySet<string> = new Set([
   DRIVER_RIDE_CODES.parcelStepRequired,
 ]);
 
-const SUCCESS_COPY: Record<DriverRideTransition | 'stop', string> = {
+const SUCCESS_COPY = perLocale((): Record<DriverRideTransition | 'stop', string> => ({
   arrived: DRIVER_RIDE_COPY.arrivedDone,
   start: DRIVER_RIDE_COPY.startedDone,
   complete: DRIVER_RIDE_COPY.completedDone,
   stop: DRIVER_RIDE_COPY.stopDone,
-};
+}));
 
 /**
  * Toasts on the driver ride screen sit below its floating back button (top: inset + 8, 56 high)
@@ -195,7 +195,7 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       const action = await dispatch(advanceDriverRide(arg));
       if (advanceDriverRide.fulfilled.match(action)) {
         // T-567: at a parcel pickup it is the sender who was told.
-        const text = arg.action === 'arrived' && parcel ? DRIVER_RIDE_COPY.arrivedDoneParcel : SUCCESS_COPY[arg.action];
+        const text = arg.action === 'arrived' && parcel ? DRIVER_RIDE_COPY.arrivedDoneParcel : SUCCESS_COPY()[arg.action];
         toast.success(text, undefined, DRIVER_RIDE_TOAST_OPTIONS);
         return { ok: true };
       }

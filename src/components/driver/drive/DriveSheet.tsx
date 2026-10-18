@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { useReducedMotion } from '../../../hooks/useReducedMotion';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { borderWidth, layout, motionPatterns, radius, space } from '../../../theme';
 import { AppText, Badge, Banner, Button, Card, Chip, ListItem, RecentRidesCard, vehicleIconName, type RecentRideRow } from '../../ui';
 import { DRIVER_HOME_COPY } from '../home/copy';
@@ -17,19 +17,19 @@ import { DriverTodayStats, type DriverTodayStatsValues } from '../home/DriverTod
 
 export type DriveStatus = 'checking' | 'offline' | 'online' | 'onRide';
 
-const STATUS_TEXT: Record<DriveStatus, string> = {
+const STATUS_TEXT = perLocale((): Record<DriveStatus, string> => ({
   checking: t('drive.checking'),
   offline: t('drive.youAreOffline'),
   online: t('drive.youAreOnline'),
   onRide: t('drive.onRide'),
-};
+}));
 
-const HINT_TEXT: Record<DriveStatus, string> = {
+const HINT_TEXT = perLocale((): Record<DriveStatus, string> => ({
   checking: t('drive.checking'),
   offline: t('drive.offlineHint'),
   online: t('drive.onlineHint'),
   onRide: t('drive.onRideHint'),
-};
+}));
 
 /** Status dot (12) beside the `h3` status sentence. */
 const DOT = space[3];
@@ -47,13 +47,13 @@ export function DriveStatusHeader({ status }: { status: DriveStatus }) {
     <View
       style={styles.header}
       accessibilityRole="summary"
-      accessibilityLabel={STATUS_TEXT[status]}
+      accessibilityLabel={STATUS_TEXT()[status]}
       testID="drive-status"
     >
       <View style={styles.statusRow}>
         <View style={[styles.dot, { backgroundColor: dot }]} testID={`drive-status-dot-${status}`} />
         <AppText variant="h3" numberOfLines={1} style={styles.flex}>
-          {STATUS_TEXT[status]}
+          {STATUS_TEXT()[status]}
         </AppText>
       </View>
       {status === 'online' ? <SearchingShimmer /> : null}
@@ -156,7 +156,7 @@ export function DriveSheetBody({
 
       <View style={styles.more}>
         <AppText variant="bodySmall" color="textSecondary" testID="drive-hint">
-          {HINT_TEXT[status]}
+          {HINT_TEXT()[status]}
         </AppText>
         {todayEarnings ? (
           <View style={styles.pillRow}>

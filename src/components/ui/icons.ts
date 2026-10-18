@@ -106,6 +106,8 @@ export const iconGlyphs = {
   logout: 'logout',
   power: 'power',
   theme: 'theme-light-dark',
+  // Language setting (T-523).
+  language: 'translate',
   // Wallet and earnings (T-508/T-507).
   moneyIn: 'arrow-bottom-left',
   moneyOut: 'arrow-top-right',

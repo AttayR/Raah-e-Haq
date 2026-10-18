@@ -7,7 +7,7 @@ import { Chip } from '../ui/Chip';
 import { IconButton } from '../ui/IconButton';
 import type { IconName } from '../ui/Icon';
 import { radius, space } from '../../theme';
-import { BOOKING_COPY, LOCATION_FIELD_LABELS } from '../../features/ride-booking/copy';
+import { BOOKING_COPY, locationFieldLabels } from '../../features/ride-booking/copy';
 
 type Coords = { latitude: number; longitude: number } | null;
 
@@ -68,7 +68,7 @@ const DualLocationPicker: React.FC<Props> = ({
             onSelect={(s) => onSelectPickup(s.coords, suggestionAddress(s))}
             readOnly={pickupQuery === BOOKING_COPY.resolvingAddress}
             leadingIcon={currentLocationGlyph}
-            replaceOnType={LOCATION_FIELD_LABELS}
+            replaceOnType={locationFieldLabels()}
             onChooseOnMap={onChooseOnMap ? () => onChooseOnMap('pickup') : undefined}
             onFocusChange={onFocusChange}
           />
@@ -82,7 +82,7 @@ const DualLocationPicker: React.FC<Props> = ({
             query={destQuery}
             queryRevision={destRevision}
             onSelect={(s) => onSelectDestination(s.coords, suggestionAddress(s))}
-            replaceOnType={LOCATION_FIELD_LABELS}
+            replaceOnType={locationFieldLabels()}
             onFocusChange={onFocusChange}
             onChooseOnMap={onChooseOnMap ? () => onChooseOnMap('destination') : undefined}
           />
@@ -91,12 +91,12 @@ const DualLocationPicker: React.FC<Props> = ({
       {!compact && (onUseCurrentLocation || onSwap) ? (
         <View style={styles.actions}>
           {onUseCurrentLocation ? (
-            <Chip label="Use current location" icon="locate" tone="primary" onPress={onUseCurrentLocation} testID="use-current-location" />
+            <Chip label={BOOKING_COPY.useCurrentLocation} icon="locate" tone="primary" onPress={onUseCurrentLocation} testID="use-current-location" />
           ) : (
             <View />
           )}
           {onSwap ? (
-            <IconButton icon="swap" variant="tonal" iconColor="primaryText" accessibilityLabel="Swap pickup and destination" onPress={onSwap} testID="swap-locations" />
+            <IconButton icon="swap" variant="tonal" iconColor="primaryText" accessibilityLabel={BOOKING_COPY.swapA11y} onPress={onSwap} testID="swap-locations" />
           ) : null}
         </View>
       ) : null}

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from '../../../components/ui/IconButton';
 import { layout, space } from '../../../theme';
+import { BOOKING_COPY } from '../copy';
 
 /** Height of the control row (48 pt floating buttons) plus its top gap. */
 export const MAP_TOP_CONTROLS_HEIGHT = 48 + space[2];
@@ -27,18 +28,18 @@ export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, onReset })
       pointerEvents="box-none"
       style={[styles.row, { top: insets.top + space[2], start: layout.gutter + insets.left, end: layout.gutter + insets.right }]}
     >
-      <IconButton testID="map-back" variant="floating" icon="back" accessibilityLabel="Back" iconColor="primaryText" onPress={onBack} />
+      <IconButton testID="map-back" variant="floating" icon="back" accessibilityLabel={BOOKING_COPY.backA11y} iconColor="primaryText" onPress={onBack} />
       <View style={styles.trailing} pointerEvents="box-none">
         <IconButton
           testID="map-recenter"
           variant="floating"
           icon="locate"
           iconColor="primaryText"
-          accessibilityLabel="Show my location"
+          accessibilityLabel={BOOKING_COPY.recenterA11y}
           onPress={onRecenter}
         />
         {onReset ? (
-          <IconButton testID="map-reset" variant="floating" icon="refresh" iconColor="primaryText" accessibilityLabel="Start over" onPress={onReset} />
+          <IconButton testID="map-reset" variant="floating" icon="refresh" iconColor="primaryText" accessibilityLabel={BOOKING_COPY.startOverA11y} onPress={onReset} />
         ) : null}
       </View>
     </View>

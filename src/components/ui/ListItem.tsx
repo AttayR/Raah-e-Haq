@@ -37,6 +37,11 @@ export type ListItemProps = {
   accessibilityHint?: string;
   /** For a row that toggles its trailing Switch: announced as a switch with this on/off state. */
   checked?: boolean;
+  /**
+   * T-523: an option in a single-choice list (a picker sheet): announced as a radio, `checked`
+   * when it is the chosen one. Default: a button (or a switch when `checked` is given).
+   */
+  selectionRole?: 'radio';
   testID?: string;
 };
 
@@ -65,6 +70,7 @@ export function ListItem({
   accessibilityLabel,
   accessibilityHint,
   checked,
+  selectionRole,
   testID,
 }: ListItemProps) {
   const { theme } = useAppTheme();
@@ -134,7 +140,7 @@ export function ListItem({
       testID={testID}
       onPress={onPress}
       disabled={disabled}
-      accessibilityRole={checked === undefined ? 'button' : 'switch'}
+      accessibilityRole={selectionRole ?? (checked === undefined ? 'button' : 'switch')}
       accessibilityLabel={accessibilityLabel ?? spoken}
       accessibilityHint={accessibilityHint}
       accessibilityState={checked === undefined ? { disabled } : { disabled, checked }}

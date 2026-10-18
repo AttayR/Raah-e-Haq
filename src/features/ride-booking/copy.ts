@@ -1,8 +1,11 @@
+import { perLocale } from '../../i18n';
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /**
  * Static copy of the booking flow (T-302). Server messages (a refused request, a 422 field
  * message, a failed estimate) come from the API and are never written here.
  */
-export const BOOKING_COPY = {
+export const BOOKING_COPY = localizedCopy({
   vehicleTypesLoading: 'Loading vehicle types…',
   vehicleTypesFailed: 'Could not load vehicle types.',
   vehicleTypesEmpty: 'No vehicle types are available right now.',
@@ -42,7 +45,35 @@ export const BOOKING_COPY = {
   locationUnavailableBody: 'Move to an open area or check your connection, then try again.',
   locationRetry: 'Try again',
   locationOpenSettings: 'Open settings',
-} as const;
+  // T-523: the booking sheet's own labels, so they follow the language too.
+  pickupPlaceholder: 'Pickup location',
+  destinationPlaceholder: 'Where to?',
+  destinationA11y: 'Destination',
+  clearA11y: 'Clear',
+  useCurrentLocation: 'Use current location',
+  swapA11y: 'Swap pickup and destination',
+  tripDetails: 'Trip details',
+  editPickup: 'Edit pickup',
+  editDropoff: 'Edit drop-off',
+  swap: 'Swap',
+  optionalStops: (max: number) => `Add optional stops (up to ${max})`,
+  addStop: 'Add a stop',
+  stopLine: (n: number, address: string) => `Stop ${n}: ${address}`,
+  removeStopA11y: (n: number) => `Remove stop ${n}`,
+  reviewTitle: 'Review & confirm',
+  reviewMeta: (vehicle: string) => `Vehicle: ${vehicle}`,
+  changeVehicle: 'Change vehicle',
+  cancelBooking: 'Cancel',
+  dismissErrorA11y: 'Dismiss error',
+  mapError: 'Map error. Please restart the app.',
+  mapLoading: 'Loading map…',
+  backA11y: 'Back',
+  recenterA11y: 'Show my location',
+  startOverA11y: 'Start over',
+} as const);
 
-/** Field texts that are labels, not addresses: typing in the field replaces them (T-551). */
-export const LOCATION_FIELD_LABELS: readonly string[] = [BOOKING_COPY.currentLocation, BOOKING_COPY.pinnedOnMap];
+/**
+ * Field texts that are labels, not addresses: typing in the field replaces them (T-551). In the
+ * active language (T-523), so call it at render time.
+ */
+export const locationFieldLabels = perLocale((): readonly string[] => [BOOKING_COPY.currentLocation, BOOKING_COPY.pinnedOnMap]);

@@ -5,6 +5,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
 import { IconButton } from '../ui/IconButton';
 import { radius, space } from '../../theme';
+import { BOOKING_COPY } from '../../features/ride-booking/copy';
 
 type Coords = { latitude: number; longitude: number; address?: string | null };
 
@@ -27,15 +28,15 @@ const StopsEditor: React.FC<Props> = ({ stops, onAddStop, onRemoveStop, maxStops
         <View key={`stop-${idx}`} style={styles.row}>
           <View style={[styles.dot, { backgroundColor: theme.colors.stopPin }]} />
           <AppText variant="bodySmall" numberOfLines={1} style={styles.stopText}>
-            {`Stop ${idx + 1}: ${s.address || `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}`}`}
+            {BOOKING_COPY.stopLine(idx + 1, s.address || `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}`)}
           </AppText>
-          <IconButton icon="close" iconColor="textSecondary" accessibilityLabel={`Remove stop ${idx + 1}`} onPress={() => onRemoveStop(idx)} />
+          <IconButton icon="close" iconColor="textSecondary" accessibilityLabel={BOOKING_COPY.removeStopA11y(idx + 1)} onPress={() => onRemoveStop(idx)} />
         </View>
       ))}
       {stops.length < maxStops && (
         <LocationSearch
           mode="destination"
-          placeholder="Add a stop"
+          placeholder={BOOKING_COPY.addStop}
           query={query}
           onChangeQuery={setQuery}
           onFocusChange={onFocusChange}

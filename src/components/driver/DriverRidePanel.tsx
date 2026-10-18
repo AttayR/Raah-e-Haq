@@ -9,7 +9,7 @@ import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverRideAction } from '../../features/driver-ride/slice';
 import { activeStops, type DriverRideStep } from '../../features/driver-ride/steps';
 import { riderRating } from '../../features/driver-requests/rating';
-import { t } from '../../i18n';
+import { perLocale, t } from '../../i18n';
 import { WaitingTimer } from '../../features/fare/components/FareBits';
 import { toFarePolicy } from '../../features/fare/api';
 import { DriverParcelSection } from '../../features/parcel/components/DriverParcelSection';
@@ -60,11 +60,11 @@ type Props = {
   parcel?: DriverParcelPanel | null;
 };
 
-const TITLES: Partial<Record<DriverRideStep, string>> = {
+const TITLES = perLocale((): Partial<Record<DriverRideStep, string>> => ({
   to_pickup: COPY.toPickup,
   at_pickup: COPY.atPickup,
   on_trip: COPY.onTrip,
-};
+}));
 
 /**
  * The live part of the driver ride screen (T-405) on the UI-R5 ride kit: RideProgress, the
@@ -203,7 +203,7 @@ export const DriverRidePanel: React.FC<Props> = ({
         <View style={styles.titleRow}>
           <AppText variant="h3" accessibilityRole="header" style={styles.title} testID="driver-ride-title">
             {/* T-567: a parcel pickup waits for the sender, not a passenger. */}
-            {step === 'at_pickup' && parcelRide ? COPY.atPickupParcel : TITLES[step] ?? COPY.unknown}
+            {step === 'at_pickup' && parcelRide ? COPY.atPickupParcel : TITLES()[step] ?? COPY.unknown}
           </AppText>
           {/* T-561: the AC tier (BE-86) and a women-mode ride (BE-87, when the server says so). */}
           {ac ? <AcBadge testID="driver-ride-ac" /> : null}

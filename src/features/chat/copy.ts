@@ -1,7 +1,8 @@
 import type { ChatRole } from './types';
+import { localizedCopy } from '../../i18n/localizedCopy';
 
 /** Static copy for in-ride chat (T-510). Every name, message and count comes from the server. */
-export const CHAT_COPY = {
+export const CHAT_COPY = localizedCopy({
   listTitle: 'Messages',
   listEmptyTitle: 'No chats yet',
   listEmpty: 'Chats appear here during a ride.',
@@ -53,7 +54,7 @@ export const CHAT_COPY = {
   // Entry points.
   message: 'Message',
   messageA11y: (name: string) => `Message ${name}`,
-};
+});
 
 export const fallbackNameOf = (role: ChatRole | null | undefined): string =>
   role === 'passenger' ? CHAT_COPY.yourPassenger : CHAT_COPY.yourDriver;

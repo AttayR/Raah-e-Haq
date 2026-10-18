@@ -16,7 +16,7 @@ import {
   SkeletonList,
   useHeaderScroll,
 } from '../../../components/ui';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { formatMoney } from '../../../core/format/money';
 import { componentTokens, layout, space } from '../../../theme';
 import { EarningsChart } from '../components/EarningsChart';
@@ -30,11 +30,11 @@ import { useDriverEarnings } from '../hooks';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
 import type { EarningsPeriod, EarningsRide } from '../types';
 
-const PERIODS = [
+const PERIODS = perLocale(() => [
   { value: 'day', label: STATS_COPY.periodDay },
   { value: 'week', label: STATS_COPY.periodWeek },
   { value: 'month', label: STATS_COPY.periodMonth },
-] as const;
+] as const);
 
 /**
  * Driver Earnings tab (T-507, BE-08; UI-R4 made it a tab root, DESIGN_SYSTEM §8.1): `large`
@@ -100,7 +100,7 @@ export default function DriverEarningsScreen() {
 
   const periodControl = (
     <SegmentedControl<EarningsPeriod>
-      options={PERIODS}
+      options={PERIODS()}
       value={period}
       onChange={setPeriod}
       accessibilityLabel={STATS_COPY.periodLabel}

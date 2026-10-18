@@ -18,17 +18,19 @@ import { confirm } from '../../../core/dialog';
 import { toast } from '../../../core/toast';
 import { formatIsoDateInput } from '../../auth/registration/inputFormat';
 import { formatPkPhone } from '../../safety/rules';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { layout, space } from '../../../theme';
 import { ADDRESS_MAX, BIO_MAX, EMAIL_MAX, GENDERS, NAME_MAX, type Gender } from '../form';
 import { useProfileEditForm } from '../useProfileEditForm';
 import { CHANGE_PHONE_ROUTE, type ProfileEditNavigator } from '../navigation';
 
-const GENDER_OPTIONS = GENDERS.map((value) => ({
-  value,
-  label: t(value === 'male' ? 'profileEdit.genderMale' : value === 'female' ? 'profileEdit.genderFemale' : 'profileEdit.genderOther'),
-}));
+const GENDER_OPTIONS = perLocale(() =>
+  GENDERS.map((value) => ({
+    value,
+    label: t(value === 'male' ? 'profileEdit.genderMale' : value === 'female' ? 'profileEdit.genderFemale' : 'profileEdit.genderOther'),
+  })),
+);
 
 /**
  * Edit profile (T-504b; shared-profile "Profile edit"), both roles: name, email, gender, date of
@@ -159,7 +161,7 @@ export default function ProfileEditScreen() {
             {t('profileEdit.genderLabel')}
           </AppText>
           <SegmentedControl<Gender | ''>
-            options={GENDER_OPTIONS}
+            options={GENDER_OPTIONS()}
             value={form.gender}
             onChange={(value) => setField('gender', value)}
             accessibilityLabel={t('profileEdit.genderLabel')}

@@ -16,6 +16,7 @@ import PassengerStack from '../../src/app/navigation/stacks/PassengerStack';
 import type { RootStackParamList } from '../../src/app/navigation/RootNavigation';
 import { routeForTarget } from '../../src/features/notifications/navigation';
 import { makeRide, makeStore, page, type TestStore } from '../../test-utils/rideFixtures';
+import { changeLanguage, resetLanguagePreferenceForTests } from '../../src/i18n/languagePreference';
 
 // Stand-ins: each real screen needs maps, location, notifications. These only say which
 // route is showing (and, for the segmented tabs, which segment was asked for).
@@ -33,7 +34,17 @@ jest.mock('../../src/screens/Passenger/PassengerHomeScreen', () => mockScreen('H
 jest.mock('../../src/screens/Passenger/PassengerMapScreen', () => mockScreen('Booking'));
 jest.mock('../../src/features/activity/ActivityScreen', () => mockScreen('Activity'));
 jest.mock('../../src/features/inbox/InboxScreen', () => mockScreen('Inbox'));
-jest.mock('../../src/screens/Passenger/PassengerSettingsScreen', () => mockScreen('Account'));
+// The Account stand-in also shows one copy line, to see a language switch reach the screen (T-523).
+jest.mock('../../src/screens/Passenger/PassengerSettingsScreen', () => function MockAccount() {
+  const { Text: MockText, View: MockView } = require('react-native');
+  const { t: translate } = require('../../src/i18n');
+  return (
+    <MockView>
+      <MockText>screen:Account</MockText>
+      <MockText>{`label:${translate('language.rowTitle')}`}</MockText>
+    </MockView>
+  );
+});
 jest.mock('../../src/screens/Passenger/Passengerprofile', () => mockScreen('Profile'));
 jest.mock('../../src/features/chat/screens/ChatThreadScreen', () => mockScreen('RideChat'));
 jest.mock('../../src/features/saved-places/screens/SavedPlacesScreen', () => mockScreen('Favorites'));
@@ -179,4 +190,35 @@ test('notification routes land on the right tab and segment (deep links)', async
     );
   });
   expect(await screen.findByText('screen:RideChat')).toBeTruthy();
+});
+
+test('T-523: a language switch from Account re-renders the screen but re-runs no stack session hook', async () => {
+  mock.onGet('/rides').reply(200, page([makeRide({ id: 56, status: 'accepted' })]));
+  mock.onGet('/notifications/unread-count').reply(200, { success: true, data: { unread_count: 0 } });
+  mock.onPost('/devices').reply(200, { success: true, data: { platform: 'ios', last_seen_at: 'now' } });
+  const store = makeStore();
+  const screen = renderPassengerApp(store);
+  // Launch restore: the live ride opens Booking once.
+  await waitFor(() => expect(screen.getByText('screen:Booking')).toBeTruthy());
+  await waitFor(() => expect(mock.history.post.filter(r => r.url === '/devices')).toHaveLength(1));
+
+  act(() => {
+    navRef.navigate('Passenger', { screen: 'PassengerTabs', params: { screen: 'Account' } });
+  });
+  expect(await screen.findByText('screen:Account')).toBeTruthy();
+  expect(screen.getByText('label:Language')).toBeTruthy();
+  const unreadReads = mock.history.get.filter(r => r.url === '/notifications/unread-count').length;
+
+  await act(async () => {
+    changeLanguage('ur-Latn');
+  });
+  // The open screen re-renders in Roman Urdu, and the user stays on Account.
+  expect(await screen.findByText('label:Zaban')).toBeTruthy();
+  expect(screen.queryByText('screen:Booking')).toBeNull();
+  expect(navRef.getCurrentRoute()?.name).toBe('Account');
+  // No stack hook ran again: no second restore, device registration or unread read.
+  expect(mock.history.get.filter(r => r.url === '/rides')).toHaveLength(1);
+  expect(mock.history.post.filter(r => r.url === '/devices')).toHaveLength(1);
+  expect(mock.history.get.filter(r => r.url === '/notifications/unread-count')).toHaveLength(unreadReads);
+  resetLanguagePreferenceForTests();
 });

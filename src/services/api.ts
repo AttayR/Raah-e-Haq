@@ -12,6 +12,7 @@ import { logger } from '../core/logging/logger';
 import { toApiError, type ApiError } from '../core/api/errors';
 import { logApiFailure } from '../core/api/logApiFailure';
 import { connectivity } from '../core/api/connectivity';
+import { acceptLanguage } from '../i18n';
 import type { ApiResponse } from '../core/api/types';
 
 export type { ApiResponse } from '../core/api/types';
@@ -215,6 +216,10 @@ const reportAccountRefused = (error: ApiError, config?: InternalAxiosRequestConf
 // only to requests whose resolved URL is on our API origin (isTokenTarget, SEC-21).
 apiClient.interceptors.request.use(
   async (config) => {
+    // T-523: the app's language, so the server can localise its messages (English fallback).
+    if (!config.headers.has('Accept-Language')) {
+      config.headers.set('Accept-Language', acceptLanguage());
+    }
     if ('bearerToken' in config) {
       // An explicit token (T-114): that one or none, never a fallback to the stored session.
       const bearer = config.bearerToken;

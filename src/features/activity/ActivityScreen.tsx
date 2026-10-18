@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useIsFocused, useRoute, type RouteProp } from '@react-navigation/native';
 import { Header, Screen, SegmentedControl } from '../../components/ui';
-import { t } from '../../i18n';
+import { perLocale, t } from '../../i18n';
 import { layout, space } from '../../theme';
 import { RideHistoryList } from '../ride-history/screens/RideHistoryScreen';
 import { useMyStats } from '../stats/hooks';
@@ -15,10 +15,10 @@ export type ActivitySegment = 'rides' | 'wallet';
 /** Tab params: a "ride completed" notification opens Rides. */
 export type ActivityParams = { segment?: ActivitySegment };
 
-const SEGMENTS: ReadonlyArray<{ value: ActivitySegment; label: string }> = [
+const SEGMENTS = perLocale((): ReadonlyArray<{ value: ActivitySegment; label: string }> => [
   { value: 'rides', label: t('activity.rides') },
   { value: 'wallet', label: t('activity.wallet') },
-];
+]);
 
 type ActivityRoute = RouteProp<{ Activity: ActivityParams | undefined }, 'Activity'>;
 
@@ -51,7 +51,7 @@ export default function ActivityScreen() {
       <Header variant="large" inlineTitle title={t('activity.title')} tone="background" testID="activity-header" />
       <View style={styles.segments}>
         <SegmentedControl<ActivitySegment>
-          options={SEGMENTS}
+          options={SEGMENTS()}
           value={segment}
           onChange={setSegment}
           accessibilityLabel={t('activity.segmentLabel')}

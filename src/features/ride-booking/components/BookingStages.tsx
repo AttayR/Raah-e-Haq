@@ -53,15 +53,15 @@ export const VehicleStage: React.FC<VehicleStageProps> = (p) => (
   <View style={styles.stack}>
     <TripSummaryCard
       testID="trip-details"
-      label="Trip details"
+      label={BOOKING_COPY.tripDetails}
       pickup={p.pickupLabel}
       stops={tripCardStops(p.stops)}
       dropoff={p.dropoffLabel}
       meta={p.tripSummary}
       actions={[
-        { label: 'Edit pickup', icon: 'edit', onPress: p.onEditPickup, testID: 'edit-pickup' },
-        { label: 'Edit drop-off', icon: 'edit', onPress: p.onEditDestination, testID: 'edit-destination' },
-        { label: 'Swap', icon: 'swap', onPress: p.onSwap, testID: 'swap-trip' },
+        { label: BOOKING_COPY.editPickup, icon: 'edit', onPress: p.onEditPickup, testID: 'edit-pickup' },
+        { label: BOOKING_COPY.editDropoff, icon: 'edit', onPress: p.onEditDestination, testID: 'edit-destination' },
+        { label: BOOKING_COPY.swap, icon: 'swap', onPress: p.onSwap, testID: 'swap-trip' },
       ]}
     />
     <VehicleChoice
@@ -74,7 +74,7 @@ export const VehicleStage: React.FC<VehicleStageProps> = (p) => (
       // T-556: while the stop search is typed in, the sheet reveals this whole section, so the
       // heading stays in view above the field and its suggestions.
       <KeyboardRevealGroup style={styles.stops} testID="booking-stops-section">
-        <AppText variant="title">{`Add optional stops (up to ${MAX_STOPS})`}</AppText>
+        <AppText variant="title">{BOOKING_COPY.optionalStops(MAX_STOPS)}</AppText>
         <StopsEditor
           stops={p.stops}
           onAddStop={p.onAddStop}
@@ -111,11 +111,11 @@ export const FareStage: React.FC<FareStageProps> = (p) => (
   <View style={styles.stack}>
     <TripSummaryCard
       testID="fare-review-summary"
-      label="Review & confirm"
-      meta={`Vehicle: ${p.vehicleLabel ?? '—'}${p.tripSummary ? ` • ${p.tripSummary}` : ''}`}
+      label={BOOKING_COPY.reviewTitle}
+      meta={`${BOOKING_COPY.reviewMeta(p.vehicleLabel ?? '—')}${p.tripSummary ? ` • ${p.tripSummary}` : ''}`}
       actions={[
-        { label: 'Change vehicle', icon: 'car', onPress: p.onChangeVehicle, testID: 'change-vehicle' },
-        { label: 'Cancel', icon: 'close', tone: 'danger', onPress: p.onCancel, testID: 'cancel-booking' },
+        { label: BOOKING_COPY.changeVehicle, icon: 'car', onPress: p.onChangeVehicle, testID: 'change-vehicle' },
+        { label: BOOKING_COPY.cancelBooking, icon: 'close', tone: 'danger', onPress: p.onCancel, testID: 'cancel-booking' },
       ]}
     />
     {p.preferences}

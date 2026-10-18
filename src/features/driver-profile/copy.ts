@@ -1,5 +1,7 @@
+import { localizedCopy } from '../../i18n/localizedCopy';
+
 /** Static copy for the driver profile and the vehicle card (T-507, T-514). Values come from the API. */
-export const DRIVER_PROFILE_COPY = {
+export const DRIVER_PROFILE_COPY = localizedCopy({
   title: 'Profile',
   back: 'Back',
   driverFallbackName: 'Driver',
@@ -35,4 +37,4 @@ export const DRIVER_PROFILE_COPY = {
   licenceNumber: 'Licence number',
   licenceExpiry: 'Expires',
   noLicence: 'No licence details on file yet',
-} as const;
+} as const);

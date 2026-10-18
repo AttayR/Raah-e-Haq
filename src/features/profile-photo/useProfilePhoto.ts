@@ -11,7 +11,7 @@ import { firstFieldMessages, rejectionMessage, type ThunkRejection } from '../..
 import { confirm } from '../../core/dialog';
 import { toast } from '../../core/toast';
 import { componentTokens, space } from '../../theme';
-import { t } from '../../i18n';
+import { perLocale, t } from '../../i18n';
 import type { MultipartFile, User } from '../../services/api';
 import { pickProfilePhoto, type PhotoSource, type PickProblem } from './picker';
 
@@ -29,12 +29,12 @@ export interface ProfilePhotoState {
 
 const IDLE: ProfilePhotoState = { phase: 'idle', progress: 0, previewUri: null, error: null };
 
-const PROBLEM_COPY: Record<Exclude<PickProblem, 'permission'>, string> = {
+const PROBLEM_COPY = perLocale((): Record<Exclude<PickProblem, 'permission'>, string> => ({
   unavailable: t('profilePhoto.cameraUnavailable'),
   wrongType: t('profilePhoto.wrongType'),
   tooLarge: t('profilePhoto.tooLarge'),
   failed: t('profilePhoto.pickFailed'),
-};
+}));
 
 /** The Profile avatar (ProfilePhotoEditor) is this tall. */
 export const PROFILE_PHOTO_SIZE = 96;
@@ -192,7 +192,7 @@ export function useProfilePhoto({ onUploaded, useServerMessage = false }: Option
         if (picked.problem === 'permission') {
           await askForAccess(source);
         } else {
-          toast.error(PROBLEM_COPY[picked.problem], undefined, TOAST_PLACEMENT);
+          toast.error(PROBLEM_COPY()[picked.problem], undefined, TOAST_PLACEMENT);
         }
         return;
       }

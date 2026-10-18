@@ -1,11 +1,12 @@
 import type { DriverDocumentStatus, DriverDocumentType } from './types';
+import { localizedCopy } from '../../i18n/localizedCopy';
 
 /**
  * Static copy of the driver documents list (T-203): the pending-driver account-status screen
  * and Settings → Vehicle & documents. Server text (a rejection_reason, a 422 rule) is never
  * written here.
  */
-export const DRIVER_DOCUMENTS_COPY = {
+export const DRIVER_DOCUMENTS_COPY = localizedCopy({
   title: 'Documents',
   screenTitle: 'Vehicle & documents',
   back: 'Back',
@@ -48,4 +49,4 @@ export const DRIVER_DOCUMENTS_COPY = {
     vehicle_left: 'Vehicle (left side)',
     vehicle_right: 'Vehicle (right side)',
   } satisfies Record<DriverDocumentType, string>,
-} as const;
+} as const);

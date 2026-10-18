@@ -17,11 +17,12 @@ import {
   type SettlementFormValues,
 } from '../settlementForm';
 import type { SettlementMethod } from '../types';
+import { perLocale } from '../../../i18n';
 
-const METHODS = [
+const METHODS = perLocale(() => [
   { value: 'cash', label: WALLET_COPY.methodCash },
   { value: 'bank_transfer', label: WALLET_COPY.methodBank },
-] as const;
+] as const);
 
 /** Server refusals that belong under the amount field rather than in a toast. */
 const AMOUNT_CODES = new Set(['AMOUNT_EXCEEDS_OWED', 'NOTHING_OWED']);
@@ -140,7 +141,7 @@ export default function PayCommissionScreen() {
             {WALLET_COPY.formMethod}
           </AppText>
           <SegmentedControl<SettlementMethod>
-            options={METHODS}
+            options={METHODS()}
             value={values.method}
             onChange={(method) => {
               setValues((current) => ({ ...current, method }));

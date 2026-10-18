@@ -20,7 +20,7 @@ import { ACTIVE_RIDE_COPY } from '../copy';
 import { DRIVER_LOCATION_POLL_MS } from '../hooks';
 import { CHAT_COPY } from '../../chat/copy';
 import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { RidePinCard } from '../../safety/components/RidePinCard';
 import { ridePinOf } from '../../safety/rules';
 import { FareLockBadge, WaitingTimer } from '../../fare/components/FareBits';
@@ -45,14 +45,14 @@ import {
   type PassengerRideStageState,
 } from '../stage';
 
-const STAGE_TITLES: Record<PassengerRideStage, string> = {
+const STAGE_TITLES = perLocale((): Record<PassengerRideStage, string> => ({
   searching: ACTIVE_RIDE_COPY.searchingTitle,
   driver_en_route: ACTIVE_RIDE_COPY.driverEnRouteTitle,
   driver_arrived: ACTIVE_RIDE_COPY.driverArrivedTitle,
   in_trip: ACTIVE_RIDE_COPY.inTripTitle,
   completed: ACTIVE_RIDE_COPY.completedTitle,
   cancelled: ACTIVE_RIDE_COPY.cancelledTitle,
-};
+}));
 
 /** The RideProgress step per stage (§5.24); none once the ride has ended. */
 const STAGE_STEP: Partial<Record<PassengerRideStage, number>> = {
@@ -62,11 +62,11 @@ const STAGE_STEP: Partial<Record<PassengerRideStage, number>> = {
   in_trip: 3,
 };
 
-const CANCELLED_BY_TEXT = {
+const CANCELLED_BY_TEXT = perLocale(() => ({
   passenger: ACTIVE_RIDE_COPY.cancelledByPassenger,
   driver: ACTIVE_RIDE_COPY.cancelledByDriver,
   system: ACTIVE_RIDE_COPY.cancelledBySystem,
-} as const;
+} as const));
 
 const toNumberOrNull = (value: unknown): number | null => {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
@@ -90,7 +90,7 @@ const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null, p
     case 'cancelled': {
       if (!ride) return ACTIVE_RIDE_COPY.cancelledBySystem;
       // T-561: a parcel the rider refused says so (the reason is on the parcel block below).
-      const outcome = parcel?.refusalReason ? t('parcel.senderRefused') : CANCELLED_BY_TEXT[cancelledByOf(ride)];
+      const outcome = parcel?.refusalReason ? t('parcel.senderRefused') : CANCELLED_BY_TEXT()[cancelledByOf(ride)];
       // BE-85: a late-cancel or no-show fee the passenger was charged is said with the outcome.
       const fee = cancellationFeeText(toNumberOrNull(ride.cancellation_fee), ride.cancellation_charge_reason ?? null);
       return fee ? `${outcome} ${fee}` : outcome;
@@ -149,7 +149,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const acReport = ride && ac ? toAcReportState(ride.ac_report) : null;
   // BE-81: the start PIN, only while the server sends it (accepted / arrived).
   const pin = driver ? ridePinOf(ride) : null;
-  const title = parcel && !warn ? parcelStatusText(parcel.status) : warn ? t('fare.requeuedTitle') : STAGE_TITLES[stage];
+  const title = parcel && !warn ? parcelStatusText(parcel.status) : warn ? t('fare.requeuedTitle') : STAGE_TITLES()[stage];
   const actions: PersonAction[] = [];
   if (driver && onCall) {
     actions.push({

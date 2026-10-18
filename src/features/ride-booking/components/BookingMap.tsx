@@ -9,6 +9,8 @@ import { AssignedDriverMarker } from '../../active-ride/components/ActiveRidePan
 import type { PassengerRideStage } from '../../active-ride/stage';
 import { BookingMapLayers } from './BookingMapLayers';
 import { MapPlaceholder } from './BookingNotices';
+import { BOOKING_COPY } from '../copy';
+import { perLocale, t } from '../../../i18n';
 
 type Props = {
   mapRef: RefObject<SafeMapViewRef | null>;
@@ -34,8 +36,8 @@ type Props = {
   stage?: PassengerRideStage | null;
 };
 
-const ERROR_FALLBACK = <MapPlaceholder message="Map error. Please restart the app." />;
-const LOADING_FALLBACK = <MapPlaceholder message="Map loading…" />;
+const errorFallback = perLocale(() => <MapPlaceholder message={BOOKING_COPY.mapError} />);
+const loadingFallback = perLocale(() => <MapPlaceholder message={t('home.mapLoading')} />);
 
 /**
  * The passenger booking map (T-534 split of PassengerMapScreen; PERF-12, PERF-15): mounted at
@@ -65,7 +67,7 @@ const BookingMapBase: React.FC<Props> = ({
   const [region] = useState(initialRegion);
   return (
     <View style={styles.fill}>
-      <MapErrorBoundary fallback={ERROR_FALLBACK}>
+      <MapErrorBoundary fallback={errorFallback()}>
         <MapErrorBoundary>
           <SafeMapView
             ref={mapRef}
@@ -76,7 +78,7 @@ const BookingMapBase: React.FC<Props> = ({
             onMapReady={onMapReady}
             onRegionChangeComplete={onRegionChangeComplete}
             onMapLoaded={onMapLoaded}
-            fallbackComponent={LOADING_FALLBACK}
+            fallbackComponent={loadingFallback()}
           >
             <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={route} />
             {nearbyDrivers ? <NearbyDriverMarkers drivers={nearbyDrivers} /> : null}
@@ -86,7 +88,7 @@ const BookingMapBase: React.FC<Props> = ({
       </MapErrorBoundary>
       {!ready ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none" testID="booking-map-loading">
-          <MapPlaceholder message="Loading map…" />
+          <MapPlaceholder message={BOOKING_COPY.mapLoading} />
         </View>
       ) : null}
     </View>

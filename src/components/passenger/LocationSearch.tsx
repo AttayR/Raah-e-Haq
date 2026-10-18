@@ -72,7 +72,8 @@ type Props = {
   replaceOnType?: string | readonly string[];
 };
 
-const PLACEHOLDER = { pickup: 'Pickup location', destination: 'Where to?' } as const;
+const placeholderOf = (mode: Props['mode']): string =>
+  mode === 'pickup' ? BOOKING_COPY.pickupPlaceholder : BOOKING_COPY.destinationPlaceholder;
 const LEADING_ICON: Record<Props['mode'], IconName> = { pickup: 'origin', destination: 'search' };
 /** T-534 (PERF-10): one lookup after the passenger pauses typing, not one per keystroke. */
 export const AUTOCOMPLETE_DEBOUNCE_MS = 300;
@@ -255,9 +256,9 @@ const LocationSearch: React.FC<Props> = ({
         {glyph ? <Icon name={glyph} size={20} color={glyph === 'locate' ? 'primaryText' : 'textSecondary'} /> : null}
         <TextInput
           testID={`location-search-${mode}`}
-          accessibilityLabel={mode === 'pickup' ? 'Pickup location' : 'Destination'}
+          accessibilityLabel={mode === 'pickup' ? BOOKING_COPY.pickupPlaceholder : BOOKING_COPY.destinationA11y}
           style={[styles.input, { color: c.textPrimary }]}
-          placeholder={placeholder ?? PLACEHOLDER[mode]}
+          placeholder={placeholder ?? placeholderOf(mode)}
           value={text}
           onChangeText={changeText}
           placeholderTextColor={c.textMuted}
@@ -273,7 +274,7 @@ const LocationSearch: React.FC<Props> = ({
         {text.length > 0 && !readOnly ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Clear"
+            accessibilityLabel={BOOKING_COPY.clearA11y}
             onPress={() => changeText('')}
             hitSlop={space[3]}
           >

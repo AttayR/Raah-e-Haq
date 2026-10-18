@@ -19,7 +19,7 @@ import {
 import { firstFieldMessages, toApiError, type ApiError } from '../../../core/api/errors';
 import { formatMoney } from '../../../core/format/money';
 import { triggerHaptic } from '../../../core/haptics';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import { TopUpProviderPicker } from '../components/TopUpProviderPicker';
 import { WALLET_COPY } from '../copy';
@@ -44,10 +44,10 @@ const AMOUNT_CODES = new Set(['DAILY_LIMIT_REACHED']);
 /** The gateway or method was switched off meanwhile: GET /wallet is read again. */
 const PROVIDER_CODES = new Set(['PROVIDER_UNAVAILABLE', 'METHOD_UNAVAILABLE']);
 
-const METHOD_LABEL: Record<TopUpMethod, string> = {
+const METHOD_LABEL = perLocale((): Record<TopUpMethod, string> => ({
   mwallet: t('topUp.methodMwallet'),
   card: t('topUp.methodCard'),
-};
+}));
 
 const initialValues = (config: TopUpConfig | null): TopUpFormValues => {
   const only = config?.providers.length === 1 ? config.providers[0] : null;
@@ -257,7 +257,7 @@ export default function AddMoneyScreen() {
               {t('topUp.methodLabel')}
             </AppText>
             <SegmentedControl<TopUpMethod>
-              options={methods.map((method) => ({ value: method, label: METHOD_LABEL[method] }))}
+              options={methods.map((method) => ({ value: method, label: METHOD_LABEL()[method] }))}
               value={values.method}
               onChange={(method) => set({ method }, ['method', 'mobile', 'cnic'])}
               accessibilityLabel={t('topUp.methodLabel')}

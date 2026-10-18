@@ -1,7 +1,8 @@
 import type { CancellationReason, RideStatus, RideViewer } from './types';
+import { localizedCopy } from '../../i18n/localizedCopy';
 
 /** Static copy for ride history and ride details (T-501). Rides and amounts come from GET /rides. */
-export const RIDE_HISTORY_COPY = {
+export const RIDE_HISTORY_COPY = localizedCopy({
   title: 'Ride history',
   back: 'Back',
   retry: 'Try again',
@@ -65,25 +66,25 @@ export const RIDE_HISTORY_COPY = {
   shareTo: (address: string) => `To: ${address}`,
   shareStop: (n: number, address: string) => `Stop ${n}: ${address}`,
   shareTotal: (amount: string, payment: string) => `Total: ${amount} · ${payment}`,
-} as const;
+} as const);
 
-export const RIDE_STATUS_LABEL: Record<RideStatus, string> = {
+export const RIDE_STATUS_LABEL: Record<RideStatus, string> = localizedCopy({
   requested: 'Finding driver',
   accepted: 'Driver on the way',
   arrived: 'Driver arrived',
   started: 'On trip',
   completed: 'Completed',
   cancelled: 'Cancelled',
-};
+});
 
-export const TIMELINE_LABEL = {
+export const TIMELINE_LABEL = localizedCopy({
   requested: 'Requested',
   accepted: 'Accepted',
   arrived: 'Driver arrived',
   started: 'Trip started',
   completed: 'Completed',
   cancelled: 'Cancelled',
-} as const;
+} as const);
 
 const VEHICLE_LABEL: Record<string, string> = {
   car: 'Car',

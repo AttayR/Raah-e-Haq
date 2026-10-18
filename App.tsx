@@ -18,6 +18,11 @@ import ReduxProvider from './src/app/providers/ReduxProvider';
 import NotificationManager from './src/components/NotificationManager';
 import SplashScreen from './src/components/SplashScreen';
 import { DevKitGalleryHost } from './src/features/dev-gallery/DevKitGalleryHost';
+import { LanguageGate } from './src/app/providers/LanguageGate';
+import { restoreStoredLanguage } from './src/i18n/languagePreference';
+
+// T-523: read the stored language now, alongside the appearance read, so the gate rarely waits.
+restoreStoredLanguage();
 
 function ThemedNav() {
   const { theme } = useAppTheme();
@@ -61,6 +66,7 @@ function ThemedNav() {
         barStyle={theme.statusBarStyle}
         backgroundColor={theme.colors.background}
       />
+      {/* T-523: a language switch re-renders the screens, not this tree (localeScreenLayout). */}
       <NavigationContainer theme={navTheme} linking={linking}>
         <AuthFlow />
       </NavigationContainer>
@@ -76,11 +82,13 @@ export default function App() {
       <ReduxProvider>
         {/* The splash, not a blank frame, while the appearance is read (T-539). */}
         <ThemeProvider fallback={<SplashScreen />}>
-          <NotificationManager>
-            <DevKitGalleryHost>
-              <ThemedNav />
-            </DevKitGalleryHost>
-          </NotificationManager>
+          <LanguageGate fallback={<SplashScreen />}>
+            <NotificationManager>
+              <DevKitGalleryHost>
+                <ThemedNav />
+              </DevKitGalleryHost>
+            </NotificationManager>
+          </LanguageGate>
         </ThemeProvider>
       </ReduxProvider>
     </SafeAreaProvider>

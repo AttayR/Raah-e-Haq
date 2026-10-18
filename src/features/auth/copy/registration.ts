@@ -1,3 +1,5 @@
+import { localizedCopy } from '../../../i18n/localizedCopy';
+
 /**
  * User-facing copy of the registration form and its phone step (T-201). Server text (the
  * BE-35/BE-38 `message` of phone/verify and phone/resend) is shown as sent; these strings only
@@ -5,7 +7,7 @@
  * the code step's inline `verify.received` banner and lines (T-564, T-567). Code-entry strings shared with
  * phone sign-in come from PHONE_AUTH_COPY.
  */
-export const REGISTRATION_COPY = {
+export const REGISTRATION_COPY = localizedCopy({
   form: {
     progress: (step: number, of: number) => `Step ${step} of ${of}`,
     /** A backend from before BE-35 (no phone step): the old success message. */
@@ -84,4 +86,4 @@ export const REGISTRATION_COPY = {
     verify: 'Phone verification failed',
     resend: 'Failed to resend code',
   },
-} as const;
+} as const);

@@ -27,6 +27,7 @@ import { CHAT_COPY, fallbackNameOf, formatChatDayTime, roleLabelOf } from '../co
 import { useChatThread } from '../hooks';
 import type { RideChatParams } from '../navigation';
 import { seenMessageId, threadItemsNewestFirst, type ChatThreadState, type ThreadItem } from '../thread';
+import { perLocale } from '../../../i18n';
 
 type RideRoot = { activeRide: ActiveRideState; driverRide: DriverRideState };
 
@@ -118,7 +119,7 @@ const ChatThreadScreen: React.FC = () => {
             <>
               <Icon name={state.status === 'error' ? 'warning' : 'lock'} size={48} color="textMuted" />
               <AppText variant="title" align="center">
-                {STATUS_TITLES[state.status]}
+                {STATUS_TITLES()[state.status]}
               </AppText>
               {state.status === 'error' && state.errorMessage ? (
                 <AppText variant="bodySmall" color="textSecondary" align="center">
@@ -203,12 +204,12 @@ const ChatThreadScreen: React.FC = () => {
   );
 };
 
-const STATUS_TITLES: Record<Exclude<ChatThreadState['status'], 'ready' | 'loading'>, string> = {
+const STATUS_TITLES = perLocale((): Record<Exclude<ChatThreadState['status'], 'ready' | 'loading'>, string> => ({
   error: CHAT_COPY.threadError,
   expired: CHAT_COPY.threadExpired,
   closed: CHAT_COPY.threadClosed,
   forbidden: CHAT_COPY.threadForbidden,
-};
+}));
 
 const styles = StyleSheet.create({
   closesAt: { paddingHorizontal: layout.gutter, paddingVertical: space[1] },
