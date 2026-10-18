@@ -42,11 +42,19 @@ export const toggleTag = (selected: ReadonlyArray<string>, key: string, maxTags:
   return [...selected, key];
 };
 
-/** Labels of `keys` for the rater's role, in order; a key the server no longer lists is left out. */
+/**
+ * Labels of `keys` for the rater's role, in order; a key the server no longer lists is left out.
+ * [T-571] On a parcel ride the parcel tags come first, then the ride tags: builds before T-569
+ * (and servers before BE-107) rated parcel rides with ride tag keys, which must still show.
+ */
 export const tagLabels = (config: RatingConfig | null, role: RaterRole, keys: ReadonlyArray<string>, parcel = false): string[] => {
   if (!config) return [];
-  const bands = bandsFor(config, role, parcel);
-  const byKey = new Map([...bands.positive, ...bands.negative].map((tag) => [tag.key, tag.label]));
+  const lists = parcel ? [bandsFor(config, role, true), config.tags[role]] : [config.tags[role]];
+  const byKey = new Map<string, string>();
+  // Reversed so the first list wins a key both lists have.
+  [...lists].reverse().forEach((bands) => {
+    [...bands.positive, ...bands.negative].forEach((tag) => byKey.set(tag.key, tag.label));
+  });
   return keys.map((key) => byKey.get(key)).filter((label): label is string => !!label);
 };
 

@@ -153,8 +153,31 @@ describe('BE-107 parcel tags (T-569)', () => {
   });
 
   it('labels a parcel rating from the parcel lists', () => {
-    expect(tagLabels(withParcel, 'passenger', ['careful_handling', 'clean_car'], true)).toEqual(['Handled with care']);
+    expect(tagLabels(withParcel, 'passenger', ['careful_handling', 'item_damaged'], true)).toEqual(['Handled with care', 'Item damaged']);
     expect(tagLabels(withParcel, 'passenger', ['careful_handling', 'clean_car'])).toEqual(['Clean car']);
+  });
+
+  it('[T-571] a parcel rating made with ride tag keys (builds before T-569) still shows their labels', () => {
+    // Before T-571 the ride keys were dropped: the sender saw only part of what they had picked.
+    expect(tagLabels(withParcel, 'passenger', ['careful_handling', 'clean_car', 'rude'], true)).toEqual([
+      'Handled with care',
+      'Clean car',
+      'Rude',
+    ]);
+    expect(tagLabels(withParcel, 'driver', ['polite', 'poorly_packed', 'gone'], true)).toEqual(['Polite', 'Poorly packed']);
+  });
+
+  it('[T-571] a key on both lists takes the parcel label on a parcel ride', () => {
+    const shared = toRatingConfig(
+      rawTags({
+        parcel_tags: {
+          ...parcelTags,
+          passenger: { positive: [{ key: 'on_time', label: 'Delivered on time' }], negative: [] },
+        },
+      }),
+    );
+    expect(tagLabels(shared, 'passenger', ['on_time'], true)).toEqual(['Delivered on time']);
+    expect(tagLabels(shared, 'passenger', ['on_time'])).toEqual(['On time']);
   });
 });
 

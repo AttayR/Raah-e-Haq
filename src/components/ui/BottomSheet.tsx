@@ -164,6 +164,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // content re-measure in that window must not re-place the sheet, which would cancel the close
   // animation, skip the unmount and leave an invisible Modal over the screen.
   const closing = useRef(false);
+  // [T-571] The same, for rendering: a closing sheet takes no touches (see `beginClose`).
+  const [closingUI, setClosingUI] = useState(false);
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   const restoreSnap = useRef<SheetSnap | null>(null);
@@ -208,11 +210,29 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   const unmount = useCallback(() => {
     closing.current = false;
+    setClosingUI(false);
     setMounted(false);
     currentRef.current = null;
     setCurrent(null);
+    // [T-571] The keyboard listeners go with the Modal: a keyboard that hides after that (the
+    // focused field went away with the sheet) is never heard, and its stale height opened the
+    // next presentation at full height with a blank half (QA 2026-10-18 bug 6).
+    setKeyboardHeight(0);
+    restoreSnap.current = null;
   }, []);
 
+  /**
+   * [T-571] Start of a modal close. The sheet stops taking touches at once: a tap on the scrim
+   * during the slide-out called `close()` again, which restarted the close spring from rest and
+   * kept the (invisible by then) Modal over the screen another ~0.22 s, swallowing the next taps
+   * too (QA 2026-10-18 bug 2). The keyboard goes down with the sheet instead of after it
+   * (the number pad lingered ~0.2 s after "Cancel" on the parcel code sheet).
+   */
+  const beginClose = useCallback(() => {
+    closing.current = true;
+    setClosingUI(true);
+    Keyboard.dismiss();
+  }, []);
   // [T-562] A drag or a snapTo that lands on a snap during a close cancels the close animation
   // (and with it the unmount). Clear `closing` then, or the sheet would stay up for good: every
   // later keyboard event, re-measure and `visible={false}` would be ignored. If the parent still
@@ -225,6 +245,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       return true;
     }
     closing.current = false;
+    setClosingUI(false);
     return false;
   }, [animateTo, unmount]);
 
@@ -262,14 +283,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       finishClose();
       return;
     }
-    closing.current = true;
+    // [T-571] Already sliding out: let that close finish (restarting it kept the Modal up longer).
+    if (closing.current) return;
+    beginClose();
     animateTo(0, 0, finishClose, containerRef.current);
-  }, [animateTo, finishClose, modal, resolved, snapTo]);
+  }, [animateTo, beginClose, finishClose, modal, resolved, snapTo]);
 
   useImperativeHandle(ref, () => ({ snapTo, close }), [close, snapTo]);
-  const markClosing = useCallback(() => {
-    closing.current = true;
-  }, []);
 
   // Modal visibility from the parent.
   useEffect(() => {
@@ -278,6 +298,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       if (closing.current) {
         // Re-opened while sliding out: rise again to where it was.
         closing.current = false;
+        setClosingUI(false);
         const target = resolvedRef.current.find(r => r.snap === currentRef.current) ?? resolvedRef.current[0];
         if (target) animateTo(target.height, 0, undefined, containerRef.current);
       }
@@ -288,10 +309,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         unmount();
         return;
       }
-      closing.current = true;
+      beginClose();
       animateTo(0, 0, unmount, containerRef.current);
     }
-  }, [animateTo, modal, mounted, unmount, visible]);
+  }, [animateTo, beginClose, modal, mounted, unmount, visible]);
 
   // First placement once the container (and, for content snaps, the content) is measured, and
   // re-placement when the snap heights change (rotation, content swap on a `content` snap).
@@ -414,7 +435,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         const height = container.value - top.value;
         const target = releaseTarget(height, event.velocityY, resolved, modal);
         if (target === 'close') {
-          runOnJS(markClosing)();
+          runOnJS(beginClose)();
           animateTo(0, event.velocityY, finishClose);
           return;
         }
@@ -422,7 +443,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         animateTo(target.height, event.velocityY);
         runOnJS(dragSettled)(target);
       });
-  }, [animateTo, container, dragSettled, finishClose, markClosing, modal, resolved, startTop, top]);
+  }, [animateTo, beginClose, container, dragSettled, finishClose, modal, resolved, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: top.value }] }));
   const scrimStyle = useAnimatedStyle(() => {
@@ -555,7 +576,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={close}>
       <ModalRoot>
-        <View style={styles.fill} onLayout={onContainerLayout}>
+        {/* [T-571] From the start of a close, taps go nowhere in the sheet (no re-close, no
+            second press on its buttons); the Modal itself goes as soon as the sheet is out. */}
+        <View style={styles.fill} onLayout={onContainerLayout} pointerEvents={closingUI ? 'none' : 'auto'}>
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.overlay }, scrimStyle]}>
             <Pressable
               style={styles.fill}

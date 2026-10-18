@@ -1,11 +1,14 @@
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BackHandler, Modal, PixelRatio, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { dialog, dialogStore, type DialogRequest } from '../../core/dialog';
 import { t } from '../../i18n';
-import { componentTokens, radius, space } from '../../theme';
+import { componentTokens, motion, radius, space } from '../../theme';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { AppText } from './AppText';
 import { Button, type ButtonVariant } from './Button';
+import { timing } from './easing';
 import { ModalRoot } from './ModalRoot';
 import { useQueuedModal } from './modalQueue';
 
@@ -95,6 +98,53 @@ export type DialogProps = DialogSurfaceProps & {
 };
 
 /**
+ * [T-571] The root Dialog's native Modal, faded in JS. With the native `fade` the Modal stayed
+ * presented through UIKit's cross-dissolve and its dismiss transition, and the next taps on the
+ * screen were lost for up to ~1 s after "Keep Ride" (QA 2026-10-18 bug 1). Now the Modal presents
+ * and dismisses without a native animation: the scrim and card fade here, the Modal hides only
+ * once they are invisible, and its (instant) dismiss is reported at once, so taps reach the screen
+ * as soon as the dialog is gone. The queue turn is still held until `onDismiss`.
+ *
+ * A request that arrives during the fade-out waits for it to finish (the fading text never swaps,
+ * T-568), then fades in on the same, still presented Modal.
+ */
+const ignoreRequestClose = () => undefined;
+
+const useFadedModal = (want: boolean) => {
+  // True from the render that shows this dialog until its fade-out has finished.
+  const [open, setOpen] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
+  const modal = useQueuedModal(want || open);
+  // Set during render (not in an effect) so no render in between hides the Modal before the fade.
+  if (modal.show && want && !open && !fadingOut) setOpen(true);
+  if (open && !want && !fadingOut) setFadingOut(true);
+  const showing = modal.show && want && !fadingOut;
+  // The app's Reduce Motion reading (like Switch and BottomSheet): no fade, the dialog appears and goes at once.
+  const reduce = useReducedMotion();
+  const opacity = useSharedValue(0);
+  const endFadeOut = useCallback(() => {
+    setFadingOut(false);
+    setOpen(false);
+  }, []);
+  useEffect(() => {
+    if (fadingOut && reduce) {
+      opacity.value = 0;
+      endFadeOut();
+    } else if (fadingOut) {
+      // Ends the fade even when interrupted: an invisible Modal must never stay up.
+      opacity.value = withTiming(0, timing(motion.exit), () => {
+        'worklet';
+        runOnJS(endFadeOut)();
+      });
+    } else if (showing) {
+      opacity.value = reduce ? 1 : withTiming(1, timing(motion.fast));
+    }
+  }, [endFadeOut, fadingOut, opacity, reduce, showing]);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return { visible: modal.show, onDismiss: modal.onDismiss, showing, fadingOut, fadeStyle };
+};
+
+/**
  * A themed modal dialog (§5.15) over the `overlay` scrim. For yes/no questions prefer the
  * promise API: `await confirm({ title, body, confirmLabel, destructive })` from
  * `src/core/dialog`, rendered by `DialogHost`.
@@ -102,12 +152,12 @@ export type DialogProps = DialogSurfaceProps & {
 export function Dialog({ visible, onDismiss, inline = false, ...surface }: DialogProps) {
   const { theme } = useAppTheme();
   // [T-562] The root Dialog is a native Modal too: it takes its turn with the modal sheets.
-  const modal = useQueuedModal(!inline && visible);
-  // [T-568] While the Modal is hidden (fading out on iOS, or waiting for its turn) it keeps the
-  // text and buttons it last showed: a new confirm() queued during the fade-out must not swap the
-  // fading dialog's text. The new request's text appears when the Modal presents again.
+  const modal = useFadedModal(!inline && visible);
+  // [T-568] While the Modal is fading out (or waiting for its turn) it keeps the text and buttons
+  // it last showed: a new confirm() queued during the fade-out must not swap the fading dialog's
+  // text. The new request's text appears when it fades in.
   const shownSurface = useRef(surface);
-  if (inline || modal.show) shownSurface.current = surface;
+  if (inline || modal.showing) shownSurface.current = surface;
   const rendered = inline ? surface : shownSurface.current;
   // Android back answers "cancel" for the inline form too (a native Modal gets onRequestClose).
   useEffect(() => {
@@ -140,14 +190,25 @@ export function Dialog({ visible, onDismiss, inline = false, ...surface }: Dialo
   }
   return (
     <Modal
-      visible={modal.show}
+      visible={modal.visible}
       transparent
-      animationType="fade"
+      animationType="none"
       statusBarTranslucent
-      onRequestClose={onDismiss ?? (() => undefined)}
+      // [T-571] Android back during the fade-out does nothing: the dialog is answered, and
+      // `onDismiss` would answer the next, still unseen confirm() queued behind it.
+      onRequestClose={modal.fadingOut || !onDismiss ? ignoreRequestClose : onDismiss}
       onDismiss={modal.onDismiss}
     >
-      <ModalRoot withDialogHost={false}>{content}</ModalRoot>
+      <ModalRoot withDialogHost={false}>
+        {/* A fading-out dialog takes no taps (its answer is given; a scrim tap must not re-answer). */}
+        <Animated.View
+          style={[styles.fill, modal.fadeStyle]}
+          pointerEvents={modal.fadingOut ? 'none' : 'auto'}
+          testID={rendered.testID ? `${rendered.testID}-fade` : undefined}
+        >
+          {content}
+        </Animated.View>
+      </ModalRoot>
     </Modal>
   );
 }
@@ -204,6 +265,7 @@ export function DialogHost({ inline = false }: { inline?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   scrim: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   surface: { borderRadius: radius.lg, padding: d.padding },
   body: { marginTop: space[2] },
