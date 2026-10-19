@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="402" height="874" viewBox="0 0 402 874" font-family="-apple-system, Helvetica">
+<rect width="402" height="874" fill="#F3F5F9"/>
+<path d="M-10 180 Q200 140 420 210" stroke="#E1E5EE" stroke-width="14" fill="none"/><path d="M-10 180 Q200 140 420 210" stroke="#FFFFFF" stroke-width="11" fill="none"/>
+<path d="M250 -10 L270 515" stroke="#E4EAF7" stroke-width="16" fill="none"/>
+<path d="M-10 400 L420 360" stroke="#FFFFFF" stroke-width="8" fill="none"/><path d="M90 0 L40 515" stroke="#FFFFFF" stroke-width="8" fill="none"/>
+<rect x="300" y="250" width="80" height="60" rx="10" fill="#E3EEE6"/><path d="M0 455 Q120 425 200 515" stroke="#CCDBF2" stroke-width="18" fill="none"/>
+<text x="120" y="330" font-size="12" font-weight="600" letter-spacing="1" fill="#626B82">BLOCK C1</text>
+<circle cx="160" cy="300" r="20" fill="#1D58C4" opacity="0.16"/><circle cx="160" cy="300" r="8.5" fill="#FFFFFF"/><circle cx="160" cy="300" r="7" fill="#1D58C4"/>
+<defs><linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient><linearGradient id="fade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/></linearGradient><filter id="e2" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0F1422" flood-opacity="0.1"/></filter><filter id="e3" x="-10%" y="-50%" width="120%" height="200%"><feDropShadow dx="0" dy="-4" stdDeviation="12" flood-color="#0F1422" flood-opacity="0.12"/></filter></defs>
+<rect width="402" height="86" fill="url(#scrim)"/>
+<text x="40" y="40" font-size="17" font-weight="600" fill="#0F1422">1:01</text>
+<circle cx="40" cy="94" r="24" fill="#FFFFFF" filter="url(#e2)" stroke="none"/><circle cx="40" cy="94" r="20" fill="#011C72"/><text x="40" y="99.5" text-anchor="middle" font-size="15" font-weight="600" fill="#FFFFFF">AR</text>
+<circle cx="362" cy="475" r="24" fill="#FFFFFF" filter="url(#e2)" stroke="none"/><circle cx="362" cy="475" r="8" fill="none" stroke="#0F1422" stroke-width="2.4"/><circle cx="362" cy="475" r="3" fill="#0F1422"/>
+<rect x="16" y="459" width="212" height="32" rx="16" fill="#FFFFFF" filter="url(#e2)" stroke="none"/><circle cx="32" cy="475" r="4" fill="#12753B"/><text x="44" y="479.5" font-size="13" font-weight="600" fill="#0F1422">49 drivers <tspan fill="#4C556C">online near you</tspan></text>
+<path d="M0 539 Q0 515 24 515 L378 515 Q402 515 402 539 L402 874 L0 874 Z" fill="#FFFFFF" filter="url(#e3)"/>
+<rect x="183.0" y="523" width="36" height="5" rx="2.5" fill="#DADFEA"/>
+<text x="16" y="555.5" font-size="17" font-weight="600" fill="#0F1422">Good evening, Attay</text>
+<text x="16" y="577.5" font-size="14" fill="#4C556C">Fixed fares, within the city</text>
+<rect x="16" y="595" width="370" height="56" rx="28" fill="#EBEEF5"/><circle cx="44" cy="623" r="16" fill="#011C72"/><circle cx="42.5" cy="621.5" r="5.5" fill="none" stroke="#FFFFFF" stroke-width="2"/><line x1="46.5" y1="625.5" x2="50" y2="629" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><text x="72" y="630" font-size="20" font-weight="600" fill="#0F1422">Where to?</text>
+<rect x="16.5" y="663.5" width="77" height="31" rx="15.5" fill="#FFFFFF" stroke="#DADFEA"/><rect x="28" y="671" width="16" height="16" rx="4" fill="#4C556C" opacity="0.9"/><text x="48" y="683.5" font-size="13" font-weight="600" fill="#0F1422">Home</text>
+<rect x="102.5" y="663.5" width="75" height="31" rx="15.5" fill="#FFFFFF" stroke="#DADFEA"/><rect x="114" y="671" width="16" height="16" rx="4" fill="#4C556C" opacity="0.9"/><text x="134" y="683.5" font-size="13" font-weight="600" fill="#0F1422">Work</text>
+<rect x="186.5" y="663.5" width="65" height="31" rx="15.5" fill="#FFFFFF" stroke="#DADFEA"/><rect x="198" y="671" width="16" height="16" rx="4" fill="#011C72" opacity="0.9"/><text x="218" y="683.5" font-size="13" font-weight="600" fill="#011C72">Add</text>
+<rect x="260.5" y="663.5" width="119" height="31" rx="15.5" fill="#FFFFFF" stroke="#DADFEA"/><rect x="272" y="671" width="16" height="16" rx="4" fill="#4C556C" opacity="0.9"/><text x="292" y="683.5" font-size="13" font-weight="600" fill="#0F1422">Saved places</text>
+<rect x="388.5" y="663.5" width="83" height="31" rx="15.5" fill="#FFFFFF" stroke="#DADFEA"/><rect x="400" y="671" width="16" height="16" rx="4" fill="#4C556C" opacity="0.9"/><text x="420" y="683.5" font-size="13" font-weight="600" fill="#0F1422">Gulberg</text>
+<rect x="386" y="663" width="16" height="32" fill="url(#fade)"/>
+<g transform="translate(16 707)"><rect width="179.0" height="72" rx="16" fill="#EEF2FC"/>
+<text x="12" y="28.5" font-family="-apple-system, Helvetica" font-size="17" font-weight="600" fill="#0F1422">Ride</text>
+<svg x="75.0" y="14" width="104" height="56" viewBox="0 0 88 48"><ellipse cx="44" cy="44.5" rx="38" ry="2.5" fill="#000" opacity="0.1"/>
+<path d="M6 34 Q6 27 12 26 L24 24.5 L33 15 Q35.5 12.5 39 12.5 L58 12.5 Q61.5 12.5 64 15 L71.5 23.5 L80 25 Q84 25.8 84 30 L84 35 Q84 38 81 38 L9 38 Q6 38 6 35 Z" fill="#011C72"/>
+<path d="M28 24 L34.5 17 Q36.2 15.5 38.5 15.5 L46.5 15.5 L46.5 24 Z" fill="#C9D5F7"/>
+<path d="M49.5 15.5 L57.5 15.5 Q59.8 15.5 61.4 17.2 L67.5 24 L49.5 24 Z" fill="#C9D5F7"/>
+<rect x="10" y="32.5" width="70" height="2.5" rx="1.25" fill="#2E4FBF"/>
+<rect x="40" y="26.5" width="4" height="1.2" rx="0.6" fill="#C9D5F7"/><rect x="53" y="26.5" width="4" height="1.2" rx="0.6" fill="#C9D5F7"/>
+<rect x="79.5" y="27.5" width="4" height="3" rx="1.5" fill="#F75606"/>
+<rect x="6" y="28" width="2.5" height="4" rx="1" fill="#C0262D"/>
+<circle cx="22" cy="37.5" r="8.5" fill="#EEF2FC"/><circle cx="66" cy="37.5" r="8.5" fill="#EEF2FC"/>
+<circle cx="22" cy="37.5" r="6.5" fill="#20273A"/><circle cx="66" cy="37.5" r="6.5" fill="#20273A"/>
+<circle cx="22" cy="37.5" r="2.75" fill="#C3CAD9"/><circle cx="66" cy="37.5" r="2.75" fill="#C3CAD9"/></svg></g>
+<g transform="translate(207.0 707)"><rect width="179.0" height="72" rx="16" fill="#FFF1E8"/>
+<text x="12" y="28.5" font-family="-apple-system, Helvetica" font-size="17" font-weight="600" fill="#0F1422">Parcel</text>
+<svg x="75.0" y="14" width="104" height="56" viewBox="0 0 88 48"><ellipse cx="56" cy="44.5" rx="26" ry="2.5" fill="#000" opacity="0.1"/>
+<g stroke="#6A86DE" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="24" x2="28" y2="24"/><line x1="12" y1="31" x2="28" y2="31"/><line x1="20" y1="38" x2="28" y2="38"/></g>
+<path d="M66 18 L78 10 L78 36 L66 44 Z" fill="#B33D00"/>
+<path d="M34 18 L46 10 L78 10 L66 18 Z" fill="#FF9B66"/>
+<rect x="34" y="18" width="32" height="26" fill="#F75606"/>
+<path d="M47 18 L59 10 L65 10 L53 18 Z" fill="#FFE2D1"/>
+<rect x="47" y="18" width="6" height="11" fill="#FFE2D1"/>
+<rect x="37" y="35" width="8" height="5" rx="1" fill="#FFE2D1"/></svg></g>
+<rect x="0" y="791" width="402" height="83" fill="#FFFFFF"/><line x1="0" y1="791" x2="402" y2="791" stroke="#DADFEA"/>
+<text x="50.25" y="835" text-anchor="middle" font-size="12" font-weight="600" fill="#011C72">Home</text>
+<text x="150.75" y="835" text-anchor="middle" font-size="12" font-weight="500" fill="#4C556C">Activity</text>
+<text x="251.25" y="835" text-anchor="middle" font-size="12" font-weight="500" fill="#4C556C">Inbox</text>
+<text x="351.75" y="835" text-anchor="middle" font-size="12" font-weight="500" fill="#4C556C">Account</text>
+</svg>

@@ -1,6 +1,6 @@
 # Passenger · Home
 
-- **Task:** T-604 (visual) after T-506 (real data) and T-610 (navigation shell). **[UI-R20, 2026-10-19]** service choice: two service tiles (Ride, Parcel) replace the greeting at the top of the sheet; see **§ Services (UI-R20)** below, which supersedes any older line here that conflicts with it.
+- **Task:** T-604 (visual) after T-506 (real data) and T-610 (navigation shell). **[UI-R20, 2026-10-19]** service choice: two service tiles (Ride, Parcel) replace the greeting at the top of the sheet; see **§ Services (UI-R20)** below, which supersedes any older line here that conflicts with it. **[UI-R20b, 2026-10-20]** the first view is redesigned: greeting + tagline, "Where to?" hero first, outline chips, illustrated Ride/Parcel cards after the chips, brand-tinted map, cold-open entrance; see **§ Services v2 (UI-R20b)**, which supersedes UI-R20 and the Layout blocks where they conflict.
 - **Route:** `PassengerTabs/Home` (tab 1 of 4). Booking is pushed from here (`PassengerBooking` stack); the old `Map` tab is removed.
 - **Audit:** `audit/passenger-home-*`, `passenger-home-scroll1-*`, `passenger-home-scroll2-*` (Home defects 1-12).
 - **Data:**
@@ -24,7 +24,7 @@ Full-screen map (5.21, map style §9) behind a **BottomSheet** with snap points 
 2. User location dot; nearby drivers (coarse, from BE-20 `nearby-drivers` when available) as 24×24 simplified car glyphs, `driverMarker` at 60 % opacity, no labels. **[T-586] Superseded:** every tier's own top-down glyph at 40 pt, full opacity, smooth motion, plus the map count chip "{online} drivers online near you" bottom-start above the sheet: `map-vehicles.md` §1–§4.
 3. Camera: user location, zoom 15; padding bottom = sheet height.
 
-**Sheet content, peek state** **[UI-R20: replaces the greeting with the service row; peek is content-defined, see § Services S5]**:
+**Sheet content, peek state** **[UI-R20: replaces the greeting with the service row; peek is content-defined, see § Services S5]** **[UI-R20b: order and sizes are now § Services v2 V1: greeting + tagline → "Where to?" 56 → chips → service cards; peek 274]**:
 1. Handle; 24 from top (drag area).
 2. **Sheet header (drag area), one of three, by state (§ Services S1):** the **service row** (Ride + Parcel tiles, 96) while the parcel tier is on; the **ride-only heading** "Rides within the city" (22) while it is off; the **greeting** (22, rules §7) only while a ride or parcel is in progress (T-577). No greeting otherwise.
 3. 12 gap. **"Where to?" bar:** full width − 32, height 52 (`WHERE_TO_HEIGHT`), radius `md`, fill `surfaceAlt`; leading 24 `magnify` `textSecondary` at x+16; text "Where to?" `title` `textPrimary` at x+52; trailing divider (1pt `border`, 24 high) + 16 + "Now" chip (`label`, `clock-outline` 16) only if scheduled rides exist later (hidden today). Tap → passenger-destination-search (pickup = current location). **[UI-R20]** It books a **ride** only: its accessibility label becomes "Where to? Book a ride within the city". Visible text unchanged.
@@ -47,6 +47,8 @@ Full-screen map (5.21, map style §9) behind a **BottomSheet** with snap points 
 Removed from Home: weather, "Active User" pill, quick-action tiles, "Recent Activity", "Account" rows (they live in Account), emoji.
 
 ## Services (UI-R20, 2026-10-19)
+
+> **[UI-R20b]** Superseded in part by § Services v2 below: S1, S2, S3, S5, S6 and S10 are replaced (no tiles above "Where to?", no ride-only heading, no active Ride state); S4, S7, S8, S9 stay with the V-section changes.
 
 **Why.** The owner could not tell from Home whether he was booking a ride or a courier ("do I go myself or send something?"), or whether a booking was in-city or city-to-city (before: `audit/passenger-home-uir20-before-light.png`, `-dark.png`). **Owner decision 2026-10-19:** two services only: **Ride** (you travel, within the city) and **Parcel** (a bike courier carries an item; you don't travel). City-to-city is not offered: no tile, no "coming soon", no "intercity" word anywhere. Pattern: inDrive / Careem / Bykea service tiles above the destination field, drawn in our tokens.
 
@@ -171,6 +173,301 @@ Never a skeleton tile: the header is either the service row or the ride-only hea
 
 `docs/qa-reports/<date>-ui-r20/design-*.png`: iPhone 17 peek / half / full in light and dark; iPhone SE peek and half (light); peek at 1.3× text (dark); peek in Roman Urdu (light, SE); parcel tier off (local admin toggle) peek light, and the on → off switch at peek; a ride in progress (greeting + Return, no tiles); the before shots are `docs/design/audit/passenger-home-uir20-before-{light,dark}.png`.
 
+## Services v2 (UI-R20b, 2026-10-20): the first view
+
+**Supersedes**, where they conflict: Layout blocks 1–5 (peek), § Services S1, S2, S3, S5, S6 and S10, and the States/Accessibility/SE/Dark lines marked [UI-R20]. S4 (a11y strings and hints), S7 (last-known parcel value), S8 (handlers, one push per tap) and S9 (performance) stay, with the changes noted below. Owner request (2026-10-20): the first screen's impression must be excellent, so V1–V15 cover the whole first view, not only the service cards.
+
+**Owner feedback.** "The Ride and Parcel buttons look very ugly." Asked to choose Uber-style tiles, a Careem-style icon row or no tiles: "make something modern, the best." Then: "If the first screen's impression is excellent, that will be very good for us."
+
+**Before** (shipped UI-R20; iPhone 17, 402 × 874 pt): `shots/ui-r20b/before-owner-peek-light-iphone17.png` (owner's screenshot), `shots/ui-r20b/before-peek-light-iphone17.png` (sim, 2026-10-20), `shots/ui-r20/peek-light-iphone17.png`, `peek-dark-iphone17.png`, `peek-dark-large-text-iphone17.png`, `peek-roman-urdu-light-iphone17.png`, `parcel-off-peek-light-iphone17.png`, `half-light-iphone17.png`.
+**Target** (geometry mock drawn from the values below; system font weights are not rendered by the mock tool, so text weight follows the spec, not the mock): `shots/ui-r20b/target-peek-light-iphone17.png`, `target-peek-dark-iphone17.png`, `target-peek-light-se.png` (SVG sources next to them).
+
+### V0. What is wrong today (measured on `before-peek-light-iphone17.png`, pt)
+
+| # | Defect | Where (pt) |
+|---|---|---|
+| 1 | The tiles are the first thing in the sheet; "Where to?", the main action, starts 133 below the sheet top | tiles y 560–656, "Where to?" y 668–720 |
+| 2 | Ride tile: 2 pt `primary` border on `primarySoft` reads as a selected toggle, though nothing can be selected | Ride tile x 16–195 |
+| 3 | Two heavy 96-high boxes, both on tinted fills, plus a grey "Where to?" and grey chips: four grey/tinted blocks in a row with the same weight | sheet y 535–791 |
+| 4 | Navy 44 disc next to an orange 44 disc: two loud fills side by side; flat MDI glyphs look generic | discs at x 37 and x 222, y 586 |
+| 5 | The subtitles repeat what the a11y label and the field already say ("Within the city", "Send an item") | y 628 |
+| 6 | "Where to?" is 52 with a grey `magnify`: it does not look like the hero | y 668 |
+| 7 | Chips: `surfaceAlt` fill, same as the field above: no hierarchy between hero and shortcuts; the last chip is cut by the screen edge with no fade | y 731 |
+| 8 | The user's dot is navy `primary` (not `userLocation`) and looks like a brand mark among the navy vehicles | map centre |
+| 9 | The status bar sits on busy map labels with no scrim | y 0–60 |
+| 10 | Count chip (hairline, no shadow) and locate button (`elevation.2`) are styled differently; the chip's "bottom 12" rule and "centred on locate" rule contradict each other | y 491–523 |
+| 11 | No greeting and no personality on the first view (the greeting shows only with a live ride) | — |
+| 12 | Cold open: the sheet and map pop in at once, no entrance | — |
+
+### V1. Peek, top to bottom (iPhone 17, 402 wide; SE 375)
+
+All x values from the sheet's start edge; gutter 16. Heights at 1.0× text.
+
+| # | Block | Height | Gap after | Notes |
+|---|---|---|---|---|
+| 1 | Handle area (kit, `sheet.contentTop`) | 24 | — | handle 36 × 5 at y 8, `border` |
+| 2 | **Greeting block** (V3): greeting `title` 22 + tagline `bodySmall` 20 (no gap; the line heights space them) | 42 | 12 | pinned header |
+| 3 | **"Where to?" hero** (V4) | 56 | 12 | pinned header |
+| 4 | **Chip row** (V5) | 32 | 12 | body |
+| 5 | **Service row** (V2), only while the parcel tier is on (S7 value) | 72 | 12 | body |
+
+- **Peek, iPhone 17:** 24 + 42 + 12 + 56 + 12 + 32 + 12 + 72 + 12 = **274** (UI-R20: 244). Without the service row (parcel off or unknown): 274 − 84 = **190**.
+- **Compact height** (window height < 700, i.e. iPhone SE 667): the tagline is hidden (greeting only, 22): **254**, without the service row **170**. Map on SE at 254: 667 − 254 − 64 (tab bar) = 349 pt including the status bar (UI-R20: 359).
+- **1.3× text (iPhone 17):** greeting 29 + tagline 26, chips grow to their measured height (≈38), "Where to?" and the cards keep their min heights (56, 72): ≈ **293**. Never computed by hand: see the formula below.
+- **Live ride or parcel** (T-577): greeting (no tagline) 22 + 12 + "Return to your ride" 56 + 8 + status 20 + 12 + chips 32 + 12 = **198** (was 202). No service row while live (S1 rule kept).
+- **Formula:** `peek = sheet.contentTop + measured header + measured peek group`. Header = block 2 + 12 + block 3 + 12 (its bottom padding); peek group = a wrapper around block 4 + 12 + block 5 + 12 (or block 4 + 12 without services; live: Return 56 + 8 + status 20 + 12 + chips 32 + 12). Both are `onLayout` heights; the peek is re-applied only on a ≥ 1 pt change (S5 rule kept). `homePeekHeight` takes `{ headerHeight, peekGroupHeight }`. First-frame estimates (`HOME_HEADER_ESTIMATE` and a new `HOME_PEEK_GROUP_ESTIMATE`): header **122** (compact 102, live 34); group **128** with services, **44** without, **140** live. Check: 24 + 122 + 128 = 274; 24 + 122 + 44 = 190; 24 + 102 + 128 = 254; 24 + 34 + 140 = 198.
+- `half` = max(50 % of the sheet container, peek + 180), capped at `full` (S5 rule kept): iPhone 17 = max(390, 454) = **454**; SE = max(302, 434) = **434**.
+- **Pinned at `full`:** handle + greeting block + "Where to?" (the header). Chips, cards and everything below scroll under it.
+- Order is fixed: greeting → "Where to?" → chips → services. "Where to?" is the first control in the sheet; the chips sit under it because they are destinations (they book the same thing faster); the services come last because they are entry points, not choices.
+
+### V2. Service cards (new kit `ServiceCard`, replaces `ServiceTile`)
+
+**Row:** x 16..386 (SE 16..359), two cards `flex: 1`, gap 12. Card width = (window − 32 − 12) / 2 = **179** (SE **165.5**).
+
+**Card anatomy:**
+- `minHeight` **72**, radius `lg` 16, `overflow: 'hidden'`, **no border, no shadow, no selected state** (Ride is never highlighted; both cards are equal entry points).
+- Fill by kind (tokens): Ride `primarySoft` (#EEF2FC / #1C2850); Parcel `accentSoft` (#FFF1E8 / #3A1A0C).
+- **Label:** one word, `title` (17/22, 600, −0.2) `textPrimary`, top 12, start 12, `numberOfLines={1}`, `ellipsizeMode="tail"`, max width = card width − 24. "Ride" / "Parcel" in both en and ur-Latn (loanwords, S4). No subtitle.
+- **Art box:** absolutely positioned, end **0**, bottom **2**, **104 × 56** pt, drawing `viewBox="0 0 88 48"` (scale 1.18). The art is the largest thing in the card: picture first, word second.
+- **Exclusion rule (tested):** no art shape has any point with viewBox x < 16 and y < 24, so the label never touches the art, even at 1.3× on SE ("Parcel" at 1.3× ends at x 80; SE art box starts at x 61.5 → viewBox x ≤ 15.7, label bottom 41 → viewBox y ≤ 23).
+- Height never grows with text: label bottom is 34 at 1.0×, 41 at 1.3× (72 − 2 − 56 = 14 is the art box top; the overlap region is empty by the exclusion rule). Nastaliq (future `ur`): `minHeight`, so the card may grow; the art stays bottom-anchored.
+- **RTL:** label at the start (right); art box at the end (left) and mirrored (`transform: [{ scaleX: -1 }]` on the art's `Svg`), so the vehicle's front always faces the end edge.
+- Contrasts (WCAG 2.1, against the card fill): label `textPrimary` 16.39 / 12.99 on `primarySoft`, 16.62 / 14.32 on `accentSoft`; Ride body (car) 13.29 / 12.99; Parcel box edge facing the card (`illoBoxSide` light, `illoBoxFront` dark) 5.30 / 4.72; front face on light 3.02 (≥ 3, non-text). Pressed fills: label 14.91 on `accentSoftPressed` light, 12.29 dark; 14.43 on `primarySoftPressed` light, 9.66 dark.
+
+**New illustration tokens** (`SemanticColors`, palette references, no hex in components; add to `contrastPairs.ts` and the dev gallery):
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `illoHub` | neutral-300 `#C3CAD9` | dark-300 `#B7BFD0` | wheel hubs |
+| `illoShadow` | black, opacity `illoShadowOpacity` **0.10** | black, opacity **0.30** | ground shadow ellipse |
+| `illoBoxFront` | saffron-500 `#F75606` | saffron-500 `#F75606` | parcel box front face |
+| `illoBoxTop` | saffron-300 `#FF9B66` | saffron-300 `#FF9B66` | box top face |
+| `illoBoxSide` | saffron-700 `#B33D00` | saffron-700 `#B33D00` | box side face |
+| `illoBoxTape` | saffron-100 `#FFE2D1` | saffron-100 `#FFE2D1` | tape and label |
+| `illoMotion` | navy-400 `#6A86DE` | navy-400 `#6A86DE` | speed lines (3.13 / 4.56 on `accentSoft`, decorative) |
+
+The car reuses the T-586 vehicle tokens (`vehicleBody`, `vehicleRoof`, `vehicleGlass`, `vehicleTyre`, `vehicleHeadlight` = `accent`, `vehicleTaillight`), so the card car and the map cars are one family (navy body in light, near-white body in dark). The wheel-arch cut-outs take the **card fill** (`cutout` prop), never a hard-coded colour.
+
+**Ride art: sedan, side view, front at the end edge** (`viewBox 0 0 88 48`, paint order top to bottom; every value exact):
+
+| # | Shape | Geometry | Fill |
+|---|---|---|---|
+| 1 | Ground shadow | `Ellipse cx=44 cy=44.5 rx=38 ry=2.5` | `illoShadow` at `illoShadowOpacity` |
+| 2 | Body (one path: lower body + cabin) | `M6 34 Q6 27 12 26 L24 24.5 L33 15 Q35.5 12.5 39 12.5 L58 12.5 Q61.5 12.5 64 15 L71.5 23.5 L80 25 Q84 25.8 84 30 L84 35 Q84 38 81 38 L9 38 Q6 38 6 35 Z` | `vehicleBody` |
+| 3 | Rear side window | `M28 24 L34.5 17 Q36.2 15.5 38.5 15.5 L46.5 15.5 L46.5 24 Z` | `vehicleGlass` |
+| 4 | Front side window | `M49.5 15.5 L57.5 15.5 Q59.8 15.5 61.4 17.2 L67.5 24 L49.5 24 Z` | `vehicleGlass` |
+| 5 | Sill stripe | `Rect x=10 y=32.5 w=70 h=2.5 rx=1.25` | `vehicleRoof` |
+| 6 | Door handles | `Rect x=40 y=26.5 w=4 h=1.2 rx=0.6`, `Rect x=53 y=26.5 w=4 h=1.2 rx=0.6` | `vehicleGlass` |
+| 7 | Headlight | `Rect x=79.5 y=27.5 w=4 h=3 rx=1.5` | `vehicleHeadlight` |
+| 8 | Tail light | `Rect x=6 y=28 w=2.5 h=4 rx=1` | `vehicleTaillight` |
+| 9 | Wheel arches | `Circle cx=22 cy=37.5 r=8.5`, `Circle cx=66 cy=37.5 r=8.5` | card fill (`cutout`) |
+| 10 | Tyres | `Circle cx=22 cy=37.5 r=6.5`, `Circle cx=66 cy=37.5 r=6.5` | `vehicleTyre` |
+| 11 | Hubs | `Circle cx=22 cy=37.5 r=2.75`, `Circle cx=66 cy=37.5 r=2.75` | `illoHub` |
+
+Footprint x 6–84, y 12.5–47. Exclusion check: at x < 16 the body starts at y ≥ 26.
+
+**Parcel art: box with speed lines, oblique view (depth +12, −8), front at the end edge:**
+
+| # | Shape | Geometry | Fill / stroke |
+|---|---|---|---|
+| 1 | Ground shadow | `Ellipse cx=56 cy=44.5 rx=26 ry=2.5` | `illoShadow` at `illoShadowOpacity` |
+| 2 | Speed lines | `Line` (18,24)→(28,24); (12,31)→(28,31); (20,38)→(28,38) | stroke `illoMotion`, width 2.5, `strokeLinecap="round"` |
+| 3 | Side face | `M66 18 L78 10 L78 36 L66 44 Z` | `illoBoxSide` |
+| 4 | Top face | `M34 18 L46 10 L78 10 L66 18 Z` | `illoBoxTop` |
+| 5 | Front face | `Rect x=34 y=18 w=32 h=26` | `illoBoxFront` |
+| 6 | Tape on top | `M47 18 L59 10 L65 10 L53 18 Z` | `illoBoxTape` |
+| 7 | Tape on front | `Rect x=47 y=18 w=6 h=11` | `illoBoxTape` |
+| 8 | Shipping label | `Rect x=37 y=35 w=8 h=5 rx=1` | `illoBoxTape` |
+
+Footprint x 10.75–78, y 10–47. Exclusion check: the top speed line's round cap starts at x 16.75 (y 22.75–25.25); every other shape is at x ≥ 10.75 only for y ≥ 29.75.
+
+Why this art: one family with the T-586 map vehicles (same tokens, same lights), drawn by us in SVG (no stock, no raster), readable at a glance without words (a car = I travel; a box = I send something). The box is the Parcel's one saffron moment in the row (§1.2 rule 3), replacing the 44 orange disc; the Ride card has no saffron except the 4 × 3 headlight (M8 vehicle lights).
+
+**States of a card:**
+
+| State | Look |
+|---|---|
+| Rest | fill as above |
+| Pressed | fill → `primarySoftPressed` (#DCE4F8 / #1A3496) or `accentSoftPressed` (#FFE2D1 / #4A2412); card scale 1 → **0.98** and the art translates **+3 pt toward the end edge** (−3 in RTL: the vehicle "nudges forward"), both in `motion.instant` 100; release springs back (§6 #1, damping 18, stiffness 300). Reduce Motion: fill only |
+| Disabled | none (a service is either shown or hidden) |
+| Focused (keyboard / switch control) | 2 pt `focusRing` outline, radius 16, outside the card |
+
+### V3. Greeting and tagline (the personality line)
+
+- **Greeting:** `greetingFor(now, user.name)` (exists): "Good morning / afternoon / evening, {first name}", "Hello, {first name}" from 22:00 to 05:00; Roman Urdu "Subah bakhair / Salam / Shaam bakhair / Assalam-o-Alaikum, {first name}" (existing `home.greeting*` keys). `title` (17/22, 600) `textPrimary`, 1 line, tail ellipsis (only the first word of `name`, `firstNameOf`), `accessibilityRole="header"`. No name → the salutation alone. No emoji, no wave.
+- **Tagline:** `bodySmall` (14/20, 400) `textSecondary` (7.44 / 9.39 on `surface`), 1 line. New key **`home.tagline`**: en "Fixed fares, within the city"; ur-Latn "Tay shuda kiraya, shehar ke andar". It is static copy (an i18n string, not data) and carries the in-city promise that the retired ride-only heading carried (UI-R20 S1).
+- **Tagline slot by state** (first match wins):
+
+| State | Slot shows |
+|---|---|
+| Live ride/parcel | nothing (greeting only; the status line under "Return" speaks) |
+| Offline (NetInfo `isConnected === false`) | `offline` glyph (`wifi-off`) 16 `warning` → 4 → `bodySmall` `warning` (5.86 / 9.42) **`home.offlineTagline`**: en "You're offline. Showing saved info."; ur-Latn "Aap offline hain. Mehfooz maloomat dikha rahe hain." Replaces the sheet-top offline Banner on Home (no peek jump) |
+| Compact height (< 700) | hidden (greeting only), except the offline line, which replaces the greeting's tagline slot and is always shown (peek +20 while offline on SE) |
+| Otherwise | the tagline |
+
+- **Clock:** the greeting is re-evaluated on focus, on return to the foreground, and by one `setTimeout` to the next boundary (05:00, 12:00, 17:00, 22:00), cleared on blur/unmount. No per-minute tick (replaces the UI-R20 "ticks only while live" timer).
+- Greeting widths (SF Pro 17/600, estimated at ~8.6 pt per character): "Good afternoon, Muhammad" ≈ 205, "Assalam-o-Alaikum, Muhammad" ≈ 235, both one line on SE (343 available); a longer name ellipsizes. The reviewer checks these on device.
+
+### V4. "Where to?" hero
+
+- `minHeight` **56** (was 52), full width − 32, radius **`pill`**, fill `surfaceAlt`, pressed `surfaceAltPressed` + scale 0.98 (`usePressScale`, §6 #1). **No shadow or elevation in either mode** (rule: nothing inside a sheet is elevated; the sheet owns `elevation.3`; a shadow under a grey fill on white reads muddy and costs overdraw on Android). The field-boundary rule §5.6 does not apply: it is a button with a visible label, as in UI-R9.
+- Leading **search disc 32** (circle) `primary` with the 20 `search` glyph `onPrimary` (14.89 / 5.61), start inset **12** (disc x 28..60 on screen). The disc is decorative against the bar (12.82 light; 2.75 dark: the label identifies the control). Navy, not orange (§1.7 "evaluated and not adopted": orange search icon).
+- 12 gap → label "Where to?" in **`h3`** (20/25, 600, −0.1) `textPrimary` (15.81 / 14.01 on `surfaceAlt`), 1 line. At 1.3× the line is 33 and fits in 56.
+- Trailing: nothing today (the "Now"/schedule chip stays hidden until scheduled rides exist).
+- Label, hint, testID unchanged (`home-where-to`, "Where to? Book a ride within the city").
+- Live ride: replaced by "Return to your ride" / "Track your parcel" (T-577), unchanged.
+
+### V5. Chip row polish
+
+- Kit `Chip` gets **`variant: 'filled' | 'outline'`** (default `filled`, existing look everywhere else). Home's chip row uses `outline`: fill `surface`, 1 pt `border` (#DADFEA / #2B3450; decorative, the label identifies it), pressed `surfacePressed` (#EBEEF5 / #252D44). This puts a clear step between the filled hero and its shortcuts.
+- Height 32 (min), padding 12, leading glyph 16, kit gap; label `label` (13/18, 600). Colours: place chips (Home, Work, other, recents, Saved places): glyph `textSecondary`, label **`textPrimary`** (was `textSecondary`); Add chip ("Add home" / "+ Add", `tone="primary"`): glyph and label `primaryText`; "Turn on location": glyph `locationOff` in `warning`, label `textPrimary`.
+- Recent-destination chips: max width 160, label tail-ellipsis.
+- **Edge fade:** a 16 wide gradient at the trailing edge of the row (exactly the content inset, so it never covers the last chip at the scroll end), `surface` opacity 0 → 1, `react-native-svg` `LinearGradient`, static, `pointerEvents="none"`, rendered only while the content is wider than the row (`onContentSizeChange`); at the start edge in RTL. No leading fade.
+- Order, content rules and skeletons unchanged (block 4 above, UI-R9).
+
+### V6. Service row: parcel tier on/off, cold start (replaces S1, S6)
+
+- Parcel on (S7 value) and nothing live → the service row (V2). Parcel off, unknown (first launch ever) or catalogue failed with nothing known → **no service row** and no heading: the **ride-only heading is retired** (one Ride card would only repeat "Where to?"; the tagline now states "within the city"). Live ride → no service row.
+- **Off → on at `peek`:** the sheet eases 190 → 274 (`motion.base` 250, timing, no spring), then both cards fade in and rise 8 → 0 (`motion.fast` 150). Camera padding applied once at the end.
+- **On → off at `peek`:** cards fade out (150, `pointerEvents="none"` from the first frame), then the sheet eases 274 → 190 (250).
+- **At `half`/`full`:** the row's wrapper height eases 84 ↔ 0 (250) with the fade; the body below moves with it (one animated height, not `LayoutAnimation`). The sheet keeps its height; the new peek applies to the next snap.
+- During a drag: waits for the gesture end (S6 rule kept). Reduce Motion: swap at once.
+- Cold start: S7 unchanged (in-memory catalogue → `rh.home.parcelTile` → nothing). The service row is never a skeleton.
+
+### V7. Cold-open entrance (first impression)
+
+**When:** only the first time Home is focused in this JS session (after the splash, after sign-in, after a relaunch). Not after a tab switch, a return from Booking/Parcel, a theme or language change, or a resume from the background. A module-level flag `homeEntered` is set at the end.
+
+**Timeline** (ms from Home's first layout; everything on the UI thread with Reanimated shared values; opacity and transform only):
+
+| Element | From → to | Start | Duration / curve |
+|---|---|---|---|
+| Map veil: a full-cover `View` in `theme.mapBackground` above the map, `pointerEvents="none"` | opacity 1 → 0 | `onMapReady` (if it fires before 0, at 0) | 250, `motion.base` |
+| Sheet (whole sheet container) | translateY +40 → 0 | 0 | spring damping 28, stiffness 260, mass 1, `overshootClamping: true` (≈ 300, no bounce) |
+| Greeting block | opacity 0 → 1, translateY 8 → 0 | 60 | 250, `motion.base` |
+| "Where to?" | same | 100 | 250 |
+| Chip row (one block, not per chip) | same | 140 | 250 |
+| Ride card | same | 180 | 250 |
+| Parcel card | same | 220 | 250 → ends at **470** |
+| Avatar, locate button, count chip | opacity 0 → 1 | 200 | 150, `motion.fast` |
+
+- Total under 500 ms (470). The map veil is the only thing allowed to finish later: it waits for `onMapReady` (network), so a slow map shows the calm land colour, never Google's grey or a white flash.
+- Every control is pressable from frame 0 (no `pointerEvents` gate); a tap mid-entrance simply proceeds.
+- **Reduce Motion:** no translation and no spring; sheet content and controls are visible at once; the map veil fades in 150.
+- **Low-end Android:** ≤ 9 animated nodes, all started from one effect after the first layout with `withDelay` (no JS timers, no `entering` layout animations, which measure); nothing animates on later focuses.
+- Camera padding uses the final peek from the start (the map never re-fits during the entrance).
+
+### V8. Map: brand-tinted style (`src/theme/mapStyles.ts`, all maps; DESIGN_SYSTEM §9 updated)
+
+`react-native-maps` with `PROVIDER_GOOGLE` and `customMapStyle={theme.mapStyle}` already runs on Home (no cloud map ID, so JSON styling works on both platforms). The arrays stay module constants (stable identity: a new array per render would restyle the native map). `mapBackgrounds` = the land colour of each mode.
+
+**Light:**
+
+| featureType / elementType | Stylers |
+|---|---|
+| (all) `geometry` | color `#F3F5F9` (cool, navy-tinted land; was `#F2F2F2`) |
+| `poi.park` `geometry` | color `#E3EEE6` |
+| `water` `geometry` | color `#CCDBF2` |
+| `road` `geometry.fill` | color `#FFFFFF` |
+| `road` `geometry.stroke` | color `#E1E5EE` |
+| `road.arterial` `geometry` | weight 1.2 |
+| `road.highway` `geometry.fill` | color `#E4EAF7` |
+| `road.highway` `geometry.stroke` | color `#CDD7EE` |
+| `road` `labels.text.fill` | color `#626B82` |
+| `road` `labels.text.stroke` | color `#FFFFFF` |
+| `administrative.locality` `labels.text.fill` | color `#4C556C` |
+| `administrative.neighborhood` `labels.text.fill` | color `#858EA5` |
+| `poi` `labels.icon` | visibility off |
+| `poi` `labels.text.fill` | color `#858EA5` |
+| `poi.business` | visibility off |
+| `poi.medical` `labels.icon` | visibility on |
+| `transit.line` `geometry` | color `#DADFEA` |
+| `transit.station` `labels.icon` | visibility on |
+
+**Dark:**
+
+| featureType / elementType | Stylers |
+|---|---|
+| (all) `geometry` | color `#1B2233` (was `#1D2230`) |
+| (all) `labels.text.fill` | color `#8A94AD` |
+| (all) `labels.text.stroke` | color `#1B2233` |
+| `administrative.locality` `labels.text.fill` | color `#B7BFD0` |
+| `poi.park` `geometry` | color `#1A2A2A` |
+| `water` `geometry` | color `#0E1830` |
+| `road` `geometry.fill` | color `#283149` |
+| `road` `geometry.stroke` | color `#1B2233` |
+| `road.arterial` `geometry.fill` | color `#2E3852` |
+| `road.highway` `geometry.fill` | color `#34426B` (navy tint) |
+| `road.highway` `geometry.stroke` | color `#283149` |
+| `road` `labels.text.fill` | color `#8A94AD` |
+| `poi` | visibility off |
+| `transit.station` | visibility on |
+
+Contrasts against the new land (WCAG 2.1, non-text unless noted): light `pickupPin` 4.60, `routeLine` 13.64, `dropoffPin` 3.06, `userLocation` 5.93, road labels (text) 4.88, locality labels 6.81; dark `pickupPin` 8.01, `dropoffPin` 4.75, `routeLine` 6.72, `driverMarker`/vehicle body 14.42, `userLocation` 6.67, labels 5.23. Pickup pin on a light park 4.21. The hex values live only in `mapStyles.ts` (the documented place for map style JSON, like `palette.ts`).
+
+### V9. Map chrome
+
+- **Status-bar scrim:** height `insets.top + 24`, vertical `LinearGradient` `surface` at opacity 0.85 → 0, static SVG, `pointerEvents="none"`, above the map and below every control; hidden at `full`. Keeps the clock and battery legible over map labels.
+- **Avatar** (top-start, unchanged position `insets.top + 8`, x 16): 48 floating circle with the 40 avatar.
+- **User location:** halo `Circle` 40 `userLocation` at opacity 0.16 (light) / 0.20 (dark) → ring 20 `routeLineCasing` → dot 14 `userLocation` (#1D58C4 / #7FA8F5). Static (no pulse). Marker tracked for one settle window, then frozen (T-586 rule). Replaces the navy `primary` dot.
+- **Locate button and count chip, one family:**
+  - Locate: floating 48, end 16, its bottom 16 above the sheet top (unchanged).
+  - Count chip: start 16, `minHeight` 32, **vertically centred on the locate button**: bottom = sheet top − 16 − (48 − chip height) / 2 (= 24 at 1.0×, measured at 1.3×). Max width rule (map-vehicles §4) unchanged.
+  - Both (and the avatar circle): light fill `surface` + `elevation.2`; dark fill `surfaceRaised` (#252D44) + 1 pt `border`, no shadow (§3.5). Supersedes map-vehicles §4 "no shadow, hairline border" for the Home chip; Choose ride's chip follows the same rule.
+  - Both fade out at `full` (unchanged) and in with the entrance (V7).
+
+### V10. First view by state
+
+| State | First view |
+|---|---|
+| Normal (signed in, location on, online, parcel on) | Target shots. Peek 274 (SE 254) |
+| Parcel tier off / unknown | No service row; peek 190 (SE 170); tagline still says "within the city" |
+| New account, nothing saved, no rides | Greeting with the first name (no name → salutation alone); chips "Add home" + "Saved places"; service row; at `half` the one-line empty hint (UI-R9). Count chip as the server says ("No drivers online near you right now" when 0) |
+| Offline at launch | Map veil fades to cached tiles or stays the land colour (tiles may be missing; never an error over the map); tagline slot shows the offline line (V3); count chip hidden (map-vehicles §4); chips and service row from cache / last known; "Where to?" opens search, which shows its own offline state. No Banner, no peek jump |
+| Location refused or off | "Turn on location" chip first (T-580); camera on Lahore centre (§9); no user dot; locate button asks for permission (existing) |
+| Map failed (fallback component) | Land colour + "Map is loading" (`home.mapLoading`) centred in the map area; sheet unaffected |
+| Live ride or parcel | Greeting, "Return to your ride"/"Track your parcel" + status, chips; no service row; peek 198 |
+| 1.3× text | ≈ 293 (iPhone 17); every line one line except chips grow; card labels never touch the art (V2 exclusion) |
+| Roman Urdu | Greeting and tagline in ur-Latn; card words "Ride"/"Parcel"; tagline 1 line on SE ("Tay shuda kiraya, shehar ke andar" ≈ 225 at 14 pt, estimated; 343 available) |
+| RTL (future `ur`) | Everything mirrors by start/end; card art mirrored (V2); chip fade at the start edge |
+
+### V11. Copy changes (i18n `home.*`, en + ur-Latn ship together)
+
+| Key | Change |
+|---|---|
+| `home.tagline` | **new**: "Fixed fares, within the city" / "Tay shuda kiraya, shehar ke andar" |
+| `home.offlineTagline` | **new**: "You're offline. Showing saved info." / "Aap offline hain. Mehfooz maloomat dikha rahe hain." |
+| `home.serviceRideSub`, `home.serviceParcelSub` | **delete** (no subtitles) after a grep shows no other reader |
+| `home.rideOnlyHeading` | **delete** (heading retired) after grep |
+| `home.serviceRideA11y`, `…Hint`, `home.serviceParcelA11y`, `…Hint`, `home.serviceRideTitle`, `home.serviceParcelTitle`, `home.whereToA11y` | unchanged (S4) |
+
+### V12. Accessibility
+
+- Focus order: avatar → locate → count chip → handle → greeting (header) → tagline → "Where to?" → chips → Ride card → Parcel card → body.
+- Cards: `accessibilityRole="button"`, label/hint per S4 (the art is `accessibilityElementsHidden` / `importantForAccessibility="no-hide-descendants"`). Targets: cards 72 high, "Where to?" 56, chips 32 visual with `hitSlop` to 44.
+- The entrance never delays a screen reader: elements are in the tree from frame 0 (opacity only).
+
+### V13. Performance (adds to S9)
+
+- No new request: greeting from the stored profile, tagline static, services from the cached catalogue (S7), counts from the existing nearby poll.
+- `ServiceCard` and `ServiceArt` are `memo`; the art is a static `Svg` (Ride 15 shapes, Parcel 10), no gradients, no masks, no filters inside it; its props are a kind, a fill colour and a boolean (`flip`), so drags, camera moves and nearby polls re-render nothing. The two `LinearGradient`s (scrim, chip fade) are static and never re-render.
+- Press feedback and the entrance run on the UI thread; nothing animates after the first 500 ms except the map veil (once) and user-driven presses.
+- `mapStyles` constants keep their identity across renders.
+
+### V14. Builder notes (replaces S10)
+
+- **Kit:** new `ServiceCard` in `src/components/ui` (props `kind: 'ride' | 'parcel'`, `title`, `onPress`, `accessibilityLabel`, `accessibilityHint`, `testID`, gallery-only `previewPressed`); new `ServiceArt` in `src/components/ui/ride/` with its geometry as data in `serviceArt.ts` (same pattern as `vehicleGlyphs.ts`), unit-tested against this spec (shape values, exclusion rule). Delete `ServiceTile` and its gallery section/test after grep (it has no other users today: `HomeSheetTop`, the gallery and `__tests__/components/ui/serviceTile.test.tsx`). `componentTokens.serviceTile` → `componentTokens.serviceCard: { minHeight: 72, artWidth: 104, artHeight: 56, artBottom: 2, rowGap: space[3], labelInset: space[3], pressNudge: 3 }`.
+- Kit `Chip` gains `variant="outline"` (V5); dev gallery shows both variants in light/dark.
+- Home: header = greeting block + "Where to?" (`HomeSheetTop` simplifies: the header no longer swaps kinds except greeting-with/without tagline and the live "Return" block); the service row moves into the body after the chip row inside a measured `peekGroup` wrapper (V1 formula). `useHomePeek` follows the new formula and estimates.
+- Theme: illustration tokens (V2), `mapStyles.ts` and `mapBackgrounds` (V8). Update `contrastPairs.ts` and any snapshot keyed to the old map land.
+- Entrance (V7) lives in a small hook `useHomeEntrance()` returning the animated styles; tests: runs once per session, skipped on refocus, Reduce Motion path.
+- Tokens only: no hex in components or screens, no raw font sizes, spacing from `space`/`layout` (the 2 pt art bottom offset and the 3 pt nudge are component internals recorded in `componentTokens`).
+
+### V15. Design review evidence (UI-R20b)
+
+`docs/qa-reports/<date>-ui-r20b/design-*.png`, each shrunk with `sips -Z 1000`: iPhone 17 peek light and dark; half and full light; Ride and Parcel pressed (light); peek at 1.3× (dark); Roman Urdu peek (light); parcel tier off peek (light) and the on → off switch; offline first view (backend stopped briefly on the local machine, light); new-account first view (fresh local test account, light); location refused (light); live ride (greeting + Return, no cards); iPhone SE peek light and dark and SE 1.3×; a 3-frame capture of the cold-open entrance (≈ 100 / 250 / 500 ms) on iPhone 17. Before shots: `docs/design/screens/shots/ui-r20b/before-*.png`; target: `target-*.png`.
+
+
 ## States
 | State | Spec |
 |---|---|
@@ -183,7 +480,8 @@ Never a skeleton tile: the header is either the service row or the ride-only hea
 | Pull to refresh | In full state only (sheet scroll at top, pull down beyond 64): refetch rides, stats, banners, saved places, profile (`GET /auth/profile`, not the Firebase refresh). |
 | Active ride exists | Home is replaced by the trip screen for that ride (T-301); on return to Home after completion, sheet resets to peek. |
 | Long text | Greeting (live ride only) truncates name to 1 line; shortcut titles 1 line. **[UI-R20]** tile titles 1 line; tile subtitles up to 2 lines (§ Services S2). |
-| **[UI-R20]** Parcel tier on / off / changes | § Services S1, S5, S6. |
+| **[UI-R20]** Parcel tier on / off / changes | § Services S1, S5, S6. **[UI-R20b]** § Services v2 V6 (row shown or hidden; heading retired). |
+| **[UI-R20b]** First view (cold open, offline, new account, location off, 1.3×, Roman Urdu) | § Services v2 V7, V10. |
 | **[UI-R20]** Ride or parcel in progress | Service row and ride-only heading hidden; greeting + "Return to your ride"/"Track your parcel" as T-577 (peek 202). |
 
 ## Interactions
@@ -195,10 +493,12 @@ Never a skeleton tile: the header is either the service row or the ride-only hea
 
 ## Accessibility
 - Sheet handle: `accessibilityRole="button"`, label "Expand" / "Collapse" by state. "Where to?" bar: role button, label **[UI-R20]** "Where to? Book a ride within the city". Map: `accessibilityElementsHidden` except the recenter button.
-- **[UI-R20]** Focus order: handle → Ride tile → Parcel tile → "Where to?" → chips → body. Tile labels and hints: § Services S4.
+- ~~**[UI-R20]** Focus order: handle → Ride tile → Parcel tile → "Where to?" → chips → body.~~ **[UI-R20b]** Focus order and card roles: § Services v2 V12. Labels and hints: § Services S4.
 
 ## Small device (iPhone SE)
+- **[UI-R20b]** Compact height (< 700): tagline hidden; peek **254** with the cards, **170** without; `half` 434 (§ Services v2 V1).
 - **[UI-R20]** Peek 244 with the service row (same as iPhone 17 at 1.0×; tiles 165.5 wide), 170 without it. `half` = **max(50 % of the sheet container, peek + 180)**, never above `full`: SE 1.0× = **424**; iPhone 17 = max(390, 424) = **424** (corrected in design review, was 437). This keeps the compact rides ErrorState (≤156 + 16 gap) fully visible at `half` (DESIGN_SYSTEM §8.3 [UI-R20]).
 
 ## Dark
+- **[UI-R20b]** Dark map style per § Services v2 V8 (land `#1B2233`), card fills `primarySoft` #1C2850 / `accentSoft` #3A1A0C, floating controls `surfaceRaised` + 1 pt `border` (V9).
 - Dark map style, sheet `surface` #141A2A, bar `surfaceAlt`. **[UI-R20]** tiles: § Services S3 (token values for both modes).
