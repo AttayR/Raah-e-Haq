@@ -56,3 +56,6 @@ Map full screen (driver's own position as the driver marker, heading-up off), ta
 - DESIGN_SYSTEM §8.3 v1.1 wins over the v1.0 overlay above: the top overlay is the avatar (48, top-start) and "locate me" only; the **Today earnings pill lives in the sheet at `half`**, not centred in the overlay. Peek 137 (status row + 56pt button), half 50%, no full.
 - At `half`, the Today Card must not repeat the pill: tiles are Rides (today) · Online time (when the API returns it, else hidden) · Rating, as specified in block 4 — no "Earned" tile next to a "Today · Rs …" pill (UI-R11).
 - Going online with no fix yet is allowed (UI-R4 parity); "Location permission missing" (denied/services off) must replace the control with the denied card, and online-with-no-fix shows "Finding your location…" under the status row (UI-R11).
+
+## Auto-accept [T-587, owner live session 2026-10-19]
+- Auto-accept row between the status row and the Go online/offline button (peek 137 → 201), the Auto-accept settings sheet (minimum fare, max pickup distance, ride types), the online "Auto" badge, the max-pickup circle and the auto-accepted ride takeover: `map-vehicles.md` §7. The driver's own vehicle marker uses the assigned state of `map-vehicles.md` §1.6.

@@ -20,7 +20,7 @@ Full-screen map (5.21, map style §9) behind a **BottomSheet** with snap points 
    - left: Avatar 40 inside a 48 floating circle (`surface`, `elevation.2`) → opens Account tab.
    - right: IconButton `floating` `crosshairs-gps` (recenter on user).
    - No greeting, weather or badge on the map.
-2. User location dot; nearby drivers (coarse, from BE-20 `nearby-drivers` when available) as 24×24 simplified car glyphs, `driverMarker` at 60 % opacity, no labels.
+2. User location dot; nearby drivers (coarse, from BE-20 `nearby-drivers` when available) as 24×24 simplified car glyphs, `driverMarker` at 60 % opacity, no labels. **[T-586] Superseded:** every tier's own top-down glyph at 40 pt, full opacity, smooth motion, plus the map count chip "{online} drivers online near you" bottom-start above the sheet: `map-vehicles.md` §1–§4.
 3. Camera: user location, zoom 15; padding bottom = sheet height.
 
 **Sheet content, peek state** (peek height = content through block 5 + 16):
