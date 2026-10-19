@@ -12,7 +12,7 @@ import React from 'react';
 import { RefreshControl } from 'react-native';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { ChatComposer } from '../../src/features/chat/components/ChatComposer';
+import { ChatComposer, SEND_SETTLE_MS } from '../../src/features/chat/components/ChatComposer';
 import { ChatList } from '../../src/features/chat/components/ChatList';
 import { chatApi } from '../../src/features/chat/api';
 import { logger } from '../../src/core/logging/logger';
@@ -66,7 +66,7 @@ describe('4. an immediate Send keeps the last typed characters', () => {
     fireEvent.changeText(input, 'QA test one');
     expect(onSend).not.toHaveBeenCalled();
     act(() => {
-      jest.advanceTimersByTime(16);
+      jest.advanceTimersByTime(SEND_SETTLE_MS);
     });
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(onSend).toHaveBeenCalledWith('QA test one');
@@ -81,7 +81,7 @@ describe('4. an immediate Send keeps the last typed characters', () => {
     fireEvent.press(screen.getByTestId('chat-send'));
     fireEvent.press(screen.getByTestId('chat-send'));
     act(() => {
-      jest.advanceTimersByTime(16);
+      jest.advanceTimersByTime(SEND_SETTLE_MS);
     });
     expect(onSend).toHaveBeenCalledTimes(1);
   });
@@ -94,7 +94,7 @@ describe('4. an immediate Send keeps the last typed characters', () => {
     fireEvent.press(screen.getByTestId('chat-send'));
     view.unmount();
     act(() => {
-      jest.advanceTimersByTime(16);
+      jest.advanceTimersByTime(SEND_SETTLE_MS);
     });
     expect(onSend).not.toHaveBeenCalled();
   });

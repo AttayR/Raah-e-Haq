@@ -23,7 +23,7 @@ import { confirmPassengerLiveRide } from '../../src/features/notifications/liveR
 import { routeForTarget } from '../../src/features/notifications/navigation';
 import { cancelActiveRide, createActiveRide, restoreActiveRide } from '../../src/features/active-ride/slice';
 import { ChatThreadEmptyNote } from '../../src/features/chat/components/ChatThreadStates';
-import { ChatComposer } from '../../src/features/chat/components/ChatComposer';
+import { ChatComposer, SEND_SETTLE_MS } from '../../src/features/chat/components/ChatComposer';
 import { MessageBubble } from '../../src/features/chat/components/MessageBubble';
 import { CHAT_LIST_POLL_INTERVAL_MS, useChatList } from '../../src/features/chat/hooks';
 import { chatApi } from '../../src/features/chat/api';
@@ -286,9 +286,9 @@ describe('8. Send reads the latest text', () => {
       (input.props.onChangeText as (text: string) => void)('Hello');
     });
     act(() => staleSend());
-    // T-582: Send goes out one frame after the tap.
+    // T-582/T-584: Send goes out once the field has settled.
     act(() => {
-      jest.advanceTimersByTime(16);
+      jest.advanceTimersByTime(SEND_SETTLE_MS);
     });
     expect(onSend).toHaveBeenCalledWith('Hello');
   });

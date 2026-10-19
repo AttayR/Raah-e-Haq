@@ -98,6 +98,7 @@ export function registerRideCopy(): void {
     cancelRequestTitle: 'Request cancel karein?',
     cancelRequestMessage: 'Hum driver dhoondna band kar denge.',
     keepLooking: 'Dhoondte rahein',
+    requestCancelled: 'Request cancel ho gayi',
     cashLabel: 'Cash',
     driverEnRouteTitle: 'Aap ka driver aa raha hai',
     driverArrivedTitle: 'Aap ka driver pohanch gaya',

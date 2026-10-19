@@ -1,12 +1,14 @@
 /**
- * T-104 (QA T-103): expected API failures (offline, 401/403, 4xx) are warnings, never a red
- * Debug LogBox; real failures (5xx, bugs) stay errors. The line is a keyed summary, never empty.
+ * T-104 (QA T-103): expected API failures (401/403, 4xx) are warnings, never a red Debug LogBox;
+ * T-584: no connection and a 409 are debug only (no yellow LogBox either); real failures (5xx,
+ * bugs) stay errors. The line is a keyed summary, never empty.
  */
 import { AxiosError, AxiosHeaders, AxiosResponse } from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { logApiFailure } from '../../../src/core/api/logApiFailure';
 import { apiClient } from '../../../src/services/api';
 import rideService from '../../../src/services/rideService';
+import { fetchFareEstimates } from '../../../src/features/ride-booking/api';
 
 const axiosErrorWith = (status: number, data: unknown) => {
   const config = { headers: new AxiosHeaders() };
@@ -55,11 +57,13 @@ describe('logApiFailure', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('logs offline as a warning with a non-empty summary', () => {
+  it('T-584: logs offline at debug (no LogBox) with a non-empty summary', () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const config = { headers: new AxiosHeaders() };
     logApiFailure('x failed', new AxiosError('Network Error', 'ERR_NETWORK', config));
     expect(error).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
       'x failed',
       expect.objectContaining({ kind: 'network', message: expect.stringMatching(/\S/) }),
     );
@@ -71,7 +75,8 @@ describe('logApiFailure', () => {
     expect(JSON.stringify(error.mock.calls[0])).not.toMatch(/SQLSTATE|9230/);
   });
 
-  it('RideService#getNotifications offline is a warning, not an error', async () => {
+  it('T-584: RideService#getNotifications offline is debug only, not a warning or an error', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const mock = new MockAdapter(apiClient);
     mock.onGet('/notifications').networkError();
     try {
@@ -80,10 +85,53 @@ describe('logApiFailure', () => {
       mock.restore();
     }
     expect(error).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
       'RideService#getNotifications failed',
       expect.objectContaining({ kind: 'network' }),
     );
+  });
+
+  it('T-584: a 409 on POST /rides (an open booking) is debug only', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const mock = new MockAdapter(apiClient);
+    mock.onPost('/rides').reply(409, {
+      success: false,
+      message: 'You already have an open booking.',
+      error: { code: 'RIDE_ALREADY_ACTIVE', ride_id: 5 },
+    });
+    const request: Parameters<typeof rideService.createRide>[0] = {
+      pickup_latitude: 31.5,
+      pickup_longitude: 74.3,
+      pickup_address: 'A',
+      dropoff_latitude: 31.6,
+      dropoff_longitude: 74.4,
+      dropoff_address: 'B',
+      vehicle_type: 'car',
+    };
+    try {
+      await expect(rideService.createRide(request)).rejects.toMatchObject({ status: 409 });
+    } finally {
+      mock.restore();
+    }
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('Failed to create ride', expect.objectContaining({ status: 409 }));
+  });
+
+  it('T-584: POST /rides/estimate with the server down is debug only', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const mock = new MockAdapter(apiClient);
+    mock.onPost('/rides/estimate').networkError();
+    const route = { pickup: { latitude: 31.5, longitude: 74.3 }, dropoff: { latitude: 31.6, longitude: 74.4 }, stops: [] };
+    try {
+      await expect(fetchFareEstimates(route)).rejects.toMatchObject({ kind: 'network' });
+    } finally {
+      mock.restore();
+    }
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('Failed to estimate fare', expect.objectContaining({ kind: 'network' }));
   });
 
   it.each(['ACCOUNT_PENDING', 'ACCOUNT_SUSPENDED', 'ACCOUNT_REJECTED'])(

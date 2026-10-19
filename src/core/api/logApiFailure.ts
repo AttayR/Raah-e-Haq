@@ -20,6 +20,16 @@ const EXPECTED_KINDS: ReadonlySet<ApiErrorKind> = new Set<ApiErrorKind>([
 ]);
 
 /**
+ * T-584 (QA 2026-10-19): no connection (offline, the server down, a timeout or a cancelled call)
+ * and a 409 conflict (an open booking, a ride that moved on) are everyday states each screen
+ * shows itself. They log at debug, so they do not raise the yellow Debug LogBox either.
+ */
+const QUIET_KINDS: ReadonlySet<ApiErrorKind> = new Set<ApiErrorKind>(['network', 'timeout', 'cancelled', 'conflict']);
+
+/** True for a failure kind logged at debug (no connection, a 409). */
+export const isQuietFailureKind = (kind: ApiErrorKind): boolean => QUIET_KINDS.has(kind);
+
+/**
  * A 503 the backend sends on purpose (BE-28 `sms_unavailable`, `busy`): a refusal with a
  * user-facing message and retry_after that the screen handles, not a server fault (AUTH-18).
  */
@@ -40,7 +50,7 @@ export const logApiFailure = (context: string, error: unknown): void => {
     // A non-API error (a bug in our code) keeps its type so it can be found.
     cause: apiError === error || !(error instanceof Error) ? undefined : error.name,
   };
-  if (apiError.account) {
+  if (apiError.account || isQuietFailureKind(apiError.kind)) {
     // T-581: a 403 ACCOUNT_* (pending, suspended, rejected) is the account's state, shown on the
     // account status screen; every call made meanwhile is refused the same way. Not a warning.
     logger.debug(context, summary);

@@ -17,6 +17,7 @@ import { chatApi } from '../../../src/features/chat/api';
 import { safetyApi } from '../../../src/features/safety/api';
 import ChatThreadScreen from '../../../src/features/chat/screens/ChatThreadScreen';
 import { ChatList } from '../../../src/features/chat/components/ChatList';
+import { SEND_SETTLE_MS } from '../../../src/features/chat/components/ChatComposer';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage } from '../../../src/features/active-ride/stage';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
@@ -34,15 +35,14 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => true,
 }));
 
-/** T-582: Send goes out one frame after the tap (late keystroke reports land first). */
+/** T-582/T-584: Send goes out once the field has settled (late keystroke reports land first). */
 const pressSend = async () => {
   fireEvent.press(screen.getByTestId('chat-send'));
   act(() => {
-    jest.advanceTimersByTime(FRAME_MS);
+    jest.advanceTimersByTime(SEND_SETTLE_MS);
   });
   await flush();
 };
-const FRAME_MS = 16;
 
 const flush = async () => {
   await act(async () => {

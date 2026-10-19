@@ -5,6 +5,7 @@ import { toCancellationPreview } from '../fare/api';
 import { cancelPreviewText } from '../fare/format';
 import { t } from '../../i18n';
 import { isParcelRide } from '../parcel/api';
+import { toast } from '../../core/toast';
 import { ACTIVE_RIDE_COPY } from './copy';
 
 /**
@@ -31,15 +32,18 @@ const isOpenRequest = (ride: RideResource | null): boolean => !ride || ride.stat
 
 /**
  * Cancel from the booking screen: the themed confirm with the preview, then POST
- * /rides/{id}/cancel. The outcome is shown once by the stage panel (a poll that saw the cancel
- * first shows the same card), so there is no success dialog; a 409 just re-reads the ride.
- * Without a ride (POST /rides still in flight) it starts the booking over. Before a driver takes
- * the ride the question is about the request ("Cancel request?", "Keep looking"; UI-R10).
+ * /rides/{id}/cancel. A ride a driver had taken shows its outcome once in the stage panel (a poll
+ * that saw the cancel first shows the same card), so there is no success dialog; a 409 just
+ * re-reads the ride. Without a ride (POST /rides still in flight) it starts the booking over.
+ * Before a driver takes the ride the question is about the request ("Cancel request?", "Keep
+ * looking"; UI-R10), and a cancelled request is a toast "Request cancelled" and `onRequestCancelled`
+ * (back to Home), not the "Ride cancelled" panel (T-584, passenger-finding-driver.md "Cancel tap").
  */
 export const usePassengerCancel = (
   ride: RideResource | null,
-  cancelRide: (rideId: number) => Promise<unknown>,
+  cancelRide: (rideId: number) => Promise<'cancelled' | 'conflict'>,
   onNoRide: () => void,
+  onRequestCancelled?: () => void,
 ): (() => Promise<void>) => {
   const rideRef = useRef(ride);
   rideRef.current = ride;
@@ -59,11 +63,19 @@ export const usePassengerCancel = (
       onNoRide();
       return;
     }
+    // Still a request once confirmed: a driver who accepted while the dialog was open makes this a
+    // ride cancel, which ends on its panel.
+    const stillRequest = request && current.status === 'requested';
     try {
-      await cancelRide(current.id);
+      const outcome = await cancelRide(current.id);
+      // A 409 (a driver took it meanwhile) re-reads the ride instead: the panel shows that stage.
+      if (outcome === 'cancelled' && stillRequest && onRequestCancelled) {
+        toast.success(ACTIVE_RIDE_COPY.requestCancelled);
+        onRequestCancelled();
+      }
     } catch (cancelError) {
       const message = cancelError instanceof Error ? cancelError.message : ACTIVE_RIDE_COPY.cancelFailedFallback;
       await alert({ title: ACTIVE_RIDE_COPY.cancelFailedTitle, body: message });
     }
-  }, [cancelRide, onNoRide]);
+  }, [cancelRide, onNoRide, onRequestCancelled]);
 };

@@ -18,7 +18,7 @@ import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '.
 import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
 import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
-import { leaveFinishedRide } from '../../features/active-ride/done';
+import { bookingBackHandlers, leaveFinishedRide } from '../../features/active-ride/done';
 import { useNoDriverRetry } from '../../features/active-ride/noDriver';
 import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
@@ -264,10 +264,10 @@ const PassengerMapScreen = () => {
   const { editPoint } = flow;
   const editTrip = useCallback(() => editPoint('destination'), [editPoint]);
 
-  // Cancel with the server's fee preview (BE-85); the outcome is shown once, by the stage panel.
-  const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection);
+  // Cancel with the server's fee preview (BE-85); a cancelled request goes Home (T-584), a taken ride's outcome stays in the panel.
+  const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection, finishRide);
 
-  // Default: populate pickup with current location when it becomes available
+  // Pickup defaults to the current location once it is known.
   const { pickupAtCurrentLocation } = flow;
   useEffect(() => {
     if (currentLocation && !pickup) pickupAtCurrentLocation();
@@ -277,13 +277,13 @@ const PassengerMapScreen = () => {
   const request = useBookingRequest({ flow, offer, requestRide: requestRideService });
   const draft = useBookingDraft({ flow, options: vehicleOptions, estimates: estimates.data, offer });
 
-  // Back goes back one sheet state (§12.5); leaving with a trip planned asks first; held while a
-  // request is sent (UI-R10). Finding a driver has no Back: Android back asks to cancel instead.
+  // Back: one sheet state (§12.5), asks before dropping a trip, held while sending (UI-R10); see bookingBackHandlers.
   const leave = useCallback(() => navigation.goBack(), [navigation]);
   const goBack = useDiscardOnLeave({ flow, rideShown, blocked: request.busy, onLeave: leave });
   const searching = shownStage === 'requesting' && (rideStage?.stage ?? 'searching') === 'searching';
-  const findingWithRide = searching && rideShown;
-  useBookingHardwareBack(isFocused, findingWithRide ? handleCancelRide : goBack);
+  const backState = { searching, findingWithRide: searching && rideShown, cancelled: rideCancelled, retrying: noDriver.retrying };
+  const back = bookingBackHandlers(backState, { back: goBack, cancel: handleCancelRide, finish: finishRide });
+  useBookingHardwareBack(isFocused, back.hardware);
   // T-583: no iOS swipe-back under a POST /rides in flight (Request or Try again) or a search.
   useBookingSwipeBack(navigation, request.busy || searching || noDriver.retrying);
 
@@ -347,7 +347,7 @@ const PassengerMapScreen = () => {
         />
 
         <MapTopControls
-          onBack={searching ? undefined : goBack}
+          onBack={back.onScreen}
           onRecenter={centerOnUser}
           sheetHeight={sheetHeightValue}
           followRide={{ visible: rideCamera.paused, onPress: rideCamera.recentre }}

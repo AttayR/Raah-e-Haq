@@ -42,6 +42,12 @@ export const useBookingMapCamera = ({
   focusPoint = null,
 }: Options) => {
   const [isMapReady, setIsMapReady] = useState(false);
+  // T-584 (QA 2026-10-19 bug 3): with a route drawn the route fit owns the camera. Choose a ride
+  // opened from a Home chip has its route before the map is ready, and the "centre on the
+  // passenger" on ready (and on each GPS fix) used to move the map off the route.
+  const hasRoute = !!routeCoordinates && routeCoordinates.length >= 2;
+  const hasRouteRef = useRef(hasRoute);
+  hasRouteRef.current = hasRoute;
 
   // Safety net: a map that never reports ready (seen on slow devices) still drops "Loading
   // map…" and allows recentring after a few seconds.
@@ -68,9 +74,9 @@ export const useBookingMapCamera = ({
     }
   }, [currentLocation, requestLocationPermission, isMapReady, animateToUser, mapRef]);
 
-  // Initialize location (not while the ride camera follows the driver).
+  // Initialize location (not while the ride camera follows the driver, nor over a route).
   useEffect(() => {
-    if (currentLocation && isMapReady && !rideCameraHoldsMap()) animateToUser();
+    if (currentLocation && isMapReady && !hasRouteRef.current && !rideCameraHoldsMap()) animateToUser();
   }, [currentLocation, isMapReady, rideCameraHoldsMap, animateToUser]);
 
   const latestMapReady = useRef(() => {});
@@ -79,7 +85,7 @@ export const useBookingMapCamera = ({
     onRideCameraMapReady();
     // Delay the region animation to ensure map is fully ready
     setTimeout(() => {
-      if (!rideCameraHoldsMap()) animateToUser(1000);
+      if (!hasRouteRef.current && !rideCameraHoldsMap()) animateToUser(1000);
     }, 500);
   };
   const onMapReady = useCallback(() => latestMapReady.current(), []);
@@ -87,23 +93,23 @@ export const useBookingMapCamera = ({
 
   // Auto-fit map to the route whenever it updates, above the sheet (T-314). The sheet settles
   // after the route arrives (keyboard closes, vehicle list loads), so a sheet height change of
-  // a step (40 pt) refits too; smaller changes do not move the camera.
+  // a step (40 pt) refits too; smaller changes do not move the camera. T-584: a route that
+  // arrived before the map was ready is fitted once it is.
   const sheetStep = Math.round(sheetHeight / 40);
   useEffect(() => {
     // T-549: not while the ride camera holds the map (it fits the car, or the passenger panned).
-    if (!mapRef.current || !routeCoordinates || routeCoordinates.length < 2 || rideCameraHoldsMap()) return;
+    if (!isMapReady || !mapRef.current || !hasRoute || rideCameraHoldsMap()) return;
     try {
       mapRef.current.fitToCoordinates(routeCoordinates, { edgePadding: viewportEdgePadding(viewportRef.current), animated: true });
     } catch (e) {
       logger.debug('Error fitting map to route:', e);
     }
-  }, [routeCoordinates, sheetStep, mapRef, viewportRef, rideCameraHoldsMap]);
+  }, [routeCoordinates, hasRoute, isMapReady, sheetStep, mapRef, viewportRef, rideCameraHoldsMap]);
 
   // T-553: a picked pickup moves the map to it (QA: the sheet collapsed, the map stayed put).
   const focusRef = useRef(focusPoint);
   focusRef.current = focusPoint;
   const focusKey = focusPoint ? `${focusPoint.latitude},${focusPoint.longitude}` : null;
-  const hasRoute = !!routeCoordinates && routeCoordinates.length >= 2;
   useEffect(() => {
     const point = focusRef.current;
     if (!focusKey || !point || !isMapReady || !mapRef.current || hasRoute || rideCameraHoldsMap()) return;

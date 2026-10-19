@@ -24,7 +24,7 @@ import {
   UNKNOWN_STATUS,
   withRefusedStatus,
 } from '../../core/auth/normalizeUser';
-import { logApiFailure } from '../../core/api/logApiFailure';
+import { isQuietFailureKind, logApiFailure } from '../../core/api/logApiFailure';
 import {
   bumpSessionEpoch,
   currentSessionEpoch,
@@ -685,7 +685,9 @@ export const initializeAuth = createAsyncThunk<
             ? { user: { ...storedUser, status: UNKNOWN_STATUS }, statusUnverified: true }
             : null;
         }
-        logger.warn('initializeAuth - profile check failed; keeping the stored session', {
+        // T-584: offline at launch is an everyday state (debug, no LogBox).
+        const log = isQuietFailureKind(apiError.kind) ? logger.debug : logger.warn;
+        log('initializeAuth - profile check failed; keeping the stored session', {
           kind: apiError.kind,
           status: apiError.status,
         });
@@ -757,7 +759,8 @@ export const revalidateSession = createAsyncThunk<
       logger.warn('revalidateSession - invalid profile response; routing to account status');
       return { user: { ...current, status: UNKNOWN_STATUS }, statusUnverified: true };
     }
-    logger.warn('revalidateSession - profile check failed; keeping the cached session', {
+    const log = isQuietFailureKind(rejection.kind) ? logger.debug : logger.warn;
+    log('revalidateSession - profile check failed; keeping the cached session', {
       kind: rejection.kind,
       status: rejection.status,
     });

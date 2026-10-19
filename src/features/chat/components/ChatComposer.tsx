@@ -18,6 +18,12 @@ type Props = {
 };
 
 const k = componentTokens.chat;
+/**
+ * T-584: Send waits until the field has reported no keystroke for this long, so keystrokes still
+ * queued behind the tap land in the message, not in the next draft. A person stops typing well
+ * before tapping Send, so a normal tap goes out on the next frame.
+ */
+export const SEND_SETTLE_MS = 100;
 
 /**
  * The message composer (T-510; UI-R14 shared-chat-thread): a `surface` bar with a top hairline,
@@ -34,12 +40,17 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
   // the last keystroke used to meet a still-`disabled` button (or an older draft) and was lost;
   // the button now only dims while empty, and Send reads the latest text.
   const latest = useRef('');
+  // T-584: when the field last reported text, and the field itself (a clear the native field
+  // could refuse as older than its text is forced through `clear()`).
+  const lastChangeAt = useRef(0);
+  const inputRef = useRef<TextInput>(null);
   const [pressed, setPressed] = useState(false);
   const canSend = !disabled && draft.trim().length > 0;
   const lineHeight = theme.typography.body.lineHeight;
 
   const onChangeText = useCallback((text: string) => {
     latest.current = text;
+    lastChangeAt.current = Date.now();
     setDraft(text);
   }, []);
 
@@ -49,6 +60,7 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
     if (onSend(text)) {
       latest.current = '';
       setDraft('');
+      inputRef.current?.clear();
     }
   };
   // The newest `send` for the deferred tap below (a re-render may have replaced it meanwhile).
@@ -58,18 +70,31 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
   // T-582 (QA 2026-10-19 bug 5): a tap is delivered ahead of keystrokes the field has already
   // shown but not yet reported (touches jump the event queue), so an immediate Send sent
   // "QA test" of "QA test one", and the clear was refused as older than the field's text. Send
-  // waits one frame so those reports land first; more taps in that frame send once.
-  const pendingSend = useRef<number | null>(null);
+  // waits one frame so those reports land first; more taps meanwhile send once. T-584 (QA
+  // 2026-10-19 bug 2): one frame was not always enough ("QA test one" still sent "QA test"), so
+  // it also waits until the field has been quiet for SEND_SETTLE_MS.
+  const pendingFrame = useRef<number | null>(null);
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendWhenSettled = () => {
+    const wait = SEND_SETTLE_MS - (Date.now() - lastChangeAt.current);
+    if (wait > 0) {
+      pendingTimer.current = setTimeout(sendWhenSettled, wait);
+      return;
+    }
+    pendingTimer.current = null;
+    sendRef.current();
+  };
   const submit = () => {
-    if (pendingSend.current !== null) return;
-    pendingSend.current = requestAnimationFrame(() => {
-      pendingSend.current = null;
-      sendRef.current();
+    if (pendingFrame.current !== null || pendingTimer.current !== null) return;
+    pendingFrame.current = requestAnimationFrame(() => {
+      pendingFrame.current = null;
+      sendWhenSettled();
     });
   };
   useEffect(
     () => () => {
-      if (pendingSend.current !== null) cancelAnimationFrame(pendingSend.current);
+      if (pendingFrame.current !== null) cancelAnimationFrame(pendingFrame.current);
+      if (pendingTimer.current !== null) clearTimeout(pendingTimer.current);
     },
     [],
   );
@@ -91,6 +116,7 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
       ) : null}
       <View style={styles.row}>
         <TextInput
+          ref={inputRef}
           value={draft}
           onChangeText={onChangeText}
           placeholder={placeholder ?? CHAT_COPY.composerPlaceholder}

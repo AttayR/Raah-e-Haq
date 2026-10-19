@@ -23,6 +23,8 @@ export const ACTIVE_RIDE_COPY = localizedCopy({
   cancelRequestTitle: 'Cancel request?',
   cancelRequestMessage: "We'll stop looking for a driver.",
   keepLooking: 'Keep looking',
+  // T-584: the toast after a request is cancelled (back to Home, no "Ride cancelled" panel).
+  requestCancelled: 'Request cancelled',
   cashLabel: 'Cash',
   driverEnRouteTitle: 'Your driver is on the way',
   driverArrivedTitle: 'Your driver has arrived',
