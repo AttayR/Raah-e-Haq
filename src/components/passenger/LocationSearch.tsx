@@ -268,6 +268,10 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
     leadingIcon === undefined ? LEADING_ICON[mode] : typeof leadingIcon === 'function' ? leadingIcon(text) : leadingIcon;
   const showNoResults = status === 'done' && remote.length === 0;
   const showError = status === 'error';
+  // T-582 (passenger-destination-search block 4): while the passenger types, "Set location on
+  // map" is the last row, under the suggestions too (not only with no results or an error).
+  const typing = edited && !readOnly && text.trim().length > 0;
+  const showMapRow = onChooseOnMap !== undefined && (typing || showError || showNoResults);
 
   return (
     <View ref={containerRef} testID={`location-search-${mode}-container`} onLayout={focused ? () => reveal?.layoutChanged(containerRef.current) : undefined}>
@@ -335,23 +339,6 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
         </View>
       ) : null}
 
-      {(showError || showNoResults) && onChooseOnMap ? (
-        <Pressable
-          testID="location-search-on-map"
-          accessibilityRole="button"
-          accessibilityLabel={BOOKING_COPY.setLocationOnMap}
-          onPress={onChooseOnMap}
-          style={({ pressed }) => [styles.suggestionItem, pressed ? { backgroundColor: c.surfacePressed } : null]}
-        >
-          <View style={[styles.suggestionIcon, { backgroundColor: c.primarySoft }]}>
-            <Icon name="pinRadius" size={20} color="primaryText" />
-          </View>
-          <AppText variant="title" color="primaryText" numberOfLines={1} style={styles.flex}>
-            {BOOKING_COPY.setLocationOnMap}
-          </AppText>
-        </Pressable>
-      ) : null}
-
       {remote.length > 0 ? (
         <View style={styles.suggestionList}>
           {remote.map((s, idx) => (
@@ -375,12 +362,29 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
                 </AppText>
               </View>
               {selectingId === s.id ? <ActivityIndicator size="small" color={c.primaryText} /> : null}
-              {idx < remote.length - 1 ? (
+              {idx < remote.length - 1 || showMapRow ? (
                 <View style={[styles.divider, { backgroundColor: c.border, height: theme.borderWidth.hairline }]} />
               ) : null}
             </Pressable>
           ))}
         </View>
+      ) : null}
+
+      {showMapRow ? (
+        <Pressable
+          testID="location-search-on-map"
+          accessibilityRole="button"
+          accessibilityLabel={BOOKING_COPY.setLocationOnMap}
+          onPress={onChooseOnMap}
+          style={({ pressed }) => [styles.suggestionItem, pressed ? { backgroundColor: c.surfacePressed } : null]}
+        >
+          <View style={[styles.suggestionIcon, { backgroundColor: c.primarySoft }]}>
+            <Icon name="pinRadius" size={20} color="primaryText" />
+          </View>
+          <AppText variant="title" color="primaryText" numberOfLines={1} style={styles.flex}>
+            {BOOKING_COPY.setLocationOnMap}
+          </AppText>
+        </Pressable>
       ) : null}
     </View>
   );

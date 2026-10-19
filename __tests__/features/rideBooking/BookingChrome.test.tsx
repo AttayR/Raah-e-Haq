@@ -287,6 +287,5 @@ describe('LocationSearch states', () => {
     fireEvent.changeText(getByTestId('location-search-destination'), 'Liberty');
     expect(await findByText('Liberty Market')).toBeTruthy();
     expect(queryByTestId('location-search-empty')).toBeNull();
-    expect(queryByTestId('location-search-on-map')).toBeNull();
   });
 });

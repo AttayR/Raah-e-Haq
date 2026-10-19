@@ -276,6 +276,7 @@ describe('7b. a pull while the poll is due', () => {
 
 describe('8. Send reads the latest text', () => {
   it('a Send handler from the render before the last keystroke still sends what was typed', () => {
+    jest.useFakeTimers();
     const onSend = jest.fn(() => true);
     render(<ChatComposer onSend={onSend} bottomInset={0} />);
     // The press handler as it was before the keystroke re-rendered the composer.
@@ -285,6 +286,10 @@ describe('8. Send reads the latest text', () => {
       (input.props.onChangeText as (text: string) => void)('Hello');
     });
     act(() => staleSend());
+    // T-582: Send goes out one frame after the tap.
+    act(() => {
+      jest.advanceTimersByTime(16);
+    });
     expect(onSend).toHaveBeenCalledWith('Hello');
   });
 

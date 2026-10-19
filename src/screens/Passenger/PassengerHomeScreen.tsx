@@ -121,6 +121,13 @@ export default function PassengerHomeScreen() {
   const ridesState: HomeRidesState =
     rideItems === null && recent.status === 'loading' ? 'loading' : rideItems === null && recent.status === 'failed' ? 'failed' : 'ready';
   const { reload: reloadRides } = recent;
+  // T-582: "Try again" also re-reads the saved places when their read failed with nothing shown
+  // (the chips stayed away until a relaunch); one request each, only for what failed.
+  const { reload: reloadSaved, status: savedStatus, data: savedData } = saved;
+  const retryHome = useCallback(() => {
+    reloadRides();
+    if (savedStatus === 'failed' && savedData === null) reloadSaved();
+  }, [reloadRides, reloadSaved, savedStatus, savedData]);
 
   // BE-88: "Send a parcel" only while the parcel tier is on (the cached vehicle catalogue says so;
   // T-561: re-read on focus once it is a few minutes old, so a newly activated tier shows soon).
@@ -298,7 +305,7 @@ export default function PassengerHomeScreen() {
           onEnableLocation={onEnableLocation}
           recentRides={recentRides}
           recentRidesState={ridesState}
-          onRetryRides={reloadRides}
+          onRetryRides={retryHome}
           onOpenRide={openRide}
           onSeeAllRides={openActivity}
           liveRide={liveRide}

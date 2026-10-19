@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Icon } from '../../../components/ui';
@@ -43,7 +43,7 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
     setDraft(text);
   }, []);
 
-  const submit = () => {
+  const send = () => {
     const text = latest.current;
     if (disabled || text.trim().length === 0) return;
     if (onSend(text)) {
@@ -51,6 +51,28 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
       setDraft('');
     }
   };
+  // The newest `send` for the deferred tap below (a re-render may have replaced it meanwhile).
+  const sendRef = useRef(send);
+  sendRef.current = send;
+
+  // T-582 (QA 2026-10-19 bug 5): a tap is delivered ahead of keystrokes the field has already
+  // shown but not yet reported (touches jump the event queue), so an immediate Send sent
+  // "QA test" of "QA test one", and the clear was refused as older than the field's text. Send
+  // waits one frame so those reports land first; more taps in that frame send once.
+  const pendingSend = useRef<number | null>(null);
+  const submit = () => {
+    if (pendingSend.current !== null) return;
+    pendingSend.current = requestAnimationFrame(() => {
+      pendingSend.current = null;
+      sendRef.current();
+    });
+  };
+  useEffect(
+    () => () => {
+      if (pendingSend.current !== null) cancelAnimationFrame(pendingSend.current);
+    },
+    [],
+  );
 
   return (
     <View

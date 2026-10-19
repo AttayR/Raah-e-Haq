@@ -125,7 +125,12 @@ export function ChatList({ visible, role = 'passenger' }: ChatListProps) {
         scrollEventThrottle={16}
         initialNumToRender={10}
         windowSize={7}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
+        // T-582: a list shorter than the screen still bounces on iOS, so a pull reaches the
+        // RefreshControl (QA 2026-10-19 bug 3: with two or three chats a pull did nothing).
+        alwaysBounceVertical
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
+        }
         contentContainerStyle={[styles.listContent, sections.length === 0 ? styles.emptyContent : null]}
         style={styles.list}
         testID="chat-list"

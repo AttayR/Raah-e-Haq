@@ -79,6 +79,9 @@ const untilAppActive = (capMs: number, waits: Set<() => void>): Promise<void> =>
 const errorKindOf = (code: number): LocationErrorKind =>
   code === 1 ? 'denied' : code === 2 ? 'disabled' : 'unavailable';
 
+/** PERMISSION_DENIED (1) and TIMEOUT (3): situations the screens explain, logged at debug. */
+export const isExpectedPositionError = (code: number): boolean => code === 1 || code === 3;
+
 export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = {}) => {
   const appInForeground = useAppInForeground();
   const enabled = active && appInForeground;
@@ -192,7 +195,10 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
           resolve(location);
         },
         (positionError) => {
-          logger.warn('Location error:', positionError);
+          // T-582: refused access and a timeout (iOS lets the lookup time out while its own
+          // permission prompt is still up) are expected and shown in `error`; not warnings.
+          if (isExpectedPositionError(positionError.code)) logger.debug('Location error:', positionError);
+          else logger.warn('Location error:', positionError);
 
           // For Android emulator, use default location
           if (isEmulator && positionError.code === 3) { // TIMEOUT

@@ -348,6 +348,26 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     settle(target);
   }, [animateTo, container, containerHeight, live, resolved, settle, top]);
 
+  // [T-582] Bumped when the host screen is shown again; the sheet's position style and the
+  // published height read it, so both are written to their views once more.
+  const reveal = useSharedValue(0);
+  // [T-582] Back on screen (another tab or a pushed screen covered it): re-place the sheet at its
+  // snap's current height. The snap heights can change while the screen is hidden and frozen
+  // (Home's peek shrinks from 202 to 170 when the ride ends behind Booking); a spring started
+  // then never reached the hidden view, so the sheet came back at the old height (QA bug 1).
+  const wasActive = useRef(active);
+  useEffect(() => {
+    const returned = active && !wasActive.current;
+    wasActive.current = active;
+    if (!returned || modal || !live || closing.current || containerRef.current === 0) return;
+    const now = resolvedRef.current;
+    const target = now.find(r => r.snap === currentRef.current) ?? now[0];
+    if (!target) return;
+    animateTo(target.height, 0, undefined, containerRef.current);
+    settle(target);
+    reveal.value += 1;
+  }, [active, animateTo, live, modal, reveal, settle]);
+
   // [T-519] Visible body height (between the header and the footer / keyboard) for the
   // focused-field scroll below; a ref so the keyboard listeners need not re-subscribe.
   const scrollRef = useRef<ScrollView>(null);
@@ -425,9 +445,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   // Publish the visible height for camera padding and riding controls.
   useAnimatedReaction(
-    () => Math.max(0, container.value - top.value),
-    height => {
-      if (animatedHeight) animatedHeight.value = height;
+    () => ({ height: Math.max(0, container.value - top.value), reveal: reveal.value }),
+    (now, previous) => {
+      if (!animatedHeight) return;
+      animatedHeight.value = now.height;
+      // [T-582] Shown again at the same height: notify the controls riding the sheet anyway.
+      if (previous && now.reveal !== previous.reveal) animatedHeight.modify(undefined, true);
     },
   );
 
@@ -464,7 +487,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       });
   }, [animateTo, beginClose, container, dismissible, dragSettled, finishClose, modal, resolved, startTop, top]);
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: top.value }] }));
+  const sheetStyle = useAnimatedStyle(() => {
+    // [T-582] Read so a reveal re-writes the transform even when `top` did not change.
+    reveal.value;
+    return { transform: [{ translateY: top.value }] };
+  });
   const scrimStyle = useAnimatedStyle(() => {
     const lowest = resolved[0]?.height ?? 1;
     return {

@@ -165,7 +165,9 @@ export const accountRefused =
     if (refused.status === user.status && refused.rejection_reason === user.rejection_reason) {
       return false;
     }
-    logger.warn('Account refused by the server; routing to account status', { status: refused.status });
+    // T-582: the account's state (a suspended account's cold start lands here), shown on the
+    // account status screen; not a warning (it raised the dev LogBox, QA 2026-10-19 obs 7).
+    logger.debug('Account refused by the server; routing to account status', { status: refused.status });
     dispatch(accountStatusRefused(refused));
     // The cache gets the status too (never rejection_reason), so an offline cold start does
     // not route home; skipped if the session ends meanwhile.

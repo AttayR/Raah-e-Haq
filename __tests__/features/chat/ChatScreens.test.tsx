@@ -34,6 +34,16 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => true,
 }));
 
+/** T-582: Send goes out one frame after the tap (late keystroke reports land first). */
+const pressSend = async () => {
+  fireEvent.press(screen.getByTestId('chat-send'));
+  act(() => {
+    jest.advanceTimersByTime(FRAME_MS);
+  });
+  await flush();
+};
+const FRAME_MS = 16;
+
 const flush = async () => {
   await act(async () => {
     for (let i = 0; i < 8; i += 1) {
@@ -138,8 +148,7 @@ describe('ChatThreadScreen', () => {
     expect(screen.getByTestId('chat-thread-empty')).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('chat-input'), 'Coming down');
-    fireEvent.press(screen.getByTestId('chat-send'));
-    await flush();
+    await pressSend();
 
     expect(send).toHaveBeenCalledWith(7, 'Coming down', expect.any(String));
     expect(screen.getByText('Coming down')).toBeTruthy();
@@ -154,8 +163,7 @@ describe('ChatThreadScreen', () => {
     await renderWithStore(<ChatThreadScreen />);
 
     fireEvent.changeText(screen.getByTestId('chat-input'), 'Hello');
-    fireEvent.press(screen.getByTestId('chat-send'));
-    await flush();
+    await pressSend();
     expect(screen.getByText(/Too many messages, wait a moment\. Tap to retry/)).toBeTruthy();
 
     const clientId = send.mock.calls[0][2];
@@ -242,8 +250,7 @@ describe('ChatThreadScreen', () => {
     await renderWithStore(<ChatThreadScreen />);
 
     fireEvent.changeText(screen.getByTestId('chat-input'), 'one more thing');
-    fireEvent.press(screen.getByTestId('chat-send'));
-    await flush();
+    await pressSend();
 
     expect(screen.getByText('Thanks')).toBeTruthy();
     expect(screen.queryByTestId('chat-thread-forbidden')).toBeNull();
