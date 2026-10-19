@@ -948,3 +948,28 @@ GET `/public/vehicle-types` (no auth, backward compatible: nothing removed or re
 Registration is unchanged: `vehicle_make` stays free text (`required|string|max:100`), so a make not (or no longer) in the list is still accepted.
 
 App follow-up: the driver wizard's Make list reads `meta.vehicle_makes[vehicleType]` (from the catalogue the registration flow already loads with `include_inactive=1`); fall back to the static `VEHICLE_MAKES_BY_TYPE` when the key is missing (older server) or the request failed. Keep clearing a chosen make that is not in the new type's list.
+
+## BE-109: the no-show fee the server will really charge (2026-10-19, app T-577)
+
+Ride objects (every RideResource response, e.g. GET `/rides/{id}` and the active ride) gain **`no_show_preview`**, for **the ride's driver only** (missing for the passenger, admins and other drivers). Backward compatible: nothing removed or renamed; `fare_policy.cancel_fee` stays the quoted term (what the rate card says), **not** a promise.
+
+- `null` unless the ride is `arrived` (before arrival, once started, cancelled or completed).
+- While arrived:
+
+```json
+"no_show_preview": { "fee": 50, "fee_applies": true, "capped": false, "verified": true, "cancel_at": "2026-10-19T12:05:00+00:00" }
+```
+
+| key | meaning |
+|---|---|
+| `fee` | Rupees the passenger would be charged by a no-show cancel now. **0 whenever no fee would be charged** (capped, unverified, fees off, no fee on the snapshot). |
+| `fee_applies` | `fee > 0`. |
+| `capped` | A BE-91 daily cap (per pair or per passenger, Pakistan calendar day) would make it free. It never says which cap and carries no counts. A driver who has not charged this passenger today can infer that the passenger already paid fees to other drivers today; this is accepted, because the cancel result (`cancellation_fee` 0) already reveals it. |
+| `verified` | The arrival was verified, or the driver's latest ping is fresh and inside the arrival radius right now (a fresh ping later can still turn this true). |
+| `cancel_at` | Same as `no_show_cancel_at`: when "Passenger didn't come" is allowed. |
+
+Computed with the same rules as POST `/rides/{id}/cancel` for the driver (`RideFairness::noShowPreview`: snapshot `cancel_fee`, verified arrival or fresh ping, `capCheck`). The cancel response's `data.cancellation_fee` stays the final word (`"0.00"` when capped).
+
+The passenger side is unchanged: `cancellation_preview.fee_now` already applies the caps (0 when capped).
+
+App (T-577): the driver no-show sheet shows "The passenger pays Rs {fee}" only when `no_show_preview.fee_applies` is true; otherwise "No fee will be charged" (no amount; do not explain caps or other rides). Re-read the ride when the sheet opens (the value can change between arrival and `cancel_at`). Older servers (key missing): don't promise an amount, fall back to the neutral wording. After the cancel, show `data.cancellation_fee` from the response.
