@@ -160,12 +160,58 @@ describe('useActiveRidePolling', () => {
     expect(rideGets()).toHaveLength(3);
   });
 
-  it('T-514: the cadence is 3 s only while searching', () => {
+  it('T-514 / T-588: the cadence is 3 s only while searching and arrived', () => {
     expect(SEARCHING_POLL_MS).toBeGreaterThanOrEqual(3_000);
+    expect(SEARCHING_POLL_MS).toBeLessThanOrEqual(4_000);
     expect(activeRidePollMs('requested')).toBe(SEARCHING_POLL_MS);
+    expect(activeRidePollMs('arrived')).toBe(SEARCHING_POLL_MS);
     expect(activeRidePollMs('accepted')).toBe(ACTIVE_RIDE_POLL_MS);
     expect(activeRidePollMs('started')).toBe(ACTIVE_RIDE_POLL_MS);
+    expect(activeRidePollMs('completed')).toBe(ACTIVE_RIDE_POLL_MS);
     expect(activeRidePollMs(undefined)).toBe(ACTIVE_RIDE_POLL_MS);
+  });
+
+  it('T-588: while arrived the status is read every 3 s, back to 10 s once started; within the server budget', async () => {
+    jest.useFakeTimers();
+    const store = withRide('arrived', { driver_id: 5 });
+    mock
+      .onGet('/rides/21')
+      .replyOnce(200, envelope(makeRide({ id: 21, status: 'arrived', driver_id: 5 })))
+      .onGet('/rides/21')
+      .replyOnce(200, envelope(makeRide({ id: 21, status: 'arrived', driver_id: 5 })))
+      .onGet('/rides/21')
+      .reply(200, envelope(makeRide({ id: 21, status: 'started', driver_id: 5 })));
+    mock.onGet('/rides/21/driver-location').reply(200, envelope(null));
+    const rideGets = () => mock.history.get.filter((r) => r.url === '/rides/21');
+
+    renderHook(() => useActiveRidePolling(true), { wrapper: wrapperFor(store) });
+    await settle();
+    expect(rideGets()).toHaveLength(1);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS);
+    });
+    expect(rideGets()).toHaveLength(2);
+    // The driver started the trip: seen at most 3 s later.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SEARCHING_POLL_MS);
+    });
+    expect(rideGets()).toHaveLength(3);
+    expect(store.getState().activeRide.ride?.status).toBe('started');
+
+    // Started: the 10 s cadence again.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(ACTIVE_RIDE_POLL_MS - 1);
+    });
+    expect(rideGets()).toHaveLength(3);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1);
+    });
+    expect(rideGets()).toHaveLength(4);
+
+    // A minute while arrived: status + driver-location stay well under 120 requests a minute.
+    const perMinute = 60_000 / SEARCHING_POLL_MS + 60_000 / DRIVER_LOCATION_POLL_MS;
+    expect(perMinute).toBeLessThanOrEqual(40);
   });
 
   it('T-536: no status reads while the app is in the background; reads at once on return', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
@@ -24,6 +24,7 @@ import {
   type ActiveRideState,
 } from './slice';
 import { isRideInProgress } from './status';
+import { markerDriverLocation } from './arrivedMarker';
 import { ACTIVE_RIDE_COPY } from './copy';
 import { advanceRideStage, isDriverTrackable, type PassengerRideStageState } from './stage';
 
@@ -37,9 +38,18 @@ export const ACTIVE_RIDE_POLL_MS = 10_000;
  */
 export const SEARCHING_POLL_MS = 3_000;
 
+/**
+ * T-588 (owner live session 2026-10-19): the statuses read every SEARCHING_POLL_MS. Searching
+ * (`requested`, waiting for Accept) and `arrived` (waiting for Start): the next change is the
+ * one the passenger is watching for. Budget on the ride screen while arrived: 20 status reads +
+ * 15 driver-location reads a minute, well under the backend's 120 a minute per user. Until
+ * WebSockets (BE-12/T-406).
+ */
+const FAST_POLL_STATUSES: ReadonlySet<RideResource['status']> = new Set(['requested', 'arrived']);
+
 /** The status poll interval for a ride in this status. */
 export const activeRidePollMs = (status: RideResource['status'] | undefined): number =>
-  status === 'requested' ? SEARCHING_POLL_MS : ACTIVE_RIDE_POLL_MS;
+  status !== undefined && FAST_POLL_STATUSES.has(status) ? SEARCHING_POLL_MS : ACTIVE_RIDE_POLL_MS;
 
 /**
  * T-517: how often the assigned driver's position is read while the ride screen is focused and a
@@ -67,8 +77,8 @@ type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
 /**
  * Polls GET /rides/{id} while the active ride is in progress, `enabled` (the screen is focused)
  * and the app is in the foreground (T-536). It reads the ride at once when it starts (focus,
- * foreground, a new ride), then every SEARCHING_POLL_MS while searching and ACTIVE_RIDE_POLL_MS
- * once a driver is assigned (T-514). One request at a time on the shared poll engine; a failure
+ * foreground, a new ride), then every SEARCHING_POLL_MS while searching or arrived (T-514, T-588)
+ * and ACTIVE_RIDE_POLL_MS otherwise. One request at a time on the shared poll engine; a failure
  * backs off (a 429 waits its Retry-After). It stops on a final status, when disabled, in the
  * background and on unmount.
  *
@@ -179,7 +189,22 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
     return () => clearInterval(timer);
   }, [enabled, appActive, trackable, rideId, readDriverLocation]);
 
-  return { driverLocation };
+  // T-588: once `arrived`, the car is shown on the pickup (the last posted position lags).
+  const status = ride?.status;
+  const pickupLat = ride?.pickup_latitude;
+  const pickupLng = ride?.pickup_longitude;
+  const shown = useMemo(
+    () =>
+      markerDriverLocation(
+        status === undefined || pickupLat === undefined || pickupLng === undefined
+          ? null
+          : { status, pickup_latitude: pickupLat, pickup_longitude: pickupLng },
+        driverLocation,
+      ),
+    [status, pickupLat, pickupLng, driverLocation],
+  );
+
+  return { driverLocation: shown };
 };
 
 /**

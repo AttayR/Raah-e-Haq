@@ -119,7 +119,7 @@ describe('sender: parcel wording (T-574)', () => {
 describe('Done after a parcel (T-574) or a ride (T-582)', () => {
   it('goes back to Home, never the trip planner', () => {
     const popTo = jest.fn();
-    leaveFinishedRide({ popTo });
+    leaveFinishedRide({ popTo, getState: () => ({ routes: [] }), dispatch: jest.fn() });
     expect(popTo).toHaveBeenCalledTimes(1);
     expect(popTo).toHaveBeenCalledWith('PassengerTabs', { screen: 'Home' });
   });
