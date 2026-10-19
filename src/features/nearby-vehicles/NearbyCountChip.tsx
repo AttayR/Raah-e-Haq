@@ -94,14 +94,15 @@ export const NearbyCountChip: React.FC<NearbyCountChipProps> = ({ state, freshne
       style={styles.row}
     >
       <DotOrSpinner dot={content.dot} />
+      {/* One run of text (design review): "{n} {tiers} nearby · {online} online", no gap before the dot. */}
       <AppText variant="label" color={error ? 'danger' : 'textPrimary'} numberOfLines={1} style={styles.primary}>
         {content.primary}
+        {showSecondary ? (
+          <AppText variant="label" color="textSecondary" testID={`${testID}-online`} style={styles.secondary}>
+            {` · ${content.secondary}`}
+          </AppText>
+        ) : null}
       </AppText>
-      {showSecondary ? (
-        <AppText variant="label" color="textSecondary" numberOfLines={1} style={styles.secondary}>
-          {`· ${content.secondary}`}
-        </AppText>
-      ) : null}
     </Animated.View>
   );
   const chipStyle = [
@@ -146,6 +147,6 @@ const styles = StyleSheet.create({
   spinner: { width: c.spinner, height: c.spinner },
   // Numbers in tabular figures, so a count change does not shift the text.
   primary: { flexShrink: 1, fontVariant: ['tabular-nums'] },
-  secondary: { flexShrink: 1, fontVariant: ['tabular-nums'] },
+  secondary: { fontVariant: ['tabular-nums'] },
   pressed: { opacity: 0.85 },
 });

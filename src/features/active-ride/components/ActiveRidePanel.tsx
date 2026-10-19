@@ -36,6 +36,7 @@ import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection
 import type { ParcelView } from '../../parcel/types';
 import { readNumberOrNull } from '../../../core/api/read';
 import { formatMoney } from '../../../utils/format';
+import { RequestReachStrip } from './RequestReachStrip';
 import { FindingSubtitle, NoDriverFound, PassengerCancelButton, SearchingTripCard, searchingTripOf, type SearchDraft } from './FindingDriver';
 import {
   canPassengerCancel,
@@ -250,6 +251,9 @@ const ActiveRidePanel: React.FC<Props> = ({
           <FindingSubtitle key={ride?.requeue_count ?? 0} requestedAt={ride?.requeue_count ? null : ride?.requested_at} />
         ) : null}
       </View>
+
+      {/* T-587: "Sent to {n} drivers · {m} viewing", from the ride poll's reach. */}
+      <RequestReachStrip ride={ride} searching={searching} />
 
       {searchingTrip ? <SearchingTripCard trip={searchingTrip} /> : null}
 

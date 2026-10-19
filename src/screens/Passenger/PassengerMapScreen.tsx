@@ -149,14 +149,19 @@ const PassengerMapScreen = () => {
   const rideCall = useRideCall(rideId, { onChatOnly: openChat });
   const compact = searchFocused;
   const choosing = !rideShown && shownStage === 'vehicle';
-  // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked; read again
-  // at once when the ride ends (T-311). T-586 §3: Choose ride shows only the selected tier's.
+  const searching = shownStage === 'requesting' && (rideStage?.stage ?? 'searching') === 'searching';
+  // Nearby drivers (BE-20) around the pickup, or the passenger, until a driver takes the ride; read
+  // again at once when the ride ends (T-311). T-586: Choose ride and Finding show only the tier's.
   const nearby = useBookingNearby({
     center: pickup ?? currentLocation,
-    enabled: isFocused && (shownStage !== 'requesting' || rideEnded),
-    refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
-    tier: choosing ? flow.selectedVehicle ?? null : null,
-    chipShown: !rideShown && !compact,
+    focused: isFocused,
+    ride: currentRide,
+    requesting: shownStage === 'requesting',
+    rideEnded,
+    searching,
+    choosing,
+    selectedTier: flow.selectedVehicle ?? null,
+    chipShown: !rideShown && !compact && !searching,
   });
   const { isMapReady, onMapReady, onMapLoaded, centerOnUser } = useBookingMapCamera({
     mapRef,
@@ -265,7 +270,6 @@ const PassengerMapScreen = () => {
   // Back: one sheet state (§12.5), asks before dropping a trip, held while sending (UI-R10); see bookingBackHandlers.
   const leave = useCallback(() => navigation.goBack(), [navigation]);
   const goBack = useDiscardOnLeave({ flow, rideShown, blocked: request.busy, onLeave: leave });
-  const searching = shownStage === 'requesting' && (rideStage?.stage ?? 'searching') === 'searching';
   const backState = { searching, findingWithRide: searching && rideShown, cancelled: rideCancelled, retrying: noDriver.retrying };
   const back = bookingBackHandlers(backState, { back: goBack, cancel: handleCancelRide, finish: finishRide });
   useBookingHardwareBack(isFocused, back.hardware);
@@ -324,7 +328,7 @@ const PassengerMapScreen = () => {
           destination={trip.dropoff ?? destination}
           route={mapRoutes.route}
           driverRoute={mapRoutes.driverRoute}
-          nearbyDrivers={rideShown ? null : nearby.state.drivers}
+          nearbyDrivers={nearby.drivers}
           nearbyTier={nearby.tier}
           nearbyFreshness={nearby.freshness}
           nearbyListTier={nearby.state.listTier}
@@ -341,7 +345,7 @@ const PassengerMapScreen = () => {
           followRide={{ visible: rideCamera.paused, onPress: rideCamera.recentre }}
         />
         {choosing && tripSummary && !compact ? <RouteSummaryPill summary={tripSummary} onPress={editTrip} /> : null}
-        {!rideShown && !compact ? <NearbyCountChip state={nearby.state} freshness={nearby.freshness} tier={nearby.tier} sheetHeight={sheetHeightValue} /> : null}
+        {nearby.chipShown ? <NearbyCountChip state={nearby.state} freshness={nearby.freshness} tier={nearby.tier} sheetHeight={sheetHeightValue} /> : null}
 
         <BookingSheet
           onHeightChange={setSheetHeight}

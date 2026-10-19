@@ -1186,4 +1186,15 @@ export const urLatn: TranslationTable = {
       parcel: { one: 'parcel rider', other: 'parcel riders', none: 'parcel rider' },
     },
   },
+  rideReach: {
+    sending: 'Qareeb drivers ko bhej rahe hain…',
+    sentOne: '{n} driver ko bheji gayi',
+    sent: '{n} drivers ko bheji gayi',
+    viewingOne: '{n} dekh raha hai',
+    viewing: '{n} dekh rahe hain',
+    announceSentOne: 'Aap ki request 1 driver ko bheji gayi.',
+    announceSent: 'Aap ki request {n} drivers ko bheji gayi.',
+    announceViewingOne: '1 driver dekh raha hai.',
+    announceViewing: '{n} drivers dekh rahe hain.',
+  },
 };

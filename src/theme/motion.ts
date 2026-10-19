@@ -77,6 +77,17 @@ export const motionPatterns = {
     jitterMeters: 3,
     teleportMeters: 500,
     snapMeters: 30,
+    /**
+     * [T-586 part 2] map-vehicles.md §2.1, §2.2, §2.4, D7: a move over `teleportMeters`, faster
+     * than `maxSpeedMps`, or the first after a pause over `resumeRelocateMs` relocates with a
+     * crossfade (out `relocateOutMs` at the old point, in `relocateInMs` at the new one) instead
+     * of a hard jump; a newly shown vehicle fades in over `appearMs`.
+     */
+    maxSpeedMps: 40,
+    relocateOutMs: 150,
+    relocateInMs: 250,
+    appearMs: 250,
+    resumeRelocateMs: 30_000,
   },
   /**
    * [T-586] map-vehicles.md §2: nearby vehicles (Home, Choose ride). Each poll starts a linear move

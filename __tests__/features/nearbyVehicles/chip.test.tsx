@@ -107,8 +107,9 @@ describe('NearbyCountChip', () => {
 
   it('shows the server total online as the second part', () => {
     render(<Chip state={{ drivers: [driver('a')], status: 'ready', error: null, counts: { byTier: { car: 4 }, onlineTotal: 9 } }} tier="car" />);
-    expect(screen.getByText('4 cars nearby')).toBeTruthy();
-    expect(screen.getByText('· 9 online')).toBeTruthy();
+    // T-586 part 2: one run of text (no gap before the dot); the online part is a nested span.
+    expect(screen.getByText('4 cars nearby · 9 online')).toBeTruthy();
+    expect(screen.getByTestId('nearby-drivers-status-online').props.children).toBe(' · 9 online');
   });
 
   it('error (first read failed, or the list is 90 s old): danger text, tap retries', () => {

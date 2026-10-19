@@ -1479,6 +1479,19 @@ export const en = {
       parcel: { one: 'parcel rider', other: 'parcel riders', none: 'parcel riders' },
     },
   },
+  // T-587: request reach on Finding a driver (passenger-finding-driver.md § Request reach).
+  // `{n}` is drawn as its own crossfading number, so keep it a separate word.
+  rideReach: {
+    sending: 'Sending to drivers nearby…',
+    sentOne: 'Sent to {n} driver',
+    sent: 'Sent to {n} drivers',
+    viewingOne: '{n} viewing',
+    viewing: '{n} viewing',
+    announceSentOne: 'Your request was sent to 1 driver.',
+    announceSent: 'Your request was sent to {n} drivers.',
+    announceViewingOne: '1 driver is viewing it.',
+    announceViewing: '{n} drivers are viewing it.',
+  },
 } as const;
 
 export type Strings = typeof en;

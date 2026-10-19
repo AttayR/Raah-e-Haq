@@ -65,6 +65,41 @@ export const spreadOverlaps = (vehicles: ReadonlyArray<NearbyVehicleInput>, radi
 };
 
 /**
+ * T-586 part 2 (design review: a bike drew on top of a car close by): vehicles closer than
+ * `minMeters` (about the spread, ~30 pt on screen) are pushed apart along the line between them,
+ * half each, in one pass. Cheap (≤ 15 markers, ≤ 105 pairs), and continuous in the positions, so
+ * two vehicles driving past each other glide apart instead of hopping. Identical points are
+ * spread first by `spreadOverlaps`.
+ */
+export const separateClose = (vehicles: ReadonlyArray<NearbyVehicleInput>, minMeters: number): NearbyVehicleInput[] => {
+  if (vehicles.length < 2 || !(minMeters > 0)) return [...vehicles];
+  const lat0 = vehicles[0].latitude;
+  const mPerDegLng = M_PER_DEG_LAT * Math.cos((lat0 * Math.PI) / 180);
+  if (!(mPerDegLng > 0)) return [...vehicles];
+  // Local metres (east, north) round the first vehicle.
+  const pts = vehicles.map(v => ({ x: (v.longitude - vehicles[0].longitude) * mPerDegLng, y: (v.latitude - lat0) * M_PER_DEG_LAT }));
+  const shift = pts.map(() => ({ x: 0, y: 0 }));
+  for (let i = 0; i < pts.length; i += 1) {
+    for (let j = i + 1; j < pts.length; j += 1) {
+      const dx = pts[j].x - pts[i].x;
+      const dy = pts[j].y - pts[i].y;
+      const d = Math.hypot(dx, dy);
+      if (d >= minMeters || d < 0.01) continue;
+      const push = (minMeters - d) / 2;
+      shift[i].x -= (dx / d) * push;
+      shift[i].y -= (dy / d) * push;
+      shift[j].x += (dx / d) * push;
+      shift[j].y += (dy / d) * push;
+    }
+  }
+  return vehicles.map((v, i) =>
+    shift[i].x === 0 && shift[i].y === 0
+      ? v
+      : { ...v, latitude: v.latitude + shift[i].y / M_PER_DEG_LAT, longitude: v.longitude + shift[i].x / mPerDegLng },
+  );
+};
+
+/**
  * T-586 design review: the overlap spread is ~`overlapSpreadPt` points on screen at the current
  * zoom, in metres: `latitudeDelta` spans `mapHeightPt` points. Falls back to the fixed
  * `overlapSpreadMeters` while no region (or no map height) is known yet.
@@ -99,6 +134,19 @@ export const tierReadFor = (tier: string | null | undefined, hasTiers: boolean):
   return SERVER_FILTERED_TIERS.find(t => t === tier) ?? null;
 };
 
+/**
+ * The glyph a nearby vehicle draws (§1.1, §3: true to the vehicle). BE-116 sends the vehicle kind
+ * in `vehicle_type` (an AC car is a `car`) and what it may serve in `tiers`: a car whose tiers
+ * include `car_ac` is an AC car on every screen (Home, and under the Car tier too). A bike shown
+ * for the parcel tier carries its box (`parcel`), as the tier's own list read does on older
+ * servers. Anything else keeps its own `vehicle_type`.
+ */
+export const glyphTypeFor = (driver: NearbyDriver, tier: string | null | undefined): string | null => {
+  if (Array.isArray(driver.tiers) && driver.tiers.includes('car_ac')) return 'car_ac';
+  if (tier === 'parcel' && driver.vehicle_type === 'bike') return 'parcel';
+  return driver.vehicle_type;
+};
+
 export interface NearbyMarkerOptions {
   /**
    * The tier the list was read for (`vehicle_type` read): every vehicle in it serves that tier,
@@ -111,7 +159,7 @@ export interface NearbyMarkerOptions {
 
 /**
  * The vehicles to draw (§2.1, §3): the tier's drivers, nearest first by `distance_km`, at most
- * `maxMarkers`, overlaps spread. Each keeps its own `vehicle_type` glyph (an AC car serving the
+ * `maxMarkers`, overlaps spread. Each keeps its own glyph (`glyphTypeFor`: an AC car serving the
  * car tier still shows the AC car), except in a list read for the tier itself (see `listTier`).
  */
 export const nearbyMarkerInputs = (
@@ -126,12 +174,12 @@ export const nearbyMarkerInputs = (
     .slice(0, max)
     .map(d => ({
       id: d.id,
-      vehicleType: tierList ? tier : d.vehicle_type,
+      vehicleType: tierList ? tier : glyphTypeFor(d, tier),
       latitude: d.location.latitude,
       longitude: d.location.longitude,
       heading: d.heading,
     }));
-  return spreadOverlaps(nearest, spreadMeters);
+  return separateClose(spreadOverlaps(nearest, spreadMeters), spreadMeters);
 };
 
 /**

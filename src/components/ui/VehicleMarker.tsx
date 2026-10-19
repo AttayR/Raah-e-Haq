@@ -94,6 +94,8 @@ const VehicleMarkerBase: React.FC<VehicleMarkerProps> = ({
       testID={testID}
       coordinate={live.coordinate}
       rotation={live.rotation}
+      // T-586 part 2 (D7): the appear fade and the relocation crossfade; a marker prop, no re-track.
+      opacity={live.opacity}
       flat
       title={title}
       description={description}

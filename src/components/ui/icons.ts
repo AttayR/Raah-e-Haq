@@ -173,6 +173,8 @@ export const iconGlyphs = {
   mapSearch: 'map-search-outline',
   // UI-R10: no rides available on the choose-ride sheet.
   carOff: 'car-off',
+  // T-587: the request reach strip (MDI broadcast).
+  broadcast: 'access-point',
   // UI-R7 role choice cards: trailing radio.
   radioOn: 'radiobox-marked',
   radioOff: 'radiobox-blank',

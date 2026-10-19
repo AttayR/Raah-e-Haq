@@ -1,5 +1,6 @@
 import type { RecentRideRow } from '../../components/ui/ride/RecentRidesCard';
-import { formatDateTime, rideAmountText, rideTime } from './format';
+import { RIDE_HISTORY_COPY } from './copy';
+import { formatDateTime, isChargedFee, isNoDriverRide, rideAmountText, rideTime } from './format';
 import type { Ride, RideViewer } from './types';
 
 /** How many finished rides the Home / Drive sheet lists (passenger-home.md block 8, T-507). */
@@ -23,6 +24,8 @@ export const toHomeRecentRides = (rides: ReadonlyArray<Ride>, viewer: RideViewer
       from: ride.pickupAddress,
       to: ride.dropoffAddress,
       date: formatDateTime(rideTime(ride)),
-      fare: rideAmountText(ride, viewer),
+      // T-586 design review: the short fare slot says "No charge" for a request nobody took (the
+      // long "No driver found · No charge" was cut off); the details screen keeps the long form.
+      fare: isNoDriverRide(ride) && !isChargedFee(ride) ? RIDE_HISTORY_COPY.noCharge : rideAmountText(ride, viewer),
       status: ride.status,
     }));

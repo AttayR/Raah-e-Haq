@@ -25,6 +25,7 @@ import { toRide } from '../../../src/features/ride-history/api';
 import { cancellationText } from '../../../src/features/ride-history/copy';
 import { rideAmountText, receiptShareText } from '../../../src/features/ride-history/format';
 import { RideHistoryRow } from '../../../src/features/ride-history/components/RideHistoryRow';
+import { toHomeRecentRides } from '../../../src/features/ride-history/recentRides';
 import { bumpSessionEpoch } from '../../../src/store/sessionEpoch';
 import { CLIENT_ID_PATTERN } from '../../../src/features/chat/clientId';
 import { setLocale } from '../../../src/i18n';
@@ -181,6 +182,10 @@ describe('history and receipts', () => {
     expect(cancellationText('no_driver', 'passenger')).toBe('No driver accepted this ride in time.');
     expect(cancellationText('no_driver', 'passenger', true)).toBe('No rider accepted this delivery in time.');
     expect(receiptShareText(historyRide(), 'passenger')).toContain('No driver found · No charge');
+  });
+
+  it('T-586 design review: the short Home recent-ride fare slot says "No charge" (not cut off)', () => {
+    expect(toHomeRecentRides([historyRide({ id: 62 })])[0].fare).toBe('No charge');
   });
 
   it('the history row shows the label without a "Cancelled" pill; Roman Urdu', () => {

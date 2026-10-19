@@ -144,13 +144,15 @@ describe('VehicleMarker', () => {
     expect(distanceMeters(markerProps().coordinate, at(0, 100))).toBeLessThan(0.01);
   });
 
-  it('teleports over ~500 m', async () => {
+  it('relocates over ~500 m with a crossfade (T-586 part 2, D7), never sliding across blocks', async () => {
     jest.useFakeTimers();
     const { rerender } = render(<VehicleMarker testID="vm" coordinate={at(0)} />);
     await flush();
+    await advance(400);
     rerender(<VehicleMarker testID="vm" coordinate={at(800)} />);
-    await advance(16);
+    await advance(450);
     expect(distanceMeters(markerProps().coordinate, at(800))).toBeLessThan(0.01);
+    expect((screen.getByTestId('vm').props as { opacity: number }).opacity).toBe(1);
   });
 
   it('Reduce Motion: jumps to the new position and heading at once', async () => {

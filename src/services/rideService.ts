@@ -202,6 +202,11 @@ export interface RideResource {
   female_driver_only?: boolean;
   /** BE-87, passenger only: the women-mode block (read through features/women-mode/api). */
   women_mode?: unknown;
+  /**
+   * BE-116 (T-587), passenger only, while `requested`: `{sent, viewing}` counts of the request's
+   * reach (null counts in women mode). Read through features/active-ride/reach, never by hand.
+   */
+  reach?: unknown;
   /** BE-105, passenger only: `{can_report, report}` (read through features/women-mode/api). */
   safety_report?: unknown;
   /** BE-88: a parcel delivery (vehicle_type parcel). */

@@ -35,7 +35,7 @@ import { responseHasTiers, tierReadFor } from '../features/nearby-vehicles/selec
  * `vehicle_type` (the server applies the AC and parcel rules). The tier settles for
  * NEARBY_TIER_SETTLE_MS first (the last of quick switches wins) and the read keeps the 10 s floor
  * and the poll; until a list read for what is wanted arrives, `status` is `loading`. With BE-116
- * data no extra read is made.
+ * data (`meta.counts`, `data[].tiers`) no extra read is made: tier switches filter the one list.
  */
 export const NEARBY_POLL_MS = motionPatterns.nearbyMarker.updateMs;
 export const NEARBY_MIN_GAP_MS = 10_000;
@@ -228,7 +228,10 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
   }, [enabled, lat, lng, radiusKm, vehicleType, refreshKey, recovery]);
 
   // A list read for another tier is not this tier's answer: loading until the wanted read lands.
-  const pending = state.status === 'ready' && (state.listTier ?? null) !== wantedType;
+  // A list read for the selected tier itself still answers it (T-586 part 2: the first reply of
+  // a cold Choose ride on AC says the server sends tiers; the next poll is unfiltered, no burst).
+  const listTier = state.listTier ?? null;
+  const pending = state.status === 'ready' && listTier !== wantedType && !(listTier !== null && listTier === tier);
   return useMemo(() => ({ ...state, status: pending ? 'loading' : state.status, retry }), [state, pending, retry]);
 };
 

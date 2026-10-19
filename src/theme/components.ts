@@ -184,6 +184,25 @@ export const componentTokens = {
     },
     /** [T-586] map count chip (map-vehicles.md §4): 32 min pill, 8 dot, 16 spinner. */
     nearbyChip: { minHeight: 32, dot: 8, spinner: 16, paddingHorizontal: space[3], gap: space[2] },
+    /**
+     * [T-587] reach strip on Finding a driver (passenger-finding-driver.md block 3a): 40 min,
+     * 8/12 padding, 20 icon, 6 viewing dot. Numbers: old out 100, new in 150 with a 4 pt rise;
+     * the dot breathes 1 → 0.4 → 1 over 2000 ms while someone is viewing.
+     */
+    reachStrip: {
+      minHeight: 40,
+      paddingVertical: space[2],
+      paddingHorizontal: space[3],
+      icon: 20,
+      gap: space[2],
+      dot: 6,
+      dotGap: space[1],
+      numberOutMs: 100,
+      numberInMs: 150,
+      numberRise: 4,
+      breatheMs: 2000,
+      breatheMinOpacity: 0.4,
+    },
     /** §6.5 searching pulse: rings start at the pickup pin size; 2pt progress bar. */
     // [UI-R10] reduced motion: the bar is a static `primary` segment 30 % wide at the start.
     pulse: { ring: 20, progressHeight: 2, progressBandRatio: 0.35, reducedBandRatio: 0.3 },

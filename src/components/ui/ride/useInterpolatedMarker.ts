@@ -54,7 +54,37 @@ export interface InterpolatedMarker {
   coordinate: LatLng;
   /** Degrees clockwise from north, 0..360. */
   rotation: number;
+  /** 0..1: the appear fade and the relocation crossfade (T-586 part 2, D7); 1 at rest. */
+  opacity: number;
 }
+
+const DM = motionPatterns.driverMarker;
+/** An opacity change under this is not committed on its own. */
+const MIN_OPACITY_STEP = 0.02;
+
+interface Fade {
+  from: number;
+  to: number;
+  start: number;
+  duration: number;
+}
+
+/** The fade's value at `t` (decelerating, like `motion.fast` / `motion.base`) and whether it ended. */
+const fadeAt = (fade: Fade, t: number): { value: number; done: boolean } => {
+  const k = fade.duration <= 0 ? 1 : Math.min(1, Math.max(0, (t - fade.start) / fade.duration));
+  return { value: fade.from + (fade.to - fade.from) * (1 - (1 - k) ** 3), done: k >= 1 };
+};
+
+/**
+ * map-vehicles.md §2.1/§2.2 (D7): a move too far (`teleportMeters`) or too fast (`maxSpeedMps`
+ * over the gap between the two updates) to be driving is relocated with a crossfade, not slid.
+ */
+export const isImplausibleMove = (from: LatLng, to: LatLng, gapMs: number | null): boolean => {
+  const d = distanceMeters(from, to);
+  if (d > DM.teleportMeters) return true;
+  if (gapMs === null) return false;
+  return d / (Math.max(gapMs, DM.minPositionMs) / 1000) > DM.maxSpeedMps;
+};
 
 interface Motion {
   path: LatLng[];
@@ -75,7 +105,10 @@ interface Motion {
  *   last two updates, clamped), linear, from wherever the marker is at that moment, so a car
  *   driving steadily never stops between polls. Within `snapMeters` of the route it drives along
  *   the polyline (and stays on the road); otherwise in a straight line. Moves under
- *   `jitterMeters` are ignored; over `teleportMeters` it jumps.
+ *   `jitterMeters` are ignored.
+ * - T-586 part 2 (D7): a move over `teleportMeters`, faster than `maxSpeedMps`, or the first after
+ *   a pause over `resumeRelocateMs` relocates with a crossfade (out 150 ms, moved and turned while
+ *   hidden, in 250 ms); the first position fades in (250 ms). Reduced motion: instant.
  * - Rotation: along the route the road's direction; otherwise the server/device heading, else the
  *   bearing of the move. It eases the shortest way round in about `rotationMs`.
  * - `animate` off (reduced motion): position and rotation jump.
@@ -94,6 +127,8 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
   const [state, setState] = useState<InterpolatedMarker>(() => ({
     coordinate: snapToRoute({ latitude, longitude }, route),
     rotation: serverHeading ?? 0,
+    // D7: a newly shown vehicle starts transparent and fades in (placed at once when not animated).
+    opacity: animate && !paused ? 0 : 1,
   }));
   /** What was last committed (rendered). */
   const shown = useRef(state);
@@ -112,6 +147,9 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
   routeRef.current = route;
   const expectedRef = useRef(expected);
   expectedRef.current = expected;
+  /** When the loop was paused; a pause over `resumeRelocateMs` makes the next move a relocation. */
+  const pausedAt = useRef<number | null>(paused ? Date.now() : null);
+  const relocateNext = useRef(false);
 
   useEffect(
     () => () => {
@@ -127,7 +165,13 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
     if (paused) {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
       frame.current = null;
-    } else if (activeStep.current !== null && frame.current === null) {
+      pausedAt.current = Date.now();
+      return;
+    }
+    // §2.4: back after a long pause, the first move crossfades instead of a long slide.
+    if (pausedAt.current !== null && Date.now() - pausedAt.current > DM.resumeRelocateMs) relocateNext.current = true;
+    pausedAt.current = null;
+    if (activeStep.current !== null && frame.current === null) {
       frame.current = requestAnimationFrame(activeStep.current);
     }
   }, [paused]);
@@ -160,12 +204,97 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
       ? headingForMove(previous, target, serverHeading, DEFAULT_THRESHOLDS.jitterMeters)
       : serverHeading;
 
+    /**
+     * The frame loop (≤ 30 fps): drives `motion`, eases the rotation, runs `fade`, and when all
+     * of it rests calls `after` (the second half of a crossfade) or stops.
+     */
+    const run = (motion: Motion | null, fade: Fade | null, after?: () => void) => {
+      stop();
+      const startedAt = Date.now();
+      let lastFrameAt = startedAt - MARKER_FRAME_MS;
+      let due = startedAt;
+      const step = () => {
+        const t = Date.now();
+        if (t < due - MARKER_FRAME_SLACK_MS) {
+          // Faster than 30 fps: wait for a later frame.
+          schedule(step);
+          return;
+        }
+        // Next slot: one frame after this one's slot (or after now, when frames were dropped).
+        due = Math.max(due, t - MARKER_FRAME_SLACK_MS) + MARKER_FRAME_MS;
+        const dt = t - lastFrameAt;
+        lastFrameAt = t;
+        let position = live.current.coordinate;
+        let done = true;
+        if (motion) {
+          const k = Math.min(1, (t - motion.start) / motion.duration);
+          const at = pointAlong(motion.path, motion.cumulative, k, motion.leadIn);
+          position = at.point;
+          // On the road: the road's direction. A lead-in with no road segment keeps the heading
+          // (the raw fix → road hop and the raw move both point across the road).
+          const fallback = motion.leadIn ? null : motion.straightHeading;
+          const wanted = motion.onRoute ? at.bearing ?? fallback : motion.straightHeading;
+          if (wanted !== null) targetRotation.current = wanted;
+          done = k >= 1;
+        }
+        let opacity = live.current.opacity;
+        let faded = true;
+        if (fade) {
+          const f = fadeAt(fade, t);
+          opacity = f.value;
+          faded = f.done;
+        }
+        const rotation = easeRotation(live.current.rotation, targetRotation.current, dt);
+        const next = { coordinate: position, rotation, opacity };
+        const turning = Math.abs(shortestTurn(rotation, targetRotation.current)) > 0.25;
+        const resting = done && faded && !turning;
+        const visible =
+          distanceMeters(shown.current.coordinate, position) >= MARKER_MIN_MOVE_M ||
+          Math.abs(shortestTurn(shown.current.rotation, rotation)) >= MARKER_MIN_TURN_DEG ||
+          Math.abs(shown.current.opacity - opacity) >= MIN_OPACITY_STEP;
+        if (resting || visible) commit(next);
+        else live.current = next;
+        if (!resting) {
+          schedule(step);
+        } else if (after) {
+          after();
+        } else {
+          activeStep.current = null;
+          frame.current = null;
+        }
+      };
+      schedule(step);
+    };
+
+    /** §2.2 relocation (D7): fade out at the old point, move and turn while hidden, fade in. */
+    const relocate = (to: LatLng, rotation: number) => {
+      targetRotation.current = rotation;
+      if (pausedRef.current) {
+        // Off screen nothing is seen: place it.
+        stop();
+        commit({ coordinate: to, rotation, opacity: 1 });
+        return;
+      }
+      const out = live.current.opacity;
+      run(null, { from: out, to: 0, start: Date.now(), duration: DM.relocateOutMs * out }, () => {
+        commit({ coordinate: to, rotation, opacity: 0 });
+        run(null, { from: 0, to: 1, start: Date.now(), duration: DM.relocateInMs });
+      });
+    };
+
     if (previous === null) {
-      // First position: place it (rotation from the server if it sent one).
+      // First position: place it (rotation from the server if it sent one), fading in (D7).
       lastTarget.current = target;
       stop();
       targetRotation.current = serverHeading ?? live.current.rotation;
-      commit({ coordinate: snapToRoute(target, currentRoute), rotation: targetRotation.current });
+      const placed = { coordinate: snapToRoute(target, currentRoute), rotation: targetRotation.current };
+      if (!animate || pausedRef.current) {
+        commit({ ...placed, opacity: 1 });
+        return;
+      }
+      const startOpacity = live.current.opacity;
+      commit({ ...placed, opacity: startOpacity });
+      if (startOpacity < 1) run(null, { from: startOpacity, to: 1, start: now, duration: DM.appearMs * (1 - startOpacity) });
       return;
     }
 
@@ -177,16 +306,19 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
       const rotation = moveHeading ?? live.current.rotation;
       targetRotation.current = rotation;
       const position = plan.kind === 'hold' ? live.current.coordinate : snapToRoute(target, currentRoute);
-      commit({ coordinate: position, rotation });
+      commit({ coordinate: position, rotation, opacity: 1 });
       return;
     }
 
-    if (plan.kind === 'jump') {
-      stop();
-      lastTarget.current = target;
-      targetRotation.current = serverHeading ?? live.current.rotation;
-      commit({ coordinate: plan.to, rotation: targetRotation.current });
-      return;
+    if (plan.kind !== 'hold') {
+      const longResume = relocateNext.current;
+      relocateNext.current = false;
+      if (plan.kind === 'jump' || longResume || isImplausibleMove(previous, target, gap)) {
+        lastTarget.current = target;
+        const to = plan.kind === 'jump' ? plan.to : snapToRoute(target, currentRoute);
+        relocate(to, serverHeading ?? moveHeading ?? live.current.rotation);
+        return;
+      }
     }
 
     let motion: Motion | null = null;
@@ -207,50 +339,9 @@ export function useInterpolatedMarker(coordinate: LatLng, options: InterpolatedM
       };
     }
 
-    stop();
-    let lastFrameAt = now - MARKER_FRAME_MS;
-    let due = now;
-    const step = () => {
-      const t = Date.now();
-      if (t < due - MARKER_FRAME_SLACK_MS) {
-        // Faster than 30 fps: wait for a later frame.
-        schedule(step);
-        return;
-      }
-      // Next slot: one frame after this one's slot (or after now, when frames were dropped).
-      due = Math.max(due, t - MARKER_FRAME_SLACK_MS) + MARKER_FRAME_MS;
-      const dt = t - lastFrameAt;
-      lastFrameAt = t;
-      let position = live.current.coordinate;
-      let done = true;
-      if (motion) {
-        const k = Math.min(1, (t - motion.start) / motion.duration);
-        const at = pointAlong(motion.path, motion.cumulative, k, motion.leadIn);
-        position = at.point;
-        // On the road: the road's direction. A lead-in with no road segment keeps the heading
-        // (the raw fix → road hop and the raw move both point across the road).
-        const fallback = motion.leadIn ? null : motion.straightHeading;
-        const wanted = motion.onRoute ? at.bearing ?? fallback : motion.straightHeading;
-        if (wanted !== null) targetRotation.current = wanted;
-        done = k >= 1;
-      }
-      const rotation = easeRotation(live.current.rotation, targetRotation.current, dt);
-      const next = { coordinate: position, rotation };
-      const turning = Math.abs(shortestTurn(rotation, targetRotation.current)) > 0.25;
-      const resting = done && !turning;
-      const visible =
-        distanceMeters(shown.current.coordinate, position) >= MARKER_MIN_MOVE_M ||
-        Math.abs(shortestTurn(shown.current.rotation, rotation)) >= MARKER_MIN_TURN_DEG;
-      if (resting || visible) commit(next);
-      else live.current = next;
-      if (resting) {
-        activeStep.current = null;
-        frame.current = null;
-      } else {
-        schedule(step);
-      }
-    };
-    schedule(step);
+    // A move that interrupts a fade also brings the vehicle back to full opacity.
+    const opacityNow = live.current.opacity;
+    run(motion, opacityNow < 1 ? { from: opacityNow, to: 1, start: now, duration: DM.relocateInMs * (1 - opacityNow) } : null);
     // serverHeading is derived from `heading`; listed so a heading-only change runs this.
   }, [animate, inferHeading, latitude, longitude, serverHeading]);
 
