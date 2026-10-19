@@ -27,7 +27,7 @@ export const RideHistoryRow = memo(function RideHistoryRow({ ride, viewer, onPre
   // the row shows the status pill only (also keeps the top line on one row on iPhone SE).
   const inProgress = !completed && !cancelled;
   const amount = inProgress ? '' : rideAmountText(ride, viewer);
-  const chargedFee = cancelled && isChargedFee(ride, viewer);
+  const chargedFee = cancelled && isChargedFee(ride);
   const time = formatTime(at);
   const handlePress = useCallback(() => onPress(ride), [onPress, ride]);
   return (

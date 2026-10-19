@@ -87,7 +87,7 @@ export function RideRatingSection({ rideId, role, myRating, canRate, personName,
           {t('rating.yourRating')}
         </AppText>
         <Button
-          label={t('rating.rateThisTrip')}
+          label={parcel ? t('parcel.rateThisDelivery') : t('rating.rateThisTrip')}
           variant="secondary"
           leadingIcon="starOutline"
           accessibilityHint={t('rating.rateHint')}

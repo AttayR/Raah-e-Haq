@@ -193,7 +193,7 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
             </AppText>
           </View>
           <Button
-            label={submitting ? COPY.working : noShow ? t('driverFare.noShowSubmit') : COPY.cancelSubmit}
+            label={submitting ? COPY.working : noShow ? t('driverFare.noShowSubmit') : forParcel ? t('parcel.cancelDelivery') : COPY.cancelSubmit}
             variant="destructive"
             size="lg"
             onPress={submit}

@@ -199,7 +199,9 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
 
       {!finished && step !== null && !parcel ? <RideProgress step={step} testID="active-ride-progress" /> : null}
 
-      {parcel && ride ? <ParcelSenderSection parcel={parcel} rideId={ride.id} /> : null}
+      {parcel && ride ? (
+        <ParcelSenderSection parcel={parcel} rideId={ride.id} times={{ acceptedAt: ride.accepted_at, arrivedAt: ride.arrived_at }} />
+      ) : null}
 
       {/* BE-87: "Looking for a female driver" and the keep-waiting / allow-any choice. */}
       {/* T-565: mounted for the whole ride, so its choice sheet slides out when a driver takes it. */}

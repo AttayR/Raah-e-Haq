@@ -862,6 +862,9 @@ export const en = {
     estimated: 'Estimated from the current fare until the trip ends.',
     cancelFeeShare: 'The passenger was charged {amount} for this cancellation. Your share shows in your wallet once it is credited.',
     cancelFeeShareParcel: 'The sender was charged {amount} for this cancellation. Your share shows in your wallet once it is credited.',
+    // T-578: the same in the cancel toast, short enough for its two lines.
+    cancelFeeToast: 'Passenger charged {amount}. Your share comes to your wallet.',
+    cancelFeeToastParcel: 'Sender charged {amount}. Your share comes to your wallet.',
     rideFareSplit: 'Fare {fare} · commission {rate}% = {commission}',
     // T-557: an Earnings row whose fare was locked at accept (BE-82/BE-103).
     rideFareSplitLocked: 'Locked fare {fare} · commission {rate}% = {commission}',
@@ -1273,6 +1276,13 @@ export const en = {
     yourSender: 'Your sender',
     overchargeButton: 'Rider asked for more?',
     overchargeAmount: 'Amount the rider asked for (optional)',
+    // T-578: the rest of the ride wording on a parcel.
+    detailsTitle: 'Delivery details',
+    rateThisDelivery: 'Rate this delivery',
+    paymentCashSender: 'Cash (paid at the pickup)',
+    paymentCashDriver: 'Cash (collected at the pickup)',
+    cancelDelivery: 'Cancel delivery',
+    cancelledDone: 'Delivery cancelled.',
     item: 'Parcel',
     declaredValue: 'Declared value {amount}',
     receiver: 'Receiver',

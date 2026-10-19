@@ -271,7 +271,8 @@ describe('DriverRideScreen', () => {
     await waitFor(() => expect(selectDriverActiveRide(store.getState())).toBeNull());
     expect(success).toHaveBeenCalledWith(
       'Ride cancelled.',
-      'The passenger was charged Rs 50 for this cancellation. Your share shows in your wallet once it is credited.',
+      // T-578: the short form, so it fits the toast's two lines.
+      'Passenger charged Rs 50. Your share comes to your wallet.',
       expect.anything(),
     );
     clock.mockRestore();

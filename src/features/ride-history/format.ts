@@ -1,4 +1,5 @@
 import { t } from '../../i18n';
+import { isParcelRide } from '../parcel/api';
 import { formatDistance, formatDuration, formatMoney, formatRelativeDate, formatTime } from '../../utils/format';
 import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL, vehicleLabel } from './copy';
 import type { Ride, RidePerson, RideStatus, RideViewer } from './types';
@@ -24,17 +25,20 @@ export const formatDateTime = (value: string | null): string => {
 };
 
 /**
- * The amount a row and the summary show: the fare for the passenger, the earnings for the
- * driver. A cancelled ride shows the passenger the fee they were charged (BE-85
- * `cancellation_fee` > 0, "Rs 50 fee", T-543), else "No charge".
+ * BE-85: a cancelled ride the passenger was charged a fee for (e.g. a no-show). T-578: both sides
+ * see it (the driver's share of it is credited separately), not "No charge".
  */
-/** BE-85: a cancelled ride the passenger was charged a fee for (the driver sees "No charge"). */
-export const isChargedFee = (ride: Pick<Ride, 'status' | 'cancellationFee'>, viewer: RideViewer): boolean =>
-  ride.status === 'cancelled' && viewer === 'passenger' && ride.cancellationFee !== null && ride.cancellationFee > 0;
+export const isChargedFee = (ride: Pick<Ride, 'status' | 'cancellationFee'>): boolean =>
+  ride.status === 'cancelled' && ride.cancellationFee !== null && ride.cancellationFee > 0;
 
+/**
+ * The amount a row and the summary show: the fare for the passenger, the earnings for the
+ * driver. A cancelled ride shows the fee the passenger was charged (BE-85 `cancellation_fee`
+ * > 0, "Rs 50 fee", T-543; T-578 also to the driver), else "No charge".
+ */
 export const rideAmountText = (ride: Ride, viewer: RideViewer): string => {
   if (ride.status === 'cancelled') {
-    return viewer === 'passenger' && ride.cancellationFee !== null && ride.cancellationFee > 0
+    return isChargedFee(ride) && ride.cancellationFee !== null
       ? t('fare.feeCharged', { amount: formatMoney(ride.cancellationFee) })
       : RIDE_HISTORY_COPY.noCharge;
   }
@@ -42,6 +46,17 @@ export const rideAmountText = (ride: Ride, viewer: RideViewer): string => {
     return formatMoney(ride.driverEarnings);
   }
   return formatMoney(ride.totalFare);
+};
+
+/**
+ * How the ride was paid: cash to the driver (collected by the driver); T-578: a parcel's fare is
+ * paid in cash at the pickup.
+ */
+export const paymentMethodText = (ride: Pick<Ride, 'vehicleType' | 'parcel'>, viewer: RideViewer): string => {
+  if (ride.parcel !== null || isParcelRide({ vehicle_type: ride.vehicleType })) {
+    return t(viewer === 'driver' ? 'parcel.paymentCashDriver' : 'parcel.paymentCashSender');
+  }
+  return RIDE_HISTORY_COPY.paymentCash[viewer];
 };
 
 /** The other party: the driver for a passenger, the passenger for a driver. */
@@ -145,7 +160,7 @@ export const receiptShareText = (ride: Ride, viewer: RideViewer): string => {
     ...ride.stops.map((stop, i) => RIDE_HISTORY_COPY.shareStop(i + 1, stop.address)),
     RIDE_HISTORY_COPY.shareTo(ride.dropoffAddress),
     metrics,
-    ride.status === 'cancelled' ? amount : RIDE_HISTORY_COPY.shareTotal(amount, RIDE_HISTORY_COPY.paymentCash[viewer]),
+    ride.status === 'cancelled' ? amount : RIDE_HISTORY_COPY.shareTotal(amount, paymentMethodText(ride, viewer)),
     ride.rideCode ? `${RIDE_HISTORY_COPY.rideCode}: ${ride.rideCode}` : '',
   ];
   return lines.filter(Boolean).join('\n');

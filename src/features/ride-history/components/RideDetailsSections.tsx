@@ -18,7 +18,7 @@ import { formatDistance, formatDuration } from '../../../utils/format';
 import { space } from '../../../theme';
 import { cancellationText, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
 import { formatMoney } from '../../../utils/format';
-import { formatDateTime, isChargedFee, otherParty, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
+import { formatDateTime, isChargedFee, otherParty, paymentMethodText, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
 import type { Ride, RideViewer } from '../types';
 import { t } from '../../../i18n';
 import { isParcelRide } from '../../parcel/api';
@@ -74,7 +74,7 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
     .filter(Boolean)
     .join(' · ');
   const cancelled = ride.status === 'cancelled';
-  const chargedFee = isChargedFee(ride, viewer);
+  const chargedFee = isChargedFee(ride);
   const vehicle = vehicleLabel(ride.vehicleType);
   return (
     <Card testID="ride-details-summary">
@@ -101,7 +101,7 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
       ) : null}
       {!cancelled ? (
         <AppText variant="bodySmall" color="textSecondary">
-          {[C.paymentCash[viewer], titleCase(ride.paymentStatus)].filter(Boolean).join(' · ')}
+          {[paymentMethodText(ride, viewer), titleCase(ride.paymentStatus)].filter(Boolean).join(' · ')}
         </AppText>
       ) : null}
       {vehicle || metrics ? (
@@ -274,7 +274,7 @@ export const receiptPaymentStatus = (ride: Pick<Ride, 'status' | 'paymentStatus'
 export function ReceiptCard({ ride, viewer }: SectionProps) {
   const paymentStatus = receiptPaymentStatus(ride);
   const info: FareRow[] = [
-    { key: 'method', label: C.paymentMethod, value: C.paymentCash[viewer] },
+    { key: 'method', label: C.paymentMethod, value: paymentMethodText(ride, viewer) },
     ...(paymentStatus ? [{ key: 'status', label: C.paymentStatus, value: paymentStatus }] : []),
     ...(ride.rideCode ? [{ key: 'code', label: C.rideCode, value: ride.rideCode, fit: true }] : []),
   ];

@@ -179,8 +179,9 @@ describe('ride format', () => {
     const charged = ride({ status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' });
     expect(rideAmountText(charged, 'passenger')).toBe('Rs 50 fee');
     expect(rideAmountText(ride({ status: 'cancelled', cancellation_fee: 0 }), 'passenger')).toBe('No charge');
-    // The driver's share is credited separately; their row keeps "No charge".
-    expect(rideAmountText(charged, 'driver')).toBe('No charge');
+    // T-578: the driver sees the fee the passenger paid too (their share is credited separately).
+    expect(rideAmountText(charged, 'driver')).toBe('Rs 50 fee');
+    expect(rideAmountText(ride({ status: 'cancelled', cancellation_fee: 0 }), 'driver')).toBe('No charge');
   });
 
   it('builds the receipt from the server breakdown; the driver also sees fee and earnings', async () => {

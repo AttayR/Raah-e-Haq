@@ -156,18 +156,20 @@ export const parcelStatusText = (status: ParcelStatus): string => t(STEP_LABEL[s
  * The timeline: requested → accepted → arrived → picked up → delivered, or with a return
  * … → picked up → returning → returned. A cancelled parcel shows the steps it reached and then
  * "Cancelled": T-563, a parcel refused at the pickup (BE-88 refuses only once the rider has
- * arrived) keeps accepted and arrived. The last reached step is `current` until the parcel is done.
+ * arrived) keeps accepted and arrived. T-578: so does a parcel cancelled (not refused) after a
+ * rider accepted or arrived, from the ride's `accepted_at` / `arrived_at` (`times`).
+ * The last reached step is `current` until the parcel is done.
  */
 export const parcelTimeline = (
   parcel: Pick<ParcelView, 'status' | 'pickedUpAt' | 'returnStartedAt'> & Partial<Pick<ParcelView, 'refusalReason'>>,
+  times: { acceptedAt?: string | null; arrivedAt?: string | null } = {},
 ): ParcelTimelineStep[] => {
   const { status } = parcel;
   if (status === 'cancelled') {
-    const reached: ParcelStatus[] = parcel.pickedUpAt
-      ? ['requested', 'accepted', 'arrived', 'picked_up']
-      : parcel.refusalReason
-        ? ['requested', 'accepted', 'arrived']
-        : ['requested'];
+    let reached: ParcelStatus[] = ['requested'];
+    if (parcel.pickedUpAt) reached = ['requested', 'accepted', 'arrived', 'picked_up'];
+    else if (parcel.refusalReason || times.arrivedAt) reached = ['requested', 'accepted', 'arrived'];
+    else if (times.acceptedAt) reached = ['requested', 'accepted'];
     return [
       ...reached.map((key) => ({ key, label: parcelStatusText(key), state: 'done' as const })),
       { key: 'cancelled', label: parcelStatusText('cancelled'), state: 'current' },

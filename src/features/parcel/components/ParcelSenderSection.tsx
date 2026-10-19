@@ -88,12 +88,21 @@ function RefusalNotice({ parcel }: { parcel: ParcelView }) {
  * pickup or once it is scrubbed), the delivery code's state with "Send the code again", and the
  * return code only while the parcel is coming back.
  */
-export function ParcelSenderSection({ parcel, rideId }: { parcel: ParcelView; rideId: number }) {
+export function ParcelSenderSection({
+  parcel,
+  rideId,
+  times,
+}: {
+  parcel: ParcelView;
+  rideId: number;
+  /** T-578: the ride's accepted / arrived times, kept on the timeline of a cancelled parcel. */
+  times?: { acceptedAt?: string | null; arrivedAt?: string | null };
+}) {
   const receiver = receiverLine(parcel.receiver);
   const item = itemLine(parcel);
   return (
     <View style={styles.block} testID="parcel-sender">
-      <ParcelTimeline parcel={parcel} />
+      <ParcelTimeline parcel={parcel} times={times} />
       <RefusalNotice parcel={parcel} />
       {receiver || item ? (
         <Card>

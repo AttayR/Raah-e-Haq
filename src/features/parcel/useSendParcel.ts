@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ScrollView, View } from 'react-native';
 import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { hideModal, showErrorModal } from '../../components/NotificationManager';
+import { REVEAL_DELAY_MS } from '../../components/ui/keyboardReveal';
 import { t } from '../../i18n';
+import { space } from '../../theme';
 import { reverseGeocode } from '../../services/placesService';
 import type { RideResource } from '../../services/rideService';
 import { createActiveRide, type ActiveRideState } from '../active-ride/slice';
@@ -25,6 +28,25 @@ type LatLng = { latitude: number; longitude: number };
 
 /** A parcel goes straight from the pickup to the drop-off (BE-88: no stops). */
 const NO_STOPS: ReadonlyArray<LatLng> = [];
+
+/**
+ * T-578: room kept above the field a refused "Send parcel" scrolls to (the Header is outside the
+ * scroll; the form's error shows in the footer), so its label stays readable.
+ */
+export const PARCEL_FIELD_SCROLL_OFFSET = space[4];
+
+/**
+ * When the scroll to the topmost error runs: after the kit TextField's own reveal of a newly red
+ * field (REVEAL_DELAY_MS), so a lower field turning red never wins over a red field above it.
+ */
+export const PARCEL_ERROR_SCROLL_DELAY_MS = REVEAL_DELAY_MS * 2;
+
+/** Gives the field's wrapper a ref, so a refused submit can scroll to it. */
+export type ParcelAnchor = (field: ParcelField) => (node: View | null) => void;
+
+/** The fields that have an error, so the form can scroll to the topmost one. */
+export const erroredParcelFields = (errors: ParcelFieldErrors): ParcelField[] =>
+  (Object.keys(errors) as ParcelField[]).filter((field) => !!errors[field]);
 
 export interface SendParcelHandlers {
   /** The parcel was booked (it is now the active ride). */
@@ -53,6 +75,16 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
   const [errors, setErrors] = useState<ParcelFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // T-578: every refused submit scrolls to the topmost field still in error (also one that was
+  // already red, e.g. the declaration checkbox off screen). A new object each time, so the same
+  // field is scrolled to again after the sender scrolled away.
+  const [scrollTarget, setScrollTarget] = useState<{ fields: ParcelField[] } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // The form's container in the scroll content, to turn a field's position into a scroll offset.
+  const containerRef = useRef<View>(null);
+  const containerY = useRef(0);
+  const anchors = useRef(new Map<ParcelField, View>());
+  const anchorRefs = useRef(new Map<ParcelField, (node: View | null) => void>());
   const inFlight = useRef(false);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -82,6 +114,59 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       })
       .catch(() => undefined);
   }, [pickupIsGps, lat, lng]);
+
+  const anchor = useCallback<ParcelAnchor>((field) => {
+    let ref = anchorRefs.current.get(field);
+    if (!ref) {
+      ref = (node: View | null) => {
+        if (node) anchors.current.set(field, node);
+        else anchors.current.delete(field);
+      };
+      anchorRefs.current.set(field, ref);
+    }
+    return ref;
+  }, []);
+
+  /** The refused fields as shown: their messages, and a scroll to the topmost one. */
+  const showErrors = useCallback((fields: ParcelFieldErrors) => {
+    setErrors(fields);
+    const errored = erroredParcelFields(fields);
+    if (errored.length > 0) setScrollTarget({ fields: errored });
+  }, []);
+
+  // Once the errors are rendered (the footer banner may have grown), scroll to the topmost one.
+  useEffect(() => {
+    if (!scrollTarget) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const nodes = scrollTarget.fields
+        .map((field) => anchors.current.get(field))
+        .filter((node): node is View => node !== undefined);
+      Promise.all(
+        nodes.map(
+          (node) =>
+            new Promise<number | null>((resolve) =>
+              node.measureLayout(
+                container,
+                (_x, y) => resolve(y),
+                () => resolve(null),
+              ),
+            ),
+        ),
+      ).then((ys) => {
+        const measured = ys.filter((y): y is number => y !== null);
+        if (cancelled || measured.length === 0) return;
+        const offset = containerY.current + Math.min(...measured) - PARCEL_FIELD_SCROLL_OFFSET;
+        scrollRef.current?.scrollTo({ y: Math.max(0, offset), animated: true });
+      });
+    }, PARCEL_ERROR_SCROLL_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [scrollTarget]);
 
   const clearError = useCallback((field: ParcelField) => {
     setErrors((e) => (e[field] ? { ...e, [field]: undefined } : e));
@@ -142,7 +227,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       inFlight.current = false;
       if (mounted.current) {
         setSubmitting(false);
-        setErrors(built.errors);
+        showErrors(built.errors);
         setFormError(built.message ?? t('parcel.fixFields'));
       }
       return;
@@ -164,7 +249,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       }
       if (rejection?.kind === 'validation') {
         const mapped = parcelFieldErrorsOf(rejection);
-        setErrors(mapped.fields);
+        showErrors(mapped.fields);
         if (mapped.rulesChanged) {
           resetDeclaration();
           handlersRef.current.onRulesChanged();
@@ -189,7 +274,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       // Booked: the screen is replaced by the ride, so nothing is set after it is gone.
       if (mounted.current) setSubmitting(false);
     }
-  }, [options, pickup, dropoff, draft, offeredFare, applyBand, dispatch, resetDeclaration]);
+  }, [options, pickup, dropoff, draft, offeredFare, applyBand, dispatch, resetDeclaration, showErrors]);
 
   return {
     pickup,
@@ -206,6 +291,10 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
     offer,
     submitting,
     submit,
+    scrollRef,
+    containerRef,
+    containerY,
+    anchor,
   };
 };
 

@@ -80,6 +80,7 @@ export default function SendParcelScreen() {
     body = (
       <>
         <ParcelRouteSection
+          anchor={form.anchor}
           pickup={form.pickup}
           pickupIsGps={form.pickupIsGps}
           dropoff={form.dropoff}
@@ -89,13 +90,14 @@ export default function SendParcelScreen() {
           onPickup={form.setPickup}
           onDropoff={form.setDropoff}
         />
-        <ParcelDetailsSection options={opts} draft={form.draft} errors={form.errors} update={form.update} />
+        <ParcelDetailsSection options={opts} draft={form.draft} errors={form.errors} update={form.update} anchor={form.anchor} />
         <ParcelDeclaration
           items={opts.prohibitedItems}
           declaration={opts.declaration}
           accepted={form.draft.declarationAccepted}
           onChange={(on) => form.update('declarationAccepted', on, 'declaration')}
           error={form.errors.declaration}
+          anchorRef={form.anchor('declaration')}
         />
         {form.quote && form.offer.band ? <OfferStepper offer={form.offer} testID="parcel-offer" /> : null}
         <Banner tone="info" icon="cash" text={t('parcel.noCod')} testID="send-parcel-cash" />
@@ -114,8 +116,23 @@ export default function SendParcelScreen() {
   return (
     <Screen testID="send-parcel" keyboardAvoiding>
       <Header tone="background" title={t('parcel.screenTitle')} backLabel={t('parcel.back')} onBack={() => navigation.goBack()} testID="send-parcel-header" />
-      <KeyboardAwareScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} testID="send-parcel-scroll">
-        {body}
+      <KeyboardAwareScrollView
+        ref={form.scrollRef}
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        testID="send-parcel-scroll"
+      >
+        {/* T-578: a refused "Send parcel" scrolls to the topmost red field inside this container. */}
+        <View
+          ref={form.containerRef}
+          style={styles.body}
+          onLayout={(e) => {
+            form.containerY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          {body}
+        </View>
       </KeyboardAwareScrollView>
       {ready && !keyboardUp ? (
         <View
@@ -147,11 +164,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.gutter,
     paddingTop: space[2],
     paddingBottom: space[6],
-    gap: space[6],
     width: '100%',
     maxWidth: layout.contentMaxWidth,
     alignSelf: 'center',
   },
+  body: { gap: space[6] },
   footer: { paddingHorizontal: layout.gutter, paddingTop: space[3], gap: space[3], borderTopWidth: StyleSheet.hairlineWidth },
   fareRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] },
 });

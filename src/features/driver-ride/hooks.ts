@@ -227,8 +227,9 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       if (cancelDriverRide.fulfilled.match(action)) {
         // BE-109: the fee the cancel really charged (the server's answer, not the preview).
         const fee = chargedCancelFeeOf(action.payload);
-        const feeText = fee === null ? undefined : t(parcel ? 'driverFare.cancelFeeShareParcel' : 'driverFare.cancelFeeShare', { amount: formatMoney(fee) });
-        toast.success(DRIVER_RIDE_COPY.cancelledDone, feeText, DRIVER_RIDE_TOAST_OPTIONS);
+        // T-578: the short form, so it fits the toast's two lines; a parcel says delivery.
+        const feeText = fee === null ? undefined : t(parcel ? 'driverFare.cancelFeeToastParcel' : 'driverFare.cancelFeeToast', { amount: formatMoney(fee) });
+        toast.success(parcel ? t('parcel.cancelledDone') : DRIVER_RIDE_COPY.cancelledDone, feeText, DRIVER_RIDE_TOAST_OPTIONS);
         // The server no longer reports `on_ride`; the toggle and the request feed follow it.
         dispatch(loadDriverStatus());
         return true;

@@ -12,11 +12,13 @@ type Props = {
   accepted: boolean;
   onChange: (accepted: boolean) => void;
   error?: string;
+  /** T-578: the checkbox and its error, so a refused submit can scroll to them. */
+  anchorRef?: (node: View | null) => void;
   testID?: string;
 };
 
 /** "Do not send" (the prohibited list) and the declaration the sender accepts (BE-88). */
-export function ParcelDeclaration({ items, declaration, accepted, onChange, error, testID = 'parcel-declaration' }: Props) {
+export function ParcelDeclaration({ items, declaration, accepted, onChange, error, anchorRef, testID = 'parcel-declaration' }: Props) {
   return (
     <View style={styles.wrap} testID={testID}>
       <Card>
@@ -34,17 +36,19 @@ export function ParcelDeclaration({ items, declaration, accepted, onChange, erro
           ))}
         </View>
       </Card>
-      <Checkbox
-        label={declaration || t('parcel.declarationRequired')}
-        checked={accepted}
-        onChange={onChange}
-        testID={`${testID}-accept`}
-      />
-      {error ? (
-        <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID={`${testID}-error`}>
-          {error}
-        </AppText>
-      ) : null}
+      <View ref={anchorRef} style={styles.wrap} testID={`${testID}-anchor`}>
+        <Checkbox
+          label={declaration || t('parcel.declarationRequired')}
+          checked={accepted}
+          onChange={onChange}
+          testID={`${testID}-accept`}
+        />
+        {error ? (
+          <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID={`${testID}-error`}>
+            {error}
+          </AppText>
+        ) : null}
+      </View>
     </View>
   );
 }

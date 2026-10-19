@@ -370,9 +370,10 @@ describe('3. the driver pickup footer on small phones', () => {
   const label = (testID: string) => screen.getByTestId(`${testID}-content`).findByType(ReactNative.Text).props.children;
 
   it.each([
+    // T-578: a parcel is cancelled as a delivery; "Cancel delivery" takes its short form in the row.
     [320, 'Refuse', 'Cancel'],
-    [375, 'Refuse', 'Cancel ride'],
-    [414, 'Refuse parcel', 'Cancel ride'],
+    [375, 'Refuse', 'Cancel'],
+    [414, 'Refuse parcel', 'Cancel'],
   ])('at %i pt: Pick up full width, Refuse and Cancel share one row (%s / %s)', (width, refuse, cancel) => {
     atPickup(width);
     const row = screen.getByTestId('driver-ride-footer-row');
@@ -386,7 +387,7 @@ describe('3. the driver pickup footer on small phones', () => {
     expect(label('driver-ride-cancel')).toBe(cancel);
     // The screen reader always hears the full label.
     expect(screen.getByTestId('driver-parcel-refuse').props.accessibilityLabel).toBe('Refuse parcel');
-    expect(screen.getByTestId('driver-ride-cancel').props.accessibilityLabel).toBe('Cancel ride');
+    expect(screen.getByTestId('driver-ride-cancel').props.accessibilityLabel).toBe('Cancel delivery');
   });
 
   it('after the wait, No-show replaces Cancel in the row', () => {

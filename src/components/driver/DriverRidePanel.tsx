@@ -158,7 +158,8 @@ export const DriverRidePanel: React.FC<Props> = ({
     secondaries.push({ key: 'no-show', label: parcelRide ? t('driverFare.noShowButtonParcel') : t('driverFare.noShowButton'), shortLabel: t('driverFare.noShowShort'), variant: 'destructiveSoft', onPress: onNoShow, testID: 'driver-ride-no-show' });
   }
   if (cancellable) {
-    secondaries.push({ key: 'cancel', label: COPY.cancel, shortLabel: COPY.cancelShort, variant: 'destructiveSoft', onPress: onCancel, testID: 'driver-ride-cancel' });
+    // T-578: a parcel is cancelled as a delivery.
+    secondaries.push({ key: 'cancel', label: parcelRide ? t('parcel.cancelDelivery') : COPY.cancel, shortLabel: COPY.cancelShort, variant: 'destructiveSoft', onPress: onCancel, testID: 'driver-ride-cancel' });
   }
   const inRow = secondaries.length > 1;
   const rowLabels = inRow ? footerRowLabels(secondaries, windowWidth, fontScale) : secondaries.map(a => a.label);

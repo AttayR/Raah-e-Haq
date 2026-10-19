@@ -71,23 +71,67 @@ type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
  * backs off (a 429 waits its Retry-After). It stops on a final status, when disabled, in the
  * background and on unmount.
  *
- * T-304 / T-517: while a driver is assigned (accepted, arrived, started) and `enabled`, it reads
- * GET /rides/{id}/driver-location every DRIVER_LOCATION_POLL_MS (its own interval, one request
- * at a time) and returns the driver's position (null when the server has none or refuses it).
- * Only while the app is in the foreground. It is read at once when a driver gets assigned or the
- * screen (or app) regains focus, and dropped when
- * the ride leaves those statuses; nothing is set after unmount.
+ * T-578: the status part on its own, for passenger Home's "Return to your ride" card, so a
+ * driver cancel (or any other change) shows there without opening the ride. Only one screen
+ * that uses it is focused at a time (Booking covers Home), so there is never a second poll; and
+ * refreshActiveRide skips a read while another one of the ride is in flight.
  */
-export const useActiveRidePolling = (enabled: boolean): { driverLocation: DriverLocation | null } => {
+export const useActiveRideStatusPolling = (enabled: boolean): void => {
+  useStatusPoll(enabled, useAppIsActive());
+};
+
+/** The status poll itself; the caller says whether the app is in front (one AppState listener). */
+const useStatusPoll = (enabled: boolean, appActive: boolean): void => {
   const dispatch = useDispatch<ActiveRideDispatch>();
   const ride = useSelector(selectActiveRide);
   const rideId = ride?.id;
   const inProgress = isRideInProgress(ride);
   const pollMs = activeRidePollMs(ride?.status);
+
+  // T-536: the status poll runs on the shared engine (one request at a time, back-off, a 429's
+  // Retry-After) and only while the app is in the foreground. It reads at once on focus, on a
+  // return to the foreground and for a new ride; a cadence change alone (searching -> driver
+  // assigned, learned from a read that just landed) re-times the next read without reading again.
+  const pollStatus = useCallback(async (): Promise<PollOutcome> => {
+    if (rideId === undefined) return 'stop';
+    const action = await dispatch(refreshActiveRide(rideId));
+    if (refreshActiveRide.fulfilled.match(action)) {
+      return isRideInProgress(action.payload) ? 'continue' : 'stop';
+    }
+    // Skipped: another read of the ride is in flight (e.g. after a cancel conflict).
+    if (action.meta.condition) return 'continue';
+    const payload = action.payload;
+    // Signed out, or the ride is gone / not ours (the slice dropped it): nothing more to read.
+    if (isStaleSessionRejection(payload) || payload?.kind === 'not_found' || payload?.kind === 'forbidden') {
+      return 'stop';
+    }
+    throw payload ? pollFailureOf(payload) : new Error('Failed to refresh ride');
+  }, [dispatch, rideId]);
+
+  usePolling({
+    enabled: enabled && appActive && rideId !== undefined && inProgress,
+    intervalMs: pollMs,
+    run: pollStatus,
+    readAtOnceKey: rideId,
+  });
+};
+
+/**
+ * The ride screen's poll: the status (useActiveRideStatusPolling) and, T-304 / T-517, while a
+ * driver is assigned (accepted, arrived, started) and `enabled`, GET /rides/{id}/driver-location
+ * every DRIVER_LOCATION_POLL_MS (its own interval, one request at a time). It returns the
+ * driver's position (null when the server has none or refuses it). Only while the app is in the
+ * foreground. It is read at once when a driver gets assigned or the screen (or app) regains
+ * focus, and dropped when the ride leaves those statuses; nothing is set after unmount.
+ */
+export const useActiveRidePolling = (enabled: boolean): { driverLocation: DriverLocation | null } => {
+  const ride = useSelector(selectActiveRide);
+  const rideId = ride?.id;
   const trackable = isDriverTrackable(ride);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
   // T-517: the 4 s driver-location reads run only while the app is in front (as DriverRide).
   const appActive = useAppIsActive();
+  useStatusPoll(enabled, appActive);
 
   // The latest ride for the interval callback, so a status change does not restart the timer.
   const rideRef = useRef(ride);
@@ -120,33 +164,6 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
         locationInFlight.current = false;
       });
   }, []);
-
-  // T-536: the status poll runs on the shared engine (one request at a time, back-off, a 429's
-  // Retry-After) and only while the app is in the foreground. It reads at once on focus, on a
-  // return to the foreground and for a new ride; a cadence change alone (searching -> driver
-  // assigned, learned from a read that just landed) re-times the next read without reading again.
-  const pollStatus = useCallback(async (): Promise<PollOutcome> => {
-    if (rideId === undefined) return 'stop';
-    const action = await dispatch(refreshActiveRide(rideId));
-    if (refreshActiveRide.fulfilled.match(action)) {
-      return isRideInProgress(action.payload) ? 'continue' : 'stop';
-    }
-    // Skipped: another read of the ride is in flight (e.g. after a cancel conflict).
-    if (action.meta.condition) return 'continue';
-    const payload = action.payload;
-    // Signed out, or the ride is gone / not ours (the slice dropped it): nothing more to read.
-    if (isStaleSessionRejection(payload) || payload?.kind === 'not_found' || payload?.kind === 'forbidden') {
-      return 'stop';
-    }
-    throw payload ? pollFailureOf(payload) : new Error('Failed to refresh ride');
-  }, [dispatch, rideId]);
-
-  usePolling({
-    enabled: enabled && appActive && rideId !== undefined && inProgress,
-    intervalMs: pollMs,
-    run: pollStatus,
-    readAtOnceKey: rideId,
-  });
 
   // A driver was just assigned (or the screen is back in focus): show them now, then follow them
   // every DRIVER_LOCATION_POLL_MS. No driver any more: hide the marker.

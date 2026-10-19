@@ -12,11 +12,20 @@ const DOT = space[3];
 /**
  * The parcel's steps for the sender (BE-88 `parcel.status`): requested → accepted → arrived →
  * picked up → delivered, or … → returning → returned; cancelled ends it. Done steps carry a
- * tick, the current one the primary dot, later ones a muted dot.
+ * tick, the current one the primary dot, later ones a muted dot. T-578: `times` (the ride's
+ * accepted / arrived times) keep those steps on a cancelled parcel.
  */
-export function ParcelTimeline({ parcel, testID = 'parcel-timeline' }: { parcel: ParcelView; testID?: string }) {
+export function ParcelTimeline({
+  parcel,
+  times,
+  testID = 'parcel-timeline',
+}: {
+  parcel: ParcelView;
+  times?: { acceptedAt?: string | null; arrivedAt?: string | null };
+  testID?: string;
+}) {
   const { theme } = useAppTheme();
-  const steps = parcelTimeline(parcel);
+  const steps = parcelTimeline(parcel, times);
   return (
     <View style={styles.list} accessibilityLabel={t('parcel.timelineA11y')} testID={testID}>
       {steps.map((step) => {

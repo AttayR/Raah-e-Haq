@@ -28,6 +28,7 @@ import {
   SummaryCard,
   TimelineCard,
 } from '../components/RideDetailsSections';
+import { t } from '../../../i18n';
 import { RIDE_HISTORY_COPY } from '../copy';
 import { canOpenChat, otherParty, receiptShareText } from '../format';
 import { RideStaticMap } from '../components/RideStaticMap';
@@ -75,7 +76,8 @@ export default function RideDetailsScreen() {
   const header = (
     <Header
       tone="background"
-      title={RIDE_HISTORY_COPY.detailsTitle}
+      // T-578: a parcel's details are a delivery's.
+      title={shownRide && isParcelDetails(shownRide) ? t('parcel.detailsTitle') : RIDE_HISTORY_COPY.detailsTitle}
       backLabel={RIDE_HISTORY_COPY.back}
       onBack={() => navigation.goBack()}
       actions={

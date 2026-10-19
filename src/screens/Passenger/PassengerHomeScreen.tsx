@@ -29,6 +29,7 @@ import { useSavedPlaces } from '../../features/saved-places/hooks';
 import { otherCount, takenLabels } from '../../features/saved-places/format';
 import { bookingParamsFor } from '../../features/saved-places/navigation';
 import { selectInProgressRide } from '../../features/active-ride/slice';
+import { useActiveRideStatusPolling } from '../../features/active-ride/hooks';
 import { liveRideStatusText } from '../../features/active-ride/status';
 import { useParcelAvailable } from '../../features/parcel/hooks';
 import { parcelLiveStatusText } from '../../features/parcel/live';
@@ -85,6 +86,10 @@ export default function PassengerHomeScreen() {
   const needsSettings = locationError === 'disabled' || (locationError === 'denied' && !permissionStatus.canAskAgain);
   const enableLocation = needsSettings ? openSettings : requestLocationPermission;
   const nearbyDrivers = useNearbyDrivers(currentLocation, { enabled: isFocused });
+  // T-578: until WebSockets, the live ride's status is re-read while Home is focused (the ride
+  // poll's cadence and back-off; it stops once the ride ends), so a driver cancel clears
+  // "Return to your ride". Booking covers Home while it is open, so only one of them polls.
+  useActiveRideStatusPolling(isFocused);
 
   // T-536 (PERF-19): one small page (GET /rides?per_page=4), not 20 rides for 3 rows. One more
   // than the card shows, so a ride still in progress (left out of the card) never costs a row.
