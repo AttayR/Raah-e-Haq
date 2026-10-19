@@ -16,6 +16,7 @@ import { selectDriverActiveRide, type DriverRideState } from '../driver-ride/sli
 import { perLocale, t } from '../../i18n';
 import { ACCEPT_RIDE_CODES, PENDING_RIDES_CODES, type LatLng, type PendingRideRequest } from './api';
 import { DRIVER_REQUESTS_COPY } from './copy';
+import { isParcelRide } from '../parcel/api';
 import {
   acceptRideRequest,
   clearPendingRequests,
@@ -176,7 +177,8 @@ export const useRideRequestActions = (): RideRequestActions => {
     async (rideId: number): Promise<RideResource | null> => {
       const action = await dispatch(acceptRideRequest(rideId));
       if (acceptRideRequest.fulfilled.match(action)) {
-        toast.success(DRIVER_REQUESTS_COPY.accepted);
+        // T-574: a parcel is said as one, not as a ride.
+        toast.success(isParcelRide(action.payload) ? t('parcel.acceptedToast') : DRIVER_REQUESTS_COPY.accepted);
         // The server now reports `on_ride`; the toggle and the poller follow it.
         dispatch(loadDriverStatus());
         return action.payload;

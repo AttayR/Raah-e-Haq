@@ -9,9 +9,9 @@ import {
   EmptyState,
   ErrorState,
   Header,
-  HeaderLargeTitle,
   Icon,
   Screen,
+  ScrollHairline,
   SegmentedControl,
   SkeletonList,
   useHeaderScroll,
@@ -37,10 +37,11 @@ const PERIODS = perLocale(() => [
 ] as const);
 
 /**
- * Driver Earnings tab (T-507, BE-08; UI-R4 made it a tab root, DESIGN_SYSTEM §8.1): `large`
- * Header that collapses on scroll, GET /driver/earnings for Today / This week / This month with
- * the period total, trips, fares and commission, the commission/settlements entry (GET /wallet ->
- * Wallet screen), a per-day bar chart (week and month) and the period's completed rides, paged
+ * Driver Earnings tab (T-507, BE-08; UI-R4 made it a tab root, DESIGN_SYSTEM §8.1; UI-R15b
+ * layout, §5.2 revised UI-R15): `large` Header with the title in the bar, the Today / This week /
+ * This month segments pinned under it with a hairline once the list scrolls. GET /driver/earnings
+ * for the chosen period with the period total, trips, fares and commission, the
+ * commission/settlements entry (GET /wallet -> Wallet screen), a per-day bar chart (week and month) and the period's completed rides, paged
  * on scroll; a ride opens RideDetails (T-501). Pull to refresh; loading, error and empty states.
  */
 export default function DriverEarningsScreen() {
@@ -51,6 +52,10 @@ export default function DriverEarningsScreen() {
   const earnings = useDriverEarnings(period, isFocused);
   const { data, status, error, rides, refresh, reload } = earnings;
   const { scrollY, onScroll } = useHeaderScroll();
+  // A new period may remount the list at the top: the hairline follows it.
+  useEffect(() => {
+    scrollY.value = 0;
+  }, [period, scrollY]);
   const title = t('earnings.title');
 
   const [pulling, setPulling] = useState(false);
@@ -108,15 +113,19 @@ export default function DriverEarningsScreen() {
     />
   );
 
-  const header = <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="earnings" />;
+  // Title in the bar and the period segments pinned under it, in every state (no jump on load).
+  const header = (
+    <>
+      <Header variant="large" inlineTitle title={title} tone="background" testID="earnings" />
+      <View style={styles.controls}>{periodControl}</View>
+    </>
+  );
   const walletCard = <EarningsWalletCard visible={isFocused} onOpen={() => navigation.navigate('Wallet')} />;
 
   if (!data) {
     return (
       <Screen testID="earnings-screen">
         {header}
-        <HeaderLargeTitle title={title} />
-        <View style={styles.controls}>{periodControl}</View>
         {status === 'failed' ? (
           <ErrorState
             title={STATS_COPY.loadFailed}
@@ -134,9 +143,7 @@ export default function DriverEarningsScreen() {
 
   const listHeader = (
     <View>
-      <HeaderLargeTitle title={title} scrollY={scrollY} />
       <View style={styles.headerBlock}>
-        {periodControl}
         <EarningsHero earnings={data} />
         {walletCard}
         <EarningsLinksCard
@@ -182,6 +189,7 @@ export default function DriverEarningsScreen() {
   return (
     <Screen testID="earnings-screen">
       {header}
+      <ScrollHairline scrollY={scrollY} testID="earnings-hairline" />
       <Animated.FlatList
         testID="earnings-rides"
         style={styles.list}
@@ -211,8 +219,9 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   contentEmpty: { flexGrow: 1 },
-  controls: { paddingHorizontal: space[4], paddingTop: space[2] },
-  headerBlock: { paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[2], gap: space[4] },
+  // Pinned under the bar: 0 top / 12 bottom (§5.2 revised UI-R15).
+  controls: { paddingHorizontal: layout.gutter, paddingBottom: space[3] },
+  headerBlock: { paddingHorizontal: layout.gutter, paddingBottom: space[2], gap: space[4] },
   sectionTitle: { marginTop: space[2] },
   ride: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 64 },
   rideText: { flex: 1, minWidth: 0 },

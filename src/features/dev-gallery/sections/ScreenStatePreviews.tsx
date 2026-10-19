@@ -10,7 +10,6 @@ import {
   ErrorState,
   FilterChips,
   Header,
-  HeaderLargeTitle,
   ListGroup,
   ListItem,
   Screen,
@@ -339,7 +338,10 @@ export function SignOutDialogPreview() {
   return <WalletLoadedPreview />;
 }
 
-/** `large` Header on a tab root: at rest, or scrolled past the collapse range. */
+/**
+ * `large` Header on a tab root (UI-R15b, §5.2 revised UI-R15): the `h1` title in the bar, no
+ * collapse; at rest, or scrolled so the bar's hairline shows (Account, both roles).
+ */
 export function LargeTitlePreview({ scrolled }: { scrolled: boolean }) {
   const { scrollY, onScroll } = useHeaderScroll();
   const ref = useRef<Animated.ScrollView>(null);
@@ -356,6 +358,7 @@ export function LargeTitlePreview({ scrolled }: { scrolled: boolean }) {
     <Screen testID="preview-large-title">
       <Header
         variant="large"
+        inlineTitle
         title={title}
         scrollY={scrollY}
         tone="background"
@@ -366,7 +369,6 @@ export function LargeTitlePreview({ scrolled }: { scrolled: boolean }) {
         scrollEventThrottle={16}
         contentContainerStyle={styles.largeContent}
       >
-        <HeaderLargeTitle title={title} scrollY={scrollY} />
         <View style={styles.block}>
           {[0, 1, 2].map(g => (
             <ListGroup key={g} title={t('kitGallery.groupAccount')}>

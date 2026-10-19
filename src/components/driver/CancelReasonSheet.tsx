@@ -176,7 +176,7 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
             loading={submitting}
             testID="cancel-reason-submit"
           />
-          <Button label={COPY.cancelKeep} variant="ghost" onPress={keep} disabled={submitting} testID="cancel-reason-keep" />
+          <Button label={forParcel ? t('parcel.cancelKeep') : COPY.cancelKeep} variant="ghost" onPress={keep} disabled={submitting} testID="cancel-reason-keep" />
         </View>
       }
     >

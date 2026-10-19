@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-nativ
 import Animated from 'react-native-reanimated';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, FilterChips, Icon } from '../../../components/ui';
+import { AppText, Button, FilterChips, Icon, ScrollHairline, useHeaderScroll } from '../../../components/ui';
 import { componentTokens, layout, space } from '../../../theme';
 import { NotificationRow } from './NotificationRow';
 import { PushPermissionBanner } from './PushPermissionBanner';
@@ -18,10 +18,6 @@ export type NotificationsListProps = {
   role: NotificationRole;
   /** `useNotificationsList(...)`, owned by the host so its header can offer "Mark all read". */
   list: NotificationsListState;
-  /** Rendered above the rows (the Inbox large title and segments); scrolls with the list. */
-  header?: React.ReactElement;
-  /** `useHeaderScroll().onScroll`, so the large title collapses into the bar. */
-  onScroll?: React.ComponentProps<typeof Animated.FlatList>['onScroll'];
 };
 
 const FILTERS = perLocale((): ReadonlyArray<{ value: NotificationFilter; label: string }> => [
@@ -33,13 +29,20 @@ const FILTERS = perLocale((): ReadonlyArray<{ value: NotificationFilter; label: 
  * Inbox › Notifications for both roles (T-502, BE-11; UI-R4 moved it into the Inbox tab): GET
  * /notifications with pull-to-refresh, infinite scroll, loading / error / empty states, All /
  * Unread chips and mark read on open. Opening a row goes to its ride, chat or history
- * (routing.ts). Content styling is UI-R14.
+ * (routing.ts). Content styling is UI-R14. UI-R15b: the chips stay pinned above the list (under
+ * the Inbox segments) with a hairline once it scrolls, like Activity › Rides.
  */
-export function NotificationsList({ role, list, header, onScroll }: NotificationsListProps) {
+export function NotificationsList({ role, list }: NotificationsListProps) {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const { state, hasMore, refresh, loadMore, reload, setFilter, markRead } = list;
   const { items, status, error, loadMoreError, filter } = state;
+  const { scrollY, onScroll } = useHeaderScroll();
+
+  // A fresh filter starts at the top: the hairline follows it.
+  useEffect(() => {
+    scrollY.value = 0;
+  }, [filter, scrollY]);
 
   // The spinner shows for a pull only: the quiet reload on focus (T-513) toggling `refreshing`
   // left iOS's content inset behind and pushed the large title down (UI-R4 QA).
@@ -137,9 +140,19 @@ export function NotificationsList({ role, list, header, onScroll }: Notification
   };
 
   const listHeader = (
-    <View>
-      {header}
-      <View style={styles.controls}>
+    <View style={styles.listHeader}>
+      <PushPermissionBanner style={styles.headerItem} />
+      {error && items.length > 0 ? (
+        <AppText variant="bodySmall" color="danger" style={styles.headerItem} testID="notifications-refresh-error">
+          {error}
+        </AppText>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <View style={styles.list}>
+      <View style={styles.pinned}>
         <FilterChips<NotificationFilter>
           options={FILTERS()}
           value={filter}
@@ -147,46 +160,42 @@ export function NotificationsList({ role, list, header, onScroll }: Notification
           accessibilityLabel={NOTIFICATIONS_COPY.filterLabel}
           testID="notifications-filter"
         />
-        <PushPermissionBanner />
-        {error && items.length > 0 ? (
-          <AppText variant="bodySmall" color="danger" testID="notifications-refresh-error">
-            {error}
-          </AppText>
-        ) : null}
       </View>
+      <ScrollHairline scrollY={scrollY} testID="notifications-hairline" />
+      <Animated.FlatList
+        testID="notifications-list"
+        data={items}
+        keyExtractor={item => String(item.id)}
+        renderItem={renderItem}
+        ItemSeparatorComponent={separator}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={renderEmpty}
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={[styles.listContent, items.length === 0 && styles.listEmpty]}
+        style={styles.list}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onEndReached={hasMore && !loadMoreError ? loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={pulling}
+            onRefresh={onPull}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
+        }
+      />
     </View>
-  );
-
-  return (
-    <Animated.FlatList
-      testID="notifications-list"
-      data={items}
-      keyExtractor={item => String(item.id)}
-      renderItem={renderItem}
-      ItemSeparatorComponent={separator}
-      ListHeaderComponent={listHeader}
-      ListEmptyComponent={renderEmpty}
-      ListFooterComponent={renderFooter}
-      contentContainerStyle={[styles.listContent, items.length === 0 && styles.listEmpty]}
-      style={styles.list}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      onEndReached={hasMore && !loadMoreError ? loadMore : undefined}
-      onEndReachedThreshold={0.5}
-      refreshControl={
-        <RefreshControl
-          refreshing={pulling}
-          onRefresh={onPull}
-          tintColor={theme.colors.primary}
-          colors={[theme.colors.primary]}
-        />
-      }
-    />
   );
 }
 
 const styles = StyleSheet.create({
-  controls: { paddingHorizontal: layout.gutter, paddingBottom: space[3], gap: space[3] },
+  // Chips pinned under the Inbox segments: 4 top / 12 bottom (§5.2 revised UI-R15).
+  pinned: { paddingHorizontal: layout.gutter, paddingTop: space[1], paddingBottom: space[3] },
+  // Banner and refresh error scroll with the rows; each keeps 12 below it, nothing when absent.
+  listHeader: { paddingHorizontal: layout.gutter },
+  headerItem: { marginBottom: space[3] },
   list: { flex: 1 },
   listContent: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[6] },
   listEmpty: { flexGrow: 1 },

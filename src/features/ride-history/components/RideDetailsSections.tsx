@@ -21,6 +21,7 @@ import { formatMoney } from '../../../utils/format';
 import { formatDateTime, isChargedFee, otherParty, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
 import type { Ride, RideViewer } from '../types';
 import { t } from '../../../i18n';
+import { isParcelRide } from '../../parcel/api';
 import { FareLockBadge } from '../../fare/components/FareBits';
 import { cancellationFeeText, formatRate } from '../../fare/format';
 
@@ -186,6 +187,10 @@ export function RouteCard({ ride }: { ride: Ride }) {
   );
 }
 
+/** A parcel ride (BE-88): the parcel block, else the parcel tier key. */
+export const isParcelDetails = (ride: Pick<Ride, 'vehicleType' | 'parcel'>): boolean =>
+  ride.parcel !== null || isParcelRide({ vehicle_type: ride.vehicleType });
+
 /**
  * The other party: first name only, plus the car for a passenger. Never a phone number.
  * "Message" shows only while the ride's chat can still be read.
@@ -195,7 +200,12 @@ export function PersonCard({ ride, viewer, canMessage, onMessage }: SectionProps
   if (!person) return null;
   const vehicle = viewer === 'passenger' ? ride.vehicle : null;
   const vehicleName = vehicle ? [vehicle.make, vehicle.model].filter(Boolean).join(' ') : '';
-  const fallback = viewer === 'passenger' ? C.yourDriver : C.yourPassenger;
+  // T-574: on a parcel the sender sees their rider and the driver their sender.
+  const parcel = isParcelDetails(ride);
+  const fallback =
+    viewer === 'passenger'
+      ? parcel ? t('parcel.yourRider') : C.yourDriver
+      : parcel ? t('parcel.yourSender') : C.yourPassenger;
   return (
     <Card testID="ride-details-person">
       <CardTitle>{fallback}</CardTitle>

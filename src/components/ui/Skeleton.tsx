@@ -179,7 +179,12 @@ export function SkeletonList({
 }) {
   return (
     <SkeletonGroup testID={testID} style={styles.list}>
-      {heroHeight ? <SkeletonCard height={heroHeight} style={styles.hero} /> : null}
+      {/* UI-R15b: the inset sits on a wrapper; a 100%-wide card with its own margin ran 16 past the edge. */}
+      {heroHeight ? (
+        <View style={styles.hero}>
+          <SkeletonCard height={heroHeight} />
+        </View>
+      ) : null}
       {Array.from({ length: rows }, (_, i) => (
         <SkeletonListItem key={i} leading={leading} />
       ))}
@@ -206,5 +211,5 @@ const styles = StyleSheet.create({
   // Same rhythm as SkeletonText: inset 6 + 2.
   rowText: { flex: 1, gap: componentTokens.skeleton.textInset + 2 },
   list: { paddingTop: space[2] },
-  hero: { marginHorizontal: space[4], marginBottom: space[3] },
+  hero: { paddingHorizontal: space[4], marginBottom: space[3] },
 });

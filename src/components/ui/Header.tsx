@@ -60,8 +60,16 @@ const h = componentTokens.header;
  */
 export function useHeaderScroll() {
   const scrollY = useSharedValue(0);
+  // UI-R15b: the end of a drag and of a fling report the resting offset too, so a throttled-away
+  // last scroll event never leaves the hairline showing over a list that is back at the top.
   const onScroll = useAnimatedScrollHandler({
     onScroll: event => {
+      scrollY.value = event.contentOffset.y;
+    },
+    onEndDrag: event => {
+      scrollY.value = event.contentOffset.y;
+    },
+    onMomentumEnd: event => {
       scrollY.value = event.contentOffset.y;
     },
   });

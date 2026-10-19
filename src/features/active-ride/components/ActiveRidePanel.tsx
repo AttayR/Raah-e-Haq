@@ -30,7 +30,7 @@ import { cancellationFeeText } from '../../fare/format';
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { isAcRide, toAcReportState } from '../../ac/api';
 import { WomenModeSearching } from '../../women-mode/components/WomenModeSearching';
-import { parcelOf } from '../../parcel/api';
+import { isParcelRide, parcelOf } from '../../parcel/api';
 import { parcelStatusText } from '../../parcel/rules';
 import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection';
 import type { ParcelView } from '../../parcel/types';
@@ -86,11 +86,17 @@ const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null, p
     case 'driver_arrived':
       return parcel ? handOverText(ride) : ACTIVE_RIDE_COPY.driverArrivedMessage;
     case 'completed':
-      return ACTIVE_RIDE_COPY.completedMessage;
+      // T-574: a parcel was sent, not ridden.
+      return isParcelRide(ride) ? t('parcel.senderCompleted') : ACTIVE_RIDE_COPY.completedMessage;
     case 'cancelled': {
       if (!ride) return ACTIVE_RIDE_COPY.cancelledBySystem;
       // T-561: a parcel the rider refused says so (the reason is on the parcel block below).
-      const outcome = parcel?.refusalReason ? t('parcel.senderRefused') : CANCELLED_BY_TEXT()[cancelledByOf(ride)];
+      const by = cancelledByOf(ride);
+      const outcome = parcel?.refusalReason
+        ? t('parcel.senderRefused')
+        : by === 'driver' && isParcelRide(ride)
+          ? t('parcel.senderCancelledByRider')
+          : CANCELLED_BY_TEXT()[by];
       // BE-85: a late-cancel or no-show fee the passenger was charged is said with the outcome.
       const fee = cancellationFeeText(toNumberOrNull(ride.cancellation_fee), ride.cancellation_charge_reason ?? null);
       return fee ? `${outcome} ${fee}` : outcome;
@@ -247,6 +253,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
         <OverchargeReportSection
           rideId={ride.id}
           state={overcharge}
+          parcel={isParcelRide(ride)}
           fare={lock?.acceptedFare ?? fare?.total ?? null}
           testID="active-ride-overcharge"
         />

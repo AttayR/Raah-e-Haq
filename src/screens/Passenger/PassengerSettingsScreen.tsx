@@ -10,7 +10,7 @@ import { RootState, useAppDispatch } from '../../store';
 import { getUserProfile } from '../../store/thunks/apiThunks';
 import { useLogout } from '../../hooks/useLogout';
 import { useTabScrollReset } from '../../hooks/useTabScrollReset';
-import { Header, HeaderLargeTitle, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
+import { Header, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { LanguageRow } from '../../components/driver/settings/LanguageRow';
@@ -20,8 +20,8 @@ import { AccountChecks } from '../../features/profile-edit';
 import { layout, space } from '../../theme';
 
 /**
- * Passenger Account tab (T-618 passenger side, shared-settings spec; UI-R4: `large` Header that
- * collapses on scroll, DESIGN_SYSTEM §8.1). Every row leads somewhere: the profile card opens the
+ * Passenger Account tab (T-618 passenger side, shared-settings spec; UI-R4; UI-R15b: `large` Header
+ * with the title in the bar, a hairline once the list scrolls, DESIGN_SYSTEM §5.2/§8.1). Every row leads somewhere: the profile card opens the
  * Profile view, Saved places its screen, Notifications the push preferences (BE-11, T-502) with
  * the phone's own settings as a second row, Appearance is the T-601 override and Sign out is the
  * shared confirm flow (T-102). Ride history and Wallet live in Activity and the inbox is its own
@@ -51,7 +51,7 @@ const PassengerSettingsScreen = () => {
 
   return (
     <Screen testID="passenger-settings">
-      <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="passenger-settings-header" />
+      <Header variant="large" inlineTitle title={title} scrollY={scrollY} tone="background" testID="passenger-settings-header" />
       <Animated.ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -64,7 +64,6 @@ const PassengerSettingsScreen = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
         }
       >
-        <HeaderLargeTitle title={title} scrollY={scrollY} />
         <View style={styles.body}>
           <ProfileSummaryCard user={user} onPress={() => navigation.navigate('Profile')} />
           <AccountChecks user={user} phoneOnly onOpenPhone={() => navigation.navigate('ChangePhone')} testID="passenger-settings-checks" />

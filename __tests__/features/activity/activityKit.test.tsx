@@ -105,6 +105,15 @@ describe('ScrollHairline', () => {
     expect(line.props.accessibilityElementsHidden).toBe(true);
   });
 
+  it('UI-R15b: takes no layout height, so the list under it starts on a whole point', async () => {
+    await themed(<Hairline y={0} />);
+    const line = screen.getByTestId('line', { includeHiddenElements: true });
+    expect(StyleSheet.flatten(screen.getByTestId('line-slot', { includeHiddenElements: true }).props.style).height).toBe(0);
+    const style = StyleSheet.flatten(line.props.style);
+    expect(style.position).toBe('absolute');
+    expect(style.top).toBe(-style.height);
+  });
+
   it('renders without a scroll value', async () => {
     await themed(<Hairline />);
     expect(screen.getByTestId('line', { includeHiddenElements: true })).toBeTruthy();

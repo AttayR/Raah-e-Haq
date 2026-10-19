@@ -87,6 +87,16 @@ describe('Skeleton', () => {
     await renderThemed(<SkeletonList rows={3} heroHeight={120} testID="list" />, 'dark');
     expect(screen.getByTestId('list')).toBeTruthy();
   });
+
+  it('UI-R15b: the hero never pairs a 100% width with a horizontal margin (it ran past the edge)', async () => {
+    await renderThemed(<SkeletonList rows={1} heroHeight={120} testID="list" />);
+    const overflowing = screen.UNSAFE_root.findAll((node) => {
+      if (typeof node.type !== 'string') return false;
+      const style = StyleSheet.flatten(node.props.style) ?? {};
+      return style.width === '100%' && (style.marginHorizontal ?? style.marginStart ?? style.marginLeft) !== undefined;
+    });
+    expect(overflowing).toHaveLength(0);
+  });
 });
 
 describe('EmptyState and ErrorState', () => {

@@ -254,8 +254,8 @@ describe('T-570: "Please fix the highlighted fields" points at a field in view',
 
     act(() => result.current.handleNext());
     expect(Object.keys(result.current.errors).sort()).toEqual(['bankAccountNumber', 'bankBranch', 'bankName']);
-    // 40 (container) + 300 (Bank name, the topmost) - 16 (FIELD_SCROLL_OFFSET).
-    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ y: 324, animated: true }));
+    // 40 (container) + 300 (Bank name, the topmost) - 72 (FIELD_SCROLL_OFFSET, T-574: below the toast).
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ y: 268, animated: true }));
     expect(scrollTo).toHaveBeenCalledTimes(1);
   });
 
@@ -276,6 +276,6 @@ describe('T-570: "Please fix the highlighted fields" points at a field in view',
     scrollTo.mockClear();
 
     act(() => result.current.handleNext());
-    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ y: 444, animated: true }));
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ y: 388, animated: true }));
   });
 });

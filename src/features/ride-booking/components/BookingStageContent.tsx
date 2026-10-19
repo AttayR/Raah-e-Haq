@@ -29,6 +29,8 @@ type Props = {
   offer: FareOffer;
   tripSummary: string | null;
   onConfirm: () => void;
+  /** T-574: the Request tap is being handled (the button shows its loading state). */
+  confirming?: boolean;
   onCancelRide: () => void;
   ride: RideResource | null;
   rideStage: PassengerRideStageState | null;
@@ -53,6 +55,7 @@ export const BookingStageContent: React.FC<Props> = ({
   offer,
   tripSummary,
   onConfirm,
+  confirming = false,
   onCancelRide,
   ride,
   rideStage,
@@ -153,6 +156,7 @@ export const BookingStageContent: React.FC<Props> = ({
           onChangeVehicle={() => setStage('vehicle')}
           onCancel={onCancelRide}
           onConfirm={onConfirm}
+          confirming={confirming}
           preferences={
             <FemaleDriverOption
               pickup={pickup}

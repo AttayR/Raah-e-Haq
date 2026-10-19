@@ -9,7 +9,7 @@ import { formatMoney, formatSignedMoney } from '../../utils/format';
 import { driverSplitOf } from '../../features/fare/api';
 import { formatRate } from '../../features/fare/format';
 import { t } from '../../i18n';
-import { isParcelRide } from '../../features/parcel/api';
+import { isParcelRide, parcelOf } from '../../features/parcel/api';
 import { lockedDistanceLabel, lockedTimeLabel } from '../ui/ride/FareBreakdown';
 
 type Props = {
@@ -30,7 +30,14 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
   const summary = toRideSummary(ride);
   const isCash = summary.paymentMethod === null || summary.paymentMethod === 'cash';
   // T-561: a parcel's sender paid in cash at the pickup; nothing is collected at the end.
-  const collectText = isParcelRide(ride)
+  const parcel = isParcelRide(ride);
+  // T-574: a parcel's end card says delivered (or returned), not "Trip complete".
+  const title = parcel
+    ? parcelOf(ride)?.status === 'returned'
+      ? t('parcel.summaryReturned')
+      : t('parcel.summaryDelivered')
+    : COPY.summary;
+  const collectText = parcel
     ? t('parcel.summaryCollected')
     : isCash
       ? COPY.collectCash
@@ -61,7 +68,7 @@ export const DriverRideSummary: React.FC<Props> = ({ ride, onDone }) => {
 
   return (
     <View style={styles.card} testID="driver-ride-summary">
-      <Text style={styles.title} accessibilityRole="header">{COPY.summary}</Text>
+      <Text style={styles.title} accessibilityRole="header">{title}</Text>
 
       {summary.totalFare !== null && (
         <View style={styles.totalBlock}>

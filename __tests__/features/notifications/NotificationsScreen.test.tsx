@@ -12,6 +12,7 @@ import { apiClient } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import InboxScreen from '../../../src/features/inbox/InboxScreen';
+import { isInside } from '../../../test-utils/tabRoot';
 import { chatApi } from '../../../src/features/chat/api';
 import { NotificationPreferencesScreen } from '../../../src/features/notifications/screens/NotificationPreferencesScreen';
 import { toast } from '../../../src/core/toast';
@@ -212,6 +213,26 @@ describe('Inbox tab (UI-R4)', () => {
     await flush();
     expect(chats).toHaveBeenCalledTimes(1);
     expect(mock.history.get.filter((r) => r.url === '/notifications')).toHaveLength(0);
+  });
+
+  it('UI-R15b: the title sits in the bar once; segments and filter chips stay pinned above the list', async () => {
+    mock.onGet('/notifications').reply(200, listBody([row(1)]));
+    jest.spyOn(chatApi, 'listChats').mockResolvedValue([]);
+    renderWith(<InboxScreen role="passenger" />);
+    await flush();
+    expect(screen.getByTestId('inbox-header-title').props.children).toBe('Inbox');
+    // No second (collapsing) large title in the list.
+    expect(screen.getAllByText('Inbox')).toHaveLength(1);
+    expect(isInside(screen.getByTestId('inbox-segments'), 'notifications-list')).toBe(false);
+    expect(isInside(screen.getByTestId('notifications-filter'), 'notifications-list')).toBe(false);
+    expect(isInside(screen.getByText('Offer 1'), 'notifications-list')).toBe(true);
+    expect(screen.getByTestId('notifications-hairline', { includeHiddenElements: true })).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('radio', { name: 'Inbox, Messages' }));
+    await flush();
+    expect(screen.getByTestId('inbox-header-title').props.children).toBe('Inbox');
+    expect(isInside(screen.getByTestId('inbox-segments'), 'chat-list')).toBe(false);
+    expect(screen.getByTestId('chat-list-hairline', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('hides "Mark all read" while nothing is unread', async () => {

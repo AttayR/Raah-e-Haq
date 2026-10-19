@@ -7,7 +7,7 @@ import { logger } from '../../../core/logging/logger';
 import { rejectionMessage } from '../../../core/api/errors';
 import { registerUserWithImages, type PendingPhoneVerification } from '../../../store/thunks/apiThunks';
 import type { StepErrors } from '../../../schemas/registrationSchema';
-import { space } from '../../../theme';
+import { componentTokens, space } from '../../../theme';
 import { REGISTRATION_COPY as COPY } from '../copy/registration';
 import { buildRegistrationRequest } from './buildRegistrationRequest';
 import { firstInvalidPage, pageOfField, registrationPages, validatePage, type RegistrationPage } from './pages';
@@ -18,8 +18,13 @@ import {
 } from './registrationForm';
 import { mapRegistrationServerErrors } from './serverFieldErrors';
 
-/** Space kept above a field the form scrolls to after a 422 (the Header is outside the scroll). */
-const FIELD_SCROLL_OFFSET = space[4];
+/**
+ * Space kept above a field the form scrolls to (the Header is outside the scroll). T-574: the
+ * "fix the highlighted fields" toast sits 8 below the Header bar, over the top of the scroll, so
+ * the field lands below the toast (its gap, its height) with the usual 16 to spare, and its label
+ * stays readable.
+ */
+export const FIELD_SCROLL_OFFSET = space[2] + componentTokens.toast.minHeight + space[4];
 
 /** What registration left for the phone step. In memory only: the token is a bearer secret. */
 export interface PhoneStepState {

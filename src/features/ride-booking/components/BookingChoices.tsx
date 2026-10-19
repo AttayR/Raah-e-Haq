@@ -105,6 +105,8 @@ type FareReviewProps = {
   vehicleType: VehicleType | null;
   estimates: Loaded<FareEstimates>;
   onConfirm: () => void;
+  /** T-574: the Request tap is being handled: the button shows its loading state at once. */
+  confirming?: boolean;
   /** BE-83: the passenger's offer for this quote (the stepper renders only with a band). */
   offer?: FareOffer;
   /** BE-60: the vehicle catalogue's fuel notice, used when the estimate carries none. */
@@ -117,7 +119,7 @@ type FareReviewProps = {
  * notice, "Offer your fare" inside the band (the hero and total follow the offer) and, while fees
  * are on, the waiting and cancel terms.
  */
-export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, onConfirm, offer, catalogueNotice = null }) => {
+export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, onConfirm, confirming = false, offer, catalogueNotice = null }) => {
   if (estimates.status === 'error') {
     return (
       <BookingStatusLine status="error" text={estimates.error ?? BOOKING_COPY.estimateFailed} onRetry={estimates.retry} />
@@ -161,6 +163,7 @@ export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, 
         size="lg"
         haptic="impactLight"
         onPress={onConfirm}
+        loading={confirming}
         testID="fare-request"
       />
     </View>

@@ -21,6 +21,7 @@ import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '.
 import { RideRequestRefused, useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
 import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
+import { rideDoneDestination } from '../../features/active-ride/done';
 import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
@@ -44,6 +45,7 @@ import { bookingPrefillState, useBookingPrefill } from '../../features/ride-book
 import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
 import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
 import { useSearchFocus } from '../../features/ride-booking/useSearchFocus';
+import { useConfirmRequest } from '../../features/ride-booking/useConfirmRequest';
 import { openRideChat } from '../../features/chat/navigation';
 import { useRideCall } from '../../features/safety/hooks';
 import { canCallOn } from '../../features/safety/rules';
@@ -236,10 +238,13 @@ const PassengerMapScreen = () => {
 
   // The passenger has seen the outcome (completed / cancelled): start over.
   const finishRide = useCallback(() => {
+    const doneTo = rideDoneDestination(currentRide);
     shownRideIdRef.current = null;
     dispatch(clearActiveRide());
     resetSelection();
-  }, [dispatch, resetSelection]);
+    // T-574: a parcel ends back on Home, where it was sent from, not in the ride planner.
+    if (doneTo === 'home') navigation.popTo('PassengerTabs', { screen: 'Home' });
+  }, [currentRide, dispatch, resetSelection, navigation]);
 
   const { stepBack } = flow;
   const goBack = useCallback(() => {
@@ -285,6 +290,12 @@ const PassengerMapScreen = () => {
       setIsLoading(false);
     }
   }, [pickup, destination, stops, flow.selectedVehicle, flow.femaleDriverOnly, requestRideService, offer, setError, setStage]);
+
+  // T-574: the Request button shows its loading state on the tap; the request starts after.
+  const confirmRequest = useConfirmRequest(() => {
+    onRequestRide();
+    setStage('requesting');
+  });
 
   // T-315: a ride (its completed summary above all) always wins over the location wait.
   if (showLocationWait({ hasLocation: !!currentLocation, locationLoading, rideShown })) {
@@ -364,10 +375,8 @@ const PassengerMapScreen = () => {
             estimates={estimates}
             offer={offer}
             tripSummary={tripSummary}
-            onConfirm={() => {
-              onRequestRide();
-              setStage('requesting');
-            }}
+            onConfirm={confirmRequest.confirm}
+            confirming={confirmRequest.confirming}
             onCancelRide={handleCancelRide}
             ride={currentRide}
             rideStage={rideStage}

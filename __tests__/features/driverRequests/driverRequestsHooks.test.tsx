@@ -222,6 +222,18 @@ describe('useRideRequestActions', () => {
     expect(getStatus).toHaveBeenCalled();
   });
 
+  it('accept on a parcel: the toast says parcel, not ride (T-574)', async () => {
+    const success = jest.spyOn(toast, 'success');
+    jest.spyOn(driverRequestsApi, 'accept').mockResolvedValue(makeRide({ id: 41, status: 'accepted', vehicle_type: 'parcel', is_parcel: true }));
+    const { result } = await renderActions();
+
+    await act(async () => {
+      await result.current.accept(41);
+    });
+
+    expect(success).toHaveBeenCalledWith('Parcel accepted. Head to the pickup.');
+  });
+
   it.each([
     ['RIDE_ALREADY_ACCEPTED', 'Another driver already took this ride.', false],
     ['RIDE_NOT_AVAILABLE', 'This ride is no longer available.', false],

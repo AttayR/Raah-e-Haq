@@ -26,10 +26,13 @@ type SheetProps = {
   error: string | null;
   onSubmit: (input: OverchargeReportInput) => void;
   onClose: () => void;
+  /** T-574: a parcel's rider asked for more, not a driver. */
+  parcel?: boolean;
 };
 
 /** The report form: an optional amount the driver asked for and an optional note (BE-82). */
-export function OverchargeReportSheet({ visible, fare, submitting, error, onSubmit, onClose }: SheetProps) {
+export function OverchargeReportSheet({ visible, fare, submitting, error, onSubmit, onClose, parcel = false }: SheetProps) {
+  const title = parcel ? t('parcel.overchargeButton') : t('fare.reportTitle');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -57,12 +60,12 @@ export function OverchargeReportSheet({ visible, fare, submitting, error, onSubm
       mode="modal"
       visible={visible}
       onClose={onClose}
-      accessibilityLabel={t('fare.reportTitle')}
+      accessibilityLabel={title}
       testID="overcharge-sheet"
       header={
         <View style={styles.header} testID="overcharge-form-header">
           <AppText variant="h3" accessibilityRole="header">
-            {t('fare.reportTitle')}
+            {title}
           </AppText>
           <AppText variant="bodySmall" color="textSecondary">
             {fare !== null ? t('fare.reportBody', { fare: formatMoney(fare) }) : t('fare.reportBodyNoFare')}
@@ -85,7 +88,7 @@ export function OverchargeReportSheet({ visible, fare, submitting, error, onSubm
     >
       <View style={styles.body} testID="overcharge-form-fields">
         <TextField
-          label={t('fare.reportAmount')}
+          label={parcel ? t('parcel.overchargeAmount') : t('fare.reportAmount')}
           value={amount}
           onChangeText={setAmount}
           placeholder={t('fare.reportAmountPlaceholder')}
@@ -119,6 +122,8 @@ type SectionProps = {
   fare: number | null;
   /** Re-read the ride after a report (or a refusal that says it can no longer be made). */
   onReported?: (result: OverchargeReportResult | null) => void;
+  /** T-574: a parcel ride, where the person who asked for more is the rider. */
+  parcel?: boolean;
   testID?: string;
 };
 
@@ -128,7 +133,7 @@ type SectionProps = {
  * After a report (or a refusal saying none can be made) the button goes at once, without waiting
  * for the ride to be read again; the server's state wins as soon as it stops offering the button.
  */
-export function OverchargeReportSection({ rideId, state, fare, onReported, testID = 'overcharge' }: SectionProps) {
+export function OverchargeReportSection({ rideId, state, fare, onReported, parcel = false, testID = 'overcharge' }: SectionProps) {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState<{ rideId: number; state: OverchargeState } | null>(null);
   const action = useOverchargeReport(rideId, (result) => {
@@ -171,7 +176,7 @@ export function OverchargeReportSection({ rideId, state, fare, onReported, testI
           ) : null}
           {canReport ? (
             <Button
-              label={t('fare.reportButton')}
+              label={parcel ? t('parcel.overchargeButton') : t('fare.reportButton')}
               variant="outline"
               leadingIcon="report"
               onPress={() => setOpen(true)}
@@ -183,6 +188,7 @@ export function OverchargeReportSection({ rideId, state, fare, onReported, testI
       <OverchargeReportSheet
         visible={open && canReport}
         fare={fare}
+        parcel={parcel}
         submitting={action.submitting}
         error={action.error}
         onSubmit={(input) => {

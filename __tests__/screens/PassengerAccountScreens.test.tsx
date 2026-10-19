@@ -22,6 +22,7 @@ import { apiService } from '../../src/services/api';
 import { ThemeProvider, APPEARANCE_STORAGE_KEY } from '../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme, type AppTheme } from '../../src/theme';
 import PassengerSettingsScreen from '../../src/screens/Passenger/PassengerSettingsScreen';
+import { isInside } from '../../test-utils/tabRoot';
 import PassengerProfile from '../../src/screens/Passenger/Passengerprofile';
 import { LOGOUT_CONFIRM_TITLE } from '../../src/hooks/useLogout';
 import { dialog, dialogStore } from '../../src/core/dialog';
@@ -134,6 +135,13 @@ describe('PassengerSettingsScreen', () => {
     // Active accounts show no status badge.
     expect(screen.queryByTestId('passenger-settings-status')).toBeNull();
     expectOnlyThemeColors(theme);
+  });
+
+  it('UI-R15b: "Account" sits in the bar once (no collapsing title in the list)', async () => {
+    await renderScreen(PassengerSettingsScreen, 'light');
+    expect(screen.getByTestId('passenger-settings-header-title').props.children).toBe('Account');
+    expect(isInside(screen.getByTestId('passenger-settings-header-title'), 'passenger-settings-scroll')).toBe(false);
+    expect(screen.getAllByText('Account')).toHaveLength(1);
   });
 
   it('every row goes somewhere real; the profile card opens the profile view', async () => {

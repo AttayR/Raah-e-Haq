@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { AppText, Button, Card, Icon } from '../../../components/ui';
 import { space } from '../../../theme';
 import { NOTIFICATIONS_COPY } from '../copy';
@@ -9,11 +9,11 @@ import { usePushPermission } from '../hooks';
  * Contextual push prompt on the notifications screen (T-502): shown only while push is off.
  * The first tap shows the system prompt; after a denial it opens the phone settings.
  */
-export function PushPermissionBanner() {
+export function PushPermissionBanner({ style }: { style?: StyleProp<ViewStyle> } = {}) {
   const { permission, enable } = usePushPermission();
   if (permission === null || permission === 'granted') return null;
   return (
-    <Card testID="notifications-push-banner">
+    <Card style={style} testID="notifications-push-banner">
       <View style={styles.row}>
         <Icon name="bell" color="primaryText" />
         <View style={styles.text}>

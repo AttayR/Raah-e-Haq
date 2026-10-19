@@ -23,6 +23,7 @@ import type { DriverStats, PassengerStats } from '../../../src/features/stats/ty
 import { StatGrid } from '../../../src/features/passenger-home/components/StatGrid';
 import DriverEarningsScreen from '../../../src/features/stats/screens/DriverEarningsScreen';
 import { envelope, rawWallet } from '../../../test-utils/walletFixtures';
+import { isInside } from '../../../test-utils/tabRoot';
 
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
@@ -250,6 +251,24 @@ describe('DriverEarningsScreen', () => {
     expect(screen.queryByTestId('earnings-back')).toBeNull();
     fireEvent.press(screen.getByTestId('earnings-wallet'));
     expect(mockNavigate).toHaveBeenCalledWith('Wallet');
+  });
+
+  it('UI-R15b: "Earnings" sits in the bar and the period segments stay pinned, while loading and once loaded', async () => {
+    let reply: (value: [number, unknown]) => void = () => undefined;
+    mock.onGet('/driver/earnings').reply(() => new Promise((resolve) => (reply = resolve)));
+    mock.onGet('/wallet').reply(200, envelope(rawWallet()));
+    showEarnings();
+    expect(await screen.findByTestId('earnings-loading', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('earnings-title').props.children).toBe('Earnings');
+    expect(screen.getByTestId('earnings-period')).toBeTruthy();
+
+    reply([200, envelope(rawEarnings('day'))]);
+    await waitFor(() => expect(screen.getByTestId('earnings-ride-7')).toBeTruthy());
+    expect(screen.getByTestId('earnings-title').props.children).toBe('Earnings');
+    expect(screen.getAllByText('Earnings')).toHaveLength(1);
+    expect(isInside(screen.getByTestId('earnings-period'), 'earnings-rides')).toBe(false);
+    expect(isInside(screen.getByTestId('earnings-total'), 'earnings-rides')).toBe(true);
+    expect(screen.getByTestId('earnings-hairline', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('the wallet card says the wallet could not load when GET /wallet fails (never "loading" forever)', async () => {

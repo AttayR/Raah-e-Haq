@@ -17,7 +17,7 @@ import { GallerySection } from './GallerySection';
 
 const noop = () => {};
 
-/** Header variants (§5.2 v1.1): standard with back + actions, text action, large, overlay. */
+/** Header variants (§5.2 v1.1): standard with back + actions, text action, large (inline title, UI-R15b), overlay. */
 export function HeaderSection() {
   const { theme } = useAppTheme();
   return (
@@ -43,6 +43,7 @@ export function HeaderSection() {
       <View style={[styles.frame, { borderColor: theme.colors.border }]}>
         <Header
           variant="large"
+          inlineTitle
           title={t('kitGallery.headerLarge')}
           tone="background"
           trailingText={{ label: t('kitGallery.headerMarkAllRead'), onPress: noop }}

@@ -17,6 +17,7 @@ import { DarkTheme, LightTheme } from '../../src/theme';
 import { driverStatusApi } from '../../src/features/driver-status/api';
 import DriverDriveScreen from '../../src/screens/Driver/DriverDriveScreen';
 import DriverSettingsScreen from '../../src/screens/Driver/DriverSettingsScreen';
+import { isInside } from '../../test-utils/tabRoot';
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
 import { driverRideApi } from '../../src/features/driver-ride/api';
 import { statsApi, toMyStats } from '../../src/features/stats/api';
@@ -363,6 +364,14 @@ describe('DriverSettingsScreen', () => {
     // No dead rows: Privacy and Help come back with T-511.
     expect(screen.queryByText('Privacy & security')).toBeNull();
     expect(screen.queryByText('Help & support')).toBeNull();
+  });
+
+  it('UI-R15b: "Account" sits in the bar once (no collapsing title in the list)', async () => {
+    await renderScreen(DriverSettingsScreen);
+    expect(screen.getByTestId('driver-settings-header-title').props.children).toBe('Account');
+    expect(isInside(screen.getByTestId('driver-settings-header-title'), 'driver-settings-scroll')).toBe(false);
+    // The only other "Account" is the row group's overline, inside the list.
+    expect(screen.getAllByText('Account').filter((node) => !isInside(node, 'driver-settings-scroll'))).toHaveLength(1);
   });
 
   it('Edit profile opens the edit form and the profile card opens Profile (T-545); Notifications opens the preferences screen (T-502); phone settings stays a row', async () => {

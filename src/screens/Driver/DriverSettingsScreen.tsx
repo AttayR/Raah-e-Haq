@@ -8,7 +8,7 @@ import type { DriverStackParamList } from '../../app/navigation/stacks/DriverSta
 import { RootState } from '../../store';
 import { useLogout } from '../../hooks/useLogout';
 import { useTabScrollReset } from '../../hooks/useTabScrollReset';
-import { AppText, Avatar, Badge, Card, Header, HeaderLargeTitle, Icon, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
+import { AppText, Avatar, Badge, Card, Header, Icon, ListGroup, ListItem, Screen, useHeaderScroll } from '../../components/ui';
 import { t } from '../../i18n';
 import { AppearanceRow } from '../../components/driver/settings/AppearanceRow';
 import { LanguageRow } from '../../components/driver/settings/LanguageRow';
@@ -19,8 +19,8 @@ import { showParcelOptInRow, useParcelOptInSummary } from '../../features/parcel
 import { layout, space } from '../../theme';
 
 /**
- * Driver Account tab (T-618 driver side, shared-settings spec; UI-R4: `large` Header that
- * collapses on scroll, DESIGN_SYSTEM §8.1). Every row leads somewhere: the profile card opens
+ * Driver Account tab (T-618 driver side, shared-settings spec; UI-R4; UI-R15b: `large` Header
+ * with the title in the bar, a hairline once the list scrolls, DESIGN_SYSTEM §5.2/§8.1). Every row leads somewhere: the profile card opens
  * Profile and Edit profile the edit form (T-545, like the passenger Profile → Edit),
  * Vehicle & documents the documents list (T-203), Ride history its screen (T-501), Notifications
  * the push preferences (BE-11, T-502) with the phone's own settings as a second row, Sign out is
@@ -45,7 +45,7 @@ const DriverSettingsScreen = () => {
 
   return (
     <Screen testID="driver-settings">
-      <Header variant="large" title={title} scrollY={scrollY} tone="background" testID="driver-settings-header" />
+      <Header variant="large" inlineTitle title={title} scrollY={scrollY} tone="background" testID="driver-settings-header" />
       <Animated.ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -55,7 +55,6 @@ const DriverSettingsScreen = () => {
         showsVerticalScrollIndicator={false}
         testID="driver-settings-scroll"
       >
-        <HeaderLargeTitle title={title} scrollY={scrollY} />
         <View style={styles.body}>
           <Card
             onPress={() => navigation.navigate('Profile')}

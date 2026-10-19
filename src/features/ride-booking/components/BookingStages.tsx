@@ -102,6 +102,8 @@ type FareStageProps = {
   onChangeVehicle: () => void;
   onCancel: () => void;
   onConfirm: () => void;
+  /** T-574: the Request tap is being handled. */
+  confirming?: boolean;
   /** Ride preferences above the fare (BE-87 "Female driver"); nothing when absent. */
   preferences?: React.ReactNode;
 };
@@ -125,6 +127,7 @@ export const FareStage: React.FC<FareStageProps> = (p) => (
       offer={p.offer}
       catalogueNotice={p.catalogueNotice}
       onConfirm={p.onConfirm}
+      confirming={p.confirming}
     />
   </View>
 );
