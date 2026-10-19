@@ -1,54 +1,47 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IconButton } from '../../../components/ui/IconButton';
-import { layout, space } from '../../../theme';
+import type { SharedValue } from 'react-native-reanimated';
+import { MapControls } from '../../../components/ui/MapControls';
+import { componentTokens, space } from '../../../theme';
+import { ACTIVE_RIDE_COPY } from '../../active-ride/copy';
 import { BOOKING_COPY } from '../copy';
 
-/** Height of the control row (48 pt floating buttons) plus its top gap. */
-export const MAP_TOP_CONTROLS_HEIGHT = 48 + space[2];
+/** Height of the top control row (48 pt floating buttons) plus its top gap. */
+export const MAP_TOP_CONTROLS_HEIGHT = componentTokens.iconButton.floatingVisual + space[2];
 
 type Props = {
-  onBack: () => void;
+  /** None while finding a driver (passenger-finding-driver.md: no back button). */
+  onBack?: () => void;
   onRecenter: () => void;
-  /** Hidden while a ride is shown (starting over is not allowed then). */
-  onReset?: () => void;
+  /** The booking sheet's height, so the end-side control rides 16 above it. */
+  sheetHeight: SharedValue<number>;
+  /**
+   * T-549: the passenger panned the live-ride map; the end-side control becomes "follow your
+   * ride" (fits the ride again) instead of "show my location".
+   */
+  followRide?: { visible: boolean; onPress: () => void };
 };
 
 /**
- * Floating map controls below the status bar / Dynamic Island (`insets.top + 8`), never
- * inside it: back at the start edge, recentre and start over at the end edge. T-553: the
- * legacy "+" Request Ride modal is gone (the sheet books every ride, stops included).
+ * The booking map's floating chrome on the kit MapControls (DESIGN_SYSTEM §9 v1.1, UI-R10): at
+ * most two controls, back at the top start (below the status bar / Dynamic Island) and one
+ * end-side control riding 16 above the sheet. No "start over" and no refresh: Back steps through
+ * the booking and the data refreshes itself.
  */
-export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, onReset }) => {
-  const insets = useSafeAreaInsets();
+export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, sheetHeight, followRide }) => {
+  const follow = followRide?.visible === true;
   return (
-    <View
+    <MapControls
       testID="map-top-controls"
-      pointerEvents="box-none"
-      style={[styles.row, { top: insets.top + space[2], start: layout.gutter + insets.left, end: layout.gutter + insets.right }]}
-    >
-      <IconButton testID="map-back" variant="floating" icon="back" accessibilityLabel={BOOKING_COPY.backA11y} iconColor="primaryText" onPress={onBack} />
-      <View style={styles.trailing} pointerEvents="box-none">
-        <IconButton
-          testID="map-recenter"
-          variant="floating"
-          icon="locate"
-          iconColor="primaryText"
-          accessibilityLabel={BOOKING_COPY.recenterA11y}
-          onPress={onRecenter}
-        />
-        {onReset ? (
-          <IconButton testID="map-reset" variant="floating" icon="refresh" iconColor="primaryText" accessibilityLabel={BOOKING_COPY.startOverA11y} onPress={onReset} />
-        ) : null}
-      </View>
-    </View>
+      onBack={onBack}
+      backLabel={BOOKING_COPY.backA11y}
+      backTestID="map-back"
+      onLocate={follow ? followRide.onPress : onRecenter}
+      locateIcon={follow ? 'navigate' : 'locate'}
+      locateLabel={follow ? ACTIVE_RIDE_COPY.recentreA11y : BOOKING_COPY.recenterA11y}
+      locateTestID={follow ? 'ride-recentre' : 'map-recenter'}
+      sheetHeight={sheetHeight}
+    />
   );
 };
-
-const styles = StyleSheet.create({
-  row: { position: 'absolute', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  trailing: { flexDirection: 'row', gap: space[2] },
-});
 
 export default MapTopControls;

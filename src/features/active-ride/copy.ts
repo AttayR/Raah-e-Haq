@@ -14,8 +14,16 @@ export const ACTIVE_RIDE_COPY = localizedCopy({
   dismiss: 'OK',
   // T-304 stage panel
   searchingTitle: 'Finding you a driver…',
-  searchingMessage: 'Sharing your request with nearby drivers',
-  driverCancelledRequeued: 'Your driver cancelled. Finding you another driver…',
+  driverCancelledRequeued: "Your driver cancelled. We're asking other drivers nearby.",
+  // UI-R10: the finding-driver sheet (passenger-finding-driver.md).
+  findingTitle: 'Finding you a driver',
+  findingMessage: 'This usually takes under a minute.',
+  findingSlowMessage: 'Still looking. More drivers are joining.',
+  cancelRequest: 'Cancel request',
+  cancelRequestTitle: 'Cancel request?',
+  cancelRequestMessage: "We'll stop looking for a driver.",
+  keepLooking: 'Keep looking',
+  cashLabel: 'Cash',
   driverEnRouteTitle: 'Your driver is on the way',
   driverArrivedTitle: 'Your driver has arrived',
   driverArrivedMessage: 'Meet your driver at the pickup point',

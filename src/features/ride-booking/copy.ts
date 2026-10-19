@@ -1,24 +1,45 @@
 import { SUPPORTED_LOCALES } from '../../i18n';
 import { copyInLocale, localizedCopy } from '../../i18n/localizedCopy';
+import { formatDistance, formatDuration } from '../../utils/format';
 
 /**
  * Static copy of the booking flow (T-302). Server messages (a refused request, a 422 field
  * message, a failed estimate) come from the API and are never written here.
  */
 export const BOOKING_COPY = localizedCopy({
-  vehicleTypesLoading: 'Loading vehicle types…',
   vehicleTypesFailed: 'Could not load vehicle types.',
-  vehicleTypesEmpty: 'No vehicle types are available right now.',
   estimateLoading: 'Calculating fare…',
   estimateFailed: 'Could not calculate the fare.',
-  retry: 'Retry',
   // T-311: the booking price is the server's quote. T-521: the footnote is `fare.lockNote` (BE-82
   // locks the fare when a driver accepts).
-  estimatedFareTitle: 'Estimated fare',
   estimatedTotal: 'Estimated total',
-  /** §7: the button names the action and the choice ("Request Rickshaw"). */
-  request: (vehicle: string) => `Request ${vehicle}`,
-  tripSummary: (km: number, min: number) => `${km} km • ${min} min`,
+  /** UI-R10 (§12.5 [UI-R5]): the sticky footer names the action, the tier and the fare. */
+  requestWithFare: (vehicle: string, fare: string) => `Request ${vehicle} · ${fare}`,
+  /** UI-R10: the footer while nothing can be requested yet (prices loading, none available). */
+  requestIdle: 'Request',
+  /** UI-R10: the footer while NetInfo reports no connection. */
+  requestOffline: "You're offline",
+  /** UI-R5 → UI-R10: one distance and duration format (`formatDistance` / `formatDuration`). */
+  tripSummary: (km: number, min: number) => [formatDuration(min), formatDistance(km)].filter(Boolean).join(' · '),
+  // UI-R10: the "Choose a ride" sheet (passenger-vehicle-fare.md).
+  chooseRideTitle: 'Choose a ride',
+  tripLine: (pickup: string, dropoff: string) => `${pickup} → ${dropoff}`,
+  stopsCount: (n: number) => (n === 1 ? '1 stop' : `${n} stops`),
+  editTripA11y: (trip: string) => `Edit trip, ${trip}`,
+  routeSummaryA11y: (summary: string) => `Trip ${summary}. Edit trip`,
+  pricesFailedTitle: "Couldn't get prices",
+  noRidesTitle: 'No rides available here',
+  noRidesBody: 'Try a different pickup or try again in a few minutes.',
+  fareDetails: 'Fare details',
+  hideFareDetails: 'Hide fare details',
+  fareLockChip: 'Fixed fare. It locks when a driver accepts.',
+  addStopSubtitle: (max: number) => `Up to ${max} stops on the way`,
+  paymentCash: 'Cash',
+  paymentCashBody: 'Pay your driver at the end of the trip',
+  discardTitle: 'Discard this trip?',
+  discardBody: 'Your pickup and drop-off will be cleared.',
+  keepEditing: 'Keep editing',
+  discard: 'Discard',
   phoneNotVerifiedTitle: 'Verify your phone number',
   phoneNotVerifiedAction: 'Verify number',
   notNow: 'Not now',
@@ -31,7 +52,7 @@ export const BOOKING_COPY = localizedCopy({
   noPlacesTitle: 'No places found',
   noPlacesBody: 'Check the spelling or choose on the map.',
   searchFailed: "Search isn't working right now.",
-  addStopOnMap: '+ Add via map',
+  addStopOnMap: 'Choose stop on map',
   pinnedOnMap: 'Pinned on map',
   mapPickHint: (target: 'pickup' | 'destination' | 'stop') =>
     target === 'pickup' ? 'Tap the map to set your pickup' : target === 'destination' ? 'Tap the map to set your destination' : 'Tap the map to add a stop',
@@ -55,30 +76,16 @@ export const BOOKING_COPY = localizedCopy({
   clearA11y: 'Clear',
   useCurrentLocation: 'Use current location',
   swapA11y: 'Swap pickup and destination',
-  tripDetails: 'Trip details',
-  editPickup: 'Edit pickup',
-  editDropoff: 'Edit drop-off',
-  swap: 'Swap',
-  optionalStops: (max: number) => `Add optional stops (up to ${max})`,
   addStop: 'Add a stop',
   stopLine: (n: number, address: string) => `Stop ${n}: ${address}`,
   removeStopA11y: (n: number) => `Remove stop ${n}`,
-  reviewTitle: 'Review & confirm',
-  reviewMeta: (vehicle: string) => `Vehicle: ${vehicle}`,
-  changeVehicle: 'Change vehicle',
-  cancelBooking: 'Cancel',
   dismissErrorA11y: 'Dismiss error',
   mapError: 'Map error. Please restart the app.',
   mapLoading: 'Loading map…',
   backA11y: 'Back',
   recenterA11y: 'Show my location',
-  startOverA11y: 'Start over',
-  // T-575: planner title and step chips.
+  // T-575: planner title.
   planTitle: 'Plan your trip',
-  stages: { pickup: 'Pickup', destination: 'Destination', vehicle: 'Vehicle', fare: 'Fare', requesting: 'Request' },
-  stageChip: (n: number, label: string) => `${n}. ${label}`,
-  stageA11y: (n: number, total: number, label: string, current: boolean) =>
-    `Step ${n} of ${total}: ${label}${current ? ', current' : ''}`,
 } as const);
 
 /** `pick(BOOKING_COPY)` in every language, so a label set before a language switch is still known. */

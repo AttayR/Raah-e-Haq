@@ -11,11 +11,12 @@ import { PassengerTripSafety } from '../../safety/components/RideSafety';
 import { FemaleDriverOption } from '../../women-mode/components/FemaleDriverOption';
 import type { useFareEstimates, useVehicleTypes } from '../hooks';
 import type { BookingFlow, BookingStage } from '../useBookingFlow';
-import { FareStage, MAX_STOPS, VehicleStage } from './BookingStages';
+import { ChooseRideStage, MAX_STOPS, StopsSection } from './BookingStages';
+import type { VehicleOption } from '../vehicleOptions';
+import type { SearchDraft } from '../../active-ride/components/FindingDriver';
 import { ChooseOnMapButton } from './MapPick';
 import { PlaceShortcuts } from './PlaceShortcuts';
 import { locationFieldLabels } from '../copy';
-import { tierLabel } from '../../ride-history/copy';
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -28,11 +29,13 @@ type Props = {
   currentLocation: LatLng | null;
   vehicleTypes: ReturnType<typeof useVehicleTypes>;
   estimates: ReturnType<typeof useFareEstimates>;
+  /** The ride tiers priced by the estimate (`toVehicleOptions`), shared with the sheet footer. */
+  vehicleOptions: ReadonlyArray<VehicleOption>;
   offer: FareOffer;
-  tripSummary: string | null;
-  onConfirm: () => void;
-  /** T-574: the Request tap is being handled (the button shows its loading state). */
-  confirming?: boolean;
+  /** Back to the search to change the trip (the trip line, the map's route pill). */
+  onEditTrip: () => void;
+  /** UI-R10: the booking just sent, for the finding-driver card while POST /rides runs. */
+  draft: SearchDraft | null;
   onCancelRide: () => void;
   ride: RideResource | null;
   rideStage: PassengerRideStageState | null;
@@ -43,7 +46,8 @@ type Props = {
 
 /**
  * The step shown in the booking sheet (T-534 split of PassengerMapScreen): the two-field start,
- * the pickup or destination search, vehicle, fare, and the ride itself. A finished ride's Done is
+ * the pickup or destination search, "Choose a ride" (UI-R10: tier, inline fare, stops; its Request
+ * is the sheet footer), and the ride itself. A finished ride's Done is
  * the sheet footer's (PassengerMapScreen, T-564).
  */
 export const BookingStageContent: React.FC<Props> = ({
@@ -54,10 +58,10 @@ export const BookingStageContent: React.FC<Props> = ({
   currentLocation,
   vehicleTypes,
   estimates,
+  vehicleOptions,
   offer,
-  tripSummary,
-  onConfirm,
-  confirming = false,
+  onEditTrip,
+  draft,
   onCancelRide,
   ride,
   rideStage,
@@ -65,8 +69,7 @@ export const BookingStageContent: React.FC<Props> = ({
   calling,
   busy,
 }) => {
-  const { pickup, destination, stops, pickupField, destField, setStage, setMapPick, chooseOnMap } = flow;
-  const selectedType = vehicleTypes.data?.find((t) => t.key === flow.selectedVehicle) ?? null;
+  const { pickup, destination, stops, pickupField, destField, setMapPick, chooseOnMap } = flow;
   // UI-R9: stable handlers, so the memoised shortcut list re-renders only when its data changes.
   // A shortcut pick goes through the same handlers as a picked suggestion (route, next step).
   const { selectPickup, selectDestination } = flow;
@@ -143,41 +146,18 @@ export const BookingStageContent: React.FC<Props> = ({
       );
     case 'vehicle':
       return (
-        <VehicleStage
+        <ChooseRideStage
           pickupLabel={pickup?.address || pickupField.text}
           dropoffLabel={destination?.address || destField.text}
-          tripSummary={tripSummary}
+          stops={stops}
           vehicleTypes={vehicleTypes}
           estimates={estimates}
+          options={vehicleOptions}
           selectedVehicle={flow.selectedVehicle}
-          onSelectVehicle={(id) => {
-            flow.setSelectedVehicle(id);
-            setStage('fare');
-          }}
-          onEditPickup={() => flow.editPoint('pickup')}
-          onEditDestination={() => flow.editPoint('destination')}
-          onSwap={flow.swapPickupDrop}
-          canEditStops={!!(pickup && destination)}
-          stops={stops}
-          onAddStop={(c, address) => flow.updateStops([...stops, { ...c, address }].slice(0, MAX_STOPS))}
-          onRemoveStop={(index) => flow.updateStops(stops.filter((_, i) => i !== index))}
-          onAddStopOnMap={() => setMapPick('stop')}
-          onFocusChange={onFocusChange}
-        />
-      );
-    case 'fare':
-      return (
-        <FareStage
-          vehicleLabel={selectedType ? tierLabel(selectedType.key, selectedType.label) : null}
-          tripSummary={tripSummary}
-          vehicleType={selectedType}
-          estimates={estimates}
+          onSelectVehicle={flow.setSelectedVehicle}
           offer={offer}
           catalogueNotice={vehicleTypes.notice}
-          onChangeVehicle={() => setStage('vehicle')}
-          onCancel={onCancelRide}
-          onConfirm={onConfirm}
-          confirming={confirming}
+          onEditTrip={onEditTrip}
           preferences={
             <FemaleDriverOption
               pickup={pickup}
@@ -186,6 +166,17 @@ export const BookingStageContent: React.FC<Props> = ({
               onChange={flow.setFemaleDriverOnly}
             />
           }
+          stopsSection={
+            pickup && destination ? (
+              <StopsSection
+                stops={stops}
+                onAddStop={(c, address) => flow.updateStops([...stops, { ...c, address }].slice(0, MAX_STOPS))}
+                onRemoveStop={(index) => flow.updateStops(stops.filter((_, i) => i !== index))}
+                onAddStopOnMap={() => setMapPick('stop')}
+                onFocusChange={onFocusChange}
+              />
+            ) : null
+          }
         />
       );
     case 'requesting':
@@ -193,6 +184,9 @@ export const BookingStageContent: React.FC<Props> = ({
         <ActiveRidePanel
           stageState={rideStage ?? { rideId: null, stage: 'searching', notice: null }}
           ride={ride}
+          draft={draft}
+          cancelInFooter
+          inlineSearchingBar={false}
           onCancel={onCancelRide}
           onCall={onCall}
           calling={calling}

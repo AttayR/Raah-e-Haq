@@ -35,6 +35,7 @@ import {
   InboxNotificationsStatePreview,
 } from './sections/InboxPreviews';
 import { HomeSheetPreview, PlaceSearchPreview } from './sections/HomeSearchPreviews';
+import { ChooseRidePreview, FindingDriverPreview } from './sections/BookingPreviews';
 import { VehicleMotionSection } from './sections/VehicleMotionSection';
 import {
   LargeTitlePreview,
@@ -144,6 +145,17 @@ const SCREEN_PREVIEWS: Section[] = [
   ['screen-home-loading', () => <HomeSheetPreview snap="half" state="loading" />],
   ['screen-home-error', () => <HomeSheetPreview snap="half" state="error" />],
   ['screen-search', () => <PlaceSearchPreview />],
+  // UI-R10: choose a ride and finding a driver.
+  ['screen-choose-ride', () => <ChooseRidePreview />],
+  ['screen-choose-ride-loading', () => <ChooseRidePreview state="loading" />],
+  ['screen-choose-ride-error', () => <ChooseRidePreview state="error" />],
+  ['screen-choose-ride-empty', () => <ChooseRidePreview state="empty" />],
+  ['screen-choose-ride-details', () => <ChooseRidePreview state="details" />],
+  ['screen-choose-ride-details-end', () => <ChooseRidePreview state="details-end" />],
+  ['screen-choose-ride-offline', () => <ChooseRidePreview state="offline" />],
+  ['screen-choose-ride-discard', () => <ChooseRidePreview state="discard" />],
+  ['screen-finding-driver', () => <FindingDriverPreview />],
+  ['screen-finding-driver-requeued', () => <FindingDriverPreview requeued />],
   ...REGISTRATION_PREVIEWS,
   ...AUTH_STATE_PREVIEWS,
 ];

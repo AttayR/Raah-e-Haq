@@ -437,9 +437,11 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 ### 5.19 EmptyState
 - Centered column, max width 280: illustration or icon circle (96, `primarySoft`, glyph 48 `primaryText`) → 16 → title `h3` `textPrimary` → 8 → body `bodySmall` `textSecondary` centered → 24 → optional `md` button (`secondary` variant).
 - Placed 64 from the top of the content area (not vertically centered in long screens).
+- **[UI-R10] `size="compact"`** (a section inside a map sheet): 48 `primarySoft` circle with a 24 `primaryText` glyph → 12 → title `title` (17/22 600) → 4 → body `bodySmall` `textSecondary` → 12 → optional `sm` `secondary` action; centred, max width 280, 8 vertical padding.
 
 ### 5.20 ErrorState
 - Same layout as EmptyState; icon circle `dangerSoft`, glyph **[UI-R3]** `cloud-off-outline` (network; the bundled MDI has no `cloud-alert-outline`) or `alert-circle-outline` (server) in `danger`; title "Couldn't load {thing}"; body explains in one sentence; primary `md` button "Try again" (loading state while retrying). If cached data exists, show the data plus an error Toast or Banner instead of replacing content.
+- **[UI-R10] `size="compact"`** is the exact twin of the compact EmptyState: 48 `dangerSoft` circle, 24 glyph `danger` → 12 → title **`title`** (17/22 600; corrects the UI-R9 `body` 400, because the empty and error states of one sheet must read as one family) → optional body `bodySmall` → 12 → `sm` `secondary` "Try again".
 
 ### 5.21 Map pins and route
 - **Pickup pin:** 20×20 circle `pickupPin` with 4pt white ring (dark: `#0B0F1A` ring) and `elevation.2`; label bubble above (optional) radius `sm`, `surface`, `caption`.

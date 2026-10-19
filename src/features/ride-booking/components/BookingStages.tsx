@@ -1,17 +1,20 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { AppText } from '../../../components/ui/AppText';
+import React, { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useAppTheme } from '../../../app/providers/ThemeProvider';
+import { AppText, Banner, Button, Icon, ListGroup, ListItem, OfflineBanner, useIsOffline } from '../../../components/ui';
+import { t } from '../../../i18n';
 import { KeyboardRevealGroup } from '../../../components/ui/keyboardReveal';
 import StopsEditor from '../../../components/passenger/StopsEditor';
-import { space } from '../../../theme';
+import { componentTokens, radius, space } from '../../../theme';
 import { BOOKING_COPY } from '../copy';
 import { ChooseOnMapButton } from './MapPick';
-import { TripSummaryCard } from './TripSummaryCard';
-import { FareReview, VehicleChoice } from './BookingChoices';
+import { SelectedFare, VehicleChoice, requestFareText } from './BookingChoices';
 import type { BookingPlace } from '../buildRideRequest';
-import type { useFareEstimates, useVehicleTypes } from '../hooks';
+import { estimateFor, type useFareEstimates, type useVehicleTypes } from '../hooks';
 import type { FareOffer } from '../../fare/hooks';
 import type { FareNotice } from '../../fare/types';
+import { FareNoticeBanner } from '../../fare/components/FareBits';
+import type { VehicleOption } from '../vehicleOptions';
 
 type Coords = { latitude: number; longitude: number };
 
@@ -21,26 +24,7 @@ type Coords = { latitude: number; longitude: number };
  */
 export const MAX_STOPS = 3;
 
-type VehicleStageProps = {
-  pickupLabel: string;
-  dropoffLabel: string;
-  tripSummary: string | null;
-  vehicleTypes: ReturnType<typeof useVehicleTypes>;
-  estimates: ReturnType<typeof useFareEstimates>;
-  selectedVehicle: string | undefined;
-  onSelectVehicle: (id: string) => void;
-  onEditPickup: () => void;
-  onEditDestination: () => void;
-  onSwap: () => void;
-  canEditStops: boolean;
-  stops: BookingPlace[];
-  onAddStop: (c: Coords, address: string) => void;
-  onRemoveStop: (index: number) => void;
-  onAddStopOnMap: () => void;
-  onFocusChange?: (focused: boolean) => void;
-};
-
-/** The trip card's stop rows (T-553): a map-picked stop has no address until booking. */
+/** The trip's stop rows (T-553): a map-picked stop has no address until booking. */
 export const tripCardStops = (stops: ReadonlyArray<BookingPlace>) =>
   stops.map((s, i) => ({
     key: i,
@@ -48,91 +32,235 @@ export const tripCardStops = (stops: ReadonlyArray<BookingPlace>) =>
     testID: `trip-details-stop-${i + 1}`,
   }));
 
-/** Booking step 3: route summary (with its stops) and edit chips, vehicle choice, optional stops. */
-export const VehicleStage: React.FC<VehicleStageProps> = (p) => (
-  <View style={styles.stack}>
-    <TripSummaryCard
-      testID="trip-details"
-      label={BOOKING_COPY.tripDetails}
-      pickup={p.pickupLabel}
-      stops={tripCardStops(p.stops)}
-      dropoff={p.dropoffLabel}
-      meta={p.tripSummary}
-      actions={[
-        { label: BOOKING_COPY.editPickup, icon: 'edit', onPress: p.onEditPickup, testID: 'edit-pickup' },
-        { label: BOOKING_COPY.editDropoff, icon: 'edit', onPress: p.onEditDestination, testID: 'edit-destination' },
-        { label: BOOKING_COPY.swap, icon: 'swap', onPress: p.onSwap, testID: 'swap-trip' },
-      ]}
-    />
-    <VehicleChoice
-      vehicleTypes={p.vehicleTypes}
-      estimates={p.estimates}
-      selectedId={p.selectedVehicle}
-      onSelect={p.onSelectVehicle}
-    />
-    {p.canEditStops && (
-      // T-556: while the stop search is typed in, the sheet reveals this whole section, so the
-      // heading stays in view above the field and its suggestions.
-      <KeyboardRevealGroup style={styles.stops} testID="booking-stops-section">
-        <AppText variant="title">{BOOKING_COPY.optionalStops(MAX_STOPS)}</AppText>
-        <StopsEditor
-          stops={p.stops}
-          onAddStop={p.onAddStop}
-          onRemoveStop={p.onRemoveStop}
-          maxStops={MAX_STOPS}
-          onFocusChange={p.onFocusChange}
-        />
-        {p.stops.length < MAX_STOPS && (
-          <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={p.onAddStopOnMap} />
-        )}
-      </KeyboardRevealGroup>
-    )}
-  </View>
-);
+/**
+ * A place's short name (passenger-vehicle-fare.md block 3 [UI-R10]): the address up to its first
+ * comma ("Liberty Market", not "Liberty Market, Gulberg III, Lahore"). Booking places carry no
+ * separate name today, so the address is the source.
+ */
+export const shortPlace = (text: string): string => text.split(',')[0]?.trim() || text.trim();
 
-type FareStageProps = {
-  vehicleLabel: string | null;
-  tripSummary: string | null;
-  vehicleType: Parameters<typeof FareReview>[0]['vehicleType'];
-  estimates: ReturnType<typeof useFareEstimates>;
-  /** BE-83 "Offer your fare" for the selected quote. */
-  offer?: FareOffer;
-  /** BE-60 fuel notice from the vehicle catalogue. */
-  catalogueNotice?: FareNotice | null;
-  onChangeVehicle: () => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-  /** T-574: the Request tap is being handled. */
-  confirming?: boolean;
-  /** Ride preferences above the fare (BE-87 "Female driver"); nothing when absent. */
-  preferences?: React.ReactNode;
+/** "Liberty Market → Emporium Mall · 2 stops" (passenger-vehicle-fare.md block 3). */
+export const tripLineText = (pickup: string, dropoff: string, stopCount: number): string =>
+  [BOOKING_COPY.tripLine(shortPlace(pickup), shortPlace(dropoff)), stopCount > 0 ? BOOKING_COPY.stopsCount(stopCount) : null]
+    .filter(Boolean)
+    .join(' · ');
+
+type StopsSectionProps = {
+  stops: BookingPlace[];
+  onAddStop: (c: Coords, address: string) => void;
+  onRemoveStop: (index: number) => void;
+  onAddStopOnMap: () => void;
+  onFocusChange?: (focused: boolean) => void;
 };
 
-/** Booking step 4: chosen vehicle, fare review and confirm. */
-export const FareStage: React.FC<FareStageProps> = (p) => (
-  <View style={styles.stack}>
-    <TripSummaryCard
-      testID="fare-review-summary"
-      label={BOOKING_COPY.reviewTitle}
-      meta={`${BOOKING_COPY.reviewMeta(p.vehicleLabel ?? '—')}${p.tripSummary ? ` • ${p.tripSummary}` : ''}`}
-      actions={[
-        { label: BOOKING_COPY.changeVehicle, icon: 'car', onPress: p.onChangeVehicle, testID: 'change-vehicle' },
-        { label: BOOKING_COPY.cancelBooking, icon: 'close', tone: 'danger', onPress: p.onCancel, testID: 'cancel-booking' },
-      ]}
+/**
+ * Stops as a sheet row (DESIGN_SYSTEM §9 v1.1, UI-R10): the stops on the trip with remove, then
+ * "Add a stop" that opens the stop search and "Choose stop on map". T-556: while the stop search
+ * is typed in, the sheet reveals this whole section, so the field and its suggestions stay in view.
+ */
+export const StopsSection: React.FC<StopsSectionProps> = ({ stops, onAddStop, onRemoveStop, onAddStopOnMap, onFocusChange }) => {
+  const [adding, setAdding] = useState(false);
+  const canAdd = stops.length < MAX_STOPS;
+  const searching = adding && canAdd;
+  return (
+    <KeyboardRevealGroup style={styles.stops} testID="booking-stops-section">
+      {stops.length > 0 || searching ? (
+        <StopsEditor
+          stops={stops}
+          onAddStop={(c, address) => {
+            onAddStop(c, address);
+            setAdding(false);
+          }}
+          onRemoveStop={onRemoveStop}
+          maxStops={MAX_STOPS}
+          onFocusChange={onFocusChange}
+          searchVisible={searching}
+        />
+      ) : null}
+      {searching ? (
+        <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={onAddStopOnMap} />
+      ) : canAdd ? (
+        <ListGroup>
+          <ListItem
+            icon="add"
+            title={BOOKING_COPY.addStop}
+            subtitle={BOOKING_COPY.addStopSubtitle(MAX_STOPS)}
+            onPress={() => setAdding(true)}
+            testID="add-stop-row"
+          />
+        </ListGroup>
+      ) : null}
+    </KeyboardRevealGroup>
+  );
+};
+
+/** Cash only (owner decision B-08): a fixed row, no picker. */
+const PaymentRow: React.FC = () => (
+  <ListGroup>
+    <ListItem
+      leading={<Icon name="cash" size={24} color="success" />}
+      title={BOOKING_COPY.paymentCash}
+      subtitle={BOOKING_COPY.paymentCashBody}
+      testID="booking-payment-row"
     />
-    {p.preferences}
-    <FareReview
-      vehicleType={p.vehicleType}
-      estimates={p.estimates}
-      offer={p.offer}
-      catalogueNotice={p.catalogueNotice}
-      onConfirm={p.onConfirm}
-      confirming={p.confirming}
-    />
-  </View>
+  </ListGroup>
 );
 
+type ChooseRideProps = {
+  pickupLabel: string;
+  dropoffLabel: string;
+  stops: BookingPlace[];
+  vehicleTypes: ReturnType<typeof useVehicleTypes>;
+  estimates: ReturnType<typeof useFareEstimates>;
+  options: ReadonlyArray<VehicleOption>;
+  selectedVehicle: string | undefined;
+  onSelectVehicle: (id: string) => void;
+  /** BE-83 "Offer your fare" for the selected quote. */
+  offer?: FareOffer;
+  /** BE-60 fuel notice from the vehicle catalogue, used when the estimate carries none. */
+  catalogueNotice?: FareNotice | null;
+  /** Back to the search to change the trip. */
+  onEditTrip: () => void;
+  /** BE-87 "Female driver"; nothing when the passenger may not ask. */
+  preferences?: React.ReactNode;
+  /** The stops row (StopsSection), once both ends are set. */
+  stopsSection?: React.ReactNode;
+  /** Start with Fare details expanded (Debug gallery evidence). */
+  fareDetailsOpen?: boolean;
+  /** Show the offline state regardless of NetInfo (Debug gallery evidence only). */
+  forceOffline?: boolean;
+};
+
+/**
+ * "Choose a ride" (passenger-vehicle-fare.md, DS §12.5, UI-R10): one sheet state instead of the
+ * old vehicle and fare steps. Title, the trip on one line (tap to edit), the fuel notice, the tier
+ * list, the selected tier's fare inline, ride preferences, stops and the cash row. The request
+ * itself is the sheet footer (`ChooseRideFooter`).
+ */
+export const ChooseRideStage: React.FC<ChooseRideProps> = (p) => {
+  const { theme } = useAppTheme();
+  const trip = tripLineText(p.pickupLabel, p.dropoffLabel, p.stops.length);
+  const stopsSuffix = p.stops.length > 0 ? ` · ${BOOKING_COPY.stopsCount(p.stops.length)}` : null;
+  const route = p.estimates.data;
+  const quote = estimateFor(route, p.selectedVehicle);
+  return (
+    <View style={styles.stack} testID="choose-ride">
+      {p.forceOffline ? <Banner tone="warning" icon="offline" text={t('kit.offline')} testID="offline-banner" /> : <OfflineBanner />}
+      <View style={styles.header}>
+        <AppText variant="h2" accessibilityRole="header" testID="choose-ride-title">
+          {BOOKING_COPY.chooseRideTitle}
+        </AppText>
+        <Pressable
+          onPress={p.onEditTrip}
+          accessibilityRole="button"
+          accessibilityLabel={BOOKING_COPY.editTripA11y(trip)}
+          android_ripple={{ color: theme.colors.surfacePressed }}
+          style={({ pressed }) => [styles.tripRow, pressed ? { backgroundColor: theme.colors.surfacePressed } : null]}
+          testID="trip-details"
+        >
+          {/* The drop-off truncates; the stop count never does. */}
+          <View style={styles.tripText} testID="trip-details-line" accessibilityLabel={trip}>
+            <AppText variant="bodySmall" color="textSecondary" numberOfLines={1} style={styles.shrink}>
+              {BOOKING_COPY.tripLine(shortPlace(p.pickupLabel), shortPlace(p.dropoffLabel))}
+            </AppText>
+            {stopsSuffix ? (
+              <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                {stopsSuffix}
+              </AppText>
+            ) : null}
+          </View>
+          <Icon name="edit" size={16} color="textSecondary" />
+        </Pressable>
+      </View>
+      <FareNoticeBanner notice={route?.fare_notice ?? p.catalogueNotice ?? null} />
+      <VehicleChoice
+        vehicleTypes={p.vehicleTypes}
+        estimates={p.estimates}
+        options={p.options}
+        selectedId={p.selectedVehicle}
+        onSelect={p.onSelectVehicle}
+      />
+      {quote && route ? (
+        <SelectedFare
+          quote={quote}
+          distanceKm={route.distance_km}
+          durationMin={route.duration_min}
+          offer={p.offer}
+          defaultOpen={p.fareDetailsOpen}
+        />
+      ) : null}
+      {p.preferences}
+      {p.stopsSection}
+      <PaymentRow />
+    </View>
+  );
+};
+
+type FooterProps = {
+  options: ReadonlyArray<VehicleOption>;
+  estimates: ReturnType<typeof useFareEstimates>;
+  selectedVehicle: string | undefined;
+  offer?: FareOffer;
+  onConfirm: () => void;
+  /** T-574: the tap is being handled: the button shows its loading state at once. */
+  confirming?: boolean;
+  /** A request is already being sent: nothing more can be requested (UI-R10). */
+  disabled?: boolean;
+  /** Show the offline state regardless of NetInfo (Debug gallery evidence only). */
+  forceOffline?: boolean;
+};
+
+/**
+ * The choose-ride sheet's one primary action, pinned in the footer (§12.2 map archetype):
+ * "Request {tier} · {fare}" (§12.5 [UI-R5]) with the server's tier name and the offer (else the
+ * quote). Disabled "Request" until the selected tier is priced. Haptic `impactLight` (§6.11).
+ */
+export const ChooseRideFooter: React.FC<FooterProps> = ({
+  options,
+  estimates,
+  selectedVehicle,
+  offer,
+  onConfirm,
+  confirming = false,
+  disabled = false,
+  forceOffline = false,
+}) => {
+  const offline = useIsOffline() || forceOffline;
+  const option = useMemo(() => options.find((o) => o.id === selectedVehicle) ?? null, [options, selectedVehicle]);
+  const quote = estimateFor(estimates.data, selectedVehicle);
+  const fare = requestFareText(quote, offer);
+  const ready = !!option && !!fare && !option.unavailable;
+  const label = offline
+    ? BOOKING_COPY.requestOffline
+    : ready && option && fare
+      ? BOOKING_COPY.requestWithFare(option.name, fare)
+      : BOOKING_COPY.requestIdle;
+  return (
+    <Button
+      label={label}
+      size="lg"
+      haptic="impactLight"
+      onPress={onConfirm}
+      disabled={!ready || offline || disabled}
+      loading={confirming}
+      testID="fare-request"
+    />
+  );
+};
+
 const styles = StyleSheet.create({
-  stack: { gap: space[3] },
-  stops: { gap: space[2], marginTop: space[2] },
+  stack: { gap: space[4] },
+  header: { gap: space[1] },
+  tripRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    minHeight: componentTokens.iconButton.target,
+    marginHorizontal: -space[2],
+    paddingHorizontal: space[2],
+    borderRadius: radius.sm,
+  },
+  tripText: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
+  shrink: { flexShrink: 1, minWidth: 0 },
+  stops: { gap: space[2] },
 });

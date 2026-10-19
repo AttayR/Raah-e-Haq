@@ -8,7 +8,7 @@ import { Keyboard, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderHook, within } from '@testing-library/react-native';
 import { DarkTheme, LightTheme, type AppTheme } from '../../../src/theme';
 import { MapTopControls } from '../../../src/features/ride-booking/components/MapTopControls';
-import { TripSummaryCard } from '../../../src/features/ride-booking/components/TripSummaryCard';
+import { useSharedValue } from 'react-native-reanimated';
 import { BookingSheet } from '../../../src/features/ride-booking/components/BookingSheet';
 import { NearbyDriverMarkers } from '../../../src/components/passenger/NearbyDrivers';
 import { useKeyboardHeight } from '../../../src/hooks/useKeyboardHeight';
@@ -49,40 +49,53 @@ describe.each([
     mockTheme = theme;
   });
 
-  it('map controls start at insets.top + 8, all labelled; reset hidden during a ride', () => {
-    const handlers = { onBack: jest.fn(), onRecenter: jest.fn(), onReset: jest.fn() };
-    const { getByLabelText, getByTestId, queryByLabelText, rerender } = render(<MapTopControls {...handlers} />);
-    expect(StyleSheet.flatten(getByTestId('map-top-controls').props.style)).toMatchObject({ top: 55 });
+  it('UI-R10 (§9): two map controls only, back and locate; no start over', () => {
+    const SheetHeight = ({ onBack, onRecenter }: { onBack: () => void; onRecenter: () => void }) => {
+      const height = useSharedValue(320);
+      return <MapTopControls onBack={onBack} onRecenter={onRecenter} sheetHeight={height} />;
+    };
+    const onBack = jest.fn();
+    const onRecenter = jest.fn();
+    const { getByLabelText, queryByLabelText, queryByTestId } = render(<SheetHeight onBack={onBack} onRecenter={onRecenter} />);
     fireEvent.press(getByLabelText('Back'));
     fireEvent.press(getByLabelText('Show my location'));
-    fireEvent.press(getByLabelText('Start over'));
-    // T-553: no legacy "+" Request Ride entry point.
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onRecenter).toHaveBeenCalledTimes(1);
+    // T-553: no legacy "+" Request Ride entry point; UI-R10: no "Start over" (refresh) control.
     expect(queryByLabelText('More ride options')).toBeNull();
-    Object.values(handlers).forEach((h) => expect(h).toHaveBeenCalledTimes(1));
-    rerender(<MapTopControls {...handlers} onReset={undefined} />);
     expect(queryByLabelText('Start over')).toBeNull();
+    expect(queryByTestId('map-reset')).toBeNull();
   });
 
-  it('trip card: addresses on one line each, chips in a wrapping row', () => {
-    const onSwap = jest.fn();
-    const { getByText, getByTestId } = render(
-      <TripSummaryCard
-        label="Trip details"
-        pickup="G9C5+5F5, Block N Gulberg III, Lahore, Pakistan"
-        dropoff="Liberty Market Gulberg III, Lahore, Pakistan"
-        meta="2.26 km • 6 min"
-        actions={[
-          { label: 'Edit pickup', onPress: jest.fn() },
-          { label: 'Edit drop-off', onPress: jest.fn() },
-          { label: 'Swap', onPress: onSwap, testID: 'swap-trip' },
-        ]}
-      />,
+  it('T-549 / UI-R10: after a pan on the live ride the end-side control follows the ride again', () => {
+    const recentre = jest.fn();
+    const onRecenter = jest.fn();
+    const Follow = ({ visible }: { visible: boolean }) => {
+      const height = useSharedValue(0);
+      return <MapTopControls onBack={jest.fn()} onRecenter={onRecenter} sheetHeight={height} followRide={{ visible, onPress: recentre }} />;
+    };
+    const { getByTestId, queryByTestId, rerender } = render(<Follow visible={false} />);
+    expect(queryByTestId('ride-recentre')).toBeNull();
+    rerender(<Follow visible />);
+    expect(queryByTestId('map-recenter')).toBeNull();
+    fireEvent.press(getByTestId('ride-recentre'));
+    expect(recentre).toHaveBeenCalledTimes(1);
+    expect(onRecenter).not.toHaveBeenCalled();
+    expect(getByTestId('ride-recentre').props.accessibilityLabel).toBe('Follow your ride on the map');
+  });
+
+  it('UI-R10: the sheet draws its top accessory flush at the top, inside the radius clip', () => {
+    const { getByTestId } = render(
+      <BookingSheet topAccessory={<AppText>bar</AppText>}>
+        <AppText>content</AppText>
+      </BookingSheet>,
     );
-    expect(getByText('Liberty Market Gulberg III, Lahore, Pakistan').props.numberOfLines).toBe(1);
-    const swap = getByTestId('swap-trip');
-    expect(StyleSheet.flatten(getByTestId('trip-summary-actions').props.style)).toMatchObject({ flexWrap: 'wrap' });
-    fireEvent.press(swap);
-    expect(onSwap).toHaveBeenCalled();
+    expect(StyleSheet.flatten(getByTestId('booking-sheet-top-accessory').props.style)).toMatchObject({
+      position: 'absolute',
+      top: 0,
+      overflow: 'hidden',
+      borderTopLeftRadius: 24,
+    });
   });
 
   it('sheet: bottom inset padding, rises with the keyboard, reports its height', () => {
@@ -109,7 +122,7 @@ describe.each([
     );
     const footer = getByTestId('booking-sheet-footer');
     // Clear of the 34 pt home indicator, and outside the scroll (so long content never cuts it off).
-    expect(StyleSheet.flatten(footer.props.style)).toMatchObject({ paddingBottom: 42, paddingTop: 12, paddingHorizontal: 16 });
+    expect(StyleSheet.flatten(footer.props.style)).toMatchObject({ paddingBottom: 42, paddingTop: 16, paddingHorizontal: 16 });
     expect(StyleSheet.flatten(getByTestId('booking-sheet-scroll').props.contentContainerStyle).paddingBottom).toBe(16);
     expect(within(getByTestId('booking-sheet-scroll')).queryByText('Done')).toBeNull();
     fireEvent.press(getByText('Done'));

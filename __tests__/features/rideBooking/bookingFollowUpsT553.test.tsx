@@ -12,7 +12,7 @@ import { act, fireEvent, render, renderHook } from '@testing-library/react-nativ
 import LocationSearch from '../../../src/components/passenger/LocationSearch';
 import { KeyboardRevealContext, useKeyboardReveal, type KeyboardReveal } from '../../../src/components/ui/keyboardReveal';
 import { BookingSheet } from '../../../src/features/ride-booking/components/BookingSheet';
-import { TripSummaryCard } from '../../../src/features/ride-booking/components/TripSummaryCard';
+import { AddressPair } from '../../../src/components/ui/ride/AddressPair';
 import { tripCardStops } from '../../../src/features/ride-booking/components/BookingStages';
 import { useSearchFocus } from '../../../src/features/ride-booking/useSearchFocus';
 import { useBookingFlow } from '../../../src/features/ride-booking/useBookingFlow';
@@ -233,14 +233,14 @@ describe('T-553: picking a pickup on the two-field start', () => {
   });
 });
 
-describe('T-553: the vehicle step trip card lists the stops', () => {
+describe('T-553: the trip lists the stops', () => {
   it('pickup, the stops in order, then the drop-off; a map-picked stop reads "Pinned on map"', () => {
     const stops = tripCardStops([
       { latitude: 31.5, longitude: 74.3, address: 'Liberty Market, Lahore' },
       { latitude: 31.49, longitude: 74.31 },
     ]);
     const { getByTestId, getAllByText } = render(
-      <TripSummaryCard label="Trip details" pickup="Gulberg III" stops={stops} dropoff="DHA Phase 5" actions={[]} />,
+      <AddressPair density="compact" pickup="Gulberg III" stops={stops} dropoff="DHA Phase 5" />,
     );
     expect(getByTestId('trip-details-stop-1').props.children).toBe('Liberty Market, Lahore');
     expect(getByTestId('trip-details-stop-2').props.children).toBe('Pinned on map');

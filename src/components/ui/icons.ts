@@ -171,6 +171,8 @@ export const iconGlyphs = {
   accountOff: 'account-off-outline',
   bellRing: 'bell-ring-outline',
   mapSearch: 'map-search-outline',
+  // UI-R10: no rides available on the choose-ride sheet.
+  carOff: 'car-off',
   // UI-R7 role choice cards: trailing radio.
   radioOn: 'radiobox-marked',
   radioOff: 'radiobox-blank',

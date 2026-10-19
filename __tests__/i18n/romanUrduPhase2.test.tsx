@@ -31,7 +31,6 @@ import { NOTIFICATIONS_COPY } from '../../src/features/notifications/copy';
 import { DRIVER_SETTINGS_COPY } from '../../src/components/driver/settings/copy';
 import { RIDE_HISTORY_COPY } from '../../src/features/ride-history/copy';
 import { BOOKING_COPY, isCurrentLocationLabel, locationFieldLabels } from '../../src/features/ride-booking/copy';
-import StageChips from '../../src/components/passenger/StageChips';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 import { MapErrorBoundary } from '../../src/components/MapErrorBoundary';
 
@@ -162,13 +161,11 @@ describe('QA 2026-10-19: lines that were still English read Roman Urdu', () => {
 });
 
 describe('booking planner', () => {
-  it('step chips follow the language', () => {
+  it('the planner and choose-ride titles follow the language (UI-R10: no step chips)', () => {
     setLocale('ur-Latn');
-    render(<StageChips stage="destination" />);
-    expect(screen.getByText('1. Kahan se')).toBeTruthy();
-    expect(screen.getByText('4. Kiraya')).toBeTruthy();
-    expect(screen.getByLabelText('5 mein se qadam 2: Kahan tak, abhi yahan')).toBeTruthy();
     expect(BOOKING_COPY.planTitle).toBe('Safar plan karein');
+    expect(BOOKING_COPY.chooseRideTitle).toBe('Sawari chunein');
+    expect(BOOKING_COPY.addStopOnMap).toBe('Stop map par chunein');
   });
 
   it('recognises "Current location" from before a language switch', () => {

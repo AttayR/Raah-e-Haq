@@ -95,7 +95,7 @@ describe('trip panel (passenger)', () => {
   it('a restored ride back in the queue says it is finding another driver (BE-85 requeue_count)', () => {
     const { getByText } = render(panel(makeRide({ status: 'requested', requeue_count: 1 })));
     getByText('Finding another driver');
-    getByText('Your driver cancelled. Finding you another driver…');
+    getByText("Your driver cancelled. We're asking other drivers nearby.");
   });
 
   it('a cancelled ride with a late-cancel fee says what was charged', () => {

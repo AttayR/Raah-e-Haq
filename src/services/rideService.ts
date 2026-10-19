@@ -472,7 +472,11 @@ class RideService {
   private websocketUrl = '/websocket';
 
   // Create a new ride request with stops support
-  async createRide(rideData: RideRequest): Promise<RideResource> {
+  /**
+   * `idempotencyKey` (UI-R10, for BE-113): one key per Request tap, reused if that same attempt is
+   * sent again, so the server can answer a repeat with the ride it already created.
+   */
+  async createRide(rideData: RideRequest, options: { idempotencyKey?: string } = {}): Promise<RideResource> {
     const cancelSource = createCancellableRequest();
 
     try {
@@ -487,7 +491,8 @@ class RideService {
       }
 
       const body = await apiService.post<RideResource>(`${this.baseUrl}`, rideData, {
-        cancelToken: cancelSource.token
+        cancelToken: cancelSource.token,
+        ...(options.idempotencyKey ? { headers: { 'Idempotency-Key': options.idempotencyKey } } : {}),
       });
       const ride = unwrap(body);
       logger.debug('✅ Ride created successfully:', ride.id);

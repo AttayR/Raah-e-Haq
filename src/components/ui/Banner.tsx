@@ -96,10 +96,17 @@ export function Banner({ tone = 'info', icon, title, text, action, actionPlaceme
  * Renders only while NetInfo reports no connection; place it under the Header (or at the top of
  * a map below the status bar).
  */
-export function OfflineBanner({ style, testID = 'offline-banner' }: { style?: StyleProp<ViewStyle>; testID?: string }) {
+/**
+ * True only while NetInfo reports no connection. `null` (not known yet) counts as online, so a
+ * banner never flashes and an action is never disabled on launch (UI-R10).
+ */
+export function useIsOffline(): boolean {
   const { isConnected, isInternetReachable } = useNetInfo();
-  // `null` means "not known yet": never flash the banner on launch.
-  const offline = isConnected === false || isInternetReachable === false;
+  return isConnected === false || isInternetReachable === false;
+}
+
+export function OfflineBanner({ style, testID = 'offline-banner' }: { style?: StyleProp<ViewStyle>; testID?: string }) {
+  const offline = useIsOffline();
   if (!offline) {
     return null;
   }

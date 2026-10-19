@@ -22,7 +22,7 @@ export type ErrorStateProps = {
   placement?: 'top' | 'center';
   /**
    * `compact` (UI-R9, a section inside a sheet): 48 `dangerSoft` circle with a 24 glyph → 12 →
-   * the title in `body` (1 line, 2 at large text; `body` is not shown) → 12 → `sm` secondary
+   * the title in `title` ([UI-R10], the twin of the compact EmptyState; 2 lines at most; `body` is not shown) → 12 → `sm` secondary
    * "Try again", centred, ≤156 high. `regular` (default): the EmptyState-sized layout.
    */
   size?: 'regular' | 'compact';
@@ -106,7 +106,7 @@ function CompactErrorState({
       >
         <Icon name={kind === 'network' ? 'networkError' : 'warning'} size={k.compactGlyph} color="danger" />
       </View>
-      <AppText variant="body" align="center" numberOfLines={2}>
+      <AppText variant="title" align="center" numberOfLines={2}>
         {title}
       </AppText>
       <View style={styles.compactAction}>

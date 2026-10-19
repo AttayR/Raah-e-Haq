@@ -301,16 +301,11 @@ describe('useBookingFlow field text (T-534 review)', () => {
     expect(result.current.pickup).toMatchObject(DHA);
   });
 
-  it('Back from the vehicle step clears the old route; Back from fare keeps it (T-551)', () => {
+  it('Back from choose-ride (one state, UI-R10: no fare step) clears the old route (T-551)', () => {
     const d = directions();
     const { result } = renderHook(() => useBookingFlow({ prefill, currentLocation: GPS, rideShown: false, directions: d }));
     act(() => result.current.selectPickup(GULBERG, 'Gulberg III, Lahore', true));
     act(() => result.current.selectDestination(DHA, 'DHA Phase 5, Lahore', false));
-    expect(result.current.stage).toBe('vehicle');
-    act(() => result.current.setStage('fare'));
-    act(() => {
-      result.current.stepBack();
-    });
     expect(result.current.stage).toBe('vehicle');
     expect(d.clearRoute).not.toHaveBeenCalled();
     act(() => {

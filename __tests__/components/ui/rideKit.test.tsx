@@ -113,7 +113,10 @@ describe.each([
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValueOnce(true);
     render(<SearchingPulse testID="calm" />);
     expect(await screen.findByTestId('calm-static')).toBeTruthy();
+    // UI-R10: reduced motion keeps a static 30 % primary segment on the track (never hidden).
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValueOnce(true);
     render(<IndeterminateBar testID="bar" />);
+    expect(await screen.findByTestId('bar-static', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('AddressPair: pickup circle, stops, drop-off square in order; labels; a11y per row; RTL-safe start rail', () => {

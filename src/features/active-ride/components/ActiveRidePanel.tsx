@@ -36,6 +36,7 @@ import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection
 import type { ParcelView } from '../../parcel/types';
 import { readNumberOrNull } from '../../../core/api/read';
 import { formatMoney } from '../../../utils/format';
+import { FindingSubtitle, PassengerCancelButton, SearchingTripCard, searchingTripOf, type SearchDraft } from './FindingDriver';
 import {
   canPassengerCancel,
   cancelledByOf,
@@ -46,7 +47,9 @@ import {
 } from '../stage';
 
 const STAGE_TITLES = perLocale((): Record<PassengerRideStage, string> => ({
-  searching: ACTIVE_RIDE_COPY.searchingTitle,
+  // UI-R10: the sheet title has no ellipsis (passenger-finding-driver.md); the Home "return to
+  // your ride" line keeps `searchingTitle`.
+  searching: ACTIVE_RIDE_COPY.findingTitle,
   driver_en_route: ACTIVE_RIDE_COPY.driverEnRouteTitle,
   driver_arrived: ACTIVE_RIDE_COPY.driverArrivedTitle,
   in_trip: ACTIVE_RIDE_COPY.inTripTitle,
@@ -54,9 +57,11 @@ const STAGE_TITLES = perLocale((): Record<PassengerRideStage, string> => ({
   cancelled: ACTIVE_RIDE_COPY.cancelledTitle,
 }));
 
-/** The RideProgress step per stage (§5.24); none once the ride has ended. */
+/**
+ * The RideProgress step per stage (§5.24); none once the ride has ended, and none while searching
+ * (UI-R10: the finding-driver sheet carries the indeterminate bar instead).
+ */
 const STAGE_STEP: Partial<Record<PassengerRideStage, number>> = {
-  searching: 0,
   driver_en_route: 1,
   driver_arrived: 2,
   in_trip: 3,
@@ -89,7 +94,8 @@ const handOverText = (ride: RideResource | null): string => {
 const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null, parcel: ParcelView | null): string | null => {
   switch (state.stage) {
     case 'searching':
-      return state.notice === 'driver_cancelled' ? ACTIVE_RIDE_COPY.driverCancelledRequeued : ACTIVE_RIDE_COPY.searchingMessage;
+      // UI-R10: the plain search line is FindingSubtitle (it changes after a minute).
+      return state.notice === 'driver_cancelled' ? ACTIVE_RIDE_COPY.driverCancelledRequeued : null;
     case 'driver_arrived':
       return parcel ? handOverText(ride) : ACTIVE_RIDE_COPY.driverArrivedMessage;
     case 'completed':
@@ -131,6 +137,18 @@ type Props = {
   safety?: React.ReactNode;
   /** POST /rides or the cancel is in flight. */
   busy?: boolean;
+  /** UI-R10: the booking just sent, for the searching card while POST /rides runs. */
+  draft?: SearchDraft | null;
+  /**
+   * UI-R10: while searching, the booking map pins "Cancel request" in its sheet footer
+   * (`PassengerCancelButton`), so the panel leaves it out.
+   */
+  cancelInFooter?: boolean;
+  /**
+   * Draw the searching bar inside the panel (default). The booking map puts it flush at the top
+   * of its sheet instead (BookingSheet `topAccessory`) and passes false.
+   */
+  inlineSearchingBar?: boolean;
 };
 
 /**
@@ -138,7 +156,19 @@ type Props = {
  * (RideProgress, PersonCard with Call/Message, FareBreakdown). The full trip-sheet redesign is
  * UI-R12.
  */
-const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, onCall, calling = false, safety, busy = false }) => {
+const ActiveRidePanel: React.FC<Props> = ({
+  stageState,
+  ride,
+  onCancel,
+  onDone,
+  onCall,
+  calling = false,
+  safety,
+  busy = false,
+  draft = null,
+  cancelInFooter = false,
+  inlineSearchingBar = true,
+}) => {
   // Read from context (not useNavigation, which throws outside a navigator): without one there is
   // simply no Message action.
   const navigation: RideChatNavigator | undefined = useContext(NavigationContext);
@@ -150,7 +180,10 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
   const fare = stage === 'completed' && ride ? fareSummaryOf(ride) : null;
   const finished = isPassengerRideFinished(stage);
   const warn = stage === 'searching' && stageState.notice === 'driver_cancelled';
-  const step = STAGE_STEP[stage] ?? (ride ? rideProgressStep(ride.status) : null);
+  const searching = stage === 'searching';
+  const step = searching ? null : (STAGE_STEP[stage] ?? (ride ? rideProgressStep(ride.status) : null));
+  // UI-R10: the trip being searched for (a parcel shows its own block instead).
+  const searchingTrip = searching && !isParcelRide(ride) ? searchingTripOf(ride, draft) : null;
 
   const driver = hasDriver && ride ? driverCardOf(ride) : null;
   // BE-82: the fare is final once a driver accepted; BE-85: the waiting timer after a verified arrival.
@@ -188,10 +221,10 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
 
   return (
     <View testID={`active-ride-${stage}`} style={styles.wrap}>
-      {stage === 'searching' ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
+      {searching && inlineSearchingBar ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
       <View style={styles.header} accessibilityLiveRegion="polite">
         <View style={styles.titleRow}>
-          <AppText variant="h3" accessibilityRole="header" style={styles.title}>
+          <AppText variant={searching ? 'h2' : 'h3'} accessibilityRole="header" style={styles.title} testID="active-ride-title">
             {title}
           </AppText>
           {ac ? <AcBadge testID="active-ride-ac" /> : null}
@@ -201,8 +234,13 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
           <AppText variant="bodySmall" color={warn ? 'warning' : 'textSecondary'} testID="active-ride-subtitle">
             {subtitle}
           </AppText>
+        ) : searching ? (
+          // A re-queued search starts its own minute (not the first request's).
+          <FindingSubtitle key={ride?.requeue_count ?? 0} requestedAt={ride?.requeue_count ? null : ride?.requested_at} />
         ) : null}
       </View>
+
+      {searchingTrip ? <SearchingTripCard trip={searchingTrip} /> : null}
 
       {!finished && step !== null && !parcel ? <RideProgress step={step} testID="active-ride-progress" /> : null}
 
@@ -270,15 +308,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
 
       {ride ? <AcReportSection rideId={ride.id} state={acReport} testID="active-ride-ac-report" /> : null}
 
-      {canPassengerCancel(stage) ? (
-        <Button
-          // T-579: a parcel is cancelled as a delivery, from the search on.
-          label={isParcelRide(ride) ? t('parcel.cancelDelivery') : ACTIVE_RIDE_COPY.cancelRide}
-          variant="destructiveSoft"
-          onPress={onCancel}
-          disabled={busy}
-          testID="active-ride-cancel"
-        />
+      {canPassengerCancel(stage) && !(searching && cancelInFooter) ? (
+        <PassengerCancelButton stage={stage} ride={ride} onPress={onCancel} disabled={busy} />
       ) : null}
       {finished && onDone ? <ActiveRideDoneButton onPress={onDone} /> : null}
     </View>

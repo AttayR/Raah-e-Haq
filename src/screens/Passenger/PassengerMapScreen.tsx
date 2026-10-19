@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBar, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SafeMapViewRef } from '../../components/SafeMapView';
@@ -11,13 +11,11 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { cancelAllRequests } from '../../services/api';
 import { NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
-import { reverseGeocode } from '../../services/placesService';
-import StageChips from '../../components/passenger/StageChips';
 import { logger } from '../../core/logging/logger';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '../../features/active-ride/slice';
-import { RideRequestRefused, useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
+import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
 import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
 import { rideDoneDestination } from '../../features/active-ride/done';
@@ -26,12 +24,11 @@ import { useFareOffer } from '../../features/fare/hooks';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
 import { useRideMapRoutes, useTripRoute } from '../../features/active-ride/tripRoute';
-import { RideRecentreButton } from '../../features/active-ride/components/RideRecentreButton';
 import { ActiveRideDoneButton, isPassengerRideFinished } from '../../features/active-ride/components/ActiveRidePanel';
+import { PassengerCancelButton } from '../../features/active-ride/components/FindingDriver';
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
-import { buildRideRequest, withAddresses, type BookingPlace } from '../../features/ride-booking/buildRideRequest';
 import { estimateFor, useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 import { BookingSheet } from '../../features/ride-booking/components/BookingSheet';
@@ -45,13 +42,22 @@ import { bookingPrefillState, useBookingPrefill } from '../../features/ride-book
 import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
 import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
 import { useSearchFocus } from '../../features/ride-booking/useSearchFocus';
-import { useConfirmRequest } from '../../features/ride-booking/useConfirmRequest';
+import { useBookingRequest } from '../../features/ride-booking/useBookingRequest';
+import { useDefaultVehicle } from '../../features/ride-booking/vehicleSelection';
+import { toVehicleOptions } from '../../features/ride-booking/vehicleOptions';
+import { ChooseRideFooter } from '../../features/ride-booking/components/BookingStages';
+import { RouteSummaryPill } from '../../features/ride-booking/components/RouteSummaryPill';
+import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
+import { IndeterminateBar } from '../../components/ui';
+import { useSharedValue } from 'react-native-reanimated';
 import { openRideChat } from '../../features/chat/navigation';
 import { useRideCall } from '../../features/safety/hooks';
 import { canCallOn } from '../../features/safety/rules';
 
-/** iPhone SE class height (667 pt): the capped sheets get a little more room. */
+/** iPhone SE class height (667 pt): the capped sheets get a little more room (56 %, spec). */
 const SHORT_WINDOW_HEIGHT = 700;
+const SHEET_RATIO = 0.5;
+const SHORT_SHEET_RATIO = 0.56;
 const isSearchStage = (stage: BookingStage): boolean => stage === 'home' || stage === 'pickup' || stage === 'destination';
 
 /**
@@ -92,12 +98,20 @@ const PassengerMapScreen = () => {
   const flow = useBookingFlow({ prefill, currentLocation, rideShown, directions });
   const { pickup, stops, destination, mapPick, stage, error, setError, setStage, resetSelection } = flow;
 
-  const [isLoading, setIsLoading] = useState(false);
   // While a search field is focused the sheet drops its extras so suggestions get the room; a
   // pick, Back (a new step) or the keyboard closing leaves that mode (T-553).
   const [searchFocused, setSearchFocused] = useSearchFocus(rideShown ? 'ride' : stage);
   // T-314: what covers the map, so recentring and fitting keep points above the sheet.
-  const [sheetHeight, setSheetHeight] = useState(0);
+  const [sheetHeight, setSheetHeightState] = useState(0);
+  // The map's end-side control rides 16 above the sheet (kit MapControls, UI-R10).
+  const sheetHeightValue = useSharedValue(0);
+  const setSheetHeight = useCallback(
+    (h: number) => {
+      sheetHeightValue.value = h;
+      setSheetHeightState(h);
+    },
+    [sheetHeightValue],
+  );
   const [mapHeight, setMapHeight] = useState(0);
   const viewport: MapViewport | null =
     mapHeight > 0 ? { mapHeight, bottom: sheetHeight, top: insets.top + MAP_TOP_CONTROLS_HEIGHT } : null;
@@ -149,7 +163,7 @@ const PassengerMapScreen = () => {
     onRideCameraMapReady: rideCamera.onMapReady,
     requestLocationPermission,
     // T-553: a picked pickup is shown on the map while no route is drawn yet.
-    focusPoint: !rideShown && (stage === 'home' || stage === 'pickup' || stage === 'destination') ? pickup : null,
+    focusPoint: !rideShown && isSearchStage(stage) ? pickup : null,
   });
 
   // Unmount: drop the map ref and cancel the screen's network requests.
@@ -183,6 +197,9 @@ const PassengerMapScreen = () => {
   // BE-83: the passenger's offer for the selected quote (starts at the server fare).
   const offer = useFareOffer(estimateFor(estimates.data, flow.selectedVehicle)?.offer_band ?? null);
   const tripSummary = estimates.data ? BOOKING_COPY.tripSummary(estimates.data.distance_km, estimates.data.duration_min) : null;
+  // UI-R10: the priced tiers, shared by the list and the footer; a bookable tier stays selected.
+  const vehicleOptions = useMemo(() => toVehicleOptions(vehicleTypes.data ?? [], estimates.data), [vehicleTypes.data, estimates.data]);
+  useDefaultVehicle(vehicleOptions, flow.selectedVehicle, flow.setSelectedVehicle);
 
   // A ride from Redux (booked here, or restored on launch) puts its own pickup and
   // destination on the map, once per ride (not on every poll).
@@ -241,10 +258,8 @@ const PassengerMapScreen = () => {
     if (doneTo === 'home') navigation.popTo('PassengerTabs', { screen: 'Home' });
   }, [currentRide, dispatch, resetSelection, navigation]);
 
-  const { stepBack } = flow;
-  const goBack = useCallback(() => {
-    if (!stepBack()) navigation.goBack();
-  }, [stepBack, navigation]);
+  const { editPoint } = flow;
+  const editTrip = useCallback(() => editPoint('destination'), [editPoint]);
 
   // Cancel with the server's fee preview (BE-85); the outcome is shown once, by the stage panel.
   const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection);
@@ -255,54 +270,46 @@ const PassengerMapScreen = () => {
     if (currentLocation && !pickup) pickupAtCurrentLocation();
   }, [currentLocation, pickup, pickupAtCurrentLocation]);
 
-  const onRequestRide = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Map-tapped points have no address yet: geocode them (or use their coordinates).
-      const [p, d, ...st] = await withAddresses([pickup, destination, ...stops], reverseGeocode);
-      const built = buildRideRequest({
-        pickup: p,
-        dropoff: d,
-        stops: st.filter((x): x is BookingPlace => x !== null),
-        vehicleType: flow.selectedVehicle,
-        offeredFare: offer.offeredFare,
-        femaleDriverOnly: flow.femaleDriverOnly,
-      });
-      if (!built.ok) {
-        setError(built.error);
-        setStage('fare');
-        return;
-      }
-      await requestRideService(built.request);
-      setStage('requesting');
-    } catch (refusal) {
-      // requestRide already showed the server's message (or routed the refusal); an offer
-      // outside the band moves the stepper into the server's band (BE-83).
-      if (refusal instanceof RideRequestRefused && refusal.failure.kind === 'offer_out_of_band') offer.applyBand(refusal.failure.band);
-      setStage('fare'); // Go back to fare stage on error
-    } finally {
-      setIsLoading(false);
-    }
-  }, [pickup, destination, stops, flow.selectedVehicle, flow.femaleDriverOnly, requestRideService, offer, setError, setStage]);
+  // T-574 / UI-R10: Request shows its loading state on the tap; the request starts after.
+  const request = useBookingRequest({ flow, offer, requestRide: requestRideService });
+  const draft = useBookingDraft({ flow, options: vehicleOptions, estimates: estimates.data, offer });
 
-  // T-574: the Request button shows its loading state on the tap; the request starts after.
-  const confirmRequest = useConfirmRequest(() => {
-    onRequestRide();
-    setStage('requesting');
-  });
+  // Back goes back one sheet state (§12.5); leaving with a trip planned asks first; held while a
+  // request is sent (UI-R10). Finding a driver has no Back: Android back asks to cancel instead.
+  const leave = useCallback(() => navigation.goBack(), [navigation]);
+  const goBack = useDiscardOnLeave({ flow, rideShown, blocked: request.busy, onLeave: leave });
+  const searching = shownStage === 'requesting' && (rideStage?.stage ?? 'searching') === 'searching';
+  const findingWithRide = searching && rideShown;
+  useBookingHardwareBack(isFocused, findingWithRide ? handleCancelRide : goBack);
 
   if (locationGate.wait) {
     return <LocationWaitState {...locationGate.wait} onBack={() => navigation.goBack()} />;
   }
 
   const compact = searchFocused;
-  // Vehicle, fare and the ride itself: half the window (60% on short phones) so the route and
+  // Choose a ride and the ride itself: half the window (56% on short phones) so the route and
   // the driver stay visible above the sheet; longer content scrolls.
   const sheetRatio =
-    shownStage === 'vehicle' || shownStage === 'fare' || shownStage === 'requesting'
-      ? windowHeight <= SHORT_WINDOW_HEIGHT ? 0.6 : 0.5
+    shownStage === 'vehicle' || shownStage === 'requesting'
+      ? windowHeight <= SHORT_WINDOW_HEIGHT ? SHORT_SHEET_RATIO : SHEET_RATIO
       : undefined;
+  const choosing = !rideShown && shownStage === 'vehicle';
+  const footer =
+    rideShown && isPassengerRideFinished(rideStage?.stage) ? (
+      <ActiveRideDoneButton onPress={finishRide} />
+    ) : searching ? (
+      <PassengerCancelButton stage="searching" ride={currentRide} onPress={handleCancelRide} disabled={request.busy || rideSubmitting} />
+    ) : choosing && !compact ? (
+      <ChooseRideFooter
+        options={vehicleOptions}
+        estimates={estimates}
+        selectedVehicle={flow.selectedVehicle}
+        offer={offer}
+        onConfirm={request.confirm}
+        confirming={request.confirming}
+        disabled={request.sending}
+      />
+    ) : null;
 
   return (
     <ErrorBoundary
@@ -335,25 +342,27 @@ const PassengerMapScreen = () => {
           driverLocation={driverLocation}
           vehicleType={currentRide?.vehicle_type}
           stage={rideStage?.stage}
+          searching={searching}
         />
 
         <MapTopControls
-          onBack={goBack}
+          onBack={searching ? undefined : goBack}
           onRecenter={centerOnUser}
-          onReset={rideShown ? undefined : resetSelection}
+          sheetHeight={sheetHeightValue}
+          followRide={{ visible: rideCamera.paused, onPress: rideCamera.recentre }}
         />
-        <RideRecentreButton visible={rideCamera.paused} onPress={rideCamera.recentre} />
+        {choosing && tripSummary && !compact ? <RouteSummaryPill summary={tripSummary} onPress={editTrip} /> : null}
 
         <BookingSheet
           onHeightChange={setSheetHeight}
           maxHeightRatio={sheetRatio}
-          footer={rideShown && isPassengerRideFinished(rideStage?.stage) ? <ActiveRideDoneButton onPress={finishRide} /> : null}
+          footer={footer}
+          topAccessory={searching ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
         >
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
           {locationGate.refused && !rideShown && !compact && <LocationOffBanner onTurnOn={locationGate.askOrSettings} />}
-          {shownStage !== 'requesting' && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
-          {/* UI-R9: the search steps are the sheet itself (§12.5); the stepper starts at the vehicle. */}
-          {!rideShown && !compact && !isSearchStage(shownStage) && <StageChips stage={shownStage} />}
+          {/* UI-R10: on the search steps only; the choose-ride sheet starts with its title. */}
+          {!rideShown && isSearchStage(shownStage) && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
           {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
           <BookingStageContent
             flow={flow}
@@ -363,16 +372,16 @@ const PassengerMapScreen = () => {
             currentLocation={currentLocation}
             vehicleTypes={vehicleTypes}
             estimates={estimates}
+            vehicleOptions={vehicleOptions}
             offer={offer}
-            tripSummary={tripSummary}
-            onConfirm={confirmRequest.confirm}
-            confirming={confirmRequest.confirming}
+            onEditTrip={editTrip}
+            draft={draft}
             onCancelRide={handleCancelRide}
             ride={currentRide}
             rideStage={rideStage}
             onCall={canCallOn(currentRide) ? rideCall.call : undefined}
             calling={rideCall.calling}
-            busy={isLoading || rideSubmitting}
+            busy={request.sending || rideSubmitting}
           />
         </BookingSheet>
 

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Marker, type LatLng } from 'react-native-maps';
 import Animated, {
   cancelAnimation,
@@ -59,9 +59,18 @@ function AnimatedRings({ color }: { color: string }) {
  * mode) grow 1 → 3.2× and fade 0.35 → 0 over 2 s, 666 ms apart, around the pickup pin. Reduced
  * motion: a static two-ring halo at 0.2 opacity.
  */
-export function SearchingPulse({ showPin = true, testID }: { showPin?: boolean; testID?: string }) {
+export function SearchingPulse({
+  showPin = true,
+  staticHalo = false,
+  testID,
+}: {
+  showPin?: boolean;
+  /** Draw the reduced-motion halo even with motion on (a frozen map marker, see below). */
+  staticHalo?: boolean;
+  testID?: string;
+}) {
   const { theme } = useAppTheme();
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion() || staticHalo;
   const color = theme.colors.focusRing;
   return (
     <View
@@ -91,21 +100,27 @@ export function SearchingPulse({ showPin = true, testID }: { showPin?: boolean; 
   );
 }
 
-/** The pulse as a map marker centred on the pickup (kept tracking while it animates). */
+/**
+ * The pulse as a map marker centred on the pickup. iOS keeps tracking the view while it animates.
+ * Android re-rasterises a tracked marker bitmap on every frame, which costs low-end phones their
+ * frame rate for the whole search (UI-R10 review), so there the marker draws the static halo and
+ * is frozen after it settles; the sheet's moving bar carries the "working" cue.
+ */
 export function SearchingPulseMarker({ coordinate, testID }: { coordinate: LatLng; testID?: string }) {
   const { theme } = useAppTheme();
-  const tracks = useMarkerTracking(theme.mode, true);
+  const frozen = Platform.OS === 'android';
+  const tracks = useMarkerTracking(theme.mode, !frozen);
   return (
     <Marker testID={testID} coordinate={coordinate} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={tracks} zIndex={3}>
-      <SearchingPulse />
+      <SearchingPulse staticHalo={frozen} />
     </Marker>
   );
 }
 
 /**
  * The 2pt indeterminate bar at the top of the finding-driver sheet (§6.5): a `primary` band
- * sweeping across `surfaceAlt` every 1500 ms. Reduced motion: hidden (the sheet's "Finding a
- * driver…" label carries the state).
+ * sweeping across `surfaceAlt` every 1500 ms. Reduced motion [UI-R10]: a static `primary` segment
+ * 30 % wide at the start of the track (never hidden: it is the only "working" cue besides the title).
  */
 export function IndeterminateBar({ testID }: { testID?: string }) {
   const { theme } = useAppTheme();
@@ -119,7 +134,18 @@ export function IndeterminateBar({ testID }: { testID?: string }) {
   }, [reduced, x]);
   const band = width * k.progressBandRatio;
   const style = useAnimatedStyle(() => ({ transform: [{ translateX: -band + (width + band) * x.value }] }));
-  if (reduced) return null;
+  if (reduced) {
+    return (
+      <View
+        testID={testID ? `${testID}-static` : undefined}
+        style={[styles.track, { backgroundColor: theme.colors.surfaceAlt }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={[styles.staticBand, { backgroundColor: theme.colors.primary }]} />
+      </View>
+    );
+  }
   return (
     <View
       testID={testID}
@@ -145,4 +171,5 @@ const styles = StyleSheet.create({
   },
   track: { height: k.progressHeight, overflow: 'hidden', alignSelf: 'stretch' },
   band: { height: k.progressHeight, borderRadius: radius.xs },
+  staticBand: { height: k.progressHeight, width: `${k.reducedBandRatio * 100}%`, borderRadius: radius.xs },
 });

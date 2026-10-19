@@ -34,6 +34,8 @@ type Props = {
   driverLocation: DriverLocation | null;
   vehicleType?: string | null;
   stage?: PassengerRideStage | null;
+  /** UI-R10: a ride is being searched for (pulse on the pickup, no route line). */
+  searching?: boolean;
 };
 
 const errorFallback = perLocale(() => <MapPlaceholder message={BOOKING_COPY.mapError} />);
@@ -63,6 +65,7 @@ const BookingMapBase: React.FC<Props> = ({
   driverLocation,
   vehicleType,
   stage,
+  searching = false,
 }) => {
   const [region] = useState(initialRegion);
   return (
@@ -80,7 +83,7 @@ const BookingMapBase: React.FC<Props> = ({
             onMapLoaded={onMapLoaded}
             fallbackComponent={loadingFallback()}
           >
-            <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={route} />
+            <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={route} searching={searching} />
             {nearbyDrivers ? <NearbyDriverMarkers drivers={nearbyDrivers} /> : null}
             <AssignedDriverMarker location={driverLocation} vehicleType={vehicleType} stage={stage} route={driverRoute} />
           </SafeMapView>

@@ -9,10 +9,13 @@ import { BOOKING_COPY } from './copy';
 import { mapTapTarget, type MapPickTarget } from './mapTap';
 import type { BookingPrefillState } from './prefill';
 
-/** The booking steps; `requesting` is also the stage while a ride is shown. */
-export type BookingStage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
+/**
+ * The booking steps; `requesting` is also the stage while a ride is shown. UI-R10: `vehicle` is
+ * the one "Choose a ride" sheet (tier, fare and request); there is no separate fare step.
+ */
+export type BookingStage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'requesting';
 
-const STAGE_ORDER: BookingStage[] = ['home', 'pickup', 'destination', 'vehicle', 'fare', 'requesting'];
+const STAGE_ORDER: BookingStage[] = ['home', 'pickup', 'destination', 'vehicle', 'requesting'];
 /** The route is drawn from the vehicle step on; an earlier step shows no route (T-551). */
 const ROUTE_FROM = STAGE_ORDER.indexOf('vehicle');
 
@@ -59,7 +62,7 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
   const [pickupField, setPickupQuery] = useFieldText(prefill.pickupQuery);
   const [destField, setDestQuery] = useFieldText(prefill.destQuery);
   const [selectedVehicle, setSelectedVehicle] = useState<string | undefined>();
-  // BE-87: "Female driver" on the fare step (shown only to passengers the server lets ask).
+  // BE-87: "Female driver" on the choose-ride sheet (shown only to passengers the server lets ask).
   const [femaleDriverOnly, setFemaleDriverOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // T-576: the planner opened from "Where to?" (nothing prefilled) focuses the destination field
@@ -132,6 +135,9 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
    * to a search step drops the old route: the next pick draws a new one (T-551).
    */
   const stepBack = useCallback((): boolean => {
+    // UI-R10: while POST /rides is in flight (no ride shown yet) Back is held, never a step back to
+    // "Choose a ride" under a request that is being created (a second tap could send it twice).
+    if (stage === 'requesting' && !rideShown) return true;
     const currentIndex = STAGE_ORDER.indexOf(stage);
     if (currentIndex > 0 && !rideShown) {
       if (currentIndex - 1 < ROUTE_FROM) clearRoute();

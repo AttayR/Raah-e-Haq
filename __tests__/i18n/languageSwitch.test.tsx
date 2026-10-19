@@ -152,6 +152,6 @@ describe('Home and booking sheet copy (T-523)', () => {
     expect(greetingFor(morning, 'Ali Khan')).toBe('Subah bakhair, Ali');
     expect(greetingFor(morning, null)).toBe('Subah bakhair');
     expect(BOOKING_COPY.destinationPlaceholder).toBe('Kahan jana hai?');
-    expect(BOOKING_COPY.optionalStops(3)).toBe('Optional stops add karein (3 tak)');
+    expect(BOOKING_COPY.addStopSubtitle(3)).toBe('Raaste mein 3 stops tak');
   });
 });

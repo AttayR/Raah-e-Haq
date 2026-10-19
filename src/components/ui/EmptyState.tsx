@@ -113,9 +113,54 @@ export type EmptyStateProps = {
   /** The next step ("Book a ride"): an `md` secondary button. */
   action?: StateAction;
   placement?: 'top' | 'center';
+  /**
+   * `compact` (UI-R10, a section inside a map sheet; the twin of the compact ErrorState): 48
+   * `primarySoft` circle with a 24 `primaryText` glyph → 12 → title `title` → 4 → body `bodySmall`
+   * `textSecondary` → 12 → optional `sm` secondary action, centred, no top offset.
+   */
+  size?: 'regular' | 'compact';
   style?: StyleProp<ViewStyle>;
   testID?: string;
 };
+
+function CompactEmptyState({ icon, title, body, action, style, testID }: Omit<EmptyStateProps, 'size' | 'illustration' | 'placement'> & { icon: IconName }) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={[styles.compact, style]} testID={testID} accessibilityLiveRegion="polite">
+      <View
+        style={[styles.compactCircle, { backgroundColor: theme.colors.primarySoft }]}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
+        <Icon name={icon} size={k.compactGlyph} color="primaryText" />
+      </View>
+      <View style={styles.compactText}>
+        <AppText variant="title" align="center" accessibilityRole="header">
+          {title}
+        </AppText>
+        {body ? (
+          <AppText variant="bodySmall" color="textSecondary" align="center">
+            {body}
+          </AppText>
+        ) : null}
+      </View>
+      {action ? (
+        <View style={styles.compactAction}>
+          <Button
+            label={action.label}
+            onPress={action.onPress}
+            variant="secondary"
+            size="sm"
+            fullWidth={false}
+            loading={action.loading}
+            accessibilityHint={action.accessibilityHint}
+            testID={action.testID ?? (testID ? `${testID}-action` : undefined)}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 /**
  * EmptyState (DESIGN_SYSTEM §5.19, §12.6): centred column, max width 280: icon circle (96,
@@ -123,7 +168,10 @@ export type EmptyStateProps = {
  * `bodySmall` `textSecondary` → 24 → optional `md` secondary button. Placed 64 from the top of the
  * content area, not vertically centred in long screens.
  */
-export function EmptyState({ icon = 'info', ...rest }: EmptyStateProps) {
+export function EmptyState({ icon = 'info', size = 'regular', ...rest }: EmptyStateProps) {
+  if (size === 'compact') {
+    return <CompactEmptyState icon={icon} title={rest.title} body={rest.body} action={rest.action} style={rest.style} testID={rest.testID} />;
+  }
   return <StateLayout icon={icon} circle="primarySoft" glyph="primaryText" actionVariant="secondary" {...rest} />;
 }
 
@@ -137,4 +185,15 @@ const styles = StyleSheet.create({
   title: { marginTop: space[4] },
   body: { marginTop: space[2] },
   action: { marginTop: space[6] },
+  compact: { alignItems: 'center', gap: space[3], paddingVertical: space[2] },
+  compactCircle: {
+    width: k.compactCircle,
+    height: k.compactCircle,
+    borderRadius: k.compactCircle / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactText: { alignItems: 'center', gap: space[1], maxWidth: k.maxWidth },
+  // §5.4 ruling (UI-R8): a hugging button in a centred column centres itself.
+  compactAction: { alignSelf: 'center' },
 });

@@ -87,13 +87,16 @@ export const restoreActiveRide = createAsyncThunk<RideResource | null, void, Thu
   { condition: (_, { getState }) => getState().activeRide.restoreStatus !== 'loading' },
 );
 
+/** A POST /rides body, optionally with the attempt's Idempotency-Key (sent as a header, UI-R10). */
+export type CreateRideArg = RideRequest & { idempotencyKey?: string };
+
 /** POST /rides; the created ride becomes the active ride. */
-export const createActiveRide = createAsyncThunk<RideResource, RideRequest, ThunkConfig>(
+export const createActiveRide = createAsyncThunk<RideResource, CreateRideArg, ThunkConfig>(
   'activeRide/create',
-  async (request, { rejectWithValue }) => {
+  async ({ idempotencyKey, ...request }, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
-      const ride = await rideService.createRide(request);
+      const ride = await rideService.createRide(request, { idempotencyKey });
       return isStaleSession(startedIn) ? rejectWithValue(staleSession()) : ride;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Failed to request ride'));

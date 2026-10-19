@@ -3,7 +3,7 @@
  * server total_fare and fare_breakdown (cash), who cancelled, and the real driver card.
  */
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import ActiveRidePanel, { ActiveRideDoneButton, isPassengerRideFinished } from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
 import type { RideResource } from '../../../src/services/rideService';
@@ -23,18 +23,65 @@ const renderPanel = (ride: RideResource | null, stageState: PassengerRideStageSt
 };
 
 describe('ActiveRidePanel', () => {
-  it('searching: finding a driver, with Cancel', () => {
-    const ride = makeRide({ status: 'requested' });
-    const { getByText, getByTestId, onCancel } = renderPanel(ride, stateOf(ride));
-    expect(getByText('Finding you a driver…')).toBeTruthy();
+  it('searching (UI-R10): title, the trip card from the ride, no progress segments, Cancel request', () => {
+    const ride = makeRide({ status: 'requested', offered_fare: '210', vehicle_type: 'rickshaw', requested_at: new Date().toISOString() });
+    const { getByText, getByTestId, queryByTestId, onCancel } = renderPanel(ride, stateOf(ride));
+    expect(getByText('Finding you a driver')).toBeTruthy();
+    expect(getByText('This usually takes under a minute.')).toBeTruthy();
+    expect(getByTestId('searching-trip-card-pickup')).toHaveTextContent('Fake Pickup Street');
+    expect(getByTestId('searching-trip-card-dropoff')).toHaveTextContent('Fake Dropoff Road');
+    expect(getByTestId('searching-trip-card-vehicle')).toHaveTextContent('Rickshaw');
+    // The passenger's offer (BE-83), else the quote.
+    expect(getByTestId('searching-trip-card-fare')).toHaveTextContent('Rs 210');
+    expect(queryByTestId('active-ride-progress')).toBeNull();
+    expect(getByTestId('active-ride-cancel')).toHaveTextContent('Cancel request');
     fireEvent.press(getByTestId('active-ride-cancel'));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('searching while POST /rides runs: the card comes from the draft, with the server tier name', () => {
+    const draft = {
+      pickup: 'Liberty Market',
+      dropoff: 'Emporium Mall',
+      stops: ['Model Town'],
+      vehicleKey: 'car_ac',
+      vehicleName: 'Comfort AC',
+      fare: 'Rs 340',
+    };
+    const { getByTestId, getByText } = render(
+      <ActiveRidePanel stageState={{ rideId: null, stage: 'searching', notice: null }} ride={null} onCancel={jest.fn()} draft={draft} />,
+    );
+    expect(getByTestId('searching-trip-card-vehicle')).toHaveTextContent('Comfort AC');
+    expect(getByTestId('searching-trip-card-fare')).toHaveTextContent('Rs 340');
+    expect(getByText('Model Town')).toBeTruthy();
+  });
+
+  it('searching: after a minute the subtitle says it is still looking (one timer)', () => {
+    jest.useFakeTimers({ now: new Date('2026-10-19T10:00:30Z') });
+    try {
+      const ride = makeRide({ status: 'requested', requested_at: '2026-10-19T10:00:00Z' });
+      const { getByText } = renderPanel(ride, stateOf(ride));
+      expect(getByText('This usually takes under a minute.')).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+      expect(getByText('Still looking. More drivers are joining.')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('the inline searching bar can move to the sheet edge (the booking sheet draws it)', () => {
+    const ride = makeRide({ status: 'requested' });
+    const { queryByTestId, rerender } = renderPanel(ride, stateOf(ride));
+    rerender(<ActiveRidePanel stageState={stateOf(ride)} ride={ride} onCancel={jest.fn()} inlineSearchingBar={false} />);
+    expect(queryByTestId('active-ride-searching-bar')).toBeNull();
   });
 
   it('requeued: says the driver cancelled and that it is searching again', () => {
     const ride = makeRide({ status: 'requested' });
     const { getByText, queryByTestId } = renderPanel(ride, { rideId: ride.id, stage: 'searching', notice: 'driver_cancelled' });
-    expect(getByText('Your driver cancelled. Finding you another driver…')).toBeTruthy();
+    expect(getByText("Your driver cancelled. We're asking other drivers nearby.")).toBeTruthy();
     expect(queryByTestId('active-ride-done')).toBeNull();
   });
 

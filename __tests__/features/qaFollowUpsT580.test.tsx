@@ -63,11 +63,11 @@ describe('8. Roman Urdu leftovers', () => {
     expect(RIDE_HISTORY_COPY.cancellation).not.toBe('Cancellation');
   });
 
-  it('the fare step does not read "Gaari: Gaari"', () => {
+  it('the request button does not read "Gaari: Gaari" (UI-R10: the tier and fare in one label)', () => {
     act(() => setLocale('ur-Latn'));
-    expect(BOOKING_COPY.reviewMeta('Gaari')).toBe('Gaari chuni gayi');
+    expect(BOOKING_COPY.requestWithFare('Gaari', 'Rs 230')).toBe('Gaari mangwayein · Rs 230');
     act(() => setLocale('en'));
-    expect(BOOKING_COPY.reviewMeta('Car')).toBe('Vehicle: Car');
+    expect(BOOKING_COPY.requestWithFare('Car', 'Rs 230')).toBe('Request Car · Rs 230');
   });
 });
 

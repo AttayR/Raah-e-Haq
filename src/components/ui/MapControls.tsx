@@ -21,6 +21,15 @@ export type MapControlsProps = {
   /** End-side "locate me", 16 above the sheet's top edge. */
   onLocate?: () => void;
   locateLabel?: string;
+  /**
+   * The end-side control's glyph: `locate` (default) or, on a live-ride map the passenger panned,
+   * `navigate` ("follow the ride again", T-549), so the map still shows two controls (§9).
+   */
+  locateIcon?: 'locate' | 'navigate';
+  /** testID of the end-side control (default `${testID}-locate`). */
+  locateTestID?: string;
+  /** testID of the back control (default `${testID}-back`). */
+  backTestID?: string;
   /** The sheet's visible height (`BottomSheet animatedHeight`), so locate rides with the sheet. */
   sheetHeight?: SharedValue<number>;
   /** Fades both controls out (`motion.fast`) and disables them, e.g. while the sheet is at `full` (§8.3). */
@@ -46,6 +55,9 @@ export function MapControls({
   avatar,
   onLocate,
   locateLabel,
+  locateIcon = 'locate',
+  locateTestID,
+  backTestID,
   sheetHeight,
   hidden = false,
   locateHidden = false,
@@ -75,7 +87,7 @@ export function MapControls({
             variant="floating"
             onPress={onBack}
             accessibilityLabel={backLabel ?? (backIcon === 'close' ? t('common.close') : t('common.back'))}
-            testID={`${testID}-back`}
+            testID={backTestID ?? `${testID}-back`}
           />
         </View>
       ) : avatar ? (
@@ -99,11 +111,11 @@ export function MapControls({
       {onLocate && !locateHidden ? (
         <Animated.View style={[styles.locate, locateStyle]}>
           <IconButton
-            icon="locate"
+            icon={locateIcon}
             variant="floating"
             onPress={onLocate}
             accessibilityLabel={locateLabel ?? t('kit.locateA11y')}
-            testID={`${testID}-locate`}
+            testID={locateTestID ?? `${testID}-locate`}
           />
         </Animated.View>
       ) : null}

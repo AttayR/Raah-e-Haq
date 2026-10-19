@@ -265,9 +265,9 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
   onBalanceOwedRef.current = options.onBalanceOwed;
 
   const requestRide = useCallback(
-    async (request: RideRequest): Promise<RideResource> => {
+    async (request: RideRequest, idempotencyKey?: string): Promise<RideResource> => {
       const loadingToastId = toast.loading(ACTIVE_RIDE_COPY.requestingTitle, ACTIVE_RIDE_COPY.requestingMessage);
-      const action = await dispatch(createActiveRide(request));
+      const action = await dispatch(createActiveRide(idempotencyKey ? { ...request, idempotencyKey } : request));
       toast.hide(loadingToastId);
       if (createActiveRide.fulfilled.match(action)) {
         // No success modal (T-311): the ActiveRidePanel shows the searching stage, and a modal

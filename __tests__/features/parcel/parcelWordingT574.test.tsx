@@ -13,7 +13,8 @@ import { OverchargeReportSection } from '../../../src/features/fare/components/O
 import { isParcelDetails, PersonCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
 import { useConfirmRequest } from '../../../src/features/ride-booking/useConfirmRequest';
-import { FareReview } from '../../../src/features/ride-booking/components/BookingChoices';
+import { ChooseRideFooter } from '../../../src/features/ride-booking/components/BookingStages';
+import { toVehicleOptions } from '../../../src/features/ride-booking/vehicleOptions';
 import type { FareEstimates, VehicleType } from '../../../src/features/ride-booking/api';
 import { setLocale } from '../../../src/i18n';
 import '../../../src/i18n/copy-ur-Latn';
@@ -155,7 +156,7 @@ describe('Request button (T-574)', () => {
     expect(start).not.toHaveBeenCalled();
   });
 
-  it('FareReview: while confirming the Request button is busy and ignores taps', () => {
+  it('UI-R10 footer: while confirming the Request button is busy and ignores taps', () => {
     const onConfirm = jest.fn();
     const data: FareEstimates = {
       distance_km: 5,
@@ -174,10 +175,14 @@ describe('Request button (T-574)', () => {
     };
     const estimates = { status: 'ready' as const, data, error: null, retry: noop };
     const vehicleType: VehicleType = { key: 'car', label: 'Car', capacity: 4 };
-    const { rerender } = render(<FareReview vehicleType={vehicleType} estimates={estimates} onConfirm={onConfirm} />);
+    const options = toVehicleOptions([vehicleType], data);
+    const footer = (confirming: boolean) => (
+      <ChooseRideFooter options={options} estimates={estimates} selectedVehicle="car" onConfirm={onConfirm} confirming={confirming} />
+    );
+    const { rerender } = render(footer(false));
     const button = screen.getByTestId('fare-request');
     expect(button.props.accessibilityState).toMatchObject({ busy: false });
-    rerender(<FareReview vehicleType={vehicleType} estimates={estimates} onConfirm={onConfirm} confirming />);
+    rerender(footer(true));
     expect(screen.getByTestId('fare-request').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
     fireEvent.press(screen.getByTestId('fare-request'));
     expect(onConfirm).not.toHaveBeenCalled();

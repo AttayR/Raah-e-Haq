@@ -58,17 +58,47 @@ describe('1. registration role cards follow a live language switch', () => {
 describe('2. parcel cancels are said as a delivery', () => {
   const parcelRequested = makeRide({ id: 61, status: 'requested', vehicle_type: 'parcel', is_parcel: true });
 
-  it('the sender searching for a rider sees "Cancel delivery" (a ride keeps "Cancel ride")', () => {
+  it('the sender searching for a rider sees "Cancel delivery" (a ride: "Cancel request", UI-R10)', () => {
     const state = advanceRideStage(null, parcelRequested);
     if (!state) throw new Error('no stage');
     render(<ActiveRidePanel stageState={state} ride={parcelRequested} onCancel={jest.fn()} />);
     expect(screen.getByTestId('active-ride-cancel')).toHaveTextContent('Cancel delivery');
+    // A parcel shows its own block, not the ride's searching card.
+    expect(screen.queryByTestId('searching-trip-card')).toBeNull();
 
     const ride = makeRide({ id: 62, status: 'requested' });
     const rideState = advanceRideStage(null, ride);
     if (!rideState) throw new Error('no stage');
     screen.rerender(<ActiveRidePanel stageState={rideState} ride={ride} onCancel={jest.fn()} />);
+    expect(screen.getByTestId('active-ride-cancel')).toHaveTextContent('Cancel request');
+
+    const accepted = makeRide({ id: 64, status: 'accepted', driver_id: 5, driver: { id: 5, name: 'Ali', rating: 4.9 } });
+    const acceptedState = advanceRideStage(null, accepted);
+    if (!acceptedState) throw new Error('no stage');
+    screen.rerender(<ActiveRidePanel stageState={acceptedState} ride={accepted} onCancel={jest.fn()} />);
     expect(screen.getByTestId('active-ride-cancel')).toHaveTextContent('Cancel ride');
+  });
+
+  it('UI-R10: before a driver takes it, the cancel question is about the request', async () => {
+    const { result } = renderHook(() => usePassengerCancel(makeRide({ status: 'requested' }), jest.fn(), jest.fn()));
+    let pending: Promise<void> | undefined;
+    act(() => {
+      pending = result.current();
+    });
+    await waitFor(() => expect(dialogStore.getCurrent()).not.toBeNull());
+    expect(dialogStore.getCurrent()).toMatchObject({
+      title: 'Cancel request?',
+      body: "We'll stop looking for a driver.",
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep looking',
+      destructive: true,
+    });
+    act(() => dialog.dismissAll());
+    await act(async () => {
+      await pending;
+    });
+    setLocale('ur-Latn');
+    expect(cancelConfirmBody(makeRide({ status: 'requested' }), true)).toBe('Hum driver dhoondna band kar denge.');
   });
 
   it('the cancel question asks about the delivery, in Roman Urdu too', async () => {

@@ -161,7 +161,8 @@ export const componentTokens = {
      */
     vehicleMarker: { size: 40, mutedOpacity: 0.6 },
     /** §6.5 searching pulse: rings start at the pickup pin size; 2pt progress bar. */
-    pulse: { ring: 20, progressHeight: 2, progressBandRatio: 0.35 },
+    // [UI-R10] reduced motion: the bar is a static `primary` segment 30 % wide at the start.
+    pulse: { ring: 20, progressHeight: 2, progressBandRatio: 0.35, reducedBandRatio: 0.3 },
     /** §5.23 address pair: 20pt rail, 10pt pickup/drop-off glyphs, 8pt stops, 2/3 dotted line. */
     addressPair: {
       railWidth: 20,
