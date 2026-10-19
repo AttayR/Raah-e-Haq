@@ -11,7 +11,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { TabScrollToTop } from '../../src/hooks/TabScrollToTop';
 import { RideProgress } from '../../src/components/ui';
 import { setLocale, t } from '../../src/i18n';
-import { HOME_PEEK_HEIGHT, homePeekHeight } from '../../src/features/passenger-home/components/HomeSheet';
+import { HOME_HEADER_ESTIMATE, homePeekHeight } from '../../src/features/passenger-home/components/HomeSheet';
 import { WHERE_TO_HEIGHT } from '../../src/features/passenger-home/components/WhereToBar';
 import { componentTokens, textStyles } from '../../src/theme';
 
@@ -92,10 +92,13 @@ describe('RideProgress labels', () => {
 
 describe('Home peek with "Return to your ride"', () => {
   it('grows by the live block minus "Where to?", so the chip row clears the tab bar', () => {
-    expect(homePeekHeight(false)).toBe(HOME_PEEK_HEIGHT);
-    expect(homePeekHeight(true)).toBe(
-      HOME_PEEK_HEIGHT + componentTokens.button.height.lg + 8 + textStyles.bodySmall.lineHeight - WHERE_TO_HEIGHT,
+    // UI-R20: the greeting header (22) shows only while a ride is live.
+    const headerHeight = HOME_HEADER_ESTIMATE.greeting;
+    const idle = homePeekHeight({ headerHeight, live: false });
+    expect(idle).toBe(170);
+    expect(homePeekHeight({ headerHeight, live: true })).toBe(
+      idle + componentTokens.button.height.lg + 8 + textStyles.bodySmall.lineHeight - WHERE_TO_HEIGHT,
     );
-    expect(homePeekHeight(true)).toBe(202);
+    expect(homePeekHeight({ headerHeight, live: true })).toBe(202);
   });
 });

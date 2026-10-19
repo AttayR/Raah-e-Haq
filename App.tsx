@@ -20,9 +20,12 @@ import SplashScreen from './src/components/SplashScreen';
 import { DevKitGalleryHost } from './src/features/dev-gallery/DevKitGalleryHost';
 import { LanguageGate } from './src/app/providers/LanguageGate';
 import { restoreStoredLanguage } from './src/i18n/languagePreference';
+import { restoreParcelTile } from './src/features/parcel/lastKnown';
 
 // T-523: read the stored language now, alongside the appearance read, so the gate rarely waits.
+// UI-R20: the last known parcel tier in the same pass (Home's first frame picks its header).
 restoreStoredLanguage();
+restoreParcelTile();
 
 function ThemedNav() {
   const { theme } = useAppTheme();

@@ -33,7 +33,8 @@ import {
   validateParcelDraft,
 } from '../../../src/features/parcel/rules';
 import { useSendParcel } from '../../../src/features/parcel/useSendParcel';
-import { HomeSheetBody } from '../../../src/features/passenger-home/components/HomeSheet';
+import { HomeSheetBody, type HomeHeaderKind } from '../../../src/features/passenger-home/components/HomeSheet';
+import { HomeSheetTop } from '../../../src/features/passenger-home/components/HomeSheetTop';
 import type { ParcelDraft } from '../../../src/features/parcel/types';
 import type { RideResource } from '../../../src/services/rideService';
 import { envelope, makeRide, makeStore, type TestStore } from '../../../test-utils/rideFixtures';
@@ -193,7 +194,7 @@ describe('catalogue: the parcel tier is not a ride', () => {
     expect(toVehicleOptions(types, estimates).map((o) => o.id)).toEqual(['bike']);
   });
 
-  it('Home offers "Send a parcel" only when asked to (tier on) and not during a ride', () => {
+  it('Home offers the Parcel tile only while the tier is on and not during a ride (UI-R20)', () => {
     const base = {
       onWhereTo: jest.fn(),
       savedPlaces: [],
@@ -206,13 +207,21 @@ describe('catalogue: the parcel tier is not a ride', () => {
       onOpenRide: jest.fn(),
       onSeeAllRides: jest.fn(),
     };
-    const onSendParcel = jest.fn();
-    const { rerender } = render(<HomeSheetBody {...base} />);
+    // The chip row no longer carries it.
+    const body = render(<HomeSheetBody {...base} />);
     expect(screen.queryByTestId('home-send-parcel')).toBeNull();
-    rerender(<HomeSheetBody {...base} onSendParcel={onSendParcel} />);
+    body.unmount();
+
+    const onParcel = jest.fn();
+    const top = (kind: HomeHeaderKind) => (
+      <HomeSheetTop kind={kind} greeting="Hello" onRide={jest.fn()} onParcel={onParcel} onHeight={jest.fn()} />
+    );
+    const { rerender } = render(top('rideOnly'));
+    expect(screen.queryByTestId('home-send-parcel')).toBeNull();
+    rerender(top('services'));
     fireEvent.press(screen.getByTestId('home-send-parcel'));
-    expect(onSendParcel).toHaveBeenCalled();
-    rerender(<HomeSheetBody {...base} onSendParcel={onSendParcel} liveRide={{ status: 'On the way' }} onReturnToRide={jest.fn()} />);
+    expect(onParcel).toHaveBeenCalledTimes(1);
+    rerender(top('greeting'));
     expect(screen.queryByTestId('home-send-parcel')).toBeNull();
   });
 });

@@ -29,7 +29,7 @@ import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel'
 import { CancellationCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
 import { vehicleLabel } from '../../../src/features/ride-history/copy';
-import { HomeSheetBody } from '../../../src/features/passenger-home/components/HomeSheet';
+import { HomeSheetTop } from '../../../src/features/passenger-home/components/HomeSheetTop';
 import { PersonCard, PLATE_MIN_FONT_SCALE } from '../../../src/components/ui/ride/PersonCard';
 import { useVehicleTypes } from '../../../src/features/ride-booking/hooks';
 import type { RideResource } from '../../../src/services/rideService';
@@ -244,26 +244,12 @@ describe('5. labels and the Home entry', () => {
     expect(vehicleLabel('car')).toBe('Car');
   });
 
-  it('"Send a parcel" sits in the peek chip row (no sheet expanding needed)', () => {
-    const onSendParcel = jest.fn();
-    render(
-      <HomeSheetBody
-        onWhereTo={jest.fn()}
-        savedPlaces={[]}
-        onSavedPlace={jest.fn()}
-        onAddPlace={jest.fn()}
-        onSavedPlaces={jest.fn()}
-        locationOff={false}
-        onEnableLocation={jest.fn()}
-        recentRides={[]}
-        onOpenRide={jest.fn()}
-        onSeeAllRides={jest.fn()}
-        onSendParcel={onSendParcel}
-      />,
-    );
-    const row = screen.getByTestId('home-saved-places-row');
+  it('"Send a parcel" is the Parcel tile in the sheet header (UI-R20), shown at peek with no expanding', () => {
+    const onParcel = jest.fn();
+    render(<HomeSheetTop kind="services" greeting="" onRide={jest.fn()} onParcel={onParcel} onHeight={jest.fn()} />);
+    const row = screen.getByTestId('home-service-row');
     fireEvent.press(within(row).getByTestId('home-send-parcel'));
-    expect(onSendParcel).toHaveBeenCalled();
+    expect(onParcel).toHaveBeenCalled();
   });
 });
 

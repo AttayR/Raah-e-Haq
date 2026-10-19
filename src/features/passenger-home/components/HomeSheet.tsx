@@ -11,10 +11,30 @@ import { HomeRidesSection, type HomeRidesState } from './HomeRidesSection';
 import { WHERE_TO_HEIGHT, WhereToBar } from './WhereToBar';
 
 /**
- * §8.3 peek: 24 handle area + greeting 22 + 12 + "Where to?" 52 + 12 + chip row 32 + 16. The
- * sheet sits above the tab bar, so the tab bar is not part of it.
+ * §8.3 / passenger-home § Services S5: the body's part of the peek under the header: 12 + "Where
+ * to?" 52 + 12 + chip row 32 + 16 = 124. The sheet sits above the tab bar, so the tab bar is not
+ * part of it.
  */
-export const HOME_PEEK_HEIGHT = 170;
+export const HOME_PEEK_BODY = space[3] + WHERE_TO_HEIGHT + space[3] + componentTokens.chip.height + space[4];
+
+/** The sheet header under the handle, by state (passenger-home § Services S1). */
+export type HomeHeaderKind = 'services' | 'rideOnly' | 'greeting';
+
+/**
+ * Header heights at 1.0× text, used until the header has been measured (first frame): service
+ * row 96, the ride-only heading and the greeting one `title` line (22).
+ */
+export const HOME_HEADER_ESTIMATE: Record<HomeHeaderKind, number> = {
+  services: componentTokens.serviceTile.height,
+  rideOnly: textStyles.title.lineHeight,
+  greeting: textStyles.title.lineHeight,
+};
+
+/**
+ * UI-R20 (S5): `half` is at least peek + 180, so the compact rides ErrorState (≤ 156 + 16) is
+ * fully visible at `half` on iPhone SE with the service row (424 there; 437 on iPhone 17).
+ */
+export const HOME_HALF_EXTRA = 180;
 
 /**
  * T-577: with a ride in progress "Return to your ride" (56) + 8 + its status line (20) take the
@@ -24,10 +44,17 @@ export const HOME_PEEK_HEIGHT = 170;
 export const HOME_LIVE_PEEK_EXTRA =
   componentTokens.button.height.lg + space[2] + textStyles.bodySmall.lineHeight - WHERE_TO_HEIGHT;
 
-/** The Home sheet's peek height: taller while "Return to your ride" shows. */
-export const homePeekHeight = (liveRide: boolean): number => HOME_PEEK_HEIGHT + (liveRide ? HOME_LIVE_PEEK_EXTRA : 0);
+/**
+ * The Home sheet's peek (S5): handle area 24 + the measured header + the body's 124, taller while
+ * "Return to your ride" shows. Service row 244 (250 at 1.3×), ride-only heading 170, live 202.
+ */
+export const homePeekHeight = ({ headerHeight, live }: { headerHeight: number; live: boolean }): number =>
+  Math.round(componentTokens.sheet.contentTop + headerHeight + HOME_PEEK_BODY + (live ? HOME_LIVE_PEEK_EXTRA : 0));
 
-/** Sheet header (the drag area under the handle): the time-of-day greeting in `title`. */
+/** `half` floor for the Home sheet (S5): peek + 180 (the kit caps it at `full`). */
+export const homeHalfMinHeight = (peek: number): number => peek + HOME_HALF_EXTRA;
+
+/** Sheet header while a ride or parcel is in progress (S1): the time-of-day greeting in `title`. */
 export function HomeSheetHeader({ greeting }: { greeting: string }) {
   return (
     <View style={styles.header}>
@@ -73,18 +100,17 @@ type BodyProps = {
    */
   liveRide?: { status: string; parcel?: boolean } | null;
   onReturnToRide?: () => void;
-  /** BE-88: "Send a parcel", only while the parcel tier is on (and no ride is in progress). */
-  onSendParcel?: () => void;
 };
 
 const noop = () => {};
 
 /**
  * Home sheet body (UI-R4 structure, UI-R9 content; passenger-home, DESIGN_SYSTEM §8.3): "Where
- * to?" (pushes Booking), the edge-to-edge shortcut chip row (location off and "Send a parcel"
- * first, T-561/T-580; saved places, T-516; recent destinations; "+ Add" / "Add home"; the full
+ * to?" (pushes Booking), the edge-to-edge shortcut chip row (place shortcuts only: "Turn on
+ * location" first, T-580; saved places, T-516; recent destinations; "+ Add" / "Add home"; the full
  * list), then at `half`/`full` the location notice and recent rides with their loading and error
- * states. Memoised, so a sheet drag or a map camera move never re-renders it.
+ * states. UI-R20: "Send a parcel" left the chip row; it is the Parcel service tile in the header
+ * (HomeSheetTop). Memoised, so a sheet drag or a map camera move never re-renders it.
  */
 function HomeSheetBodyBase({
   onWhereTo,
@@ -105,7 +131,6 @@ function HomeSheetBodyBase({
   onSeeAllRides,
   liveRide = null,
   onReturnToRide,
-  onSendParcel,
 }: BodyProps) {
   return (
     <View style={styles.body}>
@@ -138,28 +163,15 @@ function HomeSheetBodyBase({
           onAdd={onAddPlace}
           onOpenAll={onSavedPlaces}
           leading={
-            <>
-              {locationOff ? (
-                <Chip
-                  icon="locationOff"
-                  tone="primary"
-                  label={t('home.turnOnLocation')}
-                  onPress={onEnableLocation}
-                  testID="home-location-chip"
-                />
-              ) : null}
-              {/* T-561: in the peek chip row, so it shows without expanding the sheet. */}
-              {onSendParcel && !liveRide ? (
-                <Chip
-                  icon="parcel"
-                  tone="primary"
-                  label={t('parcel.homeEntryTitle')}
-                  onPress={onSendParcel}
-                  accessibilityLabel={`${t('parcel.homeEntryTitle')}, ${t('parcel.homeEntrySubtitle')}`}
-                  testID="home-send-parcel"
-                />
-              ) : null}
-            </>
+            locationOff ? (
+              <Chip
+                icon="locationOff"
+                tone="primary"
+                label={t('home.turnOnLocation')}
+                onPress={onEnableLocation}
+                testID="home-location-chip"
+              />
+            ) : null
           }
         />
       </View>

@@ -313,6 +313,11 @@ export const componentTokens = {
    * bottom-end of the disc.
    */
   illustration: { textMaxWidth: 320, box: 160, disc: 128, glyph: 64, badge: 48, badgeGlyph: 28, badgeRing: 3, compactBox: 120, compactDisc: 96, compactGlyph: 48, compactBadge: 36, compactBadgeGlyph: 20, compactBadgeRing: 2 },
+  /**
+   * UI-R20 service tile (passenger-home § Services S2): 44 icon disc (28 glyph), 12 from the outer
+   * edge to the content, 12 from the disc to the title, 12 between tiles in a row; 96 high at 1.0×.
+   */
+  serviceTile: { disc: 44, padding: space[3], gap: space[3], rowGap: space[3], height: 96 },
   /** UI-R8 denied state on the driver Drive sheet (shared-permissions): icon circle and glyph. */
   locationNeeded: { circle: 64, glyph: 32 },
   /**

@@ -113,7 +113,7 @@ describe.each([
   it('"Where to?" opens booking', () => {
     const onPress = jest.fn();
     const { getByLabelText } = render(<WhereToBar onPress={onPress} />);
-    fireEvent.press(getByLabelText('Where to? Search destination'));
+    fireEvent.press(getByLabelText('Where to? Book a ride within the city'));
     expect(onPress).toHaveBeenCalled();
   });
 

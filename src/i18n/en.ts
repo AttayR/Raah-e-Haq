@@ -165,6 +165,11 @@ export const en = {
     profilePendingEmailBody: 'Open the link we sent to {email}. Your current email stays until then.',
     profileCancelChange: 'Cancel change',
     sectionCards: 'Cards',
+    sectionServiceTiles: 'Service tiles (UI-R20)',
+    serviceTileHint: 'Passenger Home service row: Ride is the active service (navy border), Parcel has a saffron disc. Row 2 shows the pressed fills; the narrow tile wraps its subtitle to two lines.',
+    serviceTilePressed: 'Pressed',
+    serviceTileLongSub: 'A bike rider takes your item',
+    homeLiveStatus: 'Driver on the way',
     sectionLists: 'List rows and groups',
     sectionFeedback: 'Banners and toasts',
     sectionStates: 'Skeleton, empty and error states',
@@ -386,7 +391,8 @@ export const en = {
     returnToRide: 'Return to your ride',
     // T-523: the sheet's greeting and "Where to?" entry.
     whereTo: 'Where to?',
-    whereToA11y: 'Where to? Search destination',
+    // UI-R20: "Where to?" books a ride only (the Parcel tile sends an item).
+    whereToA11y: 'Where to? Book a ride within the city',
     greetingHello: 'Hello',
     greetingMorning: 'Good morning',
     greetingAfternoon: 'Good afternoon',
@@ -405,6 +411,16 @@ export const en = {
     ridesLoadingA11y: 'Loading your recent rides',
     ridesFailedTitle: "Couldn't load your recent rides",
     emptyHint: 'Your recent places and rides will appear here.',
+    // UI-R20: the service tiles (passenger-home § Services S4).
+    serviceRideTitle: 'Ride',
+    serviceRideSub: 'Within the city',
+    serviceRideA11y: 'Ride. You travel, within the city.',
+    serviceRideHint: 'Opens Where to?',
+    serviceParcelTitle: 'Parcel',
+    serviceParcelSub: 'Send an item',
+    serviceParcelA11y: "Parcel. A bike rider takes your item. You don't travel.",
+    serviceParcelHint: 'Opens Send a parcel',
+    rideOnlyHeading: 'Rides within the city',
   },
   /** UI-R9: the booking search's saved and recent places (passenger-destination-search). */
   placeSearch: {
@@ -1191,9 +1207,7 @@ export const en = {
     reportLimited: 'Too many reports just now. Please try again in a minute.',
   },
   parcel: {
-    // Passenger Home entry and the form.
-    homeEntryTitle: 'Send a parcel',
-    homeEntrySubtitle: 'A rider picks it up and delivers it by bike',
+    // Passenger Home ("Track your parcel") and the form.
     homeReturn: 'Track your parcel',
     screenTitle: 'Send a parcel',
     back: 'Back',

@@ -1,6 +1,6 @@
 /**
  * UI-R4 (DESIGN_SYSTEM §8.1, §8.3; owner decision 2026-10-11): passenger Home is the full map
- * with the "Where to?" sheet. Opens at peek 170, snaps peek → half → full, map controls fade at
+ * with the "Where to?" sheet. Opens at peek 170 (ride-only heading; UI-R20), snaps peek → half → full, map controls fade at
  * full; "Where to?" pushes Booking; recent rides come from GET /rides; avatar opens Profile; no
  * notifications bell (the Inbox tab carries the badge).
  */
@@ -62,12 +62,14 @@ afterEach(() => {
 });
 
 describe('map-first Home', () => {
-  it('opens at peek 170 with the greeting and "Where to?"; snaps half → full and the map controls fade at full', async () => {
+  it('opens at peek 170 with the ride-only heading and "Where to?"; snaps half → full and the map controls fade at full', async () => {
     mock.onGet('/rides').reply(200, page([]));
     await renderHome();
     // Safe-area mock: zero insets, so full = 874 − 0 − 8.
     await layoutSheet(874);
-    expect(screen.getByTestId('home-greeting')).toBeTruthy();
+    // UI-R20: no parcel tier known (the catalogue is not mocked here): the ride-only heading.
+    expect(screen.getByTestId('home-ride-only-heading')).toBeTruthy();
+    expect(screen.queryByTestId('home-greeting')).toBeNull();
     expect(screen.getByTestId('home-where-to')).toBeTruthy();
     expect(screen.getByTestId('home-controls').props.pointerEvents).toBe('box-none');
 

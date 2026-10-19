@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { closeLateLanguageRestore, restoreStoredLanguage } from '../../i18n/languagePreference';
 import { logger } from '../../core/logging/logger';
+import { restoreParcelTile } from '../../features/parcel/lastKnown';
 // Registers the Roman Urdu translations of the feature copy objects (T-523).
 import '../../i18n/copy-ur-Latn';
 
@@ -35,7 +36,9 @@ export function LanguageGate({ children, fallback = null }: LanguageGateProps) {
         setState('timedOut');
       }
     }, LANGUAGE_READ_TIMEOUT_MS);
-    restoreStoredLanguage().finally(() => {
+    // UI-R20 (passenger-home S7): the last known parcel tier is read in the same pass, so Home's
+    // first frame already shows the right header. It never rejects and never holds the app alone.
+    Promise.all([restoreStoredLanguage(), restoreParcelTile()]).finally(() => {
       if (active) {
         clearTimeout(timer);
         setState(current => (current === 'reading' ? 'ready' : current));

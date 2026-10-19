@@ -33,7 +33,7 @@ import { componentTokens, layout, motion, motionPatterns, reducedMotion, space, 
 import { toEasing } from './easing';
 import { ModalRoot } from './ModalRoot';
 import { useModalTurn } from './modalQueue';
-import { fullHeight, releaseTarget, resolveSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
+import { fullHeight, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
 
 export type { SheetSnap } from './sheetSnaps';
 
@@ -53,8 +53,18 @@ export type BottomSheetProps = React.PropsWithChildren<{
   mode?: 'map' | 'modal';
   /** Map default `['peek', 'half', 'full']`; modal default `['content']`. */
   snapPoints?: readonly SheetSnap[];
-  /** Height of `peek` (170 passenger Home, 137 driver Drive, §8.3). Without it, `peek` = content. */
+  /** Height of `peek` (passenger Home 170–244, driver Drive 137, §8.3). Without it, `peek` = content. */
   peekHeight?: number;
+  /** [UI-R20] Floor for `half` (passenger Home: peek + 180); `half` is still capped at `full`. */
+  halfMinHeight?: number;
+  /**
+   * [UI-R20] When the snap heights change while the sheet is up (not on opening): at the lowest
+   * snap it eases to the new height (`motion.base`, no overshoot; Reduce Motion: at once) instead
+   * of springing; at a higher snap it keeps its height and the new heights apply to the next snap.
+   */
+  calmResize?: boolean;
+  /** [UI-R20] Written true while a drag is in progress (UI thread), false when it ends. */
+  dragging?: SharedValue<boolean>;
   /** Where the sheet opens. Default: the lowest snap. */
   initialSnap?: SheetSnap;
   /** Modal mode only. */
@@ -106,6 +116,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     mode = 'map',
     snapPoints,
     peekHeight,
+    halfMinHeight,
+    calmResize = false,
+    dragging,
     initialSnap,
     visible = true,
     onClose,
@@ -146,17 +159,23 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // sheet grows by its height (capped at `full`) instead of hiding its body under the keyboard.
   const contentHeight = k.contentTop + headerHeight + bodyHeight + (footer ? footerBlock : footerBottom) + keyboardHeight;
 
-  const resolved = useMemo(
+  const computed = useMemo(
     () =>
       resolveSnaps(snaps, {
         containerHeight,
         topInset: insets.top,
         peekHeight,
+        halfMinHeight,
         contentHeight: bodyHeight > 0 || headerHeight > 0 ? contentHeight : undefined,
         minHeight: k.contentTop + headerHeight + footerBlock,
       }),
-    [bodyHeight, containerHeight, contentHeight, footerBlock, headerHeight, insets.top, peekHeight, snaps],
+    [bodyHeight, containerHeight, contentHeight, footerBlock, halfMinHeight, headerHeight, insets.top, peekHeight, snaps],
   );
+  // [UI-R20] The same heights keep the same list, so a header that changes its measured height
+  // (an animated header swap) re-places the sheet only when a snap height really moves.
+  const resolvedKept = useRef(computed);
+  if (!sameSnaps(resolvedKept.current, computed)) resolvedKept.current = computed;
+  const resolved = resolvedKept.current;
 
   // Position: points from the container top to the sheet top. Off-screen until measured.
   const top = useSharedValue(100000);
@@ -204,6 +223,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     [container, reduce, top],
   );
 
+  const calmRef = useRef(calmResize);
+  calmRef.current = calmResize;
   // Refs so a settle (state + callback) never re-triggers the placement effect mid-spring.
   const currentRef = useRef<SheetSnap | null>(null);
   const onSnapChangeRef = useRef(onSnapChange);
@@ -343,10 +364,19 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     if (currentRef.current === null) {
       // Opening: start below the screen, then rise with the spring.
       top.value = containerHeight;
+    } else if (calmRef.current && currentRef.current === target.snap) {
+      // [UI-R20] Resized while up: a higher snap keeps its height (the next snap uses the new
+      // heights); the lowest one eases to its new height without overshoot.
+      if (target.snap !== resolved[0].snap) return;
+      top.value = reduce
+        ? containerHeight - target.height
+        : withTiming(containerHeight - target.height, { duration: motion.base.duration, easing: swapEasing });
+      settle(target);
+      return;
     }
     animateTo(target.height, 0, undefined, containerHeight);
     settle(target);
-  }, [animateTo, container, containerHeight, live, resolved, settle, top]);
+  }, [animateTo, container, containerHeight, live, reduce, resolved, settle, top]);
 
   // [T-582] Bumped when the host screen is shown again; the sheet's position style and the
   // published height read it, so both are written to their views once more.
@@ -462,6 +492,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       .activeOffsetY([-6, 6])
       .onStart(() => {
         startTop.value = top.value;
+        if (dragging) dragging.value = true;
       })
       .onUpdate(event => {
         if (!highest || !lowest) return;
@@ -469,6 +500,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         // A map sheet stops at its lowest snap; a modal one follows the finger down to close.
         const maxTop = modal ? container.value : container.value - lowest.height;
         top.value = Math.min(Math.max(startTop.value + event.translationY, minTop), maxTop);
+      })
+      .onFinalize(() => {
+        if (dragging) dragging.value = false;
       })
       .onEnd(event => {
         if (!lowest) return;
@@ -485,7 +519,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         animateTo(target.height, event.velocityY);
         runOnJS(dragSettled)(target);
       });
-  }, [animateTo, beginClose, container, dismissible, dragSettled, finishClose, modal, resolved, startTop, top]);
+  }, [animateTo, beginClose, container, dismissible, dragSettled, dragging, finishClose, modal, resolved, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => {
     // [T-582] Read so a reveal re-writes the transform even when `top` did not change.

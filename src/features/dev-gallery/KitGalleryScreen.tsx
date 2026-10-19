@@ -49,6 +49,7 @@ import {
   WalletSkeletonPreview,
 } from './sections/ScreenStatePreviews';
 import { CardSection, HeaderSection, ListSection } from './sections/StructureSections';
+import { ServiceTileSection } from './sections/ServiceTileSection';
 import { BadgeSection, SelectionSection } from './sections/SelectionSection';
 import { ComponentTokenSection, ElevationSection, RadiusSection, SpacingSection } from './sections/ScaleSections';
 import { TYPE_PART_COUNT, TypeSection } from './sections/TypeSection';
@@ -74,6 +75,7 @@ const SECTIONS: Section[] = [
   ['badges', () => <BadgeSection />],
   ['headers', () => <HeaderSection />],
   ['cards', () => <CardSection />],
+  ['service-tiles', () => <ServiceTileSection />],
   ['lists', () => <ListSection />],
   ['profile', () => <ProfileSection />],
   ['feedback', () => <FeedbackSection />],
@@ -141,6 +143,9 @@ const SCREEN_PREVIEWS: Section[] = [
   // UI-R9: passenger Home sheet and place search.
   ['screen-home', () => <HomeSheetPreview snap="peek" />],
   ['screen-home-half', () => <HomeSheetPreview snap="half" />],
+  // UI-R20: parcel tier off (ride-only heading) and a ride in progress (greeting, no tiles).
+  ['screen-home-ride-only', () => <HomeSheetPreview snap="peek" header="rideOnly" />],
+  ['screen-home-live', () => <HomeSheetPreview snap="peek" header="greeting" />],
   ['screen-home-empty', () => <HomeSheetPreview snap="half" state="empty" />],
   ['screen-home-loading', () => <HomeSheetPreview snap="half" state="loading" />],
   ['screen-home-error', () => <HomeSheetPreview snap="half" state="error" />],

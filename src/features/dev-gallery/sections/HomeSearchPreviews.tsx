@@ -4,7 +4,9 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import SafeMapView from '../../../components/SafeMapView';
 import DualLocationPicker from '../../../components/passenger/DualLocationPicker';
 import { BottomSheet, MapControls, type SheetSnap } from '../../../components/ui';
-import { HomeSheetBody, HomeSheetHeader, homePeekHeight } from '../../passenger-home/components/HomeSheet';
+import { HomeSheetBody, type HomeHeaderKind } from '../../passenger-home/components/HomeSheet';
+import { HomeSheetTop } from '../../passenger-home/components/HomeSheetTop';
+import { useHomePeek } from '../../passenger-home/useHomePeek';
 import { greetingFor } from '../../passenger-home/greeting';
 import { toHomeRecentRides } from '../../ride-history/recentRides';
 import { BookingSheet } from '../../ride-booking/components/BookingSheet';
@@ -14,11 +16,13 @@ import type { HomeRidesState } from '../../passenger-home/components/HomeRidesSe
 import { BOOKING_COPY } from '../../ride-booking/copy';
 import { galleryRecentRides, gallerySavedPlaces } from '../fixtures/homeFixtures';
 import { galleryRegion } from '../fixtures/rideFixtures';
+import { t } from '../../../i18n';
 
 /**
  * Debug kit gallery (UI-R9 evidence): the passenger Home sheet and the place search full screen
  * over the styled map, built from the product components with API-shaped saved places and rides.
- * Shown with `-RHKitGallerySection screen-home` (and `-half`, `-empty`, `-loading`, `-error`, `screen-search`), so
+ * Shown with `-RHKitGallerySection screen-home` (and `-half`, `-empty`, `-loading`, `-error`,
+ * UI-R20 `-ride-only` (parcel tier off) and `-live` (greeting + Return), `screen-search`), so
  * small-device and dark-mode screenshots need no sign-in. Product screens never import this.
  */
 const noop = () => {};
@@ -32,8 +36,19 @@ function HomeMap() {
 /** `loading`: first reads in flight; `error`: the rides read failed with nothing cached. */
 type HomeState = 'loaded' | 'empty' | 'loading' | 'error';
 
-export function HomeSheetPreview({ snap, state = 'loaded' }: { snap: SheetSnap; state?: HomeState }) {
+export function HomeSheetPreview({
+  snap,
+  state = 'loaded',
+  header = 'services',
+}: {
+  snap: SheetSnap;
+  state?: HomeState;
+  /** UI-R20 header (S1): service row (default), ride-only heading, or the live-ride greeting. */
+  header?: HomeHeaderKind;
+}) {
   const { theme } = useAppTheme();
+  const live = header === 'greeting';
+  const { peek, halfMin, onHeaderHeight, onHeaderShown } = useHomePeek(header);
   const loaded = state === 'loaded';
   const places = loaded ? gallerySavedPlaces : [];
   const rides = loaded ? toHomeRecentRides(galleryRecentRides) : [];
@@ -44,10 +59,21 @@ export function HomeSheetPreview({ snap, state = 'loaded' }: { snap: SheetSnap; 
       <HomeMap />
       <MapControls avatar={{ name: 'Ali Raza', onPress: noop, accessibilityLabel: 'Profile' }} onLocate={noop} />
       <BottomSheet
-        peekHeight={homePeekHeight(false)}
+        peekHeight={peek}
+        halfMinHeight={halfMin}
+        calmResize
         initialSnap={snap}
         snapPoints={['peek', 'half', 'full']}
-        header={<HomeSheetHeader greeting={greetingFor(MORNING, 'Ali Raza')} />}
+        header={
+          <HomeSheetTop
+            kind={header}
+            greeting={greetingFor(MORNING, 'Ali Raza')}
+            onRide={noop}
+            onParcel={noop}
+            onHeight={onHeaderHeight}
+            onShown={onHeaderShown}
+          />
+        }
       >
         <HomeSheetBody
           onWhereTo={noop}
@@ -66,6 +92,8 @@ export function HomeSheetPreview({ snap, state = 'loaded' }: { snap: SheetSnap; 
           onRetryRides={noop}
           onOpenRide={noop}
           onSeeAllRides={noop}
+          liveRide={live ? { status: t('kitGallery.homeLiveStatus') } : null}
+          onReturnToRide={noop}
         />
       </BottomSheet>
     </View>

@@ -5,7 +5,8 @@ import { componentTokens } from '../../theme';
  * - `peek`: content-defined collapsed height (`peekHeight`, e.g. 170 passenger Home, 137 Drive).
  * - `content`: the sheet's natural height (handle + header + body + footer), for pickers,
  *   confirmations and the incoming request; capped at `full`.
- * - `half`: 50% of the container (the window on a full-screen map).
+ * - `half`: 50% of the container (the window on a full-screen map), or `halfMinHeight` when that
+ *   is taller (UI-R20: passenger Home keeps its compact rides error visible at `half` on SE).
  * - `full`: container − top inset − 8; never more than 88% on short screens (iPhone SE).
  */
 export type SheetSnap = 'peek' | 'half' | 'full' | 'content';
@@ -15,6 +16,8 @@ export type SnapInput = {
   topInset: number;
   peekHeight?: number;
   contentHeight?: number;
+  /** [UI-R20] `half` is never lower than this (still capped at `full`). */
+  halfMinHeight?: number;
   /**
    * [UI-R3] Floor for every snap: handle area 24 + header + sticky footer block, so the footer is
    * never drawn over the header (a `peek` below it resolves to it).
@@ -37,7 +40,7 @@ export const snapHeight = (snap: SheetSnap, input: SnapInput): number | null => 
     case 'full':
       return max;
     case 'half':
-      return Math.min(input.containerHeight * s.halfRatio, max);
+      return Math.min(Math.max(input.containerHeight * s.halfRatio, input.halfMinHeight ?? 0), max);
     case 'peek':
       return input.peekHeight !== undefined ? Math.min(input.peekHeight, max) : snapHeight('content', input);
     case 'content':
@@ -46,6 +49,10 @@ export const snapHeight = (snap: SheetSnap, input: SnapInput): number | null => 
 };
 
 export type ResolvedSnap = { snap: SheetSnap; height: number };
+
+/** True when both lists name the same snaps at the same heights. */
+export const sameSnaps = (a: readonly ResolvedSnap[], b: readonly ResolvedSnap[]): boolean =>
+  a.length === b.length && a.every((r, i) => r.snap === b[i].snap && r.height === b[i].height);
 
 /** The requested snap points as heights, lowest first, without duplicates or unknowns. */
 export const resolveSnaps = (snaps: readonly SheetSnap[], input: SnapInput): ResolvedSnap[] => {

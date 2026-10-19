@@ -10,6 +10,7 @@ import type { RideResource } from '../../services/rideService';
 import { useVehicleTypes } from '../ride-booking/hooks';
 import { telUrl, useSecondsLeft } from '../safety/hooks';
 import { PARCEL_CODES, isParcelType, parcelApi } from './api';
+import { lastKnownParcelTile, rememberParcelTile } from './lastKnown';
 import { resendRefusalText } from './rules';
 import type { ParcelOptIn, ParcelOptions } from './types';
 
@@ -34,7 +35,7 @@ export const useParcelOptions = (enabled = true): RemoteData<ParcelOptions> =>
   useRemoteData({ fetch: parcelApi.options, fallbackError: t('parcel.loadFailed'), enabled, cache: PARCEL_OPTIONS_CACHE });
 
 /**
- * "Send a parcel" shows only while the admin has the parcel tier on: the bookable catalogue
+ * The Parcel service tile (UI-R20) shows only while the admin has the parcel tier on: the bookable catalogue
  * (GET /public/vehicle-types, cached for the booking screen too) lists it. T-561: `focused`
  * re-reads a catalogue older than a couple of minutes, so a tier just switched on shows soon.
  */
@@ -44,7 +45,13 @@ export const useParcelAvailable = (focused = false): boolean => {
   // off meanwhile drops "Send a parcel" without a relaunch.
   const appActive = useAppIsActive();
   const catalogue = useVehicleTypes({ refreshWhen: focused && appActive });
-  return (catalogue.data ?? []).some(isParcelType);
+  const live = catalogue.data ? catalogue.data.some(isParcelType) : null;
+  // UI-R20 (S7): a read that answered is remembered (stored only on a change); until one answers,
+  // or when it fails, the last known value keeps Home's layout (no tier known: off).
+  useEffect(() => {
+    if (live !== null) rememberParcelTile(live);
+  }, [live]);
+  return live ?? lastKnownParcelTile() ?? false;
 };
 
 /**

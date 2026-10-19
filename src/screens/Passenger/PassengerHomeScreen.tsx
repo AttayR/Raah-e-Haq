@@ -20,7 +20,10 @@ import type { PassengerStackParamList } from '../../app/navigation/stacks/Passen
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { logger } from '../../core/logging/logger';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
-import { HOME_PEEK_HEIGHT, HomeSheetBody, HomeSheetHeader, homePeekHeight } from '../../features/passenger-home/components/HomeSheet';
+import { HomeSheetBody, type HomeHeaderKind } from '../../features/passenger-home/components/HomeSheet';
+import { HomeSheetTop } from '../../features/passenger-home/components/HomeSheetTop';
+import { useHomePeek } from '../../features/passenger-home/useHomePeek';
+import { useOnePush } from '../../features/passenger-home/useOnePush';
 import { greetingFor } from '../../features/passenger-home/greeting';
 import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
 import { useRecentRides } from '../../features/ride-history/hooks';
@@ -62,6 +65,9 @@ const MAP_ROUTES_ABOVE_HOME = ['Booking'] as const;
  * the booking map and only while Home is focused and the app is in the foreground (the hook
  * stops when backgrounded). T-586: react-native-svg vehicles on one shared ticker, and the
  * "N drivers online near you" chip bottom-start, on the locate button's baseline.
+ * UI-R20 (passenger-home § Services): the sheet header is the Ride + Parcel service row while the
+ * parcel tier is on, "Rides within the city" while it is off, the greeting only while a ride is
+ * live; the peek follows the measured header (244 / 170 / 202) and `half` is at least peek + 180.
  */
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
@@ -78,6 +84,7 @@ export default function PassengerHomeScreen() {
     return parcelStatus ? { status: parcelStatus, parcel: true } : { status: liveRideStatusText(inProgressRide.status) };
   }, [inProgressRide]);
   const [now, setNow] = useState(() => new Date());
+  const live = liveRide !== null;
 
   // T-315: no lookups while another screen covers Home; failures show in the sheet, no alerts.
   const isFocused = useIsFocused();
@@ -135,9 +142,14 @@ export default function PassengerHomeScreen() {
     if (savedStatus === 'failed' && savedData === null) reloadSaved();
   }, [reloadRides, reloadSaved, savedStatus, savedData]);
 
-  // BE-88: "Send a parcel" only while the parcel tier is on (the cached vehicle catalogue says so;
-  // T-561: re-read on focus once it is a few minutes old, so a newly activated tier shows soon).
+  // BE-88: the Parcel tile only while the parcel tier is on (the cached vehicle catalogue says so;
+  // T-561: re-read on focus once it is a few minutes old; UI-R20 S7: last known value at a cold start).
   const parcelAvailable = useParcelAvailable(isFocused);
+  // UI-R20 (S1): first match wins; a live ride or parcel always shows the greeting.
+  const headerKind: HomeHeaderKind = live ? 'greeting' : parcelAvailable ? 'services' : 'rideOnly';
+  // S5: peek = handle + the measured header + 124; half ≥ peek + 180.
+  const { peek: peekHeight, halfMin, onHeaderHeight, onHeaderShown } = useHomePeek(headerKind);
+  const sheetDragging = useSharedValue(false);
 
   const {
     isInitialized: notificationsInitialized,
@@ -145,10 +157,13 @@ export default function PassengerHomeScreen() {
     unsubscribeFromPassengerNotifications,
   } = usePassengerNotifications(user?.id?.toString());
 
+  // The greeting shows only while a ride is live (UI-R20 S1), so only then does its clock tick.
   useEffect(() => {
+    if (!live) return undefined;
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), GREETING_REFRESH_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [live]);
 
   useEffect(() => {
     if (notificationsInitialized && user?.id) {
@@ -164,7 +179,7 @@ export default function PassengerHomeScreen() {
   const mapMounted = useMapMounted(MAP_ROUTES_ABOVE_HOME);
   const [mapReady, setMapReady] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
-  const [sheet, setSheet] = useState<{ snap: SheetSnap; height: number }>({ snap: 'peek', height: HOME_PEEK_HEIGHT });
+  const [sheet, setSheet] = useState<{ snap: SheetSnap; height: number }>(() => ({ snap: 'peek', height: peekHeight }));
   const sheetAnimatedHeight = useSharedValue(0);
   const viewport = useMemo<MapViewport | null>(
     () => (mapHeight > 0 ? { mapHeight, bottom: sheet.height + CAMERA_SHEET_GAP, top: insets.top } : null),
@@ -205,7 +220,9 @@ export default function PassengerHomeScreen() {
   }, [centre, currentLocation, enableLocation]);
 
   // Stable handlers, so the memoised sheet body skips the renders a map or sheet move causes.
-  const openBooking = useCallback(() => navigation.navigate('Booking'), [navigation]);
+  // UI-R20 (S8): one push per tap for "Where to?", the Ride and Parcel tiles and "Return".
+  const once = useOnePush(isFocused);
+  const openBooking = useCallback(() => once(() => navigation.navigate('Booking')), [navigation, once]);
   const openSavedPlace = useCallback(
     (place: SavedPlace) => navigation.navigate('Booking', bookingParamsFor(place, 'destination')),
     [navigation],
@@ -219,7 +236,7 @@ export default function PassengerHomeScreen() {
     () => navigation.navigate('PassengerTabs', { screen: 'Activity', params: { segment: 'rides' } }),
     [navigation],
   );
-  const sendParcel = useCallback(() => navigation.navigate('SendParcel'), [navigation]);
+  const sendParcel = useCallback(() => once(() => navigation.navigate('SendParcel')), [navigation, once]);
   const onEnableLocation = useCallback(() => {
     enableLocation();
   }, [enableLocation]);
@@ -289,12 +306,25 @@ export default function PassengerHomeScreen() {
       <NearbyCountChip state={nearbyDrivers} freshness={nearbyFreshness} sheetHeight={sheetAnimatedHeight} hidden={sheet.snap === 'full'} />
 
       <BottomSheet
-        peekHeight={homePeekHeight(liveRide !== null)}
+        peekHeight={peekHeight}
+        halfMinHeight={halfMin}
+        calmResize
+        dragging={sheetDragging}
         active={isFocused}
         snapPoints={['peek', 'half', 'full']}
         animatedHeight={sheetAnimatedHeight}
         onSnapChange={(snap, height) => setSheet({ snap, height })}
-        header={<HomeSheetHeader greeting={greetingFor(now, user?.name)} />}
+        header={
+          <HomeSheetTop
+            kind={headerKind}
+            greeting={greetingFor(now, user?.name)}
+            onRide={openBooking}
+            onParcel={sendParcel}
+            onHeight={onHeaderHeight}
+            onShown={onHeaderShown}
+            hold={sheetDragging}
+          />
+        }
         accessibilityLabel={t('home.sheetA11y')}
         testID="home-sheet"
       >
@@ -317,7 +347,6 @@ export default function PassengerHomeScreen() {
           onSeeAllRides={openActivity}
           liveRide={liveRide}
           onReturnToRide={openBooking}
-          onSendParcel={parcelAvailable ? sendParcel : undefined}
         />
       </BottomSheet>
     </Screen>
