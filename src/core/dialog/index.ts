@@ -1,2 +1,2 @@
-export { alert, confirm, dialog, dialogStore, useConfirm } from './dialog';
-export type { AlertOptions, ConfirmOptions, DialogApi, DialogRequest } from './dialog';
+export { alert, confirm, dialog, dialogStore, openConfirm, useConfirm } from './dialog';
+export type { AlertOptions, ConfirmHandle, ConfirmOptions, DialogApi, DialogRequest } from './dialog';

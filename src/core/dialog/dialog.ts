@@ -53,10 +53,12 @@ let hostCounter = 0;
 
 const emit = () => listeners.forEach(listener => listener());
 
-const enqueue = (request: Omit<DialogRequest, 'id'>): void => {
+const enqueue = (request: Omit<DialogRequest, 'id'>): string => {
   counter += 1;
-  queue = [...queue, { ...request, id: `dialog_${counter}` }];
+  const id = `dialog_${counter}`;
+  queue = [...queue, { ...request, id }];
   emit();
+  return id;
 };
 
 /** Resolves the dialog with `id` and shows the next one. Answering twice is a no-op. */
@@ -81,6 +83,50 @@ export const confirm = (options: ConfirmOptions): Promise<boolean> =>
       resolve,
     });
   });
+
+/** A confirm that can change its question while it is open (T-589). */
+export interface ConfirmHandle {
+  /** Resolves `true` only when the confirm button is pressed. */
+  result: Promise<boolean>;
+  /** Replaces the question's text and labels; a no-op once it was answered. */
+  update: (options: ConfirmOptions) => void;
+}
+
+/**
+ * `confirm`, plus `update` to change the open question in place (same dialog, no flicker), e.g.
+ * "Cancel request?" becoming "Cancel ride?" with its fee when a driver accepts meanwhile.
+ */
+export const openConfirm = (options: ConfirmOptions): ConfirmHandle => {
+  let id = '';
+  const result = new Promise<boolean>(resolve => {
+    id = enqueue({
+      kind: 'confirm',
+      title: options.title,
+      body: options.body,
+      confirmLabel: options.confirmLabel,
+      cancelLabel: options.cancelLabel,
+      destructive: options.destructive ?? false,
+      resolve,
+    });
+  });
+  const update = (next: ConfirmOptions): void => {
+    if (!queue.some(r => r.id === id)) return;
+    queue = queue.map(r =>
+      r.id === id
+        ? {
+            ...r,
+            title: next.title,
+            body: next.body,
+            confirmLabel: next.confirmLabel,
+            cancelLabel: next.cancelLabel,
+            destructive: next.destructive ?? false,
+          }
+        : r,
+    );
+    emit();
+  };
+  return { result, update };
+};
 
 /** A single-button notice; resolves when it is dismissed. */
 export const alert = (options: AlertOptions): Promise<void> =>

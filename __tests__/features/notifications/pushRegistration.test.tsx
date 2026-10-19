@@ -97,9 +97,12 @@ describe('syncPushRegistration', () => {
   });
 
   it('a failing getToken (no APNs on a simulator) is swallowed', async () => {
+    // T-589: and logged at debug: it raised the yellow Debug LogBox after every sign-in.
+    const warn = jest.spyOn(console, 'warn');
     messagingMock.getToken.mockRejectedValue(new Error('no apns'));
     await expect(syncPushRegistration({ prompt: false })).resolves.toBe('granted');
     expect(getRegisteredDeviceToken()).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('Android 13+: asks POST_NOTIFICATIONS, then reads a refusal as denied', async () => {

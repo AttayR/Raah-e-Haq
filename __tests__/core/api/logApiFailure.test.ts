@@ -1,7 +1,8 @@
 /**
- * T-104 (QA T-103): expected API failures (401/403, 4xx) are warnings, never a red Debug LogBox;
- * T-584: no connection and a 409 are debug only (no yellow LogBox either); real failures (5xx,
- * bugs) stay errors. The line is a keyed summary, never empty.
+ * T-104 (QA T-103): expected API failures (401/403, 4xx) are never a red Debug LogBox;
+ * T-584: no connection and a 409 are debug only (no yellow LogBox either); T-589: so is every
+ * other expected failure (RN 0.80 shows a warning only as the unreadable "Open debugger to view
+ * warnings" toast); real failures (5xx, bugs) stay errors. The line is a keyed summary, never empty.
  */
 import { AxiosError, AxiosHeaders, AxiosResponse } from 'axios';
 import MockAdapter from 'axios-mock-adapter';
@@ -34,10 +35,12 @@ describe('logApiFailure', () => {
     [403, { message: 'Forbidden.' }],
     [422, { message: 'Validation errors', errors: { email: ['Taken'] } }],
     [429, { message: 'Too many requests.', code: 'rate_limited', retry_after: 5 }],
-  ])('logs an expected %s as a warning', (status, body) => {
+  ])('T-589: logs an expected %s at debug (no LogBox)', (status, body) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     logApiFailure('loginUser failed', axiosErrorWith(status, body));
     expect(error).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('loginUser failed', expect.objectContaining({ status }));
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('loginUser failed', expect.objectContaining({ status }));
   });
 
   it.each([
@@ -45,10 +48,12 @@ describe('logApiFailure', () => {
     [503, { message: 'The server is busy.', code: 'busy', retry_after: 5 }],
     [429, { message: 'Too many incorrect attempts.', code: 'code_exhausted', retry_after: 20 }],
     [429, { message: 'Too many codes from this network.', code: 'otp_ip_limit', retry_after: 3600 }],
-  ])('T-113: logs the expected OTP refusal %s %o as a warning (no red LogBox)', (status, body) => {
+  ])('T-113: logs the expected OTP refusal %s %o at debug (no LogBox)', (status, body) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     logApiFailure('sendOtp failed', axiosErrorWith(status, body));
     expect(error).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('sendOtp failed', expect.objectContaining({ status, code: body.code }));
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('sendOtp failed', expect.objectContaining({ status, code: body.code }));
   });
 
   it('T-113: a 503 without a known refusal code is still an error', () => {
@@ -167,5 +172,43 @@ describe('logApiFailure', () => {
       mock.restore();
     }
     expect(error).toHaveBeenCalledWith('Failed to fetch rides', expect.objectContaining({ status: 500 }));
+  });
+
+  it('T-589: a failed cancel with the server down is debug only (no red LogBox)', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const mock = new MockAdapter(apiClient);
+    mock.onPost('/rides/7/cancel').networkError();
+    try {
+      await expect(rideService.cancelRide(7)).rejects.toMatchObject({ kind: 'network' });
+    } finally {
+      mock.restore();
+    }
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('Failed to cancel ride', expect.objectContaining({ kind: 'network' }));
+  });
+
+  it('T-589: a cancel refused with 409 (the ride moved on) is debug only', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const mock = new MockAdapter(apiClient);
+    mock.onPost('/rides/7/cancel').reply(409, { success: false, message: 'The ride has already started.' });
+    try {
+      await expect(rideService.cancelRide(7)).rejects.toMatchObject({ status: 409 });
+    } finally {
+      mock.restore();
+    }
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('T-589: a cancel failing on a 5xx is still an error, as a summary', async () => {
+    const mock = new MockAdapter(apiClient);
+    mock.onPost('/rides/7/cancel').reply(500, { message: 'boom' });
+    try {
+      await expect(rideService.cancelRide(7)).rejects.toMatchObject({ status: 500 });
+    } finally {
+      mock.restore();
+    }
+    expect(error).toHaveBeenCalledWith('Failed to cancel ride', expect.objectContaining({ status: 500 }));
   });
 });

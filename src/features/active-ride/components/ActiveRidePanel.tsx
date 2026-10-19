@@ -18,6 +18,7 @@ import { space } from '../../../theme';
 import type { DriverLocation, RideResource } from '../../../services/rideService';
 import { ACTIVE_RIDE_COPY } from '../copy';
 import { DRIVER_LOCATION_POLL_MS } from '../hooks';
+import { assignedMarkerIntervalMs } from '../arrivedMarker';
 import { CHAT_COPY } from '../../chat/copy';
 import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
 import { perLocale, t } from '../../../i18n';
@@ -380,7 +381,7 @@ const AssignedDriverMarkerBase: React.FC<{
       heading={location.heading}
       vehicleType={vehicleType}
       route={trackingRouteFor(stage, route)}
-      updateIntervalMs={DRIVER_LOCATION_POLL_MS}
+      updateIntervalMs={assignedMarkerIntervalMs(stage, DRIVER_LOCATION_POLL_MS)}
       title={ACTIVE_RIDE_COPY.driverMarkerTitle}
     />
   );

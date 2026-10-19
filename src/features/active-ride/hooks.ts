@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
 import { rejectionMessage } from '../../core/api/errors';
@@ -84,16 +84,51 @@ type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
  *
  * T-578: the status part on its own, for passenger Home's "Return to your ride" card, so a
  * driver cancel (or any other change) shows there without opening the ride. Only one screen
- * that uses it is focused at a time (Booking covers Home), so there is never a second poll; and
- * refreshActiveRide skips a read while another one of the ride is in flight.
+ * that uses it is focused at a time (Booking covers Home); T-589: and only one enabled poll
+ * reads even if two are on (see statusReaders). refreshActiveRide skips a read while another
+ * one of the ride is in flight.
  */
 export const useActiveRideStatusPolling = (enabled: boolean): void => {
   useStatusPoll(enabled, useAppIsActive());
 };
 
+/**
+ * T-589 (QA 2026-10-19 obs 1): the one ride-status reader. Every screen whose status poll is
+ * enabled registers here, and only the newest registration reads; the others wait. So two
+ * screens that both think they are focused (a screen still mounted under another, a second copy
+ * of a screen pushed by a notification) never read GET /rides/{id} twice at the cadence, nor
+ * both at once on a status change. When the reader leaves, the previous one takes over and
+ * reads at once, as on a focus.
+ */
+const statusReaders: symbol[] = [];
+const statusReaderListeners = new Set<() => void>();
+const subscribeStatusReaders = (listener: () => void): (() => void) => {
+  statusReaderListeners.add(listener);
+  return () => {
+    statusReaderListeners.delete(listener);
+  };
+};
+const setStatusReader = (token: symbol, on: boolean): void => {
+  const at = statusReaders.lastIndexOf(token);
+  if (at >= 0) statusReaders.splice(at, 1);
+  if (on) statusReaders.push(token);
+  statusReaderListeners.forEach((listener) => listener());
+};
+const isStatusReader = (token: symbol): boolean => statusReaders[statusReaders.length - 1] === token;
+
+/** The registered status polls (tests). */
+export const statusReaderCount = (): number => statusReaders.length;
+
 /** The status poll itself; the caller says whether the app is in front (one AppState listener). */
 const useStatusPoll = (enabled: boolean, appActive: boolean): void => {
   const dispatch = useDispatch<ActiveRideDispatch>();
+  const [token] = useState(() => Symbol('ride-status-reader'));
+  useEffect(() => {
+    if (!enabled) return undefined;
+    setStatusReader(token, true);
+    return () => setStatusReader(token, false);
+  }, [enabled, token]);
+  const reader = useSyncExternalStore(subscribeStatusReaders, () => isStatusReader(token));
   const ride = useSelector(selectActiveRide);
   const rideId = ride?.id;
   const inProgress = isRideInProgress(ride);
@@ -120,7 +155,7 @@ const useStatusPoll = (enabled: boolean, appActive: boolean): void => {
   }, [dispatch, rideId]);
 
   usePolling({
-    enabled: enabled && appActive && rideId !== undefined && inProgress,
+    enabled: enabled && reader && appActive && rideId !== undefined && inProgress,
     intervalMs: pollMs,
     run: pollStatus,
     readAtOnceKey: rideId,
@@ -188,6 +223,13 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
     const timer = setInterval(() => readDriverLocation(rideId), DRIVER_LOCATION_POLL_MS);
     return () => clearInterval(timer);
   }, [enabled, appActive, trackable, rideId, readDriverLocation]);
+
+  // T-589: arrived with no position read yet: read it now, so the car can be put on the pickup
+  // without waiting for the next tick.
+  const arrivedWithoutPosition = ride?.status === 'arrived' && driverLocation === null;
+  useEffect(() => {
+    if (arrivedWithoutPosition && enabled && appActive && rideId !== undefined) readDriverLocation(rideId);
+  }, [arrivedWithoutPosition, enabled, appActive, rideId, readDriverLocation]);
 
   // T-588: once `arrived`, the car is shown on the pickup (the last posted position lags).
   const status = ride?.status;
@@ -305,6 +347,7 @@ export const openActiveBooking = async (dispatch: ActiveRideDispatch, rideId: nu
  */
 export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => {
   const dispatch = useDispatch<ActiveRideDispatch>();
+  const store = useStore<SliceRoot>();
   const onPhoneNotVerifiedRef = useRef(options.onPhoneNotVerified);
   onPhoneNotVerifiedRef.current = options.onPhoneNotVerified;
   const onBalanceOwedRef = useRef(options.onBalanceOwed);
@@ -371,5 +414,32 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
     [dispatch],
   );
 
-  return { requestRide, cancelRide };
+  /**
+   * T-589: GET /rides/{id} now (the cancel question's check that no driver took the request).
+   * Resolves the server's ride, or null when it could not be read. A status read already in
+   * flight is waited for and its answer (in the store) used, so there is never a second read.
+   */
+  const rereadRide = useCallback(
+    async (rideId: number): Promise<RideResource | null> => {
+      const action = await dispatch(refreshActiveRide(rideId));
+      if (refreshActiveRide.fulfilled.match(action)) return action.payload;
+      if (!action.meta.condition) return null;
+      await new Promise<void>((resolve) => {
+        if (!store.getState().activeRide.isRefreshing) {
+          resolve();
+          return;
+        }
+        const unsubscribe = store.subscribe(() => {
+          if (store.getState().activeRide.isRefreshing) return;
+          unsubscribe();
+          resolve();
+        });
+      });
+      const held = store.getState().activeRide.ride;
+      return held?.id === rideId ? held : null;
+    },
+    [dispatch, store],
+  );
+
+  return { requestRide, cancelRide, rereadRide };
 };

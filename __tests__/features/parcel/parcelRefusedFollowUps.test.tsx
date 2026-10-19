@@ -24,6 +24,7 @@ import { advanceRideStage, type PassengerRideStageState } from '../../../src/fea
 import { driverCancelledCopy } from '../../../src/components/driver/DriverRideCancelledCard';
 import { setDriverActiveRide } from '../../../src/features/driver-ride/slice';
 import { useVehicleTypes } from '../../../src/features/ride-booking/hooks';
+import { MARKER_SETTLE_MS } from '../../../src/components/ui/ride/useMarkerTracking';
 import type { RideResource } from '../../../src/services/rideService';
 import { envelope, makeRide, makeStore } from '../../../test-utils/rideFixtures';
 
@@ -173,6 +174,12 @@ describe('2. the driver after refusing a parcel', () => {
   });
 
   it('refuse on the ride screen ends on "Parcel refused", without a console warning or error', async () => {
+    // T-589: the map markers freeze their view MARKER_SETTLE_MS after they mount (a real 1 s
+    // timer). On a busy machine that timer fired between two awaits of this test, outside act(),
+    // and React's "not wrapped in act(...)" console.error failed it once in a full run. On the
+    // fake clock the timers run only inside waitFor / act, so the result no longer depends on
+    // how fast the machine is.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
     const warn = jest.spyOn(console, 'warn');
     const error = jest.spyOn(console, 'error');
     let server = parcelRide(parcelBlock());
@@ -198,7 +205,12 @@ describe('2. the driver after refusing a parcel', () => {
     await waitFor(() => screen.getByTestId('driver-ride-cancelled'));
     expect(screen.getByTestId('driver-ride-cancelled-title').props.children).toBe('Parcel refused');
     expect(screen.queryByText('This ride is no longer assigned to you.')).toBeNull();
-    await waitFor(() => expect(mock.history.get.some((r) => r.url === '/driver/status')).toBe(true));
+    await waitFor(() => expect(store.getState().driverStatus.loadStatus).toBe('done'));
+    expect(mock.history.get.some((r) => r.url === '/driver/status')).toBe(true);
+    // Every marker settles (and the status read lands) inside act: still no warning.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(MARKER_SETTLE_MS * 2);
+    });
     expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });

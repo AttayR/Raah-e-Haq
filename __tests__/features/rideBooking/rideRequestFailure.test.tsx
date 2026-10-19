@@ -93,8 +93,9 @@ describe('useActiveRideActions.requestRide success (T-311)', () => {
 });
 
 describe('useActiveRideActions.requestRide refusals', () => {
-  it('a 422 shows the server field message and logs a warning, not an error', async () => {
+  it('a 422 shows the server field message and logs at debug (T-589), not a warning or an error', async () => {
     mock.onPost('/rides').reply(422, validation422);
+    const debug = jest.spyOn(logger, 'debug');
     const warn = jest.spyOn(logger, 'warn');
     const error = jest.spyOn(logger, 'error');
     const result = renderActions();
@@ -106,7 +107,8 @@ describe('useActiveRideActions.requestRide refusals', () => {
 
     expect(thrown).toBeInstanceOf(RideRequestRefused);
     expect(showError).toHaveBeenCalledWith('Ride Request Failed', 'The selected vehicle type is invalid.', expect.anything());
-    expect(warn).toHaveBeenCalledWith('Failed to create ride', expect.objectContaining({ status: 422 }));
+    expect(debug).toHaveBeenCalledWith('Failed to create ride', expect.objectContaining({ status: 422 }));
+    expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
 

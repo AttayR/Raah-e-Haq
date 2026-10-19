@@ -1,7 +1,7 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation, { type GeolocationError } from '@react-native-community/geolocation';
 import rideService, { type DriverLocation } from './rideService';
-import { isApiError } from '../core/api/errors';
+import { isApiError, type ApiErrorKind } from '../core/api/errors';
 import { logger } from '../core/logging/logger';
 import { DRIVER_LOCATION_CODES, driverLocationApi } from '../features/driver-location/api';
 import {
@@ -25,6 +25,12 @@ import {
 } from '../features/driver-location/throttle';
 
 export type { LocationFix } from '../features/driver-location/throttle';
+
+/**
+ * T-589: location post failures that are everyday states, logged at debug: no connection (the
+ * next tick posts again) and an ended session (logout stops tracking).
+ */
+const QUIET_POST_FAILURES: ReadonlySet<ApiErrorKind> = new Set<ApiErrorKind>(['network', 'timeout', 'cancelled', 'auth']);
 
 /** Which options the device watcher runs with (T-537). */
 type WatchMode = 'ride' | 'tracking' | 'lowPower';
@@ -397,7 +403,12 @@ class LocationTrackingService {
 
   private handleWatchError(watchGeneration: number, error: GeolocationError): void {
     if (watchGeneration !== this.watchGeneration) return;
-    logger.warn('Driver location watcher error', { code: error.code });
+    // T-589: refused access, no fix yet and a timeout are everyday GPS states (the watcher keeps
+    // running, or stops on a refusal); debug, not the yellow Debug LogBox. Anything else warns.
+    const expected =
+      error.code === error.PERMISSION_DENIED || error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT;
+    const log = expected ? logger.debug : logger.warn;
+    log('Driver location watcher error', { code: error.code });
     if (error.code === error.PERMISSION_DENIED) {
       this.watchRefs = 0;
       this.stopTracking();
@@ -447,7 +458,9 @@ class LocationTrackingService {
       return;
     }
     if (error.status === 403) {
-      logger.warn('Driver location refused', { status: error.status, code: error.code });
+      // A 403 ACCOUNT_* is the account's state (the status screen shows it), not a warning.
+      const log = error.account ? logger.debug : logger.warn;
+      log('Driver location refused', { status: error.status, code: error.code });
       this.stopTracking();
       return;
     }
@@ -456,7 +469,10 @@ class LocationTrackingService {
         now + (error.retryAfter ? error.retryAfter * 1000 : DRIVER_LOCATION_CONFIG.rateLimitBackoffMs);
       return;
     }
-    logger.warn('Driver location post failed', { kind: error.kind, status: error.status });
+    // T-589: offline, a timeout or an ended session (the next tick posts again, or logout stops
+    // tracking) is debug; a refusal we do not expect (422, 5xx) still warns.
+    const log = QUIET_POST_FAILURES.has(error.kind) ? logger.debug : logger.warn;
+    log('Driver location post failed', { kind: error.kind, status: error.status });
   }
 }
 

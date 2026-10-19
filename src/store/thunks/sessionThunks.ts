@@ -11,6 +11,8 @@ import { authStorage } from '../../services/authStorage';
 import { withRefusedStatus, type RefusalLike } from '../../core/auth/normalizeUser';
 import type { User } from '../../services/api';
 import { logger } from '../../core/logging/logger';
+import { isApiError } from '../../core/api/errors';
+import { isQuietFailureKind } from '../../core/api/logApiFailure';
 import { safetyApi } from '../../features/safety/api';
 import { isRecord, readId } from '../../core/api/read';
 import { resetOtpSendHold } from '../../features/auth/otpSendHold';
@@ -41,12 +43,24 @@ export const LEGACY_NOTIFICATIONS_CACHE_KEY = 'notifications';
 /** An offline logout must not leave the user waiting for the 30 s default timeout. */
 export const LOGOUT_REQUEST_TIMEOUT_MS = 8000;
 
-/** Runs one cleanup step; a failure is logged and never stops the remaining steps. */
+/**
+ * Runs one cleanup step; a failure is logged and never stops the remaining steps. T-589: an
+ * expected API failure (offline, or a 401 because the session already ended on the server) is
+ * debug, not a warning (it raised the yellow Debug LogBox on the login screen); anything else
+ * is logged as a summary (kind, status, error name), never the raw error.
+ */
 const step = async (name: string, fn: () => unknown): Promise<void> => {
   try {
     await fn();
   } catch (error) {
-    logger.warn(`logout - ${name} failed; continuing`, error);
+    const apiError = isApiError(error) ? error : null;
+    const summary = {
+      kind: apiError?.kind,
+      status: apiError?.status,
+      name: error instanceof Error ? error.name : typeof error,
+    };
+    const log = apiError && isQuietFailureKind(apiError.kind) ? logger.debug : logger.warn;
+    log(`logout - ${name} failed; continuing`, summary);
   }
 };
 
@@ -132,7 +146,8 @@ export const sessionExpired =
     if (!getState().apiAuth.isInitialized) {
       return false;
     }
-    logger.warn('Session expired (401); signing out');
+    // T-589: an ended session is an everyday state (the login screen follows), not a warning.
+    logger.debug('Session expired (401); signing out');
     dispatch(logout());
     return true;
   };

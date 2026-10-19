@@ -659,7 +659,9 @@ class RideService {
       logger.debug('❌ Cancelling ride:', rideId);
       return unwrap(await apiService.post<RideResource>(`${this.baseUrl}/${rideId}/cancel`));
     } catch (error) {
-      logger.error('❌ Failed to cancel ride:', error);
+      // T-589: the screen shows "Couldn't cancel. Try again."; offline, a 409 (the ride moved on)
+      // and other expected refusals log at debug, not a red Debug LogBox. A 5xx is still an error.
+      logApiFailure('Failed to cancel ride', error);
       throw error;
     }
   }

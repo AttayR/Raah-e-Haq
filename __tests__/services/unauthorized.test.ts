@@ -14,6 +14,7 @@ import {
   setUnauthorizedHandler,
 } from '../../src/services/api';
 import { authStorage } from '../../src/services/authStorage';
+import rideService from '../../src/services/rideService';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, sessionExpired, SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import { bootstrapAuth, loginUser, verifyOtp } from '../../src/store/thunks/apiThunks';
@@ -98,6 +99,25 @@ describe('401 handling (T-104)', () => {
     expect(state.isAuthenticated).toBe(false);
     expect(state.isInitialized).toBe(true);
     expect(await authStorage.getToken()).toBeNull();
+  });
+
+  it('T-589: a session that ends during a search signs out without a console warning (no yellow LogBox)', async () => {
+    const store = await signedIn();
+    const warn = jest.spyOn(console, 'warn');
+    const error = jest.spyOn(console, 'error');
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    // The searching ride's status read meets the revoked token; so does logout's own revoke.
+    mock.onGet('/rides/21').reply(401, { message: 'Unauthenticated.' });
+    mock.onPost('/auth/logout').reply(401, { message: 'Unauthenticated.' });
+
+    await expect(rideService.getRide(21)).rejects.toMatchObject({ status: 401 });
+    await waitForLogout();
+
+    expect(store.getState().apiAuth.isAuthenticated).toBe(false);
+    expect(mock.history.post.map((r) => r.url)).toEqual(['/auth/logout']);
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
   });
 
   it('a 401 from login (wrong password) does not log out or call anything else', async () => {

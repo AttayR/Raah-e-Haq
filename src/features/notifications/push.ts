@@ -122,8 +122,10 @@ export const syncPushRegistration = async ({ prompt }: { prompt: boolean }): Pro
     const token = await getToken(getMessaging());
     await registerDeviceToken(token);
   } catch (error) {
-    // No APNs token (e.g. a simulator without push support) or no Play services.
-    logger.warn('notifications - push registration skipped', {
+    // No APNs token (e.g. a simulator without push support) or no Play services: expected on
+    // those devices and retried on the next sign-in or launch, so debug (T-589: it raised the
+    // yellow Debug LogBox after every sign-in on the simulator).
+    logger.debug('notifications - push registration skipped', {
       name: error instanceof Error ? error.name : typeof error,
     });
   }

@@ -1,5 +1,6 @@
 import type { DriverLocation, RideResource } from '../../services/rideService';
 import { distanceMeters } from '../driver-location/throttle';
+import type { PassengerRideStage } from './stage';
 
 /**
  * T-588: how far from the pickup the last reported driver position may be for the marker to be
@@ -33,3 +34,15 @@ export const markerDriverLocation = (
   const away = distanceMeters(location, { latitude, longitude });
   return away <= ARRIVED_SNAP_RADIUS_M ? { ...location, latitude, longitude } : location;
 };
+
+/**
+ * T-589 (QA 2026-10-19 obs 2): the update interval the assigned marker expects while the driver
+ * has arrived. The snap onto the pickup then lands in at most two of these (0.6 s) instead of
+ * gliding over the time since the last location read (up to 4 s, so the car seemed to wait for
+ * the next read). The driver is parked there, so no later move needs the long glide.
+ */
+export const ARRIVED_SETTLE_MS = 300;
+
+/** The interval the assigned driver's marker animates with: short while arrived, else the poll's. */
+export const assignedMarkerIntervalMs = (stage: PassengerRideStage | null | undefined, pollMs: number): number =>
+  stage === 'driver_arrived' ? ARRIVED_SETTLE_MS : pollMs;

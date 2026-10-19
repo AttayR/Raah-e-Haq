@@ -87,7 +87,7 @@ const PassengerMapScreen = () => {
   const { currentLocation, requestLocationPermission } = locationGate;
   // BE-37: a refused booking for an unverified phone opens the profile, where the number is
   // verified (T-504 builds that flow).
-  const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
+  const { requestRide: requestRideService, cancelRide: cancelRideService, rereadRide } = useActiveRideActions({
     onPhoneNotVerified: () => navigation.navigate('Profile'),
     // BE-85: owing more than the limit blocks booking until a top-up.
     onBalanceOwed: (amountOwed) => navigation.navigate('AddMoney', topUpParamsFor(amountOwed)),
@@ -255,7 +255,7 @@ const PassengerMapScreen = () => {
   const editTrip = useCallback(() => editPoint('destination'), [editPoint]);
 
   // Cancel with the server's fee preview (BE-85); a cancelled request goes Home (T-584), a taken ride's outcome stays in the panel.
-  const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection, finishRide);
+  const handleCancelRide = usePassengerCancel(currentRide, cancelRideService, resetSelection, finishRide, rereadRide);
 
   // Pickup defaults to the current location once it is known.
   const { pickupAtCurrentLocation } = flow;
