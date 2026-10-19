@@ -973,3 +973,40 @@ Computed with the same rules as POST `/rides/{id}/cancel` for the driver (`RideF
 The passenger side is unchanged: `cancellation_preview.fee_now` already applies the caps (0 when capped).
 
 App (T-577): the driver no-show sheet shows "The passenger pays Rs {fee}" only when `no_show_preview.fee_applies` is true; otherwise "No fee will be charged" (no amount; do not explain caps or other rides). Re-read the ride when the sheet opens (the value can change between arrival and `cancel_at`). Older servers (key missing): don't promise an amount, fall back to the neutral wording. After the cancel, show `data.cancellation_fee` from the response.
+
+## BE-110: server-sent text in the app's language (2026-10-19, app T-523 / T-575)
+
+Every `/api/*` request runs in the language its **`Accept-Language`** header asks for. Two languages are served: **`en`** (default and fallback) and **`ur-Latn`** (Roman Urdu). Backward compatible: no field is added, removed or renamed, and English output is byte-identical to before.
+
+Header parsing (`App\Support\ApiLocale::fromHeader`):
+
+- Ranges are ordered by `q` (then by position); `q=0` ranges are skipped. `en`, `en-US`, `en-PK` → `en`; `ur-Latn`, `ur-latn-PK` → `ur-Latn` (case ignored).
+- **Anything else is English**: no header, empty, `*`, plain `ur` (Urdu script) or `ur-PK`, other languages, junk, a malformed `q`, a header over 512 characters. It never errors.
+- The app's `ur-Latn, en;q=0.8` → Roman Urdu; `en` → English.
+- Responses carry **`Content-Language: en | ur-Latn`** (the language actually used) and **`Vary: Accept-Language`** (caches must key on it). Storing `users.locale` never fails a request: a failed write is logged (user id and exception class only) and the response goes out unchanged.
+
+What is translated:
+
+| Where | What |
+|---|---|
+| Envelope | `message`, `error.message` and each string in `errors.{field}[]`, on success and error responses, including 401/403/404/405/413/419/429/5xx fixed copy and validation errors. |
+| Validation | Laravel's rule messages (`lang/ur-Latn/validation.php`) and the app's own rules (phone, lat/lng, vehicle type, UTF-8). The summary `message` keeps Laravel's shape: first error + "(aur N mazeed ghalti/ghaltiyan)". |
+| `GET /rating-tags` | `label` of `tags` and `parcel_tags` (keys unchanged). |
+| `GET /public/vehicle-types`, fare estimates | `name` / `label` of a tier while the rate card still has its stock name (`car_ac` → "AC Car"). A name an admin typed is shown as typed. |
+| Wallet | `label` of wallet transactions (`type` unchanged). Stored `description` text is not translated. |
+| Other labels | ride stop `status_label`; parcel options `categories`, `sizes`, `return_reasons`, `refusal_reasons` (+ a parcel's `item_category_label`, `size_label`); SOS `emergency_numbers[].label`; chat `safety_warning.message`; top-up `failure.message` and poll `message`. |
+
+Never translated: machine values (`code`, `error.code`, enum keys, `status`, `type`, `key`), user-entered text, admin-typed text (broadcasts, banners, rate-card names, review notes), stored descriptions, the parcel `declaration` and `prohibited_items`, SMS to third parties, the SOS `share_message`, the public trip page, and the web admin panel (always English).
+
+Notifications follow the **recipient**, not the request:
+
+- `users.locale` (new nullable column; null = English) is set from the `Accept-Language` of the user's **own authenticated** requests. It is written only when the header names a supported language that differs from the stored one; no header, junk or an unsupported language leaves it as it is.
+- Ride and stop notifications (passenger and driver copy, parcel copy), chat (`New message from …`, and the chat `safety_warning` in the WebSocket event), and wallet notifications (settlements, adjustments, top-ups) are written in the recipient's stored language: the in-app row (`GET /notifications` `title` / `body`) and the FCM push alike. A row keeps the language it was written in. Admin broadcasts stay as the admin wrote them. There are no user-facing safety pushes today.
+
+Copy lives in `lang/ur-Latn.json` (sentences keyed by their English text, with `:placeholders` for names, amounts and addresses) and `lang/ur-Latn/*.php` (validation and labels keyed by stable API keys). Loanwords stay in English (Ride, Driver, Wallet, OTP, PIN, SMS, Rs).
+
+App follow-up:
+
+- Send `Accept-Language` on **every** request, authenticated or not (T-523 / T-575 already do this). Send it right after a language switch (any authenticated call does), so the next push arrives in the new language.
+- Show the server's `message` / `errors` / labels as they come; keep matching on `code` / `error.code` and `key`, never on message text.
+- Messages that already arrived (in-app notification rows) keep their language after a switch; that is expected.
