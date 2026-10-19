@@ -22,7 +22,7 @@ Everything below is built and tested in code against a local stand-in. Each item
 | 9 | Production server for the Laravel backend: SSL for raahehaq.com, `/api` served, queue worker running, `APP_ENV=production`, `APP_DEBUG=false`, `TRUSTED_PROXIES` set | B-09, B-16 |
 | 10 | Hosting for real-time updates (Laravel Reverb + wss proxy), needed for the WebSockets work | B-10 |
 | 11 | Before the wallet goes live: run the migration on a staging copy of the production database first | B-17 |
-| 12 | Production clean-up: change the admin password, remove seeded test users and fake data, purge old logs | B-12 |
+| 12 | Production clean-up: change the admin password, remove seeded test users and fake data, purge old logs. Before deploying BE-113/BE-114: close stale open rides on production (old pending/searching/requested, and any stuck accepted/started), otherwise those passengers can't book; then run migrate before switching code (BE-110 users.locale, BE-113 idempotency table, BE-114 no_driver enum) and `config:cache` (BE-108) | B-12 |
 | 13 | **Apple Developer** and **Google Play** accounts; iOS certificates; Android release signing keystore | B-05, B-21 |
 
 ## Decisions still open

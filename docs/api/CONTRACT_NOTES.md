@@ -1030,3 +1030,48 @@ No field added, removed or renamed; English output is byte-identical (anything b
 The BE-110 "never translated" list no longer includes the parcel `declaration` and `prohibited_items`.
 
 App follow-up: none required; show these strings as sent (T-579 keeps local tier fallbacks in the same words).
+
+## BE-113: no duplicate bookings from POST /rides (2026-10-19)
+
+**One active booking per passenger, of any kind.** A ride or a parcel in status `pending`, `requested`, `searching`, `accepted`, `arrived`, `started` or `ongoing` (API status `requested`/`accepted`/`arrived`/`started`) blocks a new `POST /rides` for that passenger, rides and parcels alike. A sender cannot have a parcel and a ride open at once (the conservative rule; relax it later only if product asks). `completed` and `cancelled` rides do not block. An admin booking for a passenger (`passenger_id`) is refused the same way. The check runs inside the booking transaction after a `SELECT … FOR UPDATE` on the passenger's `users` row, so two concurrent requests cannot both pass.
+
+```
+409 {
+  "success": false,
+  "message": "You already have a booking in progress. Open it, or cancel it before booking again.",
+  "error": {
+    "code": "RIDE_ALREADY_ACTIVE",
+    "message": "<same>",
+    "ride_id": 202,                       // numeric id: GET /rides/{ride_id}
+    "ride_ref": "RIDE-01M59Z…",           // the display ride_id
+    "status": "requested",               // API status of the open booking
+    "vehicle_type": "car"                // "parcel" when the open booking is a parcel
+  }
+}
+```
+Roman Urdu (`Accept-Language: ur-Latn`): "Aap ki ek booking pehle se jari hai. Use kholein, ya nayi booking se pehle use cancel karein." Match on `error.code`, never the text. Order of checks: auth/role/phone (401/403) → Idempotency-Key format and replay → balance owed (403 `PASSENGER_BALANCE_OWED`) → validation (422) → fare checks (422) → **active booking (409)**.
+
+**Optional `Idempotency-Key` header** (8-100 chars of `A-Z a-z 0-9 . _ : -`, same rule as BE-74 top-ups). Send one fresh key (e.g. a UUID) per booking attempt, and the **same key on every retry** of that attempt (timeout, dropped connection, app restart mid-request).
+- Same key + same body from the same user within `RIDES_IDEMPOTENCY_TTL_MINUTES` (default 10): `200` with header `Idempotent-Replayed: true` and the same body as the original `201` (`{success:true, message:"Ride request created successfully", data: <ride>}`), showing the ride's **current** state (it may be accepted or cancelled by now). No new ride.
+- Same key + different body: `422 { success:false, message:"This request key was already used for a different ride request.", errors:{idempotency_key:[…]}, error:{code:"IDEMPOTENCY_KEY_REUSED"} }`. Body key order does not matter. (Note: BE-74 top-ups answer 409 for this; rides use 422.)
+- Malformed key: `422 VALIDATION_ERROR`, `errors.idempotency_key`.
+- Keys are per user (another user's identical key is unrelated); after the TTL the key is forgotten. Only SHA-256 hashes of the key and body are stored (`ride_idempotency_keys`), pruned daily.
+- Without the header, a retry that reaches the server after the first request committed gets the 409 above with the first ride's `ride_id`.
+- The admin web panel (Admin → Rides → Create) applies the same rule under the same lock: it goes back with a `passenger_id` error and the flash "This passenger already has an open booking. Finish or cancel it before creating another. (RIDE-…)"; JSON callers get `409 RIDE_ALREADY_ACTIVE` with `error.ride_id`.
+
+App follow-up (T-…): (1) generate an Idempotency-Key per "Confirm ride/parcel" press and reuse it for automatic retries; (2) treat `200` + `Idempotent-Replayed` like `201`; (3) on `409 RIDE_ALREADY_ACTIVE` open the active-ride screen for `error.ride_id` (GET /rides/{id}) instead of showing an error, offering cancel there; (4) disable the confirm button while the request is in flight.
+
+## BE-114: unanswered ride requests expire (2026-10-19)
+
+**Rule.** A ride or parcel request still without a driver `N` minutes after its latest `requested_at` is cancelled by the server. `N` = admin setting `ride_request_expiry_minutes` (admin settings page, "app" tab; empty = `RIDES_REQUEST_EXPIRY_MINUTES`, default **10**), always between 1 and `RIDES_PENDING_MAX_AGE_MINUTES` (the driver feed age, 10), so a request drivers can no longer see never keeps waiting. The clock restarts when a driver cancel re-queues the ride (BE-85) and when the passenger picks women-mode **"allow any driver"** (BE-87, `requested_at` is set again). Women-mode **"keep waiting"** does not restart it: a women-mode request also ends 10 minutes after booking.
+
+**What the app sees** (no new field; `GET /rides/{id}`, `GET /rides?status=…`, the 201 of a later `POST /rides`):
+- `status: "cancelled"`, `cancellation_reason: "no_driver"` (new enum value), `cancellation_fee: "0.00"`, `cancellation_charge_reason: null`, `cancelled_at` set, `driver: null`. No fee, no strike, no re-queue.
+- It is applied **on read** as well as by the every-minute scheduler: `GET /rides/{id}` (the ride's own viewers only; a 403 changes nothing), the passenger's `GET /rides` (so the active-ride restore `status=requested,accepted,arrived,started` never returns an over-age request) and `POST /rides` (an over-age request never blocks a new booking under BE-113). `POST /rides/{id}/women-mode` on an over-age request answers 409 `RIDE_NOT_SEARCHING` (the ride is cancelled, not revived).
+- A driver who accepts at the same moment wins (both are conditional updates on the same row); an accept after the expiry gets the usual 409.
+
+**Notification** (passenger only): type `ride_cancelled`, category `ride`, data `{cancelled_by: "system", reason: "no_driver", requeued: false}`. Push data adds `reason: "no_driver"` next to `requeued: "false"` and `ride_status: "cancelled"`, so the existing routing (`src/features/notifications/routing.ts`) opens ride history / details. In the recipient's stored language (BE-110):
+- Ride: "No Driver Found" / "No driver accepted your ride in time, so we cancelled the request. You were not charged. Please try again" — ur-Latn "Koi Driver Nahi Mila" / "Waqt par kisi driver ne aap ki ride accept nahi ki, is liye request cancel kar di gayi. Aap se koi paisay nahi liye gaye. Dobara koshish karein".
+- Parcel (BE-111): "No Rider Found" / "No rider accepted your delivery in time, so we cancelled the request. You were not charged. Please try again" — ur-Latn "Koi Rider Nahi Mila" / "Waqt par kisi rider ne aap ki delivery accept nahi ki, …".
+
+App follow-up: while searching, a poll or focus read returning `cancelled` + `no_driver` shows a "No driver found" state (parcel: "No rider found") with **Try again** (re-book the same trip, new Idempotency-Key) and Close; not the "You cancelled / driver cancelled" copy, and no fee line. History/receipt label for `no_driver`: "No driver found · No charge". Optional: a client-side countdown is not needed; the server decides.
