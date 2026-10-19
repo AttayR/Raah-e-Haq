@@ -28,7 +28,6 @@ export function registerRideCopy(): void {
     noRidesBody: 'Doosra pickup try karein ya chand minute baad dobara koshish karein.',
     fareDetails: 'Fare ki tafseel',
     hideFareDetails: 'Fare ki tafseel chhupayein',
-    fareLockChip: 'Tay shuda fare. Driver ke accept karne par lock ho jata hai.',
     addStopSubtitle: (max: number) => `Raaste mein ${max} stops tak`,
     paymentCash: 'Cash',
     paymentCashBody: 'Trip ke aakhir mein driver ko cash dein',

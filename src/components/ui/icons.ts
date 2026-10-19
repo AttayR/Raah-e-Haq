@@ -71,6 +71,8 @@ export const iconGlyphs = {
   // Money.
   cash: 'cash',
   promo: 'tag-outline',
+  /** [UI-R21] Invite code card disc (M5). */
+  gift: 'gift-outline',
   savings: 'piggy-bank-outline',
   // Status and feedback.
   check: 'check-circle',
@@ -142,6 +144,8 @@ export const iconGlyphs = {
   // Fare fairness (T-521).
   minus: 'minus',
   fareLock: 'lock-check-outline',
+  /** [UI-R21] FareTag "Your offer" (M4). */
+  fareOffer: 'hand-coin-outline',
   waiting: 'timer-sand',
   report: 'flag-outline',
   statement: 'calendar-week',

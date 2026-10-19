@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, BottomSheet, Button, Icon, TextField } from '../../../components/ui';
+import { AppText, BottomSheet, BrandBar, Button, Icon, TextField } from '../../../components/ui';
 import { haptics } from '../../../core/haptics';
 import { logger } from '../../../core/logging/logger';
 import { componentTokens, layout, space } from '../../../theme';
@@ -121,6 +121,8 @@ export default function ForgotPasswordSheet({ visible, initialEmail, onClose, on
       ) : (
         <View style={styles.body}>
           <View style={styles.titleBlock}>
+            {/* UI-R21 §1.8: the sheet's one brand moment (not on the sent state, beside the success glyph). */}
+            <BrandBar style={styles.brandBar} testID="forgot-password-brand-bar" />
             <AppText variant="h2" accessibilityRole="header">
               {COPY.title}
             </AppText>
@@ -159,6 +161,8 @@ const styles = StyleSheet.create({
   // The sheet pads only its footer; the body takes the same side gutter (T-543).
   body: { gap: space[6], paddingHorizontal: layout.gutter, paddingTop: space[2] },
   titleBlock: { gap: space[2] },
+  // titleBlock gap (8) + this = the spec's 12 from the bar to the title.
+  brandBar: { marginBottom: componentTokens.brand.barGapBeforeTitle - space[2] },
   footer: { gap: space[2] },
   glyph: { width: glyph, height: glyph, borderRadius: glyph / 2, alignItems: 'center', justifyContent: 'center' },
 });

@@ -65,6 +65,9 @@ export const urLatn: TranslationTable = {
     otpA11y: 'Verification code, {length} digits',
     errorA11y: 'Ghalti: {message}',
     countOverflow: '{max}+',
+    // UI-R21 FareTag (DESIGN_SYSTEM §1.7 M4).
+    fareTagFixed: 'Tay shuda kiraya',
+    fareTagOffer: 'Aap ki offer',
     unreadA11y: 'Bina parha',
     unreadCountA11y: '{count} bina parhe',
     loadingA11y: 'Load ho raha hai',

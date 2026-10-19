@@ -69,7 +69,7 @@ describe('notificationTone', () => {
     expect(notificationTone('ride')).toEqual({ icon: 'rides', tile: 'infoSoft', glyph: 'info' });
     expect(notificationTone('chat')).toEqual({ icon: 'chat', tile: 'primarySoft', glyph: 'onPrimarySoft' });
     expect(notificationTone('wallet')).toEqual({ icon: 'cash', tile: 'successSoft', glyph: 'success' });
-    expect(notificationTone('promo')).toEqual({ icon: 'promo', tile: 'warningSoft', glyph: 'warning' });
+    expect(notificationTone('promo')).toEqual({ icon: 'promo', tile: 'accentSoft', glyph: 'accentStrong' });
     expect(notificationTone('system')).toEqual({ icon: 'bell', tile: 'surfaceAlt', glyph: 'textSecondary' });
   });
 });

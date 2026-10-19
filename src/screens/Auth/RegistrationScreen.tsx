@@ -10,7 +10,7 @@ import { confirm } from '../../core/dialog';
 import { formatCountdown } from '../../services/otpService';
 import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
 import { FieldAnchorContext } from '../../features/auth/registration/fieldAnchors';
-import { pageProgress, type RegistrationPage } from '../../features/auth/registration/pages';
+import { pageProgress, registrationPages, type RegistrationPage } from '../../features/auth/registration/pages';
 import type { RegistrationRole } from '../../features/auth/registration/registrationForm';
 import { hasFormInput, useRegistrationWizard } from '../../features/auth/registration/useRegistrationWizard';
 import RegistrationPhoneStep from '../../features/auth/components/RegistrationPhoneStep';
@@ -192,6 +192,7 @@ export default function RegistrationScreen({ initialRole }: Props = {}) {
                   title={copy.title}
                   description={copy.description}
                   progress={pageProgress(page, formData.role)}
+                  brandBar={registrationPages(formData.role)[0] === page}
                 />
               ) : null}
               {renderPage()}

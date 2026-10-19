@@ -150,7 +150,7 @@ export default function LoginScreen() {
         testID="login-scroll"
       >
         <View style={styles.main}>
-          <AuthIntro logo title={COPY.title} subtitle={COPY.subtitle} testID="login-intro" />
+          <AuthIntro logo brandBar title={COPY.title} subtitle={COPY.subtitle} testID="login-intro" />
           <View style={styles.form}>
             <SegmentedControl
               options={METHODS()}

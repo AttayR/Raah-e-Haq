@@ -285,6 +285,7 @@ export default function PhoneAuthScreen() {
           title={onCodeStep ? COPY.codeStep.title : COPY.phoneStep.title}
           subtitle={onCodeStep ? COPY.codeStep.subtitle(`+92 ${formatNationalPhone(digits)}`) : COPY.phoneStep.subtitle}
           testID="phone-auth-intro"
+          brandBar
         />
         {onCodeStep ? (
           <PhoneCodeStep

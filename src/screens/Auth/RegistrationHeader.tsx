@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { AppText } from '../../components/ui';
+import { AppText, BrandBar } from '../../components/ui';
 import { REGISTRATION_COPY as COPY } from '../../features/auth/copy/registration';
 import { componentTokens, radius, space } from '../../theme';
 
@@ -12,6 +12,8 @@ interface Props {
   description?: string;
   /** "Step n of m"; null hides the progress (role page, phone step). */
   progress: { current: number; total: number } | null;
+  /** UI-R21 §1.8: the logo-orange BrandBar above the title on the first registration page only. */
+  brandBar?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * `background`), "Step n of m", then the page title (`h2`) and description. Replaces the navy
  * brand header with decorative circles.
  */
-export default function RegistrationHeader({ title, description, progress }: Props) {
+export default function RegistrationHeader({ title, description, progress, brandBar = false }: Props) {
   const { theme } = useAppTheme();
   return (
     <View style={styles.wrap}>
@@ -51,6 +53,7 @@ export default function RegistrationHeader({ title, description, progress }: Pro
         </View>
       ) : null}
       <View style={styles.titleBlock}>
+        {brandBar ? <BrandBar style={styles.brandBar} testID="registration-brand-bar" /> : null}
         <AppText variant="h2" accessibilityRole="header">
           {title}
         </AppText>
@@ -70,4 +73,6 @@ const styles = StyleSheet.create({
   segments: { flexDirection: 'row', gap: w.progressGap },
   segment: { flex: 1, height: w.progressHeight, borderRadius: radius.pill },
   titleBlock: { gap: space[1] },
+  // titleBlock gap (4) + this = the spec's 12 from the bar to the title.
+  brandBar: { marginBottom: componentTokens.brand.barGapBeforeTitle - space[1] },
 });

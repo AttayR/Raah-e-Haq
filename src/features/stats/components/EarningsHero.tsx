@@ -2,7 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Icon, type IconName } from '../../../components/ui';
+import { AppText, BrandBar, Icon, type IconName } from '../../../components/ui';
 import { useReducedMotion } from '../../../hooks/useReducedMotion';
 import { t } from '../../../i18n';
 import { borderWidth, componentTokens, motion, radius, space } from '../../../theme';
@@ -47,6 +47,8 @@ function EarningsHeroView({ totals, currency, period, from, to, stale = false }:
   return (
     <Animated.View style={[styles.card, { backgroundColor: theme.colors.heroFill }, fade]} testID="earnings-hero">
       <View accessible accessibilityLabel={t('earnings.heroKeepA11y', { amount: content.net, period: caption })}>
+        {/* UI-R21 §1.7 M3: the hero's one saffron element, 8 above "You keep". */}
+        <BrandBar style={styles.brandBar} testID="earnings-brand-bar" />
         <View style={styles.headline}>
           <AppText variant="label" color="heroTextMuted">
             {t('earnings.heroKeep')}
@@ -140,6 +142,7 @@ export const EarningsHero = React.memo(EarningsHeroView);
 
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, padding: e.heroPadding },
+  brandBar: { marginBottom: componentTokens.brand.barGapHero },
   headline: {
     flexDirection: 'row',
     justifyContent: 'space-between',

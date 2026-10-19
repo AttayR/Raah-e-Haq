@@ -137,7 +137,14 @@ describe.each([
     expect(screen.getByLabelText('Stop 1: Model Town')).toBeTruthy();
     expect(screen.getByLabelText('Drop-off: Emporium Mall')).toBeTruthy();
     expect(flat(screen.getByTestId('address-rail-pickup').props.style)).toMatchObject({ backgroundColor: theme.colors.pickupPin, width: 10 });
-    expect(flat(screen.getByTestId('address-rail-dropoff').props.style)).toMatchObject({ backgroundColor: theme.colors.dropoffPin, borderRadius: 2 });
+    // UI-R21 §5.23: orange square with its 1pt `dropoffPinEdge` inside the 10.
+    expect(flat(screen.getByTestId('address-rail-dropoff').props.style)).toMatchObject({
+      backgroundColor: theme.colors.dropoffPin,
+      borderColor: theme.colors.dropoffPinEdge,
+      borderWidth: 1,
+      borderRadius: 2,
+      width: 10,
+    });
     expect(flat(screen.getByTestId('address-rail-stop').props.style)).toMatchObject({ backgroundColor: theme.colors.stopPin, width: 8 });
 
     render(<AddressPair pickup="A" dropoff="B" size="lg" numberOfLines={0} pickupTestID="big" />);

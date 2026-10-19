@@ -146,7 +146,13 @@ const DualLocationPicker: React.FC<Props> = ({
         </View>
       </View>
       <View style={styles.row}>
-        <View style={[styles.dropoffSquare, { backgroundColor: c.dropoffPin }]} />
+        <View
+          style={[
+            styles.dropoffSquare,
+            { backgroundColor: c.dropoffPin, borderColor: c.dropoffPinEdge, borderWidth: theme.borderWidth.thin },
+          ]}
+          testID="picker-rail-dropoff"
+        />
         <View style={styles.field}>
           <LocationSearch
             ref={(handle) => {

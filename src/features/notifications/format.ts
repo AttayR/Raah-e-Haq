@@ -20,7 +20,8 @@ const CATEGORY_TONE: Record<NotificationCategory, NotificationTone> = {
   ride: { icon: 'rides', tile: 'infoSoft', glyph: 'info' },
   chat: { icon: 'chat', tile: 'primarySoft', glyph: 'onPrimarySoft' },
   wallet: { icon: 'cash', tile: 'successSoft', glyph: 'success' },
-  promo: { icon: 'promo', tile: 'warningSoft', glyph: 'warning' },
+  // UI-R21 §1.7 M6: a promo is not a warning; the brand pair (5.30 / 7.60).
+  promo: { icon: 'promo', tile: 'accentSoft', glyph: 'accentStrong' },
   system: { icon: 'bell', tile: 'surfaceAlt', glyph: 'textSecondary' },
 };
 

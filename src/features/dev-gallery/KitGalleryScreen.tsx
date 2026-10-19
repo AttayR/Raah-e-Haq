@@ -50,6 +50,7 @@ import {
 } from './sections/ScreenStatePreviews';
 import { CardSection, HeaderSection, ListSection } from './sections/StructureSections';
 import { ServiceTileSection } from './sections/ServiceTileSection';
+import { BrandSection } from './sections/BrandSection';
 import { BadgeSection, SelectionSection } from './sections/SelectionSection';
 import { ComponentTokenSection, ElevationSection, RadiusSection, SpacingSection } from './sections/ScaleSections';
 import { TYPE_PART_COUNT, TypeSection } from './sections/TypeSection';
@@ -76,6 +77,7 @@ const SECTIONS: Section[] = [
   ['headers', () => <HeaderSection />],
   ['cards', () => <CardSection />],
   ['service-tiles', () => <ServiceTileSection />],
+  ['brand', () => <BrandSection />],
   ['lists', () => <ListSection />],
   ['profile', () => <ProfileSection />],
   ['feedback', () => <FeedbackSection />],

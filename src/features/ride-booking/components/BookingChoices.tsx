@@ -1,12 +1,11 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
-  AppText,
   Button,
   EmptyState,
   ErrorState,
   FareBreakdown,
-  Icon,
+  FareTag,
   VehicleOptionCard,
   VehicleOptionSkeleton,
 } from '../../../components/ui';
@@ -116,7 +115,7 @@ type SelectedFareProps = {
 
 /**
  * The selected tier's fare, inline under the list (UI-R10, §12.5): "Offer your fare" inside the
- * server's band (T-521, ±20%, the passenger may offer within it, no haggling), the fixed-fare note,
+ * server's band (T-521, ±20%, the passenger may offer within it, no haggling), the FareTag (UI-R21),
  * and a "Fare details" toggle that expands the server breakdown (§5.26) and the waiting / cancel
  * terms in place. No separate fare step.
  */
@@ -127,12 +126,8 @@ export const SelectedFare: React.FC<SelectedFareProps> = ({ quote, distanceKm, d
   return (
     <View style={styles.fare} testID="selected-fare">
       {offered ? <OfferStepper offer={offered} /> : null}
-      <View style={styles.lockRow} testID="fare-lock-note">
-        <Icon name="fareLock" size={16} color="textSecondary" />
-        <AppText variant="caption" color="textSecondary" style={styles.flex}>
-          {BOOKING_COPY.fareLockChip}
-        </AppText>
-      </View>
+      {/* UI-R21 §1.7 M4: replaces the lock caption; "Your offer" once the offer is off the quote. */}
+      <FareTag kind={offered && offerDifference(offered.band, offered.value) !== 0 ? 'offer' : 'fixed'} testID="fare-lock-note" />
       <Button
         label={open ? BOOKING_COPY.hideFareDetails : BOOKING_COPY.fareDetails}
         variant="ghost"
@@ -172,7 +167,5 @@ export const requestFareText = (quote: FareEstimate | null, offer?: FareOffer): 
 const styles = StyleSheet.create({
   list: { gap: space[2] },
   fare: { gap: space[2] },
-  lockRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  flex: { flex: 1, minWidth: 0 },
   details: { gap: space[2] },
 });

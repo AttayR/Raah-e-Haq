@@ -19,12 +19,19 @@ export const navy = {
   950: '#000D3B',
 } as const;
 
-/** Saffron accent from the logo. Never for buttons, status or large areas. */
+/**
+ * Saffron: the logo orange (DESIGN_SYSTEM §1.2, UI-R21). saffron-500 `#F75606` is the logo's own
+ * orange. Navy acts, saffron marks: never a button, a selected state, a status or text on a light
+ * surface; only the §1.7 brand moments.
+ */
 export const saffron = {
-  50: '#FFF4E5',
-  500: '#F59A23',
-  600: '#C77700',
-  700: '#A85A00',
+  50: '#FFF1E8',
+  100: '#FFE2D1',
+  300: '#FF9B66',
+  400: '#FF7A33',
+  500: '#F75606',
+  700: '#B33D00',
+  900: '#3A1A0C',
 } as const;
 
 /** Light-mode neutrals. */
@@ -83,7 +90,8 @@ export const extra = {
   infoDark: '#7FA8F5',
   infoSoft: '#E7EFFD',
   infoSoftDark: '#15264A',
-  ratingStarDark: '#F5A524',
+  /** [UI-R21] pressed `accentSoft` in dark (between saffron-900 and the 700 glyph). */
+  accentSoftPressedDark: '#4A2412',
   routeLineDark: '#8EA6F2',
   pickupPin: '#15803D',
   pickupPinDark: '#3DD17A',

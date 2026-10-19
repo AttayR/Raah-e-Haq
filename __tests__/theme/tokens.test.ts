@@ -72,9 +72,14 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   primarySoftPressed: ['#DCE4F8', '#1A3496'],
   info: ['#1D58C4', '#7FA8F5'],
   infoSoft: ['#E7EFFD', '#15264A'],
-  accent: ['#F59A23', '#F59A23'],
+  // UI-R21: the logo orange (§1.2, §1.4).
+  accent: ['#F75606', '#F75606'],
+  accentPressed: ['#FF7A33', '#FF7A33'],
   onAccent: ['#0F1422', '#0F1422'],
-  ratingStar: ['#C77700', '#F5A524'],
+  accentSoft: ['#FFF1E8', '#3A1A0C'],
+  accentSoftPressed: ['#FFE2D1', '#4A2412'],
+  accentStrong: ['#B33D00', '#FF9B66'],
+  ratingStar: ['#F75606', '#F75606'],
   ratingStarEmpty: ['#C3CAD9', '#2B3450'],
   overlay: ['rgba(9,12,22,0.48)', 'rgba(0,0,0,0.64)'],
   skeletonHighlight: ['#F4F6FA', '#252D44'],
@@ -82,7 +87,8 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   routeLineCasing: ['#FFFFFF', '#0B0F1A'],
   routeLineTraveled: ['#858EA5', '#626E90'],
   pickupPin: ['#15803D', '#3DD17A'],
-  dropoffPin: ['#011C72', '#C9D5F7'],
+  dropoffPin: ['#F75606', '#F75606'],
+  dropoffPinEdge: ['#B33D00', '#F75606'],
   stopPin: ['#4C556C', '#B7BFD0'],
   driverMarker: ['#0F1422', '#F2F4F9'],
   userLocation: ['#1D58C4', '#7FA8F5'],
@@ -92,7 +98,7 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   vehicleGlass: ['#C9D5F7', '#1A3496'],
   vehicleTyre: ['#20273A', '#626E90'],
   vehicleCasing: ['#FFFFFF', '#0B0F1A'],
-  vehicleHeadlight: ['#F59A23', '#F59A23'],
+  vehicleHeadlight: ['#F75606', '#F75606'],
   vehicleTaillight: ['#C0262D', '#FF7A7F'],
   vehicleShadow: ['#000000', '#000000'],
   vehicleAcBadge: ['#FFFFFF', '#011C72'],
@@ -109,7 +115,20 @@ describe('palette (§1.1, §1.2)', () => {
   it('keeps the existing brand navy as navy-800', () => {
     expect(navy[800]).toBe('#011C72');
     expect(Object.keys(navy)).toEqual(['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']);
-    expect(saffron).toEqual({ 50: '#FFF4E5', 500: '#F59A23', 600: '#C77700', 700: '#A85A00' });
+    // UI-R21: saffron moved onto the logo orange; the old amber values are retired.
+    expect(saffron).toEqual({
+      50: '#FFF1E8',
+      100: '#FFE2D1',
+      300: '#FF9B66',
+      400: '#FF7A33',
+      500: '#F75606',
+      700: '#B33D00',
+      900: '#3A1A0C',
+    });
+    const all = JSON.stringify({ lightColors, darkColors, saffron });
+    for (const retired of ['#F59A23', '#C77700', '#A85A00', '#F5A524', '#FFF4E5']) {
+      expect(all).not.toContain(retired);
+    }
   });
 });
 
@@ -130,7 +149,7 @@ describe('semantic colours (§1.4)', () => {
       for (const key of Object.keys(SPEC) as SemanticColorName[]) {
         expect(theme.colors[key]).toBe(source[key]);
       }
-      expect(theme.colors.accent).toBe('#F59A23');
+      expect(theme.colors.accent).toBe('#F75606');
       expect(theme.colors.text).toBe(source.textPrimary);
       expect(theme.colors.mutedText).toBe(source.textSecondary);
     }
@@ -165,9 +184,21 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
     ['info', 'surface', 6.47, 7.29, 4.5],
     ['info', 'infoSoft', 5.6, 6.27, 4.5],
     ['onPrimary', 'dangerFill', 5.9, 4.75, 4.5],
-    ['onAccent', 'accent', 8.33, 8.33, 4.5],
+    ['onAccent', 'accent', 5.5, 5.5, 4.5],
+    // UI-R21 (§1.5): pressed disc, saffron glyph on its tint and on surface, text on the tint.
+    ['onAccent', 'accentPressed', 7.07, 7.07, 4.5],
+    ['accentStrong', 'surface', 5.86, 8.37, 3],
+    ['accentStrong', 'accentSoft', 5.3, 7.6, 3],
+    ['textPrimary', 'accentSoft', 16.62, 14.32, 4.5],
+    ['textSecondary', 'accentSoft', 6.73, 8.53, 4.5],
+    ['textMuted', 'accentSoft', 4.82, 5.53, 4.5],
+    ['textSecondary', 'accentSoftPressed', 6.04, 7.33, 4.5],
+    ['dropoffPinEdge', 'surface', 5.86, 5.19, 3],
+    ['dropoffPinEdge', 'surfaceAlt', 5.04, 4.62, 3],
+    // BrandBar on the money heroes (light `primary` = `heroFill`; dark Wallet card is `primarySoft` = `heroFill`).
+    ['accent', 'heroFill', 4.46, 4.28, 3],
     ['borderStrong', 'surface', 3.28, 3.43, 3],
-    ['ratingStar', 'surface', 3.46, 8.5, 3],
+    ['ratingStar', 'surface', 3.34, 5.19, 3],
     // Filled success button label (BrandButton success).
     ['onSuccess', 'success', 5.78, 9.23, 4.5],
     // T-545: disabled Button label on its solid fill, and a disabled ghost/outline label on the page.

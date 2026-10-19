@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText } from '../../../components/ui';
+import { AppText, BrandBar } from '../../../components/ui';
 import { formatMoney } from '../../../core/format/money';
-import { radius, space } from '../../../theme';
+import { componentTokens, radius, space } from '../../../theme';
 import { WALLET_COPY } from '../copy';
 import type { Wallet } from '../types';
 
@@ -13,6 +13,8 @@ type Props = { wallet: Wallet; isDriver: boolean };
  * Balance hero (docs/design/screens/passenger-wallet.md): `primary` fill with `onPrimary`
  * text in light, `primarySoft` / `onPrimarySoft` in dark. One meta line: spent (passenger) or
  * cash earnings (driver). "Add money" (T-515) sits under the card, on the Wallet screen.
+ * UI-R21 (§1.7 M3): the logo-orange BrandBar 8 above "Wallet balance" (4.46 on `primary`, 4.28
+ * on dark `primarySoft`), the card's one saffron element.
  */
 export function BalanceCard({ wallet, isDriver }: Props) {
   const { theme } = useAppTheme();
@@ -28,6 +30,7 @@ export function BalanceCard({ wallet, isDriver }: Props) {
       accessible
       accessibilityLabel={`${WALLET_COPY.balanceLabel}: ${balance}`}
     >
+      <BrandBar style={styles.brandBar} testID="wallet-brand-bar" />
       <AppText variant="caption" color={text}>
         {WALLET_COPY.balanceLabel}
       </AppText>
@@ -57,4 +60,6 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, padding: space[5], gap: space[1] },
   meta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2], marginTop: space[3] },
   metaLabel: { flexShrink: 1 },
+  // The card's gap (4) + this = 8 from the bar to the label.
+  brandBar: { marginBottom: componentTokens.brand.barGapHero - space[1] },
 });

@@ -70,6 +70,9 @@ export const en = {
     otpA11y: 'Verification code, {length} digits',
     errorA11y: 'Error: {message}',
     countOverflow: '{max}+',
+    // UI-R21 FareTag (DESIGN_SYSTEM §1.7 M4).
+    fareTagFixed: 'Fixed fare',
+    fareTagOffer: 'Your offer',
     unreadA11y: 'Unread',
     unreadCountA11y: '{count} unread',
     // UI-R3 structure + feedback.
@@ -168,6 +171,14 @@ export const en = {
     sectionServiceTiles: 'Service tiles (UI-R20)',
     serviceTileHint: 'Passenger Home service row: Ride is the active service (navy border), Parcel has a saffron disc. Row 2 shows the pressed fills; the narrow tile wraps its subtitle to two lines.',
     serviceTilePressed: 'Pressed',
+    // UI-R21 brand moments (DESIGN_SYSTEM §1.7).
+    sectionBrand: 'Brand moments (UI-R21)',
+    brandHint: 'Navy acts, saffron marks. BrandBar on a navy hero and on the page, FareTag fixed and offer, promo and invite cards. Saffron is never text, a button or a status.',
+    brandHeroLabel: 'Wallet balance',
+    brandPromoTitle: '20% off rides this weekend',
+    brandPromoBody: 'Use the offer on any car or rickshaw ride until Sunday night.',
+    brandInviteTitle: 'Invite a friend',
+    brandInviteBody: 'Share your code. You both get a ride credit after their first trip.',
     serviceTileLongSub: 'A bike rider takes your item',
     homeLiveStatus: 'Driver on the way',
     sectionLists: 'List rows and groups',

@@ -142,6 +142,6 @@ describe('theme tokens for outline / disabled controls (QA T-106 dark mode)', ()
     expect(contrast(DarkTheme.colors.primary, DarkTheme.colors.surface)).toBeLessThan(4.5);
     expect(DarkTheme.colors.primaryText).not.toBe(DarkTheme.colors.primary);
     // UI-R2: the legacy alias is gone; `accent` is the spec saffron, never a text colour.
-    expect(DarkTheme.colors.accent).toBe('#F59A23');
+    expect(DarkTheme.colors.accent).toBe('#F75606');
   });
 });

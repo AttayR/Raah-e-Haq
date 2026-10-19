@@ -16,6 +16,28 @@ export const componentTokens = {
     iconSize: { lg: 24, md: 20, sm: 16 },
     iconGap: { lg: space[2], md: space[2], sm: 6 },
   },
+  /**
+   * [UI-R21] navy + saffron brand moments (DESIGN_SYSTEM §1.7): BrandBar (M3), FareTag (M4) and the
+   * image-less promo / invite card (M5, §5.30).
+   */
+  brand: {
+    barWidth: 24,
+    barHeight: 4,
+    /** BrandBar to the label it sits above in a money hero (Wallet balance, Earnings "You keep"). */
+    barGapHero: space[2],
+    /** Auth hero: logo badge → 16 → BrandBar → 12 → title. */
+    barGapAfterLogo: space[4],
+    barGapBeforeTitle: space[3],
+    fareTagMinHeight: 24,
+    fareTagPaddingHorizontal: space[2],
+    fareTagGap: space[1],
+    fareTagIcon: 16,
+    promoMinHeight: 120,
+    promoPadding: space[4],
+    promoDisc: 40,
+    promoGlyph: 24,
+    promoGap: space[3],
+  },
   /** §5.2 [v1.1]: one Header, three variants (standard, large, overlay). */
   header: {
     /** Bar height below the top inset (standard and large). */

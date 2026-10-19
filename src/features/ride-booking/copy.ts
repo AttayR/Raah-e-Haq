@@ -32,7 +32,6 @@ export const BOOKING_COPY = localizedCopy({
   noRidesBody: 'Try a different pickup or try again in a few minutes.',
   fareDetails: 'Fare details',
   hideFareDetails: 'Hide fare details',
-  fareLockChip: 'Fixed fare. It locks when a driver accepts.',
   addStopSubtitle: (max: number) => `Up to ${max} stops on the way`,
   paymentCash: 'Cash',
   paymentCashBody: 'Pay your driver at the end of the trip',

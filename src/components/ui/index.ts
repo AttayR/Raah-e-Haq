@@ -2,12 +2,14 @@
  * UI kit (DESIGN_SYSTEM §5). UI-R2 added the v1.1 controls (Button states, TextField, OtpInput,
  * Switch, Checkbox/Radio, Chip, Badge count/dot); UI-R3 adds structure and feedback components;
  * UI-R5 adds the ride-flow components (`./ride`) and exports CarMarker; T-517 replaces it with
- * the top-down VehicleMarker (CarMarker stays as an alias).
+ * the top-down VehicleMarker (CarMarker stays as an alias). UI-R21 adds the brand moments
+ * BrandBar, FareTag and PromoCard (DESIGN_SYSTEM §1.7).
  */
 export * from './AppText';
 export * from './Avatar';
 export * from './Badge';
 export * from './Banner';
+export * from './BrandBar';
 export * from './BottomSheet';
 export * from './Button';
 export * from './Card';
@@ -15,6 +17,7 @@ export * from './CarMarker';
 export * from './Chip';
 export * from './Dialog';
 export * from './EmptyState';
+export * from './FareTag';
 export * from './FilterChips';
 export * from './ErrorState';
 export * from './FieldLabel';
@@ -31,6 +34,7 @@ export * from './MapControls';
 export * from './ModalRoot';
 export * from './OtpInput';
 export * from './phoneInput';
+export * from './PromoCard';
 export * from './Screen';
 export * from './ScrollHairline';
 export * from './SectionHeader';

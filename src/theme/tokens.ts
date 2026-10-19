@@ -47,8 +47,16 @@ export type SemanticColors = {
   textDisabled: string;
   info: string;
   infoSoft: string;
+  /** [UI-R21] logo orange: brand glyph discs, BrandBar, vehicle lights (§1.7 moments only). */
   accent: string;
+  /** [UI-R21] pressed saffron disc. */
+  accentPressed: string;
   onAccent: string;
+  /** [UI-R21] promo / invite card, FareTag, promo notification tile. Never a Banner or status. */
+  accentSoft: string;
+  accentSoftPressed: string;
+  /** [UI-R21] saffron glyph on `surface` / `accentSoft`. Never for words. */
+  accentStrong: string;
   ratingStar: string;
   ratingStarEmpty: string;
   overlay: string;
@@ -58,6 +66,8 @@ export type SemanticColors = {
   routeLineTraveled: string;
   pickupPin: string;
   dropoffPin: string;
+  /** [UI-R21] 1 pt edge of the AddressPair dropoff square (`accent` on `surfaceAlt` is 2.88 in light). */
+  dropoffPinEdge: string;
   stopPin: string;
   driverMarker: string;
   userLocation: string;
@@ -128,8 +138,12 @@ export const lightColors: SemanticColors = {
   info: extra.info,
   infoSoft: extra.infoSoft,
   accent: saffron[500],
+  accentPressed: saffron[400],
   onAccent: neutral[900],
-  ratingStar: saffron[600],
+  accentSoft: saffron[50],
+  accentSoftPressed: saffron[100],
+  accentStrong: saffron[700],
+  ratingStar: saffron[500],
   ratingStarEmpty: neutral[300],
   overlay: extra.overlay,
   skeletonHighlight: neutral[50],
@@ -137,7 +151,8 @@ export const lightColors: SemanticColors = {
   routeLineCasing: extra.white,
   routeLineTraveled: neutral[400],
   pickupPin: extra.pickupPin,
-  dropoffPin: navy[800],
+  dropoffPin: saffron[500],
+  dropoffPinEdge: saffron[700],
   stopPin: neutral[600],
   driverMarker: neutral[900],
   userLocation: extra.info,
@@ -194,8 +209,12 @@ export const darkColors: SemanticColors = {
   info: extra.infoDark,
   infoSoft: extra.infoSoftDark,
   accent: saffron[500],
+  accentPressed: saffron[400],
   onAccent: neutral[900],
-  ratingStar: extra.ratingStarDark,
+  accentSoft: saffron[900],
+  accentSoftPressed: extra.accentSoftPressedDark,
+  accentStrong: saffron[300],
+  ratingStar: saffron[500],
   ratingStarEmpty: dark[700],
   overlay: extra.overlayDark,
   skeletonHighlight: dark[800],
@@ -203,7 +222,8 @@ export const darkColors: SemanticColors = {
   routeLineCasing: dark[950],
   routeLineTraveled: dark[600],
   pickupPin: extra.pickupPinDark,
-  dropoffPin: navy[200],
+  dropoffPin: saffron[500],
+  dropoffPinEdge: saffron[500],
   stopPin: dark[300],
   driverMarker: dark[50],
   userLocation: extra.infoDark,

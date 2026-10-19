@@ -64,13 +64,21 @@ function RailGlyph({ kind }: { kind: Kind }) {
   const { theme } = useAppTheme();
   const c = theme.colors;
   if (kind === 'pickup') return <View testID="address-rail-pickup" style={[styles.pickup, { backgroundColor: c.pickupPin }]} />;
-  if (kind === 'dropoff') return <View testID="address-rail-dropoff" style={[styles.dropoff, { backgroundColor: c.dropoffPin }]} />;
+  if (kind === 'dropoff') {
+    // UI-R21 §5.23: orange square with a 1 pt `dropoffPinEdge` inside the 10 (`accent` alone is 2.88 on light `surfaceAlt`).
+    return (
+      <View
+        testID="address-rail-dropoff"
+        style={[styles.dropoff, { backgroundColor: c.dropoffPin, borderColor: c.dropoffPinEdge, borderWidth: theme.borderWidth.thin }]}
+      />
+    );
+  }
   return <View testID="address-rail-stop" style={[styles.stop, { backgroundColor: c.stopPin }]} />;
 }
 
 /**
  * Address pair, the "Raah line" (DESIGN_SYSTEM §5.23, brand signature): pickup (10pt `pickupPin`
- * circle), stops (8pt `stopPin` circles) and drop-off (10pt `dropoffPin` square) on a 20pt rail,
+ * circle), stops (8pt `stopPin` circles) and drop-off (10pt `dropoffPin` square, 1pt `dropoffPinEdge`) on a 20pt rail,
  * joined by a 2pt dotted `borderStrong` line. One component everywhere (booking, history, details,
  * incoming request, trip sheets). The rail sits on the start side, so it moves to the end in RTL.
  */
