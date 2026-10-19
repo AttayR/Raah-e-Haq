@@ -516,3 +516,98 @@ rh-security, `audit` mode, reading code only. **App:** `fix/phase-1-auth` at `17
 | BE 9 Headers/CORS | OK. Signed email pages send `no-referrer`, private files send `no-store` and a sandbox CSP. SEC-30 (low) |
 
 **Phase 1 gate verdict: PASS.** No critical or high finding is open in the code. Before production, the owner still has to do B-02, B-11, B-12, B-13, B-15 and B-16. Production is down (B-09).
+
+## Design rulings 2026-10-19: map vehicles, request reach, auto-accept (BE-116)
+
+These are rulings on proposals that are not built yet: `docs/design/screens/map-vehicles.md` §0 D2/D3, §2 and §6 asks 2, 4 and 5, plus BE-116 (b) and (c). The code read for them is `app/Support/DriverPrivacy.php`, `DriverLocation::getDriversInRadius` (`app/Models/DriverLocation.php:150`), `RidesController::getNearbyDrivers` (`:1309`) and `getPendingRides` (`:1172`), `WomenMode::availabilityNear` (`app/Services/WomenMode.php:266`), and the `nearby-drivers` limiter (`app/Providers/AppServiceProvider.php:151`, 12/min per user and 30/min per IP). Severity is what the risk would be if the proposal shipped as written.
+
+### SEC-31 · high · privacy: proposed "fixed 80–150 m hourly offset + 15 s delay" for public driver positions
+**Ruling: FAIL as proposed. CONDITIONS for the variant below (BE-118).**
+
+**Why the proposal fails**
+- **A fixed offset does not survive map matching.** A track shifted by a constant vector lies off the roads. Fitting the shift back onto the road network after a few hundred metres with one or two turns gives the true path to within a few metres. So the offset protects nothing while the car moves, and it draws cars driving through buildings, which hurts the "like Uber" goal.
+- **Averaging.** If the offset depends on the viewer (as it would by tying it to the viewer-bound `publicId`), N throwaway accounts give N independent zero-mean offsets, and their mean has an error of about 115/√N m (about 35 m with 10 accounts). If the offset depends only on the driver, every viewer gets identical coordinates, which links the viewer-bound ids and defeats `publicId`.
+- **Hour boundaries.** A driver parked online (at home, at a stand) gives one new sample p+o_k every hour. After an 8-hour night the mean is within about 40 m of the true point. Each hourly step also shows up as a 100–300 m jump on a still marker, which marks it as parked.
+- **The delay is too short.** 15 s is less than the time needed to notice that a driver has stopped, so the stop point is published. That is how a driver gets tracked home.
+- **Following.** The query centre is chosen by the client and is not bound to anything. One account can re-centre on a driver 12 times a minute and follow it across town. Once positions are continuous, the hourly id rotation is bridged by continuity (the app does this itself, §2.5).
+- **Women drivers.** Gender is not on the map today, which is good. But any rule that treats women drivers differently (coarser, hidden or delayed) would single them out on the map.
+
+**Approved variant: delayed, rounded, zoned (all parameters are server constants in `config/rides.php`, with enforced floors so an admin can loosen them only down to the floor)**
+1. **Fine path only when every one of these holds.**
+   - The caller has the `passenger` role, an active status and a verified phone. Drivers and others get the coarse path.
+   - The driver is moving (item 4) and outside their privacy zones (item 5).
+   - At least **3** available drivers are in the response radius (k-minimum).
+   - The driver is among the **15** nearest.
+   - The driver is within **3 km** of the query centre.
+
+   Everything else uses today's coarse path, unchanged: 0.005° grid, 120 s bucket.
+2. **Delay D = 45 s** (floor 30 s). The position is the last available ping at or before now−D. It is never extrapolated. Who is listed still follows the latest ping (BE-65).
+3. **Rounding** to 0.0005° on both axes (about 55 m; floor 0.0003°). No random offset and no per-viewer noise: the output is a deterministic function of the delayed ping, so averaging recovers nothing. Heading comes from the same ping in 15° steps (BE-76) and is null when the driver is stationary. This rounding is also the zoom cap. The server never sends more precision whatever the passenger's zoom.
+4. **Moving** means ≥ 40 m of true displacement over the last **30 s** of live pings, and a latest speed ≥ 1.5 m/s when speed is reported. This is judged on live pings, not delayed ones. Because D (45 s) is longer than the 30 s window, a stop point is never on the fine path. A stationary driver falls back to the coarse path.
+5. **Privacy zones, 1.0 km radius** (floor 0.5 km), centred on (a) the first available ping of the current online session and (b) the driver's last **5** go-offline points from the last 30 days.
+   - Inside a zone the driver is **not drawn at all**: no fine marker and no coarse marker. They are still counted and still dispatchable.
+   - Zone centres are kept server-side only, rounded to 0.001°, and pruned after 30 days (SEC-24).
+   - They never appear in any API response.
+6. **Id rotation.** The public id changes at session start, on every coarse/hidden → fine transition, and at least hourly. Implementation: a per-driver visibility epoch is mixed into `publicId`. A marker can then not be linked across a stop, a zone or a new session.
+7. **Anti-following budget.**
+   - Fine positions are served in at most **6 distinct 2 km cells per account per rolling hour**, using the `WomenMode::allowedCell` pattern (atomic, fails closed). Past the budget the answer is the coarse path (200, not 429), so the app keeps working.
+   - The `nearby-drivers` limit drops from 12/min to **6/min plus 180/hour** per user. The IP limit stays at 30/min. The app polls 4/min.
+8. **Counts (BE-116 a).** `by_tier` and `online_total` are computed from the **coarse** (grid, 120 s bucket) positions of all listed drivers, including zoned ones. A client-chosen centre with a 1 km minimum radius can then never home in on a hidden driver more finely than today's accepted 550 m cell. Counts never split by gender.
+9. **Uniform treatment.** No rule may depend on gender or on `WomenMode::driverEligible`. A feature test asserts byte-identical output for a female and a male driver with the same pings. `WomenMode::availabilityNear` stays on the coarse path.
+10. **No logs or caches** of fine public positions beyond the 15 s response cache. Fine responses are not stored per viewer.
+11. **Follow detection (feeds BE-92).** Flag an account for admin review when ≥ 10 queries in 20 min, spread over ≥ 3 cells, are each centred within 1 km of the same driver's true position. Admin decides; nothing is automatic.
+
+**Effect on the app (T-586).** None of the §2 motion rules change. A stationary or zoned driver relocates with a crossfade or leaves with a fade. The 15 m jitter rule absorbs the 55 m rounding at speed.
+
+### SEC-32 · medium · privacy: "b2", viewer-scoped ids of drivers sent or viewing a request
+**Ruling: CONDITIONS (BE-119). Without them, counts only.**
+
+**Risks**
+- In women mode the set of drivers sent the request is exactly the verified female drivers. Marking them on the map bypasses BE-87's rule that the map never narrows by gender, and the availability endpoint's limits (boolean only, 4/min, 30/h, cell budget).
+- Ids of drivers that are not drawn (zoned, stationary-coarse, beyond 15, outside the radius) would reveal and link hidden drivers.
+- `viewing` and `declined` per marker is a live behavioural signal about one vehicle, which invites retaliation.
+
+**Conditions**
+1. Ids go only to the ride's passenger, only while the ride is `requested`, and only inside `GET /rides/{id}` (the ride poll). There is no separate timer.
+2. `sent_ids` and `viewing_ids` are the **intersection** with the fine-path ids in that viewer's own nearby response at the same instant (same `publicId` and epoch). Every other recipient appears only in the counts.
+3. **Women-mode rides (`female_driver_only = true`): no ids, and `sent`/`viewing` counts are null as well**, so the app shows "Sending to drivers nearby…". This also amends BE-116 (b). After `allow_any_driver`, or after a requeue (T-546), reach counts and ids only come from offers made after the switch. Offers made before the switch never surface.
+4. No `declined` ids ever, and no `declined` count to the passenger.
+5. `POST /rides/{id}/offer-viewed` is `role:driver`.
+   - It is accepted only when this driver was served the ride (a `ride_offers` row exists) and the ride is still `requested`. Otherwise it returns 404, so it is no ride-id oracle.
+   - It is idempotent (the first view wins) and throttled at 30/min.
+6. `ride_offers` (ride, driver, served_at, viewed_at, declined_at) is pruned after 30 days (SEC-24/25).
+
+### SEC-33 · high · abuse: driver auto-accept (BE-116 c)
+**Ruling: CONDITIONS (BE-120, must ship in the same release as BE-116 c).**
+
+**Risks**
+- **Targeted assignment, passenger side.** A stalker reads the map, books near a chosen driver, and gets a deterministic match. Acceptance reveals the driver's name, photo and exact live position (`canSeeDriverDetails`). Cancelling and re-booking repeats it. Auto-accept removes the per-ride consent that blocks this today.
+- **Targeted assignment, driver side.** A driver parks near a target's home with a wide radius and a low minimum fare, and gets that person's pickup.
+- **Women-mode bypass.** Auto-assignment skips the feed filter or races the fallback timer.
+- **Gaming.** GPS spoofing to be "nearest", or accepting everything and cancelling the bad ones.
+- **Ghost accepts.** An inattentive driver with the phone in a pocket is auto-assigned.
+
+**Conditions**
+1. **One assignment code path.** Auto-assignment goes through the same function as manual accept (`acceptRideAsDriver`): a transaction, a conditional update on `status = requested AND driver_id IS NULL`, a driver row lock, one active ride, and `DriverAvailability` = available. It re-checks every feed rule at assignment time:
+   - the tier is in `AcTier::servableTypes` (recomputed);
+   - the driver has not declined this ride (`ride_driver_declines`);
+   - the ride is not the driver's own booking;
+   - for `female_driver_only` rides, `WomenMode::driverEligible`;
+   - the driver is not matched to anyone but a female driver before the passenger chooses `allow_any_driver`.
+2. **Freshness and plausibility.** The latest ping is ≤ **30 s** old (foreground only, B-08), and the true pickup distance is ≤ `max_pickup_km`.
+   - A ping with the mock-location flag (Android `mocked`, iOS `isSimulatedBySoftware`, sent by the app) makes the driver ineligible for auto-assignment for the session.
+   - A jump > 50 m/s between pings makes them ineligible for 30 min and flags them to BE-92.
+3. **Bounds.** `max_pickup_km` is 0.5–3.0 km (default 2). `min_fare` is checked against the server's `total_fare`, including stops and the passenger's offer within the band, at assignment. `tiers` ⊆ eligible tiers. Settings go through `validated()` only, and `PUT` is throttled at 10/min. The driver's settings are never exposed to passengers.
+4. **Eligibility** to enable, re-checked at each assignment:
+   - the driver is active and approved, with an approved vehicle;
+   - ≥ **5** completed rides;
+   - cancel strikes in 7 days below the admin threshold (default 3);
+   - no open safety incident against the driver.
+5. **Window.** Auto-assign only after the ride has been offered for **W s** (admin-tunable 10–60, default 15) so manual drivers can accept. Among auto-accept drivers, pick **at random among those whose pickup distance is ≤ best + 0.5 km**, not strictly the nearest.
+6. **Pair and fishing limits.**
+   - The same passenger–driver pair is auto-matched at most once per 24 h; after that, manual only.
+   - A pair is never auto-matched if there is any safety incident or report between them.
+   - A passenger who cancels ≥ 2 auto-assigned rides within 1 h is not auto-assigned for 24 h.
+7. **Women drivers.** Drivers for whom `WomenMode::driverEligible` holds get a "women passengers only" auto-accept filter, **on by default**, enforced by the server.
+8. **Parcels excluded** from auto-accept in v1, because the driver must see the parcel declaration (BE-88).
+9. **Auto-off.** 2 cancels of auto-accepted rides by the driver within 24 h turn auto-accept off on the server, with a `message`. An admin can disable it per driver. Every auto-assignment is recorded (ride, driver, settings snapshot) for disputes. The takeover shows the drop-off area, and the strike rule stays.
