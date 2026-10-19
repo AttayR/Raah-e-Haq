@@ -156,6 +156,41 @@ describe('useNativeLocation pre-prompt (UI-R8)', () => {
     expect(result.current.currentLocation).toEqual({ latitude: 31.52, longitude: 74.35 });
   });
 
+  it('T-580: "Don\'t Allow" on the OS prompt keeps the denied state, now for Settings', async () => {
+    const { result } = renderHook(() => useNativeLocation());
+    await settle();
+    act(() => permissionPrimer.answer('later'));
+    await settle();
+    expect(result.current.permissionStatus.canAskAgain).toBe(true);
+
+    // The OS prompt is refused; the lookup ends with a timeout rather than PERMISSION_DENIED.
+    native.RHPermissions = { locationStatus: jest.fn(() => Promise.resolve('denied')) };
+    answerWith((_ok, fail) => fail?.(failure(3)));
+    await act(async () => {
+      await result.current.requestLocationPermission();
+    });
+    expect(result.current.currentLocation).toBeNull();
+    expect(result.current.error).toBe('denied');
+    expect(result.current.permissionStatus.canAskAgain).toBe(false);
+  });
+
+  // RHPermissions reports 'granted' for any "while using"/"always" authorization; any value that
+  // is not denied/restricted must leave a timeout as a retryable "unavailable".
+  it.each(['granted', 'authorizedWhenInUse'])('T-580: a timeout with access %s stays "unavailable", not "denied"', async (status) => {
+    const { result } = renderHook(() => useNativeLocation());
+    await settle();
+    act(() => permissionPrimer.answer('later'));
+    await settle();
+
+    native.RHPermissions = { locationStatus: jest.fn(() => Promise.resolve(status)) };
+    answerWith((_ok, fail) => fail?.(failure(3)));
+    await act(async () => {
+      await result.current.requestLocationPermission();
+    });
+    expect(result.current.error).toBe('unavailable');
+    expect(result.current.permissionStatus.canAskAgain).toBe(true);
+  });
+
   it('"Continue" goes on to the lookup (which shows the OS prompt)', async () => {
     answerWith((ok) => ok(position(31.5, 74.3)));
     const { result } = renderHook(() => useNativeLocation());

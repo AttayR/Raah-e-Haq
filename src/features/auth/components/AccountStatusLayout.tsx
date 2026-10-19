@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Banner, Button, Header, Screen } from '../../../components/ui';
@@ -48,6 +48,18 @@ export function AccountStatusLayout({
   const [supportOpen, setSupportOpen] = useState(initialSupportOpen);
   const openSupport = useCallback(() => setSupportOpen(true), []);
   const closeSupport = useCallback(() => setSupportOpen(false), []);
+  // T-580: the pull spinner only for a pull. A "Check status" tap showed it too, which pushed the
+  // hero down ~20 pt while checking; the button shows its own spinner.
+  const [pulled, setPulled] = useState(false);
+  // Ends with the check, and at once when a pull did not start one (one already ran, or checking
+  // is not offered), so a later button check never inherits the pull.
+  useEffect(() => {
+    if (pulled && !checking) setPulled(false);
+  }, [checking, pulled]);
+  const onPullToRefresh = useCallback(() => {
+    setPulled(true);
+    onCheckStatus();
+  }, [onCheckStatus]);
 
   return (
     <Screen edges={['top', 'bottom']} testID="account-status">
@@ -66,8 +78,8 @@ export function AccountStatusLayout({
         refreshControl={
           view.canCheckStatus ? (
             <RefreshControl
-              refreshing={checking}
-              onRefresh={onCheckStatus}
+              refreshing={pulled && checking}
+              onRefresh={onPullToRefresh}
               tintColor={theme.colors.primary}
               colors={[theme.colors.primary]}
             />

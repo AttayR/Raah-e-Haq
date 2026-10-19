@@ -37,8 +37,10 @@ describe('resolveAccountStatusVariant', () => {
 });
 
 describe('accountStatusView', () => {
-  it('shows the rejection reason for rejected (and suspended) only', () => {
+  it('shows the rejection reason for rejected only', () => {
     expect(accountStatusView(u('rejected', 'driver', ' Blurry licence '), false).reason).toBe('Blurry licence');
+    // T-580 (QA bug 2): suspended after rejected kept showing the old rejection reason.
+    expect(accountStatusView(u('suspended', 'driver', 'Blurry licence'), false).reason).toBeNull();
     expect(accountStatusView(u('pending', 'driver', 'old reason'), false).reason).toBeNull();
     expect(accountStatusView(u('rejected', 'driver', null), false).reason).toBeNull();
   });

@@ -55,7 +55,8 @@ export function accountStatusView(
     variant,
     // An active admin has nothing to wait for; an account without a role may be fixed.
     canCheckStatus: variant === 'unsupportedRole' ? user.role !== 'admin' : copy.canCheckStatus,
-    reason: variant === 'rejected' || variant === 'suspended' ? reason : null,
+    // T-580: the reason belongs to the rejected status only (BE-32), never to a later suspension.
+    reason: variant === 'rejected' ? reason : null,
     showDocuments: variant === 'pendingDriver',
   };
 }

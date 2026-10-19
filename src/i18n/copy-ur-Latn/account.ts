@@ -178,7 +178,7 @@ export function registerAccountCopy(): void {
     rideCode: 'Ride ID',
     date: 'Tareekh',
     timeline: 'Timeline',
-    cancellation: 'Cancellation',
+    cancellation: 'Cancel ki tafseel',
     cancellationNote: 'Note',
     noChargeCancelled: 'Cancel rides ka koi charge nahi.',
     emptyAction: 'Ride book karein',

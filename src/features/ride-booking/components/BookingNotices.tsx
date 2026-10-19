@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
+import { Banner } from '../../../components/ui/Banner';
 import { Button } from '../../../components/ui/Button';
 import { Icon } from '../../../components/ui/Icon';
 import { IconButton } from '../../../components/ui/IconButton';
@@ -39,6 +40,21 @@ const waitCopy = (reason: LocationErrorKind | null | undefined): { title: string
 };
 
 /**
+ * T-580: on the booking sheet while location is refused or off. The pickup field above stays
+ * usable; the action asks the OS again when it still can, else opens Settings.
+ */
+export const LocationOffBanner: React.FC<{ onTurnOn: () => void }> = ({ onTurnOn }) => (
+  <Banner
+    tone="warning"
+    icon="locationOff"
+    title={BOOKING_COPY.locationOffTitle}
+    text={BOOKING_COPY.locationOffManualBody}
+    action={{ label: BOOKING_COPY.locationTurnOn, onPress: onTurnOn, testID: 'booking-location-turn-on' }}
+    testID="booking-location-off"
+  />
+);
+
+/**
  * Full-screen state while the booking map waits for (or is refused) the device location.
  * T-315: the reason comes from useNativeLocation and is shown here instead of an alert;
  * access that was refused or switched off offers the Settings page.
@@ -53,13 +69,20 @@ export const LocationWaitState: React.FC<{
    * passenger Home.
    */
   canAskAgain?: boolean;
-}> = ({ onRetry, reason, onOpenSettings, canAskAgain = false }) => {
+  /** T-580: the way out while waiting (booking is a pushed screen). */
+  onBack?: () => void;
+}> = ({ onRetry, reason, onOpenSettings, canAskAgain = false, onBack }) => {
   const { theme } = useAppTheme();
   const { title, body } = waitCopy(reason);
   const needsSettings = reason === 'disabled' || (reason === 'denied' && !canAskAgain);
   const settingsAction = needsSettings ? onOpenSettings : undefined;
   return (
     <Screen edges={['top', 'bottom']} contentStyle={styles.wait} testID="location-wait">
+      {onBack ? (
+        <View style={styles.back}>
+          <IconButton icon="back" accessibilityLabel={BOOKING_COPY.backA11y} onPress={onBack} testID="location-wait-back" />
+        </View>
+      ) : null}
       <View style={[styles.iconCircle, { backgroundColor: theme.colors.primarySoft }]}>
         <Icon name="locationOff" size={48} color="primaryText" />
       </View>
@@ -100,6 +123,7 @@ const styles = StyleSheet.create({
   banner: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingStart: space[3], gap: space[2] },
   bannerText: { flex: 1, paddingVertical: space[3] },
   wait: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] },
+  back: { position: 'absolute', top: space[2], start: space[4] },
   iconCircle: { width: 96, height: 96, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   mapPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

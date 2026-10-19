@@ -198,6 +198,18 @@ describe('403 ACCOUNT_* refusals (BE-25/BE-32)', () => {
       .toMatchObject({ id: 1, role: 'driver', status: 'rejected', rejection_reason: 'Blurry' });
     expect(withRefusedStatus(user, { status: 500 })).toBeNull();
   });
+
+  it('T-580: a refusal other than rejected clears a rejection_reason held from before', () => {
+    const user = normalizeUser({ id: 1, status: 'active', role: 'driver' });
+    if (!user) throw new Error('fixture');
+    const rejected = withRefusedStatus(user, { status: 403, code: 'ACCOUNT_REJECTED', account: { status: 'rejected', rejectionReason: 'Blurry' } });
+    if (!rejected) throw new Error('fixture');
+    const suspended = withRefusedStatus(rejected, { status: 403, code: 'ACCOUNT_SUSPENDED', account: { status: 'suspended' } });
+    expect(suspended).toMatchObject({ status: 'suspended', rejection_reason: null });
+    // Rejected again without a reason in the body keeps the one held.
+    expect(withRefusedStatus(rejected, { status: 403, code: 'ACCOUNT_REJECTED', account: { status: 'rejected' } }))
+      .toMatchObject({ status: 'rejected', rejection_reason: 'Blurry' });
+  });
 });
 
 describe('mergeServerUser (T-111, BE-35/BE-38 phone verify)', () => {

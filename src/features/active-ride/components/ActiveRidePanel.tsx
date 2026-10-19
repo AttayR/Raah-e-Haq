@@ -68,6 +68,13 @@ const CANCELLED_BY_TEXT = perLocale(() => ({
   system: ACTIVE_RIDE_COPY.cancelledBySystem,
 } as const));
 
+/** T-580: a cancelled parcel says "delivery", whoever cancelled it. */
+const PARCEL_CANCELLED_BY_TEXT = perLocale(() => ({
+  passenger: t('parcel.senderCancelledByYou'),
+  driver: t('parcel.senderCancelledByRider'),
+  system: t('parcel.senderCancelledBySystem'),
+} as const));
+
 const toNumberOrNull = (value: unknown): number | null => {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
@@ -94,8 +101,8 @@ const subtitleOf = (state: PassengerRideStageState, ride: RideResource | null, p
       const by = cancelledByOf(ride);
       const outcome = parcel?.refusalReason
         ? t('parcel.senderRefused')
-        : by === 'driver' && isParcelRide(ride)
-          ? t('parcel.senderCancelledByRider')
+        : isParcelRide(ride)
+          ? PARCEL_CANCELLED_BY_TEXT()[by]
           : CANCELLED_BY_TEXT()[by];
       // BE-85: a late-cancel or no-show fee the passenger was charged is said with the outcome.
       const fee = cancellationFeeText(toNumberOrNull(ride.cancellation_fee), ride.cancellation_charge_reason ?? null);
@@ -174,7 +181,7 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
       icon: 'chat',
       label: CHAT_COPY.message,
       accessibilityLabel: CHAT_COPY.messageA11y(driver.name ?? ACTIVE_RIDE_COPY.driverFallbackName),
-      onPress: () => openRideChat(navigation, ride.id),
+      onPress: () => openRideChat(navigation, ride.id, driver.name),
       testID: 'ride-chat-button',
     });
   }

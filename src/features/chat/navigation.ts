@@ -6,7 +6,11 @@
  */
 export const RIDE_CHAT_ROUTE = 'RideChat' as const;
 
-export type RideChatParams = { rideId: number };
+export type RideChatParams = {
+  rideId: number;
+  /** T-580: the other person's first name when the opener knows it (composer placeholder while loading). */
+  name?: string;
+};
 
 /** Anything that can navigate to `RideChat`: a screen's `navigation` inside a role stack. */
 export interface RideChatNavigator {
@@ -19,6 +23,7 @@ export interface RideChatNavigator {
  */
 export const rideChatScreenId = ({ params }: { params: RideChatParams }): string => String(params.rideId);
 
-export const openRideChat =(navigation: RideChatNavigator, rideId: number): void => {
-  navigation.navigate(RIDE_CHAT_ROUTE, { rideId });
+export const openRideChat = (navigation: RideChatNavigator, rideId: number, name?: string | null): void => {
+  const firstName = name?.trim();
+  navigation.navigate(RIDE_CHAT_ROUTE, firstName ? { rideId, name: firstName } : { rideId });
 };

@@ -146,7 +146,13 @@ const ChatThreadScreen: React.FC = () => {
           <>
             <ChatThreadSkeleton />
             {/* The composer is already in place while loading, so nothing jumps when it opens. */}
-            <ChatComposer onSend={() => false} bottomInset={insets.bottom} disabled />
+            <ChatComposer
+              onSend={() => false}
+              bottomInset={insets.bottom}
+              disabled
+              // T-580: the name the opener passed, so the placeholder does not change on load.
+              placeholder={route.params.name ? CHAT_COPY.composerPlaceholderTo(route.params.name) : undefined}
+            />
           </>
         ) : (
           <ChatThreadUnavailable status={state.status} errorMessage={state.errorMessage} onRetry={reload} onBack={goBack} />

@@ -111,7 +111,30 @@ type BodyProps = {
    * replaced by the "Location needed to go online" card.
    */
   locationBlocked?: { onOpenSettings: () => void; onRetry: () => void } | null;
+  /** T-580: the "Location needed" card's height, so the screen can raise the peek to show all of it. */
+  onLocationCardLayout?: (height: number) => void;
 };
+
+/** §8.3: the 56pt online action the peek is sized for. */
+export const DRIVE_ACTION_HEIGHT = 56;
+
+/** Whether the "Location needed" card replaces the online control (UI-R8). */
+export const showsLocationCard = (blocked: boolean, hasRide: boolean, status: DriveStatus): boolean =>
+  blocked && !hasRide && status === 'offline';
+
+/**
+ * T-580 (QA bug 1): the Drive sheet's snap points. While the "Location needed" card replaces the
+ * 56pt action, the peek grows by the card's extra height so its title, Open Settings and Try
+ * again are all visible without dragging; the second snap is `full` (always above that peek, also
+ * on short phones where `half` could be lower). Otherwise the §8.3 peek 137 → half.
+ */
+export const driveSheetSnaps = (
+  basePeek: number,
+  locationCardHeight: number | null,
+): { peekHeight: number; snapPoints: readonly ('peek' | 'half' | 'full')[] } =>
+  locationCardHeight !== null && locationCardHeight > 0
+    ? { peekHeight: basePeek - DRIVE_ACTION_HEIGHT + locationCardHeight, snapPoints: ['peek', 'full'] }
+    : { peekHeight: basePeek, snapPoints: ['peek', 'half'] };
 
 /**
  * Drive sheet body (§8.3): the 56pt Go online (primary) / Go offline (outline) action (or
@@ -135,12 +158,15 @@ export function DriveSheetBody({
   onSeeAllRides,
   onOpenRide,
   locationBlocked,
+  onLocationCardLayout,
 }: BodyProps) {
   const online = status === 'online';
   return (
     <View style={styles.body}>
-      {locationBlocked && !hasRide && status === 'offline' ? (
-        <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
+      {locationBlocked && showsLocationCard(true, hasRide, status) ? (
+        <View onLayout={e => onLocationCardLayout?.(e.nativeEvent.layout.height)} testID="drive-location-card-wrap">
+          <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
+        </View>
       ) : hasRide ? (
         <Button
           label={t('drive.resumeRide')}

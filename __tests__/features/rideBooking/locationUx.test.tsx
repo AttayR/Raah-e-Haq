@@ -7,8 +7,8 @@
 import React from 'react';
 import { fireEvent, render, renderHook, act } from '@testing-library/react-native';
 import type { LatLng } from 'react-native-maps';
-import { bookingInitialRegion, showLocationWait } from '../../../src/features/ride-booking/locationGate';
-import { LocationWaitState } from '../../../src/features/ride-booking/components/BookingNotices';
+import { bookingInitialRegion, locationRefused, showLocationWait } from '../../../src/features/ride-booking/locationGate';
+import { LocationOffBanner, LocationWaitState } from '../../../src/features/ride-booking/components/BookingNotices';
 import { HomeHeader } from '../../../src/features/passenger-home/components/HomeHeader';
 import {
   BOOKING_REGION_DELTA,
@@ -28,6 +28,33 @@ describe('showLocationWait (b)', () => {
 
   it('never covers a ride (the completed summary is shown even without a position)', () => {
     expect(showLocationWait({ hasLocation: false, locationLoading: false, rideShown: true })).toBe(false);
+  });
+});
+
+describe('booking with location refused (T-580)', () => {
+  it('denied or switched off keeps the map (no full-screen dead end); a plain wait still shows', () => {
+    expect(locationRefused('denied')).toBe(true);
+    expect(locationRefused('disabled')).toBe(true);
+    expect(locationRefused('unavailable')).toBe(false);
+    expect(locationRefused(null)).toBe(false);
+    expect(showLocationWait({ hasLocation: false, locationLoading: false, rideShown: false, refused: true })).toBe(false);
+    expect(showLocationWait({ hasLocation: false, locationLoading: false, rideShown: false, refused: false })).toBe(true);
+  });
+
+  it('the sheet Banner says to search the pickup and its action turns location on', () => {
+    const onTurnOn = jest.fn();
+    const { getByText, getByTestId } = render(<LocationOffBanner onTurnOn={onTurnOn} />);
+    getByText('Location is off');
+    getByText(/Search for your pickup below/);
+    fireEvent.press(getByTestId('booking-location-turn-on'));
+    expect(onTurnOn).toHaveBeenCalled();
+  });
+
+  it('the remaining full-screen wait has a back button', () => {
+    const onBack = jest.fn();
+    const { getByTestId } = render(<LocationWaitState onRetry={jest.fn()} onBack={onBack} />);
+    fireEvent.press(getByTestId('location-wait-back'));
+    expect(onBack).toHaveBeenCalled();
   });
 });
 

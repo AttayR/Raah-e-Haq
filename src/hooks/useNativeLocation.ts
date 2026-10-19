@@ -4,7 +4,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { isAndroidEmulator, getDefaultLocation } from '../utils/locationUtils';
 import { logger } from '../core/logging/logger';
 import { primeBeforeOsPrompt } from '../features/permissions/primer';
-import { locationOsUndetermined } from '../features/permissions/locationStatus';
+import { locationOsDenied, locationOsUndetermined } from '../features/permissions/locationStatus';
 
 export interface Coordinates {
   latitude: number;
@@ -255,6 +255,13 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
       const location = await getCurrentLocation();
       if (location && mounted.current) {
         setPermissionStatus({ isGranted: true, canAskAgain: false, isLocationEnabled: true });
+      }
+      // T-580 (QA bug 4): after "Don't Allow" the OS will not ask again. Record that, so the
+      // screen keeps its "Turn on location" state, now opening Settings (whatever error code the
+      // lookup ended with).
+      if (!location && (await locationOsDenied()) && mounted.current) {
+        setPermissionStatus({ isGranted: false, canAskAgain: false, isLocationEnabled: false });
+        setError('denied');
       }
       return location !== null;
     } catch (requestError) {

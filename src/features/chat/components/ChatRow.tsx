@@ -30,7 +30,8 @@ export const chatPreviewOf = (chat: ChatSummary): string => {
 
 type Props = {
   chat: ChatSummary;
-  onPress: (rideId: number) => void;
+  /** T-580: with the other person's first name, when known. */
+  onPress: (rideId: number, name?: string) => void;
   position?: ChatRowPosition;
 };
 
@@ -59,7 +60,7 @@ function ChatRowBase({ chat, onPress, position = 'only' }: Props) {
 
   return (
     <Pressable
-      onPress={() => onPress(chat.rideId)}
+      onPress={() => onPress(chat.rideId, chat.otherParty?.firstName ?? undefined)}
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={`chat-row-${chat.rideId}`}

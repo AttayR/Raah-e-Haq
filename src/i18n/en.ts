@@ -1300,6 +1300,9 @@ export const en = {
     summaryReturned: 'Parcel returned',
     cancelKeep: 'Keep delivery',
     senderCancelledByRider: 'Your rider cancelled this delivery.',
+    // T-580: the live panel right after a delivery is cancelled.
+    senderCancelledByYou: 'You cancelled this delivery.',
+    senderCancelledBySystem: 'This delivery was cancelled.',
     senderCompleted: 'Thanks for sending with Raah-e-Haq.',
     yourRider: 'Your rider',
     yourSender: 'Your sender',

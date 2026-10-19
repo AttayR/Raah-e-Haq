@@ -7,13 +7,19 @@ import React from 'react';
 import { NativeModules } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { DriveSheetBody, type DriveStatus } from '../../../src/components/driver/drive/DriveSheet';
+import { DriveSheetBody, driveSheetSnaps, type DriveStatus } from '../../../src/components/driver/drive/DriveSheet';
+import { DRIVE_PEEK_HEIGHT } from '../../../src/screens/Driver/DriverDriveScreen';
 import type { DriverTodayStatsValues } from '../../../src/components/driver/home/DriverTodayStats';
 import { locationOsDenied, locationOsUndetermined } from '../../../src/features/permissions/locationStatus';
 
 const today: DriverTodayStatsValues = { earnings: null, trips: null, rating: null };
 
-const renderBody = async (status: DriveStatus, blocked: { onOpenSettings: () => void; onRetry: () => void } | null, hasRide = false) => {
+const renderBody = async (
+  status: DriveStatus,
+  blocked: { onOpenSettings: () => void; onRetry: () => void } | null,
+  hasRide = false,
+  onLocationCardLayout?: (height: number) => void,
+) => {
   render(
     <ThemeProvider>
       <DriveSheetBody
@@ -29,6 +35,7 @@ const renderBody = async (status: DriveStatus, blocked: { onOpenSettings: () => 
         isApproved
         vehicleType="car"
         locationBlocked={blocked}
+        onLocationCardLayout={onLocationCardLayout}
       />
     </ThemeProvider>,
   );
@@ -53,6 +60,24 @@ describe('Drive sheet location denied (UI-R8)', () => {
     screen.unmount();
     await renderBody('offline', null);
     expect(screen.getByTestId('drive-online-toggle')).toBeTruthy();
+  });
+});
+
+describe('Drive sheet height with the location card (T-580)', () => {
+  it('reports the card height, so the screen can size the peek to it', async () => {
+    const onLayout = jest.fn();
+    await renderBody('offline', { onOpenSettings: jest.fn(), onRetry: jest.fn() }, false, onLayout);
+    fireEvent(screen.getByTestId('drive-location-card-wrap'), 'layout', { nativeEvent: { layout: { height: 312 } } });
+    expect(onLayout).toHaveBeenCalledWith(312);
+  });
+
+  it('the peek grows by the card over the 56pt action (Open Settings + Try again visible), with full above it', () => {
+    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 312)).toEqual({ peekHeight: DRIVE_PEEK_HEIGHT - 56 + 312, snapPoints: ['peek', 'full'] });
+  });
+
+  it('without the card (or before it is measured): the normal 137 → half', () => {
+    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, null)).toEqual({ peekHeight: 137, snapPoints: ['peek', 'half'] });
+    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 0)).toEqual({ peekHeight: 137, snapPoints: ['peek', 'half'] });
   });
 });
 

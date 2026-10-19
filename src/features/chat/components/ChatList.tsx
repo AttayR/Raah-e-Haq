@@ -62,7 +62,7 @@ export function ChatList({ visible, role = 'passenger' }: ChatListProps) {
   // Rows only once loaded: a failed first load keeps no stale list.
   const sections = useMemo(() => (status === 'ready' ? chatSections(chats) : []), [status, chats]);
 
-  const onOpen = useCallback((rideId: number) => openRideChat(navigation, rideId), [navigation]);
+  const onOpen = useCallback((rideId: number, name?: string) => openRideChat(navigation, rideId, name), [navigation]);
 
   const renderItem = useCallback(
     ({ item, index, section }: { item: ChatSummary; index: number; section: ChatSection }) => (

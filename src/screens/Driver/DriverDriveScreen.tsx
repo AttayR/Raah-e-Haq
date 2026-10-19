@@ -9,7 +9,13 @@ import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
 import MapErrorBoundary from '../../components/MapErrorBoundary';
 import { AppText, BottomSheet, MapControls, RideMarker, Screen, VehicleMarker } from '../../components/ui';
 import { confirm } from '../../core/dialog';
-import { DriveSheetBody, DriveStatusHeader, type DriveStatus } from '../../components/driver/drive/DriveSheet';
+import {
+  DriveSheetBody,
+  DriveStatusHeader,
+  driveSheetSnaps,
+  showsLocationCard,
+  type DriveStatus,
+} from '../../components/driver/drive/DriveSheet';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { RootState } from '../../store';
@@ -153,6 +159,14 @@ export default function DriverDriveScreen() {
   }, [toggle]);
 
   const status: DriveStatus = isChecking ? 'checking' : isOnRide ? 'onRide' : isOnline ? 'online' : 'offline';
+  // T-580: while the "Location needed" card shows, the peek rises to fit it; back to 137 after.
+  const hasRide = isRestorableDriverRide(currentRide);
+  const [locationCardHeight, setLocationCardHeight] = useState(0);
+  const cardShown = showsLocationCard(locationBlocked !== null, hasRide, status);
+  const sheetSnaps = useMemo(
+    () => driveSheetSnaps(DRIVE_PEEK_HEIGHT, cardShown ? locationCardHeight : null),
+    [cardShown, locationCardHeight],
+  );
   const pickup = currentRide ? toCoordinate(currentRide.pickup_latitude, currentRide.pickup_longitude) : null;
   const dropoff = currentRide ? toCoordinate(currentRide.dropoff_latitude, currentRide.dropoff_longitude) : null;
 
@@ -214,9 +228,9 @@ export default function DriverDriveScreen() {
 
       {requestShown ? null : (
         <BottomSheet
-          peekHeight={DRIVE_PEEK_HEIGHT}
+          peekHeight={sheetSnaps.peekHeight}
           active={isFocused}
-          snapPoints={['peek', 'half']}
+          snapPoints={sheetSnaps.snapPoints}
           animatedHeight={sheetAnimatedHeight}
           onSnapChange={(_, height) => setSheetHeight(height)}
           header={<DriveStatusHeader status={status} />}
@@ -228,7 +242,7 @@ export default function DriverDriveScreen() {
             busy={isBusy}
             disabled={disabled}
             onToggle={onToggle}
-            hasRide={isRestorableDriverRide(currentRide)}
+            hasRide={hasRide}
             onResume={() => navigation.navigate('DriverRide')}
             todayEarnings={
               driverStats ? formatMoney(driverStats.earningsToday, { currency: driverStats.currency }) : null
@@ -241,6 +255,7 @@ export default function DriverDriveScreen() {
             onSeeAllRides={() => navigation.navigate('RideHistory')}
             onOpenRide={(id) => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: Number(id) })}
             locationBlocked={locationBlocked}
+            onLocationCardLayout={setLocationCardHeight}
           />
         </BottomSheet>
       )}

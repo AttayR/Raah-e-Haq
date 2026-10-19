@@ -272,7 +272,8 @@ export function refusedAccountStatus(error: RefusalLike | null | undefined): Acc
 
 /**
  * `user` with the status of a 403 ACCOUNT_* refusal merged in, or null when `error` is not
- * such a refusal. `rejection_reason` is taken when the body has it; it is a sensitive field
+ * such a refusal. `rejection_reason` is taken when the body has it (rejected only; any other
+ * refused status clears it); it is a sensitive field
  * (core/auth/storedUser), so it lives in Redux memory only and is never cached.
  */
 export function withRefusedStatus(user: User, error: RefusalLike | null | undefined): User | null {
@@ -281,6 +282,12 @@ export function withRefusedStatus(user: User, error: RefusalLike | null | undefi
     return null;
   }
   const merged: User = { ...user, status };
+  // T-580: a reason belongs to the rejected status only (BE-32). A suspension after a rejection
+  // must not keep showing the old rejection reason.
+  if (status !== 'rejected') {
+    if (merged.rejection_reason != null) merged.rejection_reason = null;
+    return merged;
+  }
   const reason = error?.account?.rejectionReason;
   if (reason !== undefined) {
     merged.rejection_reason = reason;

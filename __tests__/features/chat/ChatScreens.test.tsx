@@ -26,10 +26,11 @@ import { message, mine, theirs, threadPage } from '../../../test-utils/chatFixtu
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
+let mockRouteParams: { rideId: number; name?: string } = { rideId: 7 };
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, canGoBack: () => true }),
-  useRoute: () => ({ key: 'RideChat-1', name: 'RideChat', params: { rideId: 7 } }),
+  useRoute: () => ({ key: 'RideChat-1', name: 'RideChat', params: mockRouteParams }),
   useIsFocused: () => true,
 }));
 
@@ -268,6 +269,17 @@ describe('ChatThreadScreen (UI-R14 content)', () => {
     expect(screen.getByTestId('chat-thread-loading')).toBeTruthy();
   });
 
+  it('T-580: while loading, the composer already says "Message Bilal" when the opener passed the name', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockReturnValue(new Promise(() => undefined));
+    mockRouteParams = { rideId: 7, name: 'Bilal' };
+    try {
+      await renderWithStore(<ChatThreadScreen />);
+      expect(screen.getByTestId('chat-input').props.placeholder).toBe('Message Bilal');
+    } finally {
+      mockRouteParams = { rideId: 7 };
+    }
+  });
+
   it('an open, empty thread says who can read it, offers quick replies, and a reply sends at once', async () => {
     jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage());
     const send = jest.spyOn(chatApi, 'sendMessage').mockImplementation(async (_ride, body, clientId) => mine(11, clientId, body));
@@ -383,7 +395,8 @@ describe('ChatList (Inbox › Messages)', () => {
     expect(screen.getByTestId('chat-row-7').props.accessibilityLabel).toContain('2 unread');
 
     fireEvent.press(screen.getByTestId('chat-row-7'));
-    expect(mockNavigate).toHaveBeenCalledWith('RideChat', { rideId: 7 });
+    // T-580: the first name goes along, for the composer placeholder while the thread loads.
+    expect(mockNavigate).toHaveBeenCalledWith('RideChat', { rideId: 7, name: 'Bilal' });
   });
 
   it('empty: names the other side per role', async () => {

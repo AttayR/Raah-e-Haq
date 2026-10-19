@@ -5,7 +5,6 @@ import type { SafeMapViewRef } from '../../components/SafeMapView';
 import { useNavigation, useFocusEffect, useIsFocused, useRoute, type RouteProp } from '@react-navigation/native';
 import MAPS_CONFIG from '../../config/mapsConfig';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useDirections } from '../../hooks/useDirections';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -39,8 +38,9 @@ import { BookingSheet } from '../../features/ride-booking/components/BookingShee
 import { MapTopControls, MAP_TOP_CONTROLS_HEIGHT } from '../../features/ride-booking/components/MapTopControls';
 import { BookingMap } from '../../features/ride-booking/components/BookingMap';
 import { BookingStageContent } from '../../features/ride-booking/components/BookingStageContent';
-import { BookingErrorBanner, LocationWaitState } from '../../features/ride-booking/components/BookingNotices';
-import { bookingInitialRegion, showLocationWait } from '../../features/ride-booking/locationGate';
+import { BookingErrorBanner, LocationOffBanner, LocationWaitState } from '../../features/ride-booking/components/BookingNotices';
+import { bookingInitialRegion } from '../../features/ride-booking/locationGate';
+import { useBookingLocationGate } from '../../features/ride-booking/useBookingLocationGate';
 import { bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
 import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
 import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
@@ -70,20 +70,13 @@ const PassengerMapScreen = () => {
   const { height: windowHeight } = useWindowDimensions();
 
   const isFocused = useIsFocused();
-  // T-315: no lookups (and so nothing to show) while another screen covers this one; a
-  // failure is rendered inline below, never as an alert.
-  const {
-    currentLocation,
-    isLoading: locationLoading,
-    error: locationError,
-    permissionStatus: locationPermission,
-    requestLocationPermission,
-    openSettings: openLocationSettings,
-  } = useNativeLocation({ active: isFocused });
-
   // The active ride lives in Redux (T-301): one copy for every screen, restored on launch.
   const dispatch = useDispatch<AppDispatch>();
   const currentRide = useSelector(selectActiveRide);
+  // T-315/T-580: no lookups while another screen covers this one; a failure is rendered inline
+  // (wait state, or the sheet Banner when access is refused), never as an alert.
+  const locationGate = useBookingLocationGate({ active: isFocused, rideShown: !!currentRide });
+  const { currentLocation, requestLocationPermission } = locationGate;
   // BE-37: a refused booking for an unverified phone opens the profile, where the number is
   // verified (T-504 builds that flow).
   const { requestRide: requestRideService, cancelRide: cancelRideService } = useActiveRideActions({
@@ -298,16 +291,8 @@ const PassengerMapScreen = () => {
     setStage('requesting');
   });
 
-  // T-315: a ride (its completed summary above all) always wins over the location wait.
-  if (showLocationWait({ hasLocation: !!currentLocation, locationLoading, rideShown })) {
-    return (
-      <LocationWaitState
-        reason={locationError}
-        onRetry={() => requestLocationPermission()}
-        onOpenSettings={openLocationSettings}
-        canAskAgain={locationPermission.canAskAgain}
-      />
-    );
+  if (locationGate.wait) {
+    return <LocationWaitState {...locationGate.wait} onBack={() => navigation.goBack()} />;
   }
 
   const compact = searchFocused;
@@ -364,6 +349,7 @@ const PassengerMapScreen = () => {
           footer={rideShown && isPassengerRideFinished(rideStage?.stage) ? <ActiveRideDoneButton onPress={finishRide} /> : null}
         >
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
+          {locationGate.refused && !rideShown && !compact && <LocationOffBanner onTurnOn={locationGate.askOrSettings} />}
           {shownStage !== 'requesting' && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
           {!rideShown && !compact && <StageChips stage={shownStage} />}
           {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}

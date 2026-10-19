@@ -83,7 +83,8 @@ export const BookingStageContent: React.FC<Props> = ({
             onChooseOnMap={chooseOnMap}
             onSelectPickup={(c, address) => flow.selectPickup(c, address, true)}
             onSelectDestination={(c, address) => flow.selectDestination(c, address, false)}
-            onUseCurrentLocation={flow.pickCurrentLocation}
+            // T-580: hidden without a position (refused, off or not found yet): no dead taps.
+            onUseCurrentLocation={currentLocation ? flow.pickCurrentLocation : undefined}
             onSwap={flow.swapPickupDrop}
             autoFocusDestination={flow.focusDestinationOnOpen}
           />

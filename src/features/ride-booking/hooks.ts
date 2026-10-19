@@ -15,6 +15,8 @@ import {
 } from './api';
 import type { FareNotice } from '../fare/types';
 import { BOOKING_COPY } from './copy';
+import { getLocale, type Locale } from '../../i18n';
+import { useLocale } from '../../i18n/languagePreference';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -33,11 +35,16 @@ const useRetryOnRecovery = (status: LoadStatus, retry: () => void) => {
 };
 
 const VEHICLE_TYPES_CACHE_KEY = 'public/vehicle-types';
+/**
+ * T-580 (QA bug 7): the server names the tiers in the request's language (Accept-Language), so
+ * the catalogue is cached per language: after a switch the other language's copy is never shown.
+ */
+const vehicleTypesKey = (locale: Locale = getLocale()): string => `${VEHICLE_TYPES_CACHE_KEY}:${locale}`;
 
 type VehicleTypesState = Loaded<VehicleType[]> & { notice: FareNotice | null };
 
 const cachedVehicleTypes = (): VehicleTypesState | null => {
-  const cached = readCache<VehicleCatalogue>(VEHICLE_TYPES_CACHE_KEY, CACHE_TTL.vehicleTypes);
+  const cached = readCache<VehicleCatalogue>(vehicleTypesKey(), CACHE_TTL.vehicleTypes);
   return cached ? { status: 'ready', data: cached.value.types, error: null, notice: cached.value.notice } : null;
 };
 
@@ -69,19 +76,29 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
   const quietFailedAt = useRef<number | null>(null);
   /** [T-565] Counts the quiet re-reads that loaded, so a failed retry can tell one landed meanwhile. */
   const quietLoads = useRef(0);
+  /** [T-580] The language the shown catalogue was read in. */
+  const locale = useLocale();
+  const shownLocale = useRef<Locale>(locale);
+  /** [T-580] Bumped when a first load / retry lands in a language switched away from meanwhile. */
+  const [staleLanguageLoads, setStaleLanguageLoads] = useState(0);
 
   useEffect(() => {
     // Shown from the cache on the first frame: no request until a retry.
     if (attempt === 0 && cachedOnMount) return undefined;
     const controller = new AbortController();
-    const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
+    const requestLocale = getLocale();
+    const key = vehicleTypesKey(requestLocale);
+    const since = cacheVersion(key);
     const quietLoadsAtStart = quietLoads.current;
     let current = true;
     loadInFlight.current = true;
     setState((s) => ({ ...s, status: 'loading', error: null }));
     fetchVehicleTypes(controller.signal)
       .then((catalogue) => {
-        writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
+        writeCache(key, catalogue, since);
+        shownLocale.current = requestLocale;
+        // Switched while it ran: one quiet read in the new language follows (below).
+        if (requestLocale !== getLocale()) setStaleLanguageLoads((n) => n + 1);
         quietFailedAt.current = null;
         setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
       })
@@ -104,19 +121,32 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
 
   useEffect(() => {
     if (!refreshWhen || loadInFlight.current || quietInFlight.current) return undefined;
+    // T-580: shown in another language (switched since): the current language's copy, read by
+    // another screen a moment ago, is taken as is; else one read in the new language.
+    const otherLanguage = shownLocale.current !== locale;
+    if (otherLanguage) {
+      const cached = cachedVehicleTypes();
+      if (cached) {
+        shownLocale.current = locale;
+        setState(cached);
+        return undefined;
+      }
+    }
+    const key = vehicleTypesKey(locale);
     // Read a moment ago (here, on Home or on the booking screen): nothing to ask.
-    const age = cacheAgeMs(VEHICLE_TYPES_CACHE_KEY);
-    if (age !== null && age < CACHE_TTL.vehicleTypesRecheck) return undefined;
+    const age = cacheAgeMs(key);
+    if (!otherLanguage && age !== null && age < CACHE_TTL.vehicleTypesRecheck) return undefined;
     // The last quiet read failed a moment ago: no new request on every focus.
     const failedAt = quietFailedAt.current;
     if (failedAt !== null && Date.now() - failedAt < CACHE_TTL.vehicleTypesRecheckBackoff) return undefined;
     const controller = new AbortController();
-    const since = cacheVersion(VEHICLE_TYPES_CACHE_KEY);
+    const since = cacheVersion(key);
     let current = true;
     quietInFlight.current = true;
     fetchVehicleTypes(controller.signal)
       .then((catalogue) => {
-        writeCache(VEHICLE_TYPES_CACHE_KEY, catalogue, since);
+        writeCache(key, catalogue, since);
+        shownLocale.current = locale;
         quietFailedAt.current = null;
         quietLoads.current += 1;
         setState({ status: 'ready', data: catalogue.types, error: null, notice: catalogue.notice });
@@ -132,7 +162,7 @@ export const useVehicleTypes = (options: { refreshWhen?: boolean } = {}) => {
       quietInFlight.current = false;
       controller.abort();
     };
-  }, [refreshWhen]);
+  }, [refreshWhen, locale, staleLanguageLoads]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   useRetryOnRecovery(state.status, retry);

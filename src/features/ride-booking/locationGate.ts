@@ -12,11 +12,21 @@ export const showLocationWait = ({
   hasLocation,
   locationLoading,
   rideShown,
+  refused = false,
 }: {
   hasLocation: boolean;
   locationLoading: boolean;
   rideShown: boolean;
-}): boolean => !rideShown && !hasLocation && !locationLoading;
+  /** T-580: access refused or switched off: the map stays (see `locationRefused`). */
+  refused?: boolean;
+}): boolean => !rideShown && !hasLocation && !locationLoading && !refused;
+
+/**
+ * T-580 (QA bug 3): location refused (`denied`) or switched off (`disabled`). Booking then keeps
+ * the map and its sheet, with a warning Banner and the pickup searched by hand (or chosen on the
+ * map), instead of a full-screen dead end.
+ */
+export const locationRefused = (error: string | null | undefined): boolean => error === 'denied' || error === 'disabled';
 
 type RidePickup = { pickup_latitude: unknown; pickup_longitude: unknown };
 

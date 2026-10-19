@@ -45,6 +45,9 @@ export const BOOKING_COPY = localizedCopy({
   locationUnavailableBody: 'Move to an open area or check your connection, then try again.',
   locationRetry: 'Try again',
   locationOpenSettings: 'Open settings',
+  // T-580: location refused on the booking map: the map stays, the pickup is searched by hand.
+  locationOffManualBody: 'Search for your pickup below or choose it on the map. Turn on location to start from where you are.',
+  locationTurnOn: 'Turn on',
   // T-523: the booking sheet's own labels, so they follow the language too.
   pickupPlaceholder: 'Pickup location',
   destinationPlaceholder: 'Where to?',

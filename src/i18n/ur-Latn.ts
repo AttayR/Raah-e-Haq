@@ -1029,6 +1029,8 @@ export const urLatn: TranslationTable = {
     summaryReturned: 'Parcel wapas ho gaya',
     cancelKeep: 'Delivery rakhein',
     senderCancelledByRider: 'Aap ke rider ne ye delivery cancel ki.',
+    senderCancelledByYou: 'Aap ne ye delivery cancel ki.',
+    senderCancelledBySystem: 'Ye delivery cancel ho gayi.',
     senderCompleted: 'Raah-e-Haq se parcel bhejne ka shukriya.',
     yourRider: 'Aap ka rider',
     yourSender: 'Bhejne wala',
