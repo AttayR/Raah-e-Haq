@@ -375,10 +375,6 @@ export function registerAccountCopy(): void {
     periodDay: 'Aaj',
     periodWeek: 'Is hafte',
     periodMonth: 'Is mahine',
-    trips: 'Safar',
-    fares: 'Wasool kiye fares',
-    commission: 'Platform ka hissa',
-    distance: 'Faasla',
     chartLabel: 'Rozana kamai',
     chartDay: (date: string, earnings: string, trips: number) =>
       `${date}: ${earnings} · ${trips} safar`,

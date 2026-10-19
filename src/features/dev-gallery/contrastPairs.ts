@@ -93,6 +93,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   bgUnder('vehicleAcBadge', 'vehicleAcGlyph', 'nonText'),
   fgOn('vehicleAcGlyph', 'vehicleAcBadge', 'nonText'),
   fgOn('vehicleHalo', 'surface', 'decorative'),
+  // UI-R17 Earnings hero (driver-earnings.md §1.1).
+  bgUnder('heroFill', 'heroText', 'text'),
+  fgOn('heroText', 'heroFill', 'text'),
+  fgOn('heroTextMuted', 'heroFill', 'text'),
+  fgOn('heroDivider', 'heroFill', 'decorative'),
 ];
 
 /** Minimum ratio for a kind, or null when the pair has no threshold. */

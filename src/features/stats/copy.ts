@@ -20,10 +20,6 @@ export const STATS_COPY = localizedCopy({
   periodDay: 'Today',
   periodWeek: 'This week',
   periodMonth: 'This month',
-  trips: 'Trips',
-  fares: 'Fares collected',
-  commission: 'Platform commission',
-  distance: 'Distance',
   chartLabel: 'Earnings per day',
   chartDay: (date: string, earnings: string, trips: number) =>
     `${date}: ${earnings} · ${trips} ${trips === 1 ? 'trip' : 'trips'}`,

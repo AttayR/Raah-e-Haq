@@ -135,6 +135,10 @@ Code only ever uses these names (`theme.colors.<token>`). Raw palette names are 
 | `stopPin` | `#4C556C` | `#B7BFD0` | intermediate stop marker (numbered circle) |
 | `driverMarker` | `#0F1422` | `#F2F4F9` | car icon body on the map |
 | `userLocation` | `#1D58C4` | `#7FA8F5` | blue dot + 20% halo |
+| `heroFill` **[UI-R17]** | `#011C72` | `#1C2850` | driver Earnings period hero fill (= `primary` light / `primarySoft` dark) |
+| `heroText` **[UI-R17]** | `#FFFFFF` | `#FFFFFF` | hero big number and values (14.89 / 14.30 on `heroFill`); white in dark too, the brightest thing on screen |
+| `heroTextMuted` **[UI-R17]** | `#C9D5F7` | `#9DB2F0` | hero labels, captions, icons (10.17 / 6.85 on `heroFill`) |
+| `heroDivider` **[UI-R17]** | `#1A3496` | `#3D5FD0` | hero rules (decorative, never the only separator of meaning) |
 | `statusBar` | `dark-content` | `light-content` | set by `Screen`, never per screen |
 
 ### 1.5 Contrast ratios (computed, WCAG 2.1)

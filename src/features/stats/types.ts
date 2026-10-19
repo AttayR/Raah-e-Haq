@@ -44,6 +44,16 @@ export interface EarningsTotals {
   earnings: number;
   distanceKm: number;
   durationMinutes: number;
+  /**
+   * BE-123 (not shipped yet): the period's commission rate in percent, the commission without
+   * booking fees and the booking fees. Null when the server does not send them: the hero then
+   * says "Commission" with no rate and one row from `commission`.
+   */
+  commissionRate: number | null;
+  commissionAmount: number | null;
+  bookingFees: number | null;
+  /** BE-124 (not shipped yet): minutes online in the period; null hides the "Online" stat. */
+  onlineMinutes: number | null;
 }
 
 export interface EarningsDay {

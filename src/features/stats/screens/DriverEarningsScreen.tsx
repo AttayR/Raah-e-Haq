@@ -28,8 +28,9 @@ import { STATS_COPY } from '../copy';
 import { earningsRideText } from '../format';
 import { useDriverEarnings } from '../hooks';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
-import type { EarningsPeriod, EarningsRide } from '../types';
+import type { DriverEarnings, EarningsPeriod, EarningsRide } from '../types';
 import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
+import { ADD_MONEY_ROUTE, topUpParamsFor } from '../../wallet/navigation';
 
 const PERIODS = perLocale(() => [
   { value: 'day', label: STATS_COPY.periodDay },
@@ -51,7 +52,13 @@ export default function DriverEarningsScreen() {
   const isFocused = useIsFocused();
   const [period, setPeriod] = useState<EarningsPeriod>('day');
   const earnings = useDriverEarnings(period, isFocused);
-  const { data, status, error, rides, refresh, reload } = earnings;
+  const { status, error, refresh, reload } = earnings;
+  // UI-R17 §1.1: switching period keeps the last hero, dimmed, until the new one lands.
+  const lastData = useRef<DriverEarnings | null>(null);
+  if (earnings.data) lastData.current = earnings.data;
+  const stale = !earnings.data && status === 'loading' && lastData.current !== null;
+  const data = earnings.data ?? (stale ? lastData.current : null);
+  const rides = earnings.data ? earnings.rides : data?.rides ?? [];
   const { scrollY, onScroll } = useHeaderScroll();
   // T-577: re-tapping the selected tab scrolls this list to the top.
   const listRef = useRef<FlatList<EarningsRide>>(null);
@@ -123,7 +130,12 @@ export default function DriverEarningsScreen() {
       <View style={styles.controls}>{periodControl}</View>
     </>
   );
-  const walletCard = <EarningsWalletCard visible={isFocused} onOpen={() => navigation.navigate('Wallet')} />;
+  const openWallet = useCallback(() => navigation.navigate('Wallet'), [navigation]);
+  const payOwed = useCallback(
+    (amountOwed: number) => navigation.navigate(ADD_MONEY_ROUTE, topUpParamsFor(amountOwed)),
+    [navigation],
+  );
+  const walletCard = <EarningsWalletCard visible={isFocused} onOpenWallet={openWallet} onPay={payOwed} />;
 
   if (!data) {
     return (
@@ -147,12 +159,18 @@ export default function DriverEarningsScreen() {
   const listHeader = (
     <View>
       <View style={styles.headerBlock}>
-        <EarningsHero earnings={data} />
-        {walletCard}
-        <EarningsLinksCard
-          onOpenStatements={() => navigation.navigate(DRIVER_STATEMENTS_ROUTE)}
-          onOpenStrikes={() => navigation.navigate(DRIVER_STRIKES_ROUTE)}
-        />
+        {/* UI-R17 §1: the owed card 12 under the hero, always above the chart and links. */}
+        <View style={styles.top}>
+          <EarningsHero
+            totals={data.totals}
+            currency={data.currency}
+            period={data.period}
+            from={data.from}
+            to={data.to}
+            stale={stale}
+          />
+          {walletCard}
+        </View>
         {error ? (
           <AppText variant="bodySmall" color="danger" testID="earnings-refresh-error">
             {error}
@@ -161,6 +179,10 @@ export default function DriverEarningsScreen() {
         {data.period !== 'day' ? (
           <EarningsChart series={data.series} period={data.period} currency={data.currency} />
         ) : null}
+        <EarningsLinksCard
+          onOpenStatements={() => navigation.navigate(DRIVER_STATEMENTS_ROUTE)}
+          onOpenStrikes={() => navigation.navigate(DRIVER_STRIKES_ROUTE)}
+        />
         <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
           {STATS_COPY.ridesTitle}
         </AppText>
@@ -228,6 +250,7 @@ const styles = StyleSheet.create({
   controls: { paddingHorizontal: layout.gutter, paddingBottom: space[3] },
   headerBlock: { paddingHorizontal: layout.gutter, paddingBottom: space[2], gap: space[4] },
   sectionTitle: { marginTop: space[2] },
+  top: { gap: space[3] },
   ride: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 64 },
   rideText: { flex: 1, minWidth: 0 },
   rideAmount: { flexShrink: 0 },

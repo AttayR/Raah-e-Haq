@@ -98,6 +98,11 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   vehicleAcBadge: ['#FFFFFF', '#011C72'],
   vehicleAcGlyph: ['#011C72', '#FFFFFF'],
   vehicleHalo: ['#011C72', '#6A86DE'],
+  // UI-R17 driver-earnings.md §1.1.
+  heroFill: ['#011C72', '#1C2850'],
+  heroText: ['#FFFFFF', '#FFFFFF'],
+  heroTextMuted: ['#C9D5F7', '#9DB2F0'],
+  heroDivider: ['#1A3496', '#3D5FD0'],
 };
 
 describe('palette (§1.1, §1.2)', () => {
@@ -168,6 +173,9 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
     // T-545: disabled Button label on its solid fill, and a disabled ghost/outline label on the page.
     ['textDisabled', 'fillDisabled', 5.57, 6.7, 4.5],
     ['textDisabled', 'background', 6.87, 10.37, 4.5],
+    // UI-R17: Earnings hero text on its fill (driver-earnings.md §1.1).
+    ['heroText', 'heroFill', 14.89, 14.3, 4.5],
+    ['heroTextMuted', 'heroFill', 10.17, 6.85, 4.5],
   ];
 
   it.each(PAIRS)('%s on %s: light %d, dark %d', (fg, bg, light, darkRatio, min) => {

@@ -20,6 +20,8 @@ export type TextColor = Extract<
   | 'info'
   | 'onAccent'
   | 'onSuccess'
+  | 'heroText'
+  | 'heroTextMuted'
 >;
 
 export type AppTextProps = TextProps & {

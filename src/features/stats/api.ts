@@ -21,6 +21,11 @@ export const EARNINGS_PAGE_SIZE = 20;
 
 const currencyOf = (value: unknown): string => readText(value) ?? 'PKR';
 const count = (value: unknown): number => Math.max(0, readNumber(value));
+/** A figure only some servers send (BE-123, BE-124): null when absent or negative. */
+const nonNegativeOrNull = (value: unknown): number | null => {
+  const n = readNumberOrNull(value);
+  return n !== null && n >= 0 ? n : null;
+};
 /** A rating is only meaningful in 0–5; anything else reads as "not rated". */
 const rating = (value: unknown): number | null => {
   const n = readNumberOrNull(value);
@@ -66,6 +71,10 @@ const toTotals = (raw: unknown): EarningsTotals => {
     earnings: readNumber(data.earnings),
     distanceKm: count(data.distance_km),
     durationMinutes: count(data.duration_minutes),
+    commissionRate: nonNegativeOrNull(data.commission_rate),
+    commissionAmount: nonNegativeOrNull(data.commission_amount),
+    bookingFees: nonNegativeOrNull(data.booking_fees),
+    onlineMinutes: nonNegativeOrNull(data.online_minutes),
   };
 };
 

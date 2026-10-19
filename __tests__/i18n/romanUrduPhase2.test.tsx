@@ -146,8 +146,10 @@ describe('QA 2026-10-19: lines that were still English read Roman Urdu', () => {
     const read = () => [
       WALLET_COPY.balanceLabel,
       WALLET_COPY.transactions,
-      STATS_COPY.trips,
-      STATS_COPY.commission,
+      // UI-R17: the Earnings hero's fares and distance labels.
+      t('earnings.heroFares'),
+      t('earnings.statDistance'),
+      STATS_COPY.periodDay,
       NOTIFICATIONS_COPY.filterUnread,
       RIDE_HISTORY_COPY.fareBase,
       RIDE_HISTORY_COPY.filterCancelled,

@@ -171,7 +171,7 @@ export default function WeeklyStatementScreen() {
             testID="statement-error"
           />
         ) : (
-          <SkeletonList heroHeight={componentTokens.skeleton.heights.earningsHero} rows={4} testID="statement-loading" />
+          <SkeletonList heroHeight={componentTokens.skeleton.heights.statementHero} rows={4} testID="statement-loading" />
         )}
       </View>
     </Screen>

@@ -156,7 +156,19 @@ describe('driver Today values (T-507)', () => {
 describe('GET /driver/earnings mapping and format', () => {
   it('maps totals, series, rides and the pagination inside data', () => {
     const earnings = toDriverEarnings(rawEarnings('week'), 'week');
-    expect(earnings.totals).toEqual({ trips: 2, grossFares: 400, commission: 80, earnings: 320, distanceKm: 5, durationMinutes: 30 });
+    expect(earnings.totals).toEqual({
+      trips: 2,
+      grossFares: 400,
+      commission: 80,
+      earnings: 320,
+      distanceKm: 5,
+      durationMinutes: 30,
+      // BE-123 / BE-124 not sent: null (no rate, no Online stat).
+      commissionRate: null,
+      commissionAmount: null,
+      bookingFees: null,
+      onlineMinutes: null,
+    });
     expect(earnings.series).toHaveLength(2);
     expect(earnings.rides[0]).toMatchObject({ id: 7, rideCode: 'RH-TEST7', driverEarnings: 240, platformCommission: 60 });
     expect(earnings).toMatchObject({ page: 1, lastPage: 1, total: 1 });
@@ -223,7 +235,7 @@ describe('DriverEarningsScreen', () => {
     fireEvent.press(screen.getByRole('radio', { name: 'Period, This week' }));
     await waitFor(() => expect(screen.getByTestId('earnings-ride-7')).toBeTruthy());
     expect(screen.getByTestId('earnings-total').props.children).toBe('Rs 320');
-    expect(screen.getByTestId('earnings-commission').props.children).toBe('Rs 80');
+    expect(screen.getByTestId('earnings-commission').props.children).toBe('\u2212 Rs 80');
     expect(screen.getByTestId('earnings-chart')).toBeTruthy();
     // The busiest day is selected first.
     expect(screen.getByTestId('earnings-chart-selected').props.children).toBe('Tue, 13 Oct: Rs 320 · 2 trips');
@@ -241,15 +253,14 @@ describe('DriverEarningsScreen', () => {
     expect(screen.queryByText('RH-TEST7')).toBeNull();
   });
 
-  it('is a tab root (UI-R4): large "Earnings" title, no back; the wallet card shows commission owed and opens Wallet', async () => {
+  it('is a tab root (UI-R4): large "Earnings" title, no back; the owed card shows what is owed and opens Wallet', async () => {
     mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
-    mock.onGet('/wallet').reply(200, envelope(rawWallet({ commission_owed: 116 })));
+    mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: -116, commission_owed: 116, amount_owed: 116 })));
     showEarnings();
-    // T-521: what is owed can include fare-dispute recoveries, so it is "Amount owed".
-    await waitFor(() => expect(screen.getByText('Amount owed: Rs 116')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('earnings-owed-amount').props.children).toBe('Rs 116'));
     expect(screen.getAllByText('Earnings').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('earnings-back')).toBeNull();
-    fireEvent.press(screen.getByTestId('earnings-wallet'));
+    fireEvent.press(screen.getByTestId('earnings-owed-wallet'));
     expect(mockNavigate).toHaveBeenCalledWith('Wallet');
   });
 
@@ -271,14 +282,17 @@ describe('DriverEarningsScreen', () => {
     expect(screen.getByTestId('earnings-hairline', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('the wallet card says the wallet could not load when GET /wallet fails (never "loading" forever)', async () => {
+  it('the owed card says the wallet could not load when GET /wallet fails, and a tap retries (never "loading" forever)', async () => {
+    mockNavigate.mockClear();
     mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
-    mock.onGet('/wallet').reply(500, {});
+    mock.onGet('/wallet').replyOnce(500, {});
+    mock.onGet('/wallet').reply(200, envelope(rawWallet()));
     showEarnings();
-    await waitFor(() => expect(screen.getByText("Couldn't load your wallet. Open it to try again.")).toBeTruthy());
-    expect(screen.queryByText('Balance and payment reports')).toBeNull();
-    fireEvent.press(screen.getByTestId('earnings-wallet'));
-    expect(mockNavigate).toHaveBeenCalledWith('Wallet');
+    await waitFor(() => expect(screen.getByText("Couldn't load your wallet")).toBeTruthy());
+    expect(screen.queryByTestId('earnings-owed-loading')).toBeNull();
+    fireEvent.press(screen.getByTestId('earnings-wallet-retry'));
+    await waitFor(() => expect(screen.getByText('Nothing owed')).toBeTruthy());
+    expect(mockNavigate).not.toHaveBeenCalledWith('Wallet');
   });
 
   it('shows an error with retry', async () => {

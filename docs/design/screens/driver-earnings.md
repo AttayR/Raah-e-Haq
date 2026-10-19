@@ -61,7 +61,7 @@ Goal: one big number (what the driver keeps), the money story under it as an equ
 | 2 | `moneyOut` | "Commission {rate}%" (BE-123 `commission_rate`, formatted without trailing zeros: 20, 12.5); "Commission" when null | "− " + `formatMoney(commission_amount ?? commission)` | `earnings-commission` |
 | 2b | `receipt` | "Booking fee" (only when BE-123 `booking_fees > 0`) | "− " + `formatMoney(booking_fees)` | `earnings-booking-fee` |
 | — | divider: 1pt (`borderWidth.hairline` rounded up to 1) `heroDivider`, marginVertical 4 | | | |
-| 3 | `wallet` | "You keep" in `label` 13/18/600 `heroText` | `numeric` `heroText` = `formatMoney(earnings)` | `earnings-net` |
+| 3 | `wallet` | "Net" / "Bacha" in `label` 13/18/600 `heroText` (not "You keep" again: the headline says it; UI-R17 on-device fix) | `numeric` `heroText` = `formatMoney(earnings)` | `earnings-net` |
 
   The minus is U+2212 followed by a space, in the same style as the value. No red: commission is a normal, agreed cost, not an error.
   Accessibility: the block is one accessible group, label "Fares collected {fares}, minus commission {rate} percent {commission}, you keep {net}".
@@ -104,6 +104,7 @@ Card inner width 402 − 32 − 40 = 330. Height ≈ 20 + 20 + 4 + 40 + 16 + (3 
 | Key | en | ur-Latn |
 |---|---|---|
 | `heroKeep` | You keep | Aap ki kamai |
+| `heroNet` (total row) | Net | Bacha |
 | `heroFares` | Fares collected | Wusool kiya gaya kiraya |
 | `heroCommission` | Commission {rate}% | Commission {rate}% |
 | `heroCommissionNoRate` | Commission | Commission |
@@ -130,9 +131,9 @@ Directly under the hero, 12 gap. Data: `GET /wallet` (`useWallet(isFocused)`, as
   - `label` `warning` (5.31:1 light, 8.17:1 dark): "You owe Raah-e-Haq" / "Aap ne Raah-e-Haq ko dena hai".
   - `numericL` (22/28/700) `textPrimary`: `formatMoney(amountOwed, { currency })`, `testID earnings-owed-amount`.
   - `caption` `textSecondary`, up to 3 lines: "Commission from your cash trips. Pay with JazzCash or Easypaisa." / "Cash trips ka commission. JazzCash ya Easypaisa se ada karein." The provider names come from `wallet.topUp.providers[].name` joined with " or " / " ya "; if no providers, the sentence after the first full stop is omitted.
-- 12 gap, then actions row (`flexDirection row`, gap 8; stacks vertically when the text scale ≥ 1.3 or width < 360):
-  - When `canTopUp`: Button `md` `primary`, `flex 1`, icon `topUp`, label "Pay {amount}" / "{amount} ada karein" → `navigate(ADD_MONEY_ROUTE, topUpParamsFor(amountOwed))`, `testID earnings-owed-pay`.
-  - Button `md` `secondary` (`flex 1`; full width when the Pay button is absent), label "Wallet" / "Wallet" → `navigate('Wallet')` (other ways to settle: cash settlement request when `canSettleCommission`), `testID earnings-owed-wallet`.
+- 12 gap, then the actions, stacked (column, gap 4). The Pay label never truncates: "Pay Rs 99,999" fits at 1.0x on iPhone 17 and SE (UI-R17 on-device fix; a side-by-side row cut it to "Pay Rs 3,0…"):
+  - When `canTopUp`: Button `md` `primary`, full width, icon `topUp`, label "Pay {amount}" / "{amount} ada karein" → `navigate(ADD_MONEY_ROUTE, topUpParamsFor(amountOwed))`, `testID earnings-owed-pay`.
+  - Button `md`, full width, `ghost` under Pay (`secondary` when the Pay button is absent), label "Wallet" / "Wallet" → `navigate('Wallet')` (other ways to settle: cash settlement request when `canSettleCommission`), `testID earnings-owed-wallet`.
 - Accessibility: card group label "You owe Raah-e-Haq {amount}"; buttons are separate elements, 48 high (≥ 44).
 
 ### 2.2 Nothing owed or credit: calm

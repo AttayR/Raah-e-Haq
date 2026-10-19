@@ -145,7 +145,7 @@ export const componentTokens = {
      * Placeholder heights that mirror real blocks at rest (1.0x font) so nothing jumps when data
      * arrives: wallet BalanceCard, EarningsHero, ride details cards, transaction detail card.
      */
-    heights: { walletHero: 152, earningsHero: 132, rideHistoryRow: 114, activitySummary: 54, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
+    heights: { walletHero: 152, earningsHero: 300, statementHero: 132, earningsOwed: 72, rideHistoryRow: 114, activitySummary: 54, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
   },
   /** UI-R5 ride components (§5.21–5.31, §6.5/§6.7, §12.5). */
   ride: {
@@ -254,6 +254,23 @@ export const componentTokens = {
   /** §9 [v1.1] map floating controls: at most two, locate rides 16 above the sheet. */
   mapControls: { sheetGap: space[4], edge: space[4] },
   /** UI-R14 chat thread, Messages rows and notification rows (shared-chat-thread, shared-chat-list). */
+  /** [UI-R17] driver Earnings period hero and amount-owed card (driver-earnings.md §1.1, §2). */
+  earnings: {
+    heroPadding: space[5],
+    heroIcon: 16,
+    /** Breakdown row minimum height (grows with text). */
+    heroRowMinHeight: 28,
+    /** Minimum height of the headline row ("You keep" + period caption). */
+    heroHeadlineMinHeight: 20,
+    /** Vertical rule between stat cells. */
+    statRuleHeight: 32,
+    /** Icon → value → caption steps inside a stat cell (column: icon, 4, value, 2, caption). */
+    statGap: 2,
+    /** Dimmed old hero while another period loads. */
+    staleOpacity: 0.5,
+    owedIcon: 24,
+    owedIconCircle: 40,
+  },
   chat: {
     bubbleRadius: 18,
     bubbleTailRadius: 6,
