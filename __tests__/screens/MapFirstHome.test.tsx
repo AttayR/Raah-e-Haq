@@ -125,12 +125,12 @@ describe('map-first Home', () => {
     });
   });
 
-  it('without saved places (or when they fail to load) the row still offers "+ Add" and the list', async () => {
+  it('when the saved places fail to load the row offers only the list (UI-R9: no "Add home" guess)', async () => {
     mock.onGet('/rides').reply(200, page([]));
     mock.onGet('/saved-places').reply(500, { success: false, message: 'Server error' });
     await renderHome();
     expect(screen.queryByTestId(/^home-saved-place-\d+$/)).toBeNull();
-    expect(screen.getByTestId('home-saved-place-add')).toBeTruthy();
+    expect(screen.queryByTestId('home-saved-place-add')).toBeNull();
     expect(screen.getByTestId('home-saved-places')).toBeTruthy();
   });
 
@@ -145,7 +145,12 @@ describe('map-first Home', () => {
         ]),
       );
     await renderHome();
-    expect(screen.getByText('Liberty Market')).toBeTruthy();
+    expect(screen.getByTestId('home-recent-ride-61')).toHaveTextContent(/Liberty Market/);
+    // UI-R9: its drop-off is also a recent destination chip; a tap books a ride there.
+    fireEvent.press(screen.getByTestId('home-recent-place-0'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('Booking', {
+      destination: { latitude: 31.48, longitude: 74.3, address: 'Liberty Market' },
+    });
     // T-536 (PERF-19): one small page for the card, not the 20-ride history page.
     const ridesGet = mock.history.get.find((r) => r.url === '/rides');
     expect(ridesGet?.params).toMatchObject({ page: 1, per_page: 4 });

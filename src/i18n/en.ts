@@ -395,6 +395,21 @@ export const en = {
     nearbyNone: 'No drivers nearby right now',
     nearbyOne: '1 driver nearby',
     nearbyMany: '{n} drivers nearby',
+    // UI-R9: the sheet's shortcuts and recent rides states.
+    recentPlaceA11y: 'Recent place, {address}',
+    addHomeA11y: 'Add your home address',
+    shortcutsLoadingA11y: 'Loading your places',
+    ridesLoadingA11y: 'Loading your recent rides',
+    ridesFailedTitle: "Couldn't load your recent rides",
+    emptyHint: 'Your recent places and rides will appear here.',
+  },
+  /** UI-R9: the booking search's saved and recent places (passenger-destination-search). */
+  placeSearch: {
+    savedTitle: 'Saved places',
+    recentTitle: 'Recent',
+    savedRowA11y: '{name}, {address}',
+    recentRowA11y: 'Recent place, {address}',
+    loadingA11y: 'Loading your places',
   },
   /** Saved places (T-516, BE-14): the list, the add/edit form and the Home chips. */
   savedPlaces: {

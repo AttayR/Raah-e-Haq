@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import LocationSearch, { suggestionAddress } from '../../../components/passenger/LocationSearch';
-import DualLocationPicker from '../../../components/passenger/DualLocationPicker';
+import DualLocationPicker, { type PickerField, type ShortcutPlace } from '../../../components/passenger/DualLocationPicker';
 import type { RideResource } from '../../../services/rideService';
 import { space } from '../../../theme';
 import ActiveRidePanel from '../../active-ride/components/ActiveRidePanel';
@@ -13,6 +13,7 @@ import type { useFareEstimates, useVehicleTypes } from '../hooks';
 import type { BookingFlow, BookingStage } from '../useBookingFlow';
 import { FareStage, MAX_STOPS, VehicleStage } from './BookingStages';
 import { ChooseOnMapButton } from './MapPick';
+import { PlaceShortcuts } from './PlaceShortcuts';
 import { locationFieldLabels } from '../copy';
 import { tierLabel } from '../../ride-history/copy';
 
@@ -66,6 +67,20 @@ export const BookingStageContent: React.FC<Props> = ({
 }) => {
   const { pickup, destination, stops, pickupField, destField, setStage, setMapPick, chooseOnMap } = flow;
   const selectedType = vehicleTypes.data?.find((t) => t.key === flow.selectedVehicle) ?? null;
+  // UI-R9: stable handlers, so the memoised shortcut list re-renders only when its data changes.
+  // A shortcut pick goes through the same handlers as a picked suggestion (route, next step).
+  const { selectPickup, selectDestination } = flow;
+  const onShortcutPick = useCallback(
+    (target: PickerField, place: ShortcutPlace) =>
+      target === 'pickup' ? selectPickup(place, place.address, true) : selectDestination(place, place.address, false),
+    [selectPickup, selectDestination],
+  );
+  const renderShortcuts = useCallback(
+    (_target: PickerField, onPick: (place: ShortcutPlace) => void) => <PlaceShortcuts onPick={onPick} />,
+    [],
+  );
+  const hasPickup = pickup !== null;
+  const onChooseOnMapChip = useCallback(() => setMapPick(hasPickup ? 'destination' : 'pickup'), [setMapPick, hasPickup]);
 
   switch (shownStage) {
     case 'home':
@@ -87,8 +102,11 @@ export const BookingStageContent: React.FC<Props> = ({
             onUseCurrentLocation={currentLocation ? flow.pickCurrentLocation : undefined}
             onSwap={flow.swapPickupDrop}
             autoFocusDestination={flow.focusDestinationOnOpen}
+            onChooseOnMapChip={onChooseOnMapChip}
+            // UI-R9: saved and recent places for the field being filled.
+            renderShortcuts={renderShortcuts}
+            onShortcutPick={onShortcutPick}
           />
-          {!compact && <ChooseOnMapButton onPress={() => setMapPick(pickup ? 'destination' : 'pickup')} />}
         </>
       );
     case 'pickup':

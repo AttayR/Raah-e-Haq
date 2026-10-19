@@ -1,7 +1,12 @@
 import React from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { t } from '../../i18n';
+import { componentTokens, space } from '../../theme';
+import { AppText } from './AppText';
+import { Button } from './Button';
 import { StateLayout } from './EmptyState';
+import { Icon } from './Icon';
 
 export type ErrorStateProps = {
   /** "Couldn't load {thing}". */
@@ -15,6 +20,12 @@ export type ErrorStateProps = {
   retrying?: boolean;
   retryLabel?: string;
   placement?: 'top' | 'center';
+  /**
+   * `compact` (UI-R9, a section inside a sheet): 48 `dangerSoft` circle with a 24 glyph → 12 →
+   * the title in `body` (1 line, 2 at large text; `body` is not shown) → 12 → `sm` secondary
+   * "Try again", centred, ≤156 high. `regular` (default): the EmptyState-sized layout.
+   */
+  size?: 'regular' | 'compact';
   style?: StyleProp<ViewStyle>;
   /** The retry button gets `${testID}-retry`. */
   testID?: string;
@@ -34,9 +45,23 @@ export function ErrorState({
   retrying = false,
   retryLabel,
   placement,
+  size = 'regular',
   style,
   testID,
 }: ErrorStateProps) {
+  if (size === 'compact') {
+    return (
+      <CompactErrorState
+        title={title}
+        kind={kind}
+        onRetry={onRetry}
+        retrying={retrying}
+        retryLabel={retryLabel}
+        style={style}
+        testID={testID}
+      />
+    );
+  }
   return (
     <StateLayout
       icon={kind === 'network' ? 'networkError' : 'warning'}
@@ -59,3 +84,55 @@ export function ErrorState({
     />
   );
 }
+
+const k = componentTokens.emptyState;
+
+function CompactErrorState({
+  title,
+  kind,
+  onRetry,
+  retrying,
+  retryLabel,
+  style,
+  testID,
+}: Pick<ErrorStateProps, 'title' | 'kind' | 'onRetry' | 'retrying' | 'retryLabel' | 'style' | 'testID'>) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={[styles.compact, style]} testID={testID} accessibilityRole="alert" accessibilityLiveRegion="polite">
+      <View
+        style={[styles.compactCircle, { backgroundColor: theme.colors.dangerSoft }]}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
+        <Icon name={kind === 'network' ? 'networkError' : 'warning'} size={k.compactGlyph} color="danger" />
+      </View>
+      <AppText variant="body" align="center" numberOfLines={2}>
+        {title}
+      </AppText>
+      <View style={styles.compactAction}>
+        <Button
+          label={retryLabel ?? t('common.tryAgain')}
+          onPress={onRetry}
+          variant="secondary"
+          size="sm"
+          fullWidth={false}
+          loading={retrying}
+          testID={testID ? `${testID}-retry` : undefined}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  compact: { alignItems: 'center', gap: space[3] },
+  compactCircle: {
+    width: k.compactCircle,
+    height: k.compactCircle,
+    borderRadius: k.compactCircle / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // §5.4 ruling (UI-R8): a hugging button in a centred column centres itself.
+  compactAction: { alignSelf: 'center' },
+});

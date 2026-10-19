@@ -1,61 +1,125 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { Chip } from '../../../components/ui';
+import { Chip, Skeleton, SkeletonGroup } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { space } from '../../../theme';
+import { componentTokens, layout, space } from '../../../theme';
+import type { RecentDestination } from '../../passenger-home/recentDestinations';
 import { savedPlaceIcon, savedPlaceTitle } from '../format';
 import type { SavedPlace } from '../types';
 
 type Props = {
   /** From GET /saved-places (home, work, then others); empty while loading or on failure. */
   places: ReadonlyArray<SavedPlace>;
+  /** First load of the saved places with nothing to show yet: skeleton chips (§12.6). */
+  loading?: boolean;
+  /**
+   * The saved-places read succeeded (ready / refreshing / cached). Only then is the Add chip
+   * shown: after a failed read a passenger whose Home exists is never offered "Add home".
+   */
+  loaded?: boolean;
   /** A place chip: book a ride to it. */
   onPlace: (place: SavedPlace) => void;
-  /** "+ Add": the add-place form. */
-  onAdd: () => void;
+  /** UI-R9: where the passenger went lately (their finished rides); one chip each after the places. */
+  recents?: ReadonlyArray<RecentDestination>;
+  onRecent?: (recent: RecentDestination) => void;
+  /**
+   * "+ Add": the add-place form. Without a saved Home it reads "Add home" and `onAdd('home')`
+   * starts the form on that label (passenger-home "Empty (new account)").
+   */
+  onAdd: (label?: 'home') => void;
   /** "Saved places": the full list (edit, delete, set as pickup). */
   onOpenAll: () => void;
-  /** Chips placed before the saved places (e.g. "Turn on location"). */
+  /** Chips placed before the saved places (e.g. "Turn on location", "Send a parcel"). */
   leading?: React.ReactNode;
 };
 
+/** At most 2 place chips (passenger-home 4.3); the full list is one tap away. */
+export const MAX_PLACE_CHIPS = 2;
+const LABEL_ORDER = { home: 0, work: 1, other: 2 } as const;
+
+/** Home and Work first, then the others in server order, capped at 2. */
+export const placeChips = (places: ReadonlyArray<SavedPlace>): SavedPlace[] =>
+  places
+    .map((place, index) => ({ place, index }))
+    .sort((a, b) => LABEL_ORDER[a.place.label] - LABEL_ORDER[b.place.label] || a.index - b.index)
+    .slice(0, MAX_PLACE_CHIPS)
+    .map(({ place }) => place);
+
+/** Skeleton chip widths: short, medium, short (mirrors Home / Work / Add). */
+const SKELETON_WIDTHS = [space[16] + space[2], space[16] + space[6], space[16]] as const;
+
 /**
- * Home sheet shortcut row (T-516): one chip per saved place (house / briefcase / map marker and
- * its title), then "+ Add" and "Saved places". One line that scrolls sideways, so the sheet's
- * peek height does not change with the number of places.
+ * Home sheet shortcut row (T-516, UI-R9; DESIGN_SYSTEM §8.3 chip row): the leading chips, up to
+ * 2 saved places (Home and Work first; house / briefcase / map marker and its title), up to 3 recent
+ * destinations (history glyph, first part of the address), then "+ Add" ("Add home" while no Home
+ * is saved; only once the saved places loaded) and "Saved places". One line that scrolls sideways edge to edge (it bleeds past the
+ * sheet gutter so a cut chip reads as "more"), so the peek height never changes with the count.
  */
-export function SavedPlaceChips({ places, onPlace, onAdd, onOpenAll, leading }: Props) {
+function SavedPlaceChipsBase({ places, loading = false, loaded = true, onPlace, recents = [], onRecent, onAdd, onOpenAll, leading }: Props) {
+  const hasHome = places.some(place => place.label === 'home');
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      style={styles.bleed}
       contentContainerStyle={styles.row}
       accessibilityLabel={t('savedPlaces.chipsA11y')}
       testID="home-saved-places-row"
     >
       {leading}
-      {places.map((place) => {
-        const title = savedPlaceTitle(place);
-        return (
-          <Chip
-            key={place.id}
-            icon={savedPlaceIcon(place.label)}
-            label={title}
-            onPress={() => onPlace(place)}
-            accessibilityLabel={`${title}, ${place.address}`}
-            testID={`home-saved-place-${place.id}`}
-          />
-        );
-      })}
-      <Chip
-        icon="add"
-        tone="primary"
-        label={t('savedPlaces.addShort')}
-        onPress={onAdd}
-        accessibilityLabel={t('savedPlaces.addA11y')}
-        testID="home-saved-place-add"
-      />
+      {loading ? (
+        <SkeletonGroup style={styles.skeletons} accessibilityLabel={t('home.shortcutsLoadingA11y')} testID="home-saved-places-loading">
+          {SKELETON_WIDTHS.map((width, index) => (
+            <Skeleton key={index} width={width} height={componentTokens.chip.height} shape="pill" />
+          ))}
+        </SkeletonGroup>
+      ) : (
+        placeChips(places).map(place => {
+          const title = savedPlaceTitle(place);
+          return (
+            <Chip
+              key={place.id}
+              icon={savedPlaceIcon(place.label)}
+              label={title}
+              onPress={() => onPlace(place)}
+              accessibilityLabel={`${title}, ${place.address}`}
+              testID={`home-saved-place-${place.id}`}
+            />
+          );
+        })
+      )}
+      {onRecent
+        ? recents.map((recent, index) => (
+            <Chip
+              key={recent.key}
+              icon="history"
+              label={recent.title}
+              onPress={() => onRecent(recent)}
+              accessibilityLabel={t('home.recentPlaceA11y', { address: recent.place.address ?? recent.title })}
+              testID={`home-recent-place-${index}`}
+            />
+          ))
+        : null}
+      {loading || !loaded ? null : hasHome ? (
+        <Chip
+          icon="add"
+          tone="primary"
+          label={t('savedPlaces.addShort')}
+          onPress={() => onAdd()}
+          accessibilityLabel={t('savedPlaces.addA11y')}
+          testID="home-saved-place-add"
+        />
+      ) : (
+        <Chip
+          icon="homeAdd"
+          tone="primary"
+          label={t('savedPlaces.addHome')}
+          onPress={() => onAdd('home')}
+          accessibilityLabel={t('home.addHomeA11y')}
+          testID="home-saved-place-add"
+        />
+      )}
       <Chip
         icon="bookmark"
         label={t('home.savedPlaces')}
@@ -67,6 +131,11 @@ export function SavedPlaceChips({ places, onPlace, onAdd, onOpenAll, leading }: 
   );
 }
 
+/** Memoised: the Home map's camera and sheet height changes never re-render the chip row. */
+export const SavedPlaceChips = memo(SavedPlaceChipsBase);
+
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  bleed: { marginHorizontal: -layout.gutter },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: layout.gutter },
+  skeletons: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
 });

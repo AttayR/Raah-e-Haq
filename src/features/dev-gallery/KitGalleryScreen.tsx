@@ -34,6 +34,7 @@ import {
   InboxNotificationsPreview,
   InboxNotificationsStatePreview,
 } from './sections/InboxPreviews';
+import { HomeSheetPreview, PlaceSearchPreview } from './sections/HomeSearchPreviews';
 import { VehicleMotionSection } from './sections/VehicleMotionSection';
 import {
   LargeTitlePreview,
@@ -136,6 +137,13 @@ const SCREEN_PREVIEWS: Section[] = [
   ['screen-chat-thread', () => <ChatThreadPreview state="open" />],
   ['screen-chat-thread-closed', () => <ChatThreadPreview state="closed" />],
   ['screen-chat-thread-loading', () => <ChatThreadPreview state="loading" />],
+  // UI-R9: passenger Home sheet and place search.
+  ['screen-home', () => <HomeSheetPreview snap="peek" />],
+  ['screen-home-half', () => <HomeSheetPreview snap="half" />],
+  ['screen-home-empty', () => <HomeSheetPreview snap="half" state="empty" />],
+  ['screen-home-loading', () => <HomeSheetPreview snap="half" state="loading" />],
+  ['screen-home-error', () => <HomeSheetPreview snap="half" state="error" />],
+  ['screen-search', () => <PlaceSearchPreview />],
   ...REGISTRATION_PREVIEWS,
   ...AUTH_STATE_PREVIEWS,
 ];

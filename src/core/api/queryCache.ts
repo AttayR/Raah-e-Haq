@@ -21,6 +21,8 @@ export const CACHE_TTL = {
   /** T-563: after a failed quiet re-read, the next focus waits this long before asking again. */
   vehicleTypesRecheckBackoff: 30 * 1000,
   savedPlaces: 60 * 1000,
+  /** UI-R9: the place search reuses Home's recent rides read this recently (no second GET). */
+  recentRides: 60 * 1000,
   stats: 60 * 1000,
   directions: 5 * 60 * 1000,
 } as const;
@@ -29,6 +31,7 @@ export const CACHE_TTL = {
 export const CACHE_NAMES = {
   stats: 'stats/me',
   savedPlaces: 'saved-places',
+  recentRides: 'rides/recent',
 } as const;
 
 /** Oldest entries go first beyond this many (directions are keyed by route). */

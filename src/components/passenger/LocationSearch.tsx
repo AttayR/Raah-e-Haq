@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { fetchAutocomplete, fetchPlaceDetails, type PlacesBias } from '../../services/placesService';
 import { MIN_AUTOCOMPLETE_CHARS, newPlacesSessionToken } from '../../services/placesSession';
@@ -91,7 +91,16 @@ export const AUTOCOMPLETE_DEBOUNCE_MS = 300;
  * lookup waits for a 300 ms pause and 3 characters, a newer query aborts the older request,
  * and the lookups of one search (autocomplete + details) share a Places session token.
  */
-const LocationSearch: React.FC<Props> = ({
+/**
+ * UI-R9: what a parent may do to the field. A saved or recent place picked outside the field
+ * ends the field's Places session and blurs it, exactly as a suggestion pick does.
+ */
+export type LocationSearchHandle = {
+  /** Ends the Places session (the next lookup starts a new one) and blurs the field. */
+  finishOutsidePick: () => void;
+};
+
+const LocationSearch = forwardRef<LocationSearchHandle, Props>(function LocationSearch({
   mode,
   query,
   queryRevision,
@@ -105,7 +114,7 @@ const LocationSearch: React.FC<Props> = ({
   near,
   replaceOnType,
   autoFocus = false,
-}) => {
+}, ref) {
   const { theme } = useAppTheme();
   const c = theme.colors;
   const [text, setTextState] = useState(query);
@@ -140,6 +149,19 @@ const LocationSearch: React.FC<Props> = ({
       revealRef.current?.blur(containerRef.current);
       onFocusChangeRef.current?.(false);
     },
+    [],
+  );
+
+  const inputRef = useRef<TextInput | null>(null);
+  useImperativeHandle(
+    ref,
+    () => ({
+      finishOutsidePick: () => {
+        sessionRef.current = null;
+        setEdited(false);
+        inputRef.current?.blur();
+      },
+    }),
     [],
   );
 
@@ -258,6 +280,7 @@ const LocationSearch: React.FC<Props> = ({
       >
         {glyph ? <Icon name={glyph} size={20} color={glyph === 'locate' ? 'primaryText' : 'textSecondary'} /> : null}
         <TextInput
+          ref={inputRef}
           testID={`location-search-${mode}`}
           accessibilityLabel={mode === 'pickup' ? BOOKING_COPY.pickupPlaceholder : BOOKING_COPY.destinationA11y}
           style={[styles.input, { color: c.textPrimary }]}
@@ -299,7 +322,7 @@ const LocationSearch: React.FC<Props> = ({
       {showNoResults ? (
         <View testID="location-search-empty" accessibilityLiveRegion="polite" style={styles.suggestionItem}>
           <View style={[styles.suggestionIcon, { backgroundColor: c.surfaceAlt }]}>
-            <Icon name="search" size={20} color="textSecondary" />
+            <Icon name="mapSearch" size={20} color="textSecondary" />
           </View>
           <View style={styles.suggestionText}>
             <AppText variant="title" numberOfLines={1}>
@@ -321,7 +344,7 @@ const LocationSearch: React.FC<Props> = ({
           style={({ pressed }) => [styles.suggestionItem, pressed ? { backgroundColor: c.surfacePressed } : null]}
         >
           <View style={[styles.suggestionIcon, { backgroundColor: c.primarySoft }]}>
-            <Icon name="pin" size={20} color="primaryText" />
+            <Icon name="pinRadius" size={20} color="primaryText" />
           </View>
           <AppText variant="title" color="primaryText" numberOfLines={1} style={styles.flex}>
             {BOOKING_COPY.setLocationOnMap}
@@ -341,7 +364,7 @@ const LocationSearch: React.FC<Props> = ({
               onPress={() => pick(s)}
             >
               <View style={[styles.suggestionIcon, { backgroundColor: c.surfaceAlt }]}>
-                <Icon name="pin" size={20} color="textSecondary" />
+                <Icon name="pinOutline" size={20} color="textSecondary" />
               </View>
               <View style={styles.suggestionText}>
                 <AppText variant="title" numberOfLines={1}>
@@ -361,7 +384,7 @@ const LocationSearch: React.FC<Props> = ({
       ) : null}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   field: {

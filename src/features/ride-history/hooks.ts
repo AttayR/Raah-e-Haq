@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { toApiError } from '../../core/api/errors';
 import { usePagedList, type PagedList } from '../../core/api/usePagedList';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
+import { CACHE_NAMES, CACHE_TTL, cacheVersion, writeCache } from '../../core/api/queryCache';
 import type { RootState } from '../../store';
 import { rideHistoryApi } from './api';
 import { RIDE_HISTORY_COPY } from './copy';
@@ -29,13 +30,32 @@ export const useRideHistory = (filter: RideHistoryFilter, enabled: boolean): Pag
 /**
  * T-507: the latest `count` rides (GET /rides?page=1&per_page={count}) for a Home card. Read
  * when `enabled` turns true (screen focus); the card hides while loading or empty.
+ * UI-R9: every answer is also cached, so `reuseCached` readers (the booking place search's
+ * recent destinations) take a read made a moment ago on Home instead of asking again. Home itself
+ * never reuses: it re-reads on every focus, so a ride that just ended shows at once.
  */
-export const useRecentRides = (count: number, enabled: boolean): RemoteData<Ride[]> => {
-  const fetch = useCallback(
-    async () => (await rideHistoryApi.listRides({ page: 1, perPage: count })).items,
-    [count],
-  );
-  return useRemoteData({ fetch, key: String(count), fallbackError: RIDE_HISTORY_COPY.loadFailed, enabled });
+const RECENT_RIDES_CACHE = { name: CACHE_NAMES.recentRides, ttlMs: CACHE_TTL.recentRides } as const;
+
+export const useRecentRides = (
+  count: number,
+  enabled: boolean,
+  { reuseCached = false }: { reuseCached?: boolean } = {},
+): RemoteData<Ride[]> => {
+  const fetch = useCallback(async () => {
+    const cacheKey = `${RECENT_RIDES_CACHE.name}|${count}`;
+    // Stored only if no sign-out (or newer write) happened while the request was in flight.
+    const since = cacheVersion(cacheKey);
+    const items = (await rideHistoryApi.listRides({ page: 1, perPage: count })).items;
+    writeCache(cacheKey, items, since);
+    return items;
+  }, [count]);
+  return useRemoteData({
+    fetch,
+    key: String(count),
+    fallbackError: RIDE_HISTORY_COPY.loadFailed,
+    enabled,
+    cache: reuseCached ? RECENT_RIDES_CACHE : undefined,
+  });
 };
 
 /** What the details screen shows: the ride, or `unavailable` (403/404: not the caller's ride). */

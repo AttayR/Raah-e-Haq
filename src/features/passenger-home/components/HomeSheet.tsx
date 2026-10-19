@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppText, Banner, Button, Chip } from '../../../components/ui';
 import { SavedPlaceChips } from '../../saved-places/components/SavedPlaceChips';
@@ -6,7 +6,8 @@ import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
 import { componentTokens, layout, space, textStyles } from '../../../theme';
 import type { HomeRecentRide } from '../types';
-import { RecentRidesCard } from '../../../components/ui/ride/RecentRidesCard';
+import type { RecentDestination } from '../recentDestinations';
+import { HomeRidesSection, type HomeRidesState } from './HomeRidesSection';
 import { WHERE_TO_HEIGHT, WhereToBar } from './WhereToBar';
 
 /**
@@ -41,10 +42,18 @@ type BodyProps = {
   onWhereTo: () => void;
   /** GET /saved-places (T-516): one chip each; empty while loading or when there are none. */
   savedPlaces: ReadonlyArray<SavedPlace>;
+  /** UI-R9: first read of the saved places with nothing cached: skeleton chips. */
+  savedPlacesLoading?: boolean;
+  /** UI-R9 review: the saved-places read succeeded (cached or answered); gates the Add chip. */
+  savedPlacesLoaded?: boolean;
+  /** UI-R9: recent destinations from the passenger's finished rides (chips after the places). */
+  recents?: ReadonlyArray<RecentDestination>;
+  /** A recent destination chip: Booking with it as the destination. */
+  onRecent?: (recent: RecentDestination) => void;
   /** A saved place chip: Booking with it as the destination. */
   onSavedPlace: (place: SavedPlace) => void;
-  /** "+ Add": the add-place form. */
-  onAddPlace: () => void;
+  /** "+ Add" ("Add home" while no Home is saved: starts the form on that label). */
+  onAddPlace: (label?: 'home') => void;
   /** "Saved places": the full list. */
   onSavedPlaces: () => void;
   /** Location refused or switched off: a chip at peek and the explanation at half. */
@@ -52,6 +61,9 @@ type BodyProps = {
   onEnableLocation: () => void;
   /** The last rides from GET /rides (none until the API returns some). */
   recentRides: HomeRecentRide[];
+  /** UI-R9: skeleton on the first read, ErrorState when it failed with nothing cached. */
+  recentRidesState?: HomeRidesState;
+  onRetryRides?: () => void;
   onOpenRide: (id: string) => void;
   onSeeAllRides: () => void;
   /**
@@ -65,21 +77,30 @@ type BodyProps = {
   onSendParcel?: () => void;
 };
 
+const noop = () => {};
+
 /**
- * Home sheet body (UI-R4 structure; UI-R9 refines the content): "Where to?" (pushes Booking),
- * the shortcut chip row ("Send a parcel" first while the tier is on, T-561), then at `half`/`full` the location notice and recent rides, only when
- * the API returned some. The chip row holds the saved places (T-516, BE-14), "+ Add" and the
- * full list.
+ * Home sheet body (UI-R4 structure, UI-R9 content; passenger-home, DESIGN_SYSTEM §8.3): "Where
+ * to?" (pushes Booking), the edge-to-edge shortcut chip row (location off and "Send a parcel"
+ * first, T-561/T-580; saved places, T-516; recent destinations; "+ Add" / "Add home"; the full
+ * list), then at `half`/`full` the location notice and recent rides with their loading and error
+ * states. Memoised, so a sheet drag or a map camera move never re-renders it.
  */
-export function HomeSheetBody({
+function HomeSheetBodyBase({
   onWhereTo,
   savedPlaces,
+  savedPlacesLoading = false,
+  savedPlacesLoaded = true,
+  recents,
+  onRecent,
   onSavedPlace,
   onAddPlace,
   onSavedPlaces,
   locationOff,
   onEnableLocation,
   recentRides,
+  recentRidesState = 'ready',
+  onRetryRides = noop,
   onOpenRide,
   onSeeAllRides,
   liveRide = null,
@@ -109,7 +130,11 @@ export function HomeSheetBody({
       <View style={styles.chips}>
         <SavedPlaceChips
           places={savedPlaces}
+          loading={savedPlacesLoading && savedPlaces.length === 0}
+          loaded={savedPlacesLoaded}
           onPlace={onSavedPlace}
+          recents={recents}
+          onRecent={onRecent}
           onAdd={onAddPlace}
           onOpenAll={onSavedPlaces}
           leading={
@@ -149,16 +174,25 @@ export function HomeSheetBody({
             testID="home-location-banner"
           />
         ) : null}
-        <RecentRidesCard rides={recentRides} onSeeAll={onSeeAllRides} onOpen={onOpenRide} />
+        <HomeRidesSection
+          state={recentRidesState}
+          rides={recentRides}
+          onOpenRide={onOpenRide}
+          onSeeAll={onSeeAllRides}
+          onRetry={onRetryRides}
+          emptyHint={(recents?.length ?? 0) === 0}
+        />
       </View>
     </View>
   );
 }
+
+export const HomeSheetBody = memo(HomeSheetBodyBase);
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: layout.gutter },
   body: { paddingHorizontal: layout.gutter, paddingTop: space[3] },
   chips: { marginTop: space[3] },
   live: { gap: space[2] },
-  more: { paddingTop: space[6], gap: space[4] },
+  more: { paddingTop: space[4], gap: space[4] },
 });

@@ -52,6 +52,7 @@ import { canCallOn } from '../../features/safety/rules';
 
 /** iPhone SE class height (667 pt): the capped sheets get a little more room. */
 const SHORT_WINDOW_HEIGHT = 700;
+const isSearchStage = (stage: BookingStage): boolean => stage === 'home' || stage === 'pickup' || stage === 'destination';
 
 /**
  * Passenger booking and live ride map. T-534 (PERF-10/11/12/15): the booking state lives in
@@ -351,7 +352,8 @@ const PassengerMapScreen = () => {
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
           {locationGate.refused && !rideShown && !compact && <LocationOffBanner onTurnOn={locationGate.askOrSettings} />}
           {shownStage !== 'requesting' && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
-          {!rideShown && !compact && <StageChips stage={shownStage} />}
+          {/* UI-R9: the search steps are the sheet itself (§12.5); the stepper starts at the vehicle. */}
+          {!rideShown && !compact && !isSearchStage(shownStage) && <StageChips stage={shownStage} />}
           {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
           <BookingStageContent
             flow={flow}

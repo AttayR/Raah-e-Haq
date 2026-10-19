@@ -127,7 +127,16 @@ export const componentTokens = {
   /** §5.16 Toast. */
   toast: { minHeight: 48, iconSize: 20, swipeDismissDistance: 20 },
   /** §5.19 / §5.20 EmptyState and ErrorState. */
-  emptyState: { maxWidth: 280, circle: 96, glyph: 48, illustration: 120, topOffset: space[16] },
+  emptyState: {
+    maxWidth: 280,
+    circle: 96,
+    glyph: 48,
+    illustration: 120,
+    topOffset: space[16],
+    /** UI-R9: compact ErrorState for a section inside a sheet (48 circle, 24 glyph). */
+    compactCircle: 48,
+    compactGlyph: 24,
+  },
   /** §5.18 Skeleton. */
   skeleton: {
     /** Text block height = line height − 6. */

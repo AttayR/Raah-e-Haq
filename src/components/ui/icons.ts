@@ -63,6 +63,10 @@ export const iconGlyphs = {
   work: 'briefcase-outline',
   bookmark: 'bookmark-outline',
   history: 'history',
+  // UI-R9: Home "Add home" chip, "Choose on map" and "Set location on map".
+  homeAdd: 'home-plus-outline',
+  pinOutline: 'map-marker-outline',
+  pinRadius: 'map-marker-radius-outline',
   swap: 'swap-vertical',
   // Money.
   cash: 'cash',

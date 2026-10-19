@@ -28,6 +28,9 @@ import { openRideDetails } from '../../features/ride-history/navigation';
 import { useSavedPlaces } from '../../features/saved-places/hooks';
 import { otherCount, takenLabels } from '../../features/saved-places/format';
 import { bookingParamsFor } from '../../features/saved-places/navigation';
+import type { SavedPlace } from '../../features/saved-places/types';
+import { HOME_RECENT_DESTINATIONS, recentDestinations, type RecentDestination } from '../../features/passenger-home/recentDestinations';
+import type { HomeRidesState } from '../../features/passenger-home/components/HomeRidesSection';
 import { selectInProgressRide } from '../../features/active-ride/slice';
 import { useActiveRideStatusPolling } from '../../features/active-ride/hooks';
 import { liveRideStatusText } from '../../features/active-ride/status';
@@ -50,7 +53,9 @@ const MAP_ROUTES_ABOVE_HOME = ['Booking'] as const;
  * tab): full-bleed map centred on the rider (or the configured default region), the avatar
  * top-start (→ Profile) and "locate me" riding 16 above the "Where to?" sheet (peek 170 → half
  * → full; map controls fade out at full). "Where to?" pushes the Booking route (tab bar hidden).
- * Recent rides come from GET /rides; stats moved to Activity; offers wait for BE-10 (UI-R9).
+ * Recent rides come from GET /rides; stats moved to Activity; offers wait for BE-10. UI-R9: the
+ * chip row adds recent destinations (drop-offs of those rides), skeleton chips and rows while the
+ * first reads run, and a "Try again" state when the rides fail with nothing shown.
  * Saved places (GET /saved-places, T-516) are chips: a tap books a ride to that place.
  * T-524 (passenger-home spec, map item 2): nearby drivers (BE-20) around the rider as muted
  * vehicle markers, polled like the booking map and only while Home is focused and the app is
@@ -99,13 +104,23 @@ export default function PassengerHomeScreen() {
   // Saved places as chips (T-516, BE-14); a failed load just leaves the row without them.
   const saved = useSavedPlaces(isFocused);
   const addPlace = useCallback(
-    () =>
+    (label?: 'home') =>
       navigation.navigate('SavedPlaceEditor', {
+        // UI-R9: "Add home" (no Home saved yet) opens the form on that label.
+        ...(label ? { label } : null),
         taken: takenLabels(saved.places),
         otherFull: saved.maxOther !== null && otherCount(saved.places) >= saved.maxOther,
       }),
     [navigation, saved.places, saved.maxOther],
   );
+  // UI-R9: where the passenger went lately (their finished rides), after the saved places.
+  const recents = useMemo(
+    () => recentDestinations(rideItems ?? [], saved.places, HOME_RECENT_DESTINATIONS),
+    [rideItems, saved.places],
+  );
+  const ridesState: HomeRidesState =
+    rideItems === null && recent.status === 'loading' ? 'loading' : rideItems === null && recent.status === 'failed' ? 'failed' : 'ready';
+  const { reload: reloadRides } = recent;
 
   // BE-88: "Send a parcel" only while the parcel tier is on (the cached vehicle catalogue says so;
   // T-561: re-read on focus once it is a few minutes old, so a newly activated tier shows soon).
@@ -175,6 +190,26 @@ export default function PassengerHomeScreen() {
     }
     centre();
   }, [centre, currentLocation, enableLocation]);
+
+  // Stable handlers, so the memoised sheet body skips the renders a map or sheet move causes.
+  const openBooking = useCallback(() => navigation.navigate('Booking'), [navigation]);
+  const openSavedPlace = useCallback(
+    (place: SavedPlace) => navigation.navigate('Booking', bookingParamsFor(place, 'destination')),
+    [navigation],
+  );
+  const openRecent = useCallback(
+    (item: RecentDestination) => navigation.navigate('Booking', { destination: item.place }),
+    [navigation],
+  );
+  const openSavedPlaces = useCallback(() => navigation.navigate('FavoriteLocations'), [navigation]);
+  const openActivity = useCallback(
+    () => navigation.navigate('PassengerTabs', { screen: 'Activity', params: { segment: 'rides' } }),
+    [navigation],
+  );
+  const sendParcel = useCallback(() => navigation.navigate('SendParcel'), [navigation]);
+  const onEnableLocation = useCallback(() => {
+    enableLocation();
+  }, [enableLocation]);
 
   const openRide = useCallback(
     (id: string) => {
@@ -250,23 +285,25 @@ export default function PassengerHomeScreen() {
         testID="home-sheet"
       >
         <HomeSheetBody
-          onWhereTo={() => navigation.navigate('Booking')}
+          onWhereTo={openBooking}
           savedPlaces={saved.places}
-          onSavedPlace={place => navigation.navigate('Booking', bookingParamsFor(place, 'destination'))}
+          savedPlacesLoading={saved.status === 'loading'}
+          savedPlacesLoaded={saved.data !== null}
+          recents={recents}
+          onRecent={openRecent}
+          onSavedPlace={openSavedPlace}
           onAddPlace={addPlace}
-          onSavedPlaces={() => navigation.navigate('FavoriteLocations')}
+          onSavedPlaces={openSavedPlaces}
           locationOff={locationOff}
-          onEnableLocation={() => {
-            enableLocation();
-          }}
+          onEnableLocation={onEnableLocation}
           recentRides={recentRides}
+          recentRidesState={ridesState}
+          onRetryRides={reloadRides}
           onOpenRide={openRide}
-          onSeeAllRides={() =>
-            navigation.navigate('PassengerTabs', { screen: 'Activity', params: { segment: 'rides' } })
-          }
+          onSeeAllRides={openActivity}
           liveRide={liveRide}
-          onReturnToRide={() => navigation.navigate('Booking')}
-          onSendParcel={parcelAvailable ? () => navigation.navigate('SendParcel') : undefined}
+          onReturnToRide={openBooking}
+          onSendParcel={parcelAvailable ? sendParcel : undefined}
         />
       </BottomSheet>
     </Screen>
