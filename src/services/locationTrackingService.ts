@@ -357,7 +357,9 @@ class LocationTrackingService {
     const now = Date.now();
     const silentForMs = now - this.lastSignAt;
     if (this.watchId !== null && silentForMs > DRIVER_LOCATION_CONFIG.watchRestartAfterMs) {
-      logger.warn('Driver location: no new fix, restarting the watcher', { silentForMs });
+      // T-585: a driver parked while waiting for a request gets no new fix (the watcher's distance
+      // filter), so this is expected, not a warning (it raised the yellow Debug LogBox).
+      logger.debug('Driver location: no new fix, restarting the watcher', { silentForMs });
       this.stopWatch();
       this.startWatch();
     }

@@ -6,7 +6,7 @@ import { rejectionMessage } from '../../core/api/errors';
 import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
-import { toast } from '../../core/toast';
+import { toast, toastOnScreen } from '../../core/toast';
 import { askForPushInContext } from '../notifications/push';
 import { hideModal, showErrorModal } from '../../components/NotificationManager';
 import { confirm } from '../../core/dialog';
@@ -254,14 +254,20 @@ export const showBalanceOwed = async (
 
 /**
  * BE-113 (T-583): POST /rides answered 409 RIDE_ALREADY_ACTIVE. The open booking (`rideId`) is
- * read and becomes the active ride, with a short note instead of an error. Resolves with that
- * ride, or null when it could not be read (or has ended meanwhile); the caller then shows
- * `failure.message`.
+ * read and becomes the active ride, with a short note (a toast on Booking) instead of an error.
+ * Resolves with that ride, or null when it could not be read (or has ended meanwhile); the caller
+ * then shows `failure.message`.
  */
 export const openActiveBooking = async (dispatch: ActiveRideDispatch, rideId: number): Promise<RideResource | null> => {
   const action = await dispatch(openExistingActiveRide(rideId));
   if (!openExistingActiveRide.fulfilled.match(action)) return null;
-  toast.info(ACTIVE_RIDE_COPY.alreadyActiveTitle, ACTIVE_RIDE_COPY.alreadyActiveMessage);
+  // T-585: shown by Booking once it has the opened booking on screen (useScreenToast), not in the
+  // commit that swaps the sheet or replaces the parcel form, where it was never seen.
+  toastOnScreen('booking', {
+    type: 'info',
+    title: ACTIVE_RIDE_COPY.alreadyActiveTitle,
+    message: ACTIVE_RIDE_COPY.alreadyActiveMessage,
+  });
   return action.payload;
 };
 

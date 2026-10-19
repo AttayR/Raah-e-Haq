@@ -121,7 +121,7 @@ export function registerRideCopy(): void {
     cancelConfirmTitle: 'Ride cancel karein',
     cancelConfirmMessage: 'Kya aap waqai ye ride cancel karna chahte hain?',
     keepRide: 'Ride rakhein',
-    cancelFailedTitle: 'Ghalti',
+    cancelFailedToast: 'Cancel nahi ho saka. Dobara koshish karein.',
     alreadyActiveTitle: 'Aap ki ek booking pehle se jari hai',
     alreadyActiveMessage: 'Ye rahi. Nayi booking se pehle use cancel karein.',
     noDriverTitle: 'Koi driver nahi mila',

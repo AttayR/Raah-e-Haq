@@ -17,7 +17,8 @@ import '../../src/i18n/copy-ur-Latn';
 import { usePassengerCancel } from '../../src/features/active-ride/cancel';
 import { bookingBackHandlers } from '../../src/features/active-ride/done';
 import { dialog, dialogStore } from '../../src/core/dialog';
-import { toast, toastStore } from '../../src/core/toast';
+import { toast, toastStore, useScreenToast } from '../../src/core/toast';
+import { resetScreenToasts } from '../../src/core/toast/screenToast';
 import { ChatComposer, SEND_SETTLE_MS } from '../../src/features/chat/components/ChatComposer';
 import { useBookingMapCamera } from '../../src/features/ride-booking/useBookingMapCamera';
 import type { MapViewport } from '../../src/features/active-ride/camera';
@@ -28,6 +29,7 @@ afterEach(() => {
   act(() => {
     dialog.dismissAll();
     toast.hide();
+    resetScreenToasts();
   });
   jest.restoreAllMocks();
   jest.useRealTimers();
@@ -56,17 +58,25 @@ const cancelAndConfirm = async (
   return { cancelRide, onNoRide, onRequestCancelled };
 };
 
+/** T-585: the toast waits for Home; Home on screen shows it. */
+const homeShown = async () => {
+  renderHook(() => useScreenToast('home', true));
+  await waitFor(() => expect(toastStore.getCurrent()).not.toBeNull());
+};
+
 describe('1. Cancel request goes Home with a toast', () => {
   it('a request no driver took yet: toast "Request cancelled", then Home (no cancelled panel)', async () => {
     const { cancelRide, onRequestCancelled } = await cancelAndConfirm(makeRide({ id: 255, status: 'requested' }), 'cancelled');
     expect(cancelRide).toHaveBeenCalledWith(255);
     expect(onRequestCancelled).toHaveBeenCalledTimes(1);
+    await homeShown();
     expect(toastStore.getCurrent()).toMatchObject({ type: 'success', title: 'Request cancelled' });
   });
 
   it('in Roman Urdu too', async () => {
     setLocale('ur-Latn');
     await cancelAndConfirm(makeRide({ status: 'requested' }), 'cancelled');
+    await homeShown();
     expect(toastStore.getCurrent()).toMatchObject({ title: 'Request cancel ho gayi' });
   });
 

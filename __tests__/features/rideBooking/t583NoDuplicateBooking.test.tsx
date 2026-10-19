@@ -2,7 +2,7 @@
  * T-583 (BE-113): one booking per tap. A confirm after one that got no answer reuses its
  * Idempotency-Key for the same body; a 200 + Idempotent-Replayed is read like the 201; a 409
  * RIDE_ALREADY_ACTIVE opens the open ride or parcel (GET /rides/{id}) instead of an error; the
- * parcel form does the same. The iOS swipe-back is off while sending or searching.
+ * parcel form does the same. (The swipe-back guard is tested in qaFollowUpsT585.test.tsx.)
  */
 import React from 'react';
 import { Provider } from 'react-redux';
@@ -11,13 +11,13 @@ import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import rideService from '../../../src/services/rideService';
 import * as modals from '../../../src/components/NotificationManager';
-import { toast } from '../../../src/core/toast';
+import { toast, toastStore, useScreenToast } from '../../../src/core/toast';
+import { resetScreenToasts } from '../../../src/core/toast/screenToast';
 import { openActiveBooking, RideRequestRefused, useActiveRideActions } from '../../../src/features/active-ride/hooks';
 import { createActiveRide } from '../../../src/features/active-ride/slice';
 import { classifyRideRequestFailure } from '../../../src/features/ride-booking/rideRequestFailure';
 import { createBookingAttemptKeys } from '../../../src/features/ride-booking/idempotency';
 import { useBookingRequest } from '../../../src/features/ride-booking/useBookingRequest';
-import { useBookingSwipeBack } from '../../../src/features/ride-booking/useBookingDraft';
 import type { FareOffer } from '../../../src/features/fare/hooks';
 import { envelope, makeRide, makeRideRequest, makeStore } from '../../../test-utils/rideFixtures';
 
@@ -45,6 +45,10 @@ beforeEach(() => {
 afterEach(() => {
   mock.restore();
   jest.restoreAllMocks();
+  act(() => {
+    toast.hide();
+    resetScreenToasts();
+  });
 });
 
 describe('classifyRideRequestFailure (BE-113)', () => {
@@ -183,7 +187,17 @@ describe('POST /rides answers (BE-113)', () => {
     expect((refusal as RideRequestRefused).failure).toMatchObject({ kind: 'already_active', rideId: 202 });
     expect(store.getState().activeRide.ride?.id).toBe(202);
     expect(showError).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledWith('You already have a booking', 'Here it is. Cancel it before you book again.');
+    // T-585: the note waits for Booking to show the opened booking, then shows.
+    expect(info).not.toHaveBeenCalled();
+    expect(toastStore.getCurrent()).toBeNull();
+    renderHook(() => useScreenToast('booking', true));
+    await waitFor(() =>
+      expect(toastStore.getCurrent()).toMatchObject({
+        type: 'info',
+        title: 'You already have a booking',
+        message: 'Here it is. Cancel it before you book again.',
+      }),
+    );
   });
 
   it('409 whose ride has ended meanwhile shows the server message instead', async () => {
@@ -208,24 +222,17 @@ describe('POST /rides answers (BE-113)', () => {
     await expect(openActiveBooking(store.dispatch, 202)).resolves.toBeNull();
     expect(store.getState().activeRide.ride?.id).toBe(300);
     expect(info).not.toHaveBeenCalled();
+    renderHook(() => useScreenToast('booking', true));
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 50);
+      });
+    });
+    expect(toastStore.getCurrent()).toBeNull();
   });
 
   it('createRide resolves the replayed ride from a 200 body', async () => {
     mock.onPost('/rides').reply(200, envelope(makeRide({ id: 88 })), { 'Idempotent-Replayed': 'true' });
     await expect(rideService.createRide(makeRideRequest(), { idempotencyKey: 'abc-12345' })).resolves.toMatchObject({ id: 88 });
-  });
-});
-
-describe('iOS swipe-back on Booking (T-583)', () => {
-  it('is off while a request is sent or searching, and back on after', () => {
-    const setOptions = jest.fn();
-    const { rerender } = renderHook(({ blocked }: { blocked: boolean }) => useBookingSwipeBack({ setOptions }, blocked), {
-      initialProps: { blocked: false },
-    });
-    expect(setOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
-    rerender({ blocked: true });
-    expect(setOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
-    rerender({ blocked: false });
-    expect(setOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
   });
 });

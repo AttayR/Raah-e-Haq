@@ -46,7 +46,9 @@ import { useDefaultVehicle } from '../../features/ride-booking/vehicleSelection'
 import { toVehicleOptions } from '../../features/ride-booking/vehicleOptions';
 import { bookingFooter } from '../../features/ride-booking/components/BookingFooter';
 import { RouteSummaryPill } from '../../features/ride-booking/components/RouteSummaryPill';
-import { useBookingDraft, useBookingHardwareBack, useBookingSwipeBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
+import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
+import { useGuardedBookingActions } from '../../features/ride-booking/useBookingLeaveGuard';
+import { useScreenToast } from '../../core/toast';
 import { IndeterminateBar } from '../../components/ui';
 import { useSharedValue } from 'react-native-reanimated';
 import { openRideChat } from '../../features/chat/navigation';
@@ -284,8 +286,10 @@ const PassengerMapScreen = () => {
   const backState = { searching, findingWithRide: searching && rideShown, cancelled: rideCancelled, retrying: noDriver.retrying };
   const back = bookingBackHandlers(backState, { back: goBack, cancel: handleCancelRide, finish: finishRide });
   useBookingHardwareBack(isFocused, back.hardware);
-  // T-583: no iOS swipe-back under a POST /rides in flight (Request or Try again) or a search.
-  useBookingSwipeBack(navigation, request.busy || searching || noDriver.retrying);
+  // T-583/T-585: no going back under a POST /rides in flight (held from the press) or a search;
+  // back on an ended ride is Done. The 409 "You already have a booking" note shows once on screen.
+  const guarded = useGuardedBookingActions(navigation, { request, noDriver, searching, ended: rideEnded, onEndedLeave: finishRide });
+  useScreenToast('booking', isFocused && rideShown);
 
   if (locationGate.wait) {
     return <LocationWaitState {...locationGate.wait} onBack={() => navigation.goBack()} />;
@@ -304,12 +308,12 @@ const PassengerMapScreen = () => {
     rideStage: rideStage?.stage,
     searching,
     choose: choosing && !compact
-      ? { options: vehicleOptions, estimates, selectedVehicle: flow.selectedVehicle, offer, onConfirm: request.confirm, confirming: request.confirming, disabled: request.sending }
+      ? { options: vehicleOptions, estimates, selectedVehicle: flow.selectedVehicle, offer, onConfirm: guarded.confirm, confirming: request.confirming, disabled: request.sending }
       : null,
     onFinish: finishRide,
     onCancel: handleCancelRide,
     cancelDisabled: request.busy || rideSubmitting,
-    noDriver,
+    noDriver: guarded.noDriver,
   });
 
   return (

@@ -1,11 +1,11 @@
 import { useCallback, useRef } from 'react';
 import type { RideResource } from '../../services/rideService';
-import { alert, confirm } from '../../core/dialog';
+import { confirm } from '../../core/dialog';
 import { toCancellationPreview } from '../fare/api';
 import { cancelPreviewText } from '../fare/format';
 import { t } from '../../i18n';
 import { isParcelRide } from '../parcel/api';
-import { toast } from '../../core/toast';
+import { toast, toastOnScreen } from '../../core/toast';
 import { ACTIVE_RIDE_COPY } from './copy';
 
 /**
@@ -38,6 +38,7 @@ const isOpenRequest = (ride: RideResource | null): boolean => !ride || ride.stat
  * Before a driver takes the ride the question is about the request ("Cancel request?", "Keep
  * looking"; UI-R10), and a cancelled request is a toast "Request cancelled" and `onRequestCancelled`
  * (back to Home), not the "Ride cancelled" panel (T-584, passenger-finding-driver.md "Cancel tap").
+ * A failed cancel is the toast "Couldn't cancel. Try again." (T-585, "Cancel error").
  */
 export const usePassengerCancel = (
   ride: RideResource | null,
@@ -70,12 +71,13 @@ export const usePassengerCancel = (
       const outcome = await cancelRide(current.id);
       // A 409 (a driver took it meanwhile) re-reads the ride instead: the panel shows that stage.
       if (outcome === 'cancelled' && stillRequest && onRequestCancelled) {
-        toast.success(ACTIVE_RIDE_COPY.requestCancelled);
+        // T-585: shown by Home once it is back on screen, not in the commit that leaves Booking.
+        toastOnScreen('home', { type: 'success', title: ACTIVE_RIDE_COPY.requestCancelled });
         onRequestCancelled();
       }
-    } catch (cancelError) {
-      const message = cancelError instanceof Error ? cancelError.message : ACTIVE_RIDE_COPY.cancelFailedFallback;
-      await alert({ title: ACTIVE_RIDE_COPY.cancelFailedTitle, body: message });
+    } catch {
+      // T-585: passenger-finding-driver.md "Cancel error": a toast, not a dialog; the ride stays.
+      toast.error(ACTIVE_RIDE_COPY.cancelFailedToast);
     }
   }, [cancelRide, onNoRide, onRequestCancelled]);
 };

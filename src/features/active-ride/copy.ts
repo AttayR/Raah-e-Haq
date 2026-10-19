@@ -49,7 +49,8 @@ export const ACTIVE_RIDE_COPY = localizedCopy({
   cancelConfirmTitle: 'Cancel Ride',
   cancelConfirmMessage: 'Are you sure you want to cancel this ride?',
   keepRide: 'Keep Ride',
-  cancelFailedTitle: 'Error',
+  // T-585: a cancel the server refused or that got no answer (passenger-finding-driver.md).
+  cancelFailedToast: "Couldn't cancel. Try again.",
   // T-583 (BE-113): Request found a booking already open; that one is shown.
   alreadyActiveTitle: 'You already have a booking',
   alreadyActiveMessage: 'Here it is. Cancel it before you book again.',

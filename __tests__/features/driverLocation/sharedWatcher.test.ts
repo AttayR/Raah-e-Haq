@@ -16,6 +16,7 @@ import {
   DRIVER_LOCATION_WATCH_OPTIONS,
 } from '../../../src/features/driver-location/config';
 import locationTrackingService from '../../../src/services/locationTrackingService';
+import { logger } from '../../../src/core/logging/logger';
 
 const { minPostIntervalMs, heartbeatMs, watchRestartAfterMs, maxFixAgeMs, arrivalPingMaxAgeMs } =
   DRIVER_LOCATION_CONFIG;
@@ -91,10 +92,15 @@ describe('self-heal of a silent watcher (T-410)', () => {
     expect(geo.watchPosition).toHaveBeenCalledTimes(1);
 
     // Silence: no fix for longer than the window (ticks every minPostIntervalMs).
+    const warn = jest.spyOn(logger, 'warn');
+    const debug = jest.spyOn(logger, 'debug');
     await advance(watchRestartAfterMs + minPostIntervalMs);
     expect(geo.clearWatch).toHaveBeenCalledTimes(1);
     expect(geo.clearWatch).toHaveBeenCalledWith(1);
     expect(geo.watchPosition).toHaveBeenCalledTimes(2);
+    // T-585: a parked driver gets no new fix; expected, so debug (no yellow Debug LogBox).
+    expect(debug).toHaveBeenCalledWith('Driver location: no new fix, restarting the watcher', expect.anything());
+    expect(warn).not.toHaveBeenCalled();
 
     // Still silent, but within the new window: no further restart (no loop).
     await advance(watchRestartAfterMs - minPostIntervalMs);
