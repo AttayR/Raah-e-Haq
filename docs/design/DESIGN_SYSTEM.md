@@ -121,7 +121,7 @@ Code only ever uses these names (`theme.colors.<token>`). Raw palette names are 
 | `dangerFill` | `#C0262D` | `#D23A40` | destructive filled button (white text 5.90 / 4.75) |
 | `info` | `#1D58C4` | `#7FA8F5` | info text/icons |
 | `infoSoft` | `#E7EFFD` | `#15264A` | info banners |
-| `accent` | `#F59A23` | `#F59A23` | brand dot, promo tag fill |
+| `accent` | `#F59A23` | `#F59A23` | brand dot, promo tag fill, **[UI-R20]** Parcel service disc on passenger Home (glyph `onAccent`, 8.33:1) |
 | `onAccent` | `#0F1422` | `#0F1422` | text on `accent` |
 | `ratingStar` | `#C77700` | `#F5A524` | filled star |
 | `ratingStarEmpty` | `#C3CAD9` | `#2B3450` | empty star (decorative; the number is always shown next to it) |
@@ -599,6 +599,7 @@ Today (2026-10-11): passenger has 4 default tabs (Home dashboard, Notifications,
 ### 8.3 Home / Drive sheet behaviour
 - Library and spring per §5.14 and §6.2; handle 36×5 always visible; drag anywhere on the handle area or the sheet header; content scrolls only at the `full` snap.
 - **Passenger Home sheet:** snap points `peek` = 24 (top padding) + greeting `title` 22 + 12 + "Where to?" field 52 + 12 + shortcut chip row 32 + 16 = **170**, plus the tab bar height underneath (sheet sits above the tab bar); `half` = 50% of window; `full` = window − top inset − 8. Opens at `peek`. Map camera padding bottom = current sheet height + 24. At `full` the sheet gets a 1pt `border` top edge and the map controls fade out.
+  **[UI-R20, 2026-10-19]** The greeting slot is now the sheet header chosen by state (`screens/passenger-home.md` § Services S1): service row (Ride + Parcel tiles, 96) while the parcel tier is on → **peek 244**; ride-only heading (22) while it is off → **170**; greeting only with a ride in progress (T-577, 202). Peek = measured header + 124, re-applied only on a ≥1pt change. Passenger Home `half` = **max(50 % of window, peek + 180)**, capped at `full` (SE 424 with the service row).
 - **Driver Drive sheet:** `peek` = 24 + status row (dot + "You're offline"/"You're online" `h3` 25) + 16 + Online/Offline button 56 + 16 = **137** above the tab bar (**[T-587]** with the auto-accept row: 24 + 25 + 12 + row 56 + 12 + button 56 + 16 = **201**, `screens/map-vehicles.md` §7.1); `half` = 50% (today's earnings, account/document warnings, tips); no `full`. Offline: button "Go online" (lg, `primary`); online: "Go offline" (lg, `outline`), a 2pt `success` progress shimmer under the status row while searching for requests. Haptic `impactLight` on toggle.
 - **Incoming request (driver):** replaces the Drive sheet content with the request (§12.5), sheet springs to content height (max 70%); tab bar hides while a request is shown; on decline/timeout the Drive sheet returns at `peek`.
 - Map chrome on Home/Drive: top-start avatar or nothing, top-end bell is NOT shown (Inbox tab has the badge); end-side "locate me" floating button riding 16 above the sheet. Max two floating controls (§9).
