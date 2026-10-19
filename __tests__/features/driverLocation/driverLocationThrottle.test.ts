@@ -79,6 +79,17 @@ describe('toLocationBody', () => {
     expect(toLocationBody(fix({ heading: 87 }))).toMatchObject({ heading: 87 });
   });
 
+  it('T-587: sends is_mocked and accuracy with the ping when the device gave them', () => {
+    expect(toLocationBody(fix({ accuracy: 12, mocked: true }))).toEqual({
+      latitude: 31.5204,
+      longitude: 74.3587,
+      accuracy: 12,
+      is_mocked: true,
+    });
+    expect(toLocationBody(fix({ mocked: false }))).toMatchObject({ is_mocked: false });
+    expect(toLocationBody(fix())).not.toHaveProperty('is_mocked');
+  });
+
   it('leaves out values the device did not give', () => {
     expect(toLocationBody(fix())).toEqual({ latitude: 31.5204, longitude: 74.3587 });
   });
@@ -89,6 +100,13 @@ describe('toLocationFix', () => {
     expect(
       toLocationFix({ coords: { latitude: 1, longitude: 2, accuracy: 3, heading: 4, speed: 5 }, timestamp: 9 }, 0),
     ).toEqual({ latitude: 1, longitude: 2, accuracy: 3, heading: 4, speed: 5, timestamp: 9 });
+  });
+
+  it('T-587: keeps the native mock-location flag, and leaves it out when the device did not say', () => {
+    const coords = { latitude: 1, longitude: 2, accuracy: 3 };
+    expect(toLocationFix({ coords, mocked: true }, 0)?.mocked).toBe(true);
+    expect(toLocationFix({ coords, mocked: false }, 0)?.mocked).toBe(false);
+    expect(toLocationFix({ coords }, 0)).not.toHaveProperty('mocked');
   });
 
   it('drops a position without a usable coordinate', () => {

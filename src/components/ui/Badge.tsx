@@ -4,8 +4,10 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { t } from '../../i18n';
 import { componentTokens, radius, space, type SemanticColorName } from '../../theme';
 import { AppText, type TextColor } from './AppText';
+import { Icon } from './Icon';
+import type { IconName } from './icons';
 
-export type BadgeTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+export type BadgeTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary';
 
 const tones: Record<BadgeTone, { fill: SemanticColorName; text: TextColor }> = {
   success: { fill: 'successSoft', text: 'success' },
@@ -13,12 +15,14 @@ const tones: Record<BadgeTone, { fill: SemanticColorName; text: TextColor }> = {
   danger: { fill: 'dangerSoft', text: 'danger' },
   info: { fill: 'infoSoft', text: 'info' },
   neutral: { fill: 'surfaceAlt', text: 'textSecondary' },
+  // T-587: the driver's "Auto" badge (map-vehicles.md §7.3).
+  primary: { fill: 'primarySoft', text: 'onPrimarySoft' },
 };
 
 type Common = { testID?: string; accessibilityLabel?: string };
 
 /** Status pill (default): a short sentence-case label in one of five tones. */
-type StatusBadgeProps = Common & { variant?: 'status'; label: string; tone?: BadgeTone };
+type StatusBadgeProps = Common & { variant?: 'status'; label: string; tone?: BadgeTone; icon?: IconName };
 /**
  * Count: number on `dangerFill` (white on dark `danger` is 2.52:1); `99+` cap; zero renders nothing.
  * The host supplies `accessibilityLabel` ("3 unread"), never the bare number.
@@ -78,8 +82,9 @@ export function Badge(props: BadgeProps) {
     <View
       testID={props.testID}
       accessibilityLabel={props.accessibilityLabel}
-      style={[styles.pill, { backgroundColor: c[tone.fill] }]}
+      style={[styles.pill, props.icon ? styles.withIcon : null, { backgroundColor: c[tone.fill] }]}
     >
+      {props.icon ? <Icon name={props.icon} size={16} color={tone.text} /> : null}
       <AppText variant="label" color={tone.text} numberOfLines={1}>
         {props.label}
       </AppText>
@@ -97,6 +102,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  withIcon: { flexDirection: 'row', gap: space[1] },
   count: {
     minWidth: k.countMin,
     minHeight: k.countMin,

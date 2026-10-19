@@ -148,6 +148,9 @@ export const iconGlyphs = {
   dispute: 'scale-balance',
   // AC tier and women mode (T-522).
   ac: 'snowflake',
+  // T-587: driver auto-accept (map-vehicles.md §7.1).
+  autoAccept: 'flash',
+  autoAcceptOff: 'flash-outline',
   womenMode: 'face-woman-outline',
   // Parcel delivery (T-522, BE-88).
   parcel: 'package-variant-closed',

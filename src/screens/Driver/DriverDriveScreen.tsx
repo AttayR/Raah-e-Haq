@@ -17,6 +17,11 @@ import {
   type DriveStatus,
 } from '../../components/driver/drive/DriveSheet';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
+import { AutoAcceptRow } from '../../components/driver/drive/AutoAcceptRow';
+import { AutoAcceptSheet } from '../../components/driver/drive/AutoAcceptSheet';
+import { PickupRangeCircle } from '../../components/driver/drive/PickupRangeCircle';
+import { useAutoAcceptControls, useAutoAcceptLoad } from '../../features/driver-auto-accept/hooks';
+import { selectAutoAcceptActive } from '../../features/driver-auto-accept/slice';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { RootState } from '../../store';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
@@ -39,8 +44,11 @@ import { formatMoney } from '../../core/format/money';
 import { t } from '../../i18n';
 import { space } from '../../theme';
 
-/** §8.3: 24 handle area + status row 25 + 16 + 56 action + 16. */
-export const DRIVE_PEEK_HEIGHT = 137;
+/**
+ * §8.3 + map-vehicles.md §7.1 (T-587): 24 handle area + status row 25 + 12 + auto-accept row 56 +
+ * 12 + 56 action + 16.
+ */
+export const DRIVE_PEEK_HEIGHT = 201;
 /** Room kept above the sheet when the camera centres on the driver (§8.3: sheet height + 24). */
 const CAMERA_SHEET_GAP = space[6];
 /** Neighbourhood zoom for the first fix and for "locate me". */
@@ -60,7 +68,7 @@ const toCoordinate = (lat: unknown, lng: unknown) => {
 /**
  * Driver Drive tab (UI-R4, DESIGN_SYSTEM §8.1/§8.3; merges the old Home dashboard and Map tab):
  * full-bleed map with the avatar top-start and "locate me" riding 16 above the Drive sheet. The
- * sheet (peek 137 → half) holds the status row and the 56pt Go online / Go offline action (same
+ * sheet (peek 201 → half) holds the status row, the auto-accept row (T-587) and the 56pt Go online / Go offline action (same
  * thunks as before: GET/PUT /driver/status, T-401), and at half today's earnings, the approval
  * warning, today's figures, the last three trips (GET /rides, T-507) and the account card
  * (GET /me/stats). Incoming requests come from
@@ -86,6 +94,19 @@ export default function DriverDriveScreen() {
   const location = useMemo(
     () => (lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : null),
     [lat, lng],
+  );
+
+  // T-587: auto-accept (map-vehicles.md §7): read on mount and on going online, never polled.
+  useAutoAcceptLoad();
+  const autoAccept = useAutoAcceptControls();
+  const autoAcceptOn = useSelector(selectAutoAcceptActive);
+  const [autoAcceptSheetOpen, setAutoAcceptSheetOpen] = useState(false);
+  const openAutoAcceptSheet = useCallback(() => setAutoAcceptSheetOpen(true), []);
+  const closeAutoAcceptSheet = useCallback(() => setAutoAcceptSheetOpen(false), []);
+  const { onSwitch: switchAutoAccept } = autoAccept;
+  const onAutoAcceptSwitch = useCallback(
+    (value: boolean) => switchAutoAccept(value, openAutoAcceptSheet),
+    [switchAutoAccept, openAutoAcceptSheet],
   );
 
   const stats = useMyStats(isFocused, DRIVER_HOME_COPY.statsUnavailable);
@@ -159,7 +180,7 @@ export default function DriverDriveScreen() {
   }, [toggle]);
 
   const status: DriveStatus = isChecking ? 'checking' : isOnRide ? 'onRide' : isOnline ? 'online' : 'offline';
-  // T-580: while the "Location needed" card shows, the peek rises to fit it; back to 137 after.
+  // T-580: while the "Location needed" card shows, the peek rises to fit it; back to 201 after.
   const hasRide = isRestorableDriverRide(currentRide);
   const [locationCardHeight, setLocationCardHeight] = useState(0);
   const cardShown = showsLocationCard(locationBlocked !== null, hasRide, status);
@@ -204,6 +225,10 @@ export default function DriverDriveScreen() {
                   testID="drive-driver-marker"
                 />
               ) : null}
+              {location && autoAcceptOn && status === 'online' && autoAccept.settings ? (
+                // T-587 (§7.3): the real max-pickup circle while auto-accept is on.
+                <PickupRangeCircle center={location} radiusKm={autoAccept.settings.maxPickupKm} />
+              ) : null}
               {pickup ? <RideMarker kind="pickup" coordinate={pickup} /> : null}
               {dropoff ? <RideMarker kind="dropoff" coordinate={dropoff} /> : null}
             </SafeMapView>
@@ -233,7 +258,7 @@ export default function DriverDriveScreen() {
           snapPoints={sheetSnaps.snapPoints}
           animatedHeight={sheetAnimatedHeight}
           onSnapChange={(_, height) => setSheetHeight(height)}
-          header={<DriveStatusHeader status={status} />}
+          header={<DriveStatusHeader status={status} autoAccept={autoAcceptOn} />}
           accessibilityLabel={t('drive.sheetA11y')}
           testID="drive-sheet"
         >
@@ -256,9 +281,31 @@ export default function DriverDriveScreen() {
             onOpenRide={(id) => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: Number(id) })}
             locationBlocked={locationBlocked}
             onLocationCardLayout={setLocationCardHeight}
+            autoAcceptOn={autoAcceptOn}
+            autoAcceptRow={
+              <AutoAcceptRow
+                settings={autoAccept.settings}
+                loadStatus={autoAccept.loadStatus}
+                online={status === 'online' || status === 'onRide'}
+                saving={autoAccept.saving}
+                onOpen={openAutoAcceptSheet}
+                onSwitch={onAutoAcceptSwitch}
+                onRetry={autoAccept.retry}
+              />
+            }
           />
         </BottomSheet>
       )}
+
+      <AutoAcceptSheet
+        visible={autoAcceptSheetOpen && isFocused}
+        settings={autoAccept.settings}
+        loadStatus={autoAccept.loadStatus}
+        saving={autoAccept.saving}
+        onClose={closeAutoAcceptSheet}
+        onRetry={autoAccept.retry}
+        onSave={autoAccept.save}
+      />
     </Screen>
   );
 }

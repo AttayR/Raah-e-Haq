@@ -14,7 +14,7 @@ import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 import { toPushPayload } from './api';
 import { NOTIFICATIONS_COPY } from './copy';
-import { focusedChatRideId, openNotificationTarget } from './navigation';
+import { focusedChatRideId, focusedChildOf, openNotificationTarget } from './navigation';
 import { promptForPushWithPrimer, registerDeviceToken, setPushAskHandler, syncPushRegistration } from './push';
 import { resolveNotificationTarget, type NotificationRole } from './routing';
 import {
@@ -25,14 +25,27 @@ import {
 } from './slice';
 import { refetchActiveRideForPush, type ActiveRideState } from '../active-ride/slice';
 import { confirmPassengerLiveRide } from './liveRideTarget';
+import { loadDriverStatus, type DriverStatusState } from '../driver-status/slice';
+import {
+  selectAutoAcceptActive,
+  selectAutoAcceptTakeoverRideId,
+  type AutoAcceptState,
+} from '../driver-auto-accept/slice';
 
 type SliceRoot = {
   notifications: NotificationsState;
   activeRide: ActiveRideState;
+  driverStatus: DriverStatusState;
+  driverAutoAccept?: AutoAcceptState;
   apiAuth?: { user: { id: number } | null };
 };
 type NotificationsDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
 type RemoteMessage = FirebaseMessagingTypes.RemoteMessage;
+
+/** The driver's tab navigator route (DriverStack), where the auto-accept takeover shows. */
+const DRIVER_TABS_ROUTE = 'DriverTabs';
+/** The root route that holds DriverStack (RootNavigation). */
+const DRIVER_STACK_ROUTE = 'Driver';
 
 /** The push that cold-started the app is routed once per process. */
 let initialNotificationChecked = false;
@@ -113,6 +126,22 @@ export const usePushNotifications = (role: NotificationRole): void => {
         return;
       }
       dispatch(fetchUnreadCount());
+      // T-587: a ride assigned to the driver (auto-accept, or an admin): read the status now so
+      // the ride is restored (and the "Ride accepted for you" takeover opens) without waiting
+      // for the next request poll.
+      if (role === 'driver' && payload.type === 'driver_assigned') {
+        dispatch(loadDriverStatus());
+        // T-587: the takeover says it, so no toast too, but only when it can show now: one is
+        // already up, or auto-accept is on and the tabs (where it shows) are the focused screen.
+        // Under a stack screen (Wallet, Profile, ...) the toast with "View" is the visible notice.
+        const state = store.getState();
+        const takeoverUp = selectAutoAcceptTakeoverRideId(state) !== null;
+        const top = focusedChildOf(navigationRef.current, DRIVER_STACK_ROUTE);
+        // `undefined`: the driver stack is still on its first screen, the tabs.
+        const tabsFocused = top === undefined || top === DRIVER_TABS_ROUTE;
+        const takeoverCanShow = selectAutoAcceptActive(state) && tabsFocused;
+        if (takeoverUp || takeoverCanShow) return;
+      }
       // The driver's request card already shows a new request on every tab.
       if (role === 'driver' && payload.type === 'new_ride_request') return;
       const title = message.notification?.title?.trim() || '';

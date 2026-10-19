@@ -9,6 +9,11 @@ export interface LocationFix {
   speed: number | null;
   accuracy: number | null;
   timestamp: number;
+  /**
+   * T-587 (SEC-33): the OS flagged the position as simulated (Android `isFromMockProvider`,
+   * iOS 15+ `sourceInformation.isSimulatedBySoftware`). Undefined when the device did not say.
+   */
+  mocked?: boolean;
 }
 
 /** What the server last accepted, and when (epoch ms). */
@@ -33,6 +38,8 @@ export interface DevicePosition {
     speed?: number | null;
   };
   timestamp?: number;
+  /** Top-level flag set by the native module on both platforms (see LocationFix.mocked). */
+  mocked?: boolean;
 }
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -78,7 +85,7 @@ export const toLocationFix = (position: DevicePosition, now: number): LocationFi
   const longitude = finiteOrNull(position.coords?.longitude);
   if (latitude === null || longitude === null) return null;
   if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
-  return {
+  const fix: LocationFix = {
     latitude,
     longitude,
     heading: finiteOrNull(position.coords.heading),
@@ -86,6 +93,8 @@ export const toLocationFix = (position: DevicePosition, now: number): LocationFi
     accuracy: finiteOrNull(position.coords.accuracy),
     timestamp: finiteOrNull(position.timestamp) ?? now,
   };
+  if (typeof position.mocked === 'boolean') fix.mocked = position.mocked;
+  return fix;
 };
 
 /**
@@ -101,12 +110,14 @@ const tooSlowForHeading = (fix: LocationFix): boolean =>
 /**
  * The POST body: numbers only, raw device values (speed in m/s, iOS -1 included); a value the
  * device did not give is left out, and so is the heading while standing still (T-517). Never
- * `driver_id` or `status`.
+ * `driver_id` or `status`. `is_mocked` goes with every ping whose device said (T-587).
  */
 export const toLocationBody = (fix: LocationFix): DriverLocationBody => {
   const body: DriverLocationBody = { latitude: fix.latitude, longitude: fix.longitude };
   if (fix.heading !== null && !tooSlowForHeading(fix)) body.heading = fix.heading;
   if (fix.speed !== null) body.speed = fix.speed;
   if (fix.accuracy !== null) body.accuracy = fix.accuracy;
+  // T-587 (BE-120): the server stops auto-assigning for the session after a simulated ping.
+  if (fix.mocked !== undefined) body.is_mocked = fix.mocked;
   return body;
 };

@@ -41,7 +41,7 @@ const DOT = space[3];
  * and while online a 2pt `success` shimmer under the row (searching for requests). Reduced
  * motion: a still bar.
  */
-export function DriveStatusHeader({ status }: { status: DriveStatus }) {
+export function DriveStatusHeader({ status, autoAccept = false }: { status: DriveStatus; autoAccept?: boolean }) {
   const { theme } = useAppTheme();
   const dot =
     status === 'online' ? theme.colors.success : status === 'onRide' ? theme.colors.info : theme.colors.textMuted;
@@ -57,6 +57,10 @@ export function DriveStatusHeader({ status }: { status: DriveStatus }) {
         <AppText variant="h3" numberOfLines={1} style={styles.flex}>
           {STATUS_TEXT()[status]}
         </AppText>
+        {status === 'online' && autoAccept ? (
+          // T-587 (map-vehicles.md §7.3): matching rides are accepted for the driver.
+          <Badge tone="primary" icon="autoAccept" label={t('autoAccept.badge')} testID="drive-auto-badge" />
+        ) : null}
       </View>
       {status === 'online' ? <SearchingShimmer /> : null}
     </View>
@@ -113,6 +117,10 @@ type BodyProps = {
   locationBlocked?: { onOpenSettings: () => void; onRetry: () => void } | null;
   /** T-580: the "Location needed" card's height, so the screen can raise the peek to show all of it. */
   onLocationCardLayout?: (height: number) => void;
+  /** T-587: the auto-accept row (§7.1), between the status row and the online action. */
+  autoAcceptRow?: React.ReactNode;
+  /** T-587: auto-accept is on and allowed: the online hint says rides are accepted for you. */
+  autoAcceptOn?: boolean;
 };
 
 /** §8.3: the 56pt online action the peek is sized for. */
@@ -126,7 +134,7 @@ export const showsLocationCard = (blocked: boolean, hasRide: boolean, status: Dr
  * T-580 (QA bug 1): the Drive sheet's snap points. While the "Location needed" card replaces the
  * 56pt action, the peek grows by the card's extra height so its title, Open Settings and Try
  * again are all visible without dragging; the second snap is `full` (always above that peek, also
- * on short phones where `half` could be lower). Otherwise the §8.3 peek 137 → half.
+ * on short phones where `half` could be lower). Otherwise the §8.3 peek (201) → half.
  */
 export const driveSheetSnaps = (
   basePeek: number,
@@ -159,10 +167,13 @@ export function DriveSheetBody({
   onOpenRide,
   locationBlocked,
   onLocationCardLayout,
+  autoAcceptRow,
+  autoAcceptOn = false,
 }: BodyProps) {
   const online = status === 'online';
   return (
-    <View style={styles.body}>
+    <View style={[styles.body, autoAcceptRow ? styles.bodyWithRow : null]}>
+      {autoAcceptRow ? <View style={styles.rowSlot}>{autoAcceptRow}</View> : null}
       {locationBlocked && showsLocationCard(true, hasRide, status) ? (
         <View onLayout={e => onLocationCardLayout?.(e.nativeEvent.layout.height)} testID="drive-location-card-wrap">
           <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
@@ -190,7 +201,7 @@ export function DriveSheetBody({
 
       <View style={styles.more}>
         <AppText variant="bodySmall" color="textSecondary" testID="drive-hint">
-          {HINT_TEXT()[status]}
+          {online && autoAcceptOn ? t('autoAccept.onlineHint') : HINT_TEXT()[status]}
         </AppText>
         {todayEarnings ? (
           <View style={styles.pillRow}>
@@ -262,6 +273,9 @@ const styles = StyleSheet.create({
   },
   shimmer: { position: 'absolute', top: 0, bottom: 0, width: '30%', borderRadius: radius.pill },
   body: { paddingHorizontal: layout.gutter, paddingTop: space[4] },
+  // T-587 (§7.1): status row → 12 → auto-accept row → 12 → action.
+  bodyWithRow: { paddingTop: space[3] },
+  rowSlot: { marginBottom: space[3] },
   more: { paddingTop: space[6], gap: space[4] },
   pillRow: { flexDirection: 'row' },
 });

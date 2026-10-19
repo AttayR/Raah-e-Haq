@@ -2,7 +2,7 @@ import { apiService } from '../../services/api';
 
 /**
  * POST /tracking/update-location (BE-06, docs/api/CONTRACT_NOTES.md). Driver role only.
- * Body `{latitude, longitude, heading?, speed? (m/s), accuracy? (m)}`, all numbers; raw iOS -1
+ * Body `{latitude, longitude, heading?, speed? (m/s), accuracy? (m), is_mocked? (bool, T-587)}`; raw iOS -1
  * values are allowed (the server stores them as null). The driver comes from the token: never
  * send `driver_id` or `status`.
  * 201 on success; 409 `DRIVER_OFFLINE` when the server has the driver offline (nothing stored);
@@ -18,6 +18,8 @@ export interface DriverLocationBody {
   heading?: number;
   speed?: number;
   accuracy?: number;
+  /** T-587 (BE-120): the OS marked the position as simulated. */
+  is_mocked?: boolean;
 }
 
 export const driverLocationApi = {

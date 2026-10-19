@@ -75,9 +75,9 @@ describe('Drive sheet height with the location card (T-580)', () => {
     expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 312)).toEqual({ peekHeight: DRIVE_PEEK_HEIGHT - 56 + 312, snapPoints: ['peek', 'full'] });
   });
 
-  it('without the card (or before it is measured): the normal 137 → half', () => {
-    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, null)).toEqual({ peekHeight: 137, snapPoints: ['peek', 'half'] });
-    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 0)).toEqual({ peekHeight: 137, snapPoints: ['peek', 'half'] });
+  it('without the card (or before it is measured): the normal 201 → half (T-587 auto-accept row)', () => {
+    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, null)).toEqual({ peekHeight: 201, snapPoints: ['peek', 'half'] });
+    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 0)).toEqual({ peekHeight: 201, snapPoints: ['peek', 'half'] });
   });
 });
 

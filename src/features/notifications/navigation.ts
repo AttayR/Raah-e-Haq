@@ -96,6 +96,27 @@ const focusedRouteOf = (state: AnyState | undefined): { name: string; params?: o
 };
 
 /**
+ * The focused child route of `parentName` (a route on the focused path from the root): its name,
+ * `undefined` when that navigator has no state in the root yet (it shows its initial route; the
+ * root holds no nested state until the first navigation), or null when `parentName` is not on
+ * the focused path.
+ */
+export const focusedChildOf = (navigation: NotificationNavigation, parentName: string): string | null | undefined => {
+  let state = rootOf(navigation).getState() as AnyState | undefined;
+  while (state && state.routes.length > 0) {
+    const route = state.routes[state.index ?? state.routes.length - 1];
+    if (!route) return null;
+    const child = route.state as AnyState | undefined;
+    if (route.name === parentName) {
+      if (!child || child.routes.length === 0) return undefined;
+      return child.routes[child.index ?? child.routes.length - 1]?.name ?? undefined;
+    }
+    state = child;
+  }
+  return null;
+};
+
+/**
  * The ride whose chat thread (`RideChat`) is the focused screen right now, or null. A foreground
  * chat push for that ride shows no banner (T-544): the thread is already on screen.
  */

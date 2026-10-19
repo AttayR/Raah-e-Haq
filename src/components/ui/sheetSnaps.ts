@@ -2,7 +2,7 @@ import { componentTokens } from '../../theme';
 
 /**
  * Snap points of a BottomSheet (DESIGN_SYSTEM §5.14, §8.3):
- * - `peek`: content-defined collapsed height (`peekHeight`, e.g. 170 passenger Home, 137 Drive).
+ * - `peek`: content-defined collapsed height (`peekHeight`, e.g. 170 passenger Home, 201 Drive).
  * - `content`: the sheet's natural height (handle + header + body + footer), for pickers,
  *   confirmations and the incoming request; capped at `full`.
  * - `half`: 50% of the container (the window on a full-screen map), or `halfMinHeight` when that

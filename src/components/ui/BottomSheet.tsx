@@ -53,7 +53,7 @@ export type BottomSheetProps = React.PropsWithChildren<{
   mode?: 'map' | 'modal';
   /** Map default `['peek', 'half', 'full']`; modal default `['content']`. */
   snapPoints?: readonly SheetSnap[];
-  /** Height of `peek` (passenger Home 170–244, driver Drive 137, §8.3). Without it, `peek` = content. */
+  /** Height of `peek` (passenger Home 170–244, driver Drive 201, §8.3). Without it, `peek` = content. */
   peekHeight?: number;
   /** [UI-R20] Floor for `half` (passenger Home: peek + 180); `half` is still capped at `full`. */
   halfMinHeight?: number;

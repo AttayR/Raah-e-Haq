@@ -19,6 +19,7 @@ import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import { openRideChat } from '../../features/chat/navigation';
 import { useAppIsActive } from '../../features/driver-requests/hooks';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
+import { useEndAutoAcceptedTakeover } from '../../features/driver-auto-accept/hooks';
 import { useDriverRideCamera, type DriverRideViewport } from '../../features/driver-ride/camera';
 import { activeStopCoordinates } from '../../features/active-ride/camera';
 import {
@@ -68,6 +69,7 @@ const DriverRideScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const appActive = useAppIsActive();
   useDriverRideStatusPolling(isFocused && appActive);
+  useEndAutoAcceptedTakeover(); // T-587
   // T-517: the driver's own vehicle from the shared watcher (the tracker posts at ride cadence).
   const position = useDriverDevicePosition(isFocused);
 

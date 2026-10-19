@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppState, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { AppTheme } from '../../theme';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
 import { useDriverLastLocation } from '../../features/driver-location/hooks';
+import { useAppIsActive } from '../../hooks/useAppIsActive';
 import {
   usePendingRidePolling,
   useRideRequestActions,
@@ -17,6 +18,17 @@ import { selectDriverRequestsState } from '../../features/driver-requests/slice'
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { selectDriverIsOnline, selectDriverIsOnRide } from '../../features/driver-status/slice';
 import { RideRequestPanel } from './IncomingRequestCard';
+import { AutoAcceptedCard } from './AutoAcceptedCard';
+import { useAutoAssignedRideWatch } from '../../features/driver-auto-accept/hooks';
+import {
+  dismissAutoAcceptedTakeover,
+  selectAutoAcceptTakeoverRideId,
+} from '../../features/driver-auto-accept/slice';
+import {
+  OFFER_VIEWED_DELAY_MS,
+  reportOfferDeclined,
+  reportOfferViewed,
+} from '../../features/driver-auto-accept/offerReports';
 
 type Props = {
   /** Distance from the bottom of the tab area to the panel: the tab bar when it shows, else the inset. */
@@ -69,7 +81,51 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
   const failures = useConsecutiveFeedFailures();
   const isOnline = useSelector(selectDriverIsOnline);
   const isOnRide = useSelector(selectDriverIsOnRide);
-  const hasActiveRide = useSelector(selectDriverActiveRide) !== null;
+  const activeRide = useSelector(selectDriverActiveRide);
+  const hasActiveRide = activeRide !== null;
+
+  // T-587: a ride accepted for the driver (auto-accept) takes over the map until "Go to pickup".
+  const dispatch = useDispatch();
+  useAutoAssignedRideWatch();
+  const takeoverRideId = useSelector(selectAutoAcceptTakeoverRideId);
+  // Only while the ride is still at `accepted`: once the driver is on their way it is old news.
+  const takeoverRide =
+    takeoverRideId !== null && activeRide?.id === takeoverRideId && activeRide.status === 'accepted'
+      ? activeRide
+      : null;
+  // The takeover the driver has had on screen (focused). One raised under a stack screen
+  // (Wallet, Profile, ...) waits and shows when the tabs are focused again.
+  const seenTakeoverId = useRef<number | null>(null);
+  useEffect(() => {
+    if (takeoverRideId === null) {
+      seenTakeoverId.current = null;
+      return;
+    }
+    // The ride ended, moved past `accepted` or was replaced: nothing to take over.
+    if (takeoverRide === null) {
+      dispatch(dismissAutoAcceptedTakeover());
+      return;
+    }
+    if (isFocused) {
+      seenTakeoverId.current = takeoverRideId;
+    } else if (seenTakeoverId.current === takeoverRideId) {
+      // Seen, then the driver left (DriverRide or another screen): over, it does not come back.
+      dispatch(dismissAutoAcceptedTakeover());
+    }
+  }, [dispatch, takeoverRideId, takeoverRide, isFocused]);
+  const goToPickup = useCallback(() => {
+    dispatch(dismissAutoAcceptedTakeover());
+    navigation.navigate('DriverRide');
+  }, [dispatch, navigation]);
+
+  // T-587 (§7.4): the driver turned the request down; the server stops offering it to them.
+  const handleReject = useCallback(
+    (rideId: number) => {
+      reportOfferDeclined(rideId);
+      reject(rideId);
+    },
+    [reject],
+  );
 
   const handleAccept = useCallback(
     async (rideId: number) => {
@@ -86,8 +142,23 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
   // "no requests" are not shown here: the Drive sheet says "Looking for ride requests".
   const showError = location !== null || failures >= 2;
   const eligible = isFocused && isOnline && !isOnRide && !hasActiveRide;
-  const requestShown = eligible && view.kind === 'request';
+  const takeoverShown = isFocused && takeoverRide !== null;
+  const offerShown = eligible && view.kind === 'request';
+  const requestShown = offerShown || takeoverShown;
   const visible = requestShown || (eligible && view.kind === 'error' && showError);
+
+  // T-587 (§7.4): POST offer-viewed once the card has been on screen for 1 s (once per ride),
+  // only with the app in the foreground (never for a card behind the lock screen).
+  const appActive = useAppIsActive();
+  const shownOfferId = appActive && offerShown && view.kind === 'request' ? view.request.id : null;
+  useEffect(() => {
+    if (shownOfferId === null) return undefined;
+    const timer = setTimeout(() => {
+      // Still in the foreground and visible (iOS `inactive`: Control Centre, lock screen).
+      if (AppState.currentState === 'active') reportOfferViewed(shownOfferId);
+    }, OFFER_VIEWED_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [shownOfferId]);
 
   const onShownRef = useRef(onRequestShownChange);
   onShownRef.current = onRequestShownChange;
@@ -111,14 +182,18 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
       pointerEvents="box-none"
       testID="ride-request-host"
     >
-      <RideRequestPanel
-        view={view}
-        maxHeight={maxHeight}
-        acceptingId={acceptingId}
-        onAccept={handleAccept}
-        onReject={reject}
-        onRetry={retry}
-      />
+      {takeoverShown && takeoverRide ? (
+        <AutoAcceptedCard ride={takeoverRide} driverLocation={location} onGo={goToPickup} />
+      ) : (
+        <RideRequestPanel
+          view={view}
+          maxHeight={maxHeight}
+          acceptingId={acceptingId}
+          onAccept={handleAccept}
+          onReject={handleReject}
+          onRetry={retry}
+        />
+      )}
     </View>
   );
 };
