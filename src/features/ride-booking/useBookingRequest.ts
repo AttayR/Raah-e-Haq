@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import { createClientId } from '../chat/clientId';
 import type { RideRequest } from '../../services/rideService';
 import { reverseGeocode } from '../../services/placesService';
 import { RideRequestRefused } from '../active-ride/hooks';
 import type { FareOffer } from '../fare/hooks';
 import { buildRideRequest, withAddresses, type BookingPlace } from './buildRideRequest';
+import { useBookingAttemptKeys } from './idempotency';
 import { useConfirmRequest } from './useConfirmRequest';
 import type { BookingFlow } from './useBookingFlow';
 import { saveLastVehicle } from './vehicleSelection';
@@ -25,14 +25,19 @@ type Options = {
  *
  * One request at a time: while a request is being confirmed or sent, another confirm sends
  * nothing (`busy` lets the screen hold Back and the footer too). Each confirm gets its own
- * Idempotency-Key (BE-113), so a repeat of the same attempt can be recognised by the server.
+ * Idempotency-Key (BE-113), so a repeat of the same attempt can be recognised by the server;
+ * T-583: a confirm right after one that got no answer (network, timeout) sends the same booking
+ * with the same key, so a ride the server did create is answered back (200 replay), not made
+ * twice. A 409 RIDE_ALREADY_ACTIVE shows the open booking (useActiveRideActions) instead.
  */
 export const useBookingRequest = ({ flow, offer, requestRide }: Options) => {
   const [sending, setSending] = useState(false);
   const inFlight = useRef(false);
   const { pickup, destination, stops, selectedVehicle, femaleDriverOnly, setError, setStage } = flow;
 
-  const send = useCallback(async (idempotencyKey: string) => {
+  const keys = useBookingAttemptKeys();
+
+  const send = useCallback(async () => {
     inFlight.current = true;
     setSending(true);
     setError(null);
@@ -52,21 +57,31 @@ export const useBookingRequest = ({ flow, offer, requestRide }: Options) => {
         setStage('vehicle');
         return;
       }
-      await requestRide(built.request, idempotencyKey);
+      const idempotencyKey = keys.keyFor(built.request);
+      try {
+        await requestRide(built.request, idempotencyKey);
+        keys.settle(false);
+      } catch (refusal) {
+        const failure = refusal instanceof RideRequestRefused ? refusal.failure : null;
+        keys.settle(failure?.kind === 'message' && failure.uncertain === true);
+        throw refusal;
+      }
       saveLastVehicle(selectedVehicle);
       setStage('requesting');
     } catch (refusal) {
-      if (refusal instanceof RideRequestRefused && refusal.failure.kind === 'offer_out_of_band') offer.applyBand(refusal.failure.band);
-      setStage('vehicle');
+      const failure = refusal instanceof RideRequestRefused ? refusal.failure : null;
+      if (failure?.kind === 'offer_out_of_band') offer.applyBand(failure.band);
+      // BE-113: the open booking is on screen now (it is the active ride).
+      setStage(failure?.kind === 'already_active' ? 'requesting' : 'vehicle');
     } finally {
       inFlight.current = false;
       setSending(false);
     }
-  }, [pickup, destination, stops, selectedVehicle, femaleDriverOnly, requestRide, offer, setError, setStage]);
+  }, [pickup, destination, stops, selectedVehicle, femaleDriverOnly, requestRide, offer, setError, setStage, keys]);
 
   const confirmRequest = useConfirmRequest(() => {
     if (inFlight.current) return;
-    send(createClientId());
+    send();
     setStage('requesting');
   });
   const { confirm: confirmTap, confirming } = confirmRequest;

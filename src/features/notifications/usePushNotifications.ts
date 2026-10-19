@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useStore } from 'react-redux';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import {
@@ -24,6 +24,7 @@ import {
   type NotificationsState,
 } from './slice';
 import { refetchActiveRideForPush, type ActiveRideState } from '../active-ride/slice';
+import { confirmPassengerLiveRide } from './liveRideTarget';
 
 type SliceRoot = {
   notifications: NotificationsState;
@@ -57,6 +58,7 @@ export const usePushNotifications = (role: NotificationRole): void => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
+  const store = useStore<SliceRoot>();
 
   useEffect(() => {
     const messaging = getMessaging();
@@ -75,6 +77,14 @@ export const usePushNotifications = (role: NotificationRole): void => {
       dispatch(notificationsStale());
       markReadAndCount(payload.notificationId);
       const target = resolveNotificationTarget(payload, role);
+      // T-583 (BE-114): "No driver found" opens the booking screen only while it still shows that
+      // ride's outcome; otherwise the ride's details.
+      if (role === 'passenger' && payload.noDriver && target.kind === 'ride') {
+        confirmPassengerLiveRide(target, { getState: store.getState, dispatch, subscribe: store.subscribe })
+          .then((confirmed) => openNotificationTarget(navigationRef.current, role, confirmed, 'push', { chatThreadAvailable: true }))
+          .catch((error: unknown) => logger.debug('No-driver push: could not open the ride', error instanceof Error ? error.name : 'unknown'));
+        return;
+      }
       // T-546: the live ride screen shows the server's ride, not what the push said (e.g. a
       // requeued cancel is "finding a driver" again).
       if (role === 'passenger' && target.kind === 'ride') dispatch(refetchActiveRideForPush(target.rideId));
@@ -132,5 +142,5 @@ export const usePushNotifications = (role: NotificationRole): void => {
       unsubscribeOpened();
       setPushAskHandler(null);
     };
-  }, [dispatch, role]);
+  }, [dispatch, role, store]);
 };

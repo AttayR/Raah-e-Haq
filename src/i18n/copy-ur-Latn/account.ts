@@ -190,6 +190,8 @@ export function registerAccountCopy(): void {
     cancelledBySystem: 'Ye ride khud ba khud cancel ho gayi.',
     cancelledByWeather: 'Ye ride mausam ki wajah se cancel hui.',
     cancelledUnknown: 'Ye ride cancel ho gayi.',
+    cancelledNoDriver: 'Waqt par kisi driver ne ye ride accept nahi ki.',
+    noDriverNoCharge: 'Koi driver nahi mila · Koi charge nahi',
     parcelCancelled: {
       byYou: 'Aap ne ye delivery cancel ki.',
       byPassenger: 'Sender ne ye delivery cancel ki.',
@@ -198,6 +200,8 @@ export function registerAccountCopy(): void {
       byWeather: 'Ye delivery mausam ki wajah se cancel hui.',
       unknown: 'Ye delivery cancel ho gayi.',
       noCharge: 'Cancel deliveries ka koi charge nahi.',
+      noRider: 'Waqt par kisi rider ne ye delivery accept nahi ki.',
+      noRiderNoCharge: 'Koi rider nahi mila · Koi charge nahi',
     },
     share: 'Receipt share karein',
     shareHeading: 'Raah-e-Haq ride receipt',

@@ -10,6 +10,9 @@ export interface RideLocation {
   address?: string;
 }
 
+/** BE-04 / BE-114 `cancellation_reason` values the app reads; an admin may store another word. */
+export type RideCancellationReason = 'passenger' | 'driver' | 'system' | 'weather' | 'no_driver' | (string & Record<never, never>);
+
 /**
  * Body of POST /rides (BE-01/BE-37/BE-58). The passenger is the token user, so there is no
  * `passenger_id`; `vehicle_type` is a catalogue key (GET /public/vehicle-types). Build it
@@ -135,8 +138,11 @@ export interface RideResource {
   started_at?: string;
   completed_at?: string;
   cancelled_at?: string;
-  /** Who cancelled (`passenger`, `driver`, `system`, or an admin's reason). */
-  cancellation_reason?: string | null;
+  /**
+   * Who cancelled (`passenger`, `driver`, `system`, `weather`), BE-114 `no_driver` (an unanswered
+   * request the server expired: no fee), or an admin's own reason.
+   */
+  cancellation_reason?: RideCancellationReason | null;
   /** The free-text note given on cancel (a driver must give one, BE-04). */
   cancellation_note?: string | null;
   /** BE-07: the caller's own rating of this ride, or null. Read with features/rating/api. */

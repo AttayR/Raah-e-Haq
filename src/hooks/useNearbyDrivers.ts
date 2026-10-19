@@ -16,7 +16,13 @@ import { toApiError } from '../core/api/errors';
  * after a no-response failure (`network`/`timeout`) it retries every NETWORK_RETRY_MS instead of
  * a minute, so a "Network error" line clears soon after the server is reachable again.
  */
-export const NEARBY_POLL_MS = 30_000;
+/**
+ * T-582 (QA 2026-10-19: "1 driver nearby" stayed after the driver went offline): the server
+ * checks availability on every read, so a driver going offline drops out on the next one; 15 s
+ * (was 30 s) clears the count within seconds while the map is open. Still 4 requests a minute at
+ * most, under the 12 a minute the server allows and never closer than NEARBY_MIN_GAP_MS.
+ */
+export const NEARBY_POLL_MS = 15_000;
 export const NEARBY_MIN_GAP_MS = 10_000;
 export const NEARBY_ERROR_RETRY_MS = 60_000;
 export const NEARBY_NETWORK_RETRY_MS = 15_000;

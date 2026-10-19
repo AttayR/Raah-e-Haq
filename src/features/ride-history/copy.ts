@@ -66,6 +66,9 @@ export const RIDE_HISTORY_COPY = localizedCopy({
   cancelledBySystem: 'This ride was cancelled automatically.',
   cancelledByWeather: 'This ride was cancelled because of the weather.',
   cancelledUnknown: 'This ride was cancelled.',
+  // T-583 (BE-114): a request no driver accepted in time; the server ended it without a fee.
+  cancelledNoDriver: 'No driver accepted this ride in time.',
+  noDriverNoCharge: 'No driver found · No charge',
   // T-579: the same lines on a parcel, said as a delivery.
   parcelCancelled: {
     byYou: 'You cancelled this delivery.',
@@ -75,6 +78,8 @@ export const RIDE_HISTORY_COPY = localizedCopy({
     byWeather: 'This delivery was cancelled because of the weather.',
     unknown: 'This delivery was cancelled.',
     noCharge: 'Cancelled deliveries are not charged.',
+    noRider: 'No rider accepted this delivery in time.',
+    noRiderNoCharge: 'No rider found · No charge',
   },
   // UI-R15 share receipt.
   share: 'Share receipt',
@@ -169,6 +174,8 @@ export const cancellationText = (reason: CancellationReason | null, viewer: Ride
         return P.bySystem;
       case 'weather':
         return P.byWeather;
+      case 'no_driver':
+        return P.noRider;
       default:
         return P.unknown;
     }
@@ -182,6 +189,8 @@ export const cancellationText = (reason: CancellationReason | null, viewer: Ride
       return RIDE_HISTORY_COPY.cancelledBySystem;
     case 'weather':
       return RIDE_HISTORY_COPY.cancelledByWeather;
+    case 'no_driver':
+      return RIDE_HISTORY_COPY.cancelledNoDriver;
     default:
       return RIDE_HISTORY_COPY.cancelledUnknown;
   }

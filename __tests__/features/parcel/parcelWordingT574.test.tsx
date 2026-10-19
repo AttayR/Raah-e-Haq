@@ -8,7 +8,7 @@ import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSh
 import { DriverRideSummary } from '../../../src/components/driver/DriverRideSummary';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
-import { rideDoneDestination } from '../../../src/features/active-ride/done';
+import { leaveFinishedRide } from '../../../src/features/active-ride/done';
 import { OverchargeReportSection } from '../../../src/features/fare/components/OverchargeReport';
 import { isParcelDetails, PersonCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
@@ -116,12 +116,12 @@ describe('sender: parcel wording (T-574)', () => {
   });
 });
 
-describe('Done after a parcel (T-574)', () => {
-  it('a parcel goes back Home; a ride starts over in the planner', () => {
-    expect(rideDoneDestination(parcelRide({ status: 'completed' }))).toBe('home');
-    expect(rideDoneDestination(makeRide({ status: 'cancelled', vehicle_type: 'parcel' }))).toBe('home');
-    expect(rideDoneDestination(makeRide({ status: 'completed', vehicle_type: 'car' }))).toBe('planner');
-    expect(rideDoneDestination(null)).toBe('planner');
+describe('Done after a parcel (T-574) or a ride (T-582)', () => {
+  it('goes back to Home, never the trip planner', () => {
+    const popTo = jest.fn();
+    leaveFinishedRide({ popTo });
+    expect(popTo).toHaveBeenCalledTimes(1);
+    expect(popTo).toHaveBeenCalledWith('PassengerTabs', { screen: 'Home' });
   });
 });
 

@@ -17,6 +17,7 @@ import { BOOKING_COPY } from '../ride-booking/copy';
 import {
   cancelActiveRide,
   createActiveRide,
+  openExistingActiveRide,
   refreshActiveRide,
   restoreActiveRide,
   selectActiveRide,
@@ -252,9 +253,23 @@ export const showBalanceOwed = async (
 };
 
 /**
+ * BE-113 (T-583): POST /rides answered 409 RIDE_ALREADY_ACTIVE. The open booking (`rideId`) is
+ * read and becomes the active ride, with a short note instead of an error. Resolves with that
+ * ride, or null when it could not be read (or has ended meanwhile); the caller then shows
+ * `failure.message`.
+ */
+export const openActiveBooking = async (dispatch: ActiveRideDispatch, rideId: number): Promise<RideResource | null> => {
+  const action = await dispatch(openExistingActiveRide(rideId));
+  if (!openExistingActiveRide.fulfilled.match(action)) return null;
+  toast.info(ACTIVE_RIDE_COPY.alreadyActiveTitle, ACTIVE_RIDE_COPY.alreadyActiveMessage);
+  return action.payload;
+};
+
+/**
  * Create and cancel for the booking screen: a loading toast while POST /rides runs, and an
  * error modal with the server's display-safe message (for a 422 the field message).
- * PHONE_NOT_VERIFIED offers phone verification instead; 403 ACCOUNT_* and a stale session
+ * PHONE_NOT_VERIFIED offers phone verification instead; BE-113's 409 RIDE_ALREADY_ACTIVE opens
+ * the open booking (openActiveBooking) and rejects with `already_active`; 403 ACCOUNT_* and a stale session
  * show nothing (the API client routes those). Both reject on failure, so the screen keeps its own error state.
  */
 export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => {
@@ -276,7 +291,11 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
         askForPushInContext();
         return action.payload;
       }
-      const failure = classifyRideRequestFailure(action.payload, ACTIVE_RIDE_COPY.requestFailedFallback);
+      const classified = classifyRideRequestFailure(action.payload, ACTIVE_RIDE_COPY.requestFailedFallback);
+      // BE-113: an open booking already exists: show it (the booking screen follows the store).
+      const opened = classified.kind === 'already_active' ? await openActiveBooking(dispatch, classified.rideId) : null;
+      const failure: RideRequestFailure =
+        classified.kind === 'already_active' && !opened ? { kind: 'message', message: classified.message } : classified;
       if (failure.kind === 'phone_not_verified') {
         const verify = onPhoneNotVerifiedRef.current;
         showErrorModal(

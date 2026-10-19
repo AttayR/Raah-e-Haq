@@ -121,6 +121,14 @@ export function registerRideCopy(): void {
     cancelConfirmMessage: 'Kya aap waqai ye ride cancel karna chahte hain?',
     keepRide: 'Ride rakhein',
     cancelFailedTitle: 'Ghalti',
+    alreadyActiveTitle: 'Aap ki ek booking pehle se jari hai',
+    alreadyActiveMessage: 'Ye rahi. Nayi booking se pehle use cancel karein.',
+    noDriverTitle: 'Koi driver nahi mila',
+    noDriverMessage: 'Waqt par kisi driver ne aap ki ride accept nahi ki. Aap se koi paisay nahi liye gaye.',
+    noRiderTitle: 'Koi rider nahi mila',
+    noRiderMessage: 'Waqt par kisi rider ne aap ki delivery accept nahi ki. Aap se koi paisay nahi liye gaye.',
+    tryAgain: 'Dobara koshish karein',
+    close: 'Band karein',
   });
 
   registerCopyTranslation(DRIVER_REQUESTS_COPY, 'ur-Latn', {

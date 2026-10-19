@@ -161,6 +161,9 @@ const DualLocationPicker: React.FC<Props> = ({
             onChangeQuery={(q) => markTyped('destination', q)}
             onChooseOnMap={onChooseOnMap ? () => onChooseOnMap('destination') : undefined}
             autoFocus={autoFocusDestination}
+            // T-582 (QA 2026-10-19): less room above it than the row gap, so the pickup row
+            // scrolls fully out of view under the handle while typing (no sliver).
+            revealTopMargin={DESTINATION_REVEAL_TOP}
           />
         </View>
       </View>
@@ -186,6 +189,8 @@ const DualLocationPicker: React.FC<Props> = ({
 };
 
 const rail = componentTokens.ride.addressPair;
+/** Room above the destination field when the sheet reveals it: under the rows' gap (space 2). */
+export const DESTINATION_REVEAL_TOP = space[1];
 /** Half the 48 field (space 6 = 24) minus half the glyph. */
 const FIELD_CENTER = space[6] - rail.pickup / 2;
 

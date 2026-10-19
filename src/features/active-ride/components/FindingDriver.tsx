@@ -7,7 +7,7 @@ import { isParcelRide } from '../../parcel/api';
 import type { PassengerRideStage } from '../stage';
 import { readNumberOrNull } from '../../../core/api/read';
 import type { RideResource } from '../../../services/rideService';
-import { space } from '../../../theme';
+import { radius, space } from '../../../theme';
 import { formatMoney } from '../../../utils/format';
 import { tierLabel } from '../../ride-history/copy';
 import { ACTIVE_RIDE_COPY } from '../copy';
@@ -146,7 +146,47 @@ export const PassengerCancelButton: React.FC<{
   );
 };
 
+/**
+ * BE-114 (T-583, passenger-finding-driver.md "No driver found"): the server ended the request
+ * because no driver accepted it in time. A 64 `surfaceAlt` circle with the car-off glyph, the
+ * title ("No rider found" for a parcel) and that nothing was charged. No fee line, no pulse.
+ */
+export function NoDriverFound({ parcel, testID = 'active-ride-no-driver' }: { parcel: boolean; testID?: string }) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={styles.noDriver} testID={testID} accessibilityLiveRegion="polite">
+      <View style={[styles.noDriverCircle, { backgroundColor: theme.colors.surfaceAlt }]} accessible={false}>
+        <Icon name="carOff" size={32} color="textSecondary" />
+      </View>
+      <AppText variant="h3" align="center" accessibilityRole="header" testID="active-ride-title">
+        {parcel ? ACTIVE_RIDE_COPY.noRiderTitle : ACTIVE_RIDE_COPY.noDriverTitle}
+      </AppText>
+      <AppText variant="bodySmall" color="textSecondary" align="center" testID="active-ride-subtitle">
+        {parcel ? ACTIVE_RIDE_COPY.noRiderMessage : ACTIVE_RIDE_COPY.noDriverMessage}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * The "No driver found" sheet footer: Try again (`lg primary`, books the same trip again with a
+ * new Idempotency-Key) and Close (`ghost`, back to Home).
+ */
+export const NoDriverActions: React.FC<{ onRetry: () => void; onClose: () => void; retrying?: boolean }> = ({
+  onRetry,
+  onClose,
+  retrying = false,
+}) => (
+  <View style={styles.actions}>
+    <Button label={ACTIVE_RIDE_COPY.tryAgain} size="lg" onPress={onRetry} loading={retrying} testID="active-ride-try-again" />
+    <Button label={ACTIVE_RIDE_COPY.close} variant="ghost" onPress={onClose} disabled={retrying} testID="active-ride-close" />
+  </View>
+);
+
 const styles = StyleSheet.create({
+  noDriver: { alignItems: 'center', gap: space[2], paddingTop: space[2] },
+  noDriverCircle: { width: space[16], height: space[16], borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: space[2] },
+  actions: { gap: space[2] },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: space[3] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   flex: { flex: 1, minWidth: 0 },

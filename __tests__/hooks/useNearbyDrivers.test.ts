@@ -65,7 +65,7 @@ afterEach(() => {
 });
 
 describe('useNearbyDrivers', () => {
-  it('loads, then polls every 30 s, and stops on unmount', async () => {
+  it('loads, then polls every 15 s (T-582), and stops on unmount', async () => {
     spy.mockResolvedValue([driver]);
     const { result, unmount } = renderHook(() => useNearbyDrivers(lahore));
     expect(result.current.status).toBe('idle');
@@ -264,7 +264,7 @@ describe('useNearbyDrivers', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it('T-311: a new refreshKey (ride ended) asks again now, not at the next 30 s tick', async () => {
+  it('T-311: a new refreshKey (ride ended) asks again now, not at the next poll tick', async () => {
     spy.mockResolvedValueOnce([]).mockResolvedValue([driver]);
     const { result, rerender } = renderHook(
       ({ refreshKey }: { refreshKey: string }) => useNearbyDrivers(lahore, { refreshKey }),
@@ -273,13 +273,26 @@ describe('useNearbyDrivers', () => {
     await advance(0);
     expect(result.current.drivers).toEqual([]);
 
-    // Well past the 10 s floor, well before the 30 s poll.
+    // Well past the 10 s floor, before the 15 s poll.
     await advance(NEARBY_MIN_GAP_MS + 1_000);
     expect(spy).toHaveBeenCalledTimes(1);
     rerender({ refreshKey: '7:ended' });
     await advance(0);
     expect(spy).toHaveBeenCalledTimes(2);
     expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+  });
+
+  it('T-582: a driver who went offline leaves the count within one 15 s poll', async () => {
+    spy.mockResolvedValueOnce([driver]).mockResolvedValue([]);
+    const { result } = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    expect(result.current.drivers).toHaveLength(1);
+    expect(NEARBY_POLL_MS).toBe(15_000);
+    await advance(NEARBY_POLL_MS);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual({ drivers: [], status: 'ready', error: null });
+    // Still no burst: never closer than the 10 s floor.
+    expect(NEARBY_POLL_MS).toBeGreaterThanOrEqual(NEARBY_MIN_GAP_MS);
   });
 
   it('T-311: a refreshKey change still keeps the 10 s floor', async () => {

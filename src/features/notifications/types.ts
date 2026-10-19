@@ -23,6 +23,8 @@ export interface NotificationPayload {
   cancelledBy: 'passenger' | 'driver' | 'admin' | null;
   /** BE-85: a driver's cancel put the ride back in the queue (the passenger is still searching). */
   requeued: boolean;
+  /** BE-114 `reason: no_driver`: the request ended because no driver accepted it in time. */
+  noDriver?: boolean;
 }
 
 export interface AppNotification {
@@ -74,6 +76,8 @@ export interface PushPayload {
   rideStatus: string | null;
   /** BE-93, `ride_cancelled` only: "true" when a driver's cancel put the ride back in the queue. */
   requeued: boolean;
+  /** BE-114, `ride_cancelled` only: `reason` "no_driver" (no driver accepted the request in time). */
+  noDriver?: boolean;
 }
 
 export type DevicePlatform = 'ios' | 'android';

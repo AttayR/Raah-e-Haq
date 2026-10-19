@@ -32,13 +32,20 @@ export type RevealScrollable = {
   measureInWindow?: View['measureInWindow'];
 };
 
+/**
+ * T-582: per-field reveal options. `topMargin` replaces REVEAL_MARGIN above the field only, e.g.
+ * a field whose row sits under another row: with less room above it than the gap between the rows,
+ * the row above is scrolled fully out of view instead of leaving a sliver of it under the edge.
+ */
+export type RevealOptions = { topMargin?: number };
+
 export type KeyboardReveal = {
   /** A field gained focus. */
-  focus: (target: Measurable | null) => void;
+  focus: (target: Measurable | null, options?: RevealOptions) => void;
   /** A field lost focus. */
   blur: (target: Measurable | null) => void;
   /** A field's height changed (error or helper shown, multiline grew). */
-  layoutChanged: (target: Measurable | null) => void;
+  layoutChanged: (target: Measurable | null, options?: RevealOptions) => void;
   /** A field just got an error: brought into view, first one per render wins. */
   error: (target: Measurable | null) => void;
 };
@@ -60,13 +67,16 @@ export function revealOffset({
   field,
   viewport,
   margin = REVEAL_MARGIN,
+  topMargin = margin,
 }: {
   offset: number;
   field: Span;
   viewport: Span;
   margin?: number;
+  /** The room kept above the field (default `margin`). */
+  topMargin?: number;
 }): number | null {
-  const top = viewport.top + margin;
+  const top = viewport.top + topMargin;
   const bottom = viewport.bottom - margin;
   let delta = 0;
   if (field.bottom - field.top > bottom - top || field.top < top) {
@@ -99,7 +109,7 @@ const contentY = (target: Measurable, inner: Parameters<View['measureLayout']>[0
   );
 
 /** Measures `target` against `scroll` and scrolls it into view when it is hidden. */
-export async function revealInScroll(scroll: RevealScrollable, target: Measurable, os: string = Platform.OS) {
+export async function revealInScroll(scroll: RevealScrollable, target: Measurable, os: string = Platform.OS, options: RevealOptions = {}) {
   const inner = innerViewOf(scroll);
   const measureScroll = scroll.measureInWindow;
   if (!inner || typeof measureScroll !== 'function') return;
@@ -119,6 +129,7 @@ export async function revealInScroll(scroll: RevealScrollable, target: Measurabl
     offset,
     field: { top: field.y, bottom: field.y + field.height },
     viewport: { top: viewport.y, bottom },
+    topMargin: options.topMargin,
   });
   if (next !== null) scroll.scrollTo({ y: next, animated: true });
 }
@@ -126,30 +137,31 @@ export async function revealInScroll(scroll: RevealScrollable, target: Measurabl
 /** The controller behind `KeyboardRevealProvider`; `getScroll` returns the mounted ScrollView. */
 export function useKeyboardRevealController(getScroll: () => RevealScrollable | null): KeyboardReveal {
   const focused = useRef<Measurable | null>(null);
+  const focusedOptions = useRef<RevealOptions | undefined>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorQueued = useRef(false);
   const getScrollRef = useRef(getScroll);
   getScrollRef.current = getScroll;
 
-  const schedule = useCallback((target: Measurable) => {
+  const schedule = useCallback((target: Measurable, options?: RevealOptions) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
       errorQueued.current = false;
       const scroll = getScrollRef.current();
-      if (scroll) revealInScroll(scroll, target).catch(() => undefined);
+      if (scroll) revealInScroll(scroll, target, Platform.OS, options).catch(() => undefined);
     }, REVEAL_DELAY_MS);
   }, []);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => {
-      if (focused.current) schedule(focused.current);
+      if (focused.current) schedule(focused.current, focusedOptions.current);
     });
     // T-570: the keyboard can grow while it is up (focus moves from a number pad to a text field,
     // the iOS suggestion bar appears): reveal the focused field again once the new frame settles,
     // or a field near the end (Payout's account number) ends up under the sticky action bar.
     const frame = Keyboard.addListener('keyboardDidChangeFrame', () => {
-      if (focused.current && Keyboard.isVisible()) schedule(focused.current);
+      if (focused.current && Keyboard.isVisible()) schedule(focused.current, focusedOptions.current);
     });
     return () => {
       show.remove();
@@ -160,16 +172,17 @@ export function useKeyboardRevealController(getScroll: () => RevealScrollable | 
 
   return useMemo<KeyboardReveal>(
     () => ({
-      focus: (target) => {
+      focus: (target, options) => {
         focused.current = target;
+        focusedOptions.current = options;
         // Otherwise keyboardDidShow reveals it once the screen has made room.
-        if (target && Keyboard.isVisible()) schedule(target);
+        if (target && Keyboard.isVisible()) schedule(target, options);
       },
       blur: (target) => {
         if (focused.current === target) focused.current = null;
       },
-      layoutChanged: (target) => {
-        if (target && focused.current === target && Keyboard.isVisible() && !errorQueued.current) schedule(target);
+      layoutChanged: (target, options) => {
+        if (target && focused.current === target && Keyboard.isVisible() && !errorQueued.current) schedule(target, options);
       },
       error: (target) => {
         if (!target || errorQueued.current) return;
@@ -205,9 +218,9 @@ export function KeyboardRevealGroup({ style, testID, children }: GroupProps) {
     if (!parent) return null;
     const asGroup = (target: Measurable | null): Measurable | null => (target ? groupRef.current ?? target : null);
     return {
-      focus: (target) => parent.focus(asGroup(target)),
+      focus: (target, options) => parent.focus(asGroup(target), options),
       blur: (target) => parent.blur(asGroup(target)),
-      layoutChanged: (target) => parent.layoutChanged(asGroup(target)),
+      layoutChanged: (target, options) => parent.layoutChanged(asGroup(target), options),
       error: (target) => parent.error(target),
     };
   }, [parent]);

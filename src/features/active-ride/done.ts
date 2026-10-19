@@ -1,10 +1,12 @@
-import type { RideResource } from '../../services/rideService';
-import { isParcelRide } from '../parcel/api';
+/** The one navigation call Done needs (the passenger stack's `popTo`). */
+export type DoneNavigator = { popTo: (name: 'PassengerTabs', params: { screen: 'Home' }) => void };
 
 /**
- * Where the passenger goes on Done once a ride is over (T-574). A parcel was booked from Home's
- * "Send a parcel", so its Done goes back to Home; a ride's Done starts over in the ride planner.
+ * Done (or Close) once a ride is over: back to Home. T-574: a parcel goes back to Home, where it
+ * was sent from. T-582 (QA 2026-10-19): a ride does too, completed or cancelled, the same as
+ * "Cancel request" (passenger-finding-driver.md "back to Home (peek)"), not the trip planner;
+ * Home's "Where to?" starts the next one.
  */
-export const rideDoneDestination = (
-  ride: Pick<RideResource, 'is_parcel' | 'vehicle_type'> | null | undefined,
-): 'home' | 'planner' => (isParcelRide(ride) ? 'home' : 'planner');
+export const leaveFinishedRide = (navigation: DoneNavigator): void => {
+  navigation.popTo('PassengerTabs', { screen: 'Home' });
+};

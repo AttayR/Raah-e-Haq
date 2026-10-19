@@ -30,7 +30,7 @@ import type {
 export const RIDES_PAGE_SIZE = 20;
 
 const STATUSES: ReadonlyArray<RideStatus> = ['requested', 'accepted', 'arrived', 'started', 'completed', 'cancelled'];
-const REASONS: ReadonlyArray<CancellationReason> = ['passenger', 'driver', 'system', 'weather', 'other'];
+const REASONS: ReadonlyArray<CancellationReason> = ['passenger', 'driver', 'system', 'weather', 'no_driver', 'other'];
 
 const chargeReasonOf = (value: unknown): 'late_cancel' | 'no_show' | null =>
   value === 'late_cancel' || value === 'no_show' ? value : null;

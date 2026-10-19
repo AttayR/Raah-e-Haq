@@ -34,6 +34,8 @@ export interface TargetSource {
   requeued?: boolean;
   /** BE-93 push `ride_status`: the ride's API status when the push was sent (null when absent). */
   rideStatus?: string | null;
+  /** BE-114 `reason: no_driver`: the request expired unanswered. */
+  noDriver?: boolean;
 }
 
 const ENDED_RIDE_TYPES = new Set(['ride_completed', 'ride_cancelled']);
@@ -41,7 +43,7 @@ const ENDED_RIDE_TYPES = new Set(['ride_completed', 'ride_cancelled']);
 const WALLET_TYPES = new Set(['topup_succeeded', 'topup_failed']);
 
 export const resolveNotificationTarget = (
-  { category, type, rideId, requeued = false, rideStatus = null }: TargetSource,
+  { category, type, rideId, requeued = false, rideStatus = null, noDriver = false }: TargetSource,
   role: NotificationRole,
 ): NotificationTarget => {
   if ((category === 'chat' || type === 'chat_message') && rideId !== null) {
@@ -64,6 +66,9 @@ export const resolveNotificationTarget = (
   // another driver), not the history. T-546: a push says so with requeued "true", or with the
   // ride back in `requested` (BE-93 ride_status).
   if (type === 'ride_cancelled' && (requeued || rideStatus === 'requested')) return { kind: 'ride', rideId };
+  // T-583 (BE-114): "No driver found" opens that ride: its "No driver found" state while the
+  // booking screen still shows it, else its details (confirmPassengerLiveRide decides).
+  if (type === 'ride_cancelled' && noDriver && rideId !== null) return { kind: 'ride', rideId };
   if (type !== null && ENDED_RIDE_TYPES.has(type)) return { kind: 'rideHistory' };
   return { kind: 'ride', rideId };
 };

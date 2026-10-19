@@ -7,6 +7,7 @@ import { fetchActiveRide } from './api';
 import { isRideInProgress, isRideTerminal } from './status';
 import { invalidateStatsForRide } from '../stats/invalidate';
 import { jsonEqual } from '../../core/jsonEqual';
+import { rememberBooking } from './lastBooking';
 
 /**
  * The passenger's active ride: the single source of truth for every screen (T-301, PAX-10).
@@ -90,14 +91,46 @@ export const restoreActiveRide = createAsyncThunk<RideResource | null, void, Thu
 /** A POST /rides body, optionally with the attempt's Idempotency-Key (sent as a header, UI-R10). */
 export type CreateRideArg = RideRequest & { idempotencyKey?: string };
 
-/** POST /rides; the created ride becomes the active ride. */
+/**
+ * POST /rides; the created ride becomes the active ride. BE-113: a repeat of the same attempt
+ * (same Idempotency-Key) is answered 200 `Idempotent-Replayed` with the ride already made, read
+ * exactly like the 201. The body is remembered for "Try again" after "No driver found" (T-583).
+ */
 export const createActiveRide = createAsyncThunk<RideResource, CreateRideArg, ThunkConfig>(
   'activeRide/create',
   async ({ idempotencyKey, ...request }, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
       const ride = await rideService.createRide(request, { idempotencyKey });
-      return isStaleSession(startedIn) ? rejectWithValue(staleSession()) : ride;
+      if (isStaleSession(startedIn)) return rejectWithValue(staleSession());
+      rememberBooking(ride.id, request);
+      return ride;
+    } catch (error) {
+      return rejectWithValue(toThunkRejection(error, 'Failed to request ride'));
+    }
+  },
+);
+
+/**
+ * BE-113 (T-583): POST /rides was refused with 409 RIDE_ALREADY_ACTIVE; the passenger's open
+ * booking (ride or parcel, `error.ride_id`) is read (GET /rides/{id}) and becomes the active ride,
+ * so the booking screen shows it. Refused when it is no longer in progress (it ended meanwhile)
+ * or another live ride is held (that one is never replaced), so no "already have a booking" note.
+ */
+export const openExistingActiveRide = createAsyncThunk<RideResource, number, ThunkConfig>(
+  'activeRide/openExisting',
+  async (rideId, { getState, rejectWithValue }) => {
+    const startedIn = currentSessionEpoch();
+    try {
+      const ride = await rideService.getRide(rideId);
+      if (isStaleSession(startedIn)) return rejectWithValue(staleSession());
+      // Ended meanwhile, or another live ride is on screen now (it stays): nothing is opened.
+      const held = getState().activeRide.ride;
+      const otherLive = !!held && held.id !== ride.id && !isRideTerminal(held);
+      if (!isRideInProgress(ride) || otherLive) {
+        return rejectWithValue({ message: 'Failed to request ride', kind: 'conflict', fieldErrors: {} });
+      }
+      return ride;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, 'Failed to request ride'));
     }
@@ -221,6 +254,13 @@ const activeRideSlice = createSlice({
       .addCase(createActiveRide.rejected, (state, action) => {
         state.isSubmitting = false;
         state.error = action.payload?.message ?? 'Failed to request ride';
+      })
+      .addCase(openExistingActiveRide.fulfilled, (state, action) => {
+        // Not over a live ride (that one is the booking on screen); a finished one gives way.
+        if (!state.ride || state.ride.id === action.payload.id || isRideTerminal(state.ride)) {
+          state.ride = action.payload;
+          state.error = null;
+        }
       })
       .addCase(refreshActiveRide.pending, (state) => {
         state.isRefreshing = true;

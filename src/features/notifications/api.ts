@@ -56,6 +56,8 @@ const toPayload = (raw: unknown): NotificationPayload => {
     fare: typeof data.fare === 'number' ? String(data.fare) : toText(data.fare),
     cancelledBy: CANCELLED_BY.find((who) => who === data.cancelled_by) ?? null,
     requeued: data.requeued === true || data.requeued === 'true' || data.requeued === 1,
+    // BE-114: only said when it is so (older rows and other cancels carry no `reason`).
+    ...(data.reason === 'no_driver' ? { noDriver: true } : {}),
   };
 };
 
@@ -128,6 +130,7 @@ export const toPushPayload = (raw: unknown): PushPayload => {
     type: toText(data.type),
     rideStatus: toText(data.ride_status),
     requeued: data.requeued === 'true',
+    ...(data.reason === 'no_driver' ? { noDriver: true } : {}),
   };
 };
 

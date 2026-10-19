@@ -72,6 +72,12 @@ type Props = {
   replaceOnType?: string | readonly string[];
   /** Focus the field when it mounts (the planner's destination, T-576). */
   autoFocus?: boolean;
+  /**
+   * T-582: the room kept above the field when the sheet scrolls it into view while typing (kit
+   * keyboard reveal `topMargin`); the planner's destination keeps less than its row gap, so no
+   * sliver of the pickup row stays under the handle.
+   */
+  revealTopMargin?: number;
 };
 
 const placeholderOf = (mode: Props['mode']): string =>
@@ -114,6 +120,7 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
   near,
   replaceOnType,
   autoFocus = false,
+  revealTopMargin,
 }, ref) {
   const { theme } = useAppTheme();
   const c = theme.colors;
@@ -256,10 +263,11 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
     onChangeQuery?.(q);
   };
 
+  const revealOptions = revealTopMargin === undefined ? undefined : { topMargin: revealTopMargin };
   const setFocus = (value: boolean) => {
     focusedRef.current = value;
     setFocused(value);
-    if (value) reveal?.focus(containerRef.current);
+    if (value) reveal?.focus(containerRef.current, revealOptions);
     else reveal?.blur(containerRef.current);
     onFocusChange?.(value);
   };
@@ -274,7 +282,7 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
   const showMapRow = onChooseOnMap !== undefined && (typing || showError || showNoResults);
 
   return (
-    <View ref={containerRef} testID={`location-search-${mode}-container`} onLayout={focused ? () => reveal?.layoutChanged(containerRef.current) : undefined}>
+    <View ref={containerRef} testID={`location-search-${mode}-container`} onLayout={focused ? () => reveal?.layoutChanged(containerRef.current, revealOptions) : undefined}>
       <View
         style={[
           styles.field,

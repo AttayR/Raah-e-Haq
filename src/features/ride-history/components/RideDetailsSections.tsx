@@ -88,7 +88,8 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
         variant={cancelled && !chargedFee ? 'title' : 'numericXL'}
         color={cancelled && !chargedFee ? 'textMuted' : 'textPrimary'}
         style={styles.amount}
-        numberOfLines={1}
+        // T-583: "No driver found · No charge" may take two lines (Roman Urdu, iPhone SE).
+        numberOfLines={cancelled && !chargedFee ? 2 : 1}
         testID="ride-details-amount"
       >
         {chargedFee && ride.cancellationFee !== null ? formatMoney(ride.cancellationFee) : rideAmountText(ride, viewer)}

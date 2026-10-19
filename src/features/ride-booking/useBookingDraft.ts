@@ -105,3 +105,17 @@ export const useBookingHardwareBack = (enabled: boolean, onBack: () => void): vo
     return () => sub.remove();
   }, [enabled]);
 };
+
+/** The one navigation call the swipe-back guard needs. */
+type GestureNavigator = { setOptions: (options: { gestureEnabled: boolean }) => void };
+
+/**
+ * T-583: the iOS edge swipe-back is off while a request is being confirmed or sent and while a
+ * driver is being searched for, the same moments the on-screen Back is held or replaced by
+ * "Cancel request" (UI-R10), so a swipe never leaves under a POST /rides in flight.
+ */
+export const useBookingSwipeBack = (navigation: GestureNavigator, blocked: boolean): void => {
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: !blocked });
+  }, [navigation, blocked]);
+};

@@ -4,7 +4,7 @@ import { AddressPair, AppText, Card, Icon, RideStatusPill, vehicleIconName } fro
 import { formatTime } from '../../../utils/format';
 import { space } from '../../../theme';
 import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
-import { formatDateTime, isChargedFee, rideAmountText, rideTime } from '../format';
+import { formatDateTime, isChargedFee, isNoDriverRide, rideAmountText, rideTime } from '../format';
 import type { Ride, RideViewer } from '../types';
 
 type Props = { ride: Ride; viewer: RideViewer; onPress: (ride: Ride) => void };
@@ -28,6 +28,7 @@ export const RideHistoryRow = memo(function RideHistoryRow({ ride, viewer, onPre
   const inProgress = !completed && !cancelled;
   const amount = inProgress ? '' : rideAmountText(ride, viewer);
   const chargedFee = cancelled && isChargedFee(ride);
+  const noDriver = isNoDriverRide(ride);
   const time = formatTime(at);
   const handlePress = useCallback(() => onPress(ride), [onPress, ride]);
   return (
@@ -59,7 +60,8 @@ export const RideHistoryRow = memo(function RideHistoryRow({ ride, viewer, onPre
                 </AppText>
               ) : null}
             </View>
-            {!completed ? (
+            {/* T-583: "No driver found · No charge" says it all; no "Cancelled" pill beside it. */}
+            {!completed && !noDriver ? (
               <RideStatusPill status={ride.status} label={status} testID={`ride-history-row-${ride.id}-status`} />
             ) : null}
             {amount ? (
@@ -68,7 +70,8 @@ export const RideHistoryRow = memo(function RideHistoryRow({ ride, viewer, onPre
                 // A charged fee ("Rs 30 fee") is money taken: textPrimary. Only "No charge" is muted.
                 color={cancelled && !chargedFee ? 'textMuted' : 'textPrimary'}
                 numberOfLines={1}
-                style={styles.noShrink}
+                // T-583: the longer "No driver found · No charge" gives way before the time does.
+                style={noDriver ? styles.shrink : styles.noShrink}
                 testID={`ride-history-row-${ride.id}-amount`}
               >
                 {amount}

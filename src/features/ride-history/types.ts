@@ -13,7 +13,8 @@ import type { ParcelView } from '../parcel/types';
 export type RideStatus = 'requested' | 'accepted' | 'arrived' | 'started' | 'completed' | 'cancelled';
 
 /** Who cancelled (`rides.cancellation_reason`). */
-export type CancellationReason = 'passenger' | 'driver' | 'system' | 'weather' | 'other';
+/** BE-114 `no_driver`: the server expired a request no driver accepted in time (no fee). */
+export type CancellationReason = 'passenger' | 'driver' | 'system' | 'weather' | 'no_driver' | 'other';
 
 /** Whose side of the ride the screen shows: the passenger pays the fare, the driver earns. */
 export type RideViewer = 'passenger' | 'driver';

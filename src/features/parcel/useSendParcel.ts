@@ -9,7 +9,7 @@ import { space } from '../../theme';
 import { reverseGeocode } from '../../services/placesService';
 import type { RideResource } from '../../services/rideService';
 import { createActiveRide, type ActiveRideState } from '../active-ride/slice';
-import { showBalanceOwed } from '../active-ride/hooks';
+import { openActiveBooking, showBalanceOwed } from '../active-ride/hooks';
 import { ACTIVE_RIDE_COPY } from '../active-ride/copy';
 import { askForPushInContext } from '../notifications/push';
 import { displayAddress } from '../passenger-home/greeting';
@@ -18,6 +18,7 @@ import { BOOKING_COPY } from '../ride-booking/copy';
 import { useFareEstimates } from '../ride-booking/hooks';
 import type { FareEstimate } from '../ride-booking/api';
 import { classifyRideRequestFailure } from '../ride-booking/rideRequestFailure';
+import { useBookingAttemptKeys } from '../ride-booking/idempotency';
 import { useFareOffer } from '../fare/hooks';
 import { isParcelType } from './api';
 import { EMPTY_PARCEL_DRAFT, buildParcelRideRequest, parcelFieldErrorsOf } from './rules';
@@ -209,6 +210,8 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
   const offer = useFareOffer(quote?.offer_band ?? null);
   const offeredFare = offer.offeredFare;
   const applyBand = offer.applyBand;
+  // T-583 (BE-113): one Idempotency-Key per "Send parcel" press, kept for a resend after no answer.
+  const keys = useBookingAttemptKeys();
 
   const submit = useCallback(async () => {
     if (!options || inFlight.current) return;
@@ -233,14 +236,23 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       return;
     }
     try {
-      const action = await dispatch(createActiveRide(built.request));
+      const action = await dispatch(createActiveRide({ ...built.request, idempotencyKey: keys.keyFor(built.request) }));
       if (createActiveRide.fulfilled.match(action)) {
+        keys.settle(false);
         askForPushInContext();
         handlersRef.current.onBooked(action.payload);
         return;
       }
       const rejection = action.payload;
       const failure = classifyRideRequestFailure(rejection, ACTIVE_RIDE_COPY.requestFailedFallback);
+      keys.settle(failure.kind === 'message' && failure.uncertain === true);
+      if (failure.kind === 'already_active') {
+        // BE-113: a ride or parcel is already open; that booking is shown instead.
+        const open = await openActiveBooking(dispatch, failure.rideId);
+        if (open) handlersRef.current.onBooked(open);
+        else if (mounted.current) setFormError(failure.message);
+        return;
+      }
       if (failure.kind === 'offer_out_of_band') {
         // BE-83: the offer left the band (the fare moved); the stepper moves into the new band.
         applyBand(failure.band);
@@ -274,7 +286,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       // Booked: the screen is replaced by the ride, so nothing is set after it is gone.
       if (mounted.current) setSubmitting(false);
     }
-  }, [options, pickup, dropoff, draft, offeredFare, applyBand, dispatch, resetDeclaration, showErrors]);
+  }, [options, pickup, dropoff, draft, offeredFare, applyBand, dispatch, resetDeclaration, showErrors, keys]);
 
   return {
     pickup,

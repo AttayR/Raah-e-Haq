@@ -18,14 +18,13 @@ import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '.
 import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
 import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
-import { rideDoneDestination } from '../../features/active-ride/done';
+import { leaveFinishedRide } from '../../features/active-ride/done';
+import { useNoDriverRetry } from '../../features/active-ride/noDriver';
 import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
 import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
 import { useRideMapRoutes, useTripRoute } from '../../features/active-ride/tripRoute';
-import { ActiveRideDoneButton, isPassengerRideFinished } from '../../features/active-ride/components/ActiveRidePanel';
-import { PassengerCancelButton } from '../../features/active-ride/components/FindingDriver';
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
@@ -45,9 +44,9 @@ import { useSearchFocus } from '../../features/ride-booking/useSearchFocus';
 import { useBookingRequest } from '../../features/ride-booking/useBookingRequest';
 import { useDefaultVehicle } from '../../features/ride-booking/vehicleSelection';
 import { toVehicleOptions } from '../../features/ride-booking/vehicleOptions';
-import { ChooseRideFooter } from '../../features/ride-booking/components/BookingStages';
+import { bookingFooter } from '../../features/ride-booking/components/BookingFooter';
 import { RouteSummaryPill } from '../../features/ride-booking/components/RouteSummaryPill';
-import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
+import { useBookingDraft, useBookingHardwareBack, useBookingSwipeBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
 import { IndeterminateBar } from '../../components/ui';
 import { useSharedValue } from 'react-native-reanimated';
 import { openRideChat } from '../../features/chat/navigation';
@@ -129,7 +128,7 @@ const PassengerMapScreen = () => {
 
   // Nearby drivers (BE-20) around the pickup, or the passenger, until a ride is booked. Once
   // the ride has ended (T-311) they are read again at once, and again on Done, so the map
-  // does not say "No drivers nearby" until the next 30 s tick.
+  // does not say "No drivers nearby" until the next 15 s tick.
   const rideEnded = rideStage?.stage === 'completed' || rideStage?.stage === 'cancelled';
   const nearbyDrivers = useNearbyDrivers(pickup ?? currentLocation, {
     enabled: isFocused && (shownStage !== 'requesting' || rideEnded),
@@ -248,15 +247,19 @@ const PassengerMapScreen = () => {
     if (rideCancelled) resetSelection();
   }, [rideCancelled, resetSelection]);
 
-  // The passenger has seen the outcome (completed / cancelled): start over.
+  // The passenger has seen the outcome (completed / cancelled): start over, on Home (T-574/T-582).
   const finishRide = useCallback(() => {
-    const doneTo = rideDoneDestination(currentRide);
     shownRideIdRef.current = null;
     dispatch(clearActiveRide());
     resetSelection();
-    // T-574: a parcel ends back on Home, where it was sent from, not in the ride planner.
-    if (doneTo === 'home') navigation.popTo('PassengerTabs', { screen: 'Home' });
-  }, [currentRide, dispatch, resetSelection, navigation]);
+    leaveFinishedRide(navigation);
+  }, [dispatch, resetSelection, navigation]);
+  // BE-114 (T-583): "No driver found" → Try again books the same trip (a parcel restored without
+  // its form data goes back to the parcel form).
+  const noDriver = useNoDriverRetry(currentRide, requestRideService, () => {
+    dispatch(clearActiveRide());
+    navigation.replace('SendParcel');
+  });
 
   const { editPoint } = flow;
   const editTrip = useCallback(() => editPoint('destination'), [editPoint]);
@@ -281,6 +284,8 @@ const PassengerMapScreen = () => {
   const searching = shownStage === 'requesting' && (rideStage?.stage ?? 'searching') === 'searching';
   const findingWithRide = searching && rideShown;
   useBookingHardwareBack(isFocused, findingWithRide ? handleCancelRide : goBack);
+  // T-583: no iOS swipe-back under a POST /rides in flight (Request or Try again) or a search.
+  useBookingSwipeBack(navigation, request.busy || searching || noDriver.retrying);
 
   if (locationGate.wait) {
     return <LocationWaitState {...locationGate.wait} onBack={() => navigation.goBack()} />;
@@ -294,22 +299,18 @@ const PassengerMapScreen = () => {
       ? windowHeight <= SHORT_WINDOW_HEIGHT ? SHORT_SHEET_RATIO : SHEET_RATIO
       : undefined;
   const choosing = !rideShown && shownStage === 'vehicle';
-  const footer =
-    rideShown && isPassengerRideFinished(rideStage?.stage) ? (
-      <ActiveRideDoneButton onPress={finishRide} />
-    ) : searching ? (
-      <PassengerCancelButton stage="searching" ride={currentRide} onPress={handleCancelRide} disabled={request.busy || rideSubmitting} />
-    ) : choosing && !compact ? (
-      <ChooseRideFooter
-        options={vehicleOptions}
-        estimates={estimates}
-        selectedVehicle={flow.selectedVehicle}
-        offer={offer}
-        onConfirm={request.confirm}
-        confirming={request.confirming}
-        disabled={request.sending}
-      />
-    ) : null;
+  const footer = bookingFooter({
+    ride: currentRide,
+    rideStage: rideStage?.stage,
+    searching,
+    choose: choosing && !compact
+      ? { options: vehicleOptions, estimates, selectedVehicle: flow.selectedVehicle, offer, onConfirm: request.confirm, confirming: request.confirming, disabled: request.sending }
+      : null,
+    onFinish: finishRide,
+    onCancel: handleCancelRide,
+    cancelDisabled: request.busy || rideSubmitting,
+    noDriver,
+  });
 
   return (
     <ErrorBoundary

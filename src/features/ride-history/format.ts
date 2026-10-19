@@ -31,12 +31,22 @@ export const formatDateTime = (value: string | null): string => {
 export const isChargedFee = (ride: Pick<Ride, 'status' | 'cancellationFee'>): boolean =>
   ride.status === 'cancelled' && ride.cancellationFee !== null && ride.cancellationFee > 0;
 
+/** BE-114: the server cancelled the request because no driver accepted it in time. */
+export const isNoDriverRide = (ride: Pick<Ride, 'status' | 'cancellationReason'>): boolean =>
+  ride.status === 'cancelled' && ride.cancellationReason === 'no_driver';
+
 /**
  * The amount a row and the summary show: the fare for the passenger, the earnings for the
  * driver. A cancelled ride shows the fee the passenger was charged (BE-85 `cancellation_fee`
  * > 0, "Rs 50 fee", T-543; T-578 also to the driver), else "No charge".
  */
 export const rideAmountText = (ride: Ride, viewer: RideViewer): string => {
+  // T-583 (BE-114): a request no driver took ended on its own, free: "No driver found · No charge".
+  if (isNoDriverRide(ride) && !isChargedFee(ride)) {
+    return isParcelRide({ vehicle_type: ride.vehicleType }) || ride.parcel !== null
+      ? RIDE_HISTORY_COPY.parcelCancelled.noRiderNoCharge
+      : RIDE_HISTORY_COPY.noDriverNoCharge;
+  }
   if (ride.status === 'cancelled') {
     return isChargedFee(ride) && ride.cancellationFee !== null
       ? t('fare.feeCharged', { amount: formatMoney(ride.cancellationFee) })

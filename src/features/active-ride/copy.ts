@@ -48,4 +48,14 @@ export const ACTIVE_RIDE_COPY = localizedCopy({
   cancelConfirmMessage: 'Are you sure you want to cancel this ride?',
   keepRide: 'Keep Ride',
   cancelFailedTitle: 'Error',
+  // T-583 (BE-113): Request found a booking already open; that one is shown.
+  alreadyActiveTitle: 'You already have a booking',
+  alreadyActiveMessage: 'Here it is. Cancel it before you book again.',
+  // T-583 (BE-114): the server ended a request no driver accepted in time (no fee).
+  noDriverTitle: 'No driver found',
+  noDriverMessage: 'No driver accepted your ride in time. You were not charged.',
+  noRiderTitle: 'No rider found',
+  noRiderMessage: 'No rider accepted your delivery in time. You were not charged.',
+  tryAgain: 'Try again',
+  close: 'Close',
 } as const);

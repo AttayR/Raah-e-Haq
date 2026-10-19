@@ -91,6 +91,14 @@ export const cancelledByOf = (ride: Pick<RideResource, 'cancellation_reason'>): 
   return 'system';
 };
 
+/**
+ * BE-114: the server cancelled a request no driver accepted in time (`cancellation_reason`
+ * `no_driver`): no fee, no strike. The passenger sees "No driver found" with Try again.
+ */
+export const isNoDriverCancel = (
+  ride: Pick<RideResource, 'status' | 'cancellation_reason'> | null | undefined,
+): boolean => !!ride && ride.status === 'cancelled' && ride.cancellation_reason === 'no_driver';
+
 const toNumber = (value: unknown): number | null => {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   return typeof n === 'number' && Number.isFinite(n) ? n : null;

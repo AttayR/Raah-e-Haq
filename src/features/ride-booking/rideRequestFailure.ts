@@ -7,6 +7,8 @@ import type { OfferBand } from '../fare/types';
 export const PHONE_NOT_VERIFIED = 'PHONE_NOT_VERIFIED';
 /** BE-85: POST /rides refuses a passenger who owes more than the limit (403, error.amount_owed). */
 export const PASSENGER_BALANCE_OWED = 'PASSENGER_BALANCE_OWED';
+/** BE-113: the passenger already has an open ride or parcel (409, `error.ride_id`). */
+export const RIDE_ALREADY_ACTIVE = 'RIDE_ALREADY_ACTIVE';
 
 /**
  * What the booking screen does with a refused POST /rides:
@@ -16,15 +18,20 @@ export const PASSENGER_BALANCE_OWED = 'PASSENGER_BALANCE_OWED';
  * - `balance_owed`: "You owe Rs X. Top up to book" with a top-up (BE-85);
  * - `offer_out_of_band`: the offer was outside the server's band (BE-83 422 `offered_fare`); the
  *   message is the server's and `band` (from `error.offer_band`, null if absent) resets the stepper;
+ * - `already_active`: BE-113, the passenger already has an open booking (`rideId`, GET
+ *   /rides/{id}); the app opens it instead of showing an error;
  * - `message`: show the server's text (for a 422 the first field message, e.g. "The selected
- *   vehicle type is invalid.", not the generic "Validation failed").
+ *   vehicle type is invalid.", not the generic "Validation failed"). `uncertain` (T-583): no
+ *   answer came back (network, timeout), so the server may have created the ride; a retry of the
+ *   same booking reuses its Idempotency-Key.
  */
 export type RideRequestFailure =
   | { kind: 'phone_not_verified'; message: string }
   | { kind: 'balance_owed'; message: string; amountOwed: number | null; limit: number | null }
   | { kind: 'offer_out_of_band'; message: string; band: OfferBand | null }
+  | { kind: 'already_active'; message: string; rideId: number }
   | { kind: 'handled' }
-  | { kind: 'message'; message: string };
+  | { kind: 'message'; message: string; uncertain?: boolean };
 
 const firstFieldError = (rejection: ThunkRejection): string | null => {
   for (const messages of Object.values(rejection.fieldErrors ?? {})) {
@@ -57,6 +64,10 @@ export const classifyRideRequestFailure = (
   if (rejection.status === 403 && rejection.code?.startsWith('ACCOUNT_')) {
     return { kind: 'handled' };
   }
+  const activeRideId = rejection.extra?.ride_id;
+  if (rejection.code === RIDE_ALREADY_ACTIVE && typeof activeRideId === 'number' && activeRideId > 0) {
+    return { kind: 'already_active', message: rejectionMessage(rejection, fallback), rideId: activeRideId };
+  }
   const offerMessage = rejection.fieldErrors?.offered_fare?.find((m) => typeof m === 'string' && m.trim());
   if (rejection.kind === 'validation' && offerMessage) {
     return { kind: 'offer_out_of_band', message: offerMessage, band: offerBandFromExtra(rejection.extra) };
@@ -64,5 +75,8 @@ export const classifyRideRequestFailure = (
   if (rejection.kind === 'validation') {
     return { kind: 'message', message: firstFieldError(rejection) ?? rejectionMessage(rejection, fallback) };
   }
-  return { kind: 'message', message: rejectionMessage(rejection, fallback) };
+  const uncertain = rejection.kind === 'network' || rejection.kind === 'timeout';
+  return uncertain
+    ? { kind: 'message', message: rejectionMessage(rejection, fallback), uncertain }
+    : { kind: 'message', message: rejectionMessage(rejection, fallback) };
 };

@@ -36,12 +36,13 @@ import { ParcelSenderSection } from '../../parcel/components/ParcelSenderSection
 import type { ParcelView } from '../../parcel/types';
 import { readNumberOrNull } from '../../../core/api/read';
 import { formatMoney } from '../../../utils/format';
-import { FindingSubtitle, PassengerCancelButton, SearchingTripCard, searchingTripOf, type SearchDraft } from './FindingDriver';
+import { FindingSubtitle, NoDriverFound, PassengerCancelButton, SearchingTripCard, searchingTripOf, type SearchDraft } from './FindingDriver';
 import {
   canPassengerCancel,
   cancelledByOf,
   driverCardOf,
   fareSummaryOf,
+  isNoDriverCancel,
   type PassengerRideStage,
   type PassengerRideStageState,
 } from '../stage';
@@ -217,6 +218,16 @@ const ActiveRidePanel: React.FC<Props> = ({
       onPress: () => openRideChat(navigation, ride.id, driver.name),
       testID: 'ride-chat-button',
     });
+  }
+
+  // BE-114 (T-583): the request ended unanswered: its own state, no fee line, no report offer.
+  if (stage === 'cancelled' && isNoDriverCancel(ride)) {
+    return (
+      <View testID={`active-ride-${stage}`} style={styles.wrap}>
+        <NoDriverFound parcel={isParcelRide(ride)} />
+        {onDone ? <ActiveRideDoneButton onPress={onDone} /> : null}
+      </View>
+    );
   }
 
   return (
