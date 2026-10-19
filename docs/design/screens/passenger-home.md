@@ -119,7 +119,7 @@ Peek = **measured header height** (handle 24 + S1 header, from the BottomSheet's
 | Ride-only heading, 1.3× | 24 + 29 | **177** |
 | Ride or parcel in progress | greeting | **202** (T-577, unchanged) |
 
-- `half` = **max(50 % of the window, peek + 180)**, capped at `full` (keeps the compact rides ErrorState, ≤156 + 16, visible at `half`). iPhone 17: 437 (service row) / 437 (ride-only). SE: **424** (service row, 1.0×) / 350 (ride-only).
+- `half` = **max(50 % of the sheet container, peek + 180)**, capped at `full` (keeps the compact rides ErrorState, ≤156 + 16, visible at `half`). The container is the map area above the tab bar (kit `sheetSnaps`, same for every sheet), not the window **[design review UI-R20, 2026-10-19: corrected; was "window", 437]**. iPhone 17 (container 780): **424** (service row, max(390, 424)) / 390 (ride-only). SE: **424** (service row, 1.0×) / 350 (ride-only).
 - `full` unchanged (window − top inset − 8); service row stays pinned in the header, body scrolls.
 - Map: camera bottom padding = sheet height + 24 (unchanged); locate button and the T-586 nearby chip ride 16 above the sheet. SE at peek 244: 667 − 244 − tab bar 64 = 359 of map including the status bar.
 - What shows at each snap: **peek** = header, "Where to?", chip row. **half** = + location banner (if off) + Recent rides header and the first 1–2 rows (or the compact error / empty hint). **full** = + the rest of the body (offers when BE-10 lands, recent rides).
@@ -198,7 +198,7 @@ Never a skeleton tile: the header is either the service row or the ride-only hea
 - **[UI-R20]** Focus order: handle → Ride tile → Parcel tile → "Where to?" → chips → body. Tile labels and hints: § Services S4.
 
 ## Small device (iPhone SE)
-- **[UI-R20]** Peek 244 with the service row (same as iPhone 17 at 1.0×; tiles 165.5 wide), 170 without it. `half` = **max(50 % of the window, peek + 180)**, never above `full`: SE 1.0× = max(333.5, 424) = **424**; iPhone 17 = max(437, 424) = **437**. This keeps the compact rides ErrorState (≤156 + 16 gap) fully visible at `half` (DESIGN_SYSTEM §8.3 [UI-R20]).
+- **[UI-R20]** Peek 244 with the service row (same as iPhone 17 at 1.0×; tiles 165.5 wide), 170 without it. `half` = **max(50 % of the sheet container, peek + 180)**, never above `full`: SE 1.0× = **424**; iPhone 17 = max(390, 424) = **424** (corrected in design review, was 437). This keeps the compact rides ErrorState (≤156 + 16 gap) fully visible at `half` (DESIGN_SYSTEM §8.3 [UI-R20]).
 
 ## Dark
 - Dark map style, sheet `surface` #141A2A, bar `surfaceAlt`. **[UI-R20]** tiles: § Services S3 (token values for both modes).
