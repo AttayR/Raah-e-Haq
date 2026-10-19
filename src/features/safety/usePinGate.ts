@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 import { SUPPORT_EMAIL } from '../../config/support';
 import { haptics } from '../../core/haptics';
+import { logger } from '../../core/logging/logger';
 import { toast } from '../../core/toast';
+import { DRIVER_RIDE_COPY } from '../driver-ride/copy';
 import { t } from '../../i18n';
 import type { RideResource } from '../../services/rideService';
 import type { DriverStartResult } from '../driver-ride/hooks';
@@ -89,9 +91,16 @@ export const usePinGate = (
       setOpen(true);
       return;
     }
-    start().then((result) => {
-      if (!result.ok) refused(result.pin);
-    });
+    // T-579: a failure inside the start never escapes as an unhandled rejection.
+    start().then(
+      (result) => {
+        if (!result.ok) refused(result.pin);
+      },
+      (cause: unknown) => {
+        logger.warn('Start trip failed', { error: cause });
+        toast.error(DRIVER_RIDE_COPY.actionFailed);
+      },
+    );
   }, [ride?.pin_required, blocked, start, refused]);
 
   const submit = useCallback(
@@ -107,6 +116,11 @@ export const usePinGate = (
           } else {
             refused(result.pin);
           }
+        })
+        // T-579: `finally` alone passed a rejection on, unhandled.
+        .catch((cause: unknown) => {
+          logger.warn('Start trip with PIN failed', { error: cause });
+          toast.error(DRIVER_RIDE_COPY.actionFailed);
         })
         .finally(() => setSubmitting(false));
     },

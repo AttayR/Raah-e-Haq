@@ -265,7 +265,8 @@ const ActiveRidePanel: React.FC<Props> = ({ stageState, ride, onCancel, onDone, 
 
       {canPassengerCancel(stage) ? (
         <Button
-          label={ACTIVE_RIDE_COPY.cancelRide}
+          // T-579: a parcel is cancelled as a delivery, from the search on.
+          label={isParcelRide(ride) ? t('parcel.cancelDelivery') : ACTIVE_RIDE_COPY.cancelRide}
           variant="destructiveSoft"
           onPress={onCancel}
           disabled={busy}

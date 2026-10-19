@@ -3,6 +3,7 @@ import { vehicleMeta } from '../../components/ui';
 import type { VehicleTypeKey } from '../../services/rideService';
 import type { FareEstimate, FareEstimates, VehicleType } from './api';
 import { formatMoney } from '../../utils/format';
+import { tierLabel } from '../ride-history/copy';
 
 /** One row of the vehicle list (VehicleOptionCard props), built only from server data. */
 export type VehicleOption = {
@@ -34,7 +35,8 @@ export const toVehicleOptions = (types: ReadonlyArray<VehicleType>, estimates: F
     const quote = estimates?.estimates.find((e) => e.vehicle_type === type.key);
     return {
       id: type.key,
-      name: type.label,
+      // T-579: the server's name (BE-112), else the app's label for the key.
+      name: tierLabel(type.key, type.label) ?? type.label,
       meta: vehicleMeta(type.capacity),
       fare: quote ? formatFare(quote.fare, quote.currency) : null,
       unavailable: !!estimates && !quote,

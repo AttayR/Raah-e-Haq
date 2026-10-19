@@ -66,6 +66,16 @@ export const RIDE_HISTORY_COPY = localizedCopy({
   cancelledBySystem: 'This ride was cancelled automatically.',
   cancelledByWeather: 'This ride was cancelled because of the weather.',
   cancelledUnknown: 'This ride was cancelled.',
+  // T-579: the same lines on a parcel, said as a delivery.
+  parcelCancelled: {
+    byYou: 'You cancelled this delivery.',
+    byPassenger: 'The sender cancelled this delivery.',
+    byDriver: 'Your rider cancelled this delivery.',
+    bySystem: 'This delivery was cancelled automatically.',
+    byWeather: 'This delivery was cancelled because of the weather.',
+    unknown: 'This delivery was cancelled.',
+    noCharge: 'Cancelled deliveries are not charged.',
+  },
   // UI-R15 share receipt.
   share: 'Share receipt',
   shareHeading: 'Raah-e-Haq ride receipt',
@@ -116,8 +126,53 @@ export const vehicleLabel = (type: string | null): string | null => {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : null;
 };
 
-/** Who cancelled, said from the viewer's side. */
-export const cancellationText = (reason: CancellationReason | null, viewer: RideViewer): string => {
+/** The server's payment status in the active language (T-579); null when the server sends none. */
+export const PAYMENT_STATUS_LABEL = localizedCopy({
+  paid: 'Paid',
+  pending: 'Pending',
+  failed: 'Failed',
+  refunded: 'Refunded',
+} as const);
+
+const isPaymentStatusKey = (key: string): key is keyof typeof PAYMENT_STATUS_LABEL =>
+  Object.prototype.hasOwnProperty.call(PAYMENT_STATUS_LABEL, key);
+
+/** "paid" -> "Paid" ("Ada ho gaya" in Roman Urdu); an unknown status is shown title-cased. */
+export const paymentStatusLabel = (status: string | null): string | null => {
+  if (!status) return null;
+  const key = status.trim().toLowerCase();
+  if (isPaymentStatusKey(key)) return PAYMENT_STATUS_LABEL[key];
+  const words = status.replace(/_/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : null;
+};
+
+/**
+ * T-579: the booking's tier name. The server's display name wins whenever it sends one (BE-112:
+ * stock names come translated, "Gaari" like Activity; an admin-renamed tier is shown as typed);
+ * without one, the app's VEHICLE_LABEL in the active language, else the key title-cased.
+ */
+export const tierLabel = (key: string | null, serverLabel?: string | null): string | null => {
+  const label = serverLabel?.trim();
+  return label ? label : vehicleLabel(key);
+};
+
+/** Who cancelled, said from the viewer's side; a parcel (T-579) is said as a delivery. */
+export const cancellationText = (reason: CancellationReason | null, viewer: RideViewer, parcel = false): string => {
+  if (parcel) {
+    const P = RIDE_HISTORY_COPY.parcelCancelled;
+    switch (reason) {
+      case 'passenger':
+        return viewer === 'passenger' ? P.byYou : P.byPassenger;
+      case 'driver':
+        return viewer === 'driver' ? P.byYou : P.byDriver;
+      case 'system':
+        return P.bySystem;
+      case 'weather':
+        return P.byWeather;
+      default:
+        return P.unknown;
+    }
+  }
   switch (reason) {
     case 'passenger':
       return viewer === 'passenger' ? RIDE_HISTORY_COPY.cancelledByYou : RIDE_HISTORY_COPY.cancelledByPassenger;

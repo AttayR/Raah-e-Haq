@@ -16,9 +16,9 @@ import {
 } from '../../../components/ui';
 import { formatDistance, formatDuration } from '../../../utils/format';
 import { space } from '../../../theme';
-import { cancellationText, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
+import { cancellationText, paymentStatusLabel, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
 import { formatMoney } from '../../../utils/format';
-import { formatDateTime, isChargedFee, otherParty, paymentMethodText, rideAmountText, rideTime, timelineSteps, titleCase } from '../format';
+import { formatDateTime, isChargedFee, otherParty, paymentMethodText, rideAmountText, rideTime, timelineSteps } from '../format';
 import type { Ride, RideViewer } from '../types';
 import { t } from '../../../i18n';
 import { isParcelRide } from '../../parcel/api';
@@ -101,7 +101,7 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
       ) : null}
       {!cancelled ? (
         <AppText variant="bodySmall" color="textSecondary">
-          {[paymentMethodText(ride, viewer), titleCase(ride.paymentStatus)].filter(Boolean).join(' · ')}
+          {[paymentMethodText(ride, viewer), paymentStatusLabel(ride.paymentStatus)].filter(Boolean).join(' · ')}
         </AppText>
       ) : null}
       {vehicle || metrics ? (
@@ -138,12 +138,19 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
 
 /**
  * BE-85: what the cancel cost, said from the viewer's side; "Cancelled rides are not charged."
- * when nothing was charged. The driver hears that their share is credited once the passenger pays.
+ * ("Cancelled deliveries are not charged." on a parcel, T-579) when nothing was charged. The
+ * driver hears that their share is credited once the passenger pays.
  */
-export const cancellationChargeText = (ride: Pick<Ride, 'cancellationFee' | 'cancellationChargeReason'>, viewer: RideViewer): string => {
-  if (ride.cancellationFee === null) return C.noChargeCancelled;
+export const cancellationChargeText = (
+  ride: Pick<Ride, 'cancellationFee' | 'cancellationChargeReason'> & Partial<Pick<Ride, 'vehicleType' | 'parcel'>>,
+  viewer: RideViewer,
+): string => {
+  const noCharge = isParcelDetails({ vehicleType: ride.vehicleType ?? null, parcel: ride.parcel ?? null })
+    ? C.parcelCancelled.noCharge
+    : C.noChargeCancelled;
+  if (ride.cancellationFee === null) return noCharge;
   if (viewer === 'driver') return t('driverFare.cancelFeeShare', { amount: formatMoney(ride.cancellationFee) });
-  return cancellationFeeText(ride.cancellationFee, ride.cancellationChargeReason) ?? C.noChargeCancelled;
+  return cancellationFeeText(ride.cancellationFee, ride.cancellationChargeReason) ?? noCharge;
 };
 
 /** Who cancelled and their note (cancelled rides only). */
@@ -156,7 +163,7 @@ export function CancellationCard({ ride, viewer }: SectionProps) {
         {/* T-561: a parcel refused at the pickup is said as such, not as a plain driver cancel. */}
         {ride.parcel?.refusalReason
           ? t(viewer === 'driver' ? 'parcel.driverRefusedReceipt' : 'parcel.senderRefused')
-          : cancellationText(ride.cancellationReason, viewer)}
+          : cancellationText(ride.cancellationReason, viewer, isParcelDetails(ride))}
       </AppText>
       {ride.cancellationNote ? (
         <AppText variant="bodySmall" color="textSecondary" style={styles.metrics} testID="ride-details-cancellation-note">
@@ -263,7 +270,7 @@ export const driverSplitRows = (ride: Pick<Ride, 'split' | 'platformCommission' 
  */
 export const receiptPaymentStatus = (ride: Pick<Ride, 'status' | 'paymentStatus' | 'cancellationFee'>): string | null => {
   if (ride.status === 'cancelled' && (ride.cancellationFee === null || ride.cancellationFee <= 0)) return C.noCharge;
-  return titleCase(ride.paymentStatus);
+  return paymentStatusLabel(ride.paymentStatus);
 };
 
 /**

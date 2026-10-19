@@ -13,6 +13,7 @@ import { perLocale, t } from '../../../i18n';
 import { borderWidth, layout, motionPatterns, radius, space } from '../../../theme';
 import { AppText, Badge, Banner, Button, Card, Chip, ListItem, RecentRidesCard, vehicleIconName, type RecentRideRow } from '../../ui';
 import { DRIVER_HOME_COPY } from '../home/copy';
+import { vehicleLabel } from '../../../features/ride-history/copy';
 import { DriverTodayStats, type DriverTodayStatsValues } from '../home/DriverTodayStats';
 
 export type DriveStatus = 'checking' | 'offline' | 'online' | 'onRide';
@@ -106,8 +107,6 @@ type BodyProps = {
   onOpenRide?: (id: string) => void;
 };
 
-const titleCase = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
-
 /**
  * Drive sheet body (§8.3): the 56pt Go online (primary) / Go offline (outline) action (or
  * "Resume ride" while a ride is open), then at `half`: the status hint, today's earnings pill,
@@ -191,7 +190,8 @@ export function DriveSheetBody({
             title={DRIVER_HOME_COPY.accountCardTitle}
             subtitle={
               vehicleType
-                ? titleCase(vehicleType)
+                ? // T-579: the same tier name as Activity, in the active language.
+                  vehicleLabel(vehicleType) ?? vehicleType
                 : isApproved
                 ? DRIVER_HOME_COPY.approvedToDrive
                 : DRIVER_HOME_COPY.waitingForApproval

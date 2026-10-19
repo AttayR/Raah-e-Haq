@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
 import { toast, type ToastOptions } from '../../core/toast';
+import { logger } from '../../core/logging/logger';
 import type { RideResource } from '../../services/rideService';
 import { formatDistance, formatMoney } from '../../utils/format';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
@@ -225,11 +226,18 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       if (rideId === null) return false;
       const action = await dispatch(cancelDriverRide({ rideId, note }));
       if (cancelDriverRide.fulfilled.match(action)) {
-        // BE-109: the fee the cancel really charged (the server's answer, not the preview).
-        const fee = chargedCancelFeeOf(action.payload);
-        // T-578: the short form, so it fits the toast's two lines; a parcel says delivery.
-        const feeText = fee === null ? undefined : t(parcel ? 'driverFare.cancelFeeToastParcel' : 'driverFare.cancelFeeToast', { amount: formatMoney(fee) });
-        toast.success(parcel ? t('parcel.cancelledDone') : DRIVER_RIDE_COPY.cancelledDone, feeText, DRIVER_RIDE_TOAST_OPTIONS);
+        // T-579: the ride is already given up (cancelled or requeued, the slice dropped it, the
+        // screen is leaving). Nothing after this may turn the cancel into a rejected promise:
+        // the screen's handler has already unmounted and nobody would catch it.
+        try {
+          // BE-109: the fee the cancel really charged (the server's answer, not the preview).
+          const fee = chargedCancelFeeOf(action.payload);
+          // T-578: the short form, so it fits the toast's two lines; a parcel says delivery.
+          const feeText = fee === null ? undefined : t(parcel ? 'driverFare.cancelFeeToastParcel' : 'driverFare.cancelFeeToast', { amount: formatMoney(fee) });
+          toast.success(parcel ? t('parcel.cancelledDone') : DRIVER_RIDE_COPY.cancelledDone, feeText, DRIVER_RIDE_TOAST_OPTIONS);
+        } catch (error) {
+          logger.warn('Driver ride: the cancel toast failed', { error });
+        }
         // The server no longer reports `on_ride`; the toggle and the request feed follow it.
         dispatch(loadDriverStatus());
         return true;

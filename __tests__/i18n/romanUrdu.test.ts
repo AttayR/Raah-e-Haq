@@ -25,7 +25,7 @@ import {
   SETTLEMENT_STATUS_LABEL,
   WALLET_COPY,
 } from '../../src/features/wallet/copy';
-import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL, VEHICLE_LABEL } from '../../src/features/ride-history/copy';
+import { PAYMENT_STATUS_LABEL, RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL, VEHICLE_LABEL } from '../../src/features/ride-history/copy';
 import { NOTIFICATIONS_COPY } from '../../src/features/notifications/copy';
 import { CHAT_COPY } from '../../src/features/chat/copy';
 import { STATS_COPY } from '../../src/features/stats/copy';
@@ -126,6 +126,7 @@ const COPY_OBJECTS: Record<string, object> = {
   RIDE_STATUS_LABEL,
   TIMELINE_LABEL,
   VEHICLE_LABEL,
+  PAYMENT_STATUS_LABEL,
   NOTIFICATIONS_COPY,
   CHAT_COPY,
   STATS_COPY,
@@ -143,7 +144,6 @@ const SAME_IN_BOTH = new Set([
   'cnicPlaceholder',
   'dobPlaceholder',
   'expiryPlaceholder',
-  'vehicleNumberPlaceholder',
   'icon',
   'tone',
   'canCheckStatus',

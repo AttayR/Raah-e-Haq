@@ -3,6 +3,8 @@ import type { RideResource } from '../../services/rideService';
 import { alert, confirm } from '../../core/dialog';
 import { toCancellationPreview } from '../fare/api';
 import { cancelPreviewText } from '../fare/format';
+import { t } from '../../i18n';
+import { isParcelRide } from '../parcel/api';
 import { ACTIVE_RIDE_COPY } from './copy';
 
 /**
@@ -10,9 +12,13 @@ import { ACTIVE_RIDE_COPY } from './copy';
  * "Free to cancel until 6:05 PM." or "Cancelling now costs Rs 50. It is charged to your wallet."
  * Without a preview (a booking not sent yet, an older server) it is the plain question.
  */
-export const cancelConfirmBody = (ride: Pick<RideResource, 'cancellation_preview'> | null): string => {
+export const cancelConfirmBody = (
+  ride: (Pick<RideResource, 'cancellation_preview'> & { is_parcel?: unknown; vehicle_type?: unknown }) | null,
+): string => {
   const preview = cancelPreviewText(toCancellationPreview(ride?.cancellation_preview));
-  return preview ? `${ACTIVE_RIDE_COPY.cancelConfirmMessage} ${preview}` : ACTIVE_RIDE_COPY.cancelConfirmMessage;
+  // T-579: a parcel is asked about as a delivery.
+  const question = isParcelRide(ride) ? t('parcel.cancelConfirmMessage') : ACTIVE_RIDE_COPY.cancelConfirmMessage;
+  return preview ? `${question} ${preview}` : question;
 };
 
 /**
@@ -29,11 +35,12 @@ export const usePassengerCancel = (
   const rideRef = useRef(ride);
   rideRef.current = ride;
   return useCallback(async () => {
+    const parcel = isParcelRide(rideRef.current);
     const yes = await confirm({
-      title: ACTIVE_RIDE_COPY.cancelConfirmTitle,
+      title: parcel ? t('parcel.cancelDelivery') : ACTIVE_RIDE_COPY.cancelConfirmTitle,
       body: cancelConfirmBody(rideRef.current),
-      confirmLabel: ACTIVE_RIDE_COPY.cancelRide,
-      cancelLabel: ACTIVE_RIDE_COPY.keepRide,
+      confirmLabel: parcel ? t('parcel.cancelDelivery') : ACTIVE_RIDE_COPY.cancelRide,
+      cancelLabel: parcel ? t('parcel.cancelKeep') : ACTIVE_RIDE_COPY.keepRide,
       destructive: true,
     });
     if (!yes) return;

@@ -23,12 +23,7 @@ import {
 } from '../../../components/ui';
 import { confirm } from '../../../core/dialog';
 import { formatMoney } from '../../../core/format/money';
-import {
-  LOGOUT_CONFIRM_BUTTON,
-  LOGOUT_CONFIRM_MESSAGE,
-  LOGOUT_CONFIRM_TITLE,
-} from '../../../hooks/useLogout';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { componentTokens, layout, space } from '../../../theme';
 import { BalanceCard } from '../../wallet/components/BalanceCard';
 import { CommissionCard } from '../../wallet/components/CommissionCard';
@@ -80,11 +75,12 @@ function WalletHeader({ title = WALLET_COPY.title }: { title?: string }) {
   );
 }
 
-const FILTERS = [
-  { value: 'all', label: WALLET_COPY.filterAll },
-  { value: 'credit', label: WALLET_COPY.filterIn },
-  { value: 'debit', label: WALLET_COPY.filterOut },
-] as const;
+// T-579: built per language at render, so the previews follow a language switch.
+const FILTERS = perLocale(() => [
+  { value: 'all' as const, label: WALLET_COPY.filterAll },
+  { value: 'credit' as const, label: WALLET_COPY.filterIn },
+  { value: 'debit' as const, label: WALLET_COPY.filterOut },
+]);
 
 function WalletTop({ driver, wallet: given }: { driver: boolean; wallet?: Wallet }) {
   const wallet = given ?? (driver ? galleryDriverWallet : galleryPassengerWallet);
@@ -118,7 +114,7 @@ function WalletTop({ driver, wallet: given }: { driver: boolean; wallet?: Wallet
       </AppText>
       {/* UI-R15: the live wallet filters are FilterChips, not a segmented control. */}
       <FilterChips
-        options={FILTERS}
+        options={FILTERS()}
         value="all"
         onChange={noop}
         accessibilityLabel={WALLET_COPY.filterLabel}
@@ -171,10 +167,10 @@ export function WalletErrorPreview() {
   );
 }
 
-const ACTIVITY_SEGMENTS = [
-  { value: 'rides', label: t('activity.rides') },
-  { value: 'wallet', label: t('activity.wallet') },
-] as const;
+const ACTIVITY_SEGMENTS = perLocale(() => [
+  { value: 'rides' as const, label: t('activity.rides') },
+  { value: 'wallet' as const, label: t('activity.wallet') },
+]);
 
 /** UI-R15: a new passenger's wallet as it appears in Activity › Wallet (Rs 0, empty ledger). */
 export function WalletEmptyPreview() {
@@ -184,7 +180,7 @@ export function WalletEmptyPreview() {
       <Header variant="large" inlineTitle title={t('activity.title')} tone="background" />
       <View style={styles.segments}>
         <SegmentedControl
-          options={ACTIVITY_SEGMENTS}
+          options={ACTIVITY_SEGMENTS()}
           value="wallet"
           onChange={noop}
           accessibilityLabel={t('activity.segmentLabel')}
@@ -327,9 +323,10 @@ export function SignOutDialogPreview() {
   useEffect(() => {
     const timer = setTimeout(() => {
       confirm({
-        title: LOGOUT_CONFIRM_TITLE,
-        body: LOGOUT_CONFIRM_MESSAGE,
-        confirmLabel: LOGOUT_CONFIRM_BUTTON,
+        // T-579: read when shown, like the real sign-out dialog.
+        title: t('signOut.title'),
+        body: t('signOut.body'),
+        confirmLabel: t('signOut.confirm'),
         destructive: true,
       });
     }, AFTER_MODAL_SLIDE_MS * 2);

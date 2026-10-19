@@ -14,6 +14,7 @@ import type { BookingFlow, BookingStage } from '../useBookingFlow';
 import { FareStage, MAX_STOPS, VehicleStage } from './BookingStages';
 import { ChooseOnMapButton } from './MapPick';
 import { locationFieldLabels } from '../copy';
+import { tierLabel } from '../../ride-history/copy';
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -148,7 +149,7 @@ export const BookingStageContent: React.FC<Props> = ({
     case 'fare':
       return (
         <FareStage
-          vehicleLabel={selectedType?.label ?? null}
+          vehicleLabel={selectedType ? tierLabel(selectedType.key, selectedType.label) : null}
           tripSummary={tripSummary}
           vehicleType={selectedType}
           estimates={estimates}

@@ -216,6 +216,7 @@ export function registerAuthCopy(): void {
       colour: 'Rang',
       colourSheet: 'Rang chunein',
       vehicleNumber: 'Gaari ka number',
+      vehicleNumberPlaceholder: 'ABC-1234 ya ABC-1234-D',
       licensePlate: 'Number plate',
       licensePlatePlaceholder: 'Jaise LEA-1234',
       registrationNumber: 'Registration number',

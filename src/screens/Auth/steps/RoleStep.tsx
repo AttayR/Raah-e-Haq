@@ -9,9 +9,11 @@ import { componentTokens, radius, space } from '../../../theme';
 const C = REGISTRATION_COPY.role;
 const w = componentTokens.wizard;
 
-const ROLES: ReadonlyArray<{ role: RegistrationRole; icon: IconName; title: string; body: string }> = [
-  { role: 'passenger', icon: 'account', title: C.rideTitle, body: C.rideBody },
-  { role: 'driver', icon: 'steering', title: C.driveTitle, body: C.driveBody },
+// T-579: the card texts are read at render (not copied into a module-level list), so the cards
+// follow a live language switch.
+const ROLES: ReadonlyArray<{ role: RegistrationRole; icon: IconName; title: () => string; body: () => string }> = [
+  { role: 'passenger', icon: 'account', title: () => C.rideTitle, body: () => C.rideBody },
+  { role: 'driver', icon: 'steering', title: () => C.driveTitle, body: () => C.driveBody },
 ];
 
 type Props = {
@@ -31,8 +33,10 @@ export default function RoleStep({ value, onChange }: Props) {
   const minHeight = height < w.compactWindowHeight ? w.compactChoiceMinHeight : w.choiceMinHeight;
   return (
     <View style={styles.list} accessibilityRole="radiogroup" accessibilityLabel={C.groupA11y}>
-      {ROLES.map(({ role, icon, title, body }) => {
+      {ROLES.map(({ role, icon, title: titleOf, body: bodyOf }) => {
         const selected = value === role;
+        const title = titleOf();
+        const body = bodyOf();
         return (
           <Card
             key={role}

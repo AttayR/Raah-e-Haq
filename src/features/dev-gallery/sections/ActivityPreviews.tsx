@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FilterChips, Header, Screen, ScrollHairline, SegmentedControl } from '../../../components/ui';
-import { t } from '../../../i18n';
+import { perLocale, t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import { ActivitySummary } from '../../activity/components/ActivitySummary';
 import { RideHistoryState } from '../../ride-history/components/RideHistoryStates';
@@ -18,26 +18,27 @@ import { RIDE_HISTORY_COPY } from '../../ride-history/copy';
  */
 const noop = () => undefined;
 
-const SEGMENTS = [
-  { value: 'rides', label: t('activity.rides') },
-  { value: 'wallet', label: t('activity.wallet') },
-] as const;
+// T-579: built per language at render, so the previews follow a language switch.
+const SEGMENTS = perLocale(() => [
+  { value: 'rides' as const, label: t('activity.rides') },
+  { value: 'wallet' as const, label: t('activity.wallet') },
+]);
 
-const FILTERS = [
-  { value: 'all', label: RIDE_HISTORY_COPY.filterAll },
-  { value: 'completed', label: RIDE_HISTORY_COPY.filterCompleted },
-  { value: 'cancelled', label: RIDE_HISTORY_COPY.filterCancelled },
-] as const;
+const FILTERS = perLocale(() => [
+  { value: 'all' as const, label: RIDE_HISTORY_COPY.filterAll },
+  { value: 'completed' as const, label: RIDE_HISTORY_COPY.filterCompleted },
+  { value: 'cancelled' as const, label: RIDE_HISTORY_COPY.filterCancelled },
+]);
 
 export function ActivityHistoryPreview({ state }: { state: 'loading' | 'empty' | 'error' }) {
   return (
     <Screen testID={`preview-history-${state}`}>
       <Header variant="large" inlineTitle title={t('activity.title')} tone="background" />
       <View style={styles.segments}>
-        <SegmentedControl options={SEGMENTS} value="rides" onChange={noop} accessibilityLabel={t('activity.segmentLabel')} />
+        <SegmentedControl options={SEGMENTS()} value="rides" onChange={noop} accessibilityLabel={t('activity.segmentLabel')} />
       </View>
       <View style={styles.chips}>
-        <FilterChips<RideHistoryFilter> options={FILTERS} value="all" onChange={noop} accessibilityLabel={RIDE_HISTORY_COPY.filterLabel} />
+        <FilterChips<RideHistoryFilter> options={FILTERS()} value="all" onChange={noop} accessibilityLabel={RIDE_HISTORY_COPY.filterLabel} />
       </View>
       <ScrollHairline />
       {state === 'loading' ? (

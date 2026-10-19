@@ -389,6 +389,12 @@ export const en = {
     greetingAfternoon: 'Good afternoon',
     greetingEvening: 'Good evening',
     greetingWithName: '{greeting}, {name}',
+    // T-579: the nearby drivers line on the map.
+    nearbyLoading: 'Finding drivers nearby…',
+    nearbyFailed: 'Could not load nearby drivers.',
+    nearbyNone: 'No drivers nearby right now',
+    nearbyOne: '1 driver nearby',
+    nearbyMany: '{n} drivers nearby',
   },
   /** Saved places (T-516, BE-14): the list, the add/edit form and the Home chips. */
   savedPlaces: {
@@ -1283,6 +1289,8 @@ export const en = {
     paymentCashDriver: 'Cash (collected at the pickup)',
     cancelDelivery: 'Cancel delivery',
     cancelledDone: 'Delivery cancelled.',
+    // T-579: the sender's cancel question.
+    cancelConfirmMessage: 'Are you sure you want to cancel this delivery?',
     item: 'Parcel',
     declaredValue: 'Declared value {amount}',
     receiver: 'Receiver',

@@ -6,7 +6,7 @@ import {
   SETTLEMENT_STATUS_LABEL,
   WALLET_COPY,
 } from '../../features/wallet/copy';
-import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL, VEHICLE_LABEL } from '../../features/ride-history/copy';
+import { PAYMENT_STATUS_LABEL, RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL, VEHICLE_LABEL } from '../../features/ride-history/copy';
 import { NOTIFICATIONS_COPY } from '../../features/notifications/copy';
 import { CHAT_COPY } from '../../features/chat/copy';
 import { STATS_COPY } from '../../features/stats/copy';
@@ -163,7 +163,7 @@ export function registerAccountCopy(): void {
     rider: 'Rider',
     message: 'Message',
     messageHint: 'Is ride ki chat kholta hai',
-    receipt: 'Receipt',
+    receipt: 'Raseed',
     fareBase: 'Bunyadi fare',
     fareDistance: 'Faasla',
     fareTime: 'Waqt',
@@ -172,9 +172,9 @@ export function registerAccountCopy(): void {
     total: 'Kul',
     platformFee: 'Raah-e-Haq fee',
     youEarned: 'Aap ki kamai',
-    paymentMethod: 'Payment',
+    paymentMethod: 'Adaigi',
     paymentCash: { passenger: 'Cash (driver ko diya)', driver: 'Cash (aap ne liya)' },
-    paymentStatus: 'Payment status',
+    paymentStatus: 'Adaigi ki surat',
     rideCode: 'Ride ID',
     date: 'Tareekh',
     timeline: 'Timeline',
@@ -190,12 +190,28 @@ export function registerAccountCopy(): void {
     cancelledBySystem: 'Ye ride khud ba khud cancel ho gayi.',
     cancelledByWeather: 'Ye ride mausam ki wajah se cancel hui.',
     cancelledUnknown: 'Ye ride cancel ho gayi.',
+    parcelCancelled: {
+      byYou: 'Aap ne ye delivery cancel ki.',
+      byPassenger: 'Sender ne ye delivery cancel ki.',
+      byDriver: 'Aap ke rider ne ye delivery cancel ki.',
+      bySystem: 'Ye delivery khud ba khud cancel ho gayi.',
+      byWeather: 'Ye delivery mausam ki wajah se cancel hui.',
+      unknown: 'Ye delivery cancel ho gayi.',
+      noCharge: 'Cancel deliveries ka koi charge nahi.',
+    },
     share: 'Receipt share karein',
     shareHeading: 'Raah-e-Haq ride receipt',
     shareFrom: (address: string) => `Se: ${address}`,
     shareTo: (address: string) => `Tak: ${address}`,
     shareStop: (n: number, address: string) => `Stop ${n}: ${address}`,
     shareTotal: (amount: string, payment: string) => `Total: ${amount} · ${payment}`,
+  });
+
+  registerCopyTranslation(PAYMENT_STATUS_LABEL, 'ur-Latn', {
+    paid: 'Ada ho gaya',
+    pending: 'Baqi',
+    failed: 'Nakaam',
+    refunded: 'Wapas ho gaya',
   });
 
   registerCopyTranslation(RIDE_STATUS_LABEL, 'ur-Latn', {

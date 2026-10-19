@@ -9,6 +9,7 @@ import { estimateFor } from '../hooks';
 import { BOOKING_COPY } from '../copy';
 import { space } from '../../../theme';
 import { formatFare, quoteBreakdown, rideVehicleTypes, toVehicleOptions } from '../vehicleOptions';
+import { tierLabel } from '../../ride-history/copy';
 import { t } from '../../../i18n';
 import { FareNoticeBanner, FarePolicyNote } from '../../fare/components/FareBits';
 import { OfferStepper } from '../../fare/components/OfferStepper';
@@ -143,7 +144,7 @@ export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, 
           {formatFare(total, quote.currency)}
         </AppText>
         <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-          {[vehicleType.label, formatDistance(route.distance_km), formatDuration(route.duration_min)].filter(Boolean).join(' · ')}
+          {[tierLabel(vehicleType.key, vehicleType.label), formatDistance(route.distance_km), formatDuration(route.duration_min)].filter(Boolean).join(' · ')}
         </AppText>
       </View>
       {offered ? <OfferStepper offer={offered} /> : null}
@@ -159,7 +160,7 @@ export const FareReview: React.FC<FareReviewProps> = ({ vehicleType, estimates, 
       />
       <FarePolicyNote policy={quote.fare_policy} />
       <Button
-        label={BOOKING_COPY.request(vehicleType.label)}
+        label={BOOKING_COPY.request(tierLabel(vehicleType.key, vehicleType.label) ?? vehicleType.label)}
         size="lg"
         haptic="impactLight"
         onPress={onConfirm}

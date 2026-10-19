@@ -6,6 +6,7 @@ import { VehicleMarker } from '../ui/VehicleMarker';
 import type { NearbyDriver } from '../../services/rideService';
 import { MAX_FONT_SIZE_MULTIPLIER, radius, space, textStyles } from '../../theme';
 import type { NearbyDriversState } from '../../hooks/useNearbyDrivers';
+import { t } from '../../i18n';
 
 /** Marker callout text. Rating 0 means unrated, so it is left out. */
 export const nearbyDriverDescription = (driver: NearbyDriver): string =>
@@ -44,13 +45,14 @@ const NearbyDriverMarkersBase: React.FC<{ drivers: NearbyDriver[] }> = ({ driver
 export const NearbyDriverMarkers = React.memo(NearbyDriverMarkersBase);
 NearbyDriverMarkers.displayName = 'NearbyDriverMarkers';
 
+/** T-579: in the active language, read at render. */
 const statusText = (state: NearbyDriversState): string | null => {
-  if (state.status === 'loading') return 'Finding drivers nearby…';
-  if (state.status === 'error') return state.error ?? 'Could not load nearby drivers.';
+  if (state.status === 'loading') return t('home.nearbyLoading');
+  if (state.status === 'error') return state.error ?? t('home.nearbyFailed');
   if (state.status === 'ready') {
     const n = state.drivers.length;
-    if (n === 0) return 'No drivers nearby right now';
-    return n === 1 ? '1 driver nearby' : `${n} drivers nearby`;
+    if (n === 0) return t('home.nearbyNone');
+    return n === 1 ? t('home.nearbyOne') : t('home.nearbyMany', { n });
   }
   return null;
 };
