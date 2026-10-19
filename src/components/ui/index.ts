@@ -21,6 +21,7 @@ export * from './FieldLabel';
 export * from './Header';
 export * from './Icon';
 export * from './IconButton';
+export * from './Illustration';
 export * from './keyboard';
 export * from './keyboardReveal';
 export * from './KeyboardDoneBar';

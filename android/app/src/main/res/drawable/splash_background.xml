@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Native splash (T-531, PERF-02): brand background with the 120 dp logo in the exact centre,
-     where the JS SplashScreen draws it, so the hand-over has no white or empty frame. -->
+<!-- Native splash (T-531, PERF-02; UI-R8 auth-splash): navy-950 background with the 96 dp white
+     badge and the 64 dp logo in the exact centre, where the JS SplashScreen draws them, so the
+     hand-over has no white or empty frame. The wordmark under the badge is drawn by JS only (a
+     window background cannot draw text); it fades in when the JS splash takes over. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background" />
     <item
-        android:width="120dp"
-        android:height="120dp"
+        android:width="96dp"
+        android:height="96dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="@color/splash_badge" />
+        </shape>
+    </item>
+    <item
+        android:width="64dp"
+        android:height="64dp"
         android:gravity="center"
         android:drawable="@drawable/splash_logo" />
 </layer-list>

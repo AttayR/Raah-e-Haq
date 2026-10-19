@@ -159,6 +159,12 @@ export const iconGlyphs = {
   paused: 'pause-circle',
   blocked: 'cancel',
   admin: 'shield-account-outline',
+  // UI-R8 illustrations (account status, permission prompts).
+  applicationReview: 'clipboard-text-outline',
+  shieldOff: 'shield-off-outline',
+  accountOff: 'account-off-outline',
+  bellRing: 'bell-ring-outline',
+  mapSearch: 'map-search-outline',
   // UI-R7 role choice cards: trailing radio.
   radioOn: 'radiobox-marked',
   radioOff: 'radiobox-blank',

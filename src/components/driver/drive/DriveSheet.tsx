@@ -15,6 +15,7 @@ import { AppText, Badge, Banner, Button, Card, Chip, ListItem, RecentRidesCard, 
 import { DRIVER_HOME_COPY } from '../home/copy';
 import { vehicleLabel } from '../../../features/ride-history/copy';
 import { DriverTodayStats, type DriverTodayStatsValues } from '../home/DriverTodayStats';
+import { LocationNeededCard } from '../../../features/permissions/LocationNeededCard';
 
 export type DriveStatus = 'checking' | 'offline' | 'online' | 'onRide';
 
@@ -105,6 +106,11 @@ type BodyProps = {
   recentRides?: RecentRideRow[];
   onSeeAllRides?: () => void;
   onOpenRide?: (id: string) => void;
+  /**
+   * UI-R8: location access is refused. While offline (and no ride is open) the online control is
+   * replaced by the "Location needed to go online" card.
+   */
+  locationBlocked?: { onOpenSettings: () => void; onRetry: () => void } | null;
 };
 
 /**
@@ -128,11 +134,14 @@ export function DriveSheetBody({
   recentRides = [],
   onSeeAllRides,
   onOpenRide,
+  locationBlocked,
 }: BodyProps) {
   const online = status === 'online';
   return (
     <View style={styles.body}>
-      {hasRide ? (
+      {locationBlocked && !hasRide && status === 'offline' ? (
+        <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
+      ) : hasRide ? (
         <Button
           label={t('drive.resumeRide')}
           size="lg"

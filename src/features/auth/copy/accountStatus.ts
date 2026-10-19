@@ -17,27 +17,23 @@
  */
 
 import type { IconName } from '../../../components/ui/icons';
+import type { IllustrationBadgeTone } from '../../../components/ui/Illustration';
 import { localizedCopy } from '../../../i18n/localizedCopy';
 
-export type AccountStatusTone = 'pending' | 'danger' | 'info';
-
 export interface AccountStatusVariantCopy {
-  /** Kit icon name (MaterialCommunityIcons, T-533). */
+  /** Main glyph of the duotone illustration (UI-R8, MaterialCommunityIcons). */
   icon: IconName;
-  tone: AccountStatusTone;
-  /** Header line above the card. */
-  heading: string;
+  /** Small badge on the illustration (clock, cross, pause), or none. */
+  badge: { icon: IconName; tone: IllustrationBadgeTone } | null;
+  /** `h1` title. */
   title: string;
+  /** One short paragraph under the title. Pending accounts get "Hi {name}." in front. */
   message: string;
-  /** Short lines under the message (what to expect / what to do). */
-  notes: string[];
   /**
    * Whether Check Status is offered. For unsupportedRole it is offered only when the account
    * has no role at all (that may be fixed on the server), never to an active admin.
    */
   canCheckStatus: boolean;
-  /** Whether the support contact line is shown. */
-  showSupport: boolean;
 }
 
 export type AccountStatusVariant =
@@ -49,100 +45,83 @@ export type AccountStatusVariant =
   | 'unverified'
   | 'unsupportedRole';
 
+/**
+ * UI-R8 (auth-account-status): spec titles; no hardcoded review time and no promise of a
+ * notification (the server sends none on approval).
+ */
 export const ACCOUNT_STATUS_VARIANTS: Record<AccountStatusVariant, AccountStatusVariantCopy> = localizedCopy({
   pendingDriver: {
-    icon: 'waiting',
-    tone: 'pending',
-    heading: 'Driver application',
-    title: 'Application under review',
-    message:
-      'Our team is reviewing your documents and vehicle details. You can start driving as soon as your account is approved.',
-    notes: [
-      'Reviews usually take 24 to 48 hours.',
-      'Your documents and their review status are listed below. Upload any that are missing or rejected.',
-      'Tap Check Status to see whether you have been approved.',
-    ],
+    icon: 'applicationReview',
+    badge: { icon: 'clock', tone: 'accent' },
+    title: "We're reviewing your application",
+    message: 'Our team checks your documents and vehicle before you can start driving.',
     canCheckStatus: true,
-    showSupport: false,
   },
   pendingPassenger: {
-    icon: 'waiting',
-    tone: 'pending',
-    heading: 'Your account',
-    title: 'Account awaiting approval',
-    message: 'Your account is waiting for approval. You can book rides as soon as it is approved.',
-    notes: ['Tap Check Status to see whether your account is ready.'],
+    icon: 'applicationReview',
+    badge: { icon: 'clock', tone: 'accent' },
+    title: "We're reviewing your account",
+    message: 'You can book rides as soon as it is approved.',
     canCheckStatus: true,
-    showSupport: false,
   },
   suspended: {
-    icon: 'paused',
-    tone: 'danger',
-    heading: 'Your account',
-    title: 'Account suspended',
-    message: 'Your account has been suspended, so you cannot use the app right now.',
-    notes: ['Contact support to find out why and how to restore your account.'],
+    icon: 'shieldOff',
+    badge: { icon: 'paused', tone: 'danger' },
+    title: 'Your account is on hold',
+    message: 'Contact support to find out why and what to do next.',
     canCheckStatus: true,
-    showSupport: true,
   },
   rejected: {
-    icon: 'failed',
-    tone: 'danger',
-    heading: 'Your account',
-    title: 'Application not approved',
-    message: 'Your account application was not approved.',
-    notes: ['Contact support if you think this is a mistake.'],
+    icon: 'document',
+    badge: { icon: 'failed', tone: 'danger' },
+    title: "Your application wasn't approved",
+    message: 'Contact support to find out why and what to do next.',
     canCheckStatus: true,
-    showSupport: true,
   },
   inactive: {
-    icon: 'blocked',
-    tone: 'danger',
-    heading: 'Your account',
-    title: 'Account deactivated',
-    message: 'Your account has been deactivated, so you cannot use the app right now.',
-    notes: ['Contact support to reactivate your account.'],
+    icon: 'accountOff',
+    badge: null,
+    title: 'Your account is deactivated',
+    message: 'Contact support to turn your account back on.',
     canCheckStatus: true,
-    showSupport: true,
   },
   unverified: {
     icon: 'help',
-    tone: 'info',
-    heading: 'Your account',
+    badge: null,
     title: "We couldn't confirm your account",
-    message:
-      'The server sent an unexpected answer, so we could not check your account status. This is usually temporary.',
-    notes: ['Tap Check Status to try again.'],
+    message: 'The server sent an unexpected answer, so we could not check your status. This is usually temporary.',
     canCheckStatus: true,
-    showSupport: true,
   },
   unsupportedRole: {
     icon: 'admin',
-    tone: 'info',
-    heading: 'Your account',
+    badge: null,
     title: 'This app is for passengers and drivers',
     message:
-      'Your account does not have a passenger or driver role, so there is nothing to show in this app. Admins use the web dashboard.',
-    notes: ['Sign out and sign in with a passenger or driver account.'],
+      'Your account has no passenger or driver role. Admins use the web dashboard. Sign out and sign in with a passenger or driver account.',
     canCheckStatus: false,
-    showSupport: true,
   },
 });
 
 export const ACCOUNT_STATUS_COPY = localizedCopy({
-  checkStatus: 'Check Status',
-  checking: 'Checking…',
-  signOut: 'Sign Out',
+  checkStatus: 'Check status',
+  checkStatusHint: 'Checks whether your account has been approved',
+  signOut: 'Sign out',
   signingOut: 'Signing out…',
+  /** Pending accounts: in front of the message when the profile has a name. */
+  greeting: (name: string) => `Hi ${name}.`,
   /** Pending driver, status unchanged after Check Status. */
-  stillPending: 'Not approved yet. We will keep your application in review.',
+  stillPending: 'Still in review. Please check again later.',
   /** Pending passenger (or any non-driver), status unchanged after Check Status. */
   stillPendingPassenger: 'Your account is not approved yet. Please check again later.',
   stillBlocked: 'Your account status has not changed.',
-  approved: 'Your account is approved. Welcome!',
-  checkFailed: 'Could not check your status. Please try again.',
+  approved: "You're approved. Welcome to Raah-e-Haq!",
+  checkFailed: "Couldn't check right now. Try again.",
   reasonLabel: 'Reason',
-  supportPrefix: 'Support:',
-  /** Fallback name in the header when the profile has none. */
-  fallbackName: 'Welcome',
+  /** Rejected / suspended: the message when the server's reason is shown under it. */
+  reasonFollowUp: 'Contact support if you have questions.',
+  contactSupport: 'Contact support',
+  supportSheetTitle: 'Contact support',
+  emailSupport: (email: string) => `Email ${email}`,
+  emailSupportHint: 'Opens your email app',
+  emailFailed: (email: string) => `Couldn't open your email app. Write to ${email}.`,
 } as const);

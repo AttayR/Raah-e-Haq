@@ -80,6 +80,18 @@ describe('LocationWaitState (a)', () => {
   });
 });
 
+describe('LocationWaitState after "Not now" (UI-R8)', () => {
+  it('denied but the OS can still ask: no Settings button, "Try again" asks', () => {
+    const onRetry = jest.fn();
+    const { queryByTestId, getByTestId } = render(
+      <LocationWaitState reason="denied" canAskAgain onRetry={onRetry} onOpenSettings={jest.fn()} />,
+    );
+    expect(queryByTestId('location-open-settings')).toBeNull();
+    fireEvent.press(getByTestId('location-retry'));
+    expect(onRetry).toHaveBeenCalled();
+  });
+});
+
 describe('HomeHeader location row (a)', () => {
   it('a failed lookup reads "Location unavailable" with Retry (no alert)', () => {
     const onEnableLocation = jest.fn();

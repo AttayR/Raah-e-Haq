@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { DevSettings, Modal, Platform, Settings, StatusBar, type StatusBarProps } from 'react-native';
+import { DevSettings, LogBox, Modal, Platform, Settings, StatusBar, type StatusBarProps } from 'react-native';
 import { ModalRoot } from '../../components/ui/ModalRoot';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { logger } from '../../core/logging/logger';
@@ -59,6 +59,11 @@ export function DevKitGalleryHost({ enabled = __DEV__, children }: Props) {
   const { theme } = useAppTheme();
   const [open, setOpen] = useState(() => enabled && openOnLaunch());
   const [only] = useState(() => (enabled ? sectionOnLaunch() : undefined));
+
+  useEffect(() => {
+    // UI-R8 review: scripted screenshots (launch argument) carry no LogBox toast over the page.
+    if (enabled && openOnLaunch()) LogBox.ignoreAllLogs();
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) {

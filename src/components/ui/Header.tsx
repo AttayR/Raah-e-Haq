@@ -35,7 +35,7 @@ export type HeaderProps = {
   /** Up to two trailing IconButtons (§5.2). Ignored when `trailingText` is set. */
   actions?: HeaderAction[];
   /** One trailing text action ("Mark all read"). */
-  trailingText?: { label: string; onPress: () => void; accessibilityLabel?: string; testID?: string };
+  trailingText?: { label: string; onPress: () => void; accessibilityLabel?: string; disabled?: boolean; testID?: string };
   /** From `useHeaderScroll()`: fades the hairline in after 4pt and collapses the large title. */
   scrollY?: SharedValue<number>;
   /** Bar fill: `surface` (default) or `background`, matching the screen until scrolled. */
@@ -237,18 +237,26 @@ function TextAction({
   label,
   onPress,
   accessibilityLabel,
+  disabled = false,
   testID,
 }: NonNullable<HeaderProps['trailingText']>) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled }}
       style={styles.textAction}
       testID={testID}
     >
       {({ pressed }) => (
-        <AppText variant="buttonSmall" color="primaryText" numberOfLines={1} style={pressed ? styles.pressed : null}>
+        <AppText
+          variant="buttonSmall"
+          color={disabled ? 'textDisabled' : 'primaryText'}
+          numberOfLines={1}
+          style={pressed ? styles.pressed : null}
+        >
           {label}
         </AppText>
       )}

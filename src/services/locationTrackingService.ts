@@ -13,6 +13,8 @@ import {
   type DriverLocationConfig,
 } from '../features/driver-location/config';
 import { DRIVER_LOCATION_COPY } from '../features/driver-location/copy';
+import { primeBeforeOsPrompt } from '../features/permissions/primer';
+import { locationOsUndetermined } from '../features/permissions/locationStatus';
 import {
   shouldPostLocation,
   toLocationBody,
@@ -41,9 +43,11 @@ export interface TrackingOptions {
 /**
  * Foreground-only location permission (B-08: no background location). iOS asks "while using"
  * on the first watch (authorizationLevel whenInUse); Android asks for fine location here.
- * The full permission UX (rationale screen, settings link) is T-308.
+ * The rationale page before the first OS prompt is the UI-R8 pre-prompt (features/permissions).
  */
 const requestForegroundPermission = async (): Promise<boolean> => {
+  // UI-R8: the driver pre-prompt (no "Not now") before the OS asks the first time.
+  await primeBeforeOsPrompt('locationDriver', locationOsUndetermined);
   if (Platform.OS !== 'android') {
     return true;
   }

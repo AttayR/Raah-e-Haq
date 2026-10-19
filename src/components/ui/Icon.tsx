@@ -9,8 +9,11 @@ export { iconGlyphs, type IconName } from './icons';
 
 export type IconProps = {
   name: IconName;
-  /** 16, 20, 24 (default), 28, 32 or 48 (§4); 40 only for the rating input stars (§5.22). */
-  size?: 16 | 20 | 24 | 28 | 32 | 40 | 48;
+  /**
+   * 16, 20, 24 (default), 28, 32 or 48 (§4); 40 only for the rating input stars (§5.22); 64 only
+   * inside the duotone `Illustration` (UI-R8).
+   */
+  size?: 16 | 20 | 24 | 28 | 32 | 40 | 48 | 64;
   color?: SemanticColorName;
   /**
    * Raw colour that wins over `color`. Only for surfaces that keep one palette in both modes

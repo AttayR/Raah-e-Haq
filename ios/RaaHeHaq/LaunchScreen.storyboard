@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Native splash (T-531, PERF-02): the brand background and the 120 pt logo, centred exactly
-     like the JS SplashScreen, so launch → JS splash has no white or template frame.
-     The colour and logo live in Images.xcassets (SplashBackground has a dark variant). -->
+<!-- Native splash (T-531, PERF-02; UI-R8 auth-splash): navy-950 in both modes, a 96 pt white
+     badge (SplashBadge image: launch screens cannot round a view) holding the 64 pt logo in the exact centre, and the "Raah-e-Haq" wordmark (bold 22,
+     white) 16 pt below it, drawn exactly like the JS SplashScreen so the hand-over has no jump.
+     The colour and logo live in Images.xcassets (SplashBackground, SplashLogo); the values are in
+     src/theme/components.ts `splash` (__tests__/components/SplashScreen.test.tsx checks them). -->
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="15702" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <device id="retina4_7" orientation="portrait" appearance="light"/>
     <dependencies>
@@ -20,18 +22,38 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="Rh1-Lg-0Im">
-                                <rect key="frame" x="127.5" y="273.5" width="120" height="120"/>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashBadge" translatesAutoresizingMaskIntoConstraints="NO" id="Rh1-Bg-0Vw" userLabel="Logo badge">
+                                <rect key="frame" x="139.5" y="285.5" width="96" height="96"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="120" id="Rh1-Wd-0Cn"/>
-                                    <constraint firstAttribute="height" constant="120" id="Rh1-Ht-0Cn"/>
+                                    <constraint firstAttribute="width" constant="96" id="Rh1-BW-0Cn"/>
+                                    <constraint firstAttribute="height" constant="96" id="Rh1-BH-0Cn"/>
                                 </constraints>
                             </imageView>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="Rh1-Lg-0Im">
+                                <rect key="frame" x="155.5" y="301.5" width="64" height="64"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="64" id="Rh1-Wd-0Cn"/>
+                                    <constraint firstAttribute="height" constant="64" id="Rh1-Ht-0Cn"/>
+                                </constraints>
+                            </imageView>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Raah-e-Haq" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Rh1-Wm-0Lb" userLabel="Wordmark">
+                                <rect key="frame" x="130" y="397.5" width="115" height="28"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="28" id="Rh1-WH-0Cn"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="22"/>
+                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <nil key="highlightedColor"/>
+                            </label>
                         </subviews>
                         <color key="backgroundColor" name="SplashBackground"/>
                         <constraints>
-                            <constraint firstItem="Rh1-Lg-0Im" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Rh1-Cx-0Cn"/>
-                            <constraint firstItem="Rh1-Lg-0Im" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Rh1-Cy-0Cn"/>
+                            <constraint firstItem="Rh1-Bg-0Vw" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Rh1-Cx-0Cn"/>
+                            <constraint firstItem="Rh1-Bg-0Vw" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Rh1-Cy-0Cn"/>
+                            <constraint firstItem="Rh1-Lg-0Im" firstAttribute="centerX" secondItem="Rh1-Bg-0Vw" secondAttribute="centerX" id="Rh1-LX-0Cn"/>
+                            <constraint firstItem="Rh1-Lg-0Im" firstAttribute="centerY" secondItem="Rh1-Bg-0Vw" secondAttribute="centerY" id="Rh1-LY-0Cn"/>
+                            <constraint firstItem="Rh1-Wm-0Lb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Rh1-WX-0Cn"/>
+                            <constraint firstItem="Rh1-Wm-0Lb" firstAttribute="top" secondItem="Rh1-Bg-0Vw" secondAttribute="bottom" constant="16" id="Rh1-WT-0Cn"/>
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                     </view>
@@ -42,9 +64,10 @@
         </scene>
     </scenes>
     <resources>
+        <image name="SplashBadge" width="96" height="96"/>
         <image name="SplashLogo" width="120" height="120"/>
         <namedColor name="SplashBackground">
-            <color red="0.95686274509803926" green="0.96470588235294119" blue="0.98039215686274506" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="0.0" green="0.050980392156862744" blue="0.23137254901960785" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
     </resources>
 </document>

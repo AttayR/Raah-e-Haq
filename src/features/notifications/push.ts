@@ -10,6 +10,7 @@ import {
 import { logApiFailure } from '../../core/api/logApiFailure';
 import { logger } from '../../core/logging/logger';
 import { currentSessionEpoch, isStaleSession } from '../../store/sessionEpoch';
+import { primeBeforeOsPrompt } from '../permissions/primer';
 import { notificationsApi } from './api';
 import type { DevicePlatform } from './types';
 
@@ -127,6 +128,17 @@ export const syncPushRegistration = async ({ prompt }: { prompt: boolean }): Pro
     });
   }
   return permission;
+};
+
+/**
+ * The contextual ask (UI-R8): the app's pre-prompt page first, while the OS has not been asked
+ * (primer.ts); "Continue" goes on to the OS prompt, "Not now" leaves it unasked (the Inbox banner
+ * and Settings still offer "Turn on", which asks directly).
+ */
+export const promptForPushWithPrimer = async (): Promise<PushPermission> => {
+  const primer = await primeBeforeOsPrompt('notifications', async () => (await getPushPermission()) === 'undetermined');
+  if (primer === 'skip') return getPushPermission();
+  return syncPushRegistration({ prompt: true });
 };
 
 type AskHandler = () => Promise<PushPermission>;

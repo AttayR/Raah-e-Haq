@@ -106,15 +106,18 @@ export function DriverDocumentsList({
         <AppText variant="body" align="center">
           {error}
         </AppText>
-        <Button
-          label={DRIVER_DOCUMENTS_COPY.retry}
-          variant="outline"
-          size="sm"
-          leadingIcon="retry"
-          fullWidth={false}
-          onPress={onRetry}
-          testID={`${testID}-retry`}
-        />
+        {/* UI-R8 review: centred under the text (a hugging Button aligns to the start). */}
+        <View style={styles.centred}>
+          <Button
+            label={DRIVER_DOCUMENTS_COPY.retry}
+            variant="outline"
+            size="sm"
+            leadingIcon="retry"
+            fullWidth={false}
+            onPress={onRetry}
+            testID={`${testID}-retry`}
+          />
+        </View>
       </View>
     );
   } else if (documents.length === 0) {
@@ -160,6 +163,7 @@ const styles = StyleSheet.create({
   summary: { marginTop: space[1] },
   body: { marginTop: space[3] },
   state: { alignItems: 'center', gap: space[3], paddingVertical: space[4] },
+  centred: { alignSelf: 'center' },
   row: { gap: space[2], paddingVertical: space[3] },
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   rowText: { flex: 1, minWidth: 0 },

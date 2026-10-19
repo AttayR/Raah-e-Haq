@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Native splash background (T-531): theme `background`, dark (src/theme/tokens.ts). -->
-    <color name="splash_background">#0B0F1A</color>
+    <!-- Native splash background (UI-R8 auth-splash): navy-950 in both modes. -->
+    <color name="splash_background">#000D3B</color>
+    <!-- The window behind the app once the JS splash has drawn: theme `background`, dark. -->
+    <color name="window_background">#0B0F1A</color>
 </resources>

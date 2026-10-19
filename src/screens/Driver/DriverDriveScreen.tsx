@@ -18,6 +18,7 @@ import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useFollowCamera } from '../../hooks/useFollowCamera';
 import { useMapMounted } from '../../hooks/useMapMounted';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
+import { useLocationBlocked } from '../../features/permissions/useLocationBlocked';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { isRestorableDriverRide } from '../../features/driver-ride/steps';
@@ -126,6 +127,17 @@ export default function DriverDriveScreen() {
     if (open) Linking.openSettings();
   }, []);
 
+  // UI-R8: location refused → the sheet shows "Location needed to go online" instead of Go online.
+  const locationAccess = useLocationBlocked(isFocused);
+  const { recheck: recheckLocation } = locationAccess;
+  const locationBlocked = useMemo(
+    () =>
+      locationAccess.blocked
+        ? { onOpenSettings: () => Linking.openSettings(), onRetry: recheckLocation }
+        : null,
+    [locationAccess.blocked, recheckLocation],
+  );
+
   const onLocate = useCallback(() => {
     if (!location) {
       promptForLocation();
@@ -228,6 +240,7 @@ export default function DriverDriveScreen() {
             recentRides={recentRides}
             onSeeAllRides={() => navigation.navigate('RideHistory')}
             onOpenRide={(id) => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: Number(id) })}
+            locationBlocked={locationBlocked}
           />
         </BottomSheet>
       )}

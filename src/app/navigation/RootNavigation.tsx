@@ -6,6 +6,7 @@ import PassengerStack, { type PassengerStackParamList } from './stacks/Passenger
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { logger } from '../../core/logging/logger';
+import { PermissionPrimerHost } from '../../features/permissions/PermissionPrimerHost';
 
 export type RootStackParamList = {
   Driver: NavigatorScreenParams<DriverStackParamList> | undefined;
@@ -25,6 +26,7 @@ export default function RootNavigator() {
 
   // Use key prop to force re-rendering when role changes
   return (
+    <>
     <Stack.Navigator 
       key={role || 'no-role'} 
       screenOptions={{ headerShown: false }}
@@ -42,5 +44,8 @@ export default function RootNavigator() {
         />
       )}
     </Stack.Navigator>
+    {/* UI-R8: location / notification pre-prompts, only while signed in. */}
+    <PermissionPrimerHost />
+    </>
   );
 }

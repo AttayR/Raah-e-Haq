@@ -11,7 +11,8 @@ import com.facebook.react.bridge.ReactMethod
  * T-539: the native splash hand-over, called from the JS SplashScreen (src/core/nativeSplash.ts).
  *
  * - `hide()`: AppTheme's windowBackground is the splash (brand colour + logo, T-531). It stays
- *   until JS has drawn its own identical splash, then becomes the plain brand colour so the logo
+ *   until JS has drawn its own identical splash, then becomes the plain theme background (UI-R8:
+ *   `window_background`, not the navy splash colour) so the logo
  *   never shows behind the keyboard or a transition later. Swapping earlier (when React mounted
  *   its first, still empty view) showed the bare background: the logo blink.
  * - `setAppearance(preference)`: Settings → Appearance ("system" | "light" | "dark"). On Android 12+
@@ -26,7 +27,7 @@ class RHSplashModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun hide() {
     val activity = reactApplicationContext.currentActivity ?: return
-    activity.runOnUiThread { activity.window.setBackgroundDrawableResource(R.color.splash_background) }
+    activity.runOnUiThread { activity.window.setBackgroundDrawableResource(R.color.window_background) }
   }
 
   @ReactMethod

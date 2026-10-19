@@ -146,11 +146,12 @@ enum NativeSplash {
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
-  // T-531: behind the native splash overlay the React root has the brand colour, not the
-  // default white system background.
+  // T-531: the React root has the theme background (light/dark), not the default white system
+  // background. UI-R8: not the navy splash colour, which would show behind keyboards and
+  // transitions in light mode; the native splash overlay draws its own navy.
   override func customize(_ rootView: RCTRootView) {
     super.customize(rootView)
-    rootView.backgroundColor = UIColor(named: "SplashBackground") ?? .systemBackground
+    rootView.backgroundColor = UIColor(named: "AppBackground") ?? .systemBackground
   }
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {

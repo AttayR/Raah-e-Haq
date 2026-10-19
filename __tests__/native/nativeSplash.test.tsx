@@ -129,7 +129,7 @@ describe('native splash hand-over (T-539)', () => {
     expect(activity).not.toContain('setBackgroundDrawableResource');
     expect(activity).not.toContain('OnGlobalLayoutListener');
     expect(module).toContain('const val NAME = "RHSplash"');
-    expect(module).toMatch(/fun hide\(\)[\s\S]*setBackgroundDrawableResource\(R\.color\.splash_background\)/);
+    expect(module).toMatch(/fun hide\(\)[\s\S]*setBackgroundDrawableResource\(R\.color\.window_background\)/);
     expect(module).toContain('setApplicationNightMode');
     expect(application).toContain('add(RHSplashPackage())');
   });

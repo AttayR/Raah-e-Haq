@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Native splash background (T-531): theme `background`, light (src/theme/tokens.ts). -->
-    <color name="splash_background">#F4F6FA</color>
+    <!-- Native splash background (UI-R8 auth-splash): navy-950 in both modes, the same as the JS
+         SplashScreen (src/theme/components.ts `splash.background`). -->
+    <color name="splash_background">#000D3B</color>
+    <!-- The window behind the app once the JS splash has drawn (RHSplashModule.hide): theme
+         `background`, light (src/theme/tokens.ts). -->
+    <color name="window_background">#F4F6FA</color>
+    <!-- Splash logo badge (UI-R8): white in both modes. -->
+    <color name="splash_badge">#FFFFFF</color>
 </resources>

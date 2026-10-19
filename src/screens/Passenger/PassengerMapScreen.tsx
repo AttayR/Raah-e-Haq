@@ -76,6 +76,7 @@ const PassengerMapScreen = () => {
     currentLocation,
     isLoading: locationLoading,
     error: locationError,
+    permissionStatus: locationPermission,
     requestLocationPermission,
     openSettings: openLocationSettings,
   } = useNativeLocation({ active: isFocused });
@@ -304,6 +305,7 @@ const PassengerMapScreen = () => {
         reason={locationError}
         onRetry={() => requestLocationPermission()}
         onOpenSettings={openLocationSettings}
+        canAskAgain={locationPermission.canAskAgain}
       />
     );
   }

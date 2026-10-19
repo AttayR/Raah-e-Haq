@@ -1,3 +1,4 @@
+import { extra, navy, saffron } from './palette';
 import { radius } from './radii';
 import { space } from './spacing';
 
@@ -242,6 +243,41 @@ export const componentTokens = {
     compactWindowHeight: 700,
     /** Reserved height of the success glyph circle in the forgot-password sheet. */
     sentGlyph: 64,
+  },
+  /**
+   * UI-R8 duotone illustration (§4: account status, permission prompts): a 128 `primarySoft`
+   * disc with a 64 `onPrimarySoft` glyph inside a 160 box, plus an optional 48 saffron badge on the
+   * bottom-end of the disc.
+   */
+  illustration: { textMaxWidth: 320, box: 160, disc: 128, glyph: 64, badge: 48, badgeGlyph: 28, badgeRing: 3, compactBox: 120, compactDisc: 96, compactGlyph: 48, compactBadge: 36, compactBadgeGlyph: 20, compactBadgeRing: 2 },
+  /** UI-R8 denied state on the driver Drive sheet (shared-permissions): icon circle and glyph. */
+  locationNeeded: { circle: 64, glyph: 32 },
+  /**
+   * UI-R8 splash (auth-splash). The colours are fixed in both modes (a brand moment) and must stay
+   * in step with the native launch screens: ios SplashBackground.colorset + LaunchScreen.storyboard,
+   * android res/values/colors.xml + drawable/splash_background.xml + drawable/splash_icon.xml
+   * (__tests__/components/SplashScreen.test.tsx checks them).
+   */
+  splash: {
+    background: navy[950],
+    badgeFill: extra.white,
+    wordmark: extra.white,
+    badge: 96,
+    logo: 64,
+    /** Gap between the badge and the wordmark. */
+    wordmarkGap: space[4],
+    /** The progress bar shows only when bootstrap takes longer than this. */
+    progressDelayMs: 800,
+    progressFadeMs: 150,
+    progressWidth: 120,
+    progressHeight: 2,
+    /** Width of the moving segment of the indeterminate bar. */
+    progressSegment: 40,
+    progressCycleMs: 1100,
+    progressTrack: 'rgba(255,255,255,0.16)',
+    progressBar: saffron[500],
+    /** Bar bottom = insets.bottom + this. */
+    progressBottom: space[8],
   },
 } as const;
 

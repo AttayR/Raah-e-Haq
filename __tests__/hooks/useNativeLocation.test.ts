@@ -4,10 +4,12 @@
  * now never alerts: the failure is returned as `error` for the screen to render inline, and
  * no lookup starts while the screen is not focused.
  */
-import { Alert } from 'react-native';
+import { Alert, NativeModules } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, renderHook } from '@testing-library/react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { useNativeLocation } from '../../src/hooks/useNativeLocation';
+import { permissionPrimer } from '../../src/features/permissions/primer';
 
 const geo = Geolocation as jest.Mocked<typeof Geolocation>;
 type Success = Parameters<typeof Geolocation.getCurrentPosition>[0];
@@ -110,5 +112,65 @@ describe('useNativeLocation (T-315)', () => {
     rerender({ active: true });
     await flush();
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(afterRetry);
+  });
+});
+
+describe('useNativeLocation pre-prompt (UI-R8)', () => {
+  const native = NativeModules as { RHPermissions?: { locationStatus: () => Promise<string> } };
+  let release: () => void;
+
+  beforeEach(async () => {
+    permissionPrimer.reset();
+    await AsyncStorage.clear();
+    native.RHPermissions = { locationStatus: jest.fn(() => Promise.resolve('notDetermined')) };
+    release = permissionPrimer.registerHost();
+  });
+
+  afterEach(() => {
+    release();
+    delete native.RHPermissions;
+  });
+
+  const settle = async () => {
+    for (let i = 0; i < 4; i += 1) await flush();
+  };
+
+  it('iOS has not asked yet: the page comes first; "Not now" leaves the OS unasked and shows "Turn on"', async () => {
+    answerWith((ok) => ok(position(31.52, 74.35)));
+    const { result } = renderHook(() => useNativeLocation());
+    await settle();
+    expect(permissionPrimer.current()).toBe('locationPassenger');
+    expect(geo.getCurrentPosition).not.toHaveBeenCalled();
+
+    act(() => permissionPrimer.answer('later'));
+    await settle();
+    expect(geo.getCurrentPosition).not.toHaveBeenCalled();
+    expect(result.current.error).toBe('denied');
+    expect(result.current.permissionStatus.canAskAgain).toBe(true);
+
+    // The screen's "Turn on" tap asks the OS directly (no page again).
+    await act(async () => {
+      await result.current.requestLocationPermission();
+    });
+    expect(geo.getCurrentPosition).toHaveBeenCalled();
+    expect(result.current.currentLocation).toEqual({ latitude: 31.52, longitude: 74.35 });
+  });
+
+  it('"Continue" goes on to the lookup (which shows the OS prompt)', async () => {
+    answerWith((ok) => ok(position(31.5, 74.3)));
+    const { result } = renderHook(() => useNativeLocation());
+    await settle();
+    act(() => permissionPrimer.answer('continue'));
+    await settle();
+    expect(result.current.currentLocation).toEqual({ latitude: 31.5, longitude: 74.3 });
+  });
+
+  it('already answered by the OS: no page', async () => {
+    native.RHPermissions = { locationStatus: jest.fn(() => Promise.resolve('granted')) };
+    answerWith((ok) => ok(position(31.5, 74.3)));
+    const { result } = renderHook(() => useNativeLocation());
+    await settle();
+    expect(permissionPrimer.current()).toBeNull();
+    expect(result.current.currentLocation).toEqual({ latitude: 31.5, longitude: 74.3 });
   });
 });

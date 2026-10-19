@@ -47,10 +47,17 @@ export const LocationWaitState: React.FC<{
   onRetry?: () => void;
   reason?: LocationErrorKind | null;
   onOpenSettings?: () => void;
-}> = ({ onRetry, reason, onOpenSettings }) => {
+  /**
+   * UI-R8: the OS may still ask (useNativeLocation `permissionStatus.canAskAgain`, e.g. after the
+   * pre-prompt's "Not now"). Then "Try again" asks the OS and no Settings button is offered, as on
+   * passenger Home.
+   */
+  canAskAgain?: boolean;
+}> = ({ onRetry, reason, onOpenSettings, canAskAgain = false }) => {
   const { theme } = useAppTheme();
   const { title, body } = waitCopy(reason);
-  const settingsAction = reason === 'denied' || reason === 'disabled' ? onOpenSettings : undefined;
+  const needsSettings = reason === 'disabled' || (reason === 'denied' && !canAskAgain);
+  const settingsAction = needsSettings ? onOpenSettings : undefined;
   return (
     <Screen edges={['top', 'bottom']} contentStyle={styles.wait} testID="location-wait">
       <View style={[styles.iconCircle, { backgroundColor: theme.colors.primarySoft }]}>

@@ -383,68 +383,54 @@ export function registerAuthCopy(): void {
 
   registerCopyTranslation(ACCOUNT_STATUS_VARIANTS, 'ur-Latn', {
     pendingDriver: {
-      heading: 'Driver application',
-      title: 'Application review mein hai',
-      message:
-        'Hamari team aap ke documents aur gaari ki details dekh rahi hai. Account approve hote hi aap drive shuru kar sakte hain.',
-      notes: [
-        'Review mein aam taur par 24 se 48 ghante lagte hain.',
-        'Aap ke documents aur un ka review status neeche hai. Jo missing ya reject hain woh upload karein.',
-        'Approve hua ya nahi, dekhne ke liye Status check karein par tap karein.',
-      ],
+      title: 'Hum aap ki application dekh rahe hain',
+      message: 'Drive shuru karne se pehle hamari team aap ke documents aur gaari check karti hai.',
     },
     pendingPassenger: {
-      heading: 'Aap ka account',
-      title: 'Account approval ke intezar mein',
-      message: 'Aap ka account approval ke intezar mein hai. Approve hote hi aap rides book kar sakte hain.',
-      notes: ['Account tayyar hai ya nahi, dekhne ke liye Status check karein par tap karein.'],
+      title: 'Hum aap ka account dekh rahe hain',
+      message: 'Approve hote hi aap rides book kar sakte hain.',
     },
     suspended: {
-      heading: 'Aap ka account',
-      title: 'Account suspend hai',
-      message: 'Aap ka account suspend kar diya gaya hai, is liye abhi app istemal nahi ho sakti.',
-      notes: ['Wajah aur account bahal karne ka tareeqa jaanne ke liye support se rabta karein.'],
+      title: 'Aap ka account rok diya gaya hai',
+      message: 'Wajah aur aage kya karna hai, jaanne ke liye support se rabta karein.',
     },
     rejected: {
-      heading: 'Aap ka account',
-      title: 'Application approve nahi hui',
-      message: 'Aap ki account application approve nahi hui.',
-      notes: ['Agar aap ke khayal mein ye ghalti hai to support se rabta karein.'],
+      title: 'Aap ki application approve nahi hui',
+      message: 'Wajah aur aage kya karna hai, jaanne ke liye support se rabta karein.',
     },
     inactive: {
-      heading: 'Aap ka account',
-      title: 'Account band hai',
-      message: 'Aap ka account band kar diya gaya hai, is liye abhi app istemal nahi ho sakti.',
-      notes: ['Account dobara chalane ke liye support se rabta karein.'],
+      title: 'Aap ka account band hai',
+      message: 'Account dobara chalane ke liye support se rabta karein.',
     },
     unverified: {
-      heading: 'Aap ka account',
       title: 'Hum aap ka account confirm nahi kar sake',
       message:
-        'Server ne ghair mutawaqqa jawab diya, is liye hum aap ka account status check nahi kar sake. Aisa aam taur par thori dair ke liye hota hai.',
-      notes: ['Dobara koshish ke liye Status check karein par tap karein.'],
+        'Server ne ghair mutawaqqa jawab diya, is liye hum aap ka status check nahi kar sake. Aisa aam taur par thori dair ke liye hota hai.',
     },
     unsupportedRole: {
-      heading: 'Aap ka account',
       title: 'Ye app sawariyon aur drivers ke liye hai',
       message:
-        'Aap ke account ka passenger ya driver role nahi, is liye is app mein dikhane ko kuch nahi. Admins web dashboard istemal karte hain.',
-      notes: ['Sign out karein aur passenger ya driver account se sign in karein.'],
+        'Aap ke account ka passenger ya driver role nahi. Admins web dashboard istemal karte hain. Sign out karein aur passenger ya driver account se sign in karein.',
     },
   });
 
   registerCopyTranslation(ACCOUNT_STATUS_COPY, 'ur-Latn', {
     checkStatus: 'Status check karein',
-    checking: 'Check ho raha hai…',
-    signOut: 'Sign Out',
+    checkStatusHint: 'Check karta hai ke aap ka account approve hua ya nahi',
+    signOut: 'Sign out',
     signingOut: 'Sign out ho raha hai…',
-    stillPending: 'Abhi approve nahi hua. Aap ki application review mein rahegi.',
+    greeting: (name: string) => `Salaam ${name}.`,
+    stillPending: 'Abhi review mein hai. Baad mein dobara check karein.',
     stillPendingPassenger: 'Aap ka account abhi approve nahi hua. Baad mein dobara check karein.',
     stillBlocked: 'Aap ke account ka status nahi badla.',
-    approved: 'Aap ka account approve ho gaya. Khush aamdeed!',
-    checkFailed: 'Aap ka status check nahi ho saka. Dobara koshish karein.',
+    approved: 'Aap approve ho gaye. Raah-e-Haq mein khush aamdeed!',
+    checkFailed: 'Abhi check nahi ho saka. Dobara koshish karein.',
     reasonLabel: 'Wajah',
-    supportPrefix: 'Support:',
-    fallbackName: 'Khush aamdeed',
+    reasonFollowUp: 'Koi sawal ho to support se rabta karein.',
+    contactSupport: 'Support se rabta karein',
+    supportSheetTitle: 'Support se rabta karein',
+    emailSupport: (email: string) => `${email} par email karein`,
+    emailSupportHint: 'Aap ki email app kholta hai',
+    emailFailed: (email: string) => `Email app nahi khul saki. ${email} par likhein.`,
   });
 }

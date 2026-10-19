@@ -445,6 +445,29 @@ export const en = {
     outsideBody: 'We saved it, but rides may not be available there yet.',
     chipsA11y: 'Saved places',
   },
+  /** Splash (UI-R8, auth-splash). The brand name itself is not translated. */
+  splash: {
+    loadingA11y: 'Raah-e-Haq is loading',
+    progressA11y: 'Loading',
+  },
+  /** Permission pre-prompts (UI-R8, shared-permissions): shown once, before the OS asks. */
+  permissions: {
+    continue: 'Continue',
+    notNow: 'Not now',
+    locationPassengerTitle: 'Find rides near you',
+    locationPassengerBody: 'We use your location to set your pickup and show nearby drivers. Only while you use the app.',
+    locationDriverTitle: 'Share your location while online',
+    locationDriverBody: "We use your location only while you're online and the app is open, to match you with nearby riders and to show your trip to your rider.",
+    notificationsPassengerTitle: 'Know when your driver arrives',
+    notificationsPassengerBody: 'Get updates about your ride, messages from your driver and receipts.',
+    notificationsDriverTitle: 'Never miss a ride request',
+    notificationsDriverBody: 'Get ride requests, messages from your riders and trip updates.',
+    continueHint: 'Your phone will ask for permission next',
+    driverDeniedTitle: 'Location needed to go online',
+    driverDeniedBody: 'Turn on location for Raah-e-Haq in Settings.',
+    openSettings: 'Open Settings',
+    tryAgain: 'Try again',
+  },
   /** Driver map-first Drive tab (UI-R4 structure; UI-R11 refines the request state). */
   drive: {
     sheetA11y: 'Drive sheet',

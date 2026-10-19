@@ -147,7 +147,6 @@ const SAME_IN_BOTH = new Set([
   'icon',
   'tone',
   'canCheckStatus',
-  'showSupport',
 ]);
 
 describe('Roman Urdu feature copy (T-523)', () => {
@@ -189,8 +188,9 @@ describe('Roman Urdu feature copy (T-523)', () => {
     setLocale('ur-Latn');
     expect(WALLET_COPY.retry).toBe('Dobara koshish karein');
     expect(LOGIN_COPY.forgot.sentBody('a@b.pk')).toContain('a@b.pk');
-    expect(ACCOUNT_STATUS_VARIANTS.pendingDriver.notes).toHaveLength(3);
+    expect(ACCOUNT_STATUS_COPY.greeting('Ali')).toBe('Salaam Ali.');
     // Non-text fields of a translated object stay as written.
-    expect(ACCOUNT_STATUS_VARIANTS.pendingDriver.icon).toBe('waiting');
+    expect(ACCOUNT_STATUS_VARIANTS.pendingDriver.icon).toBe('applicationReview');
+    expect(ACCOUNT_STATUS_VARIANTS.pendingDriver.badge).toEqual({ icon: 'clock', tone: 'accent' });
   });
 });

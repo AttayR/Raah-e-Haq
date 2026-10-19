@@ -15,7 +15,7 @@ import { logger } from '../../core/logging/logger';
 import { toPushPayload } from './api';
 import { NOTIFICATIONS_COPY } from './copy';
 import { focusedChatRideId, openNotificationTarget } from './navigation';
-import { registerDeviceToken, setPushAskHandler, syncPushRegistration } from './push';
+import { promptForPushWithPrimer, registerDeviceToken, setPushAskHandler, syncPushRegistration } from './push';
 import { resolveNotificationTarget, type NotificationRole } from './routing';
 import {
   fetchUnreadCount,
@@ -85,7 +85,8 @@ export const usePushNotifications = (role: NotificationRole): void => {
     };
 
     syncPushRegistration({ prompt: false });
-    setPushAskHandler(() => syncPushRegistration({ prompt: true }));
+    // UI-R8: the pre-prompt page before the OS prompt (once).
+    setPushAskHandler(promptForPushWithPrimer);
 
     const unsubscribeRefresh = onTokenRefresh(messaging, (token) => {
       registerDeviceToken(token);

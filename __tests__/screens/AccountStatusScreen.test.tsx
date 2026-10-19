@@ -9,7 +9,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import MockAdapter from 'axios-mock-adapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Linking, ScrollView } from 'react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { __resetUnauthorizedStateForTests, apiClient } from '../../src/services/api';
 import { authStorage } from '../../src/services/authStorage';
@@ -44,6 +45,18 @@ const base: User = {
 };
 
 let mock: MockAdapter;
+
+/** The rendered tree as text (circular props, such as a context object, are skipped). */
+const treeText = (node: unknown): string => {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(node, (_key, value: unknown) => {
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) return undefined;
+      seen.add(value);
+    }
+    return typeof value === 'function' ? undefined : value;
+  });
+};
 
 const makeStore = () =>
   configureStore({
@@ -133,10 +146,16 @@ describe('AccountStatusScreen', () => {
     expect(screen.queryByTestId('driver-document-profile-upload')).toBeNull();
     expect(screen.queryByTestId('driver-document-license-upload')).toBeNull();
     // The signed URLs are never rendered or kept.
-    expect(JSON.stringify(screen.toJSON())).not.toContain('signed.example.test');
-    // Check Status and Sign Out come before the list in the tree (rendered above it).
-    const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('account-status-sign-out')).toBeLessThan(tree.indexOf('driver-documents'));
+    const tree = treeText(screen.toJSON());
+    expect(tree).not.toContain('signed.example.test');
+    // UI-R8: Sign out is the header action; Check status and Contact support are the sticky bottom
+    // actions outside the scrolling list, so a long list never pushes them off screen.
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(within(scroll).getByTestId('driver-documents')).toBeTruthy();
+    expect(within(scroll).queryByTestId('account-status-check')).toBeNull();
+    expect(within(scroll).queryByTestId('account-status-sign-out')).toBeNull();
+    expect(screen.getByTestId('account-status-sign-out')).toBeTruthy();
+    expect(screen.getByTestId('account-status-contact-support')).toBeTruthy();
 
     mock.onGet('/auth/profile').replyOnce(200, { success: true, data: { user: { ...base, status: 'active' } } });
     fireEvent.press(screen.getByTestId('account-status-check'));
@@ -206,6 +225,8 @@ describe('AccountStatusScreen', () => {
     expect(screen.getByText(ACCOUNT_STATUS_VARIANTS.rejected.title)).toBeTruthy();
     expect(screen.getByTestId('account-status-reason')).toBeTruthy();
     expect(screen.getByText('Licence has expired')).toBeTruthy();
+    // UI-R8: with a reason shown, the message points to support instead of repeating it.
+    expect(screen.getByText(ACCOUNT_STATUS_COPY.reasonFollowUp)).toBeTruthy();
     screen.unmount();
   });
 
@@ -352,5 +373,37 @@ describe('AccountStatusScreen', () => {
     expect(dialogStore.getCurrent()).toMatchObject({ title: LOGOUT_CONFIRM_TITLE, destructive: true });
     act(() => dialog.dismissAll());
     screen.unmount();
+  });
+});
+
+describe('AccountStatusScreen UI-R8', () => {
+  it('the header "Sign out" is disabled while signing out', async () => {
+    const { screen } = await renderAs({ ...base, role: 'passenger', roles: ['passenger'] });
+    mock.onPost('/auth/logout').reply(() => new Promise(() => undefined));
+    fireEvent.press(screen.getByTestId('account-status-sign-out'));
+    await act(async () => {
+      const request = dialogStore.getCurrent();
+      if (request) dialog.answer(request.id, true);
+    });
+    const signOut = screen.getByTestId('account-status-sign-out');
+    expect(signOut.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByText(ACCOUNT_STATUS_COPY.signingOut)).toBeTruthy();
+    screen.unmount();
+  });
+
+  it('pending: greets by first name; rejected: spec title; Contact support opens the email row', async () => {
+    const pending = await renderAs({ ...base, role: 'passenger', roles: ['passenger'], name: 'Ali Raza' });
+    expect(pending.screen.getByText(`Hi Ali. ${ACCOUNT_STATUS_VARIANTS.pendingPassenger.message}`)).toBeTruthy();
+    pending.screen.unmount();
+
+    const { screen } = await renderAs(
+      { ...base, role: 'passenger', roles: ['passenger'], status: 'rejected' },
+      [403, { success: false, message: 'Rejected', error_code: 'ACCOUNT_REJECTED', data: { status: 'rejected' } }],
+    );
+    expect(screen.getByText("Your application wasn't approved")).toBeTruthy();
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    fireEvent.press(screen.getByTestId('account-status-contact-support'));
+    fireEvent.press(await screen.findByTestId('account-status-support-email'));
+    expect(open).toHaveBeenCalledWith('mailto:help@raahehaq.com');
   });
 });

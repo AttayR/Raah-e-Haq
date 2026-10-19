@@ -15,9 +15,11 @@ import { getMessaging } from '@react-native-firebase/messaging';
 import { apiClient } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { toast } from '../../../src/core/toast';
+import { permissionPrimer } from '../../../src/features/permissions/primer';
 import {
   askForPushInContext,
   getRegisteredDeviceToken,
+  promptForPushWithPrimer,
   resetPushDevice,
   setPushAskHandler,
   syncPushRegistration,
@@ -214,5 +216,35 @@ describe('usePushNotifications', () => {
     first.unmount();
     renderPush();
     expect(messagingMock.getInitialNotification).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('promptForPushWithPrimer (UI-R8)', () => {
+  let release: () => void;
+  beforeEach(() => {
+    permissionPrimer.reset();
+    release = permissionPrimer.registerHost();
+    messagingMock.hasPermission.mockResolvedValue(-1);
+  });
+  afterEach(() => release());
+
+  it('shows the pre-prompt before the OS prompt; "Not now" never asks the OS', async () => {
+    const pending = promptForPushWithPrimer();
+    await waitFor(() => expect(permissionPrimer.current()).toBe('notifications'));
+    expect(messagingMock.requestPermission).not.toHaveBeenCalled();
+    act(() => permissionPrimer.answer('later'));
+    expect(await pending).toBe('undetermined');
+    expect(messagingMock.requestPermission).not.toHaveBeenCalled();
+    // The next contextual moment does not ask again.
+    expect(await promptForPushWithPrimer()).toBe('undetermined');
+    expect(messagingMock.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it('"Continue" asks the OS and registers the device', async () => {
+    const pending = promptForPushWithPrimer();
+    await waitFor(() => expect(permissionPrimer.current()).toBe('notifications'));
+    act(() => permissionPrimer.answer('continue'));
+    expect(await pending).toBe('granted');
+    expect(messagingMock.requestPermission).toHaveBeenCalledTimes(1);
   });
 });

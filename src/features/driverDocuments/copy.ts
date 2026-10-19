@@ -13,7 +13,7 @@ export const DRIVER_DOCUMENTS_COPY = localizedCopy({
   intro: 'Each photo is reviewed by our team. Upload any item that is missing or was rejected.',
   allApproved: 'All required documents are approved.',
   loading: 'Loading your documents…',
-  loadFailed: 'Could not load your documents.',
+  loadFailed: "Couldn't load your documents.",
   retry: 'Try again',
   empty: 'No documents to show yet.',
   required: 'Required',

@@ -3,6 +3,8 @@ import { AppState, AppStateStatus, Platform, Linking, PermissionsAndroid } from 
 import Geolocation from '@react-native-community/geolocation';
 import { isAndroidEmulator, getDefaultLocation } from '../utils/locationUtils';
 import { logger } from '../core/logging/logger';
+import { primeBeforeOsPrompt } from '../features/permissions/primer';
+import { locationOsUndetermined } from '../features/permissions/locationStatus';
 
 export interface Coordinates {
   latitude: number;
@@ -269,6 +271,21 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
     setIsLoading(true);
 
     try {
+      // UI-R8: before the OS asks the first time, the app's own pre-prompt explains why
+      // (shared-permissions). "Not now" leaves the OS unasked: the screen shows its "Turn on"
+      // state, whose tap asks the OS directly (requestLocationPermission).
+      const primer = await primeBeforeOsPrompt('locationPassenger', locationOsUndetermined);
+      if (!mounted.current) return;
+      if (primer === 'skip') {
+        setPermissionStatus({ isGranted: false, canAskAgain: true, isLocationEnabled: false });
+        setError('denied');
+        return;
+      }
+      if (primer === 'continued' && Platform.OS === 'android') {
+        // "Continue" means: ask now (Android has no prompt on a plain lookup).
+        await requestLocationPermission();
+        return;
+      }
       const status = await checkPermissionStatus();
       if (!mounted.current) return;
       setPermissionStatus(status);
@@ -286,7 +303,7 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
     } finally {
       if (mounted.current) setIsLoading(false);
     }
-  }, [checkPermissionStatus, getCurrentLocation]);
+  }, [checkPermissionStatus, getCurrentLocation, requestLocationPermission]);
 
   // Refresh location
   const refreshLocation = useCallback(async () => {
