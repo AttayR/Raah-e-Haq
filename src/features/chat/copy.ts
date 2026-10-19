@@ -5,9 +5,18 @@ import { strings, t } from '../../i18n';
 /** Static copy for in-ride chat (T-510). Every name, message and count comes from the server. */
 export const CHAT_COPY = localizedCopy({
   listTitle: 'Messages',
-  listEmptyTitle: 'No chats yet',
+  listEmptyTitle: 'No messages',
   listEmpty: 'Chats appear here during a ride.',
+  listEmptyPassenger: 'You can message your driver during a ride.',
+  listEmptyDriver: 'You can message your passenger during a ride.',
   listError: "We couldn't load your chats.",
+  listErrorTitle: "Couldn't load messages",
+  listLoadingA11y: 'Loading messages',
+  sectionCurrent: 'Current ride',
+  sectionEarlier: 'Earlier',
+  ended: 'Ended',
+  endedA11y: 'Chat ended',
+  youPrefix: (text: string) => `You: ${text}`,
   retry: 'Try again',
   noMessagesYet: 'No messages yet',
   readOnly: 'Read-only',
@@ -28,8 +37,15 @@ export const CHAT_COPY = localizedCopy({
   threadClosed: 'Chat closed',
   threadClosedBody: 'Messages and calls close 30 minutes after a ride ends.',
   threadEmpty: 'No messages yet. Say hello.',
+  threadEmptyPassenger: 'Messages are shared only with your driver for this ride.',
+  threadEmptyDriver: 'Messages are shared only with your passenger for this ride.',
   loadOlder: 'Loading earlier messages…',
   composerPlaceholder: 'Type a message',
+  composerPlaceholderTo: (name: string) => `Message ${name}`,
+  quickRepliesA11y: 'Quick replies',
+  quickRepliesPassenger: ["I'm on my way", "I'm at the pickup", 'Please wait 2 minutes'],
+  quickRepliesDriver: ["I've arrived", "I'm on my way", 'Running a few minutes late'],
+  sent: 'Sent',
   composerA11y: 'Message',
   send: 'Send',
   sendA11y: 'Send message',
@@ -96,4 +112,20 @@ export const formatChatDayTime = (iso: string | null | undefined, now: Date = ne
   const year = date.getFullYear() === now.getFullYear() ? '' : ` ${date.getFullYear()}`;
   const day = `${date.getDate()} ${strings().format.monthsShort[date.getMonth()]}${year}`;
   return t('format.dateAt', { date: day, time });
+};
+
+/**
+ * UI-R14: the time on a Messages row: "9:05 AM" today, "Yesterday", else "28 Sep" (plus the
+ * year when it differs). '' when the time does not parse.
+ */
+export const formatChatListTime = (iso: string | null | undefined, now: Date = new Date()): string => {
+  const time = formatChatTime(iso);
+  if (!time || !iso) return time;
+  const date = new Date(iso);
+  const dayDiff = dayIndexOf(now) - dayIndexOf(date);
+  if (dayDiff <= 0) return time;
+  const f = strings().format;
+  if (dayDiff === 1) return f.yesterday;
+  const year = date.getFullYear() === now.getFullYear() ? '' : ` ${date.getFullYear()}`;
+  return `${date.getDate()} ${f.monthsShort[date.getMonth()]}${year}`;
 };

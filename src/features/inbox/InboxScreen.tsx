@@ -72,7 +72,7 @@ export default function InboxScreen({ role }: { role: NotificationRole }) {
           testID="inbox-segments"
         />
       </View>
-      {segment === 'notifications' ? <NotificationsList role={role} list={list} /> : <ChatList visible={isFocused} />}
+      {segment === 'notifications' ? <NotificationsList role={role} list={list} /> : <ChatList visible={isFocused} role={role} />}
     </Screen>
   );
 }

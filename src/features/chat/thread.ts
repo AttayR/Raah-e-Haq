@@ -189,9 +189,35 @@ export type ThreadItem =
   | { kind: 'message'; key: string; message: ChatMessage }
   | { kind: 'pending'; key: string; pending: PendingMessage };
 
+/**
+ * One ThreadItem per message / pending object. The reducer keeps an unchanged message's object
+ * across polls (`mergeMessages` reuses it), so the item stays the same object too and a
+ * memoised bubble skips re-rendering (UI-R14 perf). Weak keys: nothing is retained.
+ */
+const messageItems = new WeakMap<ChatMessage, ThreadItem>();
+const pendingItems = new WeakMap<PendingMessage, ThreadItem>();
+
+const itemOfMessage = (message: ChatMessage): ThreadItem => {
+  let item = messageItems.get(message);
+  if (!item) {
+    item = { kind: 'message', key: `m-${message.id}`, message };
+    messageItems.set(message, item);
+  }
+  return item;
+};
+
+const itemOfPending = (pending: PendingMessage): ThreadItem => {
+  let item = pendingItems.get(pending);
+  if (!item) {
+    item = { kind: 'pending', key: `p-${pending.clientId}`, pending };
+    pendingItems.set(pending, item);
+  }
+  return item;
+};
+
 /** The rows newest first (for an inverted list): pending sends are always the newest. */
 export const threadItemsNewestFirst = (state: Pick<ChatThreadState, 'messages' | 'pending'>): ThreadItem[] => {
-  const items: ThreadItem[] = state.messages.map((message) => ({ kind: 'message', key: `m-${message.id}`, message }));
-  state.pending.forEach((pending) => items.push({ kind: 'pending', key: `p-${pending.clientId}`, pending }));
+  const items: ThreadItem[] = state.messages.map(itemOfMessage);
+  state.pending.forEach((pending) => items.push(itemOfPending(pending)));
   return items.reverse();
 };

@@ -200,6 +200,35 @@ export const componentTokens = {
   },
   /** §9 [v1.1] map floating controls: at most two, locate rides 16 above the sheet. */
   mapControls: { sheetGap: space[4], edge: space[4] },
+  /** UI-R14 chat thread, Messages rows and notification rows (shared-chat-thread, shared-chat-list). */
+  chat: {
+    bubbleRadius: 18,
+    bubbleTailRadius: 6,
+    bubbleMaxWidth: '75%',
+    /** Gap between bubbles of one run, and before a new run. */
+    runGap: space[1],
+    runBreak: space[4],
+    pendingOpacity: 0.6,
+    noteRadius: radius.md,
+    dayPillHeight: 24,
+    composerMinHeight: 40,
+    composerRadius: 20,
+    /** Text lines the composer grows to before it scrolls. */
+    composerMaxLines: 5,
+    sendButton: 40,
+    /** The "{n}/1000" counter appears from this many characters. */
+    counterFrom: 900,
+    closedBarHeight: 56,
+    /** Loading placeholder bubble (one line of body + padding). */
+    skeletonBubbleHeight: 48,
+    /** Header avatar, Messages row avatar. */
+    headerAvatar: 32,
+    rowAvatar: 48,
+    /** Read receipt / failure glyphs under a bubble, and the safety note glyph. */
+    metaIconSize: 16,
+    sendIconSize: 20,
+    closedIconSize: 20,
+  },
   /** T-520 safety: the SOS sheet's round badge and the passenger's PIN digit tiles. */
   safety: { sheetBadge: 56, sheetBadgeGlyph: 28, pinDigitWidth: 36, pinDigitHeight: 48 },
   /**

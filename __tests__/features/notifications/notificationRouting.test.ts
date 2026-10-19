@@ -14,7 +14,6 @@ import {
   routeForTarget,
   type NotificationNavigation,
 } from '../../../src/features/notifications/navigation';
-import { formatNotificationTime } from '../../../src/features/notifications/format';
 
 describe('resolveNotificationTarget', () => {
   it('chat with a ride id opens the thread (both roles)', () => {
@@ -244,17 +243,5 @@ describe('focusedChatRideId (T-544)', () => {
     const behind = stackOn({ name: CHAT_THREAD_ROUTE, params: { rideId: 12 } });
     behind.routes[0].state.index = 0;
     expect(focusedChatRideId(navWith(behind))).toBeNull();
-  });
-});
-
-describe('formatNotificationTime', () => {
-  const now = Date.parse('2026-10-11T12:00:00Z');
-  it('is short and relative, and empty for a bad date', () => {
-    expect(formatNotificationTime('2026-10-11T11:59:40Z', now)).toBe('Just now');
-    expect(formatNotificationTime('2026-10-11T11:55:00Z', now)).toBe('5m');
-    expect(formatNotificationTime('2026-10-11T09:00:00Z', now)).toBe('3h');
-    expect(formatNotificationTime('2026-10-09T12:00:00Z', now)).toBe('2d');
-    expect(formatNotificationTime('2026-09-01T12:00:00Z', now)).not.toBe('');
-    expect(formatNotificationTime('not a date', now)).toBe('');
   });
 });

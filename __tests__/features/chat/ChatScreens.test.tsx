@@ -77,7 +77,8 @@ describe('ChatThreadScreen', () => {
     expect(screen.getByTestId('chat-header-name')).toHaveTextContent('Bilal');
     expect(screen.getByText('Where are you?')).toBeTruthy();
     expect(screen.getByText('At the gate')).toBeTruthy();
-    expect(screen.getByTestId('chat-seen')).toHaveTextContent(/Seen/);
+    // UI-R14: time + double check under the run; the status is spoken, not printed.
+    expect(screen.getByTestId('chat-seen').props.accessibilityLabel).toMatch(/Seen$/);
     expect(screen.getByTestId('chat-composer')).toBeTruthy();
     expect(screen.queryByTestId('chat-closed-notice')).toBeNull();
     // T-512: the composer lives inside the iOS keyboard avoider.
@@ -260,6 +261,89 @@ describe('ChatThreadScreen', () => {
   });
 });
 
+describe('ChatThreadScreen (UI-R14 content)', () => {
+  it('loading shows skeleton bubbles, not a spinner', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockReturnValue(new Promise(() => undefined));
+    await renderWithStore(<ChatThreadScreen />);
+    expect(screen.getByTestId('chat-thread-loading')).toBeTruthy();
+  });
+
+  it('an open, empty thread says who can read it, offers quick replies, and a reply sends at once', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage());
+    const send = jest.spyOn(chatApi, 'sendMessage').mockImplementation(async (_ride, body, clientId) => mine(11, clientId, body));
+    await renderWithStore(<ChatThreadScreen />);
+    expect(screen.getByTestId('chat-thread-empty')).toHaveTextContent('Messages are shared only with your driver for this ride.');
+    expect(screen.getByTestId('chat-input').props.placeholder).toBe('Message Bilal');
+
+    fireEvent.press(screen.getByTestId('chat-quick-reply-0'));
+    await flush();
+    expect(send).toHaveBeenCalledWith(7, "I'm on my way", expect.any(String));
+    // The last message is now mine: the replies step aside.
+    expect(screen.queryByTestId('chat-quick-replies')).toBeNull();
+  });
+
+  it('quick replies come back when the last message is theirs', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage({ messages: [mine(1, 'c-1', 'Hi'), theirs(2, 'Coming')], lastId: 2 }));
+    await renderWithStore(<ChatThreadScreen />);
+    expect(screen.getByTestId('chat-quick-replies')).toBeTruthy();
+  });
+
+  it('a closed thread keeps its history with the lock bar and no quick replies', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(
+      threadPage({
+        canSend: false,
+        rideStatus: 'completed',
+        messages: [theirs(2, 'Coming')],
+        lastId: 2,
+        contactClosesAt: '2026-10-11T12:30:00+00:00',
+      }),
+    );
+    await renderWithStore(<ChatThreadScreen />);
+    expect(screen.getByText('Coming')).toBeTruthy();
+    expect(screen.getByTestId('chat-closed-notice')).toHaveTextContent(/Chat closed\. You can still read the messages\./);
+    expect(screen.queryByTestId('chat-quick-replies')).toBeNull();
+  });
+
+  it('messages from one side in a run show the time once, under the newest', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(
+      threadPage({
+        messages: [
+          message({ id: 1, body: 'one', createdAt: '2026-10-11T12:00:00+00:00' }),
+          message({ id: 2, body: 'two', createdAt: '2026-10-11T12:01:00+00:00' }),
+        ],
+        lastId: 2,
+      }),
+    );
+    await renderWithStore(<ChatThreadScreen />);
+    const times = screen.getAllByText(/\d{1,2}:\d{2} (AM|PM)/);
+    expect(times).toHaveLength(1);
+    expect(screen.getByTestId('chat-bubble-m-2')).toContainElement(times[0]);
+  });
+
+  it("a passenger sees the driver's car and plate under the name when the ride is in the store", async () => {
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage());
+    const ride = makeRide({
+      id: 7,
+      status: 'accepted',
+      vehicle: { make: 'Suzuki', model: 'Alto', color: 'White', license_plate: 'LEC-1234' },
+    } as Partial<RideResource>);
+    await renderWithStore(<ChatThreadScreen />, ride);
+    expect(screen.getByTestId('chat-header-subtitle')).toHaveTextContent('Suzuki Alto · LEC-1234');
+  });
+
+  it('the counter shows from 900 characters; send is disabled while the draft is blank', async () => {
+    jest.spyOn(chatApi, 'getMessages').mockResolvedValue(threadPage());
+    await renderWithStore(<ChatThreadScreen />);
+    fireEvent.changeText(screen.getByTestId('chat-input'), 'a'.repeat(899));
+    expect(screen.queryByTestId('chat-counter')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('chat-input'), 'a'.repeat(950));
+    expect(screen.getByTestId('chat-counter')).toHaveTextContent('950/1000');
+    expect(screen.getByTestId('chat-send').props.accessibilityState).toEqual({ disabled: false });
+    fireEvent.changeText(screen.getByTestId('chat-input'), '   ');
+    expect(screen.getByTestId('chat-send').props.accessibilityState).toEqual({ disabled: true });
+  });
+});
+
 describe('ChatList (Inbox › Messages)', () => {
   it('lists chats from GET /chats with unread counts and opens the thread on tap', async () => {
     jest.spyOn(chatApi, 'listChats').mockResolvedValue([
@@ -291,16 +375,48 @@ describe('ChatList (Inbox › Messages)', () => {
     expect(screen.getByTestId('chat-unread-7')).toHaveTextContent('2');
     expect(screen.getByText('Your driver')).toBeTruthy();
     expect(screen.getByText('No messages yet')).toBeTruthy();
-    expect(screen.getByText('Read-only')).toBeTruthy();
+    // UI-R14: "Current ride" / "Earlier" sections; a closed chat shows "Ended", not a count.
+    expect(screen.getByTestId('chat-section-current')).toHaveTextContent('Current ride');
+    expect(screen.getByTestId('chat-section-earlier')).toHaveTextContent('Earlier');
+    expect(screen.getByTestId('chat-ended-8')).toHaveTextContent('Ended');
+    expect(screen.queryByTestId('chat-ended-7')).toBeNull();
+    expect(screen.getByTestId('chat-row-7').props.accessibilityLabel).toContain('2 unread');
 
     fireEvent.press(screen.getByTestId('chat-row-7'));
     expect(mockNavigate).toHaveBeenCalledWith('RideChat', { rideId: 7 });
   });
 
-  it('empty: "Chats appear here during a ride"', async () => {
+  it('empty: names the other side per role', async () => {
     jest.spyOn(chatApi, 'listChats').mockResolvedValue([]);
     await renderWithStore(<ChatList visible />);
-    expect(screen.getByText('Chats appear here during a ride.')).toBeTruthy();
+    expect(screen.getByText('No messages')).toBeTruthy();
+    expect(screen.getByText('You can message your driver during a ride.')).toBeTruthy();
+  });
+
+  it('empty for a driver names the passenger', async () => {
+    jest.spyOn(chatApi, 'listChats').mockResolvedValue([]);
+    await renderWithStore(<ChatList visible role="driver" />);
+    expect(screen.getByText('You can message your passenger during a ride.')).toBeTruthy();
+  });
+
+  it('your own last message is prefixed "You:"', async () => {
+    jest.spyOn(chatApi, 'listChats').mockResolvedValue([
+      {
+        rideId: 9,
+        rideStatus: 'completed',
+        canSend: true,
+        readOnlyUntil: null,
+        contactClosesAt: '2026-10-11T12:30:00+00:00',
+        otherParty: { id: 12, role: 'driver', firstName: 'Bilal', profileImageUrl: null },
+        lastMessage: mine(5, 'c-5', 'Thanks a lot'),
+        unreadCount: 0,
+      },
+    ]);
+    await renderWithStore(<ChatList visible />);
+    expect(screen.getByText('You: Thanks a lot')).toBeTruthy();
+    // Still sendable (30 min after the ride): no "Ended", and it sits under Earlier.
+    expect(screen.queryByTestId('chat-ended-9')).toBeNull();
+    expect(screen.queryByTestId('chat-section-current')).toBeNull();
   });
 
   it('error: Try again reloads', async () => {

@@ -72,6 +72,8 @@ export const iconGlyphs = {
   check: 'check-circle',
   // UI-R2: bare tick for selected chips and checkboxes (§5.11).
   checkMark: 'check',
+  // UI-R14 chat: read receipt (double check).
+  checkAll: 'check-all',
   info: 'information-outline',
   warning: 'alert-circle-outline',
   // UI-R3 feedback: the bundled MDI has no `cloud-alert-outline` (§5.20), so the network error

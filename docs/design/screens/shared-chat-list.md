@@ -21,4 +21,10 @@ Inbox frame (shared-notifications) with segment "Messages" selected.
 | Error | ErrorState "Couldn't load messages" + Try again. |
 | Offline | Offline banner, cached. |
 
+## Rulings (UI-R14 design review, 2026-10-19)
+- Closed chats: subtitle `textMuted` and a neutral **"Ended"** chip under the time (DS §12.4); no `lock-outline` glyph.
+- Row anatomy per ListItem §5.8: padding 16, Avatar 48 → **16** gap → text (x=80 inside the card), dividers inset 80.
+- The " · {ride date}" suffix on the name is deferred (the overline sections carry the context).
+- Offline banner deferred.
+
 Removed: navy hero header, stock-photo demo conversations, grey empty avatars.

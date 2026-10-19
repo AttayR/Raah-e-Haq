@@ -1,138 +1,129 @@
-import React, { useCallback, useRef } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type ListRenderItem } from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Avatar, Badge, Button, Icon, ListItem, ScrollHairline, useHeaderScroll } from '../../../components/ui';
+import { AppText, ScrollHairline, useHeaderScroll } from '../../../components/ui';
 import { layout, space } from '../../../theme';
-import { CHAT_COPY, fallbackNameOf, formatChatTime } from '../copy';
+import { CHAT_COPY } from '../copy';
 import { useChatList } from '../hooks';
 import { openRideChat, type RideChatNavigator } from '../navigation';
-import type { ChatSummary } from '../types';
+import type { ChatRole, ChatSummary } from '../types';
 import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
+import { CHAT_DIVIDER_INSET, ChatRow, isCurrentChat } from './ChatRow';
+import { ChatListState } from './ChatListStates';
 
-const previewOf = (chat: ChatSummary): string => {
-  const last = chat.lastMessage;
-  if (!last) return CHAT_COPY.noMessagesYet;
-  // One line: newlines in the body would make the row jump in height.
-  const text = last.body.replace(/\s+/g, ' ');
-  const time = formatChatTime(last.createdAt);
-  return time ? `${text} · ${time}` : text;
+export interface ChatSection {
+  key: 'current' | 'earlier';
+  title: string;
+  data: ChatSummary[];
+}
+
+/** UI-R14: the chat of a ride in progress under "Current ride", every other one under "Earlier". */
+export const chatSections = (chats: ReadonlyArray<ChatSummary>): ChatSection[] => {
+  const current = chats.filter(isCurrentChat);
+  const earlier = chats.filter((chat) => !isCurrentChat(chat));
+  const sections: ChatSection[] = [];
+  if (current.length) sections.push({ key: 'current', title: CHAT_COPY.sectionCurrent, data: current });
+  if (earlier.length) sections.push({ key: 'earlier', title: CHAT_COPY.sectionEarlier, data: earlier });
+  return sections;
 };
 
-const Separator: React.FC = () => {
-  const { theme } = useAppTheme();
-  return <View style={[styles.separator, { backgroundColor: theme.colors.border }]} />;
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<ChatSummary, ChatSection>);
+
+const positionOf = (index: number, count: number) => {
+  if (count <= 1) return 'only' as const;
+  if (index === 0) return 'first' as const;
+  return index === count - 1 ? ('last' as const) : ('middle' as const);
 };
 
 export type ChatListProps = {
   /** True while the list is on screen (tab focused and the Messages segment chosen). */
   visible: boolean;
+  /** The viewer's role: the empty state names the other side. */
+  role?: ChatRole;
 };
 
 /**
- * Inbox › Messages for both roles (T-510; UI-R4 moved it from the Chat tab into Inbox): the
- * caller's ride chats from GET /chats, newest first. Loaded each time it becomes visible and on
- * pull-to-refresh; tapping a row opens the ride's thread. Content styling is UI-R14. UI-R15b: it
- * sits under the pinned Inbox segments and draws their hairline once it scrolls.
+ * Inbox › Messages for both roles (T-510; UI-R4 moved it into Inbox; UI-R14 content): the
+ * caller's ride chats from GET /chats, newest first, split into "Current ride" and "Earlier"
+ * cards. Loaded each time it becomes visible and on pull-to-refresh; tapping a row opens the
+ * ride's thread. UI-R15b: it sits under the pinned Inbox segments and draws their hairline once
+ * it scrolls.
  */
-export function ChatList({ visible }: ChatListProps) {
+export function ChatList({ visible, role = 'passenger' }: ChatListProps) {
   const { theme } = useAppTheme();
   const { scrollY, onScroll } = useHeaderScroll();
   // T-577: re-tapping the selected tab scrolls this list to the top.
-  const listRef = useRef<FlatList<ChatSummary>>(null);
+  const listRef = useRef<SectionList<ChatSummary, ChatSection>>(null);
   const navigation = useNavigation<RideChatNavigator>();
   const { chats, status, errorMessage, refreshing, refresh } = useChatList(visible);
 
-  const renderItem: ListRenderItem<ChatSummary> = useCallback(
-    ({ item }) => {
-      const name = item.otherParty?.firstName ?? fallbackNameOf(item.otherParty?.role);
-      const unread = item.unreadCount > 0;
-      return (
-        <ListItem
-          title={name}
-          subtitle={previewOf(item)}
-          leading={<Avatar name={name} uri={item.otherParty?.profileImageUrl ?? null} size={48} />}
-          trailing={
-            unread ? (
-              <Badge label={String(item.unreadCount)} tone="info" testID={`chat-unread-${item.rideId}`} />
-            ) : item.readOnlyUntil ? (
-              <Badge label={CHAT_COPY.readOnly} />
-            ) : undefined
-          }
-          chevron={!unread && !item.readOnlyUntil}
-          onPress={() => openRideChat(navigation, item.rideId)}
-          accessibilityLabel={`${name}, ${previewOf(item)}${
-            unread ? `, ${CHAT_COPY.unreadA11y(item.unreadCount)}` : ''
-          }`}
-          testID={`chat-row-${item.rideId}`}
-        />
-      );
-    },
-    [navigation],
+  // Rows only once loaded: a failed first load keeps no stale list.
+  const sections = useMemo(() => (status === 'ready' ? chatSections(chats) : []), [status, chats]);
+
+  const onOpen = useCallback((rideId: number) => openRideChat(navigation, rideId), [navigation]);
+
+  const renderItem = useCallback(
+    ({ item, index, section }: { item: ChatSummary; index: number; section: ChatSection }) => (
+      <ChatRow chat={item} onPress={onOpen} position={positionOf(index, section.data.length)} />
+    ),
+    [onOpen],
   );
 
-  const renderEmpty = () => {
-    if (status === 'loading') {
-      return (
-        <View style={styles.centered}>
-          <ActivityIndicator color={theme.colors.primary} testID="chat-list-loading" />
-        </View>
-      );
-    }
-    if (status === 'error') {
-      return (
-        <View style={styles.centered} testID="chat-list-error">
-          <Icon name="warning" size={48} color="textMuted" />
-          <AppText variant="title" align="center">
-            {CHAT_COPY.listError}
-          </AppText>
-          {errorMessage ? (
-            <AppText variant="bodySmall" color="textSecondary" align="center">
-              {errorMessage}
-            </AppText>
-          ) : null}
-          <Button
-            label={CHAT_COPY.retry}
-            onPress={refresh}
-            leadingIcon="retry"
-            fullWidth={false}
-            testID="chat-list-retry"
-          />
-        </View>
-      );
-    }
-    return (
-      <View style={styles.centered} testID="chat-list-empty">
-        <Icon name="chat" size={48} color="textMuted" />
-        <AppText variant="title" align="center">
-          {CHAT_COPY.listEmptyTitle}
-        </AppText>
-        <AppText variant="body" color="textSecondary" align="center">
-          {CHAT_COPY.listEmpty}
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: ChatSection }) => (
+      <View
+        style={[styles.sectionHeader, section.key === 'earlier' && sections.length > 1 ? styles.laterSection : null]}
+        testID={`chat-section-${section.key}`}
+      >
+        <AppText variant="overline" color="textMuted" accessibilityRole="header">
+          {section.title}
         </AppText>
       </View>
-    );
-  };
+    ),
+    [sections.length],
+  );
 
-  // Rows only once loaded: a failed first load keeps no stale list.
-  const data = status === 'ready' ? chats : [];
+  const surface = theme.colors.surface;
+  const border = theme.colors.border;
+  const separator = useCallback(
+    () => (
+      <View style={[styles.separatorTrack, { backgroundColor: surface }]}>
+        <View style={[styles.separator, { backgroundColor: border }]} />
+      </View>
+    ),
+    [surface, border],
+  );
+
+  const renderEmpty = () => (
+    <ChatListState
+      kind={status === 'loading' ? 'loading' : status === 'error' ? 'error' : 'empty'}
+      role={role}
+      error={errorMessage}
+      onRetry={refresh}
+    />
+  );
 
   return (
     <View style={styles.list}>
       <ScrollHairline scrollY={scrollY} testID="chat-list-hairline" />
       <TabScrollToTop scrollRef={listRef} />
-      <Animated.FlatList
+      <AnimatedSectionList
         ref={listRef}
-        data={data}
-        keyExtractor={item => String(item.rideId)}
+        sections={sections}
+        keyExtractor={(item) => String(item.rideId)}
         renderItem={renderItem}
-        ItemSeparatorComponent={Separator}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled={false}
+        ItemSeparatorComponent={separator}
         ListEmptyComponent={renderEmpty}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        initialNumToRender={10}
+        windowSize={7}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}
-        contentContainerStyle={[styles.listContent, data.length === 0 ? styles.emptyContent : null]}
+        contentContainerStyle={[styles.listContent, sections.length === 0 ? styles.emptyContent : null]}
         style={styles.list}
         testID="chat-list"
       />
@@ -142,8 +133,12 @@ export function ChatList({ visible }: ChatListProps) {
 
 const styles = StyleSheet.create({
   list: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space[3], padding: layout.gutter },
-  listContent: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[4] },
+  listContent: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   emptyContent: { flexGrow: 1 },
-  separator: { height: StyleSheet.hairlineWidth, marginStart: space[4] + 48 + space[4] },
+  // Grouped list header (§5.8): overline at x=16 from the gutter, 8 above the card; 24 between groups.
+  sectionHeader: { paddingHorizontal: layout.gutter + space[4], paddingTop: space[3], paddingBottom: space[2] },
+  laterSection: { paddingTop: space[6] },
+  separatorTrack: { marginHorizontal: layout.gutter },
+  // Inset to the text column (80).
+  separator: { height: StyleSheet.hairlineWidth, marginStart: CHAT_DIVIDER_INSET },
 });

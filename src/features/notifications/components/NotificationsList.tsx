@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Button, FilterChips, Icon, ScrollHairline, useHeaderScroll } from '../../../components/ui';
+import { AppText, Button, FilterChips, ScrollHairline, useHeaderScroll } from '../../../components/ui';
 import { componentTokens, layout, space } from '../../../theme';
-import { NotificationRow } from './NotificationRow';
+import { NotificationRow, rowPosition } from './NotificationRow';
+import { NotificationsState } from './NotificationsStates';
 import { PushPermissionBanner } from './PushPermissionBanner';
 import { NOTIFICATIONS_COPY } from '../copy';
+import { groupNotificationsByDay, type NotificationSection } from '../format';
 import type { NotificationsList as NotificationsListState } from '../hooks';
 import { openNotificationTarget } from '../navigation';
 import { resolveNotificationTarget, type NotificationRole } from '../routing';
@@ -26,21 +28,25 @@ const FILTERS = perLocale((): ReadonlyArray<{ value: NotificationFilter; label: 
   { value: 'unread', label: NOTIFICATIONS_COPY.filterUnread },
 ]);
 
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList<AppNotification, NotificationSection>);
+
 /**
- * Inbox › Notifications for both roles (T-502, BE-11; UI-R4 moved it into the Inbox tab): GET
- * /notifications with pull-to-refresh, infinite scroll, loading / error / empty states, All /
- * Unread chips and mark read on open. Opening a row goes to its ride, chat or history
- * (routing.ts). Content styling is UI-R14. UI-R15b: the chips stay pinned above the list (under
- * the Inbox segments) with a hairline once it scrolls, like Activity › Rides.
+ * Inbox › Notifications for both roles (T-502, BE-11; UI-R4 moved it into the Inbox tab; UI-R14
+ * content): GET /notifications with pull-to-refresh, infinite scroll, All / Unread chips and mark
+ * read on open (long press marks read without opening). Rows are grouped by day ("Today",
+ * "Yesterday", "Mon, 28 Sep"), each day one card; skeleton, error and empty states come from
+ * `NotificationsState`. Opening a row goes to its ride, chat or history (routing.ts). UI-R15b:
+ * the chips stay pinned above the list with a hairline once it scrolls.
  */
 export function NotificationsList({ role, list }: NotificationsListProps) {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const { state, hasMore, refresh, loadMore, reload, setFilter, markRead } = list;
   const { items, status, error, loadMoreError, filter } = state;
+  const sections = useMemo(() => groupNotificationsByDay(items), [items]);
   const { scrollY, onScroll } = useHeaderScroll();
   // T-577: re-tapping the selected tab scrolls this list to the top.
-  const listRef = useRef<FlatList<AppNotification>>(null);
+  const listRef = useRef<SectionList<AppNotification, NotificationSection>>(null);
 
   // A fresh filter starts at the top: the hairline follows it.
   useEffect(() => {
@@ -70,56 +76,55 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
     [markRead, navigation, role],
   );
 
+  const onMarkRead = useCallback((item: AppNotification) => markRead(item.id), [markRead]);
+
   const renderItem = useCallback(
-    ({ item }: { item: AppNotification }) => <NotificationRow item={item} onPress={onOpen} />,
-    [onOpen],
+    ({ item, index, section }: { item: AppNotification; index: number; section: NotificationSection }) => (
+      <NotificationRow
+        item={item}
+        onPress={onOpen}
+        onMarkRead={onMarkRead}
+        position={rowPosition(index, section.data.length)}
+      />
+    ),
+    [onOpen, onMarkRead],
   );
 
+  const background = theme.colors.background;
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: NotificationSection }) =>
+      section.title ? (
+        <View style={[styles.dayHeader, { backgroundColor: background }]} testID={`notifications-day-${section.key}`}>
+          <AppText variant="caption" color="textMuted" accessibilityRole="header">
+            {section.title}
+          </AppText>
+        </View>
+      ) : null,
+    [background],
+  );
+
+  const separatorColor = theme.colors.border;
+  const surface = theme.colors.surface;
   const separator = useCallback(
-    () => <View style={[styles.separator, { backgroundColor: theme.colors.border }]} />,
-    [theme.colors.border],
+    () => (
+      <View style={[styles.separatorTrack, { backgroundColor: surface }]}>
+        <View style={[styles.separator, { backgroundColor: separatorColor }]} />
+      </View>
+    ),
+    [separatorColor, surface],
   );
 
   const firstLoad = status === 'idle' || (status === 'loading' && items.length === 0);
 
-  const renderEmpty = () => {
-    if (firstLoad) {
-      return (
-        <View style={styles.centered} testID="notifications-loading">
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      );
-    }
-    if (status === 'failed') {
-      return (
-        <View style={styles.centered} testID="notifications-error">
-          <Icon name="warning" size={32} color="danger" />
-          <AppText variant="body" align="center">
-            {error ?? NOTIFICATIONS_COPY.loadFailed}
-          </AppText>
-          <Button
-            label={NOTIFICATIONS_COPY.retry}
-            variant="outline"
-            size="md"
-            onPress={reload}
-            testID="notifications-retry"
-          />
-        </View>
-      );
-    }
-    const unreadOnly = filter === 'unread';
-    return (
-      <View style={styles.centered} testID="notifications-empty">
-        <Icon name="bell" size={48} color="textMuted" />
-        <AppText variant="title" align="center">
-          {unreadOnly ? NOTIFICATIONS_COPY.emptyUnreadTitle : NOTIFICATIONS_COPY.emptyTitle}
-        </AppText>
-        <AppText variant="bodySmall" color="textSecondary" align="center">
-          {unreadOnly ? NOTIFICATIONS_COPY.emptyUnreadBody : NOTIFICATIONS_COPY.emptyBody}
-        </AppText>
-      </View>
-    );
-  };
+  const renderEmpty = () => (
+    <NotificationsState
+      kind={firstLoad ? 'loading' : status === 'failed' ? 'error' : 'empty'}
+      role={role}
+      filter={filter}
+      error={error}
+      onRetry={reload}
+    />
+  );
 
   const renderFooter = () => {
     if (status === 'loadingMore') {
@@ -135,7 +140,7 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
           <AppText variant="bodySmall" color="textSecondary" align="center">
             {loadMoreError}
           </AppText>
-          <Button label={NOTIFICATIONS_COPY.retry} variant="ghost" size="sm" onPress={loadMore} />
+          <Button label={NOTIFICATIONS_COPY.retry} variant="ghost" size="sm" fullWidth={false} onPress={loadMore} />
         </View>
       );
     }
@@ -166,12 +171,14 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
       </View>
       <ScrollHairline scrollY={scrollY} testID="notifications-hairline" />
       <TabScrollToTop scrollRef={listRef} />
-      <Animated.FlatList
+      <AnimatedSectionList
         ref={listRef}
         testID="notifications-list"
-        data={items}
-        keyExtractor={item => String(item.id)}
+        sections={sections}
+        keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled
         ItemSeparatorComponent={separator}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={renderEmpty}
@@ -180,6 +187,8 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
         style={styles.list}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        initialNumToRender={10}
+        windowSize={7}
         onEndReached={hasMore && !loadMoreError ? loadMore : undefined}
         onEndReachedThreshold={0.5}
         refreshControl={
@@ -202,20 +211,12 @@ const styles = StyleSheet.create({
   listHeader: { paddingHorizontal: layout.gutter },
   headerItem: { marginBottom: space[3] },
   list: { flex: 1 },
-  listContent: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[6] },
+  listContent: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
   listEmpty: { flexGrow: 1 },
-  // Inset to the text column: gutter + 40 icon tile + 12 (§12.4).
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginStart: layout.gutter + componentTokens.iconButton.visual + space[3],
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[3],
-    paddingHorizontal: space[6],
-    paddingVertical: space[8],
-  },
+  // Day header: caption, 32 high, on the page colour so it reads over rows when sticky.
+  dayHeader: { minHeight: space[8], justifyContent: 'center', paddingHorizontal: layout.gutter + space[4] },
+  // Divider inside the day card, inset to the text column (72, §5.8).
+  separatorTrack: { marginHorizontal: layout.gutter },
+  separator: { height: StyleSheet.hairlineWidth, marginStart: componentTokens.listItem.dividerInset.tile },
   footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },
 });

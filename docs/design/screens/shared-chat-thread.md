@@ -30,4 +30,13 @@
 | Offline | Offline banner; send disabled with placeholder "You're offline". |
 | Rate limited (429) | Toast "You're sending messages too fast. Wait a moment." |
 
+## Rulings (UI-R14 design review, 2026-10-19)
+- **Header:** `surface` fill with a permanent bottom hairline (the inverted thread is always "scrolled"); the `surface` fill **extends under the top safe-area inset** so no `background` band shows above it. Back IconButton at x=4; trailing Call = tonal IconButton (40 visual) whose visual edge sits **16 from the trailing screen edge**.
+- **Ride context strip:** deferred (not part of UI-R14).
+- **Status glyphs** under my last bubble: 16 (`iconSize.sm`), not 12; read = `check-all` `primaryText`.
+- **Safety note** (money-transfer warning): under the flagged bubble's time line, max width 75 %, `warningSoft` fill, 1pt `warning` border, radius `md`, `alert` glyph 16 `warning`, `caption` `textPrimary`.
+- **Closed copy:** "Chat closed. You can still read the messages." (covers cancelled rides too, so it no longer says "the ride has ended").
+- **Composer:** field `surfaceAlt` with a 1pt `borderStrong` border (matches kit fields); send is a 40 `primary` circle.
+- **Offline** state deferred.
+
 Removed: illustrated background, "Hello developer" seed, "?" icons, GiftedChat default styling.

@@ -27,6 +27,13 @@ import { DriverRidePreview, TripAssignedPreview } from './sections/RideScreenPre
 import { ActivityHistoryPreview, ActivityRowsPreview } from './sections/ActivityPreviews';
 import { REGISTRATION_PREVIEWS } from './sections/RegistrationPreviews';
 import { AUTH_STATE_PREVIEWS } from './sections/AuthStatePreviews';
+import {
+  ChatThreadPreview,
+  InboxMessagesPreview,
+  InboxMessagesStatePreview,
+  InboxNotificationsPreview,
+  InboxNotificationsStatePreview,
+} from './sections/InboxPreviews';
 import { VehicleMotionSection } from './sections/VehicleMotionSection';
 import {
   LargeTitlePreview,
@@ -118,6 +125,17 @@ const SCREEN_PREVIEWS: Section[] = [
   ['screen-signout', () => <SignOutDialogPreview />],
   ['screen-large', () => <LargeTitlePreview scrolled={false} />],
   ['screen-large-scrolled', () => <LargeTitlePreview scrolled />],
+  ['screen-inbox-notifications', () => <InboxNotificationsPreview />],
+  ['screen-inbox-notifications-loading', () => <InboxNotificationsStatePreview kind="loading" role="passenger" />],
+  ['screen-inbox-notifications-empty', () => <InboxNotificationsStatePreview kind="empty" role="driver" />],
+  ['screen-inbox-notifications-error', () => <InboxNotificationsStatePreview kind="error" role="passenger" />],
+  ['screen-inbox-messages', () => <InboxMessagesPreview />],
+  ['screen-inbox-messages-loading', () => <InboxMessagesStatePreview kind="loading" role="passenger" />],
+  ['screen-inbox-messages-empty', () => <InboxMessagesStatePreview kind="empty" role="driver" />],
+  ['screen-inbox-messages-error', () => <InboxMessagesStatePreview kind="error" role="passenger" />],
+  ['screen-chat-thread', () => <ChatThreadPreview state="open" />],
+  ['screen-chat-thread-closed', () => <ChatThreadPreview state="closed" />],
+  ['screen-chat-thread-loading', () => <ChatThreadPreview state="loading" />],
   ...REGISTRATION_PREVIEWS,
   ...AUTH_STATE_PREVIEWS,
 ];
