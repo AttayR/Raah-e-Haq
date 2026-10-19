@@ -1019,3 +1019,14 @@ Text only; no field, type or enum changed. Notification `type`, `data` and push 
 - On a **parcel** ride (`vehicle_type` parcel) ride notifications use delivery words. Sender: titles Rider Assigned / Rider Arrived / Parcel Picked Up / Delivery Completed / Delivery Cancelled / Delivery Update; bodies "Your delivery has been accepted by :name", "Your rider is at the pickup", "Your rider cancelled this delivery", "Your rider cancelled. Your delivery is back in the queue for another rider", "Your rider waited at the pickup and cancelled. A no-show fee of :fee was charged to your wallet", "Your delivery was cancelled by Raah-e-Haq support". Driver: New Delivery Assigned / Delivery Completed / Delivery Cancelled / New Delivery Request; "The sender cancelled this delivery" (+ the time-compensation lines with "sender"), "This delivery was cancelled by Raah-e-Haq support". The BE-88 parcel lines (picked up, delivered, returning, returned, refused) are unchanged and still win. Every line has a Roman Urdu translation.
 
 App follow-up: none required (the app shows `title` / `body` as sent). Do not match on notification text.
+
+## BE-112: parcel rules and tier names in Roman Urdu (2026-10-19)
+
+No field added, removed or renamed; English output is byte-identical (anything but `ur-Latn` in `Accept-Language` is English, as in BE-110).
+
+- `GET /parcels/options` `prohibited_items` and `declaration`, and `GET|POST /driver/parcels/opt-in` `prohibited_items`, are served in Roman Urdu for `ur-Latn` (`lang/ur-Latn/parcels.php`, same order as `config/parcels.php`). The translation records the `rules_version` it was written for: when the English rules change and the version is bumped, the English text is served until the translation is updated (never a stale translation of old rules). `rules_version` itself never changes with the language, so the booking `parcel.rules_version` check is unaffected.
+- Tier names (`GET /public/vehicle-types` `name`/`label`, fare estimate `label`) in Roman Urdu now match the app's `VEHICLE_LABEL`: car → "Gaari", car_ac → "AC gaari" (was "AC Car"); bike, rickshaw, van, parcel unchanged. English stays "Car" / "Car AC". A name an admin typed on the rate card is still shown as typed in every language.
+
+The BE-110 "never translated" list no longer includes the parcel `declaration` and `prohibited_items`.
+
+App follow-up: none required; show these strings as sent (T-579 keeps local tier fallbacks in the same words).
