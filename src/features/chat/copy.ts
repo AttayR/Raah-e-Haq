@@ -52,7 +52,9 @@ export const CHAT_COPY = localizedCopy({
   seen: 'Seen',
   sending: 'Sending…',
   notSent: 'Not sent.',
-  tapToRetry: 'Tap to retry',
+  tapToRetry: 'Tap to retry.',
+  /** shared-chat-thread "Sending": a dropped connection or unknown failure, nothing more to say. */
+  notSentRetry: 'Not sent. Tap to retry.',
   retrySendA11y: 'Retry sending this message',
   sendErrors: {
     network: 'Not sent. Check your connection.',

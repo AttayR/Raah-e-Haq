@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
+import { useDispatch, useStore } from 'react-redux';
+import type { AppDispatch, RootState } from '../../../store';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Button, FilterChips, ScrollHairline, useHeaderScroll } from '../../../components/ui';
 import { componentTokens, layout, space } from '../../../theme';
@@ -11,6 +13,7 @@ import { PushPermissionBanner } from './PushPermissionBanner';
 import { NOTIFICATIONS_COPY } from '../copy';
 import { groupNotificationsByDay, type NotificationSection } from '../format';
 import type { NotificationsList as NotificationsListState } from '../hooks';
+import { confirmPassengerLiveRide } from '../liveRideTarget';
 import { openNotificationTarget } from '../navigation';
 import { resolveNotificationTarget, type NotificationRole } from '../routing';
 import type { AppNotification, NotificationFilter } from '../types';
@@ -64,6 +67,10 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
     refresh();
   }, [refresh]);
 
+  const store = useStore<RootState>();
+  const dispatch = useDispatch<AppDispatch>();
+  // T-581: one ride check at a time (a double tap opens one screen).
+  const checkingRide = useRef(false);
   const onOpen = useCallback(
     (item: AppNotification) => {
       if (item.readAt === null) markRead(item.id);
@@ -71,9 +78,20 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
         { category: item.category, type: item.type, rideId: item.data.rideId, requeued: item.data.requeued },
         role,
       );
-      openNotificationTarget(navigation, role, target, 'list');
+      if (role !== 'passenger' || target.kind !== 'ride') {
+        openNotificationTarget(navigation, role, target, 'list');
+        return;
+      }
+      // T-581: a passenger's ride row opens Booking only while that ride is still live.
+      if (checkingRide.current) return;
+      checkingRide.current = true;
+      confirmPassengerLiveRide(target, { getState: store.getState, dispatch, subscribe: store.subscribe })
+        .then((confirmed) => openNotificationTarget(navigation, role, confirmed, 'list'))
+        .finally(() => {
+          checkingRide.current = false;
+        });
     },
-    [markRead, navigation, role],
+    [markRead, navigation, role, store, dispatch],
   );
 
   const onMarkRead = useCallback((item: AppNotification) => markRead(item.id), [markRead]);

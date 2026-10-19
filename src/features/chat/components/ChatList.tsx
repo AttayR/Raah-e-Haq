@@ -10,6 +10,7 @@ import { useChatList } from '../hooks';
 import { openRideChat, type RideChatNavigator } from '../navigation';
 import type { ChatRole, ChatSummary } from '../types';
 import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
+import { useAppIsActive } from '../../../hooks/useAppIsActive';
 import { CHAT_DIVIDER_INSET, ChatRow, isCurrentChat } from './ChatRow';
 import { ChatListState } from './ChatListStates';
 
@@ -57,7 +58,9 @@ export function ChatList({ visible, role = 'passenger' }: ChatListProps) {
   // T-577: re-tapping the selected tab scrolls this list to the top.
   const listRef = useRef<SectionList<ChatSummary, ChatSection>>(null);
   const navigation = useNavigation<RideChatNavigator>();
-  const { chats, status, errorMessage, refreshing, refresh } = useChatList(visible);
+  // T-581: re-read while on screen and the app is in the foreground (never in the background).
+  const appActive = useAppIsActive();
+  const { chats, status, errorMessage, refreshing, refresh } = useChatList(visible && appActive);
 
   // Rows only once loaded: a failed first load keeps no stale list.
   const sections = useMemo(() => (status === 'ready' ? chatSections(chats) : []), [status, chats]);

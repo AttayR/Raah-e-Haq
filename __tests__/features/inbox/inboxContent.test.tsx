@@ -185,10 +185,11 @@ describe('MessageBubble states', () => {
     expect(screen.getByLabelText('9:05 AM, Sending…')).toBeTruthy();
   });
 
-  it('failed and retryable: the reason in danger, tap retries with the client id', () => {
+  it('failed and retryable: the spec line in danger, tap retries with the client id', () => {
     const onRetry = jest.fn();
     render(<MessageBubble item={pending('failed', 'network')} seen={false} onRetry={onRetry} />);
-    expect(screen.getByText('Not sent. Check your connection. Tap to retry')).toBeTruthy();
+    // T-581: the shared-chat-thread copy, not the longer connection hint.
+    expect(screen.getByText('Not sent. Tap to retry.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('chat-retry-c1'));
     expect(onRetry).toHaveBeenCalledWith('c1');
   });

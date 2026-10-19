@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import { AppText, EmptyState, ErrorState, Icon, Skeleton, SkeletonGroup } from '../../../components/ui';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { componentTokens, layout, space } from '../../../theme';
@@ -69,10 +69,22 @@ export function ChatThreadUnavailable({ status, errorMessage, onRetry, onBack }:
   );
 }
 
-/** Centred note in an open, empty thread: who can read the messages. */
-export function ChatThreadEmptyNote({ text }: { text: string }) {
+/**
+ * Centred note in an open, empty thread: who can read the messages. T-581: as an inverted list's
+ * ListEmptyComponent, VirtualizedList passes the flip back upright as `style` (and its layout
+ * callback as `onLayout`); both must reach the View or the note renders upside down.
+ */
+export function ChatThreadEmptyNote({
+  text,
+  style,
+  onLayout,
+}: {
+  text: string;
+  style?: StyleProp<ViewStyle>;
+  onLayout?: (event: LayoutChangeEvent) => void;
+}) {
   return (
-    <View style={styles.empty} testID="chat-thread-empty">
+    <View style={[styles.empty, style]} onLayout={onLayout} testID="chat-thread-empty">
       <AppText variant="bodySmall" color="textMuted" align="center">
         {text}
       </AppText>

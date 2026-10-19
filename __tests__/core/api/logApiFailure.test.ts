@@ -29,7 +29,7 @@ afterEach(() => {
 describe('logApiFailure', () => {
   it.each([
     [401, { message: 'Invalid credentials' }],
-    [403, { message: 'Your account is pending.', code: 'ACCOUNT_PENDING' }],
+    [403, { message: 'Forbidden.' }],
     [422, { message: 'Validation errors', errors: { email: ['Taken'] } }],
     [429, { message: 'Too many requests.', code: 'rate_limited', retry_after: 5 }],
   ])('logs an expected %s as a warning', (status, body) => {
@@ -84,5 +84,40 @@ describe('logApiFailure', () => {
       'RideService#getNotifications failed',
       expect.objectContaining({ kind: 'network' }),
     );
+  });
+
+  it.each(['ACCOUNT_PENDING', 'ACCOUNT_SUSPENDED', 'ACCOUNT_REJECTED'])(
+    'T-581: a 403 %s (the account state, shown on its screen) is debug only, no LogBox',
+    (code) => {
+      const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+      logApiFailure('Failed to fetch rides', axiosErrorWith(403, { message: 'Refused.', code, data: { status: 'suspended' } }));
+      expect(error).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith('Failed to fetch rides', expect.objectContaining({ status: 403, code }));
+    },
+  );
+
+  it('T-581: RideService#getRides refused by ACCOUNT_SUSPENDED logs no console.error', async () => {
+    const mock = new MockAdapter(apiClient);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    mock.onGet('/rides').reply(403, { success: false, message: 'Suspended.', code: 'ACCOUNT_SUSPENDED', data: { status: 'suspended' } });
+    try {
+      await expect(rideService.getRides()).rejects.toMatchObject({ status: 403 });
+    } finally {
+      mock.restore();
+    }
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('T-581: RideService#getRides failing on a 5xx is still an error with a summary', async () => {
+    const mock = new MockAdapter(apiClient);
+    mock.onGet('/rides').reply(500, { message: 'boom' });
+    try {
+      await expect(rideService.getRides()).rejects.toMatchObject({ status: 500 });
+    } finally {
+      mock.restore();
+    }
+    expect(error).toHaveBeenCalledWith('Failed to fetch rides', expect.objectContaining({ status: 500 }));
   });
 });

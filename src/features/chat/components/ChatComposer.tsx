@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Icon } from '../../../components/ui';
@@ -30,12 +30,26 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
   const { theme } = useAppTheme();
   const c = theme.colors;
   const [draft, setDraft] = useState('');
+  // T-581 (QA bug 8): the text as typed, read by Send. A tap that lands before the re-render for
+  // the last keystroke used to meet a still-`disabled` button (or an older draft) and was lost;
+  // the button now only dims while empty, and Send reads the latest text.
+  const latest = useRef('');
   const [pressed, setPressed] = useState(false);
   const canSend = !disabled && draft.trim().length > 0;
   const lineHeight = theme.typography.body.lineHeight;
 
+  const onChangeText = useCallback((text: string) => {
+    latest.current = text;
+    setDraft(text);
+  }, []);
+
   const submit = () => {
-    if (onSend(draft)) setDraft('');
+    const text = latest.current;
+    if (disabled || text.trim().length === 0) return;
+    if (onSend(text)) {
+      latest.current = '';
+      setDraft('');
+    }
   };
 
   return (
@@ -56,7 +70,7 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
       <View style={styles.row}>
         <TextInput
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={onChangeText}
           placeholder={placeholder ?? CHAT_COPY.composerPlaceholder}
           placeholderTextColor={c.textMuted}
           accessibilityLabel={CHAT_COPY.composerA11y}
@@ -79,7 +93,8 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
         />
         <Pressable
           onPress={submit}
-          disabled={!canSend}
+          // Only while loading: an explicit `false` would override accessibilityState below.
+          disabled={disabled || undefined}
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
           hitSlop={(layout.touchTargetIOS - k.sendButton) / 2}

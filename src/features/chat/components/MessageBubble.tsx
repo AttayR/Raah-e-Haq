@@ -53,10 +53,14 @@ function MessageBubbleBase({ item, seen, onRetry, viewerId, firstInRun = true, l
     else if (read || seen) status = { icon: 'checkAll', label: CHAT_COPY.seen, read: true };
     else status = { icon: 'checkMark', label: CHAT_COPY.sent, read: false };
   }
-  const failText =
-    failed && item.kind === 'pending'
-      ? `${CHAT_COPY.sendErrors[item.pending.error ?? 'unknown']}${retryable ? ` ${CHAT_COPY.tapToRetry}` : ''}`
-      : '';
+  // T-581 (spec "Sending"): "Not sent. Tap to retry." for a dropped connection or an unknown
+  // failure; a refusal that needs words (wait a moment, chat closed) keeps its reason.
+  const failError = item.kind === 'pending' ? (item.pending.error ?? 'unknown') : 'unknown';
+  const failText = !failed
+    ? ''
+    : retryable && (failError === 'network' || failError === 'unknown')
+      ? CHAT_COPY.notSentRetry
+      : `${CHAT_COPY.sendErrors[failError]}${retryable ? ` ${CHAT_COPY.tapToRetry}` : ''}`;
   const showMeta = failed || sending || seen || lastInRun;
 
   const bubble = (

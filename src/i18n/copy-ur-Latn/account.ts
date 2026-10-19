@@ -175,7 +175,7 @@ export function registerAccountCopy(): void {
     paymentMethod: 'Adaigi',
     paymentCash: { passenger: 'Cash (driver ko diya)', driver: 'Cash (aap ne liya)' },
     paymentStatus: 'Adaigi ki surat',
-    rideCode: 'Ride ID',
+    rideCode: 'Ride ki ID',
     date: 'Tareekh',
     timeline: 'Timeline',
     cancellation: 'Cancel ki tafseel',
@@ -335,7 +335,8 @@ export function registerAccountCopy(): void {
     seen: 'Dekh liya',
     sending: 'Ja raha hai…',
     notSent: 'Nahi gaya.',
-    tapToRetry: 'Dobara ke liye tap karein',
+    tapToRetry: 'Dobara ke liye tap karein.',
+    notSentRetry: 'Nahi gaya. Dobara ke liye tap karein.',
     retrySendA11y: 'Ye message dobara bhejein',
     sendErrors: {
       network: 'Nahi gaya. Apna connection check karein.',

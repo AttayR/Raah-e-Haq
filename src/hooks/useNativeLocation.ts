@@ -4,7 +4,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { isAndroidEmulator, getDefaultLocation } from '../utils/locationUtils';
 import { logger } from '../core/logging/logger';
 import { primeBeforeOsPrompt } from '../features/permissions/primer';
-import { locationOsDenied, locationOsUndetermined } from '../features/permissions/locationStatus';
+import { iosLocationOsStatus, locationOsUndetermined } from '../features/permissions/locationStatus';
 
 export interface Coordinates {
   latitude: number;
@@ -45,6 +45,36 @@ const useAppInForeground = (): boolean => {
   return state !== 'background';
 };
 
+/** T-581: longest wait for an answer to the iOS location prompt still on screen. */
+export const IOS_PROMPT_WAIT_MS = 60000;
+/** T-581: with the app already active, one more look this much later (the status can lag). */
+export const IOS_STATUS_SETTLE_MS = 500;
+
+/**
+ * Resolves once the app is active again (iOS reports `inactive` while its prompt is up), or after
+ * `capMs`; when it is already active, after a short settle. Each pending wait's canceller sits in
+ * `waits` until it ends (overlapping requests each keep their own), so an unmount ends them all
+ * and removes their listeners.
+ */
+const untilAppActive = (capMs: number, waits: Set<() => void>): Promise<void> =>
+  new Promise((resolve) => {
+    const alreadyActive = AppState.currentState === 'active';
+    let subscription: { remove: () => void } | null = null;
+    const done = () => {
+      clearTimeout(timer);
+      subscription?.remove();
+      waits.delete(done);
+      resolve();
+    };
+    const timer = setTimeout(done, alreadyActive ? IOS_STATUS_SETTLE_MS : capMs);
+    if (!alreadyActive) {
+      subscription = AppState.addEventListener('change', (next) => {
+        if (next === 'active') done();
+      });
+    }
+    waits.add(done);
+  });
+
 /** Geolocation error codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT. */
 const errorKindOf = (code: number): LocationErrorKind =>
   code === 1 ? 'denied' : code === 2 ? 'disabled' : 'unavailable';
@@ -64,10 +94,14 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
   });
   // A late callback after unmount must not set state.
   const mounted = useRef(true);
+  // T-581: pending waits for the iOS prompt's answer, ended on unmount.
+  const promptWaits = useRef(new Set<() => void>());
   useEffect(() => {
     mounted.current = true;
+    const waits = promptWaits.current;
     return () => {
       mounted.current = false;
+      Array.from(waits).forEach((cancel) => cancel());
     };
   }, []);
 
@@ -251,17 +285,43 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
         return (await getCurrentLocation()) !== null;
       }
 
-      // iOS - Just get location, iOS handles permissions automatically
-      const location = await getCurrentLocation();
+      // iOS: the lookup itself shows the OS prompt the first time.
+      let location = await getCurrentLocation();
+      if (!location) {
+        // T-581 (QA bug 4): the 10 s lookup timeout can end while the prompt is still up, and
+        // right after "Don't Allow" the status can still read "notDetermined". So an undecided
+        // status waits for the prompt to close (the app turns active again) and is read again.
+        let status = await iosLocationOsStatus();
+        if (status === 'notDetermined') {
+          // Meanwhile the screen keeps "Turn on location" (not the retry-only "unavailable").
+          if (mounted.current) {
+            setPermissionStatus({ isGranted: false, canAskAgain: true, isLocationEnabled: false });
+            setError('denied');
+          }
+          await untilAppActive(IOS_PROMPT_WAIT_MS, promptWaits.current);
+          if (!mounted.current) return false;
+          status = await iosLocationOsStatus();
+          if (status === 'granted') {
+            // "Allow" after the lookup gave up: access is on (undo the askable state set above),
+            // then look once more; a failed look keeps its own error (a retry, not Settings).
+            if (mounted.current) setPermissionStatus({ isGranted: true, canAskAgain: false, isLocationEnabled: true });
+            location = await getCurrentLocation();
+          }
+        }
+        if (mounted.current) {
+          if (status === 'denied' || status === 'restricted') {
+            // T-580: the OS will not ask again; the screen keeps "Turn on location", for Settings.
+            setPermissionStatus({ isGranted: false, canAskAgain: false, isLocationEnabled: false });
+            setError('denied');
+          } else if (status === 'notDetermined') {
+            // Still unanswered: keep "Turn on location", which asks again.
+            setPermissionStatus({ isGranted: false, canAskAgain: true, isLocationEnabled: false });
+            setError('denied');
+          }
+        }
+      }
       if (location && mounted.current) {
         setPermissionStatus({ isGranted: true, canAskAgain: false, isLocationEnabled: true });
-      }
-      // T-580 (QA bug 4): after "Don't Allow" the OS will not ask again. Record that, so the
-      // screen keeps its "Turn on location" state, now opening Settings (whatever error code the
-      // lookup ended with).
-      if (!location && (await locationOsDenied()) && mounted.current) {
-        setPermissionStatus({ isGranted: false, canAskAgain: false, isLocationEnabled: false });
-        setError('denied');
       }
       return location !== null;
     } catch (requestError) {

@@ -148,6 +148,21 @@ describe('NotificationsScreen', () => {
     expect(mock.history.post).toHaveLength(0);
   });
 
+  it('T-581: an old requeued "driver cancelled" row opens the ride details once the ride is not live', async () => {
+    mock.onGet('/notifications').reply(200, listBody([
+      row(249, { category: 'ride', type: 'ride_cancelled', data: { ride_id: 249, requeued: true }, read_at: 'x' }),
+    ]));
+    // No ride in progress in the store (the server read is covered in qaFollowUpsT581).
+    renderWith(<InboxScreen role="passenger" />);
+    await flush();
+    fireEvent.press(screen.getByTestId('notification-row-249'));
+    fireEvent.press(screen.getByTestId('notification-row-249'));
+    await flush();
+    expect(mockNavDispatch).toHaveBeenCalledTimes(1);
+    const action = mockNavDispatch.mock.calls[0][0] as { payload: { params: { screen: string; params?: object } } };
+    expect(action.payload.params).toEqual({ screen: 'RideDetails', params: { rideId: 249 }, initial: false });
+  });
+
   it('Mark all read posts read-all and clears the dots', async () => {
     mock.onGet('/notifications').reply(200, listBody([row(1), row(2)]));
     mock.onPost('/notifications/read-all').reply(200, { success: true, data: { unread_count: 0 } });

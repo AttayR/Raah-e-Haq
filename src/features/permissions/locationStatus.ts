@@ -20,6 +20,20 @@ const androidGranted = async (): Promise<boolean> =>
   (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION));
 
 /**
+ * T-581: the iOS authorization as RHPermissions reports it ("notDetermined", "denied",
+ * "restricted" or "granted"); null on Android, without the native module, or on a failure.
+ */
+export const iosLocationOsStatus = async (): Promise<string | null> => {
+  if (Platform.OS !== 'ios') return null;
+  try {
+    return await iosLocationStatus();
+  } catch (error) {
+    logUnknown(error);
+    return null;
+  }
+};
+
+/**
  * Whether the OS has not been asked for location yet (UI-R8 pre-prompt), without asking.
  * - iOS: RHPermissions reads the authorization.
  * - Android: not granted (fine or coarse). Android cannot tell "never asked" from "refused", so

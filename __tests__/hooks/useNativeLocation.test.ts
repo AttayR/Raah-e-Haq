@@ -4,7 +4,7 @@
  * now never alerts: the failure is returned as `error` for the screen to render inline, and
  * no lookup starts while the screen is not focused.
  */
-import { Alert, NativeModules } from 'react-native';
+import { Alert, AppState, NativeModules, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, renderHook } from '@testing-library/react-native';
 import Geolocation from '@react-native-community/geolocation';
@@ -189,6 +189,104 @@ describe('useNativeLocation pre-prompt (UI-R8)', () => {
     });
     expect(result.current.error).toBe('unavailable');
     expect(result.current.permissionStatus.canAskAgain).toBe(true);
+  });
+
+  describe('T-581: the iOS prompt outlasts the lookup (QA bug 4, iOS 26.5)', () => {
+    let appStateHandlers: Array<(state: AppStateStatus) => void>;
+    let removed: number;
+
+    beforeEach(() => {
+      appStateHandlers = [];
+      removed = 0;
+      jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
+        appStateHandlers.push(handler as (state: AppStateStatus) => void);
+        return { remove: () => { removed += 1; } } as ReturnType<typeof AppState.addEventListener>;
+      });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    /** Signed in after "Not now": the chip asks the OS; the lookup times out under the prompt. */
+    const tapTurnOn = async () => {
+      const hook = renderHook(() => useNativeLocation());
+      await settle();
+      act(() => permissionPrimer.answer('later'));
+      await settle();
+      answerWith((_ok, fail) => fail?.(failure(3)));
+      let request!: Promise<boolean>;
+      act(() => {
+        request = hook.result.current.requestLocationPermission();
+      });
+      await settle();
+      return { ...hook, request };
+    };
+
+    const closePrompt = async (answer: string) => {
+      native.RHPermissions = { locationStatus: jest.fn(() => Promise.resolve(answer)) };
+      act(() => appStateHandlers.forEach((handler) => handler('active')));
+      await settle();
+    };
+
+    it('"Don\'t Allow" after the timeout (status still undetermined) keeps the chip, now for Settings', async () => {
+      const { result, request } = await tapTurnOn();
+      // Before the old fix ran, the timeout left "unavailable" and the chip went away.
+      expect(result.current.error).not.toBe('unavailable');
+      await closePrompt('denied');
+      await expect(request).resolves.toBe(false);
+      expect(result.current.error).toBe('denied');
+      expect(result.current.permissionStatus.canAskAgain).toBe(false);
+      expect(removed).toBeGreaterThan(0);
+    });
+
+    it('"Allow" after the timeout looks once more and gets the position', async () => {
+      const { result, request } = await tapTurnOn();
+      answerWith((ok) => ok(position(31.52, 74.35)));
+      await closePrompt('granted');
+      await expect(request).resolves.toBe(true);
+      expect(result.current.currentLocation).toEqual({ latitude: 31.52, longitude: 74.35 });
+      expect(result.current.error).toBeNull();
+    });
+
+    it('"Allow" after the timeout with a failed second look: access shows as granted, the error is a retry', async () => {
+      const { result, request } = await tapTurnOn();
+      // The second look times out too.
+      await closePrompt('granted');
+      await expect(request).resolves.toBe(false);
+      expect(result.current.permissionStatus).toEqual({ isGranted: true, canAskAgain: false, isLocationEnabled: true });
+      expect(result.current.error).toBe('unavailable');
+    });
+
+    it('two overlapping taps: unmount ends both waits', async () => {
+      const { result, unmount, request } = await tapTurnOn();
+      let second!: Promise<boolean>;
+      act(() => {
+        second = result.current.requestLocationPermission();
+      });
+      await settle();
+      const before = removed;
+      unmount();
+      await expect(request).resolves.toBe(false);
+      await expect(second).resolves.toBe(false);
+      expect(removed - before).toBeGreaterThanOrEqual(2);
+    });
+
+    it('a prompt still unanswered keeps the chip, which asks again', async () => {
+      const { result, request } = await tapTurnOn();
+      await closePrompt('notDetermined');
+      await request;
+      expect(result.current.error).toBe('denied');
+      expect(result.current.permissionStatus.canAskAgain).toBe(true);
+    });
+
+    it('unmounting during the wait ends it and removes its listener', async () => {
+      const { unmount, request } = await tapTurnOn();
+      const before = removed;
+      unmount();
+      await expect(request).resolves.toBe(false);
+      expect(removed).toBeGreaterThan(before);
+    });
   });
 
   it('"Continue" goes on to the lookup (which shows the OS prompt)', async () => {

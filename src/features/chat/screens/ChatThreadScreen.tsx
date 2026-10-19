@@ -190,7 +190,7 @@ const ChatThreadScreen: React.FC = () => {
           ) : null
         }
         ListEmptyComponent={
-          // VirtualizedList already turns the empty state upright in an inverted list.
+          // VirtualizedList turns the empty state upright through its `style` prop (T-581).
           <ChatThreadEmptyNote
             text={canSend ? (viewerRole === 'driver' ? CHAT_COPY.threadEmptyDriver : CHAT_COPY.threadEmptyPassenger) : CHAT_COPY.noMessagesYet}
           />

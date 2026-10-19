@@ -40,7 +40,11 @@ export const logApiFailure = (context: string, error: unknown): void => {
     // A non-API error (a bug in our code) keeps its type so it can be found.
     cause: apiError === error || !(error instanceof Error) ? undefined : error.name,
   };
-  if (isExpected(apiError.kind, apiError.code)) {
+  if (apiError.account) {
+    // T-581: a 403 ACCOUNT_* (pending, suspended, rejected) is the account's state, shown on the
+    // account status screen; every call made meanwhile is refused the same way. Not a warning.
+    logger.debug(context, summary);
+  } else if (isExpected(apiError.kind, apiError.code)) {
     logger.warn(context, summary);
   } else {
     logger.error(context, summary);

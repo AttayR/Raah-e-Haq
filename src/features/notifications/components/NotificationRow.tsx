@@ -45,6 +45,14 @@ function NotificationRowBase({ item, onPress, onMarkRead, position = 'only' }: N
   const canMarkRead = unread && !!onMarkRead;
 
   const markRead = useCallback(() => onMarkRead?.(item), [onMarkRead, item]);
+  // T-581: a long press only marks read. Marking read re-renders the row as read, which used to
+  // drop `onLongPress` mid-press; Pressability then saw no long-press handler on release and ran
+  // onPress too, opening the target. The handler now stays for the row's whole life (a read row's
+  // long press does nothing), so the release after a long press never opens.
+  const onLongPress = useCallback(() => {
+    if (item.readAt === null) onMarkRead?.(item);
+  }, [onMarkRead, item]);
+  const handlePress = useCallback(() => onPress(item), [onPress, item]);
   const onAction = useCallback(
     (event: AccessibilityActionEvent) => {
       if (event.nativeEvent.actionName === 'markRead') markRead();
@@ -55,8 +63,8 @@ function NotificationRowBase({ item, onPress, onMarkRead, position = 'only' }: N
   return (
     <Pressable
       testID={`notification-row-${item.id}`}
-      onPress={() => onPress(item)}
-      onLongPress={canMarkRead ? markRead : undefined}
+      onPress={handlePress}
+      onLongPress={onMarkRead ? onLongPress : undefined}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityActions={canMarkRead ? [{ name: 'markRead', label: NOTIFICATIONS_COPY.markRead }] : undefined}

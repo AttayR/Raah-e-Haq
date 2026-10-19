@@ -63,6 +63,9 @@ export const routeForTarget = (
       return role === 'passenger'
         ? { screen: 'Booking', initial: false }
         : { screen: 'DriverRide', initial: false };
+    case 'rideDetails':
+      // Registered in both role stacks (ride-history/navigation.ts); Back returns to the list.
+      return { screen: 'RideDetails', params: { rideId: target.rideId }, initial: false };
     case 'rideHistory':
       // Passenger ride history is Activity › Rides; the driver's lives under Account.
       return role === 'passenger'

@@ -4,6 +4,7 @@ import { isApiError, toThunkRejection } from '../../core/api/errors';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { haptics } from '../../core/haptics';
 import { toast, type ToastOptions } from '../../core/toast';
+import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { t } from '../../i18n';
 import type { RideResource } from '../../services/rideService';
 import { useVehicleTypes } from '../ride-booking/hooks';
@@ -38,7 +39,11 @@ export const useParcelOptions = (enabled = true): RemoteData<ParcelOptions> =>
  * re-reads a catalogue older than a couple of minutes, so a tier just switched on shows soon.
  */
 export const useParcelAvailable = (focused = false): boolean => {
-  const catalogue = useVehicleTypes({ refreshWhen: focused });
+  // T-581 (QA bug 9): Home stays focused while the app sits in the background, so coming back to
+  // the foreground counts as a return too (the same recheck age, no extra burst): a tier switched
+  // off meanwhile drops "Send a parcel" without a relaunch.
+  const appActive = useAppIsActive();
+  const catalogue = useVehicleTypes({ refreshWhen: focused && appActive });
   return (catalogue.data ?? []).some(isParcelType);
 };
 

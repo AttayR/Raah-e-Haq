@@ -229,9 +229,14 @@ export interface ChatList {
   refresh: () => void;
 }
 
+/** T-581: while Messages is on screen the list is re-read this often (a ride ending moves its row). */
+export const CHAT_LIST_POLL_INTERVAL_MS = 15000;
+
 /**
- * Inbox › Messages (GET /chats). Loaded when the list becomes `visible` (focused), again on
- * every return to it and on pull-to-refresh; a stale answer never overwrites a newer one.
+ * Inbox › Messages (GET /chats). Loaded when the list becomes `visible` (focused, app in the
+ * foreground), again on every return to it and on pull-to-refresh; a stale answer never
+ * overwrites a newer one. T-581: while visible it is re-read every 15 s on the shared poll engine
+ * (one request at a time, back-off on failures), so a finished ride leaves "Current ride".
  */
 export const useChatList = (visible: boolean): ChatList => {
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -240,15 +245,22 @@ export const useChatList = (visible: boolean): ChatList => {
   const [refreshing, setRefreshing] = useState(false);
   const loadedOnce = useRef(false);
   const requestSeq = useRef(0);
+  const lastFetchedAt = useRef(0);
+  /** T-581: loads (first, return, pull) in flight; the poll never runs over one. */
+  const loadsInFlight = useRef(0);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'silent') => {
     const seq = ++requestSeq.current;
+    loadsInFlight.current += 1;
+    // The poll times its next read from this one.
+    lastFetchedAt.current = Date.now();
     if (mode === 'refresh') setRefreshing(true);
     if (mode === 'initial') setStatus('loading');
     try {
       const result = await chatApi.listChats();
       if (seq !== requestSeq.current) return;
       loadedOnce.current = true;
+      lastFetchedAt.current = Date.now();
       setChats(result);
       setStatus('ready');
       setErrorMessage(null);
@@ -260,17 +272,37 @@ export const useChatList = (visible: boolean): ChatList => {
         if (!loadedOnce.current) setStatus('error');
       }
     } finally {
+      loadsInFlight.current -= 1;
       if (seq === requestSeq.current) setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    if (visible) load(loadedOnce.current ? 'silent' : 'initial');
+    if (!visible) return;
+    // T-581: a return reads once here (load stamps lastFetchedAt), so the poll enabled in the
+    // same commit waits a full interval instead of reading at once too.
+    load(loadedOnce.current ? 'silent' : 'initial');
   }, [visible, load]);
 
   const refresh = useCallback(() => {
     load(loadedOnce.current ? 'refresh' : 'initial');
   }, [load]);
+
+  // A quiet re-read: a failure keeps the list on screen and backs the poll off (it throws).
+  const poll = useCallback(async (): Promise<PollOutcome> => {
+    // A load or pull is already reading: no second request, and its answer is not dropped.
+    if (loadsInFlight.current > 0) return 'continue';
+    const seq = ++requestSeq.current;
+    const result = await chatApi.listChats();
+    if (seq === requestSeq.current) {
+      lastFetchedAt.current = Date.now();
+      setChats(result);
+      setStatus('ready');
+      setErrorMessage(null);
+    }
+    return 'continue';
+  }, []);
+  usePolling({ enabled: visible && status === 'ready', intervalMs: CHAT_LIST_POLL_INTERVAL_MS, run: poll, lastFetchedAt });
 
   return { chats, status, errorMessage, refreshing, refresh };
 };

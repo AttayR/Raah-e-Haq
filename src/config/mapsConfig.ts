@@ -1,4 +1,5 @@
 import { env } from './env';
+import { DEFAULT_LOCATIONS } from '../utils/locationUtils';
 
 // Google Maps Configuration
 export const MAPS_CONFIG = {
@@ -6,9 +7,11 @@ export const MAPS_CONFIG = {
   API_KEY: env.MAPS_KEY,
   
   // Default map settings
+  // T-581: the service area (Lahore) while there is no position yet, the same city as
+  // getDefaultLocation(); it was Karachi.
   DEFAULT_REGION: {
-    latitude: 24.8607, // Karachi, Pakistan
-    longitude: 67.0011,
+    latitude: DEFAULT_LOCATIONS.lahore.latitude,
+    longitude: DEFAULT_LOCATIONS.lahore.longitude,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   },

@@ -530,7 +530,8 @@ class RideService {
       logger.debug('✅ Rides fetched successfully:', rides.length);
       return { ...pagination, data: rides };
     } catch (error) {
-      logger.error('❌ Failed to fetch rides:', error);
+      // T-581: a summary, never an empty line; a refused account (403 ACCOUNT_*) is not an error.
+      logApiFailure('Failed to fetch rides', error);
       throw error;
     }
   }
@@ -541,7 +542,7 @@ class RideService {
       logger.debug('🔍 Fetching ride:', rideId);
       return unwrap(await apiService.get<RideResource>(`${this.baseUrl}/${rideId}`));
     } catch (error) {
-      logger.error('❌ Failed to fetch ride:', error);
+      logApiFailure('Failed to fetch ride', error);
       throw error;
     }
   }

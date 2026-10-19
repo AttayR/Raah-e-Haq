@@ -13,6 +13,8 @@ export type NotificationTarget =
   | { kind: 'ride'; rideId: number | null }
   /** A finished or cancelled ride (passenger history). */
   | { kind: 'rideHistory' }
+  /** T-581: one ride's static details (a ride notification whose ride is no longer live). */
+  | { kind: 'rideDetails'; rideId: number }
   /** The driver's request feed (the Drive map, UI-R4). */
   | { kind: 'rideRequests' }
   /** The role's home tab. */
