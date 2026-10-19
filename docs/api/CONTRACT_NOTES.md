@@ -1010,3 +1010,12 @@ App follow-up:
 - Send `Accept-Language` on **every** request, authenticated or not (T-523 / T-575 already do this). Send it right after a language switch (any authenticated call does), so the next push arrives in the new language.
 - Show the server's `message` / `errors` / labels as they come; keep matching on `code` / `error.code` and `key`, never on message text.
 - Messages that already arrived (in-app notification rows) keep their language after a switch; that is expected.
+
+## BE-111: fee wording and parcel notification copy (2026-10-19)
+
+Text only; no field, type or enum changed. Notification `type`, `data` and push data are as before.
+
+- A fee the passenger pays reads **charged to your wallet**, never "added" (which read as a credit): the no-show `ride_cancelled` notification ("… A no-show fee of Rs 50 was charged to your wallet") and the passenger's late-cancel `POST /rides/{ride}/cancel` `message` ("Ride cancelled. A late cancellation fee of Rs 50 was charged to your wallet"). Roman Urdu: "… aap ke wallet se kaat li gayi". Real credits (admin credit, top-up, refund) keep their wording.
+- On a **parcel** ride (`vehicle_type` parcel) ride notifications use delivery words. Sender: titles Rider Assigned / Rider Arrived / Parcel Picked Up / Delivery Completed / Delivery Cancelled / Delivery Update; bodies "Your delivery has been accepted by :name", "Your rider is at the pickup", "Your rider cancelled this delivery", "Your rider cancelled. Your delivery is back in the queue for another rider", "Your rider waited at the pickup and cancelled. A no-show fee of :fee was charged to your wallet", "Your delivery was cancelled by Raah-e-Haq support". Driver: New Delivery Assigned / Delivery Completed / Delivery Cancelled / New Delivery Request; "The sender cancelled this delivery" (+ the time-compensation lines with "sender"), "This delivery was cancelled by Raah-e-Haq support". The BE-88 parcel lines (picked up, delivered, returning, returned, refused) are unchanged and still win. Every line has a Roman Urdu translation.
+
+App follow-up: none required (the app shows `title` / `body` as sent). Do not match on notification text.
