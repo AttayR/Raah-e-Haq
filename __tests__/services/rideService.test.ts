@@ -179,6 +179,24 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
     expect(mock.history.get[0].params).toEqual({ latitude: 31.5, longitude: 74.3, radius: 3, vehicle_type: 'bike' });
   });
 
+  it('T-586 (BE-116): reads tiers[] and the counts (top level, meta or inside data); absent stays null', async () => {
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, {
+      ...envelope([{ ...nearby, tiers: ['car', 'car_ac', 'jet'] }, nearby]),
+      counts: { by_tier: { car: 7, car_ac: '2', jet: 4 }, online_total: 12 },
+    });
+    const first = await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 });
+    expect(first.drivers[0].tiers).toEqual(['car', 'car_ac']);
+    expect(first.drivers[1]).not.toHaveProperty('tiers');
+    expect(first.counts).toEqual({ byTier: { car: 7, car_ac: 2 }, onlineTotal: 12 });
+
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, envelope({ drivers: [nearby], counts: { online_total: 3 } }));
+    const second = await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 });
+    expect(second).toEqual({ drivers: [nearby], counts: { byTier: {}, onlineTotal: 3 } });
+
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, envelope([nearby]));
+    expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).counts).toBeNull();
+  });
+
   it('clamps the radius to 1..10 km and defaults to 5', async () => {
     mock.onGet('/rides/nearby-drivers').reply(200, envelope([]));
     await rideService.getNearbyDrivers({ latitude: 1, longitude: 2, radiusKm: 50 });

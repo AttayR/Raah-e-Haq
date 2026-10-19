@@ -1,10 +1,12 @@
 /**
  * T-110 / BE-20: the passenger map polls GET /rides/nearby-drivers no faster than every 10 s,
- * waits for retry_after on 429, shows loading/error/empty, and stops on unmount.
+ * waits for retry_after on 429, shows loading/error/empty, and stops on unmount. T-586: a failed
+ * poll keeps the list (with its age and failure count), BE-116 counts come with it, and a map that
+ * gains focus starts from the last read.
  */
 import { AppState, AppStateStatus } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
-import rideService, { NearbyDriver } from '../../src/services/rideService';
+import rideService, { NearbyDriver, type NearbyDriversResult } from '../../src/services/rideService';
 import { ApiError } from '../../src/core/api/errors';
 import { __resetConnectivityForTests, connectivity } from '../../src/core/api/connectivity';
 import {
@@ -27,6 +29,7 @@ const driver: NearbyDriver = {
 };
 
 const lahore = { latitude: 31.5204, longitude: 74.3587 };
+const res = (drivers: NearbyDriver[], counts: NearbyDriversResult['counts'] = null): NearbyDriversResult => ({ drivers, counts });
 
 let spy: jest.SpyInstance;
 let appStateListeners: Array<(state: AppStateStatus) => void>;
@@ -49,7 +52,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   __resetNearbyDriversThrottleForTests();
   __resetConnectivityForTests();
-  spy = jest.spyOn(rideService, 'getNearbyDrivers');
+  spy = jest.spyOn(rideService, 'getNearbyDriversResult');
   appStateListeners = [];
   removeListener = jest.fn();
   (AppState as { currentState: AppStateStatus }).currentState = 'active';
@@ -66,14 +69,14 @@ afterEach(() => {
 
 describe('useNearbyDrivers', () => {
   it('loads, then polls every 15 s (T-582), and stops on unmount', async () => {
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     const { result, unmount } = renderHook(() => useNearbyDrivers(lahore));
     expect(result.current.status).toBe('idle');
 
     await advance(0);
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0]).toMatchObject({ latitude: 31.52, longitude: 74.359 });
-    expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+    expect(result.current).toMatchObject({ drivers: [driver], status: 'ready', error: null });
 
     await advance(NEARBY_POLL_MS - 1);
     expect(spy).toHaveBeenCalledTimes(1);
@@ -86,14 +89,14 @@ describe('useNearbyDrivers', () => {
   });
 
   it('reports an empty list as ready with no drivers', async () => {
-    spy.mockResolvedValue([]);
+    spy.mockResolvedValue(res([]));
     const { result } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
-    expect(result.current).toEqual({ drivers: [], status: 'ready', error: null });
+    expect(result.current).toMatchObject({ drivers: [], status: 'ready', error: null });
   });
 
   it('does not fetch without a centre or when disabled', async () => {
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     const { result, rerender } = renderHook(
       ({ center, enabled }: { center: typeof lahore | null; enabled: boolean }) => useNearbyDrivers(center, { enabled }),
       { initialProps: { center: null as typeof lahore | null, enabled: true } },
@@ -106,7 +109,7 @@ describe('useNearbyDrivers', () => {
   });
 
   it('keeps requests at least 10 s apart when the centre moves, and ignores GPS jitter', async () => {
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     const { rerender } = renderHook(({ center }: { center: typeof lahore }) => useNearbyDrivers(center), {
       initialProps: { center: lahore },
     });
@@ -130,14 +133,14 @@ describe('useNearbyDrivers', () => {
 
   it('waits for retry_after on 429 and keeps the last list', async () => {
     spy
-      .mockResolvedValueOnce([driver])
+      .mockResolvedValueOnce(res([driver]))
       .mockRejectedValueOnce(new ApiError({ kind: 'rate_limited', status: 429, message: 'Too many', retryAfter: 45 }))
-      .mockResolvedValue([]);
+      .mockResolvedValue(res([]));
     const { result } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
     await advance(NEARBY_POLL_MS);
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+    expect(result.current).toMatchObject({ drivers: [driver], status: 'ready', error: null });
 
     await advance(45_000 - 1);
     expect(spy).toHaveBeenCalledTimes(2);
@@ -149,7 +152,7 @@ describe('useNearbyDrivers', () => {
   it('shows an error state and retries a server error after a minute', async () => {
     spy
       .mockRejectedValueOnce(new ApiError({ kind: 'server', status: 500, message: 'Something went wrong on our side. Please try again.' }))
-      .mockResolvedValue([driver]);
+      .mockResolvedValue(res([driver]));
     const { result } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
     expect(result.current.status).toBe('error');
@@ -163,23 +166,23 @@ describe('useNearbyDrivers', () => {
   it('T-540: a network error retries after 15 s, not a minute, and clears on success', async () => {
     spy
       .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
-      .mockResolvedValue([driver]);
+      .mockResolvedValue(res([driver]));
     const { result } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
-    expect(result.current).toEqual({
+    expect(result.current).toMatchObject({
       drivers: [],
       status: 'error',
       error: 'Network error. Please check your connection.',
     });
     await advance(NEARBY_NETWORK_RETRY_MS);
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+    expect(result.current).toMatchObject({ drivers: [driver], status: 'ready', error: null });
   });
 
   it('T-540: asks again as soon as the connection is back (after the 10 s floor)', async () => {
     spy
       .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
-      .mockResolvedValue([driver]);
+      .mockResolvedValue(res([driver]));
     const { result } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
     expect(result.current.status).toBe('error');
@@ -199,7 +202,7 @@ describe('useNearbyDrivers', () => {
     let signal: AbortSignal | undefined;
     spy.mockImplementation((_query, s?: AbortSignal) => {
       signal = s;
-      return new Promise<NearbyDriver[]>(() => undefined);
+      return new Promise<NearbyDriversResult>(() => undefined);
     });
     const { unmount } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
@@ -212,9 +215,9 @@ describe('useNearbyDrivers', () => {
     let signal: AbortSignal | undefined;
     spy.mockImplementationOnce((_query, s?: AbortSignal) => {
       signal = s;
-      return new Promise<NearbyDriver[]>(() => undefined);
+      return new Promise<NearbyDriversResult>(() => undefined);
     });
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     const { result, unmount } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
     expect(spy).toHaveBeenCalledTimes(1);
@@ -237,14 +240,14 @@ describe('useNearbyDrivers', () => {
 
   it('does not start while the app is in the background', async () => {
     (AppState as { currentState: AppStateStatus }).currentState = 'background';
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     renderHook(() => useNearbyDrivers(lahore));
     await advance(NEARBY_POLL_MS);
     expect(spy).not.toHaveBeenCalled();
   });
 
   it('keeps the 10 s floor across remounts', async () => {
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     const first = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
     first.unmount();
@@ -265,7 +268,7 @@ describe('useNearbyDrivers', () => {
   });
 
   it('T-311: a new refreshKey (ride ended) asks again now, not at the next poll tick', async () => {
-    spy.mockResolvedValueOnce([]).mockResolvedValue([driver]);
+    spy.mockResolvedValueOnce(res([])).mockResolvedValue(res([driver]));
     const { result, rerender } = renderHook(
       ({ refreshKey }: { refreshKey: string }) => useNearbyDrivers(lahore, { refreshKey }),
       { initialProps: { refreshKey: '7:active' } },
@@ -279,24 +282,24 @@ describe('useNearbyDrivers', () => {
     rerender({ refreshKey: '7:ended' });
     await advance(0);
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(result.current).toEqual({ drivers: [driver], status: 'ready', error: null });
+    expect(result.current).toMatchObject({ drivers: [driver], status: 'ready', error: null });
   });
 
   it('T-582: a driver who went offline leaves the count within one 15 s poll', async () => {
-    spy.mockResolvedValueOnce([driver]).mockResolvedValue([]);
+    spy.mockResolvedValueOnce(res([driver])).mockResolvedValue(res([]));
     const { result } = renderHook(() => useNearbyDrivers(lahore));
     await advance(0);
     expect(result.current.drivers).toHaveLength(1);
     expect(NEARBY_POLL_MS).toBe(15_000);
     await advance(NEARBY_POLL_MS);
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(result.current).toEqual({ drivers: [], status: 'ready', error: null });
+    expect(result.current).toMatchObject({ drivers: [], status: 'ready', error: null });
     // Still no burst: never closer than the 10 s floor.
     expect(NEARBY_POLL_MS).toBeGreaterThanOrEqual(NEARBY_MIN_GAP_MS);
   });
 
   it('T-311: a refreshKey change still keeps the 10 s floor', async () => {
-    spy.mockResolvedValue([driver]);
+    spy.mockResolvedValue(res([driver]));
     const { rerender } = renderHook(
       ({ refreshKey }: { refreshKey: string }) => useNearbyDrivers(lahore, { refreshKey }),
       { initialProps: { refreshKey: 'a' } },
@@ -307,5 +310,60 @@ describe('useNearbyDrivers', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     await advance(1);
     expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('T-586: a failed poll keeps the shown list, counts the failures and says when it was read', async () => {
+    spy
+      .mockResolvedValueOnce(res([driver]))
+      .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
+      .mockRejectedValueOnce(new ApiError({ kind: 'network', message: 'Network error. Please check your connection.' }))
+      .mockResolvedValue(res([]));
+    const { result } = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    const readAt = result.current.freshAt;
+    expect(readAt).toEqual(expect.any(Number));
+    await advance(NEARBY_POLL_MS);
+    expect(result.current).toMatchObject({ drivers: [driver], status: 'ready', failures: 1, freshAt: readAt });
+    await advance(NEARBY_NETWORK_RETRY_MS);
+    expect(result.current).toMatchObject({ drivers: [driver], status: 'ready', failures: 2 });
+    await advance(NEARBY_NETWORK_RETRY_MS);
+    expect(result.current).toMatchObject({ drivers: [], status: 'ready', failures: 0, error: null });
+  });
+
+  it('T-586: passes the BE-116 counts through', async () => {
+    spy.mockResolvedValue(res([driver], { byTier: { car: 7 }, onlineTotal: 12 }));
+    const { result } = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    expect(result.current.counts).toEqual({ byTier: { car: 7 }, onlineTotal: 12 });
+  });
+
+  it('T-586 (vi): a map that gains focus shows the last read at once; its own read waits only for the 10 s floor', async () => {
+    spy.mockResolvedValue(res([driver]));
+    const booking = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    booking.unmount();
+    // Home focuses 3 s later, about the same centre: the last list shows immediately.
+    await advance(3_000);
+    const home = renderHook(() => useNearbyDrivers({ latitude: lahore.latitude + 0.002, longitude: lahore.longitude }));
+    await advance(0);
+    expect(home.result.current).toMatchObject({ drivers: [driver], status: 'ready' });
+    expect(spy).toHaveBeenCalledTimes(1);
+    await advance(NEARBY_MIN_GAP_MS - 3_000);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('T-586: retry() asks again, still no sooner than the 10 s floor', async () => {
+    spy.mockRejectedValueOnce(new ApiError({ kind: 'server', status: 500, message: 'Oops' })).mockResolvedValue(res([driver]));
+    const { result } = renderHook(() => useNearbyDrivers(lahore));
+    await advance(0);
+    expect(result.current.status).toBe('error');
+    await act(async () => {
+      result.current.retry();
+    });
+    await advance(NEARBY_MIN_GAP_MS - 1);
+    expect(spy).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('ready');
   });
 });

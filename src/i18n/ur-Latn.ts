@@ -1157,4 +1157,26 @@ export const urLatn: TranslationTable = {
     mapTitle: 'Map mein masla',
     mapBody: 'Map load karne mein masla hua. Dobara koshish karein.',
   },
+  nearbyMap: {
+    homeOnline: '{n} drivers aap ke qareeb online hain',
+    homeOnlineOne: '1 driver aap ke qareeb online hai',
+    homeNone: 'Abhi aap ke qareeb koi driver online nahi',
+    homeLoading: 'Qareeb drivers dhoond rahe hain…',
+    tierNearby: '{n} {tiers} qareeb',
+    tierNearbyOne: '1 {tier} qareeb',
+    // {noun}: the tier's `none` noun (Roman Urdu singular: "koi gaari").
+    tierNone: 'Abhi qareeb koi {noun} nahi',
+    tierLoading: 'Qareeb {tiers} dhoond rahe hain…',
+    onlinePart: '{n} online',
+    failed: 'Qareeb drivers load nahi ho sake',
+    retryHint: 'Dobara koshish ke liye double tap karein',
+    tiers: {
+      car: { one: 'gaari', other: 'gaariyan', none: 'gaari' },
+      car_ac: { one: 'AC gaari', other: 'AC gaariyan', none: 'AC gaari' },
+      bike: { one: 'bike', other: 'bikes', none: 'bike' },
+      rickshaw: { one: 'rickshaw', other: 'rickshaw', none: 'rickshaw' },
+      van: { one: 'van', other: 'vans', none: 'van' },
+      parcel: { one: 'parcel rider', other: 'parcel riders', none: 'parcel rider' },
+    },
+  },
 };

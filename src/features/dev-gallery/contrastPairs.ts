@@ -81,6 +81,18 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   fgOn('stopPin', 'surface', 'nonText'),
   fgOn('driverMarker', 'surface', 'nonText'),
   fgOn('userLocation', 'surface', 'nonText'),
+  // T-586 vehicle art (map-vehicles.md §1.3): the body and outline carry the 3:1; trims are decorative.
+  fgOn('vehicleBody', 'surface', 'nonText'),
+  fgOn('vehicleRoof', 'vehicleBody', 'decorative'),
+  fgOn('vehicleGlass', 'vehicleBody', 'nonText'),
+  fgOn('vehicleTyre', 'vehicleCasing', 'nonText'),
+  fgOn('vehicleCasing', 'vehicleBody', 'nonText'),
+  fgOn('vehicleHeadlight', 'vehicleBody', 'decorative'),
+  fgOn('vehicleTaillight', 'vehicleBody', 'decorative'),
+  fgOn('vehicleShadow', 'surface', 'decorative'),
+  bgUnder('vehicleAcBadge', 'vehicleAcGlyph', 'nonText'),
+  fgOn('vehicleAcGlyph', 'vehicleAcBadge', 'nonText'),
+  fgOn('vehicleHalo', 'surface', 'decorative'),
 ];
 
 /** Minimum ratio for a kind, or null when the pair has no threshold. */

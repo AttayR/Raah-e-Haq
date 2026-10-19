@@ -156,10 +156,34 @@ export const componentTokens = {
     /** §5.21 car marker: 40 badge, 2pt ring; nearby (muted) drivers at 60%. */
     carMarker: { size: 40, glyph: 24, ring: 2, mutedOpacity: 0.6 },
     /**
-     * [T-517] Top-down vehicle marker (§5.21): a 40pt north-up PNG (src/assets/vehicles, made by
-     * scripts/generate-vehicle-markers.js) rotated to the heading; nearby drivers at 60%.
+     * [T-586] Top-down vehicle marker (map-vehicles.md §1.2, §1.6): react-native-svg art on a 56-unit
+     * viewBox (48-unit drawing grid + 4 margin), pivot at the centre. Nearby vehicles 40pt at full
+     * opacity (stale 0.5); the assigned vehicle 48pt inside a 64pt view with a 56pt halo.
+     * Shadow and halo opacities per map style.
      */
-    vehicleMarker: { size: 40, mutedOpacity: 0.6 },
+    vehicleMarker: {
+      viewBox: 56,
+      gridInset: 4,
+      nearbySize: 40,
+      assignedSize: 48,
+      haloSize: 56,
+      assignedViewSize: 64,
+      nearbyOpacity: 1,
+      staleOpacity: 0.5,
+      /** Appear: scale 0.85 → 1 (§2.5). */
+      appearScaleFrom: 0.85,
+      haloRingWidth: 1,
+      shadowOuterWidth: 7,
+      shadowInnerWidth: 5,
+      casingWidth: 4,
+      shadowOuterOpacity: { light: 0.08, dark: 0.24 },
+      shadowInnerOpacity: { light: 0.16, dark: 0.4 },
+      haloFillOpacity: { light: 0.14, dark: 0.2 },
+      haloRingOpacity: { light: 0.32, dark: 0.45 },
+      zIndex: { nearby: 0, assigned: 4 },
+    },
+    /** [T-586] map count chip (map-vehicles.md §4): 32 min pill, 8 dot, 16 spinner. */
+    nearbyChip: { minHeight: 32, dot: 8, spinner: 16, paddingHorizontal: space[3], gap: space[2] },
     /** §6.5 searching pulse: rings start at the pickup pin size; 2pt progress bar. */
     // [UI-R10] reduced motion: the bar is a static `primary` segment 30 % wide at the start.
     pulse: { ring: 20, progressHeight: 2, progressBandRatio: 0.35, reducedBandRatio: 0.3 },

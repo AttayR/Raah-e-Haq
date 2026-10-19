@@ -9,7 +9,7 @@ import { useDirections } from '../../hooks/useDirections';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { cancelAllRequests } from '../../services/api';
-import { NearbyDriversStatus } from '../../components/passenger/NearbyDrivers';
+import { NearbyCountChip, useNearbyFreshness } from '../../features/nearby-vehicles';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import { logger } from '../../core/logging/logger';
 import { useDispatch, useSelector } from 'react-redux';
@@ -136,6 +136,7 @@ const PassengerMapScreen = () => {
     enabled: isFocused && (shownStage !== 'requesting' || rideEnded),
     refreshKey: currentRide ? `${currentRide.id}:${rideEnded ? 'ended' : 'active'}` : 'none',
   });
+  const nearbyFreshness = useNearbyFreshness(nearbyDrivers);
   // Driver on the way (T-311/T-312): keep the driver and the pickup in view (T-549: on the trip the
   // car and the drop-off), until the passenger pans (T-549: the recentre button resumes it).
   // Ride cleared (T-313): recentre on the pickup, else the passenger, above the sheet (T-314).
@@ -303,6 +304,8 @@ const PassengerMapScreen = () => {
       ? windowHeight <= SHORT_WINDOW_HEIGHT ? SHORT_SHEET_RATIO : SHEET_RATIO
       : undefined;
   const choosing = !rideShown && shownStage === 'vehicle';
+  // T-586 §3: Choose ride shows (and counts) only the vehicles that can serve the selected tier.
+  const nearbyTier = choosing ? flow.selectedVehicle ?? null : null;
   const footer = bookingFooter({
     ride: currentRide,
     rideStage: rideStage?.stage,
@@ -344,6 +347,8 @@ const PassengerMapScreen = () => {
           route={mapRoutes.route}
           driverRoute={mapRoutes.driverRoute}
           nearbyDrivers={rideShown ? null : nearbyDrivers.drivers}
+          nearbyTier={nearbyTier}
+          nearbyFreshness={nearbyFreshness}
           driverLocation={driverLocation}
           vehicleType={currentRide?.vehicle_type}
           stage={rideStage?.stage}
@@ -357,6 +362,7 @@ const PassengerMapScreen = () => {
           followRide={{ visible: rideCamera.paused, onPress: rideCamera.recentre }}
         />
         {choosing && tripSummary && !compact ? <RouteSummaryPill summary={tripSummary} onPress={editTrip} /> : null}
+        {!rideShown && !compact ? <NearbyCountChip state={nearbyDrivers} freshness={nearbyFreshness} tier={nearbyTier} sheetHeight={sheetHeightValue} /> : null}
 
         <BookingSheet
           onHeightChange={setSheetHeight}
@@ -366,8 +372,6 @@ const PassengerMapScreen = () => {
         >
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
           {locationGate.refused && !rideShown && !compact && <LocationOffBanner onTurnOn={locationGate.askOrSettings} />}
-          {/* UI-R10: on the search steps only; the choose-ride sheet starts with its title. */}
-          {!rideShown && isSearchStage(shownStage) && !compact && <NearbyDriversStatus state={nearbyDrivers} />}
           {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
           <BookingStageContent
             flow={flow}

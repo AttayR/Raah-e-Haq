@@ -1,19 +1,16 @@
 /**
- * T-517: VehicleMarker picks the top-down art by vehicle type and map style, sits flat and
- * rotates to the heading, drives smoothly between updates (along the route when on it), and
- * jumps with Reduce Motion. CarMarker stays an alias.
+ * T-517 / T-586: VehicleMarker (the assigned vehicle) draws the react-native-svg art for the
+ * vehicle type on its halo, sits flat and rotates to the heading, drives smoothly between updates
+ * (along the route when on it), and jumps with Reduce Motion. CarMarker stays an alias. Nearby
+ * vehicles have their own layer (`__tests__/features/nearbyVehicles`).
  */
 import React from 'react';
-import { AccessibilityInfo, StyleSheet } from 'react-native';
+import { AccessibilityInfo } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 import { DarkTheme, LightTheme, type AppTheme } from '../../../src/theme';
 import { VehicleMarker, VehicleMarkerGlyph } from '../../../src/components/ui/VehicleMarker';
 import { CarMarker } from '../../../src/components/ui/CarMarker';
-import {
-  VEHICLE_MARKER_KINDS,
-  vehicleMarkerKind,
-  vehicleMarkerSource,
-} from '../../../src/components/ui/ride/vehicleAssets';
+import { vehicleMarkerKind } from '../../../src/components/ui/ride/vehicleGlyphs';
 import { distanceMeters } from '../../../src/components/ui/ride/vehicleMotion';
 
 let mockTheme: AppTheme = LightTheme;
@@ -54,31 +51,27 @@ afterEach(() => {
 });
 
 describe('vehicle art', () => {
-  it('maps backend vehicle types to art; van, unknown and missing draw the car', () => {
+  it('maps backend vehicle types to glyphs; unknown and missing draw the car (§1.1)', () => {
     expect(vehicleMarkerKind('bike')).toBe('bike');
+    expect(vehicleMarkerKind('parcel')).toBe('bikeParcel');
     expect(vehicleMarkerKind('rickshaw')).toBe('rickshaw');
     expect(vehicleMarkerKind(' Rickshaw ')).toBe('rickshaw');
     expect(vehicleMarkerKind('car')).toBe('car');
-    expect(vehicleMarkerKind('van')).toBe('car');
+    expect(vehicleMarkerKind('car_ac')).toBe('carAc');
+    expect(vehicleMarkerKind('van')).toBe('van');
     expect(vehicleMarkerKind('helicopter')).toBe('car');
     expect(vehicleMarkerKind(null)).toBe('car');
     expect(vehicleMarkerKind(undefined)).toBe('car');
   });
 
-  it('has a distinct light and dark image per kind', () => {
-    const sources = VEHICLE_MARKER_KINDS.flatMap(kind => [vehicleMarkerSource(kind, 'light'), vehicleMarkerSource(kind, 'dark')]);
-    sources.forEach(source => expect(source).toBeTruthy());
-    expect(new Set(sources.map(s => JSON.stringify(s))).size).toBe(sources.length);
-  });
-
-  it('the glyph shows the image for the type and the theme, 40pt, 60% when muted', () => {
+  it('the glyph is 40pt nearby and a 64pt halo view when assigned (§1.2, §1.6)', () => {
     const { rerender } = render(<VehicleMarkerGlyph vehicleType="bike" testID="g" />);
-    expect(screen.getByTestId('g').props.source).toEqual(vehicleMarkerSource('bike', 'light'));
-    expect(StyleSheet.flatten(screen.getByTestId('g').props.style)).toMatchObject({ width: 40, height: 40 });
+    expect(screen.getByTestId('g').props).toMatchObject({ width: 40, height: 40 });
+    expect(screen.queryByTestId('g-halo')).toBeNull();
     mockTheme = DarkTheme;
-    rerender(<VehicleMarkerGlyph vehicleType="rickshaw" muted testID="g" />);
-    expect(screen.getByTestId('g').props.source).toEqual(vehicleMarkerSource('rickshaw', 'dark'));
-    expect(StyleSheet.flatten(screen.getByTestId('g').props.style)).toMatchObject({ opacity: 0.6 });
+    rerender(<VehicleMarkerGlyph vehicleType="rickshaw" assigned testID="g" />);
+    expect(screen.getByTestId('g').props).toMatchObject({ width: 64, height: 64 });
+    expect(screen.getByTestId('g-halo')).toBeTruthy();
   });
 });
 
@@ -86,8 +79,10 @@ describe('VehicleMarker', () => {
   it('is flat, centred, rotated to the server heading, and carries the booked type', async () => {
     render(<VehicleMarker testID="vm" coordinate={at(0)} heading={135} vehicleType="rickshaw" title="Your driver" />);
     await flush();
-    expect(markerProps()).toMatchObject({ flat: true, rotation: 135, anchor: { x: 0.5, y: 0.5 }, title: 'Your driver' });
-    expect(screen.getByTestId('vm-glyph').props.source).toEqual(vehicleMarkerSource('rickshaw', 'light'));
+    expect(markerProps()).toMatchObject({ flat: true, rotation: 135, anchor: { x: 0.5, y: 0.5 }, title: 'Your driver', zIndex: 4 });
+    // The assigned look: 64pt view with the halo (§1.6).
+    expect(screen.getByTestId('vm-glyph').props).toMatchObject({ width: 64, height: 64 });
+    expect(screen.getByTestId('vm-glyph-halo')).toBeTruthy();
   });
 
   it('CarMarker is an alias of VehicleMarker', () => {
@@ -165,28 +160,6 @@ describe('VehicleMarker', () => {
     rerender(<VehicleMarker testID="vm" coordinate={at(0, 100)} />);
     expect(distanceMeters(markerProps().coordinate, at(0, 100))).toBeLessThan(0.01);
     expect(markerProps().rotation).toBeCloseTo(90, 0);
-  });
-
-  it('nearby (muted) drivers are not animated and sit below the assigned one', async () => {
-    const { rerender } = render(<VehicleMarker testID="vm" coordinate={at(0)} muted vehicleType="bike" />);
-    await flush();
-    expect(screen.getByTestId('vm').props.zIndex).toBe(0);
-    rerender(<VehicleMarker testID="vm" coordinate={at(0, 100)} muted vehicleType="bike" />);
-    expect(distanceMeters(markerProps().coordinate, at(0, 100))).toBeLessThan(0.01);
-  });
-
-  it('nearby drivers turn to the BE-76 heading; a null heading keeps the last rotation, never a grid hop bearing (T-524)', async () => {
-    const { rerender } = render(<VehicleMarker testID="vm" coordinate={at(0)} heading={null} muted />);
-    await flush();
-    expect(markerProps().rotation).toBe(0);
-    // A 550 m grid hop east with no heading: still facing north (not 90).
-    rerender(<VehicleMarker testID="vm" coordinate={at(0, 400)} heading={null} muted />);
-    expect(markerProps().rotation).toBe(0);
-    rerender(<VehicleMarker testID="vm" coordinate={at(0, 400)} heading={225} muted />);
-    expect(markerProps().rotation).toBe(225);
-    // Standing (heading null again) and another hop: keeps 225.
-    rerender(<VehicleMarker testID="vm" coordinate={at(400, 400)} heading={null} muted />);
-    expect(markerProps().rotation).toBe(225);
   });
 
   it('stops its animation frame on unmount', async () => {

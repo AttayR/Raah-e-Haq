@@ -1,6 +1,6 @@
 import apiService, { createCancellableRequest, removeRequest } from './api';
 import { isApiError, unwrap } from '../core/api/errors';
-import type { Pagination } from '../core/api/types';
+import type { ApiResponse, Pagination } from '../core/api/types';
 import { logger } from '../core/logging/logger';
 import { logApiFailure } from '../core/api/logApiFailure';
 
@@ -369,6 +369,24 @@ export interface NearbyDriver {
    * no heading, or the ping is stale. Null keeps the marker's last rotation (T-524).
    */
   heading: number | null;
+  /**
+   * BE-116 (T-586): the ride tiers this driver can serve (an AC-approved car serves `car` and
+   * `car_ac`; an opted-in bike `bike` and `parcel`). Absent on older servers: the map then
+   * falls back to `vehicle_type`.
+   */
+  tiers?: VehicleTypeKey[];
+}
+
+/** BE-116 (T-586): server counts within the query radius (never the number of markers drawn). */
+export interface NearbyCounts {
+  byTier: Partial<Record<VehicleTypeKey, number>>;
+  onlineTotal: number | null;
+}
+
+/** GET /rides/nearby-drivers: the list, plus the BE-116 counts when the server sends them. */
+export interface NearbyDriversResult {
+  drivers: NearbyDriver[];
+  counts: NearbyCounts | null;
 }
 
 export interface NearbyDriversQuery {
@@ -421,7 +439,44 @@ const normalizeNearbyDriver = (raw: unknown): NearbyDriver | null => {
     estimated_arrival_min: toNumber(item.estimated_arrival_min) ?? 0,
     location: { latitude, longitude },
     heading: nearbyHeading(item.heading),
+    ...(Array.isArray(item.tiers) ? { tiers: item.tiers.filter(isVehicleTypeKey) } : null),
   };
+};
+
+/**
+ * BE-116 `counts: {by_tier: {<tier>: n}, online_total: n}`, at the top of the body, in `meta`, or
+ * inside `data` when `data` is an object; null when absent or malformed (older backend).
+ */
+const normalizeNearbyCounts = (raw: unknown): NearbyCounts | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const item = raw as Record<string, unknown>;
+  const byTierRaw = item.by_tier && typeof item.by_tier === 'object' ? (item.by_tier as Record<string, unknown>) : null;
+  const onlineTotal = toNumber(item.online_total);
+  if (!byTierRaw && onlineTotal === null) return null;
+  const byTier: Partial<Record<VehicleTypeKey, number>> = {};
+  if (byTierRaw) {
+    for (const [key, value] of Object.entries(byTierRaw)) {
+      const n = toNumber(value);
+      if (isVehicleTypeKey(key) && n !== null && n >= 0) byTier[key] = Math.floor(n);
+    }
+  }
+  return { byTier, onlineTotal: onlineTotal !== null && onlineTotal >= 0 ? Math.floor(onlineTotal) : null };
+};
+
+/** Splits a nearby-drivers body into the list and the counts (see normalizeNearbyCounts). */
+const normalizeNearbyResult = (body: ApiResponse<unknown>): NearbyDriversResult => {
+  const data = unwrap(body);
+  const envelope: Record<string, unknown> = { ...body };
+  const meta = envelope.meta && typeof envelope.meta === 'object' ? (envelope.meta as Record<string, unknown>) : null;
+  let list: unknown = data;
+  let counts = normalizeNearbyCounts(envelope.counts) ?? normalizeNearbyCounts(meta?.counts);
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const inner = data as Record<string, unknown>;
+    list = inner.drivers;
+    counts = counts ?? normalizeNearbyCounts(inner.counts);
+  }
+  const drivers = Array.isArray(list) ? list.map(normalizeNearbyDriver).filter((d): d is NearbyDriver => d !== null) : [];
+  return { drivers, counts };
 };
 
 /** BE-76 heading as 0..360, or null (missing, not a number, negative). */
@@ -661,6 +716,14 @@ class RideService {
    * rejects with ApiError kind 'rate_limited' and `retryAfter` (seconds).
    */
   async getNearbyDrivers(query: NearbyDriversQuery, signal?: AbortSignal): Promise<NearbyDriver[]> {
+    return (await this.getNearbyDriversResult(query, signal)).drivers;
+  }
+
+  /**
+   * GET /rides/nearby-drivers with the BE-116 counts (T-586): `counts` is null until the server
+   * sends them. Same limits as getNearbyDrivers.
+   */
+  async getNearbyDriversResult(query: NearbyDriversQuery, signal?: AbortSignal): Promise<NearbyDriversResult> {
     try {
       const params: Record<string, string | number> = {
         latitude: query.latitude,
@@ -670,11 +733,7 @@ class RideService {
       if (query.vehicleType) {
         params.vehicle_type = query.vehicleType;
       }
-      const drivers = unwrap(await apiService.get<unknown>(`${this.baseUrl}/nearby-drivers`, { params, signal }));
-      if (!Array.isArray(drivers)) {
-        return [];
-      }
-      return drivers.map(normalizeNearbyDriver).filter((d): d is NearbyDriver => d !== null);
+      return normalizeNearbyResult(await apiService.get<unknown>(`${this.baseUrl}/nearby-drivers`, { params, signal }));
     } catch (error) {
       logApiFailure('Failed to load nearby drivers', error);
       throw error;

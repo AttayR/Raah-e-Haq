@@ -86,6 +86,18 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   stopPin: ['#4C556C', '#B7BFD0'],
   driverMarker: ['#0F1422', '#F2F4F9'],
   userLocation: ['#1D58C4', '#7FA8F5'],
+  // T-586 map-vehicles.md §1.3.
+  vehicleBody: ['#011C72', '#F2F4F9'],
+  vehicleRoof: ['#2E4FBF', '#C9D5F7'],
+  vehicleGlass: ['#C9D5F7', '#1A3496'],
+  vehicleTyre: ['#20273A', '#626E90'],
+  vehicleCasing: ['#FFFFFF', '#0B0F1A'],
+  vehicleHeadlight: ['#F59A23', '#F59A23'],
+  vehicleTaillight: ['#C0262D', '#FF7A7F'],
+  vehicleShadow: ['#000000', '#000000'],
+  vehicleAcBadge: ['#FFFFFF', '#011C72'],
+  vehicleAcGlyph: ['#011C72', '#FFFFFF'],
+  vehicleHalo: ['#011C72', '#6A86DE'],
 };
 
 describe('palette (§1.1, §1.2)', () => {
@@ -172,6 +184,20 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
     expect(contrast(darkColors.pickupPin, '#1D2230')).toBeCloseTo(8.01, 1);
     expect(contrast(lightColors.routeLine, '#F2F2F2')).toBeCloseTo(13.3, 1);
     expect(contrast(darkColors.routeLine, '#1D2230')).toBeCloseTo(6.71, 1);
+  });
+
+  it('T-586: vehicle bodies and casings stand out on both map styles (§1.3, WCAG 1.4.11 ≥ 3:1)', () => {
+    // Light map land ≈ #F4F4F4, dark map ≈ #1D2438 (map-vehicles.md §1.3).
+    expect(contrast(lightColors.vehicleBody, '#F4F4F4')).toBeGreaterThan(13);
+    expect(contrast(darkColors.vehicleBody, '#1D2438')).toBeGreaterThan(13);
+    // The casing outline is the silhouette's boundary: against the body it must read too.
+    expect(contrast(lightColors.vehicleCasing, lightColors.vehicleBody)).toBeGreaterThanOrEqual(3);
+    expect(contrast(darkColors.vehicleCasing, darkColors.vehicleBody)).toBeGreaterThanOrEqual(3);
+    // Roof on body is a visible depth step, not text.
+    expect(contrast(lightColors.vehicleRoof, lightColors.vehicleBody)).toBeGreaterThan(2);
+    // The AC snowflake on its badge is an icon (≥ 3:1).
+    expect(contrast(lightColors.vehicleAcGlyph, lightColors.vehicleAcBadge)).toBeGreaterThanOrEqual(3);
+    expect(contrast(darkColors.vehicleAcGlyph, darkColors.vehicleAcBadge)).toBeGreaterThanOrEqual(3);
   });
 
   it('former accent consumers (now primaryText) and the legacy disabled label meet AA', () => {

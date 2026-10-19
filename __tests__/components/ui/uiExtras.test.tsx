@@ -10,7 +10,6 @@ import { Chip } from '../../../src/components/ui/Chip';
 import { SectionHeader } from '../../../src/components/ui/SectionHeader';
 import { CarMarker, CarMarkerGlyph } from '../../../src/components/ui/CarMarker';
 import { Icon } from '../../../src/components/ui/Icon';
-import { vehicleMarkerSource } from '../../../src/components/ui/ride/vehicleAssets';
 
 let mockTheme: AppTheme = LightTheme;
 jest.mock('../../../src/app/providers/ThemeProvider', () => ({
@@ -59,12 +58,12 @@ describe.each([
     expect(queryByRole('button')).toBeNull();
   });
 
-  it('car marker (T-517 alias): the top-down car art for the theme, 40pt, centred flat marker, muted variant', () => {
-    const { getByTestId, rerender } = render(<CarMarkerGlyph testID="car" />);
-    expect(getByTestId('car').props.source).toEqual(vehicleMarkerSource('car', theme.mode));
-    expect(flat(getByTestId('car').props.style)).toMatchObject({ width: 40, height: 40 });
-    rerender(<CarMarkerGlyph testID="car" muted />);
-    expect(flat(getByTestId('car').props.style)).toMatchObject({ opacity: 0.6 });
+  it('car marker (T-517 alias): the top-down svg car, 40pt nearby glyph, assigned halo, centred flat marker', () => {
+    const { getByTestId, queryByTestId, rerender } = render(<CarMarkerGlyph testID="car" />);
+    expect(getByTestId('car').props).toMatchObject({ width: 40, height: 40 });
+    expect(queryByTestId('car-halo')).toBeNull();
+    rerender(<CarMarkerGlyph testID="car" assigned />);
+    expect(getByTestId('car-halo')).toBeTruthy();
     const marker = render(<CarMarker testID="marker" coordinate={{ latitude: 31.5, longitude: 74.3 }} title="Available Driver" />);
     expect(marker.getByTestId('marker').props).toMatchObject({ anchor: { x: 0.5, y: 0.5 }, flat: true });
   });

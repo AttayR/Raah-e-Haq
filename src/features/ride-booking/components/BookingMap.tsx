@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import type { Details, LatLng, MapPressEvent, MapStyleElement, Region } from 'react-native-maps';
 import SafeMapView, { type SafeMapViewRef } from '../../../components/SafeMapView';
 import MapErrorBoundary from '../../../components/MapErrorBoundary';
-import { NearbyDriverMarkers } from '../../../components/passenger/NearbyDrivers';
+import { NearbyVehicleMarkers, type NearbyFreshness } from '../../nearby-vehicles';
 import type { DriverLocation, NearbyDriver } from '../../../services/rideService';
 import { AssignedDriverMarker } from '../../active-ride/components/ActiveRidePanel';
 import type { PassengerRideStage } from '../../active-ride/stage';
@@ -29,8 +29,11 @@ type Props = {
   route: LatLng[];
   /** T-549: the route the driver's marker follows on the trip (the whole route, not the part left). */
   driverRoute: LatLng[];
-  /** Nearby drivers until a ride is booked; null hides them. */
+  /** Nearby drivers until a ride is booked; null hides them (they fade out). */
   nearbyDrivers: NearbyDriver[] | null;
+  /** T-586 §3: Choose ride's selected tier (only its vehicles are drawn); null on the other steps. */
+  nearbyTier?: string | null;
+  nearbyFreshness?: NearbyFreshness;
   driverLocation: DriverLocation | null;
   vehicleType?: string | null;
   stage?: PassengerRideStage | null;
@@ -38,6 +41,7 @@ type Props = {
   searching?: boolean;
 };
 
+const NO_DRIVERS: NearbyDriver[] = [];
 const errorFallback = perLocale(() => <MapPlaceholder message={BOOKING_COPY.mapError} />);
 const loadingFallback = perLocale(() => <MapPlaceholder message={t('home.mapLoading')} />);
 
@@ -62,6 +66,8 @@ const BookingMapBase: React.FC<Props> = ({
   route,
   driverRoute,
   nearbyDrivers,
+  nearbyTier = null,
+  nearbyFreshness = 'fresh',
   driverLocation,
   vehicleType,
   stage,
@@ -84,7 +90,7 @@ const BookingMapBase: React.FC<Props> = ({
             fallbackComponent={loadingFallback()}
           >
             <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={route} searching={searching} />
-            {nearbyDrivers ? <NearbyDriverMarkers drivers={nearbyDrivers} /> : null}
+            <NearbyVehicleMarkers drivers={nearbyDrivers ?? NO_DRIVERS} tier={nearbyTier} freshness={nearbyFreshness} />
             <AssignedDriverMarker location={driverLocation} vehicleType={vehicleType} stage={stage} route={driverRoute} />
           </SafeMapView>
         </MapErrorBoundary>

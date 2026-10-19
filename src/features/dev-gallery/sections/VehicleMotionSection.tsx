@@ -19,8 +19,9 @@ const MAP_FRAME_HEIGHT = 420;
 /**
  * T-517 evidence: the bike, rickshaw and car driving around a block from noisy fixture updates
  * every GALLERY_LIVE_INTERVAL_MS. They snap to the cased route, turn the corners with the road
- * and glide between updates (Reduce Motion: they jump). Below, the three top-down glyphs in the
- * current map style and the nearby (muted) look. One interval, cleared on unmount.
+ * and glide between updates (Reduce Motion: they jump). Below, the top-down glyphs in the
+ * current map style (T-586: all six react-native-svg kinds) and the assigned look with its halo.
+ * One interval, cleared on unmount.
  */
 export function VehicleMotionSection() {
   const { theme } = useAppTheme();
@@ -58,9 +59,9 @@ export function VehicleMotionSection() {
           </View>
         ))}
         <View style={styles.glyph}>
-          <VehicleMarkerGlyph vehicleType="car" muted />
+          <VehicleMarkerGlyph vehicleType="car" assigned />
           <AppText variant="caption" color="textSecondary">
-            {t('kitGallery.liveVehicleNearby')}
+            {t('kitGallery.liveVehicleAssigned')}
           </AppText>
         </View>
       </View>

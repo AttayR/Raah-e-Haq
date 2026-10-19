@@ -14,7 +14,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useMapMounted } from '../../hooks/useMapMounted';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
-import { NearbyDriverMarkers } from '../../components/passenger/NearbyDrivers';
+import { NearbyCountChip, NearbyVehicleMarkers, useNearbyFreshness } from '../../features/nearby-vehicles';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import { MAPS_CONFIG } from '../../config/mapsConfig';
@@ -58,9 +58,10 @@ const MAP_ROUTES_ABOVE_HOME = ['Booking'] as const;
  * chip row adds recent destinations (drop-offs of those rides), skeleton chips and rows while the
  * first reads run, and a "Try again" state when the rides fail with nothing shown.
  * Saved places (GET /saved-places, T-516) are chips: a tap books a ride to that place.
- * T-524 (passenger-home spec, map item 2): nearby drivers (BE-20) around the rider as muted
- * vehicle markers, polled like the booking map and only while Home is focused and the app is
- * in the foreground (the hook stops when backgrounded).
+ * T-524 (passenger-home spec, map item 2): nearby drivers (BE-20) around the rider, polled like
+ * the booking map and only while Home is focused and the app is in the foreground (the hook
+ * stops when backgrounded). T-586: react-native-svg vehicles on one shared ticker, and the
+ * "N drivers online near you" chip bottom-start, on the locate button's baseline.
  */
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
@@ -92,6 +93,8 @@ export default function PassengerHomeScreen() {
   const needsSettings = locationError === 'disabled' || (locationError === 'denied' && !permissionStatus.canAskAgain);
   const enableLocation = needsSettings ? openSettings : requestLocationPermission;
   const nearbyDrivers = useNearbyDrivers(currentLocation, { enabled: isFocused });
+  // T-586: markers dim after 30 s without fresh data and leave after 90 s (the chip then errors).
+  const nearbyFreshness = useNearbyFreshness(nearbyDrivers);
   // T-578: until WebSockets, the live ride's status is re-read while Home is focused (the ride
   // poll's cadence and back-off; it stops once the ride ends), so a driver cancel clears
   // "Return to your ride". Booking covers Home while it is open, so only one of them polls.
@@ -263,7 +266,7 @@ export default function PassengerHomeScreen() {
                   />
                 </Marker>
               ) : null}
-              <NearbyDriverMarkers drivers={nearbyDrivers.drivers} />
+              <NearbyVehicleMarkers drivers={nearbyDrivers.drivers} freshness={nearbyFreshness} />
             </SafeMapView>
           </MapErrorBoundary>
         ) : (
@@ -283,6 +286,7 @@ export default function PassengerHomeScreen() {
         hidden={sheet.snap === 'full'}
         testID="home-controls"
       />
+      <NearbyCountChip state={nearbyDrivers} freshness={nearbyFreshness} sheetHeight={sheetAnimatedHeight} hidden={sheet.snap === 'full'} />
 
       <BottomSheet
         peekHeight={homePeekHeight(liveRide !== null)}

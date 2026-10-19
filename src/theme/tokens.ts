@@ -61,6 +61,26 @@ export type SemanticColors = {
   stopPin: string;
   driverMarker: string;
   userLocation: string;
+  /** [T-586] top-down vehicle art (map-vehicles.md §1.3): body, mirrors, bike tank/handlebar. */
+  vehicleBody: string;
+  /** Roof, rickshaw canopy, rider jacket, parcel box. */
+  vehicleRoof: string;
+  /** Wind and rear glass, helmet visor. */
+  vehicleGlass: string;
+  vehicleTyre: string;
+  /** 2-unit outline round the silhouette (= `routeLineCasing`). */
+  vehicleCasing: string;
+  /** Head lights, helmet, rickshaw band (= `accent`). */
+  vehicleHeadlight: string;
+  /** Tail lights (= `danger`). */
+  vehicleTaillight: string;
+  /** Contact shadow colour; its opacity is a component token. */
+  vehicleShadow: string;
+  /** AC roof disc and its snowflake. */
+  vehicleAcBadge: string;
+  vehicleAcGlyph: string;
+  /** Assigned vehicle halo fill and ring (opacity from component tokens). */
+  vehicleHalo: string;
 };
 
 export type SemanticColorName = keyof SemanticColors;
@@ -114,6 +134,17 @@ export const lightColors: SemanticColors = {
   stopPin: neutral[600],
   driverMarker: neutral[900],
   userLocation: extra.info,
+  vehicleBody: navy[800],
+  vehicleRoof: navy[600],
+  vehicleGlass: navy[200],
+  vehicleTyre: neutral[800],
+  vehicleCasing: extra.white,
+  vehicleHeadlight: saffron[500],
+  vehicleTaillight: extra.danger,
+  vehicleShadow: extra.black,
+  vehicleAcBadge: extra.white,
+  vehicleAcGlyph: navy[800],
+  vehicleHalo: navy[800],
 };
 
 export const darkColors: SemanticColors = {
@@ -165,6 +196,18 @@ export const darkColors: SemanticColors = {
   stopPin: dark[300],
   driverMarker: dark[50],
   userLocation: extra.infoDark,
+  vehicleBody: dark[50],
+  vehicleRoof: navy[200],
+  vehicleGlass: navy[700],
+  // A darker tyre disappears into the dark casing.
+  vehicleTyre: dark[600],
+  vehicleCasing: dark[950],
+  vehicleHeadlight: saffron[500],
+  vehicleTaillight: extra.dangerDark,
+  vehicleShadow: extra.black,
+  vehicleAcBadge: navy[800],
+  vehicleAcGlyph: extra.white,
+  vehicleHalo: navy[400],
 };
 
 export const semanticColors: Record<ColorMode, SemanticColors> = {

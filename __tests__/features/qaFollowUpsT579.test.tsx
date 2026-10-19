@@ -12,7 +12,9 @@ import { setLocale, t } from '../../src/i18n';
 import { resetLanguagePreferenceForTests } from '../../src/i18n/languagePreference';
 import '../../src/i18n/copy-ur-Latn';
 import RoleStep from '../../src/screens/Auth/steps/RoleStep';
-import { NearbyDriversStatus } from '../../src/components/passenger/NearbyDrivers';
+import { NearbyCountChip } from '../../src/features/nearby-vehicles';
+import { useSharedValue } from 'react-native-reanimated';
+import type { NearbyDriversState } from '../../src/hooks/useNearbyDrivers';
 import { REGISTRATION_FIELDS } from '../../src/features/auth/copy/registrationFields';
 import { cancellationText, paymentStatusLabel, RIDE_HISTORY_COPY, tierLabel } from '../../src/features/ride-history/copy';
 import {
@@ -153,17 +155,22 @@ describe('2. parcel cancels are said as a delivery', () => {
 });
 
 describe('3. nearby drivers line in the active language', () => {
+  // T-586: the line became the map count chip (map-vehicles.md §4 copy).
+  const Chip = ({ state }: { state: NearbyDriversState }) => {
+    const sheet = useSharedValue(0);
+    return <NearbyCountChip state={state} freshness="fresh" sheetHeight={sheet} />;
+  };
   it('loading, none, one and many in Roman Urdu', () => {
     setLocale('ur-Latn');
     const driver = { id: 'a', rating: 4.5, vehicle_type: 'car' as const, distance_km: 1, estimated_arrival_min: 2, location: { latitude: 31.5, longitude: 74.3 }, heading: null };
-    const { rerender } = render(<NearbyDriversStatus state={{ drivers: [], status: 'loading', error: null }} />);
+    const { rerender } = render(<Chip state={{ drivers: [], status: 'loading', error: null }} />);
     expect(screen.getByText('Qareeb drivers dhoond rahe hain…')).toBeTruthy();
-    rerender(<NearbyDriversStatus state={{ drivers: [], status: 'ready', error: null }} />);
-    expect(screen.getByText('Abhi qareeb koi driver nahi')).toBeTruthy();
-    rerender(<NearbyDriversStatus state={{ drivers: [driver], status: 'ready', error: null }} />);
-    expect(screen.getByText('1 driver qareeb hai')).toBeTruthy();
-    rerender(<NearbyDriversStatus state={{ drivers: [driver, { ...driver, id: 'b' }], status: 'ready', error: null }} />);
-    expect(screen.getByText('2 drivers qareeb hain')).toBeTruthy();
+    rerender(<Chip state={{ drivers: [], status: 'ready', error: null }} />);
+    expect(screen.getByText('Abhi aap ke qareeb koi driver online nahi')).toBeTruthy();
+    rerender(<Chip state={{ drivers: [driver], status: 'ready', error: null }} />);
+    expect(screen.getByText('1 driver aap ke qareeb online hai')).toBeTruthy();
+    rerender(<Chip state={{ drivers: [driver, { ...driver, id: 'b' }], status: 'ready', error: null }} />);
+    expect(screen.getByText('2 drivers aap ke qareeb online hain')).toBeTruthy();
   });
 });
 

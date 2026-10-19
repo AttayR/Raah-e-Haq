@@ -41,6 +41,7 @@ import {
   galleryVehicleOptions,
 } from '../fixtures/rideFixtures';
 import { GallerySection } from './GallerySection';
+import { NearbyVehicleMarkers } from '../../nearby-vehicles/NearbyVehicleMarkers';
 
 const noop = () => {};
 /** A map frame tall enough to read the pins and route on an SE screen. */
@@ -66,9 +67,7 @@ export function RideMapSection() {
           <RideMarker kind="stop" index={1} coordinate={galleryStop} />
           <RideMarker kind="dropoff" coordinate={galleryRoute[galleryRoute.length - 1]} />
           <VehicleMarker coordinate={galleryAssignedCar.coordinate} vehicleType="car" route={galleryRoute} title={t('ride.driverMarker')} />
-          {galleryNearbyCars.map(car => (
-            <VehicleMarker key={car.id} coordinate={car.coordinate} vehicleType="car" muted title={t('ride.nearbyDriverMarker')} />
-          ))}
+          <NearbyVehicleMarkers drivers={galleryNearbyCars} />
         </SafeMapView>
       </View>
     </GallerySection>
@@ -86,7 +85,7 @@ export function RidePinsSection() {
         <PinGlyph kind="dropoff" />
         <PinGlyph kind="stop" index={1} />
         <VehicleMarkerGlyph vehicleType="car" />
-        <VehicleMarkerGlyph vehicleType="car" muted />
+        <VehicleMarkerGlyph vehicleType="car" assigned />
       </View>
       <View style={[styles.tile, { backgroundColor: theme.colors.surfaceAlt }]}>
         <SearchingPulse />

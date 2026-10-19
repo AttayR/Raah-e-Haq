@@ -241,7 +241,10 @@ export const en = {
     liveVehicle_bike: 'Bike',
     liveVehicle_rickshaw: 'Rickshaw',
     liveVehicle_car: 'Car',
-    liveVehicleNearby: 'Nearby (60%)',
+    liveVehicle_carAc: 'AC car',
+    liveVehicle_van: 'Van',
+    liveVehicle_bikeParcel: 'Parcel bike',
+    liveVehicleAssigned: 'Assigned (halo)',
     sectionRideAddress: 'Address pair (Raah line)',
     rideAddressRegular: 'Regular, labels, a stop',
     rideAddressCompact: 'Compact (list cards)',
@@ -1438,6 +1441,29 @@ export const en = {
     mapService: 'Map service error. Please check your internet connection.',
     mapTitle: 'Map Error',
     mapBody: 'There was an issue loading the map. Please try again.',
+  },
+  // T-586: the map count chip (map-vehicles.md §4) and the tier nouns it uses.
+  nearbyMap: {
+    homeOnline: '{n} drivers online near you',
+    homeOnlineOne: '1 driver online near you',
+    homeNone: 'No drivers online near you right now',
+    homeLoading: 'Finding drivers nearby…',
+    tierNearby: '{n} {tiers} nearby',
+    tierNearbyOne: '1 {tier} nearby',
+    // {noun}: the tier's `none` noun (English plural).
+    tierNone: 'No {noun} nearby right now',
+    tierLoading: 'Finding {tiers} nearby…',
+    onlinePart: '{n} online',
+    failed: "Couldn't load nearby drivers",
+    retryHint: 'Double tap to try again',
+    tiers: {
+      car: { one: 'car', other: 'cars', none: 'cars' },
+      car_ac: { one: 'AC car', other: 'AC cars', none: 'AC cars' },
+      bike: { one: 'bike', other: 'bikes', none: 'bikes' },
+      rickshaw: { one: 'rickshaw', other: 'rickshaws', none: 'rickshaws' },
+      van: { one: 'van', other: 'vans', none: 'vans' },
+      parcel: { one: 'parcel rider', other: 'parcel riders', none: 'parcel riders' },
+    },
   },
 } as const;
 

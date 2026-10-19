@@ -1,5 +1,4 @@
-import React, { useCallback, useState } from 'react';
-import { Image, StyleSheet } from 'react-native';
+import React from 'react';
 import { Marker, type LatLng } from 'react-native-maps';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
@@ -7,45 +6,31 @@ import { useIsScreenActive } from '../../hooks/useIsScreenActive';
 import { componentTokens } from '../../theme';
 import { MARKER_SETTLE_MS, useMarkerTracking } from './ride/useMarkerTracking';
 import { useInterpolatedMarker } from './ride/useInterpolatedMarker';
-import { vehicleMarkerKind, vehicleMarkerSource, type VehicleMarkerKind } from './ride/vehicleAssets';
+import { VehicleGlyph } from './ride/VehicleGlyph';
+import { vehicleMarkerKind } from './ride/vehicleGlyphs';
 
 export { shortestTurn } from './ride/vehicleMotion';
 export { useInterpolatedMarker } from './ride/useInterpolatedMarker';
 
 const m = componentTokens.ride.vehicleMarker;
 
-/** Size of the vehicle marker on the map (§5.21: 40). */
-export const VEHICLE_MARKER_SIZE = m.size;
+/** Nearby vehicle canvas (map-vehicles.md §1.2: 40). */
+export const VEHICLE_MARKER_SIZE = m.nearbySize;
 /** How long a marker re-renders its custom view before it is frozen. */
 export const VEHICLE_MARKER_SETTLE_MS = MARKER_SETTLE_MS;
 
 type GlyphProps = {
-  /** Backend vehicle type key (`car`, `bike`, `rickshaw`, `van`); unknown draws the car. */
+  /** Backend vehicle type key (`car`, `car_ac`, `bike`, `parcel`, `rickshaw`, `van`); unknown draws the car. */
   vehicleType?: string | null;
-  /** Nearby (not assigned) drivers: 60% opacity. */
-  muted?: boolean;
-  onLoad?: () => void;
+  /** The assigned look (48pt on a halo in a 64pt view); default the 40pt nearby glyph. */
+  assigned?: boolean;
   testID?: string;
 };
 
-/**
- * The top-down vehicle art (§5.21, T-517): north-up, 40pt, the light or dark map variant from
- * the theme. It carries its own casing outline, so it needs no shadow (§5.21 b).
- */
-export const VehicleMarkerGlyph: React.FC<GlyphProps> = ({ vehicleType, muted = false, onLoad, testID }) => {
-  const { theme } = useAppTheme();
-  const kind: VehicleMarkerKind = vehicleMarkerKind(vehicleType);
-  return (
-    <Image
-      testID={testID}
-      source={vehicleMarkerSource(kind, theme.mode)}
-      style={[styles.glyph, muted ? styles.muted : null]}
-      onLoad={onLoad}
-      fadeDuration={0}
-      accessibilityIgnoresInvertColors
-    />
-  );
-};
+/** The vehicle art for a type (§1): nearby 40pt, or assigned with its halo. */
+export const VehicleMarkerGlyph: React.FC<GlyphProps> = ({ vehicleType, assigned = false, testID }) => (
+  <VehicleGlyph vehicleType={vehicleType} assigned={assigned} testID={testID} />
+);
 
 export type VehicleMarkerProps = {
   coordinate: LatLng;
@@ -59,27 +44,22 @@ export type VehicleMarkerProps = {
   updateIntervalMs?: number;
   title?: string;
   description?: string;
-  /** Nearby (not yet assigned) drivers: 60% opacity, no interpolation, z-index below. */
-  muted?: boolean;
-  /** Interpolate between updates (default: on for the assigned vehicle). Reduced motion jumps. */
+  /** Interpolate between updates (default on). Reduced motion jumps. */
   animate?: boolean;
-  /**
-   * Without a heading, turn along the bearing of each move (default: on, off when `muted`):
-   * nearby drivers are snapped to a coarse grid, so they keep their last rotation instead.
-   */
+  /** Without a heading, turn along the bearing of each move (default on). */
   inferHeading?: boolean;
   testID?: string;
 };
 
 /**
- * Live vehicle on the map (DESIGN_SYSTEM §5.21 / §6.7, T-517). A top-down bike, rickshaw or car
- * that drives smoothly between position updates and turns with the road: `flat` with `rotation`,
- * so it keeps pointing along the street when the map rotates.
+ * The assigned vehicle on the map (map-vehicles.md §1.6, T-517/T-586): the passenger's driver or
+ * the driver's own vehicle. Top-down react-native-svg art on a halo, `flat` with `rotation`, so it
+ * keeps pointing along the street when the map rotates, above every pin and nearby vehicle.
+ * Nearby vehicles use the shared-ticker layer (`NearbyVehicleMarkers`) instead.
  *
- * The art is a bitmap child (not the `image` prop, whose size differs between platforms in
- * Debug), tracked until it has loaded and then frozen (`useMarkerTracking`); rotation and
- * position are marker properties, so animating them needs no view tracking and does not freeze
- * iOS Google Maps. No shadow (§5.21 b).
+ * The SVG renders synchronously, so the view is tracked for one settle window after mount and
+ * after a kind or theme change, then frozen (`useMarkerTracking`); position and rotation are
+ * marker props and never re-track the view. No native shadow (§5.21 b).
  *
  * T-535 (PERF-13): memoised, the animation commits at most ~30 times a second, and it stops
  * while its screen is blurred or the app is in the background.
@@ -92,24 +72,21 @@ const VehicleMarkerBase: React.FC<VehicleMarkerProps> = ({
   updateIntervalMs,
   title,
   description,
-  muted = false,
-  animate,
-  inferHeading,
+  animate = true,
+  inferHeading = true,
   testID,
 }) => {
   const { theme } = useAppTheme();
   const reduced = useReducedMotion();
   const screenActive = useIsScreenActive();
   const kind = vehicleMarkerKind(vehicleType);
-  const [loads, setLoads] = useState(0);
-  const onLoad = useCallback(() => setLoads((n) => n + 1), []);
-  const tracks = useMarkerTracking(`${theme.mode}|${kind}|${muted}|${loads}`);
+  const tracks = useMarkerTracking(`${theme.mode}|${kind}`);
   const live = useInterpolatedMarker(coordinate, {
     heading,
     route,
     expectedIntervalMs: updateIntervalMs,
-    animate: (animate ?? !muted) && !reduced,
-    inferHeading: inferHeading ?? !muted,
+    animate: animate && !reduced,
+    inferHeading,
     paused: !screenActive,
   });
   return (
@@ -122,24 +99,14 @@ const VehicleMarkerBase: React.FC<VehicleMarkerProps> = ({
       description={description}
       anchor={{ x: 0.5, y: 0.5 }}
       tracksViewChanges={tracks}
-      zIndex={muted ? 0 : 4}
+      zIndex={m.zIndex.assigned}
     >
-      <VehicleMarkerGlyph
-        vehicleType={kind}
-        muted={muted}
-        onLoad={onLoad}
-        testID={testID ? `${testID}-glyph` : undefined}
-      />
+      <VehicleGlyph kind={kind} assigned testID={testID ? `${testID}-glyph` : undefined} />
     </Marker>
   );
 };
 
 export const VehicleMarker = React.memo(VehicleMarkerBase);
 VehicleMarker.displayName = 'VehicleMarker';
-
-const styles = StyleSheet.create({
-  glyph: { width: m.size, height: m.size },
-  muted: { opacity: m.mutedOpacity },
-});
 
 export default VehicleMarker;

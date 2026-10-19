@@ -78,6 +78,56 @@ export const motionPatterns = {
     teleportMeters: 500,
     snapMeters: 30,
   },
+  /**
+   * [T-586] map-vehicles.md §2: nearby vehicles (Home, Choose ride). Each poll starts a linear move
+   * from where the marker is drawn, over the gap since the previous update (clamped
+   * `minPositionMs`..`maxIntervals` × `updateMs`). A move under `jitterMeters` is ignored; one over
+   * `teleportMeters` or faster than `maxSpeedMps` (today's 550 m grid hops) relocates with a
+   * crossfade instead of sliding. Rotation eases the shortest way round with τ = `rotationMs` / 3.
+   * One shared ticker for the whole layer at most every `tickMs`, at most `maxMarkers` markers.
+   * Stale: dim after `staleAfterFailures` failed polls or `staleAfterMs` without fresh data, gone
+   * after `goneAfterMs`. No extrapolation.
+   */
+  nearbyMarker: {
+    updateMs: 15000,
+    minPositionMs: 1000,
+    maxIntervals: 2,
+    positionEasing: linear,
+    rotationMs: 600,
+    jitterMeters: 15,
+    maxSpeedMps: 30,
+    teleportMeters: 600,
+    /** A null heading turns along a slide only when it is at least this long. */
+    headingMinMoveMeters: 40,
+    /** A server heading change under `headingIgnoreDeg` while moving under `headingIgnoreMoveMeters` is noise. */
+    headingIgnoreDeg: 20,
+    headingIgnoreMoveMeters: 15,
+    tickMs: 66,
+    tickSlackMs: 8,
+    maxMarkers: 15,
+    /** A frame that moves less than this and turns less than `minTurnDeg` is not committed. */
+    minMoveMeters: 0.5,
+    minTurnDeg: 1,
+    relocateOutMs: 150,
+    relocateInMs: 250,
+    appearMs: 250,
+    appearStaggerMs: 20,
+    appearMaxStaggered: 8,
+    leaveMs: 200,
+    tierLeaveMs: 150,
+    staleAfterMs: 30000,
+    staleAfterFailures: 2,
+    goneAfterMs: 90000,
+    staleFadeMs: 200,
+    freshFadeMs: 150,
+    goneFadeMs: 200,
+    /** Coarse positions only: vehicles on one point are spread on a circle of this radius. */
+    overlapSpreadMeters: 40,
+    /** Hourly opaque id rotation: a new id of the same type within this of a vanished one is the same marker. */
+    idContinuityMeters: 100,
+    /** A resume or poll gap longer than this relocates instead of sliding. */
+    resumeRelocateMs: 30000,
+  },
   incomingRequestCountdownMs: 15000,
   sheetContentSwap: { duration: 250, translateY: 8 },
   /**

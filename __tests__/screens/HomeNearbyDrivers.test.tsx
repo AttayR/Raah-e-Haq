@@ -1,7 +1,7 @@
 /**
  * T-524 (QA t-517 c2/c3, passenger-home spec map item 2): passenger Home shows the nearby
- * drivers (GET /rides/nearby-drivers, BE-20) around the rider as muted vehicle markers, turned
- * to the BE-76 heading, and only asks while Home is focused.
+ * drivers (GET /rides/nearby-drivers, BE-20) around the rider as vehicle markers, turned to the
+ * BE-76 heading, and only asks while Home is focused. T-586: the count chip and overlap spread.
  */
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 describe('passenger Home nearby drivers (T-524)', () => {
-  it('shows each nearby driver as a muted vehicle marker around the rider, rotated to its heading', async () => {
+  it('shows each nearby driver as a vehicle marker around the rider, rotated to its heading', async () => {
     mock.onGet('/rides/nearby-drivers').reply(200, envelope([nearby('a1', 90), nearby('b2', null, 'bike')]));
     await renderHome();
     const request = mock.history.get.find(r => r.url === '/rides/nearby-drivers');
@@ -89,6 +89,22 @@ describe('passenger Home nearby drivers (T-524)', () => {
     expect(screen.getByTestId('nearby-driver-a1').props.zIndex).toBe(0);
     // No heading: north for a new marker.
     expect(screen.getByTestId('nearby-driver-b2').props.rotation).toBe(0);
+    // T-586 §4: the count chip on the map (no BE-116 counts yet: the list's length).
+    expect(screen.getByText('2 drivers online near you')).toBeTruthy();
+  });
+
+  it('T-586: both vehicles on one grid point are spread apart, so the map shows the two the chip counts', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(200, envelope([nearby('a1', 90), nearby('b2', null, 'bike')]));
+    await renderHome();
+    const a = screen.getByTestId('nearby-driver-a1').props.coordinate;
+    const b = screen.getByTestId('nearby-driver-b2').props.coordinate;
+    expect(a).not.toEqual(b);
+  });
+
+  it('T-586: prefers the server count when BE-116 sends it', async () => {
+    mock.onGet('/rides/nearby-drivers').reply(200, { ...envelope([nearby('a1', 90)]), counts: { by_tier: { car: 1 }, online_total: 23 } });
+    await renderHome();
+    expect(screen.getByText('23 drivers online near you')).toBeTruthy();
   });
 
   it('does not ask while Home is covered by another screen', async () => {

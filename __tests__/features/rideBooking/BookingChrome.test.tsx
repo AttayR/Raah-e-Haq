@@ -1,7 +1,7 @@
 /**
  * T-604: booking map chrome. Controls sit below the status bar / Dynamic Island, the trip
  * card's chips wrap instead of clipping, the sheet rides above the keyboard on iOS and reports
- * its height (T-314); nearby drivers are car markers.
+ * its height (T-314); nearby drivers are top-down vehicle markers (T-586).
  */
 import React from 'react';
 import { Keyboard, StyleSheet } from 'react-native';
@@ -10,7 +10,7 @@ import { DarkTheme, LightTheme, type AppTheme } from '../../../src/theme';
 import { MapTopControls } from '../../../src/features/ride-booking/components/MapTopControls';
 import { useSharedValue } from 'react-native-reanimated';
 import { BookingSheet } from '../../../src/features/ride-booking/components/BookingSheet';
-import { NearbyDriverMarkers } from '../../../src/components/passenger/NearbyDrivers';
+import { NearbyVehicleMarkers } from '../../../src/features/nearby-vehicles';
 import { useKeyboardHeight } from '../../../src/hooks/useKeyboardHeight';
 import { AppText } from '../../../src/components/ui/AppText';
 import LocationSearch, { replaceLabelEdit } from '../../../src/components/passenger/LocationSearch';
@@ -171,17 +171,22 @@ describe.each([
     expect(StyleSheet.flatten(getByTestId('booking-sheet-handle-area').props.style).borderBottomWidth).toBeUndefined();
   });
 
-  it('nearby drivers render as car badges, not pins', () => {
+  it('nearby drivers render as top-down vehicles, not pins (T-586: full opacity once in, no callout, no tap)', () => {
+    jest.useFakeTimers();
     const { getByTestId } = render(
-      <NearbyDriverMarkers
+      <NearbyVehicleMarkers
         drivers={[{ id: 'a1', rating: 4.5, vehicle_type: 'car', distance_km: 1, estimated_arrival_min: 2, location: { latitude: 31.5, longitude: 74.3 }, heading: null }]}
       />,
     );
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
     const marker = getByTestId('nearby-driver-a1');
     expect(marker.props.pinColor).toBeUndefined();
-    // Nearby (not assigned) drivers are drawn muted, 60% opacity.
-    expect(StyleSheet.flatten(getByTestId('nearby-driver-a1-glyph').props.style)).toMatchObject({ opacity: 0.6 });
-    expect(marker.props.anchor).toEqual({ x: 0.5, y: 0.5 });
+    expect(marker.props).toMatchObject({ anchor: { x: 0.5, y: 0.5 }, flat: true, tappable: false, zIndex: 0, opacity: 1 });
+    expect(marker.props.title).toBeUndefined();
+    expect(getByTestId('nearby-driver-a1-glyph').props).toMatchObject({ width: 40, height: 40 });
+    jest.useRealTimers();
   });
 });
 
