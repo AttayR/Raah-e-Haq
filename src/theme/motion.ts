@@ -121,7 +121,11 @@ export const motionPatterns = {
     staleFadeMs: 200,
     freshFadeMs: 150,
     goneFadeMs: 200,
-    /** Coarse positions only: vehicles on one point are spread on a circle of this radius. */
+    /**
+     * Coarse positions only: vehicles on one point are spread on a circle of `overlapSpreadPt`
+     * points at the current zoom; `overlapSpreadMeters` until the map has reported a region.
+     */
+    overlapSpreadPt: 30,
     overlapSpreadMeters: 40,
     /** Hourly opaque id rotation: a new id of the same type within this of a vanished one is the same marker. */
     idContinuityMeters: 100,

@@ -3,3 +3,4 @@ export { NearbyVehicleMarkers } from './NearbyVehicleMarkers';
 export { NearbyCountChip } from './NearbyCountChip';
 export { useNearbyFreshness, nearbyFreshness } from './useNearbyFreshness';
 export type { NearbyFreshness } from './nearbyMotion';
+export { NEARBY_CHIP_ROUTE_CLEARANCE } from './layout';

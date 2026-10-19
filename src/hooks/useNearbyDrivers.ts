@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import rideService, { NearbyCounts, NearbyDriver, NearbyVehicleType } from '../services/rideService';
+import rideService, { NearbyCounts, NearbyDriver, NearbyVehicleType, type VehicleTypeKey } from '../services/rideService';
 import { useConnectionRecovered } from '../core/api/connectivity';
 import { toApiError } from '../core/api/errors';
 import { motionPatterns } from '../theme';
+import { responseHasTiers, tierReadFor } from '../features/nearby-vehicles/selection';
 
 /**
  * Polls GET /rides/nearby-drivers for the passenger map (BE-20).
@@ -28,11 +29,20 @@ import { motionPatterns } from '../theme';
  * is immediate: a screen that gains focus starts from the last read (any screen's, under a poll
  * old and about the same centre), so returning to the map never shows an empty map while the
  * 10 s floor runs; the read itself happens as soon as the floor allows.
+ *
+ * T-586 design review (AC selected said "No AC cars nearby" with 11 online): while the response
+ * carries no BE-116 `tiers`, selecting `car_ac` or `parcel` (`tier`) makes the read itself carry
+ * `vehicle_type` (the server applies the AC and parcel rules). The tier settles for
+ * NEARBY_TIER_SETTLE_MS first (the last of quick switches wins) and the read keeps the 10 s floor
+ * and the poll; until a list read for what is wanted arrives, `status` is `loading`. With BE-116
+ * data no extra read is made.
  */
 export const NEARBY_POLL_MS = motionPatterns.nearbyMarker.updateMs;
 export const NEARBY_MIN_GAP_MS = 10_000;
 export const NEARBY_ERROR_RETRY_MS = 60_000;
 export const NEARBY_NETWORK_RETRY_MS = 15_000;
+/** A tier selection must hold this long before it changes the read (no bursts on quick switches). */
+export const NEARBY_TIER_SETTLE_MS = 300;
 /** A last read whose centre is within this (degrees, ~1.1 km) seeds a newly focused map. */
 const SEED_MAX_DEGREES = 0.01;
 
@@ -49,12 +59,19 @@ export interface NearbyDriversState {
   freshAt?: number | null;
   /** Failed polls in a row since the last success. */
   failures?: number;
+  /** The `vehicle_type` the shown list was read for; null for an unfiltered read. */
+  listTier?: VehicleTypeKey | null;
 }
 
 export interface UseNearbyDriversOptions {
   enabled?: boolean;
   radiusKm?: number;
   vehicleType?: NearbyVehicleType;
+  /**
+   * Choose ride's selected tier. Without BE-116 `tiers` in the response, `car_ac` and `parcel`
+   * are read with `vehicle_type` (see above); other tiers filter the unfiltered list.
+   */
+  tier?: string | null;
   /**
    * T-311: a new value asks again now (still no sooner than MIN_GAP_MS after the last
    * request) instead of at the next POLL_MS tick, e.g. right after a ride ends.
@@ -72,23 +89,30 @@ type Center = { latitude: number; longitude: number } | null | undefined;
 // ~110 m: GPS jitter must not refetch. Public positions are snapped to ~550 m anyway.
 const roundCoord = (value: number) => Math.round(value * 1000) / 1000;
 
-const INITIAL: NearbyDriversState = { drivers: [], status: 'idle', error: null, counts: null, freshAt: null, failures: 0 };
+const INITIAL: NearbyDriversState = { drivers: [], status: 'idle', error: null, counts: null, freshAt: null, failures: 0, listTier: null };
 
 // Module-level so remounting the map (or a second instance) cannot skip the 10 s floor.
 let nextAllowedAt = 0;
 /** The last successful read of any instance (seeds a map that just gained focus). */
-let lastRead: { lat: number; lng: number; radiusKm?: number; vehicleType?: string; drivers: NearbyDriver[]; counts: NearbyCounts | null; at: number } | null = null;
+/**
+ * Whether the server sends BE-116 tiers (set from every successful reply; null before the first).
+ * Module-level, so a disabled or blurred map (state back to INITIAL) does not forget it and make
+ * an extra `vehicle_type` read on focus.
+ */
+let serverSendsTiers: boolean | null = null;
+let lastRead: { lat: number; lng: number; radiusKm?: number; vehicleType?: VehicleTypeKey; drivers: NearbyDriver[]; counts: NearbyCounts | null; at: number } | null = null;
 
 export const __resetNearbyDriversThrottleForTests = () => {
   nextAllowedAt = 0;
   lastRead = null;
+  serverSendsTiers = null;
 };
 
-const seedFor = (lat: number, lng: number, radiusKm: number | undefined, vehicleType: string | undefined): NearbyDriversState | null => {
+const seedFor = (lat: number, lng: number, radiusKm: number | undefined, vehicleType: VehicleTypeKey | undefined): NearbyDriversState | null => {
   if (!lastRead || Date.now() - lastRead.at > NEARBY_POLL_MS) return null;
   if (lastRead.radiusKm !== radiusKm || lastRead.vehicleType !== vehicleType) return null;
   if (Math.abs(lastRead.lat - lat) > SEED_MAX_DEGREES || Math.abs(lastRead.lng - lng) > SEED_MAX_DEGREES) return null;
-  return { drivers: lastRead.drivers, status: 'ready', error: null, counts: lastRead.counts, freshAt: lastRead.at, failures: 0 };
+  return { drivers: lastRead.drivers, status: 'ready', error: null, counts: lastRead.counts, freshAt: lastRead.at, failures: 0, listTier: vehicleType ?? null };
 };
 
 const useAppIsActive = (): boolean => {
@@ -100,8 +124,19 @@ const useAppIsActive = (): boolean => {
   return state === 'active';
 };
 
+/** `value` once it has held for `ms` (the first value at once). The timer is cleared on change and unmount. */
+const useSettled = <T>(value: T, ms: number): T => {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    if (Object.is(value, settled)) return undefined;
+    const timer = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, settled, ms]);
+  return settled;
+};
+
 export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOptions = {}): NearbyDriversResultState => {
-  const { enabled: enabledOption = true, radiusKm, vehicleType, refreshKey } = options;
+  const { enabled: enabledOption = true, radiusKm, vehicleType: vehicleTypeOption, tier = null, refreshKey } = options;
   const appActive = useAppIsActive();
   const enabled = enabledOption && appActive;
   const [state, setState] = useState<NearbyDriversState>(INITIAL);
@@ -110,6 +145,11 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
   const failed = state.status === 'error' || (state.failures ?? 0) > 0;
   useConnectionRecovered(() => setRecovery((n) => n + 1), enabled && failed);
   const retry = useCallback(() => setRecovery((n) => n + 1), []);
+
+  // T-586 design review: the read a tier needs (car_ac / parcel without BE-116 tiers), settled.
+  const hasTiers = serverSendsTiers ?? responseHasTiers(state.drivers, state.counts);
+  const wantedType: VehicleTypeKey | null = vehicleTypeOption ?? tierReadFor(tier, hasTiers);
+  const vehicleType = useSettled(wantedType, NEARBY_TIER_SETTLE_MS) ?? undefined;
 
   const lat = center ? roundCoord(center.latitude) : null;
   const lng = center ? roundCoord(center.longitude) : null;
@@ -126,7 +166,7 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
 
     // T-586: start from the last read when it is recent and about here (no empty map on focus).
     const seed = seedFor(lat, lng, radiusKm, vehicleType);
-    if (seed) setState(prev => (prev.status === 'ready' ? prev : seed));
+    if (seed) setState(prev => (prev.status === 'ready' && (prev.listTier ?? null) === seed.listTier ? prev : seed));
 
     const schedule = (delayMs: number) => {
       if (cancelled) return;
@@ -148,7 +188,8 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
         if (cancelled) return;
         const at = Date.now();
         lastRead = { lat, lng, radiusKm, vehicleType, drivers, counts, at };
-        setState({ drivers, status: 'ready', error: null, counts, freshAt: at, failures: 0 });
+        serverSendsTiers = responseHasTiers(drivers, counts);
+        setState({ drivers, status: 'ready', error: null, counts, freshAt: at, failures: 0, listTier: vehicleType ?? null });
         schedule(NEARBY_POLL_MS);
       } catch (error) {
         if (cancelled) return;
@@ -186,7 +227,9 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
     // refreshKey and recovery only restart the schedule (their values are not read).
   }, [enabled, lat, lng, radiusKm, vehicleType, refreshKey, recovery]);
 
-  return useMemo(() => ({ ...state, retry }), [state, retry]);
+  // A list read for another tier is not this tier's answer: loading until the wanted read lands.
+  const pending = state.status === 'ready' && (state.listTier ?? null) !== wantedType;
+  return useMemo(() => ({ ...state, status: pending ? 'loading' : state.status, retry }), [state, pending, retry]);
 };
 
 export default useNearbyDrivers;

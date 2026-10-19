@@ -4,6 +4,7 @@ import type { Details, LatLng, MapPressEvent, MapStyleElement, Region } from 're
 import SafeMapView, { type SafeMapViewRef } from '../../../components/SafeMapView';
 import MapErrorBoundary from '../../../components/MapErrorBoundary';
 import { NearbyVehicleMarkers, type NearbyFreshness } from '../../nearby-vehicles';
+import { useOverlapSpread } from '../../nearby-vehicles/useOverlapSpread';
 import type { DriverLocation, NearbyDriver } from '../../../services/rideService';
 import { AssignedDriverMarker } from '../../active-ride/components/ActiveRidePanel';
 import type { PassengerRideStage } from '../../active-ride/stage';
@@ -34,6 +35,8 @@ type Props = {
   /** T-586 §3: Choose ride's selected tier (only its vehicles are drawn); null on the other steps. */
   nearbyTier?: string | null;
   nearbyFreshness?: NearbyFreshness;
+  /** The tier the nearby list was read for (an AC / parcel read on an older server). */
+  nearbyListTier?: string | null;
   driverLocation: DriverLocation | null;
   vehicleType?: string | null;
   stage?: PassengerRideStage | null;
@@ -68,14 +71,17 @@ const BookingMapBase: React.FC<Props> = ({
   nearbyDrivers,
   nearbyTier = null,
   nearbyFreshness = 'fresh',
+  nearbyListTier = null,
   driverLocation,
   vehicleType,
   stage,
   searching = false,
 }) => {
   const [region] = useState(initialRegion);
+  // T-586 design review: stacked nearby vehicles ~30 pt apart at the current zoom (state kept here).
+  const spread = useOverlapSpread(onRegionChangeComplete);
   return (
-    <View style={styles.fill}>
+    <View style={styles.fill} onLayout={spread.onLayout}>
       <MapErrorBoundary fallback={errorFallback()}>
         <MapErrorBoundary>
           <SafeMapView
@@ -85,12 +91,18 @@ const BookingMapBase: React.FC<Props> = ({
             customMapStyle={mapStyle}
             onPress={onPress}
             onMapReady={onMapReady}
-            onRegionChangeComplete={onRegionChangeComplete}
+            onRegionChangeComplete={spread.onRegionChangeComplete}
             onMapLoaded={onMapLoaded}
             fallbackComponent={loadingFallback()}
           >
             <BookingMapLayers pickup={pickup} stops={stops} destination={destination} route={route} searching={searching} />
-            <NearbyVehicleMarkers drivers={nearbyDrivers ?? NO_DRIVERS} tier={nearbyTier} freshness={nearbyFreshness} />
+            <NearbyVehicleMarkers
+              drivers={nearbyDrivers ?? NO_DRIVERS}
+              tier={nearbyTier}
+              freshness={nearbyFreshness}
+              listTier={nearbyListTier}
+              spreadMeters={spread.spreadMeters}
+            />
             <AssignedDriverMarker location={driverLocation} vehicleType={vehicleType} stage={stage} route={driverRoute} />
           </SafeMapView>
         </MapErrorBoundary>

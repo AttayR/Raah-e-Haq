@@ -9,15 +9,15 @@ import type { NearbyDriversState } from '../../hooks/useNearbyDrivers';
 import { t } from '../../i18n';
 import { componentTokens, motion, radius } from '../../theme';
 import { nearbyChipContent, type NearbyChipContent } from './chipText';
+import { NEARBY_CHIP_BOTTOM_GAP } from './layout';
 import type { NearbyFreshness } from './nearbyMotion';
 import { nearbyChipCounts } from './selection';
 
 const c = componentTokens.ride.nearbyChip;
 const controls = componentTokens.mapControls;
-/** The locate button's visual size: the chip sits on its baseline, centred on it (§4). */
+/** The locate button's visual size (§4). */
 const LOCATE_VISUAL = componentTokens.iconButton.floatingVisual;
-/** From the sheet's top edge to the chip's bottom: locate's gap + half the size difference. */
-const CHIP_BOTTOM_GAP = controls.sheetGap + (LOCATE_VISUAL - c.minHeight) / 2;
+const CHIP_BOTTOM_GAP = NEARBY_CHIP_BOTTOM_GAP;
 /** End room kept for the locate button and its gap (§4 max width). */
 const END_ROOM = LOCATE_VISUAL + controls.edge + c.gap * 1.5;
 /** §4: on SE-class widths at large text the "· N online" part drops first. */
@@ -25,7 +25,7 @@ const NARROW_WIDTH = 380;
 const LARGE_FONT_SCALE = 1.15;
 
 export type NearbyCountChipProps = {
-  state: Pick<NearbyDriversState, 'status' | 'drivers' | 'counts'> & { retry?: () => void };
+  state: Pick<NearbyDriversState, 'status' | 'drivers' | 'counts' | 'listTier'> & { retry?: () => void };
   freshness: NearbyFreshness;
   /** Choose ride: the selected tier. Home: null. */
   tier?: string | null;
@@ -61,7 +61,7 @@ export const NearbyCountChip: React.FC<NearbyCountChipProps> = ({ state, freshne
     status: state.status,
     failed: state.status === 'error' || freshness === 'gone',
     tier,
-    counts: nearbyChipCounts(state.drivers, state.counts, tier),
+    counts: nearbyChipCounts(state.drivers, state.counts, tier, state.listTier ?? null),
   });
 
   const lastCategory = useRef<string | null>(null);

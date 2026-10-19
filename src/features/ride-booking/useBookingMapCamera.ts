@@ -2,10 +2,28 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { LatLng } from 'react-native-maps';
 import type { SafeMapViewRef } from '../../components/SafeMapView';
 import { logger } from '../../core/logging/logger';
-import { regionInViewport, viewportEdgePadding, type MapViewport } from '../active-ride/camera';
+import { clampViewportInsets, regionInViewport, viewportEdgePadding, type MapViewport } from '../active-ride/camera';
+import { NEARBY_CHIP_ROUTE_CLEARANCE } from '../nearby-vehicles/layout';
+import type { EdgePadding } from 'react-native-maps';
 
 /** How long the map may take to report ready before the overlay goes anyway. */
 export const MAP_READY_FALLBACK_MS = 5000;
+
+/**
+ * The route fit's padding. T-586 design review (the count chip covered the drop-off pin): while
+ * the chip shows, the bottom keeps the sheet plus the chip and room for a pin (sheet + 72);
+ * otherwise today's padding (viewportEdgePadding). Clamped like it, so a short map keeps a view.
+ */
+export const bookingRouteFitPadding = (viewport: MapViewport | null | undefined, chipVisible: boolean): EdgePadding => {
+  const pad = viewportEdgePadding(viewport);
+  if (!chipVisible || !viewport || viewport.bottom <= 0) return pad;
+  const { bottom } = clampViewportInsets({
+    mapHeight: viewport.mapHeight,
+    top: pad.top,
+    bottom: viewport.bottom + NEARBY_CHIP_ROUTE_CLEARANCE,
+  });
+  return { ...pad, bottom };
+};
 
 type Options = {
   mapRef: RefObject<SafeMapViewRef | null>;
@@ -23,6 +41,8 @@ type Options = {
    * map moves to it, above the sheet, when it changes and when the sheet settles.
    */
   focusPoint?: LatLng | null;
+  /** The nearby count chip shows above the sheet: the route fit keeps the drop-off pin above it. */
+  chipVisible?: boolean;
 };
 
 /**
@@ -40,6 +60,7 @@ export const useBookingMapCamera = ({
   onRideCameraMapReady,
   requestLocationPermission,
   focusPoint = null,
+  chipVisible = false,
 }: Options) => {
   const [isMapReady, setIsMapReady] = useState(false);
   // T-584 (QA 2026-10-19 bug 3): with a route drawn the route fit owns the camera. Choose a ride
@@ -100,11 +121,11 @@ export const useBookingMapCamera = ({
     // T-549: not while the ride camera holds the map (it fits the car, or the passenger panned).
     if (!isMapReady || !mapRef.current || !hasRoute || rideCameraHoldsMap()) return;
     try {
-      mapRef.current.fitToCoordinates(routeCoordinates, { edgePadding: viewportEdgePadding(viewportRef.current), animated: true });
+      mapRef.current.fitToCoordinates(routeCoordinates, { edgePadding: bookingRouteFitPadding(viewportRef.current, chipVisible), animated: true });
     } catch (e) {
       logger.debug('Error fitting map to route:', e);
     }
-  }, [routeCoordinates, hasRoute, isMapReady, sheetStep, mapRef, viewportRef, rideCameraHoldsMap]);
+  }, [routeCoordinates, hasRoute, isMapReady, sheetStep, mapRef, viewportRef, rideCameraHoldsMap, chipVisible]);
 
   // T-553: a picked pickup moves the map to it (QA: the sheet collapsed, the map stayed put).
   const focusRef = useRef(focusPoint);

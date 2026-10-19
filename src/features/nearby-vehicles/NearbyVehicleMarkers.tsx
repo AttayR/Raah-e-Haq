@@ -66,6 +66,10 @@ export type NearbyVehicleMarkersProps = {
   /** Choose ride: only vehicles that can serve this tier (§3). Home: none (every tier). */
   tier?: string | null;
   freshness?: NearbyFreshness;
+  /** The tier the list was read for (`vehicle_type` read): all of it serves the tier, with its glyph. */
+  listTier?: string | null;
+  /** Overlap spread at the current zoom (~30 pt, `overlapSpreadMetersFor`); default 40 m. */
+  spreadMeters?: number;
 };
 
 /**
@@ -74,10 +78,10 @@ export type NearbyVehicleMarkersProps = {
  * relocations, appear/leave fades and stale dimming. Keys survive the hourly opaque id rotation.
  * Never mirrored in RTL (they are geographic).
  */
-const NearbyVehicleMarkersBase: React.FC<NearbyVehicleMarkersProps> = ({ drivers, tier = null, freshness = 'fresh' }) => {
+const NearbyVehicleMarkersBase: React.FC<NearbyVehicleMarkersProps> = ({ drivers, tier = null, freshness = 'fresh', listTier = null, spreadMeters }) => {
   const reduced = useReducedMotion();
   const screenActive = useIsScreenActive();
-  const inputs = useMemo(() => nearbyMarkerInputs(drivers, tier), [drivers, tier]);
+  const inputs = useMemo(() => nearbyMarkerInputs(drivers, tier, { listTier, spreadMeters }), [drivers, tier, listTier, spreadMeters]);
   const frames = useNearbyVehicleLayer(inputs, { tier, freshness, reduced, paused: !screenActive });
   return (
     <>
