@@ -84,6 +84,7 @@ export const BookingStageContent: React.FC<Props> = ({
             onSelectDestination={(c, address) => flow.selectDestination(c, address, false)}
             onUseCurrentLocation={flow.pickCurrentLocation}
             onSwap={flow.swapPickupDrop}
+            autoFocusDestination={flow.focusDestinationOnOpen}
           />
           {!compact && <ChooseOnMapButton onPress={() => setMapPick(pickup ? 'destination' : 'pickup')} />}
         </>

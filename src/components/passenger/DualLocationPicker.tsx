@@ -30,6 +30,8 @@ type Props = {
   onFocusChange?: (focused: boolean) => void;
   /** "Set location on map" from the search results (no results / search failed). */
   onChooseOnMap?: (target: 'pickup' | 'destination') => void;
+  /** Focus the destination field on mount (the planner opened from "Where to?", T-576). */
+  autoFocusDestination?: boolean;
 };
 
 /** The pickup field shows the locate glyph while it reads "Current location". */
@@ -48,6 +50,7 @@ const DualLocationPicker: React.FC<Props> = ({
   compact = false,
   onFocusChange,
   onChooseOnMap,
+  autoFocusDestination = false,
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
@@ -85,6 +88,7 @@ const DualLocationPicker: React.FC<Props> = ({
             replaceOnType={locationFieldLabels()}
             onFocusChange={onFocusChange}
             onChooseOnMap={onChooseOnMap ? () => onChooseOnMap('destination') : undefined}
+            autoFocus={autoFocusDestination}
           />
         </View>
       </View>

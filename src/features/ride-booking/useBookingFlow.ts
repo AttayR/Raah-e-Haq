@@ -62,6 +62,12 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
   // BE-87: "Female driver" on the fare step (shown only to passengers the server lets ask).
   const [femaleDriverOnly, setFemaleDriverOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // T-576: the planner opened from "Where to?" (nothing prefilled) focuses the destination field
+  // once, as passenger-destination-search.md asks ("focused on mount"). Typing right after the
+  // tap then lands in the field. It ends for good when the booking leaves the start step or a
+  // ride shows, so a later return to the start (Back, a reset after a ride) never pops the keyboard.
+  const [focusDestinationOnOpen, setFocusDestinationOnOpen] = useState(prefill.stage === 'home' && !prefill.destination && !rideShown);
+  if (focusDestinationOnOpen && (stage !== 'home' || rideShown)) setFocusDestinationOnOpen(false);
 
   // The points and what their fields say swap together.
   const swapPickupDrop = useCallback(() => {
@@ -229,6 +235,7 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     setMapPick,
     stage,
     setStage,
+    focusDestinationOnOpen,
     pickupField,
     setPickupQuery,
     destField,

@@ -70,6 +70,8 @@ type Props = {
    * selects it and typing replaces it instead of adding to it (T-551).
    */
   replaceOnType?: string | readonly string[];
+  /** Focus the field when it mounts (the planner's destination, T-576). */
+  autoFocus?: boolean;
 };
 
 const placeholderOf = (mode: Props['mode']): string =>
@@ -102,6 +104,7 @@ const LocationSearch: React.FC<Props> = ({
   onChooseOnMap,
   near,
   replaceOnType,
+  autoFocus = false,
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
@@ -263,6 +266,7 @@ const LocationSearch: React.FC<Props> = ({
           onChangeText={changeText}
           placeholderTextColor={c.textMuted}
           editable={!readOnly}
+          autoFocus={autoFocus && !readOnly}
           maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
           returnKeyType="search"
           autoCorrect={false}

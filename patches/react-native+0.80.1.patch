@@ -1,3 +1,22 @@
+diff --git a/node_modules/react-native/React/Base/RCTKeyCommands.m b/node_modules/react-native/React/Base/RCTKeyCommands.m
+index 1e6e913..c1c190e 100644
+--- a/node_modules/react-native/React/Base/RCTKeyCommands.m
++++ b/node_modules/react-native/React/Base/RCTKeyCommands.m
+@@ -68,10 +68,10 @@ - (BOOL)isEqual:(RCTKeyCommand *)object
+ 
+ - (BOOL)matchesInput:(NSString *)input flags:(UIKeyModifierFlags)flags
+ {
+-  // We consider the key command a match if the modifier flags match
+-  // exactly or is there are no modifier flags. This means that for
+-  // `cmd + r`, we will match both `cmd + r` and `r` but not `opt + r`.
+-  return [_key isEqual:input] && (_flags == flags || flags == 0);
++  // Raah-e-Haq T-576: the modifier flags must match exactly. Upstream also matched a bare key
++  // (`r` for `cmd + r`), so a letter typed while no text field was focused reloaded the Debug
++  // app, and that reload can crash natively (RN 0.80 bridgeless reload race).
++  return [_key isEqual:input] && _flags == flags;
+ }
+ 
+ - (NSString *)description
 diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm
 index f152dab..fe96738 100644
 --- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/InputAccessory/RCTInputAccessoryComponentView.mm
