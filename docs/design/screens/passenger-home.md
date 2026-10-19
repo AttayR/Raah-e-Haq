@@ -79,8 +79,8 @@ The header is the BottomSheet `header` (drag area together with the handle), so 
 | Fill | `primarySoft` #EEF2FC | `primarySoft` #1C2850 | `surfaceAlt` #EBEEF5 | `surfaceAlt` #1D2438 |
 | Border 2pt | `primary` #011C72 (14.89 vs `surface`) | `primary` #3D5FD0 (3.09 vs `surface`) | = fill | = fill |
 | Pressed fill | `primarySoftPressed` #DCE4F8 | `primarySoftPressed` #1A3496 | `surfaceAltPressed` #DADFEA | `surfaceAltPressed` #2B3450 |
-| Disc | `primary` | `primary` | `accent` #F59A23 | `accent` #F59A23 |
-| Glyph | `onPrimary` (14.89) | `onPrimary` (5.61) | `onAccent` (8.33) | `onAccent` (8.33) |
+| Disc | `primary` | `primary` | `accent` #F75606 [UI-R21] | `accent` #F75606 [UI-R21] |
+| Glyph | `onPrimary` (14.89) | `onPrimary` (5.61) | `onAccent` (5.50 [UI-R21]) | `onAccent` (5.50 [UI-R21]) |
 | Title | `textPrimary` (16.39) | `textPrimary` (12.99) | `textPrimary` (15.81) | `textPrimary` (14.01) |
 | Subtitle | `textSecondary` (6.64) | `textSecondary` (7.75) | `textSecondary` (6.40) | `textSecondary` (8.35) |
 

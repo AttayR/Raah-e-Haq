@@ -62,7 +62,7 @@ No hex in components; these are palette references added to `lightColors` / `dar
 | `vehicleGlass` | navy-200 `#C9D5F7` | navy-700 `#1A3496` | wind/rear glass, helmet visor |
 | `vehicleTyre` | neutral-800 `#20273A` | dark-600 `#626E90` (a darker tyre disappears into the dark casing) | tyres |
 | `vehicleCasing` | = `routeLineCasing` (white) | = `routeLineCasing` (dark-950 `#0B0F1A`) | 2-unit outline around the silhouette |
-| `vehicleHeadlight` | = `accent` saffron-500 `#F59A23` | = `accent` | head lights, helmet, rickshaw band |
+| `vehicleHeadlight` | = `accent` saffron-500 `#F75606` [UI-R21] | = `accent` | head lights, helmet, rickshaw band |
 | `vehicleTaillight` | = `danger` `#C0262D` | = `danger` `#FF7A7F` | tail lights |
 | `vehicleShadow` | black | black | contact shadow colour (opacity below) |
 | `vehicleAcBadge` | white `#FFFFFF` | navy-800 `#011C72` | AC roof disc |

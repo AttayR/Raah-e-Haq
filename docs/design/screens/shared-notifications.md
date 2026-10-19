@@ -11,7 +11,7 @@
 1. 8 gap: SegmentedControl "Notifications | Messages" with count Badges inside segment labels when > 0 (e.g. "Notifications 3").
 2. 12 gap: **Filter chips** (one line, horizontal scroll, inset 16): All · Rides · Offers · Account (maps to categories ride / promo / system+wallet). Driver: All · Rides · Account. Hidden until BE-11 provides `category`.
 3. 12 gap: **List** grouped by day (section header `caption` `textMuted` 32 high: Today / Yesterday / date), each group in a Card:
-   - ListItem min 72: leading 40×40 circle with category icon (ride `car-outline` on `primarySoft`/`primaryText`; promo `tag-outline` on `saffron-50`/`saffron-700`; system `information-outline` on `surfaceAlt`/`textSecondary`; wallet `wallet-outline` on `successSoft`/`success`); title `title` (1 line); body `bodySmall` `textSecondary` (2 lines); meta `caption` `textMuted` time ("2:30 PM"; older than today shows the time only since the group shows the date).
+   - ListItem min 72: leading 40×40 circle with category icon (ride `car-outline` on `primarySoft`/`primaryText`; promo `tag-outline` on `accentSoft`/`accentStrong` [UI-R21]; system `information-outline` on `surfaceAlt`/`textSecondary`; wallet `wallet-outline` on `successSoft`/`success`); title `title` (1 line); body `bodySmall` `textSecondary` (2 lines); meta `caption` `textMuted` time ("2:30 PM"; older than today shows the time only since the group shows the date).
    - Unread: title weight 600 + 8×8 `primary` dot at the trailing edge, vertically centred; row background `surface` (no tinted rows). Read: title weight 400 (use `body` style), no dot.
    - Tap: marks read (optimistic), then deep-links by `data` (ride → shared-ride-details; promo with `action_url` → in-app browser; otherwise opens a detail sheet with full text).
    - Swipe left (iOS) / long-press (Android): "Mark as read/unread".
@@ -29,7 +29,7 @@
 
 ## Rulings (UI-R14 design review, 2026-10-19)
 These supersede the layout above where they differ.
-- **Icon tile:** 40×40 rounded square (radius `md`), glyph 24 (`listItem.tileIconSize`), not a circle. Tones follow DS §12.4: ride `infoSoft`/`info`, chat `primarySoft`/`onPrimarySoft`, wallet/payment `successSoft`/`success`, promo `warningSoft`/`warning` (no separate accent pair), system `surfaceAlt`/`textSecondary`.
+- **Icon tile:** 40×40 rounded square (radius `md`), glyph 24 (`listItem.tileIconSize`), not a circle. Tones follow DS §12.4: ride `infoSoft`/`info`, chat `primarySoft`/`onPrimarySoft`, wallet/payment `successSoft`/`success`, promo `accentSoft`/`accentStrong` (**[UI-R21]** the accent pair now exists; a promo is not a warning), system `surfaceAlt`/`textSecondary`.
 - **Row anatomy:** ListItem §5.8 measurements: padding 16, tile → **16** gap → text (text starts at x=72 inside the card), dividers inset 72.
 - **Title:** up to 2 lines (tail ellipsis), time `caption` on the first line's baseline at the end; body 2 lines.
 - **Filters:** `All | Unread` (both roles) until category filtering is wanted; the category chips above are deferred.

@@ -1,6 +1,6 @@
 # Raah-e-Haq Design System
 
-**Version:** 1.1 (refresh) · **Date:** 2026-10-11 (v1.0: 2026-10-08) · **Owner:** rh-design-director · **Builder:** rh-designer
+**Version:** 1.2 (navy + saffron, 2026-10-20) · 1.1 (refresh) 2026-10-11 · v1.0 2026-10-08 · **Owner:** rh-design-director · **Builder:** rh-designer
 **Applies to:** passenger app, driver app, auth flow (one codebase, `src/`).
 **Status:** source of truth for Phase 6 (T-601 onward). If code and this file disagree, this file wins; if this file is wrong, the design director fixes it here first.
 
@@ -25,7 +25,7 @@ Every value in this file is exact. "≈" never appears. Points (pt) = iOS points
 ## 0. Principles
 
 1. **The map and the next action come first.** A rider should always see where they are, what is happening and the one thing to do next. One primary button per screen.
-2. **Calm navy, warm accents.** Navy carries the brand and every primary action. Saffron (from the logo) is a rare accent: ratings, promos, the brand dot. Never two loud colours side by side.
+2. **Navy acts, saffron marks** **[UI-R21]**. The app looks like its logo: navy + the logo orange (saffron `#F75606`). Navy carries every primary action and selected state. Saffron marks eight recurring brand moments both roles share (§1.7): the destination, ratings, the money you keep, promos and invites, the brand glyph discs, vehicle lights. Never as text on a light surface; never two loud colours side by side.
 3. **Real data or honest states.** Every block has loading, empty, error and offline states. No invented numbers, ever. If the API has no value, show an empty state, not a placeholder figure.
 4. **One system, two roles.** Passenger and driver share every component. The driver side differs only in density (larger touch targets on driving screens) and in its primary surface (map-first).
 5. **Readable in a moving car in Lahore sun.** WCAG AA minimum, 4.5:1 for all text, 3:1 for all UI boundaries and icons. Driving screens use 56pt buttons and 20pt minimum text for addresses.
@@ -53,16 +53,28 @@ The existing brand colour `#011C72` is **navy-800**. The scale is built around i
 | navy-900 | `#01155A` | `primaryPressed` in light mode, brand header backgrounds |
 | navy-950 | `#000D3B` | splash background |
 
-### 1.2 Saffron accent (from the logo)
+### 1.2 Saffron: the logo orange **[UI-R21, revised 2026-10-20]**
+
+Owner feedback 2026-10-20: "Our logo also has an orange colour, and it isn't used anywhere." Measured from `src/assets/images/logo@3x.png` and the 1024 app icon: the logo is **orange `#F75606`** (most common non-white pixel) and royal blue `#0E47A1`. The v1.0 "saffron" `#F59A23` was a yellow-amber that does not match the logo, sat next to `warning` amber, and was used in four places, so the app never read as the logo. v1.2 keeps the token family name **saffron** (code key `saffron`, semantic `accent`) and moves it onto the real logo orange. Navy `#011C72` stays the brand primary (the owner keeps it; the logo blue is not adopted).
 
 | Token | Hex | Use |
 |---|---|---|
-| saffron-50 | `#FFF4E5` | promo card background (light) |
-| saffron-500 | `#F59A23` | brand dot, promo tag fill (with `#0F1422` text, 8.33:1) |
-| saffron-600 | `#C77700` | rating star (light, 3.46:1 on white) |
-| saffron-700 | `#A85A00` | saffron text on white (5.09:1) |
+| saffron-50 | `#FFF1E8` | `accentSoft` (light): promo, invite and promo-notification tiles |
+| saffron-100 | `#FFE2D1` | pressed `accentSoft` (light) |
+| saffron-300 | `#FF9B66` | `accentStrong` (dark): orange glyphs on dark surfaces and on dark `accentSoft` |
+| saffron-400 | `#FF7A33` | `accentPressed` (both modes) |
+| **saffron-500** | **`#F75606`** | **logo orange**; `accent` in both modes, `ratingStar`, `dropoffPin` |
+| saffron-700 | `#B33D00` | `accentStrong` (light): orange glyphs on white and on `accentSoft`; `dropoffPinEdge` (light) |
+| saffron-900 | `#3A1A0C` | `accentSoft` (dark) |
 
-Saffron is never used for buttons, never for status, never for large areas. Max one saffron element per screen region.
+Retired: `#F59A23`, `#C77700` (old light `ratingStar`), `#A85A00`, `#F5A524` (old dark `ratingStar`), `#FFF4E5`.
+
+**Rules (navy + saffron):**
+1. **Navy acts, saffron marks.** Every pressable primary thing stays navy (`primary`): buttons, selected states, active tab, switches, route line, progress fill, slide-to-confirm. Saffron marks *brand moments* (§1.7): where you are going, how you were rated, the money you keep, the brand itself. Saffron is never a button fill, never a selected state, never a status (online, error, warning, success).
+2. **Never as text on a light surface.** `accent` on white is 3.34:1 (fine for a glyph or shape, fails text). Saffron appears only as (a) a fill carrying an `onAccent` glyph or text (5.50:1), (b) a glyph or shape ≥3:1 against what touches it, (c) a decorative stroke or bar. `accentStrong` is for glyphs, never for words. Words are `textPrimary`/`textSecondary`.
+3. **One saffron moment per region** (a sheet header, a card, a hero, a list row). The approved moments in §1.7 are spaced so this always holds; a new use needs a §1.7 row first.
+4. **Never two loud colours side by side.** Navy + saffron is the logo pair and may touch (`accent` on `primary` 4.46:1). Saffron never touches a `danger`/`dangerFill`, `success`, `pickupPin` or `warning` fill (1.5–1.8:1 against them: they blur): keep ≥8 pt or a neutral surface between them. A count Badge (red) is never placed on a saffron element.
+5. **Small areas.** Largest saffron fill is a 44 disc or a 20 map pin; `accentSoft` tints are the only large warm areas, and only on promo/invite cards and the promo notification tile. `accentSoft` is visually identical to `warningSoft` (1.0:1), so it is **never** used for a Banner, a status pill or any alert; an `accentSoft` surface always carries an `accent` disc, which a warning never has.
 
 ### 1.3 Neutrals
 
@@ -121,9 +133,13 @@ Code only ever uses these names (`theme.colors.<token>`). Raw palette names are 
 | `dangerFill` | `#C0262D` | `#D23A40` | destructive filled button (white text 5.90 / 4.75) |
 | `info` | `#1D58C4` | `#7FA8F5` | info text/icons |
 | `infoSoft` | `#E7EFFD` | `#15264A` | info banners |
-| `accent` | `#F59A23` | `#F59A23` | brand dot, promo tag fill, **[UI-R20]** Parcel service disc on passenger Home (glyph `onAccent`, 8.33:1) |
-| `onAccent` | `#0F1422` | `#0F1422` | text on `accent` |
-| `ratingStar` | `#C77700` | `#F5A524` | filled star |
+| `accent` **[UI-R21]** | `#F75606` | `#F75606` | logo orange (saffron-500): brand glyph discs (illustration badge, Parcel disc, promo/invite disc), BrandBar, centre pin destination head, vehicle lights. Only the §1.7 moments |
+| `accentPressed` **[UI-R21]** | `#FF7A33` | `#FF7A33` | pressed state of a pressable saffron disc (Parcel tile disc while the tile is pressed); `onAccent` on it 7.07 |
+| `onAccent` | `#0F1422` | `#0F1422` | glyph or text on `accent` (5.50) |
+| `accentSoft` **[UI-R21]** | `#FFF1E8` | `#3A1A0C` | promo card, invite card, FareTag, promo notification tile. Never a Banner or status (§1.2 rule 5) |
+| `accentSoftPressed` **[UI-R21]** | `#FFE2D1` | `#4A2412` | pressed promo/invite card |
+| `accentStrong` **[UI-R21]** | `#B33D00` | `#FF9B66` | saffron **glyph** on `surface`/`accentSoft` (5.86 / 5.30 light, 8.37 / 7.60 dark). Never for words |
+| `ratingStar` **[UI-R21]** | `#F75606` | `#F75606` | filled star (was `#C77700` / `#F5A524`) |
 | `ratingStarEmpty` | `#C3CAD9` | `#2B3450` | empty star (decorative; the number is always shown next to it) |
 | `overlay` | `rgba(9,12,22,0.48)` | `rgba(0,0,0,0.64)` | modal/sheet scrim |
 | `skeletonHighlight` | `#F4F6FA` | `#252D44` | shimmer highlight over `surfaceAlt` |
@@ -131,7 +147,8 @@ Code only ever uses these names (`theme.colors.<token>`). Raw palette names are 
 | `routeLineCasing` | `#FFFFFF` | `#0B0F1A` | 2pt casing under the route line |
 | `routeLineTraveled` | `#858EA5` | `#626E90` | already-driven part of the route |
 | `pickupPin` | `#15803D` | `#3DD17A` | pickup marker (circle) |
-| `dropoffPin` | `#011C72` | `#C9D5F7` | dropoff marker (square) |
+| `dropoffPin` **[UI-R21]** | `#F75606` | `#F75606` | dropoff marker (square), AddressPair dropoff glyph (was `#011C72` / `#C9D5F7`) |
+| `dropoffPinEdge` **[UI-R21]** | `#B33D00` | `#F75606` | 1 pt edge of the 10×10 AddressPair dropoff square (light needs it: `accent` on `surfaceAlt` is 2.88) |
 | `stopPin` | `#4C556C` | `#B7BFD0` | intermediate stop marker (numbered circle) |
 | `driverMarker` | `#0F1422` | `#F2F4F9` | car icon body on the map |
 | `userLocation` | `#1D58C4` | `#7FA8F5` | blue dot + 20% halo |
@@ -162,7 +179,15 @@ Text must be ≥4.5:1 (large text ≥3:1); UI boundaries/icons ≥3:1.
 | `danger` on `surface` / on `dangerSoft` | 5.90 / 5.14 | 6.89 / 6.42 |
 | `info` on `surface` / on `infoSoft` | 6.47 / 5.60 | 7.29 / 6.27 |
 | white on `dangerFill` | 5.90 | 4.75 |
-| `onAccent` on `accent` | 8.33 | 8.33 |
+| `onAccent` on `accent` **[UI-R21]** | 5.50 | 5.50 |
+| `onAccent` on `accentPressed` **[UI-R21]** | 7.07 | 7.07 |
+| `accent` on `surface` / `background` (non-text only) **[UI-R21]** | 3.34 / 3.09 | 5.19 / 5.73 |
+| `accent` on `surfaceAlt` (non-text) **[UI-R21]** | 2.88 → never alone; AddressPair square carries `dropoffPinEdge` | 4.62 |
+| `accent` on `primary` / `heroFill` (BrandBar) **[UI-R21]** | 4.46 | 4.28 |
+| `accentStrong` on `surface` / on `accentSoft` (glyph) **[UI-R21]** | 5.86 / 5.30 | 8.37 / 7.60 |
+| `textPrimary` / `textSecondary` on `accentSoft` **[UI-R21]** | 16.62 / 6.73 | 14.32 / 8.53 |
+| `dropoffPin` vs its ring **[UI-R21]** | 3.34 (white ring) | 5.73 (`#0B0F1A` ring); 4.75 on dark map land |
+| `accent` vs `dangerFill` / `success` / `pickupPin` **[UI-R21, banned adjacency]** | 1.77 / 1.73 / 1.50 | — → never side by side (§1.2 rule 4) |
 | `borderStrong` on `surface` (non-text) | 3.28 | 3.43 |
 | `borderStrong` on `background` (non-text) **[UI-R2]** | 3.03 | 3.78 |
 | `surfaceAlt` vs `surface` / vs `background` (field fill alone) **[UI-R2]** | 1.16 / 1.07 | 1.12 / 1.24 → **fails 1.4.11**, so a fill-only field is not allowed (§5.6) |
@@ -175,7 +200,7 @@ Text must be ≥4.5:1 (large text ≥3:1); UI boundaries/icons ≥3:1.
 | `textDisabled` on `fillDisabled` **[T-545]** | 5.57 | 6.65 |
 | `textDisabled` on `surface` / on `background` (disabled `outline`/`ghost`) **[T-545]** | 7.44 / 6.87 | 9.39 / 10.37 |
 | `fillDisabled` vs `primary` (disabled vs enabled fill, non-text) **[T-545]** | 11.15 | 2.19 (dark tells them apart by hue: grey-navy vs bright `#3D5FD0`, and by the label colour) |
-| `ratingStar` on `surface` (non-text) | 3.46 | 8.50 |
+| `ratingStar` on `surface` (non-text) **[UI-R21]** | 3.34 | 5.19 |
 | `pickupPin` on light map land `#F2F2F2` | 4.48 | 8.01 (on `#1D2230`) |
 | `routeLine` on map land | 13.30 | 6.71 |
 
@@ -189,7 +214,67 @@ Text must be ≥4.5:1 (large text ≥3:1); UI boundaries/icons ≥3:1.
 - The map uses the dark map style (section 9) and dark pins.
 - Images and the logo: use the logo on a `surface`-coloured round badge in both modes; never invert it.
 
+### 1.7 Brand moments: navy + saffron **[UI-R21, 2026-10-20]**
+
+The recurring saffron moments, shared by both roles. Each has one component owner in `src/components/ui`, so a screen never paints saffron by hand. All values are tokens from §1.4.
+
+**Adopted (8 moments)**
+
+| # | Moment | Component and anatomy | Tokens (light / dark) | Contrast |
+|---|---|---|---|---|
+| M1 | **Destination is orange.** Dropoff map pin, AddressPair dropoff glyph and the choose-on-map centre pin in destination mode | `DropoffPin` (§5.21): 20×20 square radius 4, fill `dropoffPin`, 4 pt `routeLineCasing` ring, 6×6 inner square in ring colour. AddressPair rail (§5.23): 10×10 square `dropoffPin` with 1 pt `dropoffPinEdge` border. Centre pin (§5.21) in destination mode: head `accent` with an 8 `onAccent` inner dot; pickup mode stays `primary` | `dropoffPin` `#F75606` / `#F75606`; `dropoffPinEdge` `#B33D00` / `#F75606` | fill vs its white ring 3.34 (light), vs dark ring `#0B0F1A` 5.73, on dark map land 4.75; rail edge `#B33D00` on `surface` 5.86, on `surfaceAlt` 5.04 |
+| M2 | **Rating star is orange** (display and input) | `RatingStars` (§5.22): filled star `ratingStar`; number beside it in `textPrimary` | `ratingStar` `#F75606` / `#F75606` | 3.34 on `surface`, 5.19 dark `surface` (non-text ≥3) |
+| M3 | **Brand bar** on the two money heroes and the auth hero | New kit `BrandBar`: 24×4, radius `pill`, fill `accent`, decorative (hidden from screen readers), start-aligned (mirrors in RTL) | `accent` on `heroFill` / `primary`: 4.46 light, 4.28 dark; on `surface`/`background` 3.34/3.09 light, 5.19/5.73 dark | decorative |
+| M4 | **Fixed-fare tag** on the passenger's selected fare | New kit `FareTag`: height 24, padding 8 horizontal, radius `pill`, fill `accentSoft`, 16 glyph `lock-outline` `accentStrong`, 4 gap, `label` (13/18/600) `textPrimary`. Copy: "Fixed fare" / "Tay shuda kiraya"; when the passenger has moved the offer stepper off the quote: glyph `hand-coin-outline`, "Your offer" / "Aap ki offer". Replaces the `caption` lock note | `accentSoft` `#FFF1E8` / `#3A1A0C`; glyph `accentStrong` `#B33D00` / `#FF9B66` | glyph 5.30 / 7.60; text 16.62 / 14.32 |
+| M5 | **Promo and invite cards** | Promo card without image (§5.30) and the Invite code card: fill `accentSoft`, leading 40 `accent` disc with a 24 `onAccent` glyph (`tag-outline` promo, `gift-outline` invite), title `title` `textPrimary`, body `bodySmall` `textSecondary` | `accentSoft`; disc `accent`; glyph `onAccent` `#0F1422` | glyph 5.50; `textSecondary` on `accentSoft` 6.73 / 8.53 |
+| M6 | **Promo notification tile** | Notification row icon tile (§12.4): 40×40 radius `md` `accentSoft`, 24 `tag-outline` `accentStrong`. Replaces `warningSoft`/`warning` (UI-R14): a promo is not a warning | as M4 | 5.30 / 7.60 |
+| M7 | **Brand glyph discs** (already in place, now the real orange) | Illustration badge 48 (§4, EmptyState / permissions / account status, `onAccent` glyph), Home Parcel service disc 44 (UI-R20, `onAccent` glyph), splash progress segment (auth-splash) | `accent`; glyph `onAccent` | 5.50 |
+| M8 | **Vehicle lights** on every map vehicle | `map-vehicles.md` `vehicleHeadlight` = `accent` (head lights, bike helmet, rickshaw band) | `accent` | decorative |
+
+**Evaluated and not adopted**
+
+| Candidate | Why not |
+|---|---|
+| Active tab indicator / selected states | Selection is navy's job (rule 1); the red Inbox count Badge sits on the active pill (rule 4) |
+| "Where to?" search icon | Same sheet header region as the Parcel disc (rule 3), and it would blur "orange = Parcel" on the service row |
+| Offer stepper buttons | They are buttons (rule 1). The offer is marked by M4 instead |
+| Earnings amount-owed card | Money owed must read calm and neutral (UI-R17); orange beside a debt reads as a warning |
+| Driver online toggle "online" | Online is a status (`success`); rule 1 |
+| Trip progress bar | Progress is a navy fill; a second colour on a 4 pt bar is noise and sits next to green pickup |
+| Searching pulse | It rings the green pickup pin (rule 4) |
+| Reach strip dot | A tiny live indicator beside the searching pulse; adds a third accent to the finding-driver sheet for no meaning |
+| Section highlights on lists | Would repeat on every section; saffron must stay a moment, not a texture |
+| Route line or route endpoints both orange | Route stays navy (`routeLine`); only the destination end is orange (M1), so the eye reads "from here (green), to there (orange)" |
+
+### 1.8 Placement by screen **[UI-R21]**
+
+Every screen below gets exactly these saffron elements and no others. Screens not listed get none (beyond M7 empty-state badges and M2 stars wherever a rating is shown).
+
+| Role | Screen (spec) | Saffron elements |
+|---|---|---|
+| Both | Splash (auth-splash) | M7 progress segment `accent` (value change only). Background stays `navy-950`, logo badge unchanged |
+| Both | Login, Phone OTP, Registration step 1, Forgot password (auth-*) | M3 BrandBar: logo badge 72 → 16 → BrandBar → 12 → `h1` title (start-aligned with the title). One per screen; not on later registration steps |
+| Both | Account status, permission pre-prompts (auth-account-status, shared-permissions) | M7 illustration badge (unchanged anatomy, new value; refusal states keep `dangerFill`) |
+| Passenger | Home (passenger-home) | M7 Parcel disc; M8 nearby vehicles; M1 dropoff square in Recent rides rows (AddressPair compact). Where-to field unchanged |
+| Passenger | Destination search / choose on map (passenger-destination-search) | M1 AddressPair dropoff glyph in the From/To fields' rail; centre pin `accent` head in destination mode |
+| Passenger | Choose a ride (passenger-vehicle-fare) | M1 dropoff pin on the map and in the AddressPair summary; M4 FareTag in the selected fare block, start-aligned, replacing the lock caption (the stepper itself stays navy/neutral) |
+| Passenger | Finding driver (passenger-finding-driver) | M8 nearby vehicles only. Pulse, reach strip and progress stay navy/green |
+| Passenger | Driver assigned, Trip in progress (passenger-driver-assigned, passenger-trip-in-progress) | M1 dropoff pin + rail; M2 driver rating star in the PersonCard; M8 assigned vehicle |
+| Passenger | Trip complete / receipt (passenger-trip-complete) | M2 rating input stars (selected = `ratingStar`). Money hero gets no BrandBar here (rating input is the region's saffron) |
+| Passenger | Wallet (passenger-wallet) | M3 BrandBar 8 above "Wallet balance" in the balance card |
+| Both | Activity / Ride history, Ride details (shared-ride-history, shared-ride-details) | M1 dropoff glyph in each AddressPair; M2 star in Ride details where the rating shows |
+| Both | Inbox › Notifications (shared-notifications) | M6 promo tile (`type` promo only) |
+| Both | Account / Profile (shared-profile, shared-settings) | M2 rating star in the profile header; Invite row leading tile stays neutral |
+| Both | Invite friends (shared-support-invite) | M5 Invite code card (code `numericL` `textPrimary`, Copy IconButton `tonal` navy) |
+| Both | Promo/offers row where shown (OffersRow) | M5 promo card without image |
+| Driver | Drive offline/online (driver-drive-home) | M8 own vehicle lights; M2 star on the Rating stat. Online dot, Go online/offline unchanged |
+| Driver | Incoming request (driver-incoming-request) | M1 dropoff pin + rail (`size="lg"`); M2 rider rating star. Fare and Cash badge unchanged |
+| Driver | To pickup, Trip in progress (driver-to-pickup, driver-trip-in-progress) | M1 dropoff pin + rail; M2 rider star |
+| Driver | Trip complete (driver-trip-complete) | M2 rating input stars |
+| Driver | Earnings (driver-earnings) | M3 BrandBar 8 above "You keep" in the period hero (`heroFill`). Amount-owed card unchanged |
+
 ---
+
 
 ## 2. Typography
 
@@ -449,13 +534,13 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 
 ### 5.21 Map pins and route
 - **Pickup pin:** 20×20 circle `pickupPin` with 4pt white ring (dark: `#0B0F1A` ring) and `elevation.2`; label bubble above (optional) radius `sm`, `surface`, `caption`.
-- **Dropoff pin:** 20×20 square radius 4 `dropoffPin` with 4pt ring; inner 6×6 square in ring colour.
+- **Dropoff pin:** 20×20 square radius 4 `dropoffPin` with 4pt ring; inner 6×6 square in ring colour. **[UI-R21]** `dropoffPin` is now the logo orange in both modes (§1.7 M1).
 - **Stop pin:** 22×22 circle `stopPin` with white `numericSmall` index.
 - **[T-586, 2026-10-19] Superseded:** vehicle markers (art, sizes, colours, states, nearby motion, tier filter, count chip) now follow `screens/map-vehicles.md`: react-native-svg top-down glyphs (car, AC car, bike, parcel bike, rickshaw, van), nearby 40 pt at full opacity, assigned 48 pt with a round halo, a contact shadow drawn inside the SVG (still no native marker shadow, rule (b)), nearby vehicles interpolated on one shared ≤15 fps ticker. The T-517 paragraph and rule (d) below are kept for history.
 - **Driver marker [T-517]:** 40×40 north-up top-down vehicle PNG at 1x/2x/3x per vehicle kind and map style (`src/assets/vehicles/<car|bike|rickshaw>-<light|dark>[@2x|@3x].png`, generated by `scripts/generate-vehicle-markers.js`, never hand-edited). Kind from the backend `vehicle_type`: `bike`, `rickshaw`; `car`, `van`, unknown or missing draw the car. Colours are token values baked into the art (a test fails if a token changes without regenerating): body `driverMarker`, 2pt outline `routeLineCasing`, glass `borderStrong`, front lights (and the bike rider's helmet) `accent`, tail lights `danger`, 0.9pt casing-coloured seams between same-colour parts. The art should stay inside the 40×40 box with its 2pt outline complete (no casing touching the canvas edge; T-517 review polish: the rickshaw nose clips 0.4pt today). Drawn with `flat` + `rotation` = heading (degrees clockwise from north), anchor 0.5/0.5, so it keeps pointing along the street when the map rotates; motion per §6.7.
 - **[UI-R5] Ruled in review:** (a) the 20 / 22 pin sizes are the **outer** size, ring included (pickup = 12pt `pickupPin` fill inside a 4pt ring; stop = 22 outer with a 2pt ring), so the pickup pin and the numbered stop read as one family. (b) No map marker has `elevation`/shadow: iOS Google Maps snapshots the marker view and clips the shadow into an opaque grey square, so the `routeLineCasing` ring does the separating. Label bubbles get a hairline `border` instead. (c) ~~Upright MDI `car` badge until a top-down asset exists~~ **superseded by T-517 (2026-10-13):** the driver marker is the top-down vehicle art above (car, bike, rickshaw; light and dark variants), rotated with `flat`. The art carries its own `routeLineCasing` outline, so rule (b) still holds (no shadow). The marker's custom view is tracked until the bitmap has loaded and then frozen (`tracksViewChanges` off); position and rotation are marker props, so animating them does not re-snapshot the view. (d) Nearby (unassigned) drivers draw their own `vehicle_type` art at 60% opacity (`componentTokens.ride.vehicleMarker.mutedOpacity`), z-index 0 below the assigned vehicle (z-index 4), not interpolated, north-up while `GET /rides/nearby-drivers` sends no heading. (e) The driver's own screens (Drive, DriverRide) draw the driver's vehicle marker instead of the native blue dot (`showsUserLocation` only while there is no position).
 - **User location:** native blue dot (`showsUserLocation`), tinted `userLocation` on Android.
-- **Center pin (choose on map):** 32 tall stem pin in `primary`, lifts 8pt with a shadow while the map moves (motion 6.5).
+- **Center pin (choose on map):** 32 tall stem pin in `primary`, lifts 8pt with a shadow while the map moves (motion 6.5). **[UI-R21]** In destination mode the 20 head is `accent` with an 8 `onAccent` inner dot and the stem stays `primary`; pickup mode is unchanged.
 - **Route line:** width 5, colour `routeLine`, casing width 7 `routeLineCasing` drawn underneath; traveled part `routeLineTraveled`; line cap/join round. Draw-on animation 600 ms ease-out when a new route appears (reduced motion: instant).
 - Camera: fit route with padding top `insets.top + 72`, bottom = current sheet height + 24, sides 48.
 
@@ -466,7 +551,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Display: always star + numeric `numeric` value (e.g. `{user.rating}` to one decimal). If `rating` is null show "New" (`caption` `textMuted`), never four hardcoded stars (today: Settings header).
 
 ### 5.23 Address pair ("Raah line", brand signature)
-- Vertical stack of pickup and dropoff (and stops) rows. Leading rail at x=16..36: pickup 10×10 circle `pickupPin`, dropoff 10×10 square `dropoffPin`, stops 8×8 circle `stopPin`; connected by a 2pt dotted line (`borderStrong`, dash 2 / gap 3) through the vertical centres.
+- Vertical stack of pickup and dropoff (and stops) rows. Leading rail at x=16..36: pickup 10×10 circle `pickupPin`, dropoff 10×10 square `dropoffPin` (**[UI-R21]** with a 1 pt `dropoffPinEdge` border, inside the 10), stops 8×8 circle `stopPin`; connected by a 2pt dotted line (`borderStrong`, dash 2 / gap 3) through the vertical centres.
 - Row: min height 48; text `body` `textPrimary` 1 line (ellipsis), optional label above in `caption` `textMuted` ("Pickup", "Drop-off"). Divider hairline inset to text start (x=48) between rows when the rows are editable fields.
 - Used in: booking, history cards, ride details, incoming request, trip screens. One component, one look everywhere.
 - **[UI-R5] Densities (one component):** `density="regular"` (rows min 48, optional `caption` labels, divider when editable: booking, ride details, passenger trip); `density="compact"` (rows min 32, no labels, `body` 1 line: history cards, booking summary row, Home recent rides); plus `size="lg"` for the driver's moving screens (incoming request, driver trip): labels + `h3` (20pt) text up to 2 lines. Rail, glyphs and dotted line are identical in every variant.
@@ -501,7 +586,7 @@ Never use orange/periwinkle/green/blue fills for buttons (today: "Create New Acc
 - Card (not outlined), padding 16, min height 96: icon 20 in a 32×32 `primarySoft` circle → 12 → value `numericL` `textPrimary` (1 line, `adjustsFontSizeToFit` min scale 0.8) → 2 → label `caption` `textSecondary`. No trend chips unless the API returns a delta (today "+12%" is invented).
 
 ### 5.30 Promo / banner card
-- Width = window − 48 (peek of next card 16), height 120, radius `lg`, image `image_url` cover with a bottom gradient `rgba(9,12,22,0)→rgba(9,12,22,0.72)` only under the text (the only gradient allowed), title `title` white, description `bodySmall` white 2 lines max. Without an image: fill `saffron-50` (dark: `surfaceAlt`), text `textPrimary`, a 24 `tag-outline` icon in `saffron-700`. Horizontal pager, snap, 12 gap, page dots 6×6 below (active `primary`, 16 wide pill).
+- Width = window − 48 (peek of next card 16), height 120, radius `lg`, image `image_url` cover with a bottom gradient `rgba(9,12,22,0)→rgba(9,12,22,0.72)` only under the text (the only gradient allowed), title `title` white, description `bodySmall` white 2 lines max. Without an image **[UI-R21]**: fill `accentSoft` (both modes), padding 16, leading 40 `accent` disc with a 24 `tag-outline` `onAccent` glyph → 12 → title `title` `textPrimary` / description `bodySmall` `textSecondary`; pressed `accentSoftPressed`. Horizontal pager, snap, 12 gap, page dots 6×6 below (active `primary`, 16 wide pill).
 
 ### 5.31 Slide-to-confirm (driver)
 - Used for "Start trip" and "Complete trip" on driving screens to prevent accidental taps. Height 64, radius `pill`, track `primary`; knob 56×56 white circle with `chevron-double-right` 28 `primary`, 4 inset; label `button` `onPrimary` centered, fades as the knob moves. Completes at 85% travel; springs back otherwise. Accessibility: exposes as a button with `accessibilityActions` "activate" (double-tap confirms) so screen-reader users are not blocked.
@@ -652,7 +737,7 @@ The palette, type scale and spacing grid above were right on 2026-10-08; the app
 
 ### 12.1 Brand application (keep, refine)
 - **Navy is the only action colour.** Primary buttons, selected states, active tab, route line, slide-to-confirm. Light mode `#011C72`, dark mode `#3D5FD0` (`primary` token). Nothing else may look like a primary action: the periwinkle CTA and prices on the booking sheet, the green Accept on the driver request, the orange/"Create New Account" and three different button blues on Login all go.
-- **Saffron is the signature, used sparingly:** the brand dot in the logo badge, rating stars, promo tags and the promo card. Max one saffron element per screen region.
+- **Saffron is the signature** **[UI-R21]**: the logo orange `#F75606`, in the eight brand moments of §1.7 and the per-screen list in §1.8. Max one saffron element per screen region.
 - **Green is status, not action:** `success` for Completed, Approved, Online dot, cash collected. Red is `danger` for errors and destructive actions; "Cancel ride" is a `destructiveSoft` text-style button, never a pink filled slab (today: passenger trip sheet).
 - The logo appears only on splash and auth screens (72/96 badge, §4); never repeated as a pattern. Brand name casing **Raah-e-Haq** (today: "RaaH-E-Haq", "RaaHeHaq" on Login/Registration).
 
@@ -675,7 +760,7 @@ Rules: one primary button per screen, always in the same place for its archetype
 ### 12.4 List and card patterns
 - **Grouped settings list:** `overline` header at x=16 → 8 → Card(radius 16, no padding) of `ListItem`s with 40×40 icon tiles (`surfaceAlt`, radius 12, 24 glyph `textSecondary`), hairline dividers inset to 72. This is what driver Settings / passenger Settings v2 already do; Profile, Wallet, Saved places and History adopt it.
 - **Content card (ride, place):** Card radius 16, padding 16; top row = meta (`caption` `textMuted` date · status pill end-aligned); body = AddressPair; footer row = money `numeric` start + one ghost action end. The whole card is the tap target (no "Details" filled button; today History shows a navy "Details >" slab on every card).
-- **Notification row:** leading 40 icon tile whose glyph and tone depend on `type` (ride → `car-side` info; chat → `message-text-outline` primary; payment → `cash` success; promo → `tag-outline` `warningSoft`/`warning` [UI-R14]; system → `bell-outline` neutral) — today every ride notification uses the same taxi glyph. Unread = 8pt `primary` dot at the end + title 600; read = title 400.
+- **Notification row:** leading 40 icon tile whose glyph and tone depend on `type` (ride → `car-side` info; chat → `message-text-outline` primary; payment → `cash` success; promo → `tag-outline` `accentSoft`/`accentStrong` [UI-R21; was `warningSoft`/`warning` in UI-R14: a promo is not a warning]; system → `bell-outline` neutral) — today every ride notification uses the same taxi glyph. Unread = 8pt `primary` dot at the end + title 600; read = title 400.
 - **List filters [UI-R4]:** FilterChips row per §5.11 under the screen's SegmentedControl (Activity › Rides, Activity › Wallet, Inbox › Notifications).
 - **Chat row:** Avatar 48 (initials fallback always; today passenger sees solid periwinkle blobs) · name `title` · last message `bodySmall` 1 line · time `caption` end · status chip only when the chat is closed ("Ended", neutral), not "Read-only".
 - **Money:** `formatMoney()` everywhere — `Rs 1,250`. Today the driver side prints `PKR 150`, passenger `Rs 150`, wallet `Rs 1200`, driver profile `$2.4k`.
