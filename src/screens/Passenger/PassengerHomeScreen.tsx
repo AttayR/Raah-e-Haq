@@ -20,7 +20,7 @@ import type { PassengerStackParamList } from '../../app/navigation/stacks/Passen
 import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { logger } from '../../core/logging/logger';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
-import { HOME_PEEK_HEIGHT, HomeSheetBody, HomeSheetHeader } from '../../features/passenger-home/components/HomeSheet';
+import { HOME_PEEK_HEIGHT, HomeSheetBody, HomeSheetHeader, homePeekHeight } from '../../features/passenger-home/components/HomeSheet';
 import { greetingFor } from '../../features/passenger-home/greeting';
 import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
 import { useRecentRides } from '../../features/ride-history/hooks';
@@ -235,7 +235,7 @@ export default function PassengerHomeScreen() {
       />
 
       <BottomSheet
-        peekHeight={HOME_PEEK_HEIGHT}
+        peekHeight={homePeekHeight(liveRide !== null)}
         active={isFocused}
         snapPoints={['peek', 'half', 'full']}
         animatedHeight={sheetAnimatedHeight}

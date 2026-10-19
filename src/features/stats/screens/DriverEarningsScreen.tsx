@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -29,6 +29,7 @@ import { earningsRideText } from '../format';
 import { useDriverEarnings } from '../hooks';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
 import type { EarningsPeriod, EarningsRide } from '../types';
+import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
 
 const PERIODS = perLocale(() => [
   { value: 'day', label: STATS_COPY.periodDay },
@@ -52,6 +53,8 @@ export default function DriverEarningsScreen() {
   const earnings = useDriverEarnings(period, isFocused);
   const { data, status, error, rides, refresh, reload } = earnings;
   const { scrollY, onScroll } = useHeaderScroll();
+  // T-577: re-tapping the selected tab scrolls this list to the top.
+  const listRef = useRef<FlatList<EarningsRide>>(null);
   // A new period may remount the list at the top: the hairline follows it.
   useEffect(() => {
     scrollY.value = 0;
@@ -190,7 +193,9 @@ export default function DriverEarningsScreen() {
     <Screen testID="earnings-screen">
       {header}
       <ScrollHairline scrollY={scrollY} testID="earnings-hairline" />
+      <TabScrollToTop scrollRef={listRef} />
       <Animated.FlatList
+        ref={listRef}
         testID="earnings-rides"
         style={styles.list}
         onScroll={onScroll}

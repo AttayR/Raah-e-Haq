@@ -5,7 +5,7 @@ import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
 import { toast, type ToastOptions } from '../../core/toast';
 import type { RideResource } from '../../services/rideService';
-import { formatDistance } from '../../utils/format';
+import { formatDistance, formatMoney } from '../../utils/format';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
 import { layout, space } from '../../theme/spacing';
 import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
@@ -27,6 +27,7 @@ import {
   type DriverRideState,
 } from './slice';
 import { isRestorableDriverRide, rideStep, type DriverRideStep } from './steps';
+import { chargedCancelFeeOf } from './noShow';
 import { PIN_CODES, isPinRefusalCode, pinRefusalOf, type PinRefusal } from '../safety/pin';
 import { isParcelRide } from '../parcel/api';
 
@@ -224,7 +225,10 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       if (rideId === null) return false;
       const action = await dispatch(cancelDriverRide({ rideId, note }));
       if (cancelDriverRide.fulfilled.match(action)) {
-        toast.success(DRIVER_RIDE_COPY.cancelledDone, undefined, DRIVER_RIDE_TOAST_OPTIONS);
+        // BE-109: the fee the cancel really charged (the server's answer, not the preview).
+        const fee = chargedCancelFeeOf(action.payload);
+        const feeText = fee === null ? undefined : t(parcel ? 'driverFare.cancelFeeShareParcel' : 'driverFare.cancelFeeShare', { amount: formatMoney(fee) });
+        toast.success(DRIVER_RIDE_COPY.cancelledDone, feeText, DRIVER_RIDE_TOAST_OPTIONS);
         // The server no longer reports `on_ride`; the toggle and the request feed follow it.
         dispatch(loadDriverStatus());
         return true;
@@ -232,7 +236,7 @@ export const useDriverRideFlow = (): DriverRideFlow => {
       handleRefusal(action.payload, !!action.meta.condition, rideId);
       return false;
     },
-    [dispatch, handleRefusal, rideId],
+    [dispatch, handleRefusal, parcel, rideId],
   );
 
   const refresh = useCallback(() => {

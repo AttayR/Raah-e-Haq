@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { RideResource } from '../../services/rideService';
-import { toFarePolicy } from '../fare/api';
 import type { DriverRideStep } from './steps';
 
 /**
@@ -21,12 +20,26 @@ export const noShowAtOf = (ride: Pick<RideResource, 'no_show_cancel_at'> | null 
 };
 
 /**
- * The no-show fee the passenger would pay, only while fees are on (BE-85 `fare_policy`); null
- * otherwise, so the sheet never promises a charge the server will not make.
+ * BE-109 (T-577): the no-show fee the server would really charge now, from the driver-only
+ * `no_show_preview`: the fee when `fee_applies` (> 0), 0 when no fee would be charged (a daily
+ * cap, an unverified arrival, fees off), null when not known (an older server without the key,
+ * or not arrived yet). `fare_policy.cancel_fee` is only the rate card, never a promise.
  */
-export const noShowFeeOf = (ride: Pick<RideResource, 'fare_policy'> | null | undefined): number | null => {
-  const policy = toFarePolicy(ride?.fare_policy);
-  return policy && policy.feesEnabled && policy.cancelFee > 0 ? policy.cancelFee : null;
+export const noShowFeeOf = (ride: Pick<RideResource, 'no_show_preview'> | null | undefined): number | null => {
+  const preview = ride?.no_show_preview;
+  if (preview === null || typeof preview !== 'object') return null;
+  const fee = typeof preview.fee === 'string' ? Number(preview.fee) : preview.fee;
+  return preview.fee_applies === true && typeof fee === 'number' && Number.isFinite(fee) && fee > 0 ? fee : 0;
+};
+
+/**
+ * BE-109: what the cancel really charged (`cancellation_fee` on the POST /rides/{id}/cancel
+ * answer, "0.00" when a cap made it free): the rupees when above 0, else null.
+ */
+export const chargedCancelFeeOf = (ride: Pick<RideResource, 'cancellation_fee'> | null | undefined): number | null => {
+  const raw = ride?.cancellation_fee;
+  const fee = typeof raw === 'string' ? Number(raw) : raw;
+  return typeof fee === 'number' && Number.isFinite(fee) && fee > 0 ? fee : null;
 };
 
 /**

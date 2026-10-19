@@ -834,7 +834,9 @@ export const en = {
     noShowShort: 'No-show',
     noShowTitle: "Passenger didn't come?",
     noShowHint: 'You waited at the pickup, so no strike is recorded. The passenger sees this note.',
-    noShowFee: 'The passenger is charged the {amount} no-show fee. Your share shows in your wallet once it is credited.',
+    noShowFee: 'The passenger pays the {amount} no-show fee. Your share shows in your wallet once it is credited.',
+    /** BE-109: the server would charge nothing for this no-show (no amount, no reason). */
+    noShowNoFee: 'No fee will be charged.',
     noShowPointer: "You waited long enough at the pickup, so this cancel records no strike. Use \"Passenger didn't come\" next time.",
     noShowNote: 'The passenger did not come to the pickup.',
     noShowSubmit: 'Cancel as no-show',
@@ -842,7 +844,7 @@ export const en = {
     noShowButtonParcel: "Sender didn't come",
     noShowTitleParcel: "Sender didn't come?",
     noShowHintParcel: 'You waited at the pickup, so no strike is recorded. The sender sees this note.',
-    noShowFeeParcel: 'The sender is charged the {amount} no-show fee. Your share shows in your wallet once it is credited.',
+    noShowFeeParcel: 'The sender pays the {amount} no-show fee. Your share shows in your wallet once it is credited.',
     noShowPointerParcel: "You waited long enough at the pickup, so this cancel records no strike. Use \"Sender didn't come\" next time.",
     noShowNoteParcel: 'The sender did not come to the pickup.',
     fare: 'Fare',
@@ -851,6 +853,7 @@ export const en = {
     earnings: 'Your earnings',
     estimated: 'Estimated from the current fare until the trip ends.',
     cancelFeeShare: 'The passenger was charged {amount} for this cancellation. Your share shows in your wallet once it is credited.',
+    cancelFeeShareParcel: 'The sender was charged {amount} for this cancellation. Your share shows in your wallet once it is credited.',
     rideFareSplit: 'Fare {fare} · commission {rate}% = {commission}',
     // T-557: an Earnings row whose fare was locked at accept (BE-82/BE-103).
     rideFareSplitLocked: 'Locked fare {fare} · commission {rate}% = {commission}',

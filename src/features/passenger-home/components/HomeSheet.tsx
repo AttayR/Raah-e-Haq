@@ -4,16 +4,27 @@ import { AppText, Banner, Button, Chip } from '../../../components/ui';
 import { SavedPlaceChips } from '../../saved-places/components/SavedPlaceChips';
 import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
-import { layout, space } from '../../../theme';
+import { componentTokens, layout, space, textStyles } from '../../../theme';
 import type { HomeRecentRide } from '../types';
 import { RecentRidesCard } from '../../../components/ui/ride/RecentRidesCard';
-import { WhereToBar } from './WhereToBar';
+import { WHERE_TO_HEIGHT, WhereToBar } from './WhereToBar';
 
 /**
  * §8.3 peek: 24 handle area + greeting 22 + 12 + "Where to?" 52 + 12 + chip row 32 + 16. The
  * sheet sits above the tab bar, so the tab bar is not part of it.
  */
 export const HOME_PEEK_HEIGHT = 170;
+
+/**
+ * T-577: with a ride in progress "Return to your ride" (56) + 8 + its status line (20) take the
+ * place of "Where to?" (52), so the peek grows by the difference and the chip row stays above
+ * the tab bar instead of being cut off by it.
+ */
+export const HOME_LIVE_PEEK_EXTRA =
+  componentTokens.button.height.lg + space[2] + textStyles.bodySmall.lineHeight - WHERE_TO_HEIGHT;
+
+/** The Home sheet's peek height: taller while "Return to your ride" shows. */
+export const homePeekHeight = (liveRide: boolean): number => HOME_PEEK_HEIGHT + (liveRide ? HOME_LIVE_PEEK_EXTRA : 0);
 
 /** Sheet header (the drag area under the handle): the time-of-day greeting in `title`. */
 export function HomeSheetHeader({ greeting }: { greeting: string }) {

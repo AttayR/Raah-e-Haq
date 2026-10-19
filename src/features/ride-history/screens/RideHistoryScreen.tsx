@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
@@ -21,6 +21,7 @@ import { useRideHistory, useRideViewer } from '../hooks';
 import { useOpenRide } from '../../active-ride/useOpenRide';
 import type { Ride, RideHistoryFilter } from '../types';
 import { perLocale } from '../../../i18n';
+import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
 
 const FILTERS = perLocale(() => [
   { value: 'all', label: RIDE_HISTORY_COPY.filterAll },
@@ -56,6 +57,8 @@ export function RideHistoryList({ visible, summary, onRefresh: onHostRefresh }: 
   const { refresh, reload, loadMore } = list;
   const sections = useMemo(() => groupRidesByDay(list.items), [list.items]);
   const { scrollY, onScroll } = useHeaderScroll();
+  // T-577: re-tapping the selected tab scrolls this list to the top.
+  const listRef = useRef<SectionList<Ride, RideSection>>(null);
 
   useEffect(() => {
     scrollY.value = 0;
@@ -164,7 +167,9 @@ export function RideHistoryList({ visible, summary, onRefresh: onHostRefresh }: 
         />
       </View>
       <ScrollHairline scrollY={scrollY} testID="ride-history-hairline" />
+      <TabScrollToTop scrollRef={listRef} />
       <AnimatedSectionList
+        ref={listRef}
         testID="ride-history-list"
         style={styles.fill}
         sections={sections}

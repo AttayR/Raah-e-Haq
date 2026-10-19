@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { ActivityIndicator, RefreshControl, StyleSheet, View, type ListRenderItem } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type ListRenderItem } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -9,6 +9,7 @@ import { CHAT_COPY, fallbackNameOf, formatChatTime } from '../copy';
 import { useChatList } from '../hooks';
 import { openRideChat, type RideChatNavigator } from '../navigation';
 import type { ChatSummary } from '../types';
+import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
 
 const previewOf = (chat: ChatSummary): string => {
   const last = chat.lastMessage;
@@ -38,6 +39,8 @@ export type ChatListProps = {
 export function ChatList({ visible }: ChatListProps) {
   const { theme } = useAppTheme();
   const { scrollY, onScroll } = useHeaderScroll();
+  // T-577: re-tapping the selected tab scrolls this list to the top.
+  const listRef = useRef<FlatList<ChatSummary>>(null);
   const navigation = useNavigation<RideChatNavigator>();
   const { chats, status, errorMessage, refreshing, refresh } = useChatList(visible);
 
@@ -118,7 +121,9 @@ export function ChatList({ visible }: ChatListProps) {
   return (
     <View style={styles.list}>
       <ScrollHairline scrollY={scrollY} testID="chat-list-hairline" />
+      <TabScrollToTop scrollRef={listRef} />
       <Animated.FlatList
+        ref={listRef}
         data={data}
         keyExtractor={item => String(item.rideId)}
         renderItem={renderItem}

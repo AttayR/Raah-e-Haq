@@ -34,6 +34,12 @@ export type TextFieldProps = Omit<
   helper?: string;
   /** Error message: 2pt `danger` border, the message under the field, read with the label. */
   error?: string | null;
+  /**
+   * T-577: the caller shows the error message itself (e.g. in a sheet's sticky footer, which
+   * stays above the keyboard). The field keeps the danger border and reads the error with its
+   * name; only the message under it is left out.
+   */
+  hideErrorText?: boolean;
   variant?: TextFieldVariant;
   leadingIcon?: IconName;
   /** Trailing clear button while there is text. Default: on for `search`, off otherwise. */
@@ -69,6 +75,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     required = false,
     helper,
     error,
+    hideErrorText = false,
     variant = 'default',
     leadingIcon,
     clearable,
@@ -222,7 +229,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           />
         ) : null}
       </View>
-      {hasError ? (
+      {hasError && hideErrorText ? null : hasError ? (
         <View style={styles.helper} accessibilityLiveRegion="polite">
           <Icon name="warning" size={k.helperIconSize} color="danger" />
           <AppText variant="caption" color="danger" style={styles.helperText} testID={testID ? `${testID}-error` : undefined}>

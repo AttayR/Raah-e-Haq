@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
@@ -13,6 +13,7 @@ import { openNotificationTarget } from '../navigation';
 import { resolveNotificationTarget, type NotificationRole } from '../routing';
 import type { AppNotification, NotificationFilter } from '../types';
 import { perLocale } from '../../../i18n';
+import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
 
 export type NotificationsListProps = {
   role: NotificationRole;
@@ -38,6 +39,8 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
   const { state, hasMore, refresh, loadMore, reload, setFilter, markRead } = list;
   const { items, status, error, loadMoreError, filter } = state;
   const { scrollY, onScroll } = useHeaderScroll();
+  // T-577: re-tapping the selected tab scrolls this list to the top.
+  const listRef = useRef<FlatList<AppNotification>>(null);
 
   // A fresh filter starts at the top: the hairline follows it.
   useEffect(() => {
@@ -162,7 +165,9 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
         />
       </View>
       <ScrollHairline scrollY={scrollY} testID="notifications-hairline" />
+      <TabScrollToTop scrollRef={listRef} />
       <Animated.FlatList
+        ref={listRef}
         testID="notifications-list"
         data={items}
         keyExtractor={item => String(item.id)}

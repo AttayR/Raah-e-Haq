@@ -7,7 +7,7 @@ import React from 'react';
 import { Linking, Platform } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import * as Reanimated from 'react-native-reanimated';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../src/services/api';
@@ -228,6 +228,12 @@ describe('DriverRideScreen', () => {
     fireEvent.changeText(screen.getByTestId('cancel-reason-input'), 'no');
     fireEvent.press(screen.getByTestId('cancel-reason-submit'));
     expect(screen.getByTestId('cancel-reason-error').props.children).toBe('Please write at least 3 characters.');
+    // T-577: the error and the counter sit in the sticky footer (above the keyboard), not under
+    // the field where the footer covered them while typing; the field shows the error once.
+    const footer = screen.getByTestId('cancel-reason-sheet-footer');
+    expect(within(footer).getByTestId('cancel-reason-error')).toBeTruthy();
+    expect(within(footer).getByTestId('cancel-reason-counter').props.children).toBe('2/500');
+    expect(screen.getAllByText('Please write at least 3 characters.')).toHaveLength(1);
     expect(mock.history.post).toHaveLength(0);
 
     fireEvent.changeText(screen.getByTestId('cancel-reason-input'), 'Flat tyre');
@@ -236,6 +242,83 @@ describe('DriverRideScreen', () => {
     await waitFor(() => expect(selectDriverActiveRide(store.getState())).toBeNull());
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ note: 'Flat tyre' });
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
+    clock.mockRestore();
+  });
+
+  it('[T-577] the no-show sheet reads the ride once on opening and shows only the fee the server will charge (BE-109)', async () => {
+    const success = jest.spyOn(toast, 'success');
+    const cancelAt = '2026-01-01T00:00:00Z'; // long past: "Passenger didn't come" is offered
+    const arrived = (preview: RideResource['no_show_preview']) =>
+      makeRide({ status: 'arrived', passenger, no_show_cancel_at: cancelAt, fare_policy: { fees_enabled: true, cancel_fee: 50 }, no_show_preview: preview });
+    const { store, screen } = renderScreen(arrived({ fee: 50, fee_applies: true, capped: false, verified: true }));
+    await settle(store);
+    const readsBefore = mock.history.get.filter((r) => r.url === '/rides/41').length;
+
+    // Since the arrival a daily cap made it free: the re-read on opening says so.
+    serverRide = arrived({ fee: 0, fee_applies: false, capped: true, verified: true });
+    fireEvent.press(screen.getByTestId('driver-ride-no-show'));
+    await settle(store);
+    expect(mock.history.get.filter((r) => r.url === '/rides/41')).toHaveLength(readsBefore + 1);
+    expect(screen.getByTestId('cancel-reason-no-show-no-fee')).toBeTruthy();
+    expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();
+    // The rate card (fare_policy.cancel_fee 50) is not a promise.
+    expect(screen.queryByText(/Rs 50/)).toBeNull();
+
+    // After the cancel, the fee comes from the answer (here the server did charge it).
+    mock.onPost('/rides/41/cancel').reply(200, envelope(makeRide({ status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' })));
+    const clock = settleCancelSheet();
+    fireEvent.press(screen.getByTestId('cancel-reason-submit'));
+    await waitFor(() => expect(selectDriverActiveRide(store.getState())).toBeNull());
+    expect(success).toHaveBeenCalledWith(
+      'Ride cancelled.',
+      'The passenger was charged Rs 50 for this cancellation. Your share shows in your wallet once it is credited.',
+      expect.anything(),
+    );
+    clock.mockRestore();
+  });
+
+  it('[T-577] while the open-time read is in flight the sheet shows no fee line (never a stale amount)', async () => {
+    const preview = { fee: 50, fee_applies: true, capped: false, verified: true };
+    const { store, screen } = renderScreen(
+      makeRide({ status: 'arrived', passenger, no_show_cancel_at: '2026-01-01T00:00:00Z', no_show_preview: preview }),
+    );
+    await settle(store);
+    // Before the sheet opens the held ride says Rs 50; the server now says it is free.
+    let answer: ((value: [number, unknown]) => void) | null = null;
+    mock.onGet('/rides/41').reply(() => new Promise<[number, unknown]>((resolve) => (answer = resolve)));
+    fireEvent.press(screen.getByTestId('driver-ride-no-show'));
+    expect((store.getState() as ReturnType<typeof rootReducer>).driverRide.pendingAction).toBe('refresh');
+    expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();
+    expect(screen.queryByTestId('cancel-reason-no-show-no-fee')).toBeNull();
+    expect(screen.queryByText(/Rs 50/)).toBeNull();
+
+    // The request reaches the adapter asynchronously: wait until it is held.
+    await waitFor(() => expect(answer).not.toBeNull());
+    expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();
+    await act(async () => {
+      answer?.([200, envelope(makeRide({ status: 'arrived', passenger, no_show_cancel_at: '2026-01-01T00:00:00Z', no_show_preview: { ...preview, fee: 0, fee_applies: false, capped: true } }))]);
+    });
+    await settle(store);
+    expect(screen.getByTestId('cancel-reason-no-show-no-fee')).toBeTruthy();
+    expect(screen.queryByText(/Rs 50/)).toBeNull();
+  });
+
+  it('[T-577] a free cancel says no amount, and an older server (no preview) promises none', async () => {
+    const success = jest.spyOn(toast, 'success');
+    const { store, screen } = renderScreen(
+      makeRide({ status: 'arrived', passenger, no_show_cancel_at: '2026-01-01T00:00:00Z', fare_policy: { fees_enabled: true, cancel_fee: 50 } }),
+    );
+    await settle(store);
+    fireEvent.press(screen.getByTestId('driver-ride-no-show'));
+    await settle(store);
+    expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();
+    expect(screen.queryByTestId('cancel-reason-no-show-no-fee')).toBeNull();
+
+    mock.onPost('/rides/41/cancel').reply(200, envelope(makeRide({ status: 'cancelled', cancellation_fee: '0.00' })));
+    const clock = settleCancelSheet();
+    fireEvent.press(screen.getByTestId('cancel-reason-submit'));
+    await waitFor(() => expect(selectDriverActiveRide(store.getState())).toBeNull());
+    expect(success).toHaveBeenCalledWith('Ride cancelled.', undefined, expect.anything());
     clock.mockRestore();
   });
 

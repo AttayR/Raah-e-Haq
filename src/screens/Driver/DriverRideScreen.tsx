@@ -162,6 +162,19 @@ const DriverRideScreen: React.FC = () => {
   );
 
   const noShowReady = useNoShowReady(ride, step);
+  // BE-109 (T-577): the fee can change between the arrival and the no-show time (a daily cap, a
+  // fresh arrival ping), so opening the sheet reads the ride once; its line follows the answer.
+  // Until that read returns the sheet shows no fee line, never a stale "pays Rs X".
+  const { refresh } = flow;
+  const [feeReadPending, setFeeReadPending] = useState(false);
+  const openNoShow = useCallback(() => {
+    setCancelMode('no_show');
+    setFeeReadPending(true);
+    refresh();
+  }, [refresh]);
+  useEffect(() => {
+    if (feeReadPending && pendingAction !== 'refresh') setFeeReadPending(false);
+  }, [feeReadPending, pendingAction]);
 
   const onDone = useCallback(() => {
     flow.finish();
@@ -288,7 +301,7 @@ const DriverRideScreen: React.FC = () => {
               onComplete={flow.complete}
               onCompleteStop={flow.completeStop}
               onCancel={() => setCancelMode('strike')}
-              onNoShow={noShowReady ? () => setCancelMode('no_show') : undefined}
+              onNoShow={noShowReady ? openNoShow : undefined}
               bottomInset={insets.bottom}
               parcel={parcel.panel}
             />
@@ -305,7 +318,7 @@ const DriverRideScreen: React.FC = () => {
         <CancelReasonSheet
           visible={cancelMode !== null}
           mode={cancelMode ?? 'strike'}
-          noShowFee={noShowFeeOf(ride)}
+          noShowFee={feeReadPending ? null : noShowFeeOf(ride)}
           noShowAvailable={noShowReady}
           parcel={isParcelRide(ride)}
           submitting={pendingAction === 'cancel'}

@@ -4,9 +4,9 @@ import { CANCEL_NOTE_MAX_LENGTH, CANCEL_NOTE_MIN_LENGTH } from '../../features/d
 import { DRIVER_RIDE_COPY as COPY } from '../../features/driver-ride/copy';
 import type { DriverCancelMode } from '../../features/driver-ride/noShow';
 import { t } from '../../i18n';
-import { layout, motionPatterns, space } from '../../theme';
+import { componentTokens, layout, motionPatterns, space } from '../../theme';
 import { formatMoney } from '../../utils/format';
-import { AppText, Banner, BottomSheet, Button, TextField } from '../ui';
+import { AppText, Banner, BottomSheet, Button, Icon, TextField } from '../ui';
 
 type Props = {
   visible: boolean;
@@ -20,7 +20,11 @@ type Props = {
    * ("Passenger didn't come", after the wait) records none and starts with a note filled in.
    */
   mode?: DriverCancelMode;
-  /** The no-show fee the passenger pays, only while fees are on; null hides the line. */
+  /**
+   * BE-109 (T-577): the no-show fee the server would charge now (`noShowFeeOf`). Above 0: "The
+   * passenger pays Rs {fee}"; 0: "No fee will be charged"; null (older server, not known yet):
+   * no fee line, so the sheet never promises an amount.
+   */
   noShowFee?: number | null;
   /**
    * The no-show wait is over: a cancel now records no strike (BE-85), so the strike warning is
@@ -60,6 +64,7 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
   const valid = isValidCancelNote(note);
+  const showError = touched && !valid;
 
   // [T-573] Synchronous guards (refs: a second tap can arrive before React re-renders).
   const closingRef = useRef(!visible);
@@ -168,6 +173,25 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
       }
       footer={
         <View style={styles.footer}>
+          {/*
+            T-577: the note's error and counter sit at the top of the sticky footer, which rides
+            above the keyboard: under the field they were hidden behind the footer while typing.
+          */}
+          <View style={styles.status} testID="cancel-reason-status">
+            {showError ? (
+              <View style={styles.error} accessibilityLiveRegion="polite">
+                <Icon name="warning" size={componentTokens.textField.helperIconSize} color="danger" />
+                <AppText variant="caption" color="danger" style={styles.errorText} testID="cancel-reason-error">
+                  {COPY.cancelTooShort}
+                </AppText>
+              </View>
+            ) : (
+              <View style={styles.error} />
+            )}
+            <AppText variant="caption" color="textMuted" testID="cancel-reason-counter">
+              {`${note.length}/${CANCEL_NOTE_MAX_LENGTH}`}
+            </AppText>
+          </View>
           <Button
             label={submitting ? COPY.working : noShow ? t('driverFare.noShowSubmit') : COPY.cancelSubmit}
             variant="destructive"
@@ -182,36 +206,34 @@ export const CancelReasonSheet: React.FC<Props> = ({ visible, submitting, onSubm
     >
       <View style={styles.body}>
         {noShow ? (
-          fee !== null && fee > 0 ? (
+          fee === null ? null : fee > 0 ? (
             <Banner
               tone="info"
               text={t(forParcel ? 'driverFare.noShowFeeParcel' : 'driverFare.noShowFee', { amount: formatMoney(fee) })}
               testID="cancel-reason-no-show-fee"
             />
-          ) : null
+          ) : (
+            <Banner tone="info" text={t('driverFare.noShowNoFee')} testID="cancel-reason-no-show-no-fee" />
+          )
         ) : shown.noShowAvailable ? (
           <Banner tone="info" text={forParcel ? t('driverFare.noShowPointerParcel') : t('driverFare.noShowPointer')} testID="cancel-reason-no-show-pointer" />
         ) : (
           <Banner tone="warning" text={t('driverFare.strikeWarning')} testID="cancel-reason-strike" />
         )}
-        <View>
-          <TextField
-            value={note}
-            onChangeText={setNote}
-            onBlur={() => setTouched(true)}
-            placeholder={forParcel ? COPY.cancelPlaceholderParcel : COPY.cancelPlaceholder}
-            maxLength={CANCEL_NOTE_MAX_LENGTH}
-            multiline
-            doneBar
-            disabled={submitting}
-            error={touched && !valid ? COPY.cancelTooShort : null}
-            accessibilityLabel={COPY.cancelTitle}
-            testID="cancel-reason"
-          />
-          <AppText variant="caption" color="textMuted" style={styles.counter}>
-            {`${note.length}/${CANCEL_NOTE_MAX_LENGTH}`}
-          </AppText>
-        </View>
+        <TextField
+          value={note}
+          onChangeText={setNote}
+          onBlur={() => setTouched(true)}
+          placeholder={forParcel ? COPY.cancelPlaceholderParcel : COPY.cancelPlaceholder}
+          maxLength={CANCEL_NOTE_MAX_LENGTH}
+          multiline
+          doneBar
+          disabled={submitting}
+          error={showError ? COPY.cancelTooShort : null}
+          hideErrorText
+          accessibilityLabel={COPY.cancelTitle}
+          testID="cancel-reason"
+        />
       </View>
     </BottomSheet>
   );
@@ -221,7 +243,9 @@ const styles = StyleSheet.create({
   header: { gap: space[1], paddingHorizontal: layout.gutter, paddingBottom: space[2] },
   body: { gap: space[3], paddingHorizontal: layout.gutter, paddingBottom: space[2] },
   footer: { gap: space[2] },
-  counter: { alignSelf: 'flex-end', marginTop: space[1] },
+  status: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  error: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  errorText: { flexShrink: 1 },
 });
 
 export default CancelReasonSheet;

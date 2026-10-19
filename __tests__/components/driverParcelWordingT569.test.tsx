@@ -59,7 +59,7 @@ describe('cancel / no-show sheet on a parcel ride (T-569)', () => {
     render(<CancelReasonSheet visible parcel mode="no_show" noShowFee={50} submitting={false} onSubmit={onSubmit} onClose={jest.fn()} />);
     screen.getByText("Sender didn't come?");
     screen.getByText('You waited at the pickup, so no strike is recorded. The sender sees this note.');
-    screen.getByText('The sender is charged the Rs 50 no-show fee. Your share shows in your wallet once it is credited.');
+    screen.getByText('The sender pays the Rs 50 no-show fee. Your share shows in your wallet once it is credited.');
     const clock = settleCancelSheet();
     fireEvent.press(screen.getByTestId('cancel-reason-submit'));
     expect(onSubmit).toHaveBeenCalledWith('The sender did not come to the pickup.');

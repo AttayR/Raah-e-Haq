@@ -23,6 +23,9 @@ export type RideStatusValue =
   | 'completed'
   | 'cancelled';
 
+/** How far a step label may shrink to stay on one line (iOS; Android scales by steps). */
+const LABEL_MIN_SCALE = 0.8;
+
 const STEP_LABELS: TranslationKey[] = ['ride.stepRequested', 'ride.stepOnTheWay', 'ride.stepArrived', 'ride.stepOnTrip'];
 
 /** 0 Requested · 1 On the way · 2 Arrived · 3 On trip; null for ended or unknown statuses. */
@@ -77,9 +80,14 @@ export function RideProgress({ step, showLabels = true, testID }: { step: number
               key={key}
               variant={i === current ? 'label' : 'caption'}
               color={i === current ? 'textPrimary' : 'textMuted'}
-              numberOfLines={2}
+              // T-577: one line in every language (Roman Urdu "Pohanch gaya" wrapped); a long label
+              // shrinks a little rather than break the row.
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={LABEL_MIN_SCALE}
               align={i === 0 ? 'start' : i === STEP_LABELS.length - 1 ? 'end' : 'center'}
               style={styles.label}
+              testID={testID ? `${testID}-label-${i}` : undefined}
             >
               {t(key)}
             </AppText>

@@ -25,7 +25,7 @@ import { makeRide, makeRideRequest } from '../../../test-utils/rideFixtures';
 import { settleCancelSheet } from '../../../test-utils/cancelSheet';
 import { useActiveRideActions } from '../../../src/features/active-ride/hooks';
 import { dialog, dialogStore } from '../../../src/core/dialog';
-import { noShowAtOf, noShowFeeOf, useNoShowReady } from '../../../src/features/driver-ride/noShow';
+import { chargedCancelFeeOf, noShowAtOf, noShowFeeOf, useNoShowReady } from '../../../src/features/driver-ride/noShow';
 import { cancellationChargeText, driverSplitRows } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
 import { earningsRideText } from '../../../src/features/stats/format';
@@ -325,19 +325,27 @@ describe('driver cancel (BE-85 strikes and no-shows)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('"Passenger didn\'t come": no strike, a note filled in, the fee only while fees are on', () => {
+  it('"Passenger didn\'t come": no strike, a note filled in, the fee only when the server says it applies (BE-109)', () => {
     const onSubmit = jest.fn();
     const { rerender } = render(<CancelReasonSheet visible mode="no_show" noShowFee={50} submitting={false} onSubmit={onSubmit} onClose={jest.fn()} />);
     expect(screen.queryByTestId('cancel-reason-strike')).toBeNull();
     screen.getByText("Passenger didn't come?");
-    screen.getByText('The passenger is charged the Rs 50 no-show fee. Your share shows in your wallet once it is credited.');
+    screen.getByText('The passenger pays the Rs 50 no-show fee. Your share shows in your wallet once it is credited.');
     const clock = settleCancelSheet();
     fireEvent.press(screen.getByTestId('cancel-reason-submit'));
     expect(onSubmit).toHaveBeenCalledWith('The passenger did not come to the pickup.');
     clock.mockRestore();
 
+    // No fee would be charged (a cap, an unverified arrival): neutral, no amount, no reason.
+    rerender(<CancelReasonSheet visible mode="no_show" noShowFee={0} submitting={false} onSubmit={onSubmit} onClose={jest.fn()} />);
+    expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();
+    screen.getByText('No fee will be charged.');
+    expect(screen.queryByText(/Rs |cap/)).toBeNull();
+
+    // Older server (no preview): no promise either way.
     rerender(<CancelReasonSheet visible mode="no_show" noShowFee={null} submitting={false} onSubmit={onSubmit} onClose={jest.fn()} />);
     expect(screen.queryByTestId('cancel-reason-no-show-fee')).toBeNull();
+    expect(screen.queryByTestId('cancel-reason-no-show-no-fee')).toBeNull();
   });
 
   it('after the wait, a normal cancel shows no strike warning but points to the no-show cancel', () => {
@@ -374,11 +382,25 @@ describe('driver cancel (BE-85 strikes and no-shows)', () => {
     expect(within(footer).getAllByRole('button')).toHaveLength(2);
   });
 
-  it('reads no_show_cancel_at and the fee (fees on only)', () => {
+  it('reads no_show_cancel_at and the fee the server would really charge (BE-109 no_show_preview)', () => {
     expect(noShowAtOf({ no_show_cancel_at: '2026-10-15T10:05:00Z' })).toBe(Date.parse('2026-10-15T10:05:00Z'));
     expect(noShowAtOf({ no_show_cancel_at: null })).toBeNull();
-    expect(noShowFeeOf({ fare_policy: { fees_enabled: true, cancel_fee: 50 } })).toBe(50);
-    expect(noShowFeeOf({ fare_policy: { fees_enabled: false, cancel_fee: 0 } })).toBeNull();
+    expect(noShowFeeOf({ no_show_preview: { fee: 50, fee_applies: true, capped: false, verified: true } })).toBe(50);
+    expect(noShowFeeOf({ no_show_preview: { fee: '50.00', fee_applies: true } })).toBe(50);
+    // Capped / unverified / fees off: 0, so the sheet says "No fee will be charged".
+    expect(noShowFeeOf({ no_show_preview: { fee: 0, fee_applies: false, capped: true, verified: true } })).toBe(0);
+    expect(noShowFeeOf({ no_show_preview: { fee: 50, fee_applies: false } })).toBe(0);
+    // Not arrived, or an older server without the key: unknown, never an amount.
+    expect(noShowFeeOf({ no_show_preview: null })).toBeNull();
+    expect(noShowFeeOf({})).toBeNull();
+    expect(noShowFeeOf(null)).toBeNull();
+  });
+
+  it('reads the fee the cancel really charged (cancellation_fee on the answer)', () => {
+    expect(chargedCancelFeeOf({ cancellation_fee: '50.00' })).toBe(50);
+    expect(chargedCancelFeeOf({ cancellation_fee: '0.00' })).toBeNull();
+    expect(chargedCancelFeeOf({ cancellation_fee: null })).toBeNull();
+    expect(chargedCancelFeeOf({})).toBeNull();
   });
 
   it('offers the no-show cancel once the wait is over (one timeout, at the pickup only)', () => {

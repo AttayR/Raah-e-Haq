@@ -180,6 +180,8 @@ export interface RideResource {
   cancellation_preview?: unknown;
   /** Driver only: when "Passenger didn't come" may be used (BE-85). */
   no_show_cancel_at?: string | null;
+  /** BE-109, the ride's driver only: the no-show fee a cancel would charge now; null unless arrived. */
+  no_show_preview?: NoShowPreviewWire | null;
   cancellation_fee?: number | string | null;
   cancellation_charge_reason?: string | null;
   /** How often a driver cancel put the ride back in the queue (BE-85 re-matching). */
@@ -206,6 +208,15 @@ export interface RideResource {
   commission_amount?: number | string | null;
   driver_net?: number | string | null;
   commission_final?: boolean;
+}
+
+/** RideResource.no_show_preview (BE-109): read it through features/driver-ride/noShow. */
+export interface NoShowPreviewWire {
+  fee?: number | string;
+  fee_applies?: boolean;
+  capped?: boolean;
+  verified?: boolean;
+  cancel_at?: string | null;
 }
 
 /** RideResource.contact as the server sends it (BE-78). */

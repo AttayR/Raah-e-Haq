@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
@@ -29,6 +29,7 @@ import { ADD_MONEY_ROUTE, passengerOwedBannerAmount, passengerOwedNote, topUpPar
 import { groupByDay, type TransactionSection } from '../format';
 import { useCancelSettlement, useWallet, useWalletTransactions } from '../hooks';
 import type { Settlement, TransactionFilter, WalletTransaction } from '../types';
+import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
 
 const FILTERS = perLocale(() => [
   { value: 'all', label: WALLET_COPY.filterAll },
@@ -63,6 +64,8 @@ export function WalletBody({ visible }: WalletBodyProps) {
   const { cancel, cancellingId } = useCancelSettlement();
   const sections = useMemo(() => groupByDay(list.items), [list.items]);
   const { scrollY, onScroll } = useHeaderScroll();
+  // T-577: re-tapping the selected tab scrolls this list to the top.
+  const listRef = useRef<SectionList<WalletTransaction, TransactionSection>>(null);
 
   const { data: walletData, refresh: refreshWallet } = wallet;
   const { refresh: refreshList, reload: reloadList } = list;
@@ -273,7 +276,9 @@ export function WalletBody({ visible }: WalletBodyProps) {
   return (
     <View style={styles.fill}>
       <ScrollHairline scrollY={scrollY} testID="wallet-hairline" />
+      <TabScrollToTop scrollRef={listRef} />
       <AnimatedSectionList
+        ref={listRef}
         testID="wallet-transactions"
         sections={sections}
         keyExtractor={(item) => String(item.id)}
