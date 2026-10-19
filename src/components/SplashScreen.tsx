@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { ActivityIndicator, Image, StyleSheet, useColorScheme, View } from 'react-native';
 import { hideNativeSplash } from '../core/nativeSplash';
 import { DarkTheme, LightTheme } from '../theme';
+import { t } from '../i18n';
 
 /**
  * Shown while redux-persist rehydrates and initializeAuth checks the stored session
@@ -30,7 +31,7 @@ export default function SplashScreen() {
   return (
     <View
       testID="app-splash"
-      accessibilityLabel="Loading"
+      accessibilityLabel={t('kit.loadingA11y')}
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       onLayout={onLayout}
     >

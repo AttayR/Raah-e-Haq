@@ -2,9 +2,11 @@ import type { IconName } from '../../components/ui/Icon';
 import type { TextColor } from '../../components/ui/AppText';
 import { formatMoney } from '../../core/format/money';
 import type { WalletTransaction } from './types';
+import { strings } from '../../i18n';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Day and month names in the active language (T-575), read on every call. */
+const monthShort = (index: number): string | undefined => strings().format.monthsShort[index];
+const weekdayShort = (index: number): string | undefined => strings().format.weekdaysShort[index];
 
 const parse = (iso: string): Date | null => {
   const date = new Date(iso);
@@ -17,10 +19,10 @@ const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth()}
 export const formatDayLabel = (iso: string, now: Date = new Date()): string => {
   const date = parse(iso);
   if (!date) return '';
-  if (dayKey(date) === dayKey(now)) return 'Today';
+  if (dayKey(date) === dayKey(now)) return strings().format.today;
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (dayKey(date) === dayKey(yesterday)) return 'Yesterday';
-  const base = `${WEEKDAYS[date.getDay()]}, ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+  if (dayKey(date) === dayKey(yesterday)) return strings().format.yesterday;
+  const base = `${weekdayShort(date.getDay())}, ${date.getDate()} ${monthShort(date.getMonth())}`;
   return date.getFullYear() === now.getFullYear() ? base : `${base} ${date.getFullYear()}`;
 };
 
@@ -30,14 +32,15 @@ export const formatTime = (iso: string): string => {
   if (!date) return '';
   const hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`;
+  const f = strings().format;
+  return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${hours < 12 ? f.am : f.pm}`;
 };
 
 /** "28 Sep 2026, 6:05 PM"; "" if unreadable. */
 export const formatDateTime = (iso: string): string => {
   const date = parse(iso);
   if (!date) return '';
-  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}, ${formatTime(iso)}`;
+  return `${date.getDate()} ${monthShort(date.getMonth())} ${date.getFullYear()}, ${formatTime(iso)}`;
 };
 
 /**
@@ -46,7 +49,7 @@ export const formatDateTime = (iso: string): string => {
  */
 export const formatCalendarDate = (date: string): string => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  const month = match ? MONTHS[Number(match[2]) - 1] : undefined;
+  const month = match ? monthShort(Number(match[2]) - 1) : undefined;
   if (!match || !month) return '';
   return `${Number(match[3])} ${month} ${match[1]}`;
 };

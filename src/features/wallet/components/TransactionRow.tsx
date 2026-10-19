@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Icon } from '../../../components/ui';
 import { radius, space } from '../../../theme';
-import { WALLET_COPY } from '../copy';
+import { transactionTypeLabel, WALLET_COPY } from '../copy';
 import { formatTime, transactionAmountColor, transactionAmountText, transactionIcon } from '../format';
 import type { WalletTransaction } from '../types';
 
@@ -15,6 +15,8 @@ type Props = { item: WalletTransaction; onPress: (item: WalletTransaction) => vo
  */
 export const TransactionRow = memo(function TransactionRow({ item, onPress }: Props) {
   const { theme } = useAppTheme();
+  // T-575: an app-labelled type is read in the active language here, not kept from when it loaded.
+  const label = transactionTypeLabel(item.type) ?? item.label;
   const amount = transactionAmountText(item);
   const time = formatTime(item.createdAt);
   // UI-R15: time only; the ride reference belongs to the transaction detail and ride details.
@@ -24,7 +26,7 @@ export const TransactionRow = memo(function TransactionRow({ item, onPress }: Pr
     <Pressable
       onPress={() => onPress(item)}
       accessibilityRole="button"
-      accessibilityLabel={[item.label, amount, item.reversed ? WALLET_COPY.reversed : null, time]
+      accessibilityLabel={[label, amount, item.reversed ? WALLET_COPY.reversed : null, time]
         .filter(Boolean)
         .join(', ')}
       style={({ pressed }) => [styles.row, pressed ? { backgroundColor: theme.colors.surfacePressed } : null]}
@@ -35,7 +37,7 @@ export const TransactionRow = memo(function TransactionRow({ item, onPress }: Pr
       </View>
       <View style={styles.text}>
         <AppText variant="bodyStrong" numberOfLines={1} style={struck}>
-          {item.label}
+          {label}
         </AppText>
         <AppText variant="caption" color="textMuted" numberOfLines={1}>
           {item.reversed ? `${WALLET_COPY.reversed}${subtitle ? ` · ${subtitle}` : ''}` : subtitle}

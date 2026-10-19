@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../../../screens/Auth/LoginScreen';
 import PhoneAuthScreen from '../../../screens/Auth/PhoneAuthScreen';
+import { localeScreenLayout } from '../localeScreenLayout';
 
 export type AuthStackParamList = {
   /** `method` opens Login on that tab (PhoneAuth's email fallback, T-113). */
@@ -15,8 +16,6 @@ export type AuthStackParamList = {
  * T-531): the first screen paints without evaluating these screens and their imports.
  */
 const loadSignupScreen = () => require('../../../screens/Auth/SignupScreen').default;
-
-import { localeScreenLayout } from '../localeScreenLayout';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { AppText, Chip, TextField } from '../../../components/ui';
-import { EMERGENCY_RELATION_OPTIONS, REGISTRATION_FIELDS } from '../../../features/auth/copy/registrationFields';
+import { emergencyRelationOptions, REGISTRATION_FIELDS } from '../../../features/auth/copy/registrationFields';
 import type { RegistrationFormData } from '../../../features/auth/registration/registrationForm';
 import { Anchored, ControlLabel, FieldError, FormGroup, stepStyles, type useStepFields } from './stepParts';
 
@@ -61,7 +61,7 @@ export default function EmergencyContactFields({ data, fields: f }: Props) {
             {COPY.relationshipHint}
           </AppText>
           <View style={stepStyles.chips} accessibilityRole="radiogroup" accessibilityLabel={COPY.relationship}>
-            {EMERGENCY_RELATION_OPTIONS.map((option) => (
+            {emergencyRelationOptions().map((option) => (
               <Chip
                 key={option.value}
                 label={option.label}

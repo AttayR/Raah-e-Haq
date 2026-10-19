@@ -2,18 +2,15 @@ import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Chip } from '../ui/Chip';
 import { space } from '../../theme';
+import { BOOKING_COPY } from '../../features/ride-booking/copy';
 
 type Props = {
   stage: 'home' | 'pickup' | 'destination' | 'vehicle' | 'fare' | 'requesting';
 };
 
-const STAGES: { key: Props['stage']; label: string }[] = [
-  { key: 'pickup', label: 'Pickup' },
-  { key: 'destination', label: 'Destination' },
-  { key: 'vehicle', label: 'Vehicle' },
-  { key: 'fare', label: 'Fare' },
-  { key: 'requesting', label: 'Request' },
-];
+type Stage = Exclude<Props['stage'], 'home'>;
+
+const STAGES: readonly Stage[] = ['pickup', 'destination', 'vehicle', 'fare', 'requesting'];
 
 /** Booking step indicator: one line that scrolls sideways on narrow screens (no wrapping). */
 const StageChips: React.FC<Props> = ({ stage }) => {
@@ -25,14 +22,16 @@ const StageChips: React.FC<Props> = ({ stage }) => {
       contentContainerStyle={styles.row}
       testID="booking-stage-chips"
     >
-      {STAGES.map((s, index) => {
-        const active = s.key === stage || (stage === 'home' && s.key === 'pickup');
+      {STAGES.map((key, index) => {
+        const active = key === stage || (stage === 'home' && key === 'pickup');
+        // T-575: labels read at render time, in the active language.
+        const label = BOOKING_COPY.stages[key];
         return (
           <Chip
-            key={s.key}
-            label={`${index + 1}. ${s.label}`}
+            key={key}
+            label={BOOKING_COPY.stageChip(index + 1, label)}
             selected={active}
-            accessibilityLabel={`Step ${index + 1} of ${STAGES.length}: ${s.label}${active ? ', current' : ''}`}
+            accessibilityLabel={BOOKING_COPY.stageA11y(index + 1, STAGES.length, label, active)}
           />
         );
       })}

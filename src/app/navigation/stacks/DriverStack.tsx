@@ -18,6 +18,7 @@ import type { ProfileEditRoutes } from '../../../features/profile-edit/navigatio
 import type { DriverStatementRoutes } from '../../../features/driver-statements/navigation';
 import type { VehicleAcRoutes } from '../../../features/ac/navigation';
 import type { ParcelDriverRoutes } from '../../../features/parcel/navigation';
+import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 export type DriverStackParamList = {
   /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
@@ -82,8 +83,6 @@ const loadWeeklyStatementScreen = () => require('../../../features/driver-statem
 const loadDriverStrikesScreen = () => require('../../../features/driver-statements/screens/DriverStrikesScreen').default;
 const loadVehicleAcScreen = () => require('../../../features/ac/screens/VehicleAcScreen').default;
 const loadParcelOptInScreen = () => require('../../../features/parcel/screens/ParcelOptInScreen').default;
-
-import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 

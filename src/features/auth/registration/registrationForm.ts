@@ -1,3 +1,5 @@
+import { REGISTRATION_FIELDS } from '../copy/registrationFields';
+
 /**
  * The registration form's data and steps (T-201). The screen holds one RegistrationFormData;
  * each step edits part of it and is validated by src/schemas/registrationSchema before Next.
@@ -23,9 +25,17 @@ export type VehicleTypeId = (typeof VEHICLE_TYPES)[number]['id'];
 
 export const VEHICLE_TYPE_IDS: readonly string[] = VEHICLE_TYPES.map((type) => type.id);
 
-/** Label for a stored vehicle type id (the id itself when unknown). */
-export const vehicleTypeLabel = (id: string): string =>
-  VEHICLE_TYPES.find((type) => type.id === id)?.label ?? id;
+const isVehicleTypeId = (id: string): id is VehicleTypeId => VEHICLE_TYPE_IDS.includes(id);
+
+/** Name and kinds of a vehicle type in the active language (T-575); null for an unknown id. */
+export const vehicleTypeText = (id: string): { label: string; description: string } | null => {
+  if (!isVehicleTypeId(id)) return null;
+  const text = REGISTRATION_FIELDS.options.vehicleTypes[id];
+  return { label: text.label, description: text.description };
+};
+
+/** Label for a stored vehicle type id (the id itself when unknown), in the active language. */
+export const vehicleTypeLabel = (id: string): string => vehicleTypeText(id)?.label ?? id;
 
 /**
  * The vehicle photo slots, index-stable: slot i is always sent as `field` (T-203). An empty
@@ -37,6 +47,10 @@ export const VEHICLE_PHOTO_SLOTS = [
   { label: 'Left side', field: 'vehicle_left_image' },
   { label: 'Right side', field: 'vehicle_right_image' },
 ] as const;
+
+/** A vehicle photo slot's name ("Front") in the active language (T-575). */
+export const vehiclePhotoSlotLabel = (slot: (typeof VEHICLE_PHOTO_SLOTS)[number]): string =>
+  REGISTRATION_FIELDS.options.photoSlots[slot.field];
 
 /** The pictures with slot `index` set to `uri` ('' clears it); always one entry per slot. */
 export const setVehiclePhoto = (pictures: readonly string[], index: number, uri: string): string[] =>

@@ -12,7 +12,9 @@ import type { CopyTranslation } from './types';
  */
 type Translations = Partial<Record<Locale, unknown>>;
 
-const roots = new WeakMap<object, Translations>();
+type Root = { english: object; translations: Translations; fixed: Map<Locale, object> };
+
+const roots = new WeakMap<object, Root>();
 
 const isPlainObject = (value: unknown): value is Record<PropertyKey, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -25,7 +27,7 @@ const sameKind = (override: unknown, base: unknown): boolean =>
     ? Array.isArray(override) && override.every(item => typeof item === 'string')
     : typeof override === typeof base && !isPlainObject(override);
 
-function view<T extends object>(base: T, translationNode: () => unknown): T {
+function view<T extends object>(base: T, translationNode: () => unknown, locale: () => Locale): T {
   const children = new Map<string, unknown>();
   return new Proxy(base, {
     get(target, prop, receiver) {
@@ -36,12 +38,12 @@ function view<T extends object>(base: T, translationNode: () => unknown): T {
       if (isPlainObject(value)) {
         let child = children.get(prop);
         if (!child) {
-          child = view(value, () => childOf(translationNode(), prop));
+          child = view(value, () => childOf(translationNode(), prop), locale);
           children.set(prop, child);
         }
         return child;
       }
-      if (getLocale() === 'en') {
+      if (locale() === 'en') {
         return value;
       }
       const override = childOf(translationNode(), prop);
@@ -53,9 +55,27 @@ function view<T extends object>(base: T, translationNode: () => unknown): T {
 /** Wraps a feature's English copy object so it reads in the active language. */
 export function localizedCopy<T extends object>(english: T): T {
   const translations: Translations = {};
-  const localized = view(english, () => translations[getLocale()]);
-  roots.set(localized, translations);
+  const localized = view(english, () => translations[getLocale()], getLocale);
+  roots.set(localized, { english, translations, fixed: new Map() });
   return localized;
+}
+
+/**
+ * `copy` read in one given language, whatever the active one is (T-575): for comparing a text
+ * that was stored before a language switch with the labels of every language. A plain object is
+ * returned as it is.
+ */
+export function copyInLocale<T extends object>(copy: T, locale: Locale): T {
+  const root = roots.get(copy);
+  if (!root) {
+    return copy;
+  }
+  let fixed = root.fixed.get(locale);
+  if (!fixed) {
+    fixed = view(root.english, () => root.translations[locale], () => locale);
+    root.fixed.set(locale, fixed);
+  }
+  return fixed as T;
 }
 
 /** True for an object `localizedCopy` returned. */
@@ -63,7 +83,7 @@ export const isLocalizedCopy = (copy: object): boolean => roots.has(copy);
 
 /** The translation registered for `copy` in `locale`, if any (the coverage test reads it). */
 export const registeredTranslation = (copy: object, locale: Exclude<Locale, 'en'>): unknown =>
-  roots.get(copy)?.[locale];
+  roots.get(copy)?.translations[locale];
 
 /**
  * Registers `locale`'s translation of a `localizedCopy` object (startup, `copy-ur-Latn/index.ts`).
@@ -74,9 +94,9 @@ export function registerCopyTranslation<T extends object>(
   locale: Exclude<Locale, 'en'>,
   translation: CopyTranslation<T>,
 ): void {
-  const translations = roots.get(copy);
-  if (!translations) {
+  const root = roots.get(copy);
+  if (!root) {
     throw new Error('registerCopyTranslation: the copy object is not wrapped in localizedCopy');
   }
-  translations[locale] = translation;
+  root.translations[locale] = translation;
 }

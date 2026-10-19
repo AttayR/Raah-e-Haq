@@ -2,7 +2,11 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppText, Banner, UploadTile } from '../../../components/ui';
 import { REGISTRATION_FIELDS } from '../../../features/auth/copy/registrationFields';
-import { VEHICLE_PHOTO_SLOTS, filledVehiclePhotoCount } from '../../../features/auth/registration/registrationForm';
+import {
+  VEHICLE_PHOTO_SLOTS,
+  filledVehiclePhotoCount,
+  vehiclePhotoSlotLabel,
+} from '../../../features/auth/registration/registrationForm';
 import { space } from '../../../theme';
 import { Anchored, ControlLabel, FieldError, FormGroup, stepStyles, useStepFields, type StepProps } from './stepParts';
 import { useDocumentPicker, type PhotoField } from './useDocumentPicker';
@@ -69,11 +73,11 @@ export default function DocumentsStep(props: StepProps) {
             {D.vehiclePhotosHint}
           </AppText>
           <View style={styles.grid}>
-            {VEHICLE_PHOTO_SLOTS.map(({ label }, index) => (
+            {VEHICLE_PHOTO_SLOTS.map((slot, index) => (
               <UploadTile
-                key={label}
+                key={slot.field}
                 shape="square"
-                label={label}
+                label={vehiclePhotoSlotLabel(slot)}
                 uri={data.vehiclePictures?.[index]}
                 onPress={() => picker.pick('vehiclePictures', index)}
                 onRemove={() => picker.removeVehicle(index)}

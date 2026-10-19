@@ -4,13 +4,15 @@ import { AppText } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { REGISTRATION_COPY } from '../../../features/auth/copy/registration';
 import {
-  EMERGENCY_RELATION_OPTIONS,
-  LICENSE_TYPES,
+  emergencyRelationOptions,
+  licenseTypeOptions,
+  vehicleColourOptions,
   REGISTRATION_FIELDS as F,
 } from '../../../features/auth/copy/registrationFields';
 import type { RegistrationPage } from '../../../features/auth/registration/pages';
 import {
   VEHICLE_PHOTO_SLOTS,
+  vehiclePhotoSlotLabel,
   vehicleTypeLabel,
   type RegistrationFormData,
 } from '../../../features/auth/registration/registrationForm';
@@ -38,7 +40,11 @@ export const maskAccount = (account: string): string => {
 const labelOf = (options: ReadonlyArray<{ value: string; label: string }>, value: string) =>
   options.find((option) => option.value === value)?.label ?? value;
 
-const capitalise = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
+/** The chosen gender in the active language (T-575). */
+const genderLabel = (value: string): string => {
+  const p = F.personal;
+  return value === 'male' ? p.genderMale : value === 'female' ? p.genderFemale : value === 'other' ? p.genderOther : value;
+};
 
 /**
  * Review page "Check your details" (UI-R7): one card per page with an Edit link to it, CNIC and
@@ -61,7 +67,7 @@ export default function ReviewStep({ data, onEdit }: Props) {
         <ReviewRow label={P.phone} value={data.phoneNumber} />
         <ReviewRow label={P.cnic} value={maskCnic(data.cnic)} testID="review-cnic" />
         <ReviewRow label={P.dob} value={data.dateOfBirth} />
-        <ReviewRow label={P.gender} value={capitalise(data.gender)} />
+        <ReviewRow label={P.gender} value={genderLabel(data.gender)} />
         <ReviewRow label={P.address} value={data.address} />
       </ReviewSection>
 
@@ -71,7 +77,7 @@ export default function ReviewStep({ data, onEdit }: Props) {
           <ReviewRow label={F.emergency.phone} value={data.emergencyContactNumber} />
           <ReviewRow
             label={F.emergency.relationship}
-            value={data.emergencyRelationship ? labelOf(EMERGENCY_RELATION_OPTIONS, data.emergencyRelationship) : ''}
+            value={data.emergencyRelationship ? labelOf(emergencyRelationOptions(), data.emergencyRelationship) : ''}
           />
         </ReviewSection>
       ) : null}
@@ -81,7 +87,7 @@ export default function ReviewStep({ data, onEdit }: Props) {
           <ReviewRow label={F.vehicle.type} value={data.vehicleType ? vehicleTypeLabel(data.vehicleType) : ''} />
           <ReviewRow label={F.vehicle.make} value={[data.vehicleBrand, data.vehicleModel].filter(Boolean).join(' ')} />
           <ReviewRow label={F.vehicle.year} value={data.vehicleYear} />
-          <ReviewRow label={F.vehicle.colour} value={data.vehicleColor} />
+          <ReviewRow label={F.vehicle.colour} value={data.vehicleColor ? labelOf(vehicleColourOptions(), data.vehicleColor) : ''} />
           {data.vehicleType === 'car' && data.vehicleHasAc ? (
             <ReviewRow label={t('ac.registerLabel')} value={t('common.yes')} testID="review-vehicle-ac" />
           ) : null}
@@ -89,7 +95,7 @@ export default function ReviewStep({ data, onEdit }: Props) {
           <ReviewRow label={F.vehicle.licensePlate} value={data.licensePlate} />
           <ReviewRow label={F.vehicle.registrationNumber} value={data.registrationNumber} />
           <ReviewRow label={F.licence.number} value={data.licenseNumber} />
-          <ReviewRow label={F.licence.type} value={data.licenseType ? labelOf(LICENSE_TYPES, data.licenseType) : ''} />
+          <ReviewRow label={F.licence.type} value={data.licenseType ? labelOf(licenseTypeOptions(), data.licenseType) : ''} />
           <ReviewRow label={F.licence.expiry} value={data.licenseExpiryDate} />
           <ReviewRow
             label={F.licence.experience}
@@ -107,7 +113,7 @@ export default function ReviewStep({ data, onEdit }: Props) {
                   { label: F.documents.cnicFront, uri: data.cnicPicture },
                   { label: F.documents.cnicBack, uri: data.cnicBackPicture },
                   { label: F.documents.licenceFront, uri: data.licenseFrontPicture },
-                  ...VEHICLE_PHOTO_SLOTS.map(({ label }, index) => ({ label, uri: data.vehiclePictures?.[index] })),
+                  ...VEHICLE_PHOTO_SLOTS.map((slot, index) => ({ label: vehiclePhotoSlotLabel(slot), uri: data.vehiclePictures?.[index] })),
                 ]
               : [
                   { label: F.documents.cnicFront, uri: data.cnicFrontPicture },

@@ -70,6 +70,11 @@ export function registerRideCopy(): void {
     backA11y: 'Wapas',
     recenterA11y: 'Meri location dikhayein',
     startOverA11y: 'Shuru se karein',
+    planTitle: 'Safar plan karein',
+    stages: { pickup: 'Kahan se', destination: 'Kahan tak', vehicle: 'Gaari', fare: 'Kiraya', requesting: 'Request' },
+    stageChip: (n: number, label: string) => `${n}. ${label}`,
+    stageA11y: (n: number, total: number, label: string, current: boolean) =>
+      `${total} mein se qadam ${n}: ${label}${current ? ', abhi yahan' : ''}`,
   });
 
   registerCopyTranslation(ACTIVE_RIDE_COPY, 'ur-Latn', {
@@ -185,7 +190,7 @@ export function registerRideCopy(): void {
     collectCash: 'Cash lein',
     collectOther: 'Payment',
     yourEarnings: 'Aap ki kamai',
-    base: 'Base fare',
+    base: 'Bunyadi fare',
     distance: 'Faasla',
     time: 'Waqt',
     stopsFare: 'Stops',

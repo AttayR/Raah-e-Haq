@@ -20,6 +20,7 @@ import type { SafetyRoutes } from '../../../features/safety/navigation';
 import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
 import type { ParcelPassengerRoutes } from '../../../features/parcel/navigation';
 import type { RootStackParamList } from '../RootNavigation';
+import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 export type PassengerStackParamList = {
   /** Home · Activity · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
@@ -74,8 +75,6 @@ const loadSavedPlaceEditorScreen = () => require('../../../features/saved-places
 const loadEmergencyContactsScreen = () => require('../../../features/safety/screens/EmergencyContactsScreen').default;
 const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
 const loadSendParcelScreen = () => require('../../../features/parcel/screens/SendParcelScreen').default;
-
-import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 

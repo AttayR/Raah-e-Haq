@@ -4,7 +4,7 @@
  * password rules apply at step 1, and the vehicle year limit moves with the calendar.
  */
 import {
-  DRIVER_AGE_MESSAGE,
+  driverAgeMessage,
   firstInvalidStep,
   isStepFieldRequired,
   latestBirthDateForAge,
@@ -251,9 +251,9 @@ describe('T-207: drivers are 18+ and hold a driving licence', () => {
   it('a driver born 17 years 364 days ago is refused, under Date of Birth', () => {
     today();
     expect(validateStep('personal', { ...validDriver, dateOfBirth: '2008-10-12' })).toEqual({
-      dateOfBirth: DRIVER_AGE_MESSAGE,
+      dateOfBirth: driverAgeMessage(),
     });
-    expect(DRIVER_AGE_MESSAGE).toBe('Drivers must be at least 18 years old.');
+    expect(driverAgeMessage()).toBe('Drivers must be at least 18 years old.');
     expect(validateStepField('personal', 'dateOfBirth', { ...validDriver, dateOfBirth: '2008-10-12' })).toBe(
       'Drivers must be at least 18 years old.',
     );

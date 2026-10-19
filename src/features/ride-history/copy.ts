@@ -59,6 +59,13 @@ export const RIDE_HISTORY_COPY = localizedCopy({
   cancellationNote: 'Note',
   noChargeCancelled: 'Cancelled rides are not charged.',
   cancellationFeeLabel: 'Cancellation fee',
+  // Who cancelled, said from the viewer's side (T-575: was inline in cancellationText).
+  cancelledByYou: 'You cancelled this ride.',
+  cancelledByPassenger: 'The passenger cancelled this ride.',
+  cancelledByDriver: 'The driver cancelled this ride.',
+  cancelledBySystem: 'This ride was cancelled automatically.',
+  cancelledByWeather: 'This ride was cancelled because of the weather.',
+  cancelledUnknown: 'This ride was cancelled.',
   // UI-R15 share receipt.
   share: 'Share receipt',
   shareHeading: 'Raah-e-Haq ride receipt',
@@ -86,7 +93,8 @@ export const TIMELINE_LABEL = localizedCopy({
   cancelled: 'Cancelled',
 } as const);
 
-const VEHICLE_LABEL: Record<string, string> = {
+/** Vehicle type names (T-575: in the active language). */
+export const VEHICLE_LABEL = localizedCopy({
   car: 'Car',
   bike: 'Bike',
   rickshaw: 'Rickshaw',
@@ -94,13 +102,16 @@ const VEHICLE_LABEL: Record<string, string> = {
   // T-561: the BE-86 / BE-88 tiers by their names, not their keys ("Car ac").
   car_ac: 'Car AC',
   parcel: 'Parcel',
-};
+} as const);
+
+const isVehicleKey = (key: string): key is keyof typeof VEHICLE_LABEL =>
+  Object.prototype.hasOwnProperty.call(VEHICLE_LABEL, key);
 
 /** "car" -> "Car"; an unknown key is shown title-cased, never as a raw code. */
 export const vehicleLabel = (type: string | null): string | null => {
   if (!type) return null;
-  const known = VEHICLE_LABEL[type.toLowerCase()];
-  if (known) return known;
+  const key = type.toLowerCase();
+  if (isVehicleKey(key)) return VEHICLE_LABEL[key];
   const words = type.replace(/_/g, ' ').trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : null;
 };
@@ -109,14 +120,14 @@ export const vehicleLabel = (type: string | null): string | null => {
 export const cancellationText = (reason: CancellationReason | null, viewer: RideViewer): string => {
   switch (reason) {
     case 'passenger':
-      return viewer === 'passenger' ? 'You cancelled this ride.' : 'The passenger cancelled this ride.';
+      return viewer === 'passenger' ? RIDE_HISTORY_COPY.cancelledByYou : RIDE_HISTORY_COPY.cancelledByPassenger;
     case 'driver':
-      return viewer === 'driver' ? 'You cancelled this ride.' : 'The driver cancelled this ride.';
+      return viewer === 'driver' ? RIDE_HISTORY_COPY.cancelledByYou : RIDE_HISTORY_COPY.cancelledByDriver;
     case 'system':
-      return 'This ride was cancelled automatically.';
+      return RIDE_HISTORY_COPY.cancelledBySystem;
     case 'weather':
-      return 'This ride was cancelled because of the weather.';
+      return RIDE_HISTORY_COPY.cancelledByWeather;
     default:
-      return 'This ride was cancelled.';
+      return RIDE_HISTORY_COPY.cancelledUnknown;
   }
 };

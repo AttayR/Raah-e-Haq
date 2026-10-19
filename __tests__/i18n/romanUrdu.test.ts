@@ -1,5 +1,5 @@
 /**
- * T-523: the Roman Urdu dictionary covers `en.ts` key for key (the debug-only kit gallery
+ * T-523 / T-575: the Roman Urdu dictionary covers `en.ts` key for key (the debug-only kit gallery
  * excepted), keeps every `{placeholder}`, and its feature copy translations only name keys that
  * exist in the English copy, with the same placeholders and function arity.
  */
@@ -10,6 +10,7 @@ import { LOGIN_COPY } from '../../src/features/auth/copy/login';
 import { PHONE_AUTH_COPY } from '../../src/features/auth/copy/phoneAuth';
 import { REGISTRATION_COPY } from '../../src/features/auth/copy/registration';
 import { REGISTRATION_FIELDS } from '../../src/features/auth/copy/registrationFields';
+import { REGISTRATION_ERRORS } from '../../src/features/auth/copy/registrationErrors';
 import { ACCOUNT_STATUS_COPY, ACCOUNT_STATUS_VARIANTS } from '../../src/features/auth/copy/accountStatus';
 import { BOOKING_COPY } from '../../src/features/ride-booking/copy';
 import { ACTIVE_RIDE_COPY } from '../../src/features/active-ride/copy';
@@ -24,7 +25,7 @@ import {
   SETTLEMENT_STATUS_LABEL,
   WALLET_COPY,
 } from '../../src/features/wallet/copy';
-import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL } from '../../src/features/ride-history/copy';
+import { RIDE_HISTORY_COPY, RIDE_STATUS_LABEL, TIMELINE_LABEL, VEHICLE_LABEL } from '../../src/features/ride-history/copy';
 import { NOTIFICATIONS_COPY } from '../../src/features/notifications/copy';
 import { CHAT_COPY } from '../../src/features/chat/copy';
 import { STATS_COPY } from '../../src/features/stats/copy';
@@ -106,6 +107,8 @@ const COPY_OBJECTS: Record<string, object> = {
   PHONE_AUTH_COPY,
   REGISTRATION_COPY,
   REGISTRATION_FIELDS,
+  // T-575: validation messages and vehicle names.
+  REGISTRATION_ERRORS,
   ACCOUNT_STATUS_VARIANTS,
   ACCOUNT_STATUS_COPY,
   BOOKING_COPY,
@@ -122,6 +125,7 @@ const COPY_OBJECTS: Record<string, object> = {
   RIDE_HISTORY_COPY,
   RIDE_STATUS_LABEL,
   TIMELINE_LABEL,
+  VEHICLE_LABEL,
   NOTIFICATIONS_COPY,
   CHAT_COPY,
   STATS_COPY,

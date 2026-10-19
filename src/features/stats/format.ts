@@ -3,16 +3,14 @@ import type { DriverTodayStatsValues } from '../../components/driver/home/Driver
 import type { HomeStat } from '../passenger-home/types';
 import { STATS_COPY } from './copy';
 import { formatDateTime } from '../ride-history/format';
-import { t } from '../../i18n';
+import { strings, t } from '../../i18n';
 import { formatRate } from '../fare/format';
 import type { DriverStats, EarningsDay, EarningsPeriod, EarningsRide, PassengerStats } from './types';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_LONG = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Day and month names in the active language (T-575), read on every call. */
+const monthShort = (index: number): string | undefined => strings().format.monthsShort[index];
+const monthLong = (index: number): string | undefined => strings().format.monthsLong[index];
+const weekdayShort = (index: number): string => strings().format.weekdaysShort[index] ?? '';
 
 /** "4.8"; "New" before the first rating. */
 export const formatRating = (rating: number | null): string =>
@@ -72,14 +70,14 @@ const calendar = (value: string): { y: number; m: number; d: number; weekday: nu
 /** "Mon, 12 Oct" for a series date. */
 export const formatSeriesDate = (value: string): string => {
   const c = calendar(value);
-  return c ? `${WEEKDAYS[c.weekday]}, ${c.d} ${MONTHS[c.m]}` : value;
+  return c ? `${weekdayShort(c.weekday)}, ${c.d} ${monthShort(c.m)}` : value;
 };
 
 /** Bar label: weekday for a week ("Mon"), day of month for a month (every 5th, plus the 1st). */
 export const chartLabel = (value: string, period: EarningsPeriod, index: number): string => {
   const c = calendar(value);
   if (!c) return '';
-  if (period === 'week') return WEEKDAYS[c.weekday];
+  if (period === 'week') return weekdayShort(c.weekday);
   return index === 0 || c.d % 5 === 0 ? String(c.d) : '';
 };
 
@@ -91,9 +89,11 @@ export const periodCaption = (period: EarningsPeriod, from: string | null, to: s
   const start = from ? calendar(from) : null;
   const end = to ? calendar(to) : null;
   if (!start) return '';
-  if (period === 'day') return `${WEEKDAYS[start.weekday]}, ${start.d} ${MONTHS[start.m]}`;
-  if (period === 'month') return `${MONTHS_LONG[start.m]} ${start.y}`;
-  return end ? `${start.d} ${MONTHS[start.m]} – ${end.d} ${MONTHS[end.m]}` : `${start.d} ${MONTHS[start.m]}`;
+  if (period === 'day') return `${weekdayShort(start.weekday)}, ${start.d} ${monthShort(start.m)}`;
+  if (period === 'month') return `${monthLong(start.m)} ${start.y}`;
+  return end
+    ? `${start.d} ${monthShort(start.m)} – ${end.d} ${monthShort(end.m)}`
+    : `${start.d} ${monthShort(start.m)}`;
 };
 
 /** Bar heights as 0–1 of the best day (all zero → all zero). */

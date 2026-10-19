@@ -1,4 +1,8 @@
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+import { strings } from '../../../i18n';
+import { REGISTRATION_FIELDS } from '../../../features/auth/copy/registrationFields';
+
+/** Month name in the active language (T-575). */
+const month = (index: number): string | undefined => strings().format.monthsShort[index];
 
 /** "Oct 2026" from an ISO timestamp (local time); null when absent or unparseable. */
 export const formatMonthYear = (iso?: string | null): string | null => {
@@ -9,7 +13,7 @@ export const formatMonthYear = (iso?: string | null): string | null => {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+  return `${month(date.getMonth())} ${date.getFullYear()}`;
 };
 
 /**
@@ -22,10 +26,10 @@ export const formatCalendarDate = (value?: string | null): string | null => {
   }
   const plain = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
   if (plain) {
-    const month = Number(plain[2]);
+    const monthNumber = Number(plain[2]);
     const day = Number(plain[3]);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${day} ${MONTHS[month - 1]} ${plain[1]}`;
+    if (monthNumber >= 1 && monthNumber <= 12 && day >= 1 && day <= 31) {
+      return `${day} ${month(monthNumber - 1)} ${plain[1]}`;
     }
     return null;
   }
@@ -33,14 +37,19 @@ export const formatCalendarDate = (value?: string | null): string | null => {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+  return `${date.getDate()} ${month(date.getMonth())} ${date.getFullYear()}`;
 };
 
-/** "Female" from "female"; null when blank. */
+/** "Female" from "female" (in the active language for the three known values, T-575); null when blank. */
 export const formatGender = (value?: string | null): string | null => {
   const trimmed = value?.trim();
   if (!trimmed) {
     return null;
+  }
+  const p = REGISTRATION_FIELDS.personal;
+  const key = trimmed.toLowerCase();
+  if (key === 'male' || key === 'female' || key === 'other') {
+    return { male: p.genderMale, female: p.genderFemale, other: p.genderOther }[key];
   }
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 };

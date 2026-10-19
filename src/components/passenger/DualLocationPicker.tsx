@@ -7,7 +7,7 @@ import { Chip } from '../ui/Chip';
 import { IconButton } from '../ui/IconButton';
 import type { IconName } from '../ui/Icon';
 import { radius, space } from '../../theme';
-import { BOOKING_COPY, locationFieldLabels } from '../../features/ride-booking/copy';
+import { BOOKING_COPY, isCurrentLocationLabel, locationFieldLabels } from '../../features/ride-booking/copy';
 
 type Coords = { latitude: number; longitude: number } | null;
 
@@ -35,7 +35,7 @@ type Props = {
 };
 
 /** The pickup field shows the locate glyph while it reads "Current location". */
-const currentLocationGlyph = (text: string): IconName | null => (text === BOOKING_COPY.currentLocation ? 'locate' : null);
+const currentLocationGlyph = (text: string): IconName | null => (isCurrentLocationLabel(text) ? 'locate' : null);
 
 /** Pickup and destination fields on the Raah line (DESIGN_SYSTEM 5.23), with swap. */
 const DualLocationPicker: React.FC<Props> = ({
@@ -58,7 +58,7 @@ const DualLocationPicker: React.FC<Props> = ({
     <View style={styles.container} testID="dual-location-picker">
       {!compact && (
         <AppText variant="title" accessibilityRole="header">
-          Plan your trip
+          {BOOKING_COPY.planTitle}
         </AppText>
       )}
       <View style={styles.row}>

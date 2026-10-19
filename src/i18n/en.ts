@@ -24,6 +24,14 @@ export const en = {
     pm: 'PM',
     weekdaysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     monthsShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    monthsLong: [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ],
+    /** A time on a day that is not today (chat, T-575): "tomorrow at 9:05 AM". */
+    tomorrowAt: 'tomorrow at {time}',
+    yesterdayAt: 'yesterday at {time}',
+    dateAt: '{date} at {time}',
   },
   /** Sign out (T-102; UI-R3 moved the confirmation to the kit Dialog). */
   signOut: {
@@ -1351,6 +1359,26 @@ export const en = {
     optInTierOff: 'Parcel delivery is switched off right now. You will get requests once it is on.',
     optInSaveFailed: "Couldn't save. Please try again.",
     optInLoadFailed: "Couldn't load your parcel settings",
+  },
+  /** Crash fallbacks of ErrorBoundary and MapErrorBoundary (T-575). */
+  errorBoundary: {
+    alertTitle: 'App Error',
+    generic: 'Something went wrong. Please try again.',
+    appData: 'There was an issue with the app data. Please restart the app.',
+    network: 'Network connection issue. Please check your internet connection.',
+    auth: 'Authentication error. Please log in again.',
+    location: 'Location service error. Please enable location permissions.',
+    ok: 'OK',
+    restart: 'Restart App',
+    title: 'Oops! Something went wrong',
+    body: "We're sorry, but something unexpected happened. Please try again.",
+    retry: 'Try Again',
+    mapAlertTitle: 'Map Error',
+    mapGeneric: 'There was an issue with the map. Please try again.',
+    mapRestart: 'Map loading issue. Please restart the app.',
+    mapService: 'Map service error. Please check your internet connection.',
+    mapTitle: 'Map Error',
+    mapBody: 'There was an issue loading the map. Please try again.',
   },
 } as const;
 

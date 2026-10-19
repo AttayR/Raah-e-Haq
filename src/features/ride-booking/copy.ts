@@ -1,5 +1,5 @@
-import { perLocale } from '../../i18n';
-import { localizedCopy } from '../../i18n/localizedCopy';
+import { SUPPORTED_LOCALES } from '../../i18n';
+import { copyInLocale, localizedCopy } from '../../i18n/localizedCopy';
 
 /**
  * Static copy of the booking flow (T-302). Server messages (a refused request, a 422 field
@@ -70,10 +70,28 @@ export const BOOKING_COPY = localizedCopy({
   backA11y: 'Back',
   recenterA11y: 'Show my location',
   startOverA11y: 'Start over',
+  // T-575: planner title and step chips.
+  planTitle: 'Plan your trip',
+  stages: { pickup: 'Pickup', destination: 'Destination', vehicle: 'Vehicle', fare: 'Fare', requesting: 'Request' },
+  stageChip: (n: number, label: string) => `${n}. ${label}`,
+  stageA11y: (n: number, total: number, label: string, current: boolean) =>
+    `Step ${n} of ${total}: ${label}${current ? ', current' : ''}`,
 } as const);
 
+/** `pick(BOOKING_COPY)` in every language, so a label set before a language switch is still known. */
+const inEveryLocale = (pick: (copy: typeof BOOKING_COPY) => string): readonly string[] =>
+  SUPPORTED_LOCALES.map(locale => pick(copyInLocale(BOOKING_COPY, locale)));
+
 /**
- * Field texts that are labels, not addresses: typing in the field replaces them (T-551). In the
- * active language (T-523), so call it at render time.
+ * Field texts that are labels, not addresses: typing in the field replaces them (T-551). T-575:
+ * the labels of every language, so a "Current location" the field got before a switch to Roman
+ * Urdu is still replaced on typing (and still shows the locate glyph).
  */
-export const locationFieldLabels = perLocale((): readonly string[] => [BOOKING_COPY.currentLocation, BOOKING_COPY.pinnedOnMap]);
+export const locationFieldLabels = (): readonly string[] => [
+  ...inEveryLocale(copy => copy.currentLocation),
+  ...inEveryLocale(copy => copy.pinnedOnMap),
+];
+
+/** True when `text` is the "Current location" label in any language (T-575). */
+export const isCurrentLocationLabel = (text: string): boolean =>
+  inEveryLocale(copy => copy.currentLocation).includes(text);

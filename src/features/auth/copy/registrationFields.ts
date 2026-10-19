@@ -1,8 +1,9 @@
+import { perLocale } from '../../../i18n';
 import { localizedCopy } from '../../../i18n/localizedCopy';
 
 /**
  * Field labels, placeholders and helpers of the registration steps (UI-R7, spec
- * auth-registration). Validation messages stay in src/schemas/registrationSchema; server
+ * auth-registration). Validation messages are in ./registrationErrors (T-575); server
  * messages (422) are shown as sent.
  */
 export const REGISTRATION_FIELDS = localizedCopy({
@@ -107,18 +108,73 @@ export const REGISTRATION_FIELDS = localizedCopy({
     notProvided: 'Not provided',
     noPhoto: 'No photo',
   },
+  /** Option labels (T-575); the values sent to the API stay as listed below. */
+  options: {
+    vehicleTypes: {
+      car: { label: 'Car', description: 'Sedan, Hatchback, SUV' },
+      bike: { label: 'Bike', description: 'Motorcycle, Scooter' },
+      rickshaw: { label: 'Rickshaw', description: 'Auto rickshaw, Qingqi' },
+      van: { label: 'Van', description: 'Minivan, Hiace' },
+    },
+    photoSlots: {
+      vehicle_front_image: 'Front',
+      vehicle_back_image: 'Back',
+      vehicle_left_image: 'Left side',
+      vehicle_right_image: 'Right side',
+    },
+    licenseTypes: {
+      LTV: 'LTV (Light Transport Vehicle)',
+      HTV: 'HTV (Heavy Transport Vehicle)',
+      Motorcycle: 'Motorcycle',
+      PSV: 'PSV (Public Service Vehicle)',
+      other: 'Other',
+    },
+    relations: {
+      father: 'Father',
+      mother: 'Mother',
+      spouse: 'Spouse',
+      brother: 'Brother',
+      sister: 'Sister',
+      friend: 'Friend',
+      other: 'Other',
+    },
+    colours: {
+      White: 'White',
+      Black: 'Black',
+      Silver: 'Silver',
+      Gray: 'Gray',
+      Red: 'Red',
+      Blue: 'Blue',
+      Green: 'Green',
+      Yellow: 'Yellow',
+      Orange: 'Orange',
+      Brown: 'Brown',
+      Gold: 'Gold',
+      Purple: 'Purple',
+      Pink: 'Pink',
+      Other: 'Other',
+    },
+  },
 } as const);
 
+export type RegistrationOption = { value: string; label: string };
+
+type OptionLabels = typeof REGISTRATION_FIELDS.options;
+
 /** Pakistani licence classes the backend accepts in `license_type` (max 10 characters). */
-export const LICENSE_TYPES = [
-  { value: 'LTV', label: 'LTV (Light Transport Vehicle)' },
-  { value: 'HTV', label: 'HTV (Heavy Transport Vehicle)' },
-  { value: 'Motorcycle', label: 'Motorcycle' },
-  { value: 'PSV', label: 'PSV (Public Service Vehicle)' },
-  { value: 'other', label: 'Other' },
-] as const;
+const LICENSE_TYPE_VALUES: readonly (keyof OptionLabels['licenseTypes'])[] = ['LTV', 'HTV', 'Motorcycle', 'PSV', 'other'];
+
+/** Licence type options, labelled in the active language (T-575); call at render time. */
+export const licenseTypeOptions = perLocale((): readonly RegistrationOption[] =>
+  LICENSE_TYPE_VALUES.map((value) => ({ value, label: REGISTRATION_FIELDS.options.licenseTypes[value] })),
+);
 
 export const DRIVING_EXPERIENCE_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '15', '20', '25', '30'];
+
+/** "1 year", "2 years" … in the active language (T-575); call at render time. */
+export const drivingExperienceOptions = perLocale((): readonly RegistrationOption[] =>
+  DRIVING_EXPERIENCE_OPTIONS.map((value) => ({ value, label: REGISTRATION_FIELDS.licence.experienceValue(value) })),
+);
 
 /**
  * T-570 (QA 2026-10-18): the Make list follows the vehicle type, so a bike shows bike makes.
@@ -159,18 +215,23 @@ export const vehicleMakesFor = (
   return ownList(VEHICLE_MAKES_BY_TYPE, vehicleType) ?? [];
 };
 
-export const VEHICLE_COLOURS = [
+/** The colour values sent as `vehicle_color` (English, as the server stores them). */
+export const VEHICLE_COLOURS: readonly (keyof OptionLabels['colours'])[] = [
   'White', 'Black', 'Silver', 'Gray', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Brown', 'Gold',
   'Purple', 'Pink', 'Other',
 ];
 
-/** passenger_emergency_contact_relation values the API accepts, with their labels. */
-export const EMERGENCY_RELATION_OPTIONS: { value: string; label: string }[] = [
-  { value: 'father', label: 'Father' },
-  { value: 'mother', label: 'Mother' },
-  { value: 'spouse', label: 'Spouse' },
-  { value: 'brother', label: 'Brother' },
-  { value: 'sister', label: 'Sister' },
-  { value: 'friend', label: 'Friend' },
-  { value: 'other', label: 'Other' },
+/** Colour options: English values, labels in the active language (T-575); call at render time. */
+export const vehicleColourOptions = perLocale((): readonly RegistrationOption[] =>
+  VEHICLE_COLOURS.map((value) => ({ value, label: REGISTRATION_FIELDS.options.colours[value] })),
+);
+
+/** passenger_emergency_contact_relation values the API accepts. */
+const EMERGENCY_RELATION_VALUES: readonly (keyof OptionLabels['relations'])[] = [
+  'father', 'mother', 'spouse', 'brother', 'sister', 'friend', 'other',
 ];
+
+/** Relation options, labelled in the active language (T-575); call at render time. */
+export const emergencyRelationOptions = perLocale((): readonly RegistrationOption[] =>
+  EMERGENCY_RELATION_VALUES.map((value) => ({ value, label: REGISTRATION_FIELDS.options.relations[value] })),
+);

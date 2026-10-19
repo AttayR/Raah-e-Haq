@@ -1,5 +1,6 @@
 import type { ChatRole } from './types';
 import { localizedCopy } from '../../i18n/localizedCopy';
+import { strings, t } from '../../i18n';
 
 /** Static copy for in-ride chat (T-510). Every name, message and count comes from the server. */
 export const CHAT_COPY = localizedCopy({
@@ -69,11 +70,10 @@ export const formatChatTime = (iso: string | null | undefined): string => {
   if (Number.isNaN(date.getTime())) return '';
   const hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const f = strings().format;
+  const suffix = hours >= 12 ? f.pm : f.am;
   return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${suffix}`;
 };
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** The local calendar day as a day number (DST-safe: the local date, counted in UTC days). */
 const dayIndexOf = (date: Date): number =>
@@ -90,8 +90,10 @@ export const formatChatDayTime = (iso: string | null | undefined, now: Date = ne
   const date = new Date(iso);
   const dayDiff = dayIndexOf(date) - dayIndexOf(now);
   if (dayDiff === 0) return time;
-  if (dayDiff === 1) return `tomorrow at ${time}`;
-  if (dayDiff === -1) return `yesterday at ${time}`;
+  // T-575: day words and month names in the active language (Latin digits in every language).
+  if (dayDiff === 1) return t('format.tomorrowAt', { time });
+  if (dayDiff === -1) return t('format.yesterdayAt', { time });
   const year = date.getFullYear() === now.getFullYear() ? '' : ` ${date.getFullYear()}`;
-  return `${date.getDate()} ${MONTHS[date.getMonth()]}${year} at ${time}`;
+  const day = `${date.getDate()} ${strings().format.monthsShort[date.getMonth()]}${year}`;
+  return t('format.dateAt', { date: day, time });
 };

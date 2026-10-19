@@ -18,7 +18,7 @@ import {
 } from '../../../components/ui';
 import { formatMoney } from '../../../core/format/money';
 import { componentTokens, layout, radius, space } from '../../../theme';
-import { SETTLEMENT_METHOD_LABEL, WALLET_COPY } from '../copy';
+import { SETTLEMENT_METHOD_LABEL, transactionTypeLabel, WALLET_COPY } from '../copy';
 import { formatDateTime, transactionAmountColor, transactionAmountText, transactionIcon } from '../format';
 import { useTransactionDetail } from '../hooks';
 import { t as translate } from '../../../i18n';
@@ -66,7 +66,7 @@ export const transactionDetailRows = (t: WalletTransaction): Row[] => {
   const money = (n: number) => formatMoney(n, { currency: t.currency });
   const method = methodLabel(t);
   const rows: Array<Row | null> = [
-    { label: WALLET_COPY.detailType, value: t.label },
+    { label: WALLET_COPY.detailType, value: transactionTypeLabel(t.type) ?? t.label },
     { label: WALLET_COPY.detailStatus, value: titleCase(t.status) },
     t.createdAt ? { label: WALLET_COPY.detailDate, value: formatDateTime(t.createdAt) } : null,
     t.ride?.rideCode ? { label: WALLET_COPY.detailRide, value: t.ride.rideCode } : null,

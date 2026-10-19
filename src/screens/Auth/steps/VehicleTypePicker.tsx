@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { AppText, Card, Icon } from '../../../components/ui';
-import { VEHICLE_TYPES } from '../../../features/auth/registration/registrationForm';
+import { VEHICLE_TYPES, vehicleTypeText } from '../../../features/auth/registration/registrationForm';
 import { componentTokens, space } from '../../../theme';
 
 const w = componentTokens.wizard;
@@ -23,22 +23,24 @@ export default function VehicleTypePicker({ value, onChange, accessibilityLabel 
     <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel={accessibilityLabel}>
       {VEHICLE_TYPES.map((type) => {
         const selected = value === type.id;
+        // T-575: name and kinds in the active language.
+        const text = vehicleTypeText(type.id) ?? type;
         return (
           <Card
             key={type.id}
             variant={selected ? 'selected' : 'outlined'}
             onPress={() => onChange(type.id)}
             accessibilityRole="radio"
-            accessibilityLabel={`${type.label}, ${type.description}`}
+            accessibilityLabel={`${text.label}, ${text.description}`}
             style={[styles.card, { minHeight }]}
             testID={`registration-vehicle-type-${type.id}`}
           >
             <Icon name={type.icon} size={32} color={selected ? 'onPrimarySoft' : 'primaryText'} />
             <AppText variant="bodyStrong" color={selected ? 'onPrimarySoft' : 'textPrimary'}>
-              {type.label}
+              {text.label}
             </AppText>
             <AppText variant="caption" color="textSecondary" align="center" numberOfLines={2}>
-              {type.description}
+              {text.description}
             </AppText>
           </Card>
         );

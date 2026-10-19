@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Icon } from './ui/Icon';
 import { BrandColors } from '../theme/colors';
 import { logger } from '../core/logging/logger';
+import { t } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -52,29 +53,29 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   showErrorAlert = (error: Error) => {
-    let errorMessage = 'Something went wrong. Please try again.';
+    let errorMessage = t('errorBoundary.generic');
     
     // Provide more specific error messages based on error type
     if (error.message.includes('Property') && error.message.includes("doesn't exist")) {
-      errorMessage = 'There was an issue with the app data. Please restart the app.';
+      errorMessage = t('errorBoundary.appData');
     } else if (error.message.includes('Network')) {
-      errorMessage = 'Network connection issue. Please check your internet connection.';
+      errorMessage = t('errorBoundary.network');
     } else if (error.message.includes('Authentication')) {
-      errorMessage = 'Authentication error. Please log in again.';
+      errorMessage = t('errorBoundary.auth');
     } else if (error.message.includes('Location')) {
-      errorMessage = 'Location service error. Please enable location permissions.';
+      errorMessage = t('errorBoundary.location');
     }
 
     Alert.alert(
-      'App Error',
+      t('errorBoundary.alertTitle'),
       errorMessage,
       [
         {
-          text: 'OK',
+          text: t('errorBoundary.ok'),
           onPress: () => this.resetError(),
         },
         {
-          text: 'Restart App',
+          text: t('errorBoundary.restart'),
           onPress: () => this.resetError(),
         },
       ],
@@ -100,12 +101,10 @@ export class ErrorBoundary extends Component<Props, State> {
         <View style={styles.errorContainer}>
           <View style={styles.errorContent}>
             <Icon name="warning" size={48} tint={BrandColors.primary} />
-            <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
-            <Text style={styles.errorMessage}>
-              We're sorry, but something unexpected happened. Please try again.
-            </Text>
+            <Text style={styles.errorTitle}>{t('errorBoundary.title')}</Text>
+            <Text style={styles.errorMessage}>{t('errorBoundary.body')}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={this.resetError}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
+              <Text style={styles.retryButtonText}>{t('errorBoundary.retry')}</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Icon } from './ui/Icon';
 import { BrandColors } from '../theme/colors';
 import { logger } from '../core/logging/logger';
+import { t } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -52,27 +53,27 @@ export class MapErrorBoundary extends Component<Props, State> {
   }
 
   showMapErrorAlert = (error: Error) => {
-    let errorMessage = 'There was an issue with the map. Please try again.';
+    let errorMessage = t('errorBoundary.mapGeneric');
     
     // Provide more specific error messages based on error type
     if (error.message.includes('NullPointerException') || error.message.includes('removeView')) {
-      errorMessage = 'Map loading issue. Please restart the app.';
+      errorMessage = t('errorBoundary.mapRestart');
     } else if (error.message.includes('MapView') || error.message.includes('Google Maps')) {
-      errorMessage = 'Map service error. Please check your internet connection.';
+      errorMessage = t('errorBoundary.mapService');
     } else if (error.message.includes('Location') || error.message.includes('permission')) {
-      errorMessage = 'Location service error. Please enable location permissions.';
+      errorMessage = t('errorBoundary.location');
     }
 
     Alert.alert(
-      'Map Error',
+      t('errorBoundary.mapAlertTitle'),
       errorMessage,
       [
         {
-          text: 'OK',
+          text: t('errorBoundary.ok'),
           onPress: () => this.resetError(),
         },
         {
-          text: 'Restart App',
+          text: t('errorBoundary.restart'),
           onPress: () => this.resetError(),
         },
       ],
@@ -98,12 +99,10 @@ export class MapErrorBoundary extends Component<Props, State> {
         <View style={styles.errorContainer}>
           <View style={styles.errorContent}>
             <Icon name="map" size={48} tint={BrandColors.primary} />
-            <Text style={styles.errorTitle}>Map Error</Text>
-            <Text style={styles.errorMessage}>
-              There was an issue loading the map. Please try again.
-            </Text>
+            <Text style={styles.errorTitle}>{t('errorBoundary.mapTitle')}</Text>
+            <Text style={styles.errorMessage}>{t('errorBoundary.mapBody')}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={this.resetError}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
+              <Text style={styles.retryButtonText}>{t('errorBoundary.retry')}</Text>
             </TouchableOpacity>
           </View>
         </View>

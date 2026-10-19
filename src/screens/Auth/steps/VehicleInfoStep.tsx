@@ -2,10 +2,10 @@ import React, { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { SelectField, TextField } from '../../../components/ui';
 import {
-  DRIVING_EXPERIENCE_OPTIONS,
-  LICENSE_TYPES,
+  drivingExperienceOptions,
+  licenseTypeOptions,
   REGISTRATION_FIELDS,
-  VEHICLE_COLOURS,
+  vehicleColourOptions,
   vehicleMakesFor,
 } from '../../../features/auth/copy/registrationFields';
 import { formatIsoDateInput } from '../../../features/auth/registration/inputFormat';
@@ -20,8 +20,6 @@ const V = REGISTRATION_FIELDS.vehicle;
 const L = REGISTRATION_FIELDS.licence;
 
 const toOptions = (values: readonly string[]) => values.map((value) => ({ value, label: value }));
-const COLOUR_OPTIONS = toOptions(VEHICLE_COLOURS);
-const EXPERIENCE_OPTIONS = DRIVING_EXPERIENCE_OPTIONS.map((value) => ({ value, label: L.experienceValue(value) }));
 
 /** ABC-1234 or ABC-1234-D: letters upper-cased, separators inserted as the user types. */
 export const formatVehicleNumber = (value: string): string => {
@@ -135,7 +133,7 @@ export default function VehicleInfoStep(props: StepProps) {
             required={f.required('vehicleColor')}
             sheetTitle={V.colourSheet}
             value={data.vehicleColor}
-            options={COLOUR_OPTIONS}
+            options={vehicleColourOptions()}
             onChange={(value) => f.set('vehicleColor', value)}
             error={errors.vehicleColor}
             testID="registration-vehicle-colour"
@@ -192,7 +190,7 @@ export default function VehicleInfoStep(props: StepProps) {
             label={L.type}
             required={f.required('licenseType')}
             value={data.licenseType}
-            options={LICENSE_TYPES}
+            options={licenseTypeOptions()}
             onChange={(value) => f.set('licenseType', value)}
             error={errors.licenseType}
             testID="registration-license-type"
@@ -219,7 +217,7 @@ export default function VehicleInfoStep(props: StepProps) {
             label={L.experience}
             required={f.required('drivingExperience')}
             value={data.drivingExperience}
-            options={EXPERIENCE_OPTIONS}
+            options={drivingExperienceOptions()}
             onChange={(value) => f.set('drivingExperience', value)}
             error={errors.drivingExperience}
             testID="registration-driving-experience"
