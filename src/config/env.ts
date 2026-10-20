@@ -1,4 +1,5 @@
 import Config from 'react-native-config';
+import packageJson from '../../package.json';
 
 /**
  * Single source of truth for environment configuration (API/WS URLs, keys).
@@ -53,5 +54,24 @@ export function readEnv(source: EnvSource | null | undefined): Env {
 }
 
 export const env: Env = readEnv(Config);
+
+/** The app version (package.json `version`), shown in the Account footer (UI-R16 §8). */
+export const APP_VERSION: string = packageJson.version;
+
+/**
+ * The native build number, or null when the build does not expose one. Android: the
+ * `VERSION_CODE` that react-native-config copies from BuildConfig. Either platform: an optional
+ * `APP_BUILD` key in the env file (a build-time constant; no extra native module).
+ */
+export function readAppBuild(source: Record<string, unknown> | null | undefined): string | null {
+  const raw = source?.APP_BUILD ?? source?.VERSION_CODE;
+  const text = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw.trim() : '';
+  return /^[0-9A-Za-z.-]{1,32}$/.test(text) ? text : null;
+}
+
+export const APP_BUILD: string | null = readAppBuild(Config);
+
+/** Debug builds say so in the version line, so screenshots are never taken for a release. */
+export const IS_DEBUG_BUILD: boolean = __DEV__;
 
 export default env;

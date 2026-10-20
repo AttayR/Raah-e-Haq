@@ -29,7 +29,6 @@ import { formatGender } from '../../src/components/passenger/settings/format';
 import { transactionTypeLabel, WALLET_COPY } from '../../src/features/wallet/copy';
 import { STATS_COPY } from '../../src/features/stats/copy';
 import { NOTIFICATIONS_COPY } from '../../src/features/notifications/copy';
-import { DRIVER_SETTINGS_COPY } from '../../src/components/driver/settings/copy';
 import { RIDE_HISTORY_COPY } from '../../src/features/ride-history/copy';
 import { BOOKING_COPY, isCurrentLocationLabel, locationFieldLabels } from '../../src/features/ride-booking/copy';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -154,7 +153,7 @@ describe('QA 2026-10-19: lines that were still English read Roman Urdu', () => {
       NOTIFICATIONS_COPY.filterUnread,
       RIDE_HISTORY_COPY.fareBase,
       RIDE_HISTORY_COPY.filterCancelled,
-      DRIVER_SETTINGS_COPY.notifications,
+      t('account.groupPreferences'),
       transactionTypeLabel('ride_payment'),
     ];
     const english = read();

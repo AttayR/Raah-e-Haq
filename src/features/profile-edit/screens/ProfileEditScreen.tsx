@@ -18,6 +18,7 @@ import { confirm } from '../../../core/dialog';
 import { toast } from '../../../core/toast';
 import { formatIsoDateInput } from '../../auth/registration/inputFormat';
 import { formatPkPhone } from '../../safety/rules';
+import { ownPhotoUri, ProfilePhotoEditor, toPhotoReview } from '../../profile-photo';
 import { perLocale, t } from '../../../i18n';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { layout, space } from '../../../theme';
@@ -47,6 +48,7 @@ export default function ProfileEditScreen() {
   const { form, errors, setField } = edit;
   const [saved, setSaved] = useState(false);
   const isDriver = user?.role === 'driver';
+  const photoReview = isDriver ? toPhotoReview(user) : null;
   const { theme } = useAppTheme();
   // T-556 (QA 2026-10-16 #6): the Save bar is laid out below the scroll view (never over it), but
   // with no edge of its own the field cut at the scroll edge ("About you" on first open) read as
@@ -97,6 +99,17 @@ export default function ProfileEditScreen() {
         showsVerticalScrollIndicator={false}
         testID="profile-edit-scroll"
       >
+        {/* UI-R16 (shared-profile §P7): the photo heads the form (same editor as Profile). */}
+        <View style={styles.photo}>
+          <ProfilePhotoEditor
+            name={user?.name?.trim() || t(isDriver ? 'account.fallbackNameDriver' : 'account.fallbackNameRider')}
+            uri={isDriver ? ownPhotoUri(user, photoReview) : user?.profile_image_url}
+            canRemove={!isDriver}
+            underReview={photoReview?.status === 'pending' && !!photoReview.pendingUri}
+            useServerMessage={isDriver}
+            testID="profile-edit-photo"
+          />
+        </View>
         <TextField
           label={t('profileEdit.nameLabel')}
           value={form.name}
@@ -210,6 +223,10 @@ export default function ProfileEditScreen() {
           disabled={edit.saving}
           testID="profile-edit-bio"
         />
+        {/* UI-R16 (shared-profile §P7): the About counter, end-aligned under the field. */}
+        <AppText variant="caption" color="textMuted" style={styles.counter} testID="profile-edit-bio-counter">
+          {t('common.counter', { count: form.bio.length, max: BIO_MAX })}
+        </AppText>
         {edit.formError ? (
           <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID="profile-edit-error">
             {edit.formError}
@@ -242,7 +259,9 @@ const styles = StyleSheet.create({
     gap: space[4],
   },
   group: { gap: space[2] },
+  photo: { alignItems: 'center', paddingVertical: space[2] },
   groupHelper: { marginHorizontal: space[4] },
+  counter: { alignSelf: 'flex-end', marginTop: -space[3] },
   footer: {
     width: '100%',
     maxWidth: layout.contentMaxWidth,

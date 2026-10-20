@@ -5,7 +5,12 @@ import { haptics } from '../../core/haptics';
 import { componentTokens, radius, space } from '../../theme';
 import { AppText } from './AppText';
 
-export type SegmentOption<T extends string> = { value: T; label: string };
+export type SegmentOption<T extends string> = {
+  value: T;
+  label: string;
+  /** UI-R16: this one option cannot be picked (e.g. a saved-place slot already taken); dimmed. */
+  disabled?: boolean;
+};
 
 export type SegmentedControlProps<T extends string> = {
   options: ReadonlyArray<SegmentOption<T>>;
@@ -49,6 +54,7 @@ export function SegmentedControl<T extends string>({
     >
       {options.map((option) => {
         const selected = option.value === value;
+        const off = disabled || (!!option.disabled && !selected);
         return (
           <Pressable
             key={option.value}
@@ -59,12 +65,13 @@ export function SegmentedControl<T extends string>({
                 onChange(option.value);
               }
             }}
-            disabled={disabled}
+            disabled={off}
             accessibilityRole="radio"
             accessibilityLabel={`${accessibilityLabel}, ${option.label}`}
-            accessibilityState={{ selected, checked: selected, disabled }}
+            accessibilityState={{ selected, checked: selected, disabled: off }}
             style={[
               styles.segment,
+              off && !disabled ? styles.disabled : null,
               { borderWidth: theme.borderWidth.thin, borderColor: selected ? selectedBorder : restingBorder },
               selected ? [{ backgroundColor: thumb }, theme.elevation[1]] : null,
             ]}

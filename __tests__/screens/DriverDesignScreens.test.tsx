@@ -1,41 +1,28 @@
 /**
  * T-605 / T-618 (driver side) redesign: the Drive tab (UI-R4: map + Drive sheet, merging the old
- * Home dashboard and Map tab) and Account render on theme tokens in light and dark and show no
+ * Home dashboard and Map tab) renders on theme tokens in light and dark and show no
  * invented numbers; the status dot follows the online state (QA: it stayed green while offline).
  */
 import React from 'react';
-import { Linking, StyleSheet, useColorScheme, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { StyleSheet, useColorScheme, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { rootReducer } from '../../src/store/rootReducer';
 import type { User } from '../../src/services/api';
-import { ThemeProvider, APPEARANCE_STORAGE_KEY } from '../../src/app/providers/ThemeProvider';
+import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme } from '../../src/theme';
 import { driverStatusApi } from '../../src/features/driver-status/api';
 import DriverDriveScreen from '../../src/screens/Driver/DriverDriveScreen';
-import DriverSettingsScreen from '../../src/screens/Driver/DriverSettingsScreen';
-import { isInside } from '../../test-utils/tabRoot';
 import DriverRideScreen from '../../src/screens/Driver/DriverRideScreen';
 import { driverRideApi } from '../../src/features/driver-ride/api';
 import { statsApi, toMyStats } from '../../src/features/stats/api';
 import { rideHistoryApi, toRide } from '../../src/features/ride-history/api';
 import type { Ride } from '../../src/features/ride-history/types';
-import { driverProfileApi } from '../../src/features/driver-profile/api';
-import { driverDocumentsApi } from '../../src/features/driverDocuments/api';
-import { apiService } from '../../src/services/api';
-import DriverProfile from '../../src/screens/Driver/DriverProfile';
 import { initialDriverRideState } from '../../src/features/driver-ride/slice';
 import type { RideResource } from '../../src/services/rideService';
 import { makeRide } from '../../test-utils/rideFixtures';
-import { toast } from '../../src/core/toast';
-import { PHOTO_TOAST_OFFSET } from '../../src/features/profile-photo/useProfilePhoto';
-import { clearQueryCache } from '../../src/core/api/queryCache';
-import { parcelApi } from '../../src/features/parcel/api';
-import { showParcelOptInRow } from '../../src/features/parcel/hooks';
-import type { ParcelOptIn } from '../../src/features/parcel/types';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -235,222 +222,6 @@ describe('DriverDriveScreen recent trips (T-507)', () => {
   it('no trips yet: no card', async () => {
     await renderScreen(DriverDriveScreen);
     expect(screen.queryByTestId('home-recent-rides')).toBeNull();
-  });
-});
-
-const APPROVED_PHOTO = 'http://localhost:8000/storage/avatars/approved.jpg';
-const PENDING_PHOTO = 'http://localhost:8000/storage/avatars/pending.jpg';
-
-describe('DriverProfile (T-507)', () => {
-  let getProfile: jest.SpyInstance;
-  /** GET /auth/profile on focus (BE-94: the review fields come with the profile). */
-  const serveProfile = (extra: Partial<User>) => {
-    getProfile = jest
-      .spyOn(apiService, 'getProfile')
-      .mockResolvedValue({ success: true, data: { user: { ...user('active'), ...extra } } });
-  };
-  beforeEach(() => {
-    // The focus refresh stays in flight unless a test serves a profile, so the preloaded user counts.
-    getProfile = jest.spyOn(apiService, 'getProfile').mockReturnValue(new Promise(() => undefined));
-  });
-  afterEach(() => jest.restoreAllMocks());
-
-  it('[T-542] reads the review from the profile (no GET /driver/documents); an approved photo shows no note', async () => {
-    const documents = jest.spyOn(driverDocumentsApi, 'list');
-    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    await renderScreen(DriverProfile, {}, null, { profile_image_url: APPROVED_PHOTO, profile_image_review: 'approved' });
-    expect(getProfile).toHaveBeenCalled();
-    expect(documents).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('photo-review-pending')).toBeNull();
-    expect(screen.queryByTestId('driver-profile-photo-under-review')).toBeNull();
-    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(APPROVED_PHOTO);
-  });
-
-  it('[T-542] a pending photo shows the new photo labelled Under review (riders keep the approved one)', async () => {
-    const pending: Partial<User> = {
-      profile_image_url: APPROVED_PHOTO,
-      profile_image_review: 'pending',
-      pending_profile_image_url: PENDING_PHOTO,
-    };
-    serveProfile(pending);
-    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    await renderScreen(DriverProfile, {}, null, pending);
-    expect(screen.getByTestId('photo-review-pending')).toHaveTextContent(/Photo under review/);
-    expect(screen.getByTestId('driver-profile-photo-under-review')).toHaveTextContent('Under review');
-    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(PENDING_PHOTO);
-  });
-
-  it('[T-504] a rejected photo shows the reason', async () => {
-    const rejected: Partial<User> = {
-      profile_image_url: APPROVED_PHOTO,
-      profile_image_review: 'rejected',
-      profile_image_rejection_reason: 'Face not visible',
-    };
-    serveProfile(rejected);
-    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    await renderScreen(DriverProfile, {}, null, rejected);
-    expect(screen.getByTestId('photo-review-rejected')).toHaveTextContent(/Photo not approved.*Reason: Face not visible/);
-    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(APPROVED_PHOTO);
-  });
-
-  it('[T-542] after an upload the new photo shows as under review, the server message is shown, no Remove', async () => {
-    const toastSuccess = jest.spyOn(toast, 'success');
-    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    const message = 'Photo submitted for review. Your current photo stays until it is approved.';
-    jest.spyOn(apiService, 'uploadAvatar').mockResolvedValue({
-      success: true,
-      message,
-      data: {
-        ...user('active'),
-        profile_image_url: APPROVED_PHOTO,
-        profile_image_review: 'pending',
-        pending_profile_image_url: PENDING_PHOTO,
-      },
-    });
-    (launchImageLibrary as jest.Mock).mockResolvedValueOnce({
-      assets: [{ uri: 'file:///tmp/me.jpg', type: 'image/jpeg', fileName: 'me.jpg', fileSize: 100_000 }],
-    });
-    await renderScreen(DriverProfile, {}, null, { profile_image_url: APPROVED_PHOTO, profile_image_review: 'approved' });
-    expect(screen.queryByTestId('photo-review-pending')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('driver-profile-photo-button'));
-    expect(screen.queryByTestId('photo-source-remove')).toBeNull();
-    fireEvent.press(screen.getByTestId('photo-source-library'));
-
-    await waitFor(() => expect(screen.getByTestId('photo-review-pending')).toBeTruthy());
-    expect(screen.getByTestId('driver-profile-photo-avatar-photo').props.source.uri).toBe(PENDING_PHOTO);
-    // Below the avatar, not over it (T-543).
-    expect(toastSuccess).toHaveBeenCalledWith(message, undefined, { topOffset: PHOTO_TOAST_OFFSET });
-  });
-
-  it('shows stats from GET /me/stats (rating "New", PKR), the vehicle and the licence; no demo values', async () => {
-    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([
-      { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved', rejectionReason: null, vehicleType: null, year: null, color: null },
-    ]);
-    jest.spyOn(statsApi, 'getMyStats').mockResolvedValue(
-      toMyStats({ role: 'driver', currency: 'PKR', total_rides: 33, total_earnings: 15230, rating: null }),
-    );
-    await renderScreen(DriverProfile, {}, null, { license_number: 'LHR-55821', license_expiry_date: '2028-03-31' });
-    expect(screen.getByTestId('driver-profile-rating')).toHaveTextContent(/New/);
-    expect(screen.getByTestId('driver-profile-rides')).toHaveTextContent(/33/);
-    expect(screen.getByTestId('driver-profile-earnings')).toHaveTextContent(/Rs 15,230/);
-    expect(screen.getByText('Mitsubishi Outlander')).toBeTruthy();
-    // UI-R17: the plate as a chip, as sent.
-    expect(screen.getByText('Z-0001-19')).toBeTruthy();
-    expect(screen.getByText('LHR-55821')).toBeTruthy();
-    expect(screen.getByText('31 Mar 2028')).toBeTruthy();
-    expect(screen.queryByText(/4\.9|156|\$|Toyota Corolla|DL-123456789/)).toBeNull();
-    // Initials when there is no photo (T-514).
-    expect(screen.getByTestId('driver-profile-photo-avatar-initials')).toHaveTextContent('TD');
-  });
-
-  it('a failed stats read shows dashes and a note, never a number; no vehicle or licence says so', async () => {
-    jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
-    jest.spyOn(statsApi, 'getMyStats').mockRejectedValue(new Error('offline'));
-    await renderScreen(DriverProfile);
-    expect(screen.getByTestId('driver-profile-stats-error')).toBeTruthy();
-    expect(screen.getByTestId('driver-profile-rating')).toHaveTextContent(/—/);
-    expect(screen.getByTestId('driver-vehicle-empty')).toBeTruthy();
-    expect(screen.getByTestId('driver-profile-licence-empty')).toBeTruthy();
-  });
-});
-
-describe('DriverSettingsScreen', () => {
-  it('renders the profile card, grouped rows and sign out on tokens (light)', async () => {
-    await renderScreen(DriverSettingsScreen);
-    expect(flat(screen.getByTestId('driver-settings').props.style).backgroundColor).toBe(
-      LightTheme.colors.background,
-    );
-    expect(screen.getByText('Test Driver')).toBeTruthy();
-    expect(screen.getByText('Approved')).toBeTruthy();
-    expect(flat(screen.getByText('Sign out').props.style).color).toBe(LightTheme.colors.danger);
-    // No dead rows: Privacy and Help come back with T-511.
-    expect(screen.queryByText('Privacy & security')).toBeNull();
-    expect(screen.queryByText('Help & support')).toBeNull();
-  });
-
-  it('UI-R15b: "Account" sits in the bar once (no collapsing title in the list)', async () => {
-    await renderScreen(DriverSettingsScreen);
-    expect(screen.getByTestId('driver-settings-header-title').props.children).toBe('Account');
-    expect(isInside(screen.getByTestId('driver-settings-header-title'), 'driver-settings-scroll')).toBe(false);
-    // The only other "Account" is the row group's overline, inside the list.
-    expect(screen.getAllByText('Account').filter((node) => !isInside(node, 'driver-settings-scroll'))).toHaveLength(1);
-  });
-
-  it('Edit profile opens the edit form and the profile card opens Profile (T-545); Notifications opens the preferences screen (T-502); phone settings stays a row', async () => {
-    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
-    await renderScreen(DriverSettingsScreen);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit profile, Update your personal information' }));
-    expect(mockNavigate).toHaveBeenCalledWith('ProfileEdit');
-    expect(mockNavigate).not.toHaveBeenCalledWith('Profile');
-    fireEvent.press(screen.getByTestId('driver-settings-profile'));
-    expect(mockNavigate).toHaveBeenCalledWith('Profile');
-    fireEvent.press(screen.getByTestId('driver-settings-notifications'));
-    expect(mockNavigate).toHaveBeenCalledWith('NotificationPreferences');
-    // T-203: Vehicle & documents opens the documents list.
-    fireEvent.press(screen.getByTestId('driver-settings-documents'));
-    expect(mockNavigate).toHaveBeenCalledWith('DriverDocuments');
-    // T-501: ride history opens from Account; Earnings (with the wallet) is a tab (UI-R4).
-    fireEvent.press(screen.getByTestId('driver-settings-ride-history'));
-    expect(mockNavigate).toHaveBeenCalledWith('RideHistory');
-    expect(screen.queryByTestId('driver-settings-earnings')).toBeNull();
-    expect(screen.queryByTestId('driver-settings-wallet')).toBeNull();
-    expect(openSettings).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('driver-settings-phone-notifications'));
-    expect(openSettings).toHaveBeenCalledTimes(1);
-  });
-
-  // T-561 (QA T-522 #5): the Parcels row follows any approved bike, not the first vehicle type.
-  describe('Parcel deliveries row', () => {
-    const summary = (over: Partial<ParcelOptIn>): ParcelOptIn => ({
-      optedIn: false,
-      optedInAt: null,
-      hasApprovedBike: false,
-      tierActive: true,
-      getsParcelRequests: false,
-      prohibitedItems: [],
-      rulesVersion: '2026-10-16',
-      ...over,
-    });
-    beforeEach(() => clearQueryCache());
-
-    it('a car driver with an approved bike as a second vehicle sees it', async () => {
-      const read = jest.spyOn(parcelApi, 'getOptIn').mockResolvedValue(summary({ hasApprovedBike: true }));
-      await renderScreen(DriverSettingsScreen, {}, null, { vehicle_type: 'car' });
-      expect(await screen.findByTestId('driver-settings-parcels')).toBeTruthy();
-      expect(read).toHaveBeenCalledTimes(1);
-    });
-
-    it('a car driver without an approved bike (and not opted in) does not', async () => {
-      jest.spyOn(parcelApi, 'getOptIn').mockResolvedValue(summary({}));
-      await renderScreen(DriverSettingsScreen, {}, null, { vehicle_type: 'car' });
-      expect(screen.queryByTestId('driver-settings-parcels')).toBeNull();
-    });
-
-    it('a bike driver sees it without asking the server', async () => {
-      const read = jest.spyOn(parcelApi, 'getOptIn').mockResolvedValue(summary({}));
-      await renderScreen(DriverSettingsScreen, {}, null, { vehicle_type: 'bike' });
-      expect(screen.getByTestId('driver-settings-parcels')).toBeTruthy();
-      expect(read).not.toHaveBeenCalled();
-    });
-
-    it('the rule: a bike profile, else an approved bike or an earlier opt-in', () => {
-      expect(showParcelOptInRow(null, 'bike')).toBe(true);
-      expect(showParcelOptInRow(null, 'car')).toBe(false);
-      expect(showParcelOptInRow(summary({ optedIn: true }), 'car')).toBe(true);
-      expect(showParcelOptInRow(summary({ hasApprovedBike: true }), 'rickshaw')).toBe(true);
-    });
-  });
-
-  it('appearance control switches to dark and persists the choice', async () => {
-    await renderScreen(DriverSettingsScreen);
-    await act(async () => {
-      fireEvent.press(screen.getByRole('radio', { name: 'Appearance, Dark' }));
-    });
-    expect(flat(screen.getByTestId('driver-settings').props.style).backgroundColor).toBe(
-      DarkTheme.colors.background,
-    );
-    expect(await AsyncStorage.getItem(APPEARANCE_STORAGE_KEY)).toBe('dark');
   });
 });
 

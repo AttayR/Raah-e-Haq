@@ -6,7 +6,7 @@ import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
-import { LanguageRow } from '../../src/components/driver/settings/LanguageRow';
+import { LanguageRow } from '../../src/features/account/components/PreferenceRows';
 import { getLocale } from '../../src/i18n';
 import { LANGUAGE_STORAGE_KEY, resetLanguagePreferenceForTests } from '../../src/i18n/languagePreference';
 

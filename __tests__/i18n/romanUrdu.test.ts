@@ -32,8 +32,6 @@ import { STATS_COPY } from '../../src/features/stats/copy';
 import { DRIVER_PROFILE_COPY } from '../../src/features/driver-profile/copy';
 import { DRIVER_DOCUMENTS_COPY } from '../../src/features/driverDocuments/copy';
 import { DRIVER_HOME_COPY } from '../../src/components/driver/home/copy';
-import { DRIVER_SETTINGS_COPY } from '../../src/components/driver/settings/copy';
-import { PASSENGER_SETTINGS_COPY } from '../../src/components/passenger/settings/copy';
 import { isLocalizedCopy, registeredTranslation } from '../../src/i18n/localizedCopy';
 import { resetLanguagePreferenceForTests } from '../../src/i18n/languagePreference';
 import { setLocale } from '../../src/i18n';
@@ -133,8 +131,6 @@ const COPY_OBJECTS: Record<string, object> = {
   DRIVER_PROFILE_COPY,
   DRIVER_DOCUMENTS_COPY,
   DRIVER_HOME_COPY,
-  DRIVER_SETTINGS_COPY,
-  PASSENGER_SETTINGS_COPY,
 };
 
 /** Copy strings that read the same in Roman Urdu (brand, formats, shared English words). */

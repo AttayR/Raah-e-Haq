@@ -3,7 +3,6 @@ import {
   formatGender,
   formatMonthYear,
 } from '../../src/components/passenger/settings/format';
-import { accountStatusBadge } from '../../src/components/passenger/settings/copy';
 
 describe('passenger profile formatting (T-618)', () => {
   it('formatMonthYear', () => {
@@ -25,12 +24,5 @@ describe('passenger profile formatting (T-618)', () => {
     expect(formatGender('MALE')).toBe('Male');
     expect(formatGender('  ')).toBeNull();
     expect(formatGender(undefined)).toBeNull();
-  });
-
-  it('accountStatusBadge: one word for pending, nothing otherwise', () => {
-    expect(accountStatusBadge('pending')).toEqual({ label: 'Pending approval', tone: 'warning' });
-    expect(accountStatusBadge('active')).toBeNull();
-    expect(accountStatusBadge('inactive')).toBeNull();
-    expect(accountStatusBadge(undefined)).toBeNull();
   });
 });

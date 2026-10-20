@@ -11,6 +11,8 @@ export type ListItemProps = {
   subtitle?: string;
   /** Subtitle line cap (default 2); 0 shows all of it (a bio or an address on Profile, T-545). */
   subtitleNumberOfLines?: number;
+  /** UI-R16: `primaryText` for a call to action in the subtitle ("Add home"); default `textSecondary`. */
+  subtitleColor?: 'textSecondary' | 'primaryText';
   /** Optional third line in `caption` `textMuted` (dates, meta). */
   meta?: string;
   /**
@@ -56,6 +58,7 @@ export function ListItem({
   title,
   subtitle,
   subtitleNumberOfLines = 2,
+  subtitleColor = 'textSecondary',
   meta,
   variant = 'settings',
   icon,
@@ -99,7 +102,7 @@ export function ListItem({
           {title}
         </AppText>
         {subtitle ? (
-          <AppText variant="bodySmall" color="textSecondary" numberOfLines={subtitleNumberOfLines}>
+          <AppText variant="bodySmall" color={subtitleColor} numberOfLines={subtitleNumberOfLines}>
             {subtitle}
           </AppText>
         ) : null}

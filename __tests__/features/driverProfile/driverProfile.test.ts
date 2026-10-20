@@ -6,13 +6,10 @@ import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import { driverProfileApi, toDriverVehicles } from '../../../src/features/driver-profile/api';
 import {
-  toDriverProfileStats,
   vehiclePlate,
   vehicleStatusBadge,
   vehicleTitle,
 } from '../../../src/features/driver-profile/format';
-import { toMyStats } from '../../../src/features/stats/api';
-import type { DriverStats } from '../../../src/features/stats/types';
 
 let mock: MockAdapter;
 beforeEach(() => {
@@ -68,12 +65,3 @@ describe('vehicle labels', () => {
   });
 });
 
-describe('toDriverProfileStats', () => {
-  it('dashes until loaded; "New" before the first rating; one decimal after; money in PKR', () => {
-    expect(toDriverProfileStats(null)).toEqual({ rating: null, rides: null, earnings: null });
-    const fresh = toMyStats({ role: 'driver', currency: 'PKR', total_rides: 0, total_earnings: 0, rating: null }) as DriverStats;
-    expect(toDriverProfileStats(fresh)).toEqual({ rating: 'New', rides: '0', earnings: 'Rs 0' });
-    const rated = toMyStats({ role: 'driver', total_rides: 156, total_earnings: 24000, rating: 4.86 }) as DriverStats;
-    expect(toDriverProfileStats(rated)).toEqual({ rating: '4.9', rides: '156', earnings: 'Rs 24,000' });
-  });
-});

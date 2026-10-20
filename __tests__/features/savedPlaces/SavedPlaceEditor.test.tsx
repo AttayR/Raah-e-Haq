@@ -108,16 +108,22 @@ describe('Saved place form', () => {
     const success = jest.spyOn(toast, 'success');
     await renderEditor();
 
-    // Home and Work are taken, so a new place starts as Other; nothing is saved without a location.
-    fireEvent.press(screen.getByTestId('saved-place-save'));
-    expect(screen.getByTestId('saved-place-error')).toHaveTextContent('Search for the place first.');
+    // Home and Work are taken, so a new place starts as Other with both slots disabled and said
+    // so; "Save place" stays disabled without a location and, for Other, a name.
+    expect(screen.getByRole('radio', { name: 'Save as, Home' }).props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getAllByTestId('saved-place-taken').map((node) => node.props.children)).toEqual([
+      'You already saved Home. Edit it from the list.',
+      'You already saved Work. Edit it from the list.',
+    ]);
+    expect(screen.getByTestId('saved-place-save').props.accessibilityState).toMatchObject({ disabled: true });
 
     fireEvent.press(screen.getByTestId('mock-search-pick'));
-    expect(screen.getByTestId('saved-place-location')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('saved-place-save'));
-    expect(screen.getByText('Give this place a name.')).toBeTruthy();
+    // The chosen address shows in full (S-5).
+    expect(screen.getByTestId('saved-place-location')).toHaveTextContent(/Liberty Market, Gulberg III, Lahore/);
+    expect(screen.getByTestId('saved-place-save').props.accessibilityState).toMatchObject({ disabled: true });
 
     fireEvent.changeText(screen.getByTestId('saved-place-name'), '  Market ');
+    expect(screen.getByTestId('saved-place-name-counter')).toHaveTextContent('9/40');
     fireEvent.press(screen.getByTestId('saved-place-save'));
     await flush();
     expect(body).toEqual({
@@ -132,21 +138,49 @@ describe('Saved place form', () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('a new Home says it replaces the saved one and posts label home without a name', async () => {
-    mockParams = { label: 'home', taken: { home: 'House 1, DHA' } };
+  it('"Add home" posts label home without a name; a preset slot already taken falls back to a free one', async () => {
+    mockParams = { label: 'home' };
     let body: Record<string, unknown> = {};
     mock.onPost('/saved-places').reply((config) => {
       body = JSON.parse(config.data);
-      return [200, writeBody(placeBody({ label: 'home', name: null }), { replaced: true })];
+      return [201, writeBody(placeBody({ label: 'home', name: null }))];
     });
     await renderEditor();
-    expect(screen.getByTestId('saved-place-replaces')).toHaveTextContent(/This replaces your saved Home: House 1, DHA/);
+    expect(screen.getByRole('radio', { name: 'Save as, Home' }).props.accessibilityState).toMatchObject({ checked: true });
     fireEvent.press(screen.getByTestId('mock-search-pick'));
     fireEvent.press(screen.getByTestId('saved-place-save'));
     await flush();
     expect(body.label).toBe('home');
     expect(body).not.toHaveProperty('name');
     expect(mockGoBack).toHaveBeenCalled();
+    screen.unmount();
+
+    mockParams = { label: 'home', taken: { home: 'House 1, DHA' } };
+    await renderEditor();
+    expect(screen.getByRole('radio', { name: 'Save as, Work' }).props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.getByTestId('saved-place-taken')).toHaveTextContent('You already saved Home. Edit it from the list.');
+  });
+
+  it('a 422 on the name shows under the field; a network failure shows in a Banner', async () => {
+    mockParams = { label: 'other' };
+    mock.onPost('/saved-places').replyOnce(422, {
+      success: false,
+      message: 'The given data was invalid.',
+      errors: { name: ['The name may not be greater than 40 characters.'] },
+    });
+    await renderEditor();
+    fireEvent.press(screen.getByTestId('mock-search-pick'));
+    fireEvent.changeText(screen.getByTestId('saved-place-name'), 'Gym');
+    fireEvent.press(screen.getByTestId('saved-place-save'));
+    await flush();
+    expect(screen.getByText('The name may not be greater than 40 characters.')).toBeTruthy();
+    expect(screen.queryByTestId('saved-place-error')).toBeNull();
+
+    mock.onPost('/saved-places').networkErrorOnce();
+    fireEvent.press(screen.getByTestId('saved-place-save'));
+    await flush();
+    expect(screen.getByTestId('saved-place-error')).toBeTruthy();
+    expect(mockGoBack).not.toHaveBeenCalled();
   });
 
   it('a 422 (other places at the cap) stays on the form with the server message', async () => {

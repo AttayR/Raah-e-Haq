@@ -13,8 +13,6 @@ import { STATS_COPY } from '../../features/stats/copy';
 import { DRIVER_PROFILE_COPY } from '../../features/driver-profile/copy';
 import { DRIVER_DOCUMENTS_COPY } from '../../features/driverDocuments/copy';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
-import { DRIVER_SETTINGS_COPY } from '../../components/driver/settings/copy';
-import { PASSENGER_SETTINGS_COPY } from '../../components/passenger/settings/copy';
 
 /** Roman Urdu of the wallet, activity, inbox, earnings and account copy (T-523). */
 export function registerAccountCopy(): void {
@@ -489,59 +487,5 @@ export function registerAccountCopy(): void {
     approved: 'Approved',
     pending: 'Pending',
     statsUnavailable: 'Abhi aaj ke numbers load nahi ho sake.',
-  });
-
-  registerCopyTranslation(DRIVER_SETTINGS_COPY, 'ur-Latn', {
-    driverFallbackName: 'Driver',
-    statusApproved: 'Approved',
-    statusPending: 'Pending',
-    accountGroup: 'Account',
-    editProfile: 'Profile edit karein',
-    editProfileSubtitle: 'Apni zaati maloomat update karein',
-    openProfileHint: 'Aap ki profile kholta hai',
-    documents: 'Gaari aur documents',
-    documentsSubtitle: 'Status dekhein aur reject hui photos dobara upload karein',
-    rideHistory: 'Ride history',
-    rideHistorySubtitle: 'Aap ki trips, receipts aur cancellations',
-    notifications: 'Itlaat',
-    notificationsSubtitle: 'Chunein ke kaun se alerts milein',
-    phoneNotifications: 'Phone ki notification settings',
-    phoneNotificationsSubtitle: 'Raah-e-Haq ke alerts allow ya block karein',
-    appGroup: 'App',
-    appearance: 'Shakal',
-    appearanceSystem: 'System',
-    appearanceLight: 'Light',
-    appearanceDark: 'Dark',
-    signOut: 'Sign out',
-    signingOut: 'Sign out ho raha hai…',
-  });
-
-  registerCopyTranslation(PASSENGER_SETTINGS_COPY, 'ur-Latn', {
-    passengerFallbackName: 'Rider',
-    roleLabel: 'Rider',
-    openProfileHint: 'Aap ki profile kholta hai',
-    accountGroup: 'Aap ka account',
-    savedPlaces: 'Save ki hui jaghein',
-    savedPlacesSubtitle: 'Ghar, daftar aur pasandeeda jaghein',
-    notificationsGroup: 'Itlaat',
-    notifications: 'Itlaat',
-    notificationsSubtitle: 'Chunein ke kaun se alerts milein',
-    phoneNotifications: 'Phone ki notification settings',
-    phoneNotificationsSubtitle: 'Raah-e-Haq ke alerts allow ya block karein',
-    appGroup: 'App',
-    signOut: 'Sign out',
-    signingOut: 'Sign out ho raha hai…',
-    profileTitle: 'Profile',
-    back: 'Wapas',
-    memberSince: 'Member kab se',
-    personalInfo: 'Zaati maloomat',
-    phone: 'Phone',
-    email: 'Email',
-    gender: 'Jins',
-    dateOfBirth: 'Tareekh-e-paidaish',
-    address: 'Pata',
-    bio: 'Baare mein',
-    verified: 'Verified',
-    noDetails: 'Abhi koi zaati maloomat nahi',
   });
 }

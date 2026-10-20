@@ -108,6 +108,15 @@ const NULLABLE_RECORD_FIELDS = ['female_driver_request', 'women_mode'] as const;
 
 type NullableRecordField = (typeof NULLABLE_RECORD_FIELDS)[number];
 
+/**
+ * BE-07 `rating`: a usable 1–5 number (the server may send a `decimal:2` string like "4.80"), or
+ * null for "not rated yet". Zero, out-of-range and unparseable values are not ratings.
+ */
+export const toRating = (value: unknown): number | null => {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 5 ? n : null;
+};
+
 const isPresentString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim() !== '';
 
@@ -177,6 +186,9 @@ export function normalizeUser(raw: unknown): User | null {
   });
   if (typeof raw.email_verified === 'boolean') {
     user.email_verified = raw.email_verified;
+  }
+  if ('rating' in raw) {
+    user.rating = toRating(raw.rating);
   }
   if ('profile_image_review' in raw) {
     user.profile_image_review = toPhotoReviewStatus(raw.profile_image_review);

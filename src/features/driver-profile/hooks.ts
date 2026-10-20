@@ -1,4 +1,4 @@
-import { CACHE_NAMES, CACHE_TTL } from '../../core/api/queryCache';
+import { CACHE_NAMES, CACHE_TTL, readCache } from '../../core/api/queryCache';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { driverProfileApi } from './api';
 import { DRIVER_PROFILE_COPY } from './copy';
@@ -12,3 +12,10 @@ const VEHICLES_CACHE = { name: CACHE_NAMES.profileVehicles, ttlMs: CACHE_TTL.pro
  */
 export const useMyVehicles = (enabled: boolean): RemoteData<DriverVehicle[]> =>
   useRemoteData({ fetch: driverProfileApi.getVehicles, fallbackError: DRIVER_PROFILE_COPY.vehicleFailed, enabled, cache: VEHICLES_CACHE });
+
+/**
+ * The vehicles read in the last minute, or null: the Account tab's "Action needed" badge uses
+ * them only when they are already in memory and never asks the server itself (UI-R16 §4.1).
+ */
+export const peekMyVehicles = (): DriverVehicle[] | null =>
+  readCache<DriverVehicle[]>(`${VEHICLES_CACHE.name}|`, VEHICLES_CACHE.ttlMs)?.value ?? null;

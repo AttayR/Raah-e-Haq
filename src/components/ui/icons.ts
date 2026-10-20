@@ -112,6 +112,9 @@ export const iconGlyphs = {
   eye: 'eye-outline',
   eyeOff: 'eye-off-outline',
   logout: 'logout',
+  // UI-R16: legal rows open the browser; Profile → Delete account (UI-R18).
+  externalLink: 'open-in-new',
+  accountRemove: 'account-remove-outline',
   power: 'power',
   theme: 'theme-light-dark',
   // Language setting (T-523).

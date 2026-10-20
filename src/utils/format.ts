@@ -90,6 +90,15 @@ export function formatDistance(km: Numberish): string {
   return `${groupThousands(String(Math.round(n)))} ${unit}`;
 }
 
+/** `1204` -> `1,204` (whole counts: trips, rides); '' for a missing or invalid value. */
+export function formatCount(value: Numberish): string {
+  const n = toNumber(value);
+  if (n === null || n < 0) {
+    return '';
+  }
+  return groupThousands(String(Math.round(n)));
+}
+
 /** `7 min`, `1 h 05 min`, `2 h`. Input in minutes; anything under a minute reads `1 min`. */
 export function formatDuration(minutes: Numberish): string {
   const n = toNumber(minutes);

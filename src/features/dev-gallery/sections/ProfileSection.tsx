@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppText, Banner, Button, ListGroup, ListItem } from '../../../components/ui';
-import { ProfileInfoList } from '../../../components/passenger/settings/ProfileInfoList';
+import { ProfileInfoList } from '../../account/components/ProfileInfoList';
 import type { User } from '../../../services/api';
 import { t } from '../../../i18n';
 import { space } from '../../../theme';
@@ -44,7 +44,7 @@ export function ProfileSection() {
         actionPlacement="below"
         action={{ label: t('kitGallery.profileCancelChange'), onPress: noop }}
       />
-      <ProfileInfoList user={SAMPLE} />
+      <ProfileInfoList user={SAMPLE} onAddDetails={noop} testIDPrefix="gallery-profile" />
       <Button label={t('profileEdit.save')} onPress={noop} disabled />
     </GallerySection>
   );

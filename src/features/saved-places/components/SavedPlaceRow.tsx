@@ -1,87 +1,67 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Button, IconButton, ListItem } from '../../../components/ui';
+import { IconButton, ListItem, type IconName } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { componentTokens, space } from '../../../theme';
-import { savedPlaceIcon, savedPlaceTitle } from '../format';
-import type { BookingRole } from '../navigation';
-import type { SavedPlace } from '../types';
+import { savedPlaceTitle } from '../format';
+import type { SavedPlace, SavedPlaceLabel } from '../types';
 
-type Props = {
+const LIST_ICONS: Record<SavedPlaceLabel, IconName> = { home: 'home', work: 'work', other: 'bookmark' };
+
+type RowProps = {
   place: SavedPlace;
-  onUse: (place: SavedPlace, role: BookingRole) => void;
-  onEdit: (place: SavedPlace) => void;
-  onDelete: (place: SavedPlace) => void;
+  /** Row tap: book a ride to this place (the commonest intent, passenger-saved-places §S2). */
+  onRide: (place: SavedPlace) => void;
+  /** The one `more` menu: Ride here, Set as pickup, Edit, Delete. */
+  onMore: (place: SavedPlace) => void;
 };
 
 /**
- * One saved place in the list (T-516): the label glyph (home / briefcase / map marker), the title
- * ("Home", "Work" or the name) and the address, Edit and Delete at the end, and the two booking
- * shortcuts under the text.
+ * One saved place (passenger-saved-places §S2): label glyph tile, "Home" / "Work" or the name,
+ * the address (2 lines), and a single `more` button. No buttons under the row and no destructive
+ * control on the list itself.
  */
-export function SavedPlaceRow({ place, onUse, onEdit, onDelete }: Props) {
+export const SavedPlaceRow = React.memo(function SavedPlaceRow({ place, onRide, onMore }: RowProps) {
   const title = savedPlaceTitle(place);
   const testID = `saved-place-${place.id}`;
   return (
-    <View testID={testID}>
-      <ListItem
-        variant="content"
-        icon={savedPlaceIcon(place.label)}
-        title={title}
-        subtitle={place.address}
-        trailing={
-          <View style={styles.trailing}>
-            <IconButton
-              icon="edit"
-              iconColor="textSecondary"
-              onPress={() => onEdit(place)}
-              accessibilityLabel={t('savedPlaces.editA11y', { name: title })}
-              testID={`${testID}-edit`}
-            />
-            <IconButton
-              icon="delete"
-              iconColor="danger"
-              onPress={() => onDelete(place)}
-              accessibilityLabel={t('savedPlaces.deleteA11y', { name: title })}
-              testID={`${testID}-delete`}
-            />
-          </View>
-        }
-        testID={`${testID}-item`}
-      />
-      <View style={styles.actions}>
-        <Button
-          label={t('savedPlaces.setPickup')}
-          variant="secondary"
-          size="sm"
-          fullWidth={false}
-          leadingIcon="origin"
-          onPress={() => onUse(place, 'pickup')}
-          testID={`${testID}-pickup`}
+    <ListItem
+      variant="content"
+      icon={LIST_ICONS[place.label]}
+      title={title}
+      subtitle={place.address}
+      onPress={() => onRide(place)}
+      accessibilityLabel={`${title}, ${place.address}`}
+      accessibilityHint={t('savedPlaces.rideHere')}
+      trailing={
+        <IconButton
+          icon="more"
+          iconColor="textSecondary"
+          onPress={() => onMore(place)}
+          accessibilityLabel={t('savedPlaces.moreA11y', { name: title })}
+          testID={`${testID}-more`}
         />
-        <Button
-          label={t('savedPlaces.setDestination')}
-          variant="primary"
-          size="sm"
-          fullWidth={false}
-          leadingIcon="pin"
-          onPress={() => onUse(place, 'destination')}
-          testID={`${testID}-destination`}
-        />
-      </View>
-    </View>
+      }
+      testID={`${testID}-item`}
+    />
+  );
+});
+
+/**
+ * An empty Home or Work slot (§S2.1): always shown, so the house and the briefcase sit in the
+ * same place every time. "Add home" / "Add work" opens the form with that label preset.
+ */
+export function SavedPlaceSlotRow({ label, onAdd }: { label: 'home' | 'work'; onAdd: (label: 'home' | 'work') => void }) {
+  const title = savedPlaceTitle({ label, name: null });
+  const action = t(label === 'home' ? 'savedPlaces.addHome' : 'savedPlaces.addWork');
+  return (
+    <ListItem
+      variant="content"
+      icon={label === 'home' ? 'homeAdd' : 'work'}
+      title={title}
+      subtitle={action}
+      subtitleColor="primaryText"
+      onPress={() => onAdd(label)}
+      accessibilityLabel={action}
+      testID={`saved-places-slot-${label}`}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  trailing: { flexDirection: 'row', alignItems: 'center' },
-  // Aligned with the row's text (after the 40 tile).
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
-    paddingStart: componentTokens.listItem.dividerInset.tile,
-    paddingEnd: space[4],
-    paddingBottom: space[3],
-  },
-});

@@ -17,7 +17,7 @@ import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import ProfileEditScreen from '../../../src/features/profile-edit/screens/ProfileEditScreen';
 import ChangePhoneScreen from '../../../src/features/profile-edit/screens/ChangePhoneScreen';
 import { AccountChecks } from '../../../src/features/profile-edit';
-import { ProfileInfoList, profileInfoRows } from '../../../src/components/passenger/settings/ProfileInfoList';
+import { ProfileInfoList, profileInfoRows } from '../../../src/features/account/components/ProfileInfoList';
 import { dialog, dialogStore } from '../../../src/core/dialog';
 import { toast } from '../../../src/core/toast';
 
@@ -423,7 +423,7 @@ describe('Profile personal info (T-545)', () => {
     const bio = 'I drive mornings in Gulberg and DHA. '.repeat(6).trim();
     for (const user of [rider, driver]) {
       const withText = { ...user, bio };
-      await renderWith(<ProfileInfoList user={withText} />, withText);
+      await renderWith(<ProfileInfoList user={withText} onAddDetails={jest.fn()} testIDPrefix="passenger-profile" />, withText);
       expect(screen.getByTestId('passenger-profile-address')).toHaveTextContent(/House 1, Street 2, Lahore/);
       const bioText = screen.getByText(bio);
       expect(bioText.props.numberOfLines).toBe(0);

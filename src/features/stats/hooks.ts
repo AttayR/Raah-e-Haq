@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toApiError } from '../../core/api/errors';
-import { CACHE_NAMES, CACHE_TTL } from '../../core/api/queryCache';
+import { CACHE_NAMES, CACHE_TTL, readCache } from '../../core/api/queryCache';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { statsApi } from './api';
 import { STATS_COPY } from './copy';
@@ -15,6 +15,12 @@ const STATS_CACHE = { name: CACHE_NAMES.stats, ttlMs: CACHE_TTL.stats } as const
  */
 export const useMyStats = (enabled: boolean, fallbackError: string = STATS_COPY.statsFailed): RemoteData<MyStats> =>
   useRemoteData({ fetch: statsApi.getMyStats, fallbackError, enabled, cache: STATS_CACHE });
+
+/**
+ * The GET /me/stats read in the last minute, or null; never a request (UI-R16: the Account tab's
+ * profile card takes its rating from here when Home, Drive or Profile already read it).
+ */
+export const peekMyStats = (): MyStats | null => readCache<MyStats>(`${STATS_CACHE.name}|`, STATS_CACHE.ttlMs)?.value ?? null;
 
 export interface DriverEarningsState extends RemoteData<DriverEarnings> {
   /** Page 1 rides followed by any loaded later pages. */

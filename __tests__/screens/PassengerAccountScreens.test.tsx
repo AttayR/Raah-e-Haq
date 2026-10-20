@@ -26,6 +26,9 @@ import { isInside } from '../../test-utils/tabRoot';
 import PassengerProfile from '../../src/screens/Passenger/Passengerprofile';
 import { LOGOUT_CONFIRM_TITLE } from '../../src/hooks/useLogout';
 import { dialog, dialogStore } from '../../src/core/dialog';
+import { toast } from '../../src/core/toast';
+import { statsApi, toMyStats } from '../../src/features/stats/api';
+import { clearQueryCache } from '../../src/core/api/queryCache';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -133,7 +136,7 @@ describe('PassengerSettingsScreen', () => {
     expect(screen.queryByText(/help/i)).toBeNull();
     expect(screen.queryByText(/invite/i)).toBeNull();
     // Active accounts show no status badge.
-    expect(screen.queryByTestId('passenger-settings-status')).toBeNull();
+    expect(screen.queryByTestId('passenger-settings-profile-status')).toBeNull();
     expectOnlyThemeColors(theme);
   });
 
@@ -151,18 +154,50 @@ describe('PassengerSettingsScreen', () => {
     expect(mockNavigate).toHaveBeenLastCalledWith('Profile');
     fireEvent.press(screen.getByTestId('passenger-settings-saved-places'));
     expect(mockNavigate).toHaveBeenLastCalledWith('FavoriteLocations');
+    fireEvent.press(screen.getByTestId('passenger-settings-emergency-contacts'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('EmergencyContacts');
     // UI-R4: ride history and the wallet live in Activity, not in Account.
     expect(screen.queryByTestId('passenger-settings-wallet')).toBeNull();
     expect(screen.queryByTestId('passenger-settings-ride-history')).toBeNull();
     fireEvent.press(screen.getByTestId('passenger-settings-notifications'));
     expect(mockNavigate).toHaveBeenLastCalledWith('NotificationPreferences');
-    fireEvent.press(screen.getByTestId('passenger-settings-phone-notifications'));
-    expect(openSettings).toHaveBeenCalledTimes(1);
+    // UI-R16 A3: the phone's own settings live inside Notifications only.
+    expect(screen.queryByTestId('passenger-settings-phone-notifications')).toBeNull();
+    expect(openSettings).not.toHaveBeenCalled();
   });
 
-  it('profile card is one accessible button with name and contact', async () => {
+  it('UI-R16: same groups as the driver, one-line rows (no subtitles), version line', async () => {
     await renderScreen(PassengerSettingsScreen, 'light');
-    expect(screen.getByRole('button', { name: 'Test Passenger, +920000000001' })).toBeTruthy();
+    expect(screen.getAllByRole('header').map((node) => node.props.children)).toEqual(
+      expect.arrayContaining(['Your account', 'Safety', 'Preferences']),
+    );
+    expect(screen.queryByText('Home, work and favourites')).toBeNull();
+    expect(screen.queryByText('Choose which alerts you get')).toBeNull();
+    expect(screen.getByTestId('passenger-settings-version')).toHaveTextContent(/^Raah-e-Haq 0\.0\.1.*Debug$/);
+  });
+
+  it('profile card is one accessible button with name, formatted phone and the rating', async () => {
+    await renderScreen(PassengerSettingsScreen, 'light', { ...basePassenger, phone: '+923009990001', rating: 4.75 });
+    expect(screen.getByRole('button', { name: 'Test Passenger, +92 300 9990001, rated 4.8' })).toBeTruthy();
+    expect(screen.getByTestId('passenger-settings-profile-rating')).toHaveTextContent(/4\.8/);
+  });
+
+  it('profile card says "New" before the first rating', async () => {
+    await renderScreen(PassengerSettingsScreen, 'light', { ...basePassenger, rating: null });
+    expect(screen.getByTestId('passenger-settings-profile-rating')).toHaveTextContent('New');
+    expect(screen.getByRole('button', { name: 'Test Passenger, +920000000001, new' })).toBeTruthy();
+  });
+
+  it('pull to refresh that fails says so and keeps the content', async () => {
+    jest.spyOn(apiService, 'getProfile').mockRejectedValue(new Error('offline'));
+    const error = jest.spyOn(toast, 'error');
+    await renderScreen(PassengerSettingsScreen, 'light');
+    const scroll = screen.UNSAFE_root.findAll((node) => node.props.refreshControl !== undefined && typeof node.type !== 'string')[0];
+    await act(async () => {
+      await scroll.props.refreshControl.props.onRefresh();
+    });
+    expect(error).toHaveBeenCalledWith("Couldn't refresh your account.");
+    expect(screen.getByText('Test Passenger')).toBeTruthy();
   });
 
   it('sign out asks for confirmation first (T-102)', async () => {
@@ -175,8 +210,7 @@ describe('PassengerSettingsScreen', () => {
 
   it('pending account: the card says "Pending approval"', async () => {
     await renderScreen(PassengerSettingsScreen, 'light', { ...basePassenger, status: 'pending' });
-    expect(screen.getByTestId('passenger-settings-status')).toBeTruthy();
-    expect(screen.getByText('Pending approval')).toBeTruthy();
+    expect(screen.getByTestId('passenger-settings-profile-status')).toHaveTextContent('Pending approval');
   });
 
   it('pull to refresh re-reads the profile from the server', async () => {
@@ -191,10 +225,12 @@ describe('PassengerSettingsScreen', () => {
     expect(getProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('appearance control switches to dark and persists the choice', async () => {
+  it('Appearance sheet switches to dark and persists the choice', async () => {
     await renderScreen(PassengerSettingsScreen, 'light');
+    fireEvent.press(screen.getByTestId('settings-appearance'));
+    await act(async () => {});
     await act(async () => {
-      fireEvent.press(screen.getByRole('radio', { name: 'Appearance, Dark' }));
+      fireEvent.press(screen.getByRole('radio', { name: 'Dark' }));
     });
     expect(flat(screen.getByTestId('passenger-settings').props.style).backgroundColor).toBe(DarkTheme.colors.background);
     expect(await AsyncStorage.getItem(APPEARANCE_STORAGE_KEY)).toBe('dark');
@@ -202,6 +238,38 @@ describe('PassengerSettingsScreen', () => {
 });
 
 describe('PassengerProfile', () => {
+  beforeEach(() => {
+    clearQueryCache();
+    // The focus re-read of GET /auth/profile stays in flight: the preloaded user counts.
+    jest.spyOn(apiService, 'getProfile').mockReturnValue(new Promise(() => undefined));
+    jest
+      .spyOn(statsApi, 'getMyStats')
+      .mockResolvedValue(toMyStats({ role: 'passenger', currency: 'PKR', total_rides: 12, total_distance_km: 86.4, total_spent: 5400, rating: 4.75 }));
+  });
+
+  it('UI-R16: one stats strip (Rating / Trips / Distance) from GET /me/stats; no money', async () => {
+    await renderScreen(PassengerProfile, 'light');
+    expect(screen.getByTestId('passenger-profile-stats-rating')).toHaveTextContent(/4\.8/);
+    expect(screen.getByTestId('passenger-profile-stats-trips')).toHaveTextContent(/^12Trips$/);
+    expect(screen.getByTestId('passenger-profile-stats-distance')).toHaveTextContent(/86\s*km/);
+    expect(screen.queryByText(/Rs 5,400/)).toBeNull();
+  });
+
+  it('UI-R16: the email says "Not confirmed" when the server marks it unproven, "Verified" when proven', async () => {
+    await renderScreen(PassengerProfile, 'light', { ...basePassenger, email_verified: false });
+    expect(screen.getByTestId('passenger-profile-email-state')).toHaveTextContent('Not confirmed');
+    screen.unmount();
+    await renderScreen(PassengerProfile, 'light', { ...basePassenger, email_verified: true });
+    expect(screen.getByTestId('passenger-profile-email-state')).toHaveTextContent('Verified');
+  });
+
+  it('UI-R16: Header "Edit" opens the form; no Delete account row until UI-R18', async () => {
+    await renderScreen(PassengerProfile, 'light');
+    fireEvent.press(screen.getByTestId('passenger-profile-edit'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('ProfileEdit');
+    expect(screen.queryByText('Delete account')).toBeNull();
+  });
+
   it.each([
     ['light', LightTheme],
     ['dark', DarkTheme],
@@ -219,8 +287,8 @@ describe('PassengerProfile', () => {
     expect(screen.getByText('+920000000001')).toBeTruthy();
     expect(screen.getByText('Verified')).toBeTruthy();
     expect(screen.getByText('passenger@example.test')).toBeTruthy();
-    // No invented stats (4.8 / 24 / 2y) and no raw "( passenger )" role.
-    expect(screen.queryByText(/4\.8|^24$|2y/)).toBeNull();
+    // No invented stats (24 / 2y; the real ones come from GET /me/stats) and no raw "( passenger )" role.
+    expect(screen.queryByText(/^24$|2y/)).toBeNull();
     expect(screen.queryByText(/\(\s*passenger\s*\)/)).toBeNull();
     expectOnlyThemeColors(theme);
   });

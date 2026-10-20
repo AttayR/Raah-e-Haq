@@ -350,6 +350,12 @@ export interface User {
   female_driver_request?: Readonly<Record<string, unknown>> | null;
   /** BE-87, drivers (own profile): their women-mode status (raw, features/women-mode/api). */
   women_mode?: Readonly<Record<string, unknown>> | null;
+  /**
+   * BE-07 `publicRating()`: the average of the ratings this user received (1–5, one decimal on
+   * screen), or null before the first one. The ride count is not here: `users.total_rides` is a
+   * column nothing writes (BE-130 f); counts come from GET /me/stats.
+   */
+  rating?: number | null;
 }
 
 export interface AuthResponse {
