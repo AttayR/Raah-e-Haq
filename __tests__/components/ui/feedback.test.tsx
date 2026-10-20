@@ -13,6 +13,7 @@ import {
   Banner,
   DialogHost,
   DialogSurface,
+  labelFitsColumn,
   EmptyState,
   ErrorState,
   OfflineBanner,
@@ -276,6 +277,47 @@ describe('Dialog', () => {
     await renderThemed(<DialogSurface title="Sign out?" actions={actions} testID="d2" />);
     expect(flat(screen.getByTestId('d2-actions').props.style).flexDirection).toBeUndefined();
     expect(screen.getByTestId('d2-action-0')).toHaveTextContent('Sign out');
+    jest.restoreAllMocks();
+  });
+
+  it('[UI-R18 review] a label never truncates: "Delete account" + "Cancel" stack; layout stacked always stacks', async () => {
+    jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1);
+    const long = [
+      { label: 'Delete account', onPress: noop, variant: 'destructive' as const },
+      { label: 'Cancel', onPress: noop, variant: 'ghost' as const },
+    ];
+    await renderThemed(<DialogSurface title="Delete your account?" actions={long} testID="d3" />);
+    expect(flat(screen.getByTestId('d3-actions').props.style).flexDirection).toBeUndefined();
+    expect(screen.getByTestId('d3-action-0')).toHaveTextContent('Delete account');
+    screen.unmount();
+
+    const short = [
+      { label: 'Sign out', onPress: noop, variant: 'destructive' as const },
+      { label: 'Cancel', onPress: noop, variant: 'ghost' as const },
+    ];
+    await renderThemed(<DialogSurface title="Sign out?" actions={short} layout="stacked" testID="d4" />);
+    expect(flat(screen.getByTestId('d4-actions').props.style).flexDirection).toBeUndefined();
+    expect(screen.getByTestId('d4-action-0')).toHaveTextContent('Sign out');
+    jest.restoreAllMocks();
+  });
+
+  it('[UI-R18 review] labelFitsColumn errs towards stacking and grows with the font scale', () => {
+    expect(labelFitsColumn('Cancel', 340, 1)).toBe(true);
+    expect(labelFitsColumn('Sign out', 340, 1)).toBe(true);
+    expect(labelFitsColumn('Delete account', 340, 1)).toBe(false);
+    expect(labelFitsColumn('Sign out', 280, 1.3)).toBe(false);
+  });
+
+  it('[UI-R18 review] confirm({ layout: "stacked" }) reaches the host', async () => {
+    jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1);
+    await renderThemed(<DialogHost />);
+    act(() => {
+      confirm({ title: 'Sure?', confirmLabel: 'Yes', cancelLabel: 'No', layout: 'stacked' }).catch(noop);
+    });
+    expect(flat(screen.getByTestId('dialog-actions').props.style).flexDirection).toBeUndefined();
+    act(() => {
+      dialog.dismissAll();
+    });
     jest.restoreAllMocks();
   });
 

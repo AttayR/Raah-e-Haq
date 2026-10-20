@@ -16,7 +16,14 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** The confirm button uses the `destructive` variant. */
   destructive?: boolean;
+  /**
+   * [UI-R18 review] `stacked` always stacks the two buttons (primary on top), for flows whose
+   * spec asks for it (account deletion). `auto` (default): side by side only when both fit.
+   */
+  layout?: DialogLayout;
 }
+
+export type DialogLayout = 'auto' | 'stacked';
 
 export interface AlertOptions {
   title: string;
@@ -33,6 +40,7 @@ export interface DialogRequest {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive: boolean;
+  layout?: DialogLayout;
   /** Called once with the user's answer (scrim tap and Android back answer `false`). */
   resolve: (confirmed: boolean) => void;
 }
@@ -80,6 +88,7 @@ export const confirm = (options: ConfirmOptions): Promise<boolean> =>
       confirmLabel: options.confirmLabel,
       cancelLabel: options.cancelLabel,
       destructive: options.destructive ?? false,
+      layout: options.layout,
       resolve,
     });
   });
@@ -106,6 +115,7 @@ export const openConfirm = (options: ConfirmOptions): ConfirmHandle => {
       confirmLabel: options.confirmLabel,
       cancelLabel: options.cancelLabel,
       destructive: options.destructive ?? false,
+      layout: options.layout,
       resolve,
     });
   });
@@ -120,6 +130,7 @@ export const openConfirm = (options: ConfirmOptions): ConfirmHandle => {
             confirmLabel: next.confirmLabel,
             cancelLabel: next.cancelLabel,
             destructive: next.destructive ?? false,
+            layout: next.layout,
           }
         : r,
     );

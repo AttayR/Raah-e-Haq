@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore }
 import { BackHandler, Modal, PixelRatio, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { dialog, dialogStore, type DialogRequest } from '../../core/dialog';
+import { dialog, dialogStore, type DialogLayout, type DialogRequest } from '../../core/dialog';
 import { t } from '../../i18n';
-import { componentTokens, motion, radius, space } from '../../theme';
+import { componentTokens, motion, radius, space, textStyles } from '../../theme';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { AppText } from './AppText';
 import { Button, type ButtonVariant } from './Button';
@@ -26,10 +26,31 @@ export type DialogSurfaceProps = {
   body?: string;
   /** Primary first. Stacked full width, or side by side when two short labels fit one line. */
   actions: DialogAction[];
+  /** `stacked` always stacks (account deletion); `auto` (default) goes side by side only when both labels fit. */
+  layout?: DialogLayout;
   testID?: string;
 };
 
 const d = componentTokens.dialog;
+const b = componentTokens.button;
+const BUTTON_GAP = space[2];
+/**
+ * [UI-R18 review] Average advance of a `button` (16 pt, 600) glyph as a share of the font size,
+ * on the wide side (capitals, Roman Urdu's long words), so the estimate errs towards stacking:
+ * a label must never truncate ("Delete account" + "Cancel" rendered "Delete acc…").
+ */
+const LABEL_CHAR_EM = 0.62;
+
+/**
+ * Whether `label` fits on one line in a side-by-side column of a dialog `surfaceWidth` wide at
+ * `fontScale`. Errs towards false.
+ */
+export const labelFitsColumn = (label: string, surfaceWidth: number, fontScale: number): boolean => {
+  const column = (surfaceWidth - d.padding * 2 - BUTTON_GAP) / 2;
+  const room = column - b.paddingHorizontal.md * 2;
+  const fontSize = textStyles.button.fontSize * fontScale;
+  return label.length * fontSize * LABEL_CHAR_EM <= room;
+};
 /** Two labels this short (in characters, together) sit side by side; longer ones stack. */
 const SIDE_BY_SIDE_MAX_CHARS = 20;
 /** [UI-R3] Above this font scale the two buttons always stack (labels would not fit). */
@@ -40,13 +61,17 @@ const SIDE_BY_SIDE_MAX_FONT_SCALE = 1.3;
  * `surfaceRaised`, elevation 4; title `h3`, body `bodySmall` `textSecondary` 8 below, actions 24
  * below as `md` pill buttons. Used by `Dialog` and shown inline in the kit gallery.
  */
-export function DialogSurface({ title, body, actions, testID }: DialogSurfaceProps) {
+export function DialogSurface({ title, body, actions, layout = 'auto', testID }: DialogSurfaceProps) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
+  const surfaceWidth = Math.min(width - d.sideMargin * 2, d.maxWidth);
+  const fontScale = PixelRatio.getFontScale();
   const sideBySide =
+    layout !== 'stacked' &&
     actions.length === 2 &&
     actions.reduce((sum, a) => sum + a.label.length, 0) <= SIDE_BY_SIDE_MAX_CHARS &&
-    PixelRatio.getFontScale() <= SIDE_BY_SIDE_MAX_FONT_SCALE;
+    fontScale <= SIDE_BY_SIDE_MAX_FONT_SCALE &&
+    actions.every((a) => labelFitsColumn(a.label, surfaceWidth, Math.max(1, fontScale)));
   // Side by side: the primary sits at the end (reading order: cancel, then confirm).
   const ordered = sideBySide ? [...actions].reverse() : actions;
   return (
@@ -56,7 +81,7 @@ export function DialogSurface({ title, body, actions, testID }: DialogSurfacePro
       style={[
         styles.surface,
         theme.elevation[4],
-        { width: Math.min(width - d.sideMargin * 2, d.maxWidth), backgroundColor: theme.colors.surfaceRaised },
+        { width: surfaceWidth, backgroundColor: theme.colors.surfaceRaised },
         theme.mode === 'dark' ? { borderWidth: theme.borderWidth.thin, borderColor: theme.colors.border } : null,
       ]}
     >
@@ -257,6 +282,7 @@ export function DialogHost({ inline = false }: { inline?: boolean }) {
       title={shown.title}
       body={shown.body}
       actions={actions}
+      layout={shown.layout}
       onDismiss={answer(false)}
       inline={inline}
       testID="dialog"

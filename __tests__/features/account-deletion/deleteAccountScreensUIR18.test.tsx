@@ -8,6 +8,7 @@
  * sign-out without /auth/logout and the date Toast); AccountRestore before any tab.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -128,6 +129,8 @@ describe('Delete account (§D1)', () => {
     mock.onGet('/account/deletion').reply(200, status());
     await show(DeleteAccountScreen);
     expect(screen.getByTestId('delete-account-hero-body')).toHaveTextContent(/deleted for good on 19 Nov 2026/);
+    // The date never wraps mid-unit (no-break spaces; toHaveTextContent normalises them).
+    expect(screen.getByTestId('delete-account-hero-body').props.children).toContain('19\u00A0Nov\u00A02026');
     expect(screen.getByText('Notification settings and devices')).toBeTruthy();
     expect(screen.getAllByText('Notification settings and devices')).toHaveLength(1);
     expect(screen.getByTestId('delete-account-erase-devices')).toBeTruthy();
@@ -165,16 +168,32 @@ describe('Delete account (§D1)', () => {
     expect(screen.getByTestId('delete-account-erase')).toBeTruthy();
   });
 
-  it('ACTIVE_RIDE: danger Banner with "Go to ride" (Booking for a passenger, DriverRide for a driver)', async () => {
+  it('ACTIVE_RIDE: "Go to ride" re-reads the ride first (Booking for a passenger, DriverRide for a driver)', async () => {
     mock.onGet('/account/deletion').reply(200, status({ blockers: [{ code: 'ACTIVE_RIDE' }] }));
+    mock.onGet('/rides').reply(200, { success: true, data: [], pagination: { current_page: 1, last_page: 1, per_page: 20, total: 0 } });
     await show(DeleteAccountScreen);
     expect(screen.getByTestId('delete-account-blocker-active_ride')).toHaveTextContent(/Finish or cancel your current ride first/);
     expect(screen.getByTestId('delete-account-continue')).toBeDisabled();
-    fireEvent.press(screen.getByTestId('delete-account-blocker-active_ride-action'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('delete-account-blocker-active_ride-action'));
+    });
+    await flush();
+    expect(mock.history.get.some((r) => r.url === '/rides')).toBe(true);
     expect(mockNavigate).toHaveBeenLastCalledWith('Booking');
     screen.unmount();
-    await show(DeleteAccountScreen, user('driver'));
-    fireEvent.press(screen.getByTestId('delete-account-blocker-active_ride-action'));
+
+    mock.onGet('/driver/status').reply(200, {
+      success: true,
+      data: { status: 'on_ride', is_online: true, can_accept_rides: false, active_ride_id: 77 },
+    });
+    mock.onGet('/rides/77').reply(200, { success: true, data: { id: 77, status: 'started', passenger_id: 1, driver_id: 9 } });
+    const store = await show(DeleteAccountScreen, user('driver'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('delete-account-blocker-active_ride-action'));
+    });
+    await flush();
+    expect(mock.history.get.some((r) => r.url === '/rides/77')).toBe(true);
+    expect(store.getState().driverStatus.activeRideId).toBe(77);
     expect(mockNavigate).toHaveBeenLastCalledWith('DriverRide');
   });
 
@@ -310,7 +329,7 @@ describe('Confirm it\'s you (§D2)', () => {
   it('shows the masked phone, counts down to "Resend code", and enables Delete at 6 digits', async () => {
     jest.useFakeTimers();
     await show(DeleteAccountVerifyScreen);
-    expect(screen.getByTestId('delete-account-verify-body')).toHaveTextContent('Enter the 6-digit code we sent to +92 3•• •••• 099.');
+    expect(screen.getByTestId('delete-account-verify-body')).toHaveTextContent('Enter the 6-digit code we sent to +92\u00A03••\u00A0••••\u00A0099.');
     expect(screen.getByTestId('delete-account-resend-wait')).toHaveTextContent('Resend code in 1:00');
     expect(screen.getByTestId('delete-account-confirm')).toBeDisabled();
     enterCode('12345');
@@ -330,14 +349,14 @@ describe('Confirm it\'s you (§D2)', () => {
     const store = await show(DeleteAccountVerifyScreen);
     enterCode('246810');
     const question = await pressDelete();
-    expect(question).toMatchObject({ title: 'Delete your account?', confirmLabel: 'Delete account', destructive: true });
-    expect(question.body).toMatch(/deleted on 19 Nov 2026/);
+    expect(question).toMatchObject({ title: 'Delete your account?', confirmLabel: 'Delete account', destructive: true, layout: 'stacked' });
+    expect(question.body).toMatch(/deleted on 19\u00A0Nov\u00A02026/);
     await flush();
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ code: '246810', reason: 'other_app', acknowledge_balance: true });
     expect(mock.history.post.some((r) => r.url === '/auth/logout')).toBe(false);
     expect(store.getState().apiAuth.isAuthenticated).toBe(false);
     expect(shown).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'success', title: 'Your account is closed. It will be deleted on 19 Nov 2026.', duration: 4000 }),
+      expect.objectContaining({ type: 'success', title: 'Your account is closed. It will be deleted on 19\u00A0Nov\u00A02026.', duration: 4000 }),
     );
   });
 
@@ -408,6 +427,15 @@ describe('Confirm it\'s you (§D2)', () => {
     expect(screen.getByTestId('delete-account-resend-wait')).toHaveTextContent('Resend code in 1:30');
   });
 
+  it('the reason chips bleed to the screen edges with a gutter inset', async () => {
+    mockParams = undefined;
+    mock.onGet('/account/deletion').reply(200, status());
+    await show(DeleteAccountScreen);
+    const row = screen.getByTestId('delete-account-reasons-row');
+    expect(StyleSheet.flatten(row.props.style)).toMatchObject({ marginHorizontal: -16 });
+    expect(StyleSheet.flatten(row.props.contentContainerStyle)).toMatchObject({ paddingHorizontal: 16 });
+  });
+
   it('Resend code: a new code restarts the countdown', async () => {
     mockParams = { ...verifyParams, retryAfter: 0 };
     mock.onPost('/account/deletion/code').replyOnce(200, { success: true, data: { expires_in: 300, retry_after: 60, phone_masked: 'x' } });
@@ -426,7 +454,7 @@ describe('AccountRestore (§D4)', () => {
     expect(screen.getByTestId('account-restore')).toBeTruthy();
     expect(screen.queryByTestId('home-stacks')).toBeNull();
     expect(screen.getByTestId('account-restore-body')).toHaveTextContent(
-      'It will be deleted on 19 Nov 2026. Keep it to carry on riding with Raah-e-Haq.',
+      'It will be deleted on 19\u00A0Nov\u00A02026. Keep it to carry on riding with Raah-e-Haq.',
     );
   });
 

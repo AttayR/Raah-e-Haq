@@ -31,6 +31,7 @@ import {
 } from '../format';
 import { useDeletionStatus, useSendDeletionCode } from '../hooks';
 import { useKeepAccount } from '../keepAccount';
+import { useGoToRide } from '../useGoToRide';
 import type { AccountDeletionNavigator } from '../navigation';
 
 type Notice = { tone: BannerTone; text: string };
@@ -64,9 +65,12 @@ export default function DeleteAccountScreen() {
   const blocked = !data || data.blockers.length > 0;
   const canContinue = !!data && !scheduled && !blocked && (!hasBalance || acknowledged) && !sending;
 
+  const openRide = useCallback((route: 'DriverRide' | 'Booking') => navigation.navigate(route), [navigation]);
+  const goToRide = useGoToRide(role === 'driver', openRide);
+
   const onBlockerAction = useCallback(
     (action: BlockerAction, blocker: DeletionBlocker) => {
-      if (action === 'goToRide') navigation.navigate(role === 'driver' ? 'DriverRide' : 'Booking');
+      if (action === 'goToRide') goToRide().catch(() => undefined);
       else if (action === 'verifyPhone') navigation.navigate('ChangePhone');
       else if (blocker.code === 'COMMISSION_OWED') {
         const target = payNowTarget(blocker, role === 'driver');
@@ -74,7 +78,7 @@ export default function DeleteAccountScreen() {
         else navigation.navigate('AddMoney', target.params);
       }
     },
-    [navigation, role],
+    [navigation, role, goToRide],
   );
 
   const onContinue = useCallback(async () => {

@@ -15,7 +15,7 @@ import { useAppDispatch } from '../../../store';
 import { getUserProfile } from '../../../store/thunks/apiThunks';
 import { layout, space } from '../../../theme';
 import { accountDeletionApi, DELETION_CODES } from '../api';
-import { formatDeletionDate, formatWait } from '../format';
+import { formatDeletionDate, formatWait, keepTogether } from '../format';
 import { requestFailureOf, type Notice } from '../requestFailure';
 import { useCountdown, useSendDeletionCode } from '../hooks';
 import type { AccountDeletionNavigator, AccountDeletionRoutes } from '../navigation';
@@ -82,6 +82,8 @@ export default function DeleteAccountVerifyScreen() {
       confirmLabel: t('accountDeletion.confirmAction'),
       cancelLabel: t('accountDeletion.cancel'),
       destructive: true,
+      // §D2.4: stacked, destructive on top.
+      layout: 'stacked',
     });
     if (!confirmed) return;
     inFlight.current = true;
@@ -135,7 +137,7 @@ export default function DeleteAccountVerifyScreen() {
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <AppText variant="body" color="textSecondary" testID="delete-account-verify-body">
           {params.phoneMasked
-            ? t('accountDeletion.verifyBody', { phone: params.phoneMasked })
+            ? t('accountDeletion.verifyBody', { phone: keepTogether(params.phoneMasked) })
             : t('accountDeletion.verifyBodyNoPhone')}
         </AppText>
         <View style={styles.otp}>
@@ -162,6 +164,7 @@ export default function DeleteAccountVerifyScreen() {
               label={t('accountDeletion.resend')}
               variant="ghost"
               size="sm"
+              fullWidth={false}
               onPress={onResend}
               loading={sending}
               disabled={deleting}

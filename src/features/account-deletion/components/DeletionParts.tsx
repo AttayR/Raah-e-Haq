@@ -13,7 +13,7 @@ import {
   type IconName,
 } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { componentTokens, radius, space } from '../../../theme';
+import { componentTokens, layout, radius, space } from '../../../theme';
 import type { DeletionBlocker } from '../api';
 import { blockerView, type BlockerAction, type ConsequenceLine } from '../format';
 
@@ -171,7 +171,14 @@ export function ReasonChips({
       <AppText variant="overline" color="textSecondary" accessibilityRole="header">
         {t('accountDeletion.reasonOverline')}
       </AppText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      {/* Bleeds to the screen edges with a gutter inset (like TopicChips): chips slide under the edge, never cut at the gutter. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipsBleed}
+        contentContainerStyle={styles.chips}
+        testID="delete-account-reasons-row"
+      >
         {options.map((option) => (
           <Chip
             key={option.slug}
@@ -210,5 +217,6 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   loading: { gap: space[6] },
   skeletonCard: { borderRadius: radius.lg },
-  chips: { gap: space[2] },
+  chipsBleed: { marginHorizontal: -layout.gutter },
+  chips: { gap: space[2], paddingHorizontal: layout.gutter },
 });

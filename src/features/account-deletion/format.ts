@@ -76,11 +76,22 @@ const toDate = (iso: string | null | undefined): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/** The server's date as "19 Nov 2026" (always with the year: it is a deadline). '' when unknown. */
+const NBSP = '\u00A0';
+
+/**
+ * A value that must not wrap mid-unit inside a sentence ("+92 3•• •••• 099", "19 Nov 2026",
+ * "3:40 PM"): its spaces become no-break spaces (U+00A0), so the line breaks around it instead.
+ */
+export const keepTogether = (value: string): string => value.replace(/ /g, NBSP);
+
+/**
+ * The server's date as "19 Nov 2026" (always with the year: it is a deadline), with no-break
+ * spaces so it never splits across lines (D1, D2 Dialog, the toast, D4). '' when unknown.
+ */
 export const formatDeletionDate = (iso: string | null | undefined): string => {
   const d = toDate(iso);
   if (!d) return '';
-  return `${d.getDate()} ${strings().format.monthsShort[d.getMonth()]} ${d.getFullYear()}`;
+  return keepTogether(`${d.getDate()} ${strings().format.monthsShort[d.getMonth()]} ${d.getFullYear()}`);
 };
 
 /** "3:40 PM" on the same day, else "21 Oct 2026, 3:40 PM" (BE-135 `retry_after_at`). */
@@ -88,7 +99,7 @@ export const formatRetryAt = (iso: string, now: Date = new Date()): string => {
   const d = toDate(iso);
   if (!d) return '';
   const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  return sameDay ? formatTime(d) : `${formatDeletionDate(iso)}, ${formatTime(d)}`;
+  return sameDay ? keepTogether(formatTime(d)) : `${formatDeletionDate(iso)}, ${keepTogether(formatTime(d))}`;
 };
 
 /** A wait in seconds as "m:ss", or "{n} hours" from an hour on (daily SMS limits). */

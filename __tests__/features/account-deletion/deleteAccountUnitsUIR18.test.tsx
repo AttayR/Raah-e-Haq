@@ -27,6 +27,7 @@ import {
   formatRetryAt,
   formatWait,
   keepLines,
+  keepTogether,
   payNowTarget,
   reasonOptions,
 } from '../../../src/features/account-deletion/format';
@@ -118,14 +119,15 @@ describe('GET /account/deletion mapping and copy', () => {
   });
 
   it('formats server dates and waits without computing a date', () => {
-    expect(formatDeletionDate('2026-11-19T10:00:00+05:00')).toBe('19 Nov 2026');
+    expect(formatDeletionDate('2026-11-19T10:00:00+05:00')).toBe('19\u00A0Nov\u00A02026');
     expect(formatDeletionDate(null)).toBe('');
     expect(formatWait(42)).toBe('0:42');
     expect(formatWait(600)).toBe('10:00');
     expect(formatWait(7200)).toBe('2 hours');
+    expect(keepTogether('+92 3•• •••• 099')).toBe('+92\u00A03••\u00A0••••\u00A0099');
     const at = new Date(2026, 9, 21, 15, 40);
-    expect(formatRetryAt(at.toISOString(), new Date(2026, 9, 21, 9, 0))).toBe('3:40 PM');
-    expect(formatRetryAt(at.toISOString(), new Date(2026, 9, 20, 9, 0))).toBe('21 Oct 2026, 3:40 PM');
+    expect(formatRetryAt(at.toISOString(), new Date(2026, 9, 21, 9, 0))).toBe('3:40\u00A0PM');
+    expect(formatRetryAt(at.toISOString(), new Date(2026, 9, 20, 9, 0))).toBe('21\u00A0Oct\u00A02026, 3:40\u00A0PM');
   });
 
   it('blocker Banners and the Pay-now target by pay_with', () => {
