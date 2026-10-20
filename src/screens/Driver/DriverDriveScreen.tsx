@@ -1,31 +1,34 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import { useSharedValue } from 'react-native-reanimated';
+import Animated, { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
-import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { AppText, BottomSheet, MapControls, RideMarker, Screen, VehicleMarker } from '../../components/ui';
+import type { SafeMapViewRef } from '../../components/SafeMapView';
+import { BottomSheet, LinearFade, MapControls, Screen } from '../../components/ui';
 import { confirm } from '../../core/dialog';
 import {
   DriveSheetBody,
   DriveStatusHeader,
+  drivePeekHeight,
   driveSheetSnaps,
   showsLocationCard,
   type DriveStatus,
 } from '../../components/driver/drive/DriveSheet';
+import { DriveMap, LOCATE_DELTA } from '../../components/driver/drive/DriveMap';
+import { DriverTodayCard } from '../../components/driver/drive/DriverTodayCard';
+import { useDriveEntrance } from '../../components/driver/drive/useDriveEntrance';
+import { useDriveNotice } from '../../components/driver/drive/useDriveNotice';
+import { useRequestFraming } from '../../components/driver/drive/useRequestFraming';
 import { DRIVER_HOME_COPY } from '../../components/driver/home/copy';
 import { AutoAcceptRow } from '../../components/driver/drive/AutoAcceptRow';
 import { AutoAcceptSheet } from '../../components/driver/drive/AutoAcceptSheet';
-import { PickupRangeCircle } from '../../components/driver/drive/PickupRangeCircle';
 import { useAutoAcceptControls, useAutoAcceptLoad } from '../../features/driver-auto-accept/hooks';
 import { selectAutoAcceptActive } from '../../features/driver-auto-accept/slice';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import type { RootState } from '../../store';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
-import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { useFollowCamera } from '../../hooks/useFollowCamera';
 import { useMapMounted } from '../../hooks/useMapMounted';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
@@ -33,28 +36,26 @@ import { useLocationBlocked } from '../../features/permissions/useLocationBlocke
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { isRestorableDriverRide } from '../../features/driver-ride/steps';
-import { useIncomingRequestShown } from '../../features/driver-requests/overlay';
+import { useIncomingRequestFraming, useIncomingRequestShown } from '../../features/driver-requests/overlay';
+import { useFramedRequest } from '../../components/driver/drive/useFramedRequest';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
 import { useMyStats } from '../../features/stats/hooks';
 import { useRecentRides } from '../../features/ride-history/hooks';
 import { RIDE_DETAILS_ROUTE } from '../../features/ride-history/navigation';
 import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
-import { toDriverTodayValues } from '../../features/stats/format';
-import { formatMoney } from '../../core/format/money';
 import { t } from '../../i18n';
-import { space } from '../../theme';
+import { componentTokens, space } from '../../theme';
 
-/**
- * §8.3 + map-vehicles.md §7.1 (T-587): 24 handle area + status row 25 + 12 + auto-accept row 56 +
- * 12 + 56 action + 16.
- */
-export const DRIVE_PEEK_HEIGHT = 201;
+/** D1 first-frame estimate (223); the live peek is measured. */
+export const DRIVE_PEEK_HEIGHT = componentTokens.drive.peekEstimate;
 /** Room kept above the sheet when the camera centres on the driver (§8.3: sheet height + 24). */
 const CAMERA_SHEET_GAP = space[6];
-/** Neighbourhood zoom for the first fix and for "locate me". */
-const LOCATE_DELTA = 0.01;
 /** T-535 (PERF-14): the trip map replaces this one; only one Google Map lives at a time. */
 const MAP_ROUTES_ABOVE_DRIVE = ['DriverRide'] as const;
+const NO_STOPS: readonly { latitude: number; longitude: number }[] = [];
+/** D1 estimates until measured: status block 47, peek group 136 (12 + 56 + 12 + 56). */
+const HEADER_ESTIMATE = componentTokens.drive.headerEstimate;
+const GROUP_ESTIMATE = DRIVE_PEEK_HEIGHT - componentTokens.sheet.contentTop - HEADER_ESTIMATE - space[4];
 
 /** RideResource coordinates arrive as decimal strings. */
 const toCoordinate = (lat: unknown, lng: unknown) => {
@@ -65,15 +66,23 @@ const toCoordinate = (lat: unknown, lng: unknown) => {
     : null;
 };
 
+/** A height counts only when it moves by 1 pt or more (D1: layout passes never re-place the sheet). */
+const useMeasured = (estimate: number): [number, (next: number) => void] => {
+  const [value, setValue] = useState(estimate);
+  const set = useCallback((next: number) => setValue(prev => (Math.abs(prev - next) >= 1 ? next : prev)), []);
+  return [value, set];
+};
+
 /**
- * Driver Drive tab (UI-R4, DESIGN_SYSTEM §8.1/§8.3; merges the old Home dashboard and Map tab):
- * full-bleed map with the avatar top-start and "locate me" riding 16 above the Drive sheet. The
- * sheet (peek 201 → half) holds the status row, the auto-accept row (T-587) and the 56pt Go online / Go offline action (same
- * thunks as before: GET/PUT /driver/status, T-401), and at half today's earnings, the approval
- * warning, today's figures, the last three trips (GET /rides, T-507) and the account card
- * (GET /me/stats). Incoming requests come from
- * RideRequestHost (the tabs' single poller): while one shows, this sheet and the map controls
- * step aside and the tab bar hides. An accepted ride opens DriverRide (full-screen trip map).
+ * Driver Drive tab (UI-R4; UI-R11 Drive v2, driver-drive-home D0–D12): full-bleed map with the
+ * status-bar scrim, the avatar top-start and "locate me" riding 16 above the Drive sheet. The
+ * sheet's peek is measured (status block with its subtitle slot, the auto-accept row and the 56pt
+ * Go online / Go offline action: 223 at 1.0×); the subtitle carries the hint and every notice
+ * (device offline, uploads failing, feed error + Retry, no fix, weak GPS). At `half`: the approval
+ * warning, the Today card (GET /me/stats), the last trips (T-507) and the account card. Once per
+ * session the map veil lifts and the sheet and its blocks rise in (D6). Incoming requests come
+ * from RideRequestHost (the tabs' single poller): while one shows, this sheet and the map
+ * controls step aside, the tab bar hides and the map frames the request's pins (R1).
  */
 export default function DriverDriveScreen() {
   const { theme } = useAppTheme();
@@ -81,13 +90,13 @@ export default function DriverDriveScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
   const isFocused = useIsFocused();
   const requestShown = useIncomingRequestShown();
+  const framing = useIncomingRequestFraming();
   const { user } = useSelector((state: RootState) => state.apiAuth);
 
   useLoadDriverStatusOnMount();
   const { isOnline, isOnRide, isBusy, isChecking, disabled, toggle } = useDriverStatusToggle();
   const currentRide = useSelector(selectDriverActiveRide);
-  // The tracker's one shared watcher (T-410): asking the device here ended its watch on iOS.
-  // T-537: held only while Drive is focused; tracking holds it itself while online.
+  // The tracker's one shared watcher (T-410); T-537: held only while Drive is focused.
   const position = useDriverDevicePosition(isFocused);
   const lat = position?.latitude;
   const lng = position?.longitude;
@@ -120,30 +129,51 @@ export default function DriverDriveScreen() {
   const [mapReady, setMapReady] = useState(false);
   const onMapReady = useCallback(() => setMapReady(true), []);
   const [mapHeight, setMapHeight] = useState(0);
-  const [sheetHeight, setSheetHeight] = useState(DRIVE_PEEK_HEIGHT);
+  const [sheetHeight, setSheetHeight] = useState<number>(DRIVE_PEEK_HEIGHT);
   const sheetAnimatedHeight = useSharedValue(0);
+  const entrance = useDriveEntrance({ focused: isFocused, mapReady });
 
   const viewport = useMemo<MapViewport | null>(
     () => (mapHeight > 0 ? { mapHeight, bottom: sheetHeight + CAMERA_SHEET_GAP, top: insets.top } : null),
     [mapHeight, sheetHeight, insets.top],
   );
 
-  // T-524: the map follows the driver's own marker (online or offline) until the driver pans or
-  // zooms it; "locate me" centres again and resumes following (as on DriverRide).
+  // T-524: the map follows the driver's own marker until the driver pans or zooms it; "locate
+  // me" centres again. UI-R11 R1: paused while a request frames its pins.
   const regionFor = useCallback(
     (point: { latitude: number; longitude: number }) => regionInViewport(point, viewport, LOCATE_DELTA),
     [viewport],
   );
-  // T-535: only while Drive is focused (no camera work under another tab or DriverRide).
-  const follow = useFollowCamera(mapRef, { point: location, ready: mapReady, regionFor, enabled: isFocused });
-  // A released map is not ready until it mounts again; it comes back following the driver
-  // (a pan before DriverRide opened does not carry over), so it centres once it is ready.
+  const follow = useFollowCamera(mapRef, {
+    point: location,
+    ready: mapReady,
+    regionFor,
+    enabled: isFocused && !requestShown,
+  });
   const { recentre } = follow;
   useEffect(() => {
     if (mapMounted) return;
     setMapReady(false);
     recentre();
   }, [mapMounted, recentre]);
+
+  // R1: the pins of the offer the host shows (never the queue head behind a taken state, never
+  // the auto-accept takeover: its ride is `currentRide`). Primitive selection: polls that change
+  // nothing re-render nothing.
+  const framedId = requestShown && !currentRide ? framing.rideId : null;
+  const request = useFramedRequest(framedId);
+  const framePoints = useMemo(
+    () => [location, request.pickup, ...request.stops, request.dropoff],
+    [location, request],
+  );
+  useRequestFraming({
+    mapRef,
+    ready: mapReady && isFocused,
+    requestId: framedId,
+    points: framePoints,
+    sheetHeight: framing.sheetHeight,
+    onDone: recentre,
+  });
 
   const promptForLocation = useCallback(async () => {
     const open = await confirm({
@@ -160,7 +190,10 @@ export default function DriverDriveScreen() {
   const locationBlocked = useMemo(
     () =>
       locationAccess.blocked
-        ? { onOpenSettings: () => Linking.openSettings(), onRetry: recheckLocation }
+        ? {
+            onOpenSettings: () => Linking.openSettings(),
+            onRetry: recheckLocation,
+          }
         : null,
     [locationAccess.blocked, recheckLocation],
   );
@@ -173,128 +206,149 @@ export default function DriverDriveScreen() {
     follow.recentre();
   }, [follow, location, promptForLocation]);
 
-  // The server decides (403 not approved / no vehicle, 409 on a ride) and its message is shown;
-  // the location tracker starts posting once online (T-402), as on the old Home tab.
-  const onToggle = useCallback(() => {
-    toggle();
-  }, [toggle]);
-
   const status: DriveStatus = isChecking ? 'checking' : isOnRide ? 'onRide' : isOnline ? 'online' : 'offline';
-  // T-580: while the "Location needed" card shows, the peek rises to fit it; back to 201 after.
+  const { notice, retry } = useDriveNotice({
+    status,
+    location,
+    autoAccept: autoAcceptOn,
+  });
+
+  // D1: the peek is measured (handle + status block + peek group + 16); T-580: the location card
+  // sits in the peek group, so the peek grows to fit it, with `full` as the second snap.
   const hasRide = isRestorableDriverRide(currentRide);
-  const [locationCardHeight, setLocationCardHeight] = useState(0);
   const cardShown = showsLocationCard(locationBlocked !== null, hasRide, status);
+  const [headerHeight, setHeaderHeight] = useMeasured(HEADER_ESTIMATE);
+  const [groupHeight, setGroupHeight] = useMeasured(GROUP_ESTIMATE);
   const sheetSnaps = useMemo(
-    () => driveSheetSnaps(DRIVE_PEEK_HEIGHT, cardShown ? locationCardHeight : null),
-    [cardShown, locationCardHeight],
+    () => driveSheetSnaps(drivePeekHeight(headerHeight, groupHeight), cardShown),
+    [cardShown, groupHeight, headerHeight],
   );
-  const pickup = currentRide ? toCoordinate(currentRide.pickup_latitude, currentRide.pickup_longitude) : null;
-  const dropoff = currentRide ? toCoordinate(currentRide.dropoff_latitude, currentRide.dropoff_longitude) : null;
+  const ridePickup = useMemo(
+    () => (currentRide ? toCoordinate(currentRide.pickup_latitude, currentRide.pickup_longitude) : null),
+    [currentRide],
+  );
+  const rideDropoff = useMemo(
+    () => (currentRide ? toCoordinate(currentRide.dropoff_latitude, currentRide.dropoff_longitude) : null),
+    [currentRide],
+  );
+  const pickup = currentRide ? ridePickup : request.pickup;
+  const dropoff = currentRide ? rideDropoff : request.dropoff;
+  const rangeKm =
+    autoAcceptOn && status === 'online' && autoAccept.settings && !requestShown
+      ? autoAccept.settings.maxPickupKm
+      : null;
+
+  // V9: the scrim is static; its style changes only with the top inset.
+  const scrimStyle = useMemo(
+    () => [styles.scrim, { height: insets.top + componentTokens.home.scrimExtra }],
+    [insets.top],
+  );
 
   return (
     <Screen edges={[]} testID="driver-drive">
       <View style={styles.fill} onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}>
-        {mapMounted ? (
-          <MapErrorBoundary>
-            <SafeMapView
-              ref={mapRef}
-              style={styles.fill}
-              initialRegion={
-                location
-                  ? { ...location, latitudeDelta: LOCATE_DELTA, longitudeDelta: LOCATE_DELTA }
-                  : MAPS_CONFIG.DEFAULT_REGION
-              }
-              customMapStyle={theme.mapStyle}
-              onMapReady={onMapReady}
-              onRegionChangeComplete={follow.onRegionChangeComplete}
-              fallbackComponent={
-                <View style={styles.fill}>
-                  <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>
-                    {t('home.mapLoading')}
-                  </AppText>
-                </View>
-              }
-            >
-              {location ? (
-                // T-517: the driver's own vehicle, top-down, turning with the device course.
-                <VehicleMarker
-                  coordinate={location}
-                  heading={position?.heading}
-                  vehicleType={currentRide?.vehicle_type ?? user?.vehicle_type}
-                  title={t('ride.selfMarker')}
-                  testID="drive-driver-marker"
-                />
-              ) : null}
-              {location && autoAcceptOn && status === 'online' && autoAccept.settings ? (
-                // T-587 (§7.3): the real max-pickup circle while auto-accept is on.
-                <PickupRangeCircle center={location} radiusKm={autoAccept.settings.maxPickupKm} />
-              ) : null}
-              {pickup ? <RideMarker kind="pickup" coordinate={pickup} /> : null}
-              {dropoff ? <RideMarker kind="dropoff" coordinate={dropoff} /> : null}
-            </SafeMapView>
-          </MapErrorBoundary>
-        ) : (
-          <View testID="drive-map-released" style={[styles.fill, { backgroundColor: theme.mapBackground }]} />
-        )}
+        <DriveMap
+          mapRef={mapRef}
+          mounted={mapMounted}
+          location={location}
+          heading={position?.heading}
+          vehicleType={currentRide?.vehicle_type ?? user?.vehicle_type}
+          rangeKm={rangeKm}
+          pickup={pickup}
+          dropoff={dropoff}
+          stops={currentRide ? NO_STOPS : request.stops}
+          onMapReady={onMapReady}
+          onRegionChangeComplete={follow.onRegionChangeComplete}
+          showVeil={entrance.showVeil}
+          veilStyle={entrance.veilStyle}
+        />
       </View>
-
-      <MapControls
-        avatar={{
-          name: user?.name,
-          uri: user?.profile_image_url,
-          onPress: () => navigation.navigate('Profile'),
-          accessibilityLabel: DRIVER_HOME_COPY.openProfile,
-        }}
-        onLocate={onLocate}
-        sheetHeight={sheetAnimatedHeight}
-        hidden={requestShown}
-        testID="drive-controls"
+      {/* D5 / V9: keeps the clock and battery legible over map labels. */}
+      <LinearFade
+        color={theme.colors.surface}
+        direction="down"
+        fromOpacity={componentTokens.home.scrimOpacity}
+        toOpacity={0}
+        style={scrimStyle}
+        testID="drive-status-scrim"
       />
 
+      <Animated.View style={[StyleSheet.absoluteFill, entrance.controlsStyle]} pointerEvents="box-none">
+        <MapControls
+          avatar={{
+            name: user?.name,
+            uri: user?.profile_image_url,
+            onPress: () => navigation.navigate('Profile'),
+            accessibilityLabel: DRIVER_HOME_COPY.openProfile,
+          }}
+          onLocate={onLocate}
+          sheetHeight={sheetAnimatedHeight}
+          hidden={requestShown}
+          testID="drive-controls"
+        />
+      </Animated.View>
+
       {requestShown ? null : (
-        <BottomSheet
-          peekHeight={sheetSnaps.peekHeight}
-          active={isFocused}
-          snapPoints={sheetSnaps.snapPoints}
-          animatedHeight={sheetAnimatedHeight}
-          onSnapChange={(_, height) => setSheetHeight(height)}
-          header={<DriveStatusHeader status={status} autoAccept={autoAcceptOn} />}
-          accessibilityLabel={t('drive.sheetA11y')}
-          testID="drive-sheet"
-        >
-          <DriveSheetBody
-            status={status}
-            busy={isBusy}
-            disabled={disabled}
-            onToggle={onToggle}
-            hasRide={hasRide}
-            onResume={() => navigation.navigate('DriverRide')}
-            todayEarnings={
-              driverStats ? formatMoney(driverStats.earningsToday, { currency: driverStats.currency }) : null
-            }
-            today={toDriverTodayValues(driverStats)}
-            statsError={!driverStats && stats.status === 'failed' ? stats.error : null}
-            isApproved={user?.status === 'active'}
-            vehicleType={user?.vehicle_type}
-            recentRides={recentRides}
-            onSeeAllRides={() => navigation.navigate('RideHistory')}
-            onOpenRide={(id) => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: Number(id) })}
-            locationBlocked={locationBlocked}
-            onLocationCardLayout={setLocationCardHeight}
-            autoAcceptOn={autoAcceptOn}
-            autoAcceptRow={
-              <AutoAcceptRow
-                settings={autoAccept.settings}
-                loadStatus={autoAccept.loadStatus}
-                online={status === 'online' || status === 'onRide'}
-                saving={autoAccept.saving}
-                onOpen={openAutoAcceptSheet}
-                onSwitch={onAutoAcceptSwitch}
-                onRetry={autoAccept.retry}
+        <Animated.View style={[StyleSheet.absoluteFill, entrance.sheetStyle]} pointerEvents="box-none">
+          <BottomSheet
+            peekHeight={sheetSnaps.peekHeight}
+            active={isFocused}
+            snapPoints={sheetSnaps.snapPoints}
+            calmResize
+            animatedHeight={sheetAnimatedHeight}
+            onSnapChange={(_, height) => setSheetHeight(height)}
+            header={
+              <DriveStatusHeader
+                status={status}
+                autoAccept={autoAcceptOn}
+                notice={notice}
+                onRetry={retry}
+                onHeight={setHeaderHeight}
+                style={entrance.statusStyle}
               />
             }
-          />
-        </BottomSheet>
+            accessibilityLabel={t('drive.sheetA11y')}
+            testID="drive-sheet"
+          >
+            <DriveSheetBody
+              status={status}
+              busy={isBusy}
+              disabled={disabled}
+              onToggle={toggle}
+              hasRide={hasRide}
+              onResume={() => navigation.navigate('DriverRide')}
+              today={
+                <DriverTodayCard
+                  stats={driverStats}
+                  loading={stats.status === 'loading'}
+                  failed={stats.status === 'failed'}
+                  onRetry={stats.reload}
+                  onOpenEarnings={() => navigation.navigate('DriverTabs', { screen: 'Earnings' })}
+                />
+              }
+              isApproved={user?.status === 'active'}
+              vehicleType={user?.vehicle_type}
+              recentRides={recentRides}
+              onSeeAllRides={() => navigation.navigate('RideHistory')}
+              onOpenRide={id => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: Number(id) })}
+              locationBlocked={locationBlocked}
+              onPeekGroupHeight={setGroupHeight}
+              rowStyle={entrance.rowStyle}
+              actionStyle={entrance.actionStyle}
+              autoAcceptRow={
+                <AutoAcceptRow
+                  settings={autoAccept.settings}
+                  loadStatus={autoAccept.loadStatus}
+                  online={status === 'online' || status === 'onRide'}
+                  saving={autoAccept.saving}
+                  onOpen={openAutoAcceptSheet}
+                  onSwitch={onAutoAcceptSwitch}
+                  onRetry={autoAccept.retry}
+                />
+              }
+            />
+          </BottomSheet>
+        </Animated.View>
       )}
 
       <AutoAcceptSheet
@@ -312,5 +366,5 @@ export default function DriverDriveScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  fallback: { marginTop: space[12] },
+  scrim: { position: 'absolute', top: 0, start: 0, end: 0 },
 });

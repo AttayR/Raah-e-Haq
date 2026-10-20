@@ -11,12 +11,21 @@ import { itemLine } from '../format';
  * size, with the weight cap) and that the sender pays cash at the pickup. Never the receiver or
  * the declared value: the request feed does not carry them.
  */
-export function ParcelRequestInfo({ parcel, testID = 'incoming-request-parcel' }: { parcel: ParcelRequestSummary; testID?: string }) {
+export function ParcelRequestInfo({
+  parcel,
+  badge = true,
+  testID = 'incoming-request-parcel',
+}: {
+  parcel: ParcelRequestSummary;
+  /** UI-R11: false where the request sheet's header row already carries the Parcel badge. */
+  badge?: boolean;
+  testID?: string;
+}) {
   const item = itemLine({ itemCategoryLabel: parcel.categoryLabel, sizeLabel: parcel.sizeLabel });
   return (
     <View style={styles.wrap} testID={testID}>
       <View style={styles.row}>
-        <Badge label={t('parcel.badge')} tone="info" />
+        {badge ? <Badge label={t('parcel.badge')} tone="info" /> : null}
         {item ? (
           <AppText variant="bodySmall" style={styles.flex} numberOfLines={2} testID={`${testID}-item`}>
             {item}

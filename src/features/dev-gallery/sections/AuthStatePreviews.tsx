@@ -104,9 +104,6 @@ function DriveLocationNeededPreview() {
           onToggle={noop}
           hasRide={false}
           onResume={noop}
-          todayEarnings={null}
-          today={{ earnings: null, trips: null, rating: null }}
-          statsError={null}
           isApproved
           vehicleType="car"
           locationBlocked={{ onOpenSettings: noop, onRetry: noop }}

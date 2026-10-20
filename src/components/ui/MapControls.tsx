@@ -107,7 +107,7 @@ export function MapControls({
             ]}
             testID={`${testID}-avatar`}
           >
-            <Avatar name={avatar.name} uri={avatar.uri} size={48} />
+            <Avatar name={avatar.name} uri={avatar.uri} size={40} />
           </Pressable>
         </View>
       ) : null}
@@ -128,8 +128,15 @@ export function MapControls({
 
 const styles = StyleSheet.create({
   back: { position: 'absolute', start: c.edge },
-  // 48 visual like a floating IconButton, with its elevation so a photo lifts off the map.
-  avatar: { borderRadius: componentTokens.iconButton.floatingVisual },
+  // [UI-R11 D5, passenger-home V9] A 48 floating circle (the IconButton family) with the kit's 40
+  // avatar (photo or initials on `primarySoft`) centred in it, never a solid colour disc.
+  avatar: {
+    width: componentTokens.iconButton.floatingVisual,
+    height: componentTokens.iconButton.floatingVisual,
+    borderRadius: componentTokens.iconButton.floatingVisual,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pressed: { opacity: 0.85 },
   locate: { position: 'absolute', end: c.edge, bottom: 0 },
 });

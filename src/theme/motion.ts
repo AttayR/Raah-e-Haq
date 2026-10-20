@@ -65,6 +65,23 @@ export const motionPatterns = {
     controlsAt: 200,
     reducedVeilMs: 150,
   },
+  /**
+   * [UI-R11] Drive cold-open entrance (driver-drive-home D6), once per JS session: the sheet rises
+   * 40 → 0 on the clamped spring, the status block, auto-accept row and action fade in and rise 8
+   * at 60/100/140 (250 each), the avatar and locate fade in at 200 (150). Reduce Motion: no
+   * movement, the map veil fades in 150.
+   */
+  driveEntrance: {
+    statusAt: 60,
+    rowAt: 100,
+    actionAt: 140,
+    controlsAt: 200,
+  },
+  /**
+   * [UI-R11] Going online (driver-drive-home D3): one 16 `success` ring pulse, scale 1 → 2.25,
+   * opacity 0.4 → 0 over 600 ms (out quad); the colour/label crossfades take `motion.fast`.
+   */
+  onlinePulse: { durationMs: 600, scaleTo: 2.25, opacityFrom: 0.4 },
   listAppear: { duration: 250, easing: standard, translateY: 8, staggerMs: 30, maxStaggered: 8 },
   searchingPulse: {
     duration: 2000,

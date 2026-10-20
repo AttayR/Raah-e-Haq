@@ -5,6 +5,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { haptics, type HapticPattern } from '../../core/haptics';
 import { componentTokens, space, type SemanticColorName } from '../../theme';
 import { AppText, type TextColor } from './AppText';
+import { CountdownRing, type CountdownSpec } from './CountdownRing';
 import { Icon, type IconName } from './Icon';
 import { usePressScale } from './usePressScale';
 
@@ -28,6 +29,11 @@ export type ButtonProps = {
    * commits (Request ride, Go online/offline, Accept, I've arrived, Send).
    */
   haptic?: HapticPattern;
+  /**
+   * [UI-R11] A countdown ring (TS9) at the button's end, 12 from the edge; the label centres in
+   * the remaining width. Hidden while `loading` (the spinner keeps the width).
+   */
+  countdown?: CountdownSpec;
   accessibilityLabel?: string;
   accessibilityHint?: string;
   testID?: string;
@@ -71,6 +77,7 @@ export function Button({
   loading = false,
   fullWidth = true,
   haptic,
+  countdown,
   accessibilityLabel,
   accessibilityHint,
   testID,
@@ -137,7 +144,7 @@ export function Button({
     >
       {/* The label row always lays out, so loading keeps the exact width and height (§5.4). */}
       <View
-        style={[styles.content, { gap: dims.gap }, loading && styles.hidden]}
+        style={[styles.content, { gap: dims.gap }, countdown ? styles.withRing : null, loading && styles.hidden]}
         testID={testID ? `${testID}-content` : undefined}
         importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}
       >
@@ -147,6 +154,11 @@ export function Button({
         </AppText>
         {trailingIcon ? <Icon name={trailingIcon} size={dims.icon} color={textColor} /> : null}
       </View>
+      {countdown && !loading ? (
+        <View style={styles.ring} pointerEvents="none">
+          <CountdownRing {...countdown} color={textColor} testID={testID ? `${testID}-countdown` : undefined} />
+        </View>
+      ) : null}
       {loading ? (
         <View style={styles.spinner} pointerEvents="none">
           <ActivityIndicator color={theme.colors[tone.text]} testID={testID ? `${testID}-spinner` : undefined} />
@@ -169,4 +181,13 @@ const styles = StyleSheet.create({
   label: { flexShrink: 1 },
   hidden: { opacity: 0 },
   spinner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  // The label centres in the width the ring leaves (ring 32 + 12 from the end edge).
+  withRing: { marginEnd: componentTokens.countdownRing.size + componentTokens.countdownRing.endInset },
+  ring: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    end: componentTokens.countdownRing.endInset,
+    justifyContent: 'center',
+  },
 });

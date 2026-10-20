@@ -142,9 +142,11 @@ describe('DriverDriveScreen (UI-R4)', () => {
     // No demo figures (156 rides, PKR 24k, $25.50) and no demo recent rides.
     expect(screen.queryByText(/156|PKR|\$/)).toBeNull();
     expect(screen.queryByText('Sarah Ahmed')).toBeNull();
-    // Today's earnings pill and tiles from GET /me/stats; untracked online time / acceptance are hidden.
-    expect(screen.getByText('Today · Rs 1,250')).toBeTruthy();
-    expect(screen.getByText('Rs 1,250')).toBeTruthy();
+    // UI-R11 D4: one Today card (no "Today · Rs" chip): earnings once, then the cells; untracked
+    // online time / acceptance are hidden.
+    expect(screen.queryByText('Today · Rs 1,250')).toBeNull();
+    expect(screen.getByTestId('drive-today-earnings').props.children).toBe('Rs 1,250');
+    expect(screen.getAllByText('Rs 1,250')).toHaveLength(1);
     expect(screen.getByText('2')).toBeTruthy();
     expect(screen.getByText('New')).toBeTruthy();
     expect(screen.queryByTestId('driver-home-stat-online')).toBeNull();

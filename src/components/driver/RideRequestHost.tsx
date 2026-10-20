@@ -1,84 +1,82 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, AppState, BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
-import { useAppTheme } from '../../app/providers/ThemeProvider';
-import type { AppTheme } from '../../theme';
 import type { DriverStackParamList } from '../../app/navigation/stacks/DriverStack';
+import { haptics } from '../../core/haptics';
 import { useDriverLastLocation } from '../../features/driver-location/hooks';
 import { useAppIsActive } from '../../hooks/useAppIsActive';
 import {
   usePendingRidePolling,
   useRideRequestActions,
   useRideRequestFeed,
+  type RequestGoneKind,
 } from '../../features/driver-requests/hooks';
-import { selectDriverRequestsState } from '../../features/driver-requests/slice';
+import { useOfferClock, useOfferCountdown } from '../../features/driver-requests/countdown';
+import { DRIVER_REQUESTS_COPY as COPY } from '../../features/driver-requests/copy';
+import { selectDriverRequestsState, type DriverRequestsState } from '../../features/driver-requests/slice';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { selectDriverIsOnline, selectDriverIsOnRide } from '../../features/driver-status/slice';
-import { RideRequestPanel } from './IncomingRequestCard';
-import { AutoAcceptedCard } from './AutoAcceptedCard';
 import { useAutoAssignedRideWatch } from '../../features/driver-auto-accept/hooks';
-import {
-  dismissAutoAcceptedTakeover,
-  selectAutoAcceptTakeoverRideId,
-} from '../../features/driver-auto-accept/slice';
+import { dismissAutoAcceptedTakeover, selectAutoAcceptTakeoverRideId } from '../../features/driver-auto-accept/slice';
 import {
   OFFER_VIEWED_DELAY_MS,
   reportOfferDeclined,
   reportOfferViewed,
 } from '../../features/driver-auto-accept/offerReports';
+import { componentTokens } from '../../theme';
+import { formatMoney } from '../../utils/format';
+import { AutoAcceptedCard, AutoAcceptedFooter, useAutoAcceptedAdvance } from './AutoAcceptedCard';
+import { RequestSheet } from './request/RequestSheet';
+import { RequestSheetContent } from './request/RequestSheetContent';
+import { RequestFooter, RequestGoneContent } from './request/RequestParts';
+import { useLingering } from './request/useLingering';
 
 type Props = {
-  /** Distance from the bottom of the tab area to the panel: the tab bar when it shows, else the inset. */
-  bottomOffset: number;
   /**
-   * Called with true while a request (not an error) is on screen and false once it is gone, so
-   * the tabs hide the tab bar and open the Drive map under it (§8.3).
+   * Called with true while a request (or the taken state, or the auto-accept takeover) is on
+   * screen and false once it is gone, so the tabs hide the tab bar and open the Drive map (§8.3).
    */
   onRequestShownChange?: (shown: boolean) => void;
+  /** The request sheet's height while shown (the Drive map frames the pins above it, R1). */
+  onSheetHeightChange?: (height: number) => void;
+  /**
+   * The offer on screen (null for none, the taken state or the takeover), so the Drive map frames
+   * that ride's pins and no other (R1).
+   */
+  onShownOfferChange?: (rideId: number | null) => void;
 };
 
-/**
- * How many polls in a row have failed (0 after a good one). Counted when a poll finishes
- * (`isFetching` goes back to false).
- */
-const useConsecutiveFeedFailures = (): number => {
-  const { isFetching, loadStatus } = useSelector(selectDriverRequestsState);
-  const [failures, setFailures] = useState(0);
-  const wasFetching = useRef(isFetching);
-  useEffect(() => {
-    if (wasFetching.current && !isFetching) {
-      setFailures((count) => (loadStatus === 'failed' ? count + 1 : 0));
-    }
-    wasFetching.current = isFetching;
-  }, [isFetching, loadStatus]);
-  return failures;
-};
+type Gone = { rideId: number; kind: RequestGoneKind };
+
+/** Requests waiting behind the one on screen ("+N more"). */
+const selectQueuedBehind = (state: { driverRequests: DriverRequestsState }): number =>
+  Math.max(0, selectDriverRequestsState(state).items.length - 1);
 
 /**
  * Incoming ride requests for every driver tab (T-408). Mounted once, by DriverBottomTabs, so
  * GET /rides/pending is polled (T-403) whenever the driver is online, has no ride, the app is in
- * the foreground and the tabs are on screen, whichever tab is open. A request takes over the
- * Drive map (UI-R4, §8.3: the tabs switch to Drive and hide the tab bar through
- * `onRequestShownChange`). Accepting (T-404) opens the DriverRide screen. The position sent with
- * each poll is the location tracker's (T-402).
+ * the foreground and the tabs are on screen, whichever tab is open. UI-R11 (driver-incoming-
+ * request § Request sheet v2): the request is the Drive sheet in its `request` form (RequestSheet)
+ * with Decline + Accept and the decision countdown (`meta.offer_seconds`, else 20 s; at 0 it is a
+ * decline). A 409 taken / gone swaps the content for 2 s; accepting (T-404) opens DriverRide.
+ * Feed loading, empty and error states are the Drive sheet's subtitle (no card here). Keeps the
+ * offer-viewed (1 s on screen) and offer-declined reports and the auto-accept takeover (T-587).
  */
-export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownChange }) => {
-  const { theme } = useAppTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+export const RideRequestHost: React.FC<Props> = ({ onRequestShownChange, onSheetHeightChange, onShownOfferChange }) => {
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
   const { height: windowHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const compact = windowHeight < componentTokens.requestSheet.compactWindowHeight;
 
   const isFocused = useIsFocused();
   const location = useDriverLastLocation();
   usePendingRidePolling({ isFocused, location });
-  const { view, retry } = useRideRequestFeed(location);
+  const { view } = useRideRequestFeed(location);
+  // A primitive: an unchanged poll does not re-render the sheet for the "+N more" badge.
+  const moreCount = useSelector(selectQueuedBehind);
   const { acceptingId, accept, reject } = useRideRequestActions();
 
-  const failures = useConsecutiveFeedFailures();
   const isOnline = useSelector(selectDriverIsOnline);
   const isOnRide = useSelector(selectDriverIsOnRide);
   const activeRide = useSelector(selectDriverActiveRide);
@@ -118,7 +116,8 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
     navigation.navigate('DriverRide');
   }, [dispatch, navigation]);
 
-  // T-587 (§7.4): the driver turned the request down; the server stops offering it to them.
+  // T-587 (§7.4): the driver turned the request down (or let it run out, R3); the server stops
+  // offering it to them.
   const handleReject = useCallback(
     (rideId: number) => {
       reportOfferDeclined(rideId);
@@ -127,30 +126,41 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
     [reject],
   );
 
+  // R5: "Another driver took this ride" / "no longer available" in place for 2 s.
+  const [gone, setGone] = useState<Gone | null>(null);
+  useEffect(() => {
+    if (!gone) return undefined;
+    const timer = setTimeout(() => setGone(null), componentTokens.requestSheet.goneDismissMs);
+    return () => clearTimeout(timer);
+  }, [gone]);
+
   const handleAccept = useCallback(
     async (rideId: number) => {
-      const ride = await accept(rideId);
+      const ride = await accept(rideId, {
+        onGone: kind => {
+          haptics.notificationError();
+          setGone({ rideId, kind });
+        },
+      });
       if (ride) {
+        haptics.notificationSuccess();
         navigation.navigate('DriverRide');
       }
     },
     [accept, navigation],
   );
 
-  // The first poll after going online can run before the tracker's first fix (422
-  // LOCATION_REQUIRED); an error waits for a fix or a second failure in a row. Loading and
-  // "no requests" are not shown here: the Drive sheet says "Looking for ride requests".
-  const showError = location !== null || failures >= 2;
   const eligible = isFocused && isOnline && !isOnRide && !hasActiveRide;
   const takeoverShown = isFocused && takeoverRide !== null;
-  const offerShown = eligible && view.kind === 'request';
-  const requestShown = offerShown || takeoverShown;
-  const visible = requestShown || (eligible && view.kind === 'error' && showError);
+  const offer = eligible && view.kind === 'request' ? view.request : null;
+  const goneShown = isFocused && gone !== null && !takeoverShown;
+  const offerShown = !takeoverShown && !goneShown && offer !== null;
+  const requestShown = takeoverShown || goneShown || offerShown;
 
-  // T-587 (§7.4): POST offer-viewed once the card has been on screen for 1 s (once per ride),
-  // only with the app in the foreground (never for a card behind the lock screen).
+  // T-587 (§7.4): POST offer-viewed once the request has been on screen for 1 s (once per ride),
+  // only with the app in the foreground (never for a sheet behind the lock screen).
   const appActive = useAppIsActive();
-  const shownOfferId = appActive && offerShown && view.kind === 'request' ? view.request.id : null;
+  const shownOfferId = appActive && offerShown && offer ? offer.id : null;
   useEffect(() => {
     if (shownOfferId === null) return undefined;
     const timer = setTimeout(() => {
@@ -160,6 +170,57 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
     return () => clearTimeout(timer);
   }, [shownOfferId]);
 
+  // R4 / R8: haptic and the arrival announcement once per request.
+  const arrivedId = offerShown && offer ? offer.id : null;
+  const offerRef = useRef(offer);
+  offerRef.current = offer;
+  useEffect(() => {
+    const arrived = offerRef.current;
+    if (arrivedId === null || !arrived) return;
+    haptics.notificationWarning();
+    const fare = arrived.estimatedFare !== null ? formatMoney(arrived.estimatedFare) : '';
+    AccessibilityInfo.announceForAccessibility(
+      arrived.estimatedPickupMin !== null
+        ? COPY.arrivalA11y(fare, arrived.estimatedPickupMin)
+        : COPY.arrivalNoEtaA11y(fare),
+    );
+  }, [arrivedId]);
+
+  // R3: the clock starts once the sheet is fully up and the app is active; accepting pauses it;
+  // at 0 the request counts as declined.
+  const [sheetUp, setSheetUp] = useState(false);
+  const clock = useOfferClock(
+    offerShown ? offer : null,
+    sheetUp && appActive,
+    acceptingId !== null && acceptingId === offer?.id,
+  );
+  const announce = useOfferCountdown(clock, handleReject);
+  useEffect(() => {
+    if (announce !== null) AccessibilityInfo.announceForAccessibility(COPY.secondsLeftA11y(announce));
+  }, [announce]);
+
+  // R1: Android back declines (the same report) and never leaves the tab.
+  useEffect(() => {
+    if (!offerShown || !offer) return undefined;
+    const rideId = offer.id;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleReject(rideId);
+      return true;
+    });
+    return () => sub.remove();
+  }, [handleReject, offer, offerShown]);
+
+  const takeoverCountdown = useAutoAcceptedAdvance(takeoverShown && takeoverRide ? takeoverRide.id : null, goToPickup);
+
+  // R1: the Drive map frames this ride (not the queue head, not the taken state).
+  const framedOfferId = offerShown && offer ? offer.id : null;
+  const onShownOfferRef = useRef(onShownOfferChange);
+  onShownOfferRef.current = onShownOfferChange;
+  useEffect(() => {
+    onShownOfferRef.current?.(framedOfferId);
+  }, [framedOfferId]);
+  useEffect(() => () => onShownOfferRef.current?.(null), []);
+
   const onShownRef = useRef(onRequestShownChange);
   onShownRef.current = onRequestShownChange;
   useEffect(() => {
@@ -168,44 +229,75 @@ export const RideRequestHost: React.FC<Props> = ({ bottomOffset, onRequestShownC
   // Unmount (sign-out, a ride screen replacing the tabs): the tab bar comes back.
   useEffect(() => () => onShownRef.current?.(false), []);
 
-  if (!visible) {
+  let content: {
+    key: string;
+    body: React.ReactNode;
+    footer: React.ReactNode;
+  } | null = null;
+  if (takeoverShown && takeoverRide) {
+    content = {
+      key: `takeover-${takeoverRide.id}`,
+      body: <AutoAcceptedCard ride={takeoverRide} driverLocation={location} />,
+      footer: <AutoAcceptedFooter onGo={goToPickup} countdown={takeoverCountdown} />,
+    };
+  } else if (goneShown && gone) {
+    content = {
+      key: `gone-${gone.rideId}`,
+      body: <RequestGoneContent kind={gone.kind} />,
+      footer: null,
+    };
+  } else if (offerShown && offer) {
+    content = {
+      key: `offer-${offer.id}`,
+      body: <RequestSheetContent request={offer} moreCount={moreCount} compact={compact} />,
+      footer: (
+        <RequestFooter
+          rideId={offer.id}
+          onDecline={handleReject}
+          onAccept={handleAccept}
+          accepting={acceptingId === offer.id}
+          disabled={acceptingId !== null}
+          countdown={clock}
+          announceSeconds={announce}
+        />
+      ),
+    };
+  }
+
+  // D7: on decline, timeout or taken the sheet slides out with its last content.
+  const lingering = useLingering(content);
+  const { clear: clearLingering } = lingering;
+  const onHidden = useCallback(() => {
+    setSheetUp(false);
+    clearLingering();
+  }, [clearLingering]);
+  const onShown = useCallback(() => setSheetUp(true), []);
+  // The sheet starts leaving: a new offer arriving during the exit must wait for the next rise
+  // before its clock starts.
+  const contentVisible = content !== null;
+  useEffect(() => {
+    if (!contentVisible) setSheetUp(false);
+  }, [contentVisible]);
+
+  if (!lingering.value) {
     return null;
   }
 
-  const bottom = bottomOffset + theme.space[4];
-  // T-552: the card is placed from the bottom; with several stops it must not grow past the top.
-  const maxHeight = Math.max(0, windowHeight - insets.top - theme.space[4] - bottom);
-
   return (
-    <View
-      style={[styles.container, { bottom }]}
-      pointerEvents="box-none"
-      testID="ride-request-host"
-    >
-      {takeoverShown && takeoverRide ? (
-        <AutoAcceptedCard ride={takeoverRide} driverLocation={location} onGo={goToPickup} />
-      ) : (
-        <RideRequestPanel
-          view={view}
-          maxHeight={maxHeight}
-          acceptingId={acceptingId}
-          onAccept={handleAccept}
-          onReject={handleReject}
-          onRetry={retry}
-        />
-      )}
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID="ride-request-host">
+      <RequestSheet
+        visible={content !== null}
+        contentKey={lingering.value.key}
+        footer={lingering.value.footer}
+        onShown={onShown}
+        onHidden={onHidden}
+        onHeightChange={onSheetHeightChange}
+        testID="ride-request-sheet"
+      >
+        {lingering.value.body}
+      </RequestSheet>
     </View>
   );
 };
-
-const createStyles = (theme: AppTheme) =>
-  StyleSheet.create({
-    // Positions the panel over the tab content; the card itself is themed (IncomingRequestCard).
-    container: {
-      position: 'absolute',
-      left: theme.space[5],
-      right: theme.space[5],
-    },
-  });
 
 export default RideRequestHost;

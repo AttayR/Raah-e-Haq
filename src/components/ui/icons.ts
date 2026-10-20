@@ -185,6 +185,10 @@ export const iconGlyphs = {
   // UI-R7 role choice cards: trailing radio.
   radioOn: 'radiobox-marked',
   radioOff: 'radiobox-blank',
+  // UI-R11 Drive status notices (driver-drive-home D2) and the request taken state (R5).
+  gpsSearching: 'crosshairs',
+  gpsWeak: 'crosshairs-question',
+  rideTaken: 'car-clock',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

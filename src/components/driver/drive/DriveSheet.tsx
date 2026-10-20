@@ -1,95 +1,16 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
-import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { useReducedMotion } from '../../../hooks/useReducedMotion';
-import { perLocale, t } from '../../../i18n';
-import { borderWidth, layout, motionPatterns, radius, space } from '../../../theme';
-import { AppText, Badge, Banner, Button, Card, Chip, ListItem, RecentRidesCard, vehicleIconName, type RecentRideRow } from '../../ui';
+import React from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { t } from '../../../i18n';
+import { componentTokens, layout, space } from '../../../theme';
+import { Badge, Banner, Button, Card, ListItem, RecentRidesCard, vehicleIconName, type RecentRideRow } from '../../ui';
 import { DRIVER_HOME_COPY } from '../home/copy';
 import { vehicleLabel } from '../../../features/ride-history/copy';
-import { DriverTodayStats, type DriverTodayStatsValues } from '../home/DriverTodayStats';
 import { LocationNeededCard } from '../../../features/permissions/LocationNeededCard';
+import type { DriveStatus } from './driveNotice';
 
-export type DriveStatus = 'checking' | 'offline' | 'online' | 'onRide';
-
-const STATUS_TEXT = perLocale((): Record<DriveStatus, string> => ({
-  checking: t('drive.checking'),
-  offline: t('drive.youAreOffline'),
-  online: t('drive.youAreOnline'),
-  onRide: t('drive.onRide'),
-}));
-
-const HINT_TEXT = perLocale((): Record<DriveStatus, string> => ({
-  checking: t('drive.checking'),
-  offline: t('drive.offlineHint'),
-  online: t('drive.onlineHint'),
-  onRide: t('drive.onRideHint'),
-}));
-
-/** Status dot (12) beside the `h3` status sentence. */
-const DOT = space[3];
-
-/**
- * Drive sheet header (DESIGN_SYSTEM §8.3): status dot + "You're offline"/"You're online" in `h3`,
- * and while online a 2pt `success` shimmer under the row (searching for requests). Reduced
- * motion: a still bar.
- */
-export function DriveStatusHeader({ status, autoAccept = false }: { status: DriveStatus; autoAccept?: boolean }) {
-  const { theme } = useAppTheme();
-  const dot =
-    status === 'online' ? theme.colors.success : status === 'onRide' ? theme.colors.info : theme.colors.textMuted;
-  return (
-    <View
-      style={styles.header}
-      accessibilityRole="summary"
-      accessibilityLabel={STATUS_TEXT()[status]}
-      testID="drive-status"
-    >
-      <View style={styles.statusRow}>
-        <View style={[styles.dot, { backgroundColor: dot }]} testID={`drive-status-dot-${status}`} />
-        <AppText variant="h3" numberOfLines={1} style={styles.flex}>
-          {STATUS_TEXT()[status]}
-        </AppText>
-        {status === 'online' && autoAccept ? (
-          // T-587 (map-vehicles.md §7.3): matching rides are accepted for the driver.
-          <Badge tone="primary" icon="autoAccept" label={t('autoAccept.badge')} testID="drive-auto-badge" />
-        ) : null}
-      </View>
-      {status === 'online' ? <SearchingShimmer /> : null}
-    </View>
-  );
-}
-
-function SearchingShimmer() {
-  const { theme } = useAppTheme();
-  const reduce = useReducedMotion();
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    if (reduce) {
-      progress.value = 0.5;
-      return undefined;
-    }
-    progress.value = withRepeat(withTiming(1, { duration: motionPatterns.searchingProgressLoopMs }), -1, false);
-    return () => cancelAnimation(progress);
-  }, [progress, reduce]);
-  const style = useAnimatedStyle(() => ({ start: `${progress.value * 130 - 30}%` }));
-  return (
-    <View
-      style={[styles.track, { backgroundColor: theme.colors.successSoft }]}
-      accessibilityLabel={t('drive.searchingA11y')}
-      testID="drive-searching"
-    >
-      <Animated.View style={[styles.shimmer, { backgroundColor: theme.colors.success }, style]} />
-    </View>
-  );
-}
+export { DriveStatusHeader } from './DriveStatusHeader';
+export type { DriveStatus } from './driveNotice';
 
 type BodyProps = {
   status: DriveStatus;
@@ -100,10 +21,8 @@ type BodyProps = {
   /** The accepted ride (T-405): the action becomes "Resume ride". */
   hasRide: boolean;
   onResume: () => void;
-  /** Today's earnings from GET /me/stats, formatted; null until loaded. */
-  todayEarnings: string | null;
-  today: DriverTodayStatsValues;
-  statsError: string | null;
+  /** UI-R11 D4: the Today card (DriverTodayCard) at `half`. */
+  today?: React.ReactNode;
   isApproved: boolean;
   vehicleType: string | undefined;
   /** T-507: the last finished trips (GET /rides?per_page=3); the card hides while empty. */
@@ -115,40 +34,48 @@ type BodyProps = {
    * replaced by the "Location needed to go online" card.
    */
   locationBlocked?: { onOpenSettings: () => void; onRetry: () => void } | null;
-  /** T-580: the "Location needed" card's height, so the screen can raise the peek to show all of it. */
+  /** T-580: the "Location needed" card's height. */
   onLocationCardLayout?: (height: number) => void;
-  /** T-587: the auto-accept row (§7.1), between the status row and the online action. */
+  /** T-587: the auto-accept row (§7.1), between the status block and the online action. */
   autoAcceptRow?: React.ReactNode;
-  /** T-587: auto-accept is on and allowed: the online hint says rides are accepted for you. */
-  autoAcceptOn?: boolean;
+  /**
+   * UI-R11 D1: the measured height of the peek group (12 + auto-accept row + 12 + action, or the
+   * location card), so the peek is measured, never hard-coded.
+   */
+  onPeekGroupHeight?: (height: number) => void;
+  /** D6 cold-open entrance styles for the auto-accept row and the action. */
+  rowStyle?: StyleProp<ViewStyle>;
+  actionStyle?: StyleProp<ViewStyle>;
 };
-
-/** §8.3: the 56pt online action the peek is sized for. */
-export const DRIVE_ACTION_HEIGHT = 56;
 
 /** Whether the "Location needed" card replaces the online control (UI-R8). */
 export const showsLocationCard = (blocked: boolean, hasRide: boolean, status: DriveStatus): boolean =>
   blocked && !hasRide && status === 'offline';
 
 /**
- * T-580 (QA bug 1): the Drive sheet's snap points. While the "Location needed" card replaces the
- * 56pt action, the peek grows by the card's extra height so its title, Open Settings and Try
- * again are all visible without dragging; the second snap is `full` (always above that peek, also
- * on short phones where `half` could be lower). Otherwise the §8.3 peek (201) → half.
+ * T-580 (QA bug 1) + UI-R11 D1: the Drive sheet's snap points. `peek` is the measured peek; the
+ * peek group holds the "Location needed" card in place of the action when it shows, so the whole
+ * card is visible without dragging. While the card shows, the second snap is `full` (always above
+ * that peek, also on short phones where `half` could be lower); otherwise `half`.
  */
 export const driveSheetSnaps = (
-  basePeek: number,
-  locationCardHeight: number | null,
+  peek: number,
+  locationCardShown: boolean,
 ): { peekHeight: number; snapPoints: readonly ('peek' | 'half' | 'full')[] } =>
-  locationCardHeight !== null && locationCardHeight > 0
-    ? { peekHeight: basePeek - DRIVE_ACTION_HEIGHT + locationCardHeight, snapPoints: ['peek', 'full'] }
-    : { peekHeight: basePeek, snapPoints: ['peek', 'half'] };
+  locationCardShown
+    ? { peekHeight: peek, snapPoints: ['peek', 'full'] }
+    : { peekHeight: peek, snapPoints: ['peek', 'half'] };
+
+/** D1: handle area 24 + measured status block + measured peek group + 16. */
+export const drivePeekHeight = (headerHeight: number, groupHeight: number): number =>
+  componentTokens.sheet.contentTop + headerHeight + groupHeight + space[4];
 
 /**
- * Drive sheet body (§8.3): the 56pt Go online (primary) / Go offline (outline) action (or
- * "Resume ride" while a ride is open), then at `half`: the status hint, today's earnings pill,
- * the approval warning, today's figures, the recent trips (T-507) and the driver account card.
- * Nothing is shown that the API did not return.
+ * Drive sheet body (§8.3, UI-R11 D1/D4): the peek group (auto-accept row, then the 56pt Go
+ * online / Go offline action, "Resume ride" while a ride is open, or the "Location needed" card),
+ * then at `half`: the approval warning, the Today card, the recent trips (T-507) and the driver
+ * account card. The hint and every notice live in the status block's subtitle. Nothing is shown
+ * that the API did not return.
  */
 export function DriveSheetBody({
   status,
@@ -157,9 +84,7 @@ export function DriveSheetBody({
   onToggle,
   hasRide,
   onResume,
-  todayEarnings,
   today,
-  statsError,
   isApproved,
   vehicleType,
   recentRides = [],
@@ -168,51 +93,46 @@ export function DriveSheetBody({
   locationBlocked,
   onLocationCardLayout,
   autoAcceptRow,
-  autoAcceptOn = false,
+  onPeekGroupHeight,
+  rowStyle,
+  actionStyle,
 }: BodyProps) {
   const online = status === 'online';
+  const onGroupLayout = (e: LayoutChangeEvent) => onPeekGroupHeight?.(Math.round(e.nativeEvent.layout.height));
   return (
-    <View style={[styles.body, autoAcceptRow ? styles.bodyWithRow : null]}>
-      {autoAcceptRow ? <View style={styles.rowSlot}>{autoAcceptRow}</View> : null}
-      {locationBlocked && showsLocationCard(true, hasRide, status) ? (
-        <View onLayout={e => onLocationCardLayout?.(e.nativeEvent.layout.height)} testID="drive-location-card-wrap">
-          <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
-        </View>
-      ) : hasRide ? (
-        <Button
-          label={t('drive.resumeRide')}
-          size="lg"
-          onPress={onResume}
-          haptic="impactLight"
-          testID="drive-resume-ride"
-        />
-      ) : (
-        <Button
-          label={online ? t('drive.goOffline') : t('drive.goOnline')}
-          variant={online ? 'outline' : 'primary'}
-          size="lg"
-          loading={busy}
-          disabled={disabled || status === 'checking'}
-          onPress={onToggle}
-          haptic="impactLight"
-          testID="drive-online-toggle"
-        />
-      )}
+    <View style={styles.body}>
+      <View style={styles.group} onLayout={onGroupLayout} testID="drive-peek-group">
+        {autoAcceptRow ? <Animated.View style={[styles.rowSlot, rowStyle]}>{autoAcceptRow}</Animated.View> : null}
+        <Animated.View style={actionStyle}>
+          {locationBlocked && showsLocationCard(true, hasRide, status) ? (
+            <View onLayout={e => onLocationCardLayout?.(e.nativeEvent.layout.height)} testID="drive-location-card-wrap">
+              <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
+            </View>
+          ) : hasRide ? (
+            <Button
+              label={t('drive.resumeRide')}
+              size="lg"
+              onPress={onResume}
+              haptic="impactLight"
+              testID="drive-resume-ride"
+            />
+          ) : (
+            <Button
+              label={online ? t('drive.goOffline') : t('drive.goOnline')}
+              variant={online ? 'outline' : 'primary'}
+              size="lg"
+              loading={busy}
+              disabled={disabled || status === 'checking'}
+              onPress={onToggle}
+              haptic="impactLight"
+              accessibilityLabel={online ? t('drive.goOfflineA11y') : t('drive.goOnlineA11y')}
+              testID="drive-online-toggle"
+            />
+          )}
+        </Animated.View>
+      </View>
 
       <View style={styles.more}>
-        <AppText variant="bodySmall" color="textSecondary" testID="drive-hint">
-          {online && autoAcceptOn ? t('autoAccept.onlineHint') : HINT_TEXT()[status]}
-        </AppText>
-        {todayEarnings ? (
-          <View style={styles.pillRow}>
-            <Chip
-              icon="cash"
-              label={t('drive.todayEarnings', { amount: todayEarnings })}
-              accessibilityLabel={t('drive.todayEarningsA11y', { amount: todayEarnings })}
-              testID="drive-today-earnings"
-            />
-          </View>
-        ) : null}
         {!isApproved ? (
           <Banner
             tone="warning"
@@ -221,7 +141,7 @@ export function DriveSheetBody({
             testID="driver-home-pending-banner"
           />
         ) : null}
-        <DriverTodayStats values={today} error={statsError} />
+        {today}
         {onSeeAllRides ? (
           <RecentRidesCard
             rides={recentRides}
@@ -257,25 +177,10 @@ export function DriveSheetBody({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, minWidth: 0 },
-  header: { paddingHorizontal: layout.gutter },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  dot: { width: DOT, height: DOT, borderRadius: radius.pill },
-  // Under the status row, inside the 16 gap above the action (§8.3); takes no layout height.
-  track: {
-    position: 'absolute',
-    start: layout.gutter,
-    end: layout.gutter,
-    bottom: -space[2],
-    height: borderWidth.focus,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-  },
-  shimmer: { position: 'absolute', top: 0, bottom: 0, width: '30%', borderRadius: radius.pill },
-  body: { paddingHorizontal: layout.gutter, paddingTop: space[4] },
-  // T-587 (§7.1): status row → 12 → auto-accept row → 12 → action.
-  bodyWithRow: { paddingTop: space[3] },
+  body: { paddingHorizontal: layout.gutter },
+  // D1: status block → 12 → auto-accept row → 12 → action (the group's height is measured).
+  group: { paddingTop: space[3] },
   rowSlot: { marginBottom: space[3] },
+  // D4: 24 below the action, 16 between blocks.
   more: { paddingTop: space[6], gap: space[4] },
-  pillRow: { flexDirection: 'row' },
 });

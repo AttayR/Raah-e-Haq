@@ -3,6 +3,7 @@
  * passenger Home tiles stay hidden at zero rides and say "New" before a rating; driver tiles
  * hide untracked figures; the Earnings screen switches periods and shows its states.
  */
+import { todayCells } from '../../../src/components/driver/drive/DriverTodayCard';
 import React from 'react';
 import MockAdapter from 'axios-mock-adapter';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -13,7 +14,6 @@ import {
   shortPlace,
   formatMinutes,
   periodCaption,
-  toDriverTodayValues,
   toPassengerHomeStats,
 } from '../../../src/features/stats/format';
 import type { DriverStats, PassengerStats } from '../../../src/features/stats/types';
@@ -139,15 +139,15 @@ describe('passenger Home stats (T-506)', () => {
   });
 });
 
-describe('driver Today values (T-507)', () => {
-  it('dashes while loading, hides untracked tiles, formats when tracked', () => {
-    expect(toDriverTodayValues(null)).toEqual({ earnings: null, trips: null, rating: null });
+describe('driver Today cells (T-507, UI-R11 D4)', () => {
+  it('trips, online time only when tracked, rating or New; none on a day with no trip yet', () => {
     const base = toMyStats({ role: 'driver', earnings_today: 1250, trips_today: 2, rating: null }) as DriverStats;
-    expect(toDriverTodayValues(base)).toEqual({ earnings: 'Rs 1,250', trips: '2', rating: 'New' });
-    expect(toDriverTodayValues({ ...base, onlineMinutesToday: 65, acceptanceRate: 92.4 })).toMatchObject({
-      onlineTime: '1 h 05 min',
-      acceptance: '92%',
-    });
+    expect(todayCells(base).map(c => [c.key, c.value])).toEqual([
+      ['trips', '2'],
+      ['rating', 'New'],
+    ]);
+    expect(todayCells({ ...base, onlineMinutesToday: 65, rating: 4.86 }).map(c => c.value)).toEqual(['2', '1 h 05 min', '4.9']);
+    expect(todayCells({ ...base, tripsToday: 0 })).toEqual([]);
     expect(formatMinutes(45)).toBe('45 min');
   });
 });

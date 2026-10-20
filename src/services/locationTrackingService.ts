@@ -113,6 +113,9 @@ class LocationTrackingService {
   private blockedUntil = 0;
   private onDriverOffline: (() => void) | undefined;
   private listeners: Set<(location: LocationFix) => void> = new Set();
+  /** UI-R11 (Drive D2): location posts that failed in a row since the last accepted one. */
+  private postFailures = 0;
+  private postFailureListeners: Set<(failures: number) => void> = new Set();
 
   // The shared device watcher.
   private watchId: number | null = null;
@@ -204,6 +207,7 @@ class LocationTrackingService {
     this.blockedUntil = 0;
     this.lastPost = null;
     this.onDriverOffline = undefined;
+    this.setPostFailures(0);
   }
 
   /**
@@ -249,6 +253,7 @@ class LocationTrackingService {
     this.lastFixLowPower = false;
     this.rideCadence = false;
     this.listeners.clear();
+    this.postFailureListeners.clear();
   }
 
   /**
@@ -278,6 +283,31 @@ class LocationTrackingService {
 
   getLastLocation(): LocationFix | null {
     return this.lastLocation;
+  }
+
+  /** UI-R11: location posts that failed in a row (0 after an accepted post or a stop). */
+  getPostFailures(): number {
+    return this.postFailures;
+  }
+
+  /** Called when the failed-in-a-row count changes. Returns the unsubscribe function. */
+  addPostFailureListener(listener: (failures: number) => void): () => void {
+    this.postFailureListeners.add(listener);
+    return () => {
+      this.postFailureListeners.delete(listener);
+    };
+  }
+
+  private setPostFailures(next: number): void {
+    if (next === this.postFailures) return;
+    this.postFailures = next;
+    this.postFailureListeners.forEach((listener) => {
+      try {
+        listener(next);
+      } catch (error) {
+        logger.warn('Driver location failure listener failed', { error });
+      }
+    });
   }
 
   /** Positions from the shared watcher while it runs. Returns the unsubscribe function. */
@@ -432,6 +462,7 @@ class LocationTrackingService {
       .then(() => {
         if (generation !== this.generation) return;
         this.lastPost = { latitude: fix.latitude, longitude: fix.longitude, at: now };
+        this.setPostFailures(0);
       })
       .catch((error: unknown) => {
         if (generation !== this.generation) return;
@@ -449,6 +480,7 @@ class LocationTrackingService {
   private handlePostError(error: unknown, now: number): void {
     if (!isApiError(error)) {
       logger.warn('Driver location post failed');
+      this.setPostFailures(this.postFailures + 1);
       return;
     }
     if (error.status === 409 && error.code === DRIVER_LOCATION_CODES.driverOffline) {
@@ -473,6 +505,8 @@ class LocationTrackingService {
     // tracking) is debug; a refusal we do not expect (422, 5xx) still warns.
     const log = QUIET_POST_FAILURES.has(error.kind) ? logger.debug : logger.warn;
     log('Driver location post failed', { kind: error.kind, status: error.status });
+    // Offline, timeouts and server errors: the server is not getting the position (Drive D2).
+    this.setPostFailures(this.postFailures + 1);
   }
 }
 

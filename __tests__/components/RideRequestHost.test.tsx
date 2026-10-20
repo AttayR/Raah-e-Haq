@@ -5,7 +5,7 @@
  * requests" are left to the Drive sheet.
  */
 import React from 'react';
-import { AppState } from 'react-native';
+import { AppState, BackHandler } from 'react-native';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -14,6 +14,10 @@ import { rootReducer } from '../../src/store/rootReducer';
 import { RideRequestHost } from '../../src/components/driver/RideRequestHost';
 import { driverRequestsApi } from '../../src/features/driver-requests/api';
 import { PENDING_POLL_INTERVAL_MS } from '../../src/features/driver-requests/hooks';
+import { REQUEST_DECISION_SECONDS } from '../../src/features/driver-requests/countdown';
+import { autoAcceptApi } from '../../src/features/driver-auto-accept/api';
+import { __resetOfferReportsForTests } from '../../src/features/driver-auto-accept/offerReports';
+import { toast } from '../../src/core/toast';
 import { driverStatusApi, type DriverAvailability } from '../../src/features/driver-status/api';
 import { loadDriverStatus } from '../../src/features/driver-status/slice';
 import { setDriverActiveRide } from '../../src/features/driver-ride/slice';
@@ -38,7 +42,11 @@ const FIX: LocationFix = {
   timestamp: 0,
 };
 
-const statusInfo = (status: DriverAvailability) => ({ status, activeRideId: null, changedAt: null });
+const statusInfo = (status: DriverAvailability) => ({
+  status,
+  activeRideId: null,
+  changedAt: null,
+});
 
 const flush = async () => {
   await act(async () => {
@@ -63,7 +71,7 @@ const renderHost = async (status: DriverAvailability, onRequestShownChange?: (sh
   await store.dispatch(loadDriverStatus());
   const screen = render(
     <Provider store={store}>
-      <RideRequestHost bottomOffset={49} onRequestShownChange={onRequestShownChange} />
+      <RideRequestHost onRequestShownChange={onRequestShownChange} />
     </Provider>,
   );
   await flush();
@@ -72,6 +80,7 @@ const renderHost = async (status: DriverAvailability, onRequestShownChange?: (sh
 
 beforeEach(() => {
   jest.useFakeTimers();
+  __resetOfferReportsForTests();
   mockIsFocused = true;
   mockNavigate.mockReset();
   jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
@@ -90,7 +99,10 @@ describe('RideRequestHost', () => {
   it('polls while online on any tab and shows the request card, with the tracker position', async () => {
     const { screen } = await renderHost('available');
     expect(listPending).toHaveBeenCalledTimes(1);
-    expect(listPending).toHaveBeenLastCalledWith({ latitude: 31.5, longitude: 74.3 });
+    expect(listPending).toHaveBeenLastCalledWith({
+      latitude: 31.5,
+      longitude: 74.3,
+    });
     screen.getByTestId('incoming-request-card');
 
     await advance(PENDING_POLL_INTERVAL_MS);
@@ -152,11 +164,11 @@ describe('RideRequestHost', () => {
     expect(shown).toHaveBeenLastCalledWith(false);
   });
 
-  it('an error card is not a request: the tab bar stays', async () => {
+  it('a feed error draws no card here (the Drive subtitle says it) and the tab bar stays', async () => {
     listPending.mockRejectedValue(new ApiError({ kind: 'server', status: 500, message: 'Server error' }));
     const shown = jest.fn();
     const { screen } = await renderHost('available', shown);
-    screen.getByTestId('ride-requests-error');
+    expect(screen.queryByTestId('ride-request-host')).toBeNull();
     expect(shown).not.toHaveBeenCalledWith(true);
   });
 
@@ -169,58 +181,160 @@ describe('RideRequestHost', () => {
   });
 });
 
-describe('RideRequestHost layout', () => {
-  it('lets touches outside the card through to the screen below', async () => {
+describe('RideRequestHost request sheet (UI-R11)', () => {
+  it('lets touches outside the sheet through to the map below', async () => {
     const { screen } = await renderHost('available');
     expect(screen.getByTestId('ride-request-host').props.pointerEvents).toBe('box-none');
+    screen.getByTestId('ride-request-sheet');
   });
 
-  it('applies the offset to the panel position', async () => {
+  it('R3: the 20 s countdown runs out as a decline (offer-declined report), and the sheet leaves', async () => {
+    const declined = jest.spyOn(autoAcceptApi, 'offerDeclined').mockResolvedValue();
+    jest.spyOn(autoAcceptApi, 'offerViewed').mockResolvedValue();
+    const shown = jest.fn();
+    const { store, screen } = await renderHost('available', shown);
+    // Polls keep listing it; the device hides it once declined.
+    await advance(REQUEST_DECISION_SECONDS * 1000 - 100);
+    expect(declined).not.toHaveBeenCalled();
+    screen.getByTestId('incoming-request-card');
+    await advance(200);
+    expect(declined).toHaveBeenCalledWith(7);
+    expect(store.getState().driverRequests.dismissedIds).toContain(7);
+    expect(screen.queryByTestId('incoming-request-card')).toBeNull();
+    expect(shown).toHaveBeenLastCalledWith(false);
+  });
+
+  it('R3: the server offer window (meta.offer_seconds) wins over 20 s', async () => {
+    const declined = jest.spyOn(autoAcceptApi, 'offerDeclined').mockResolvedValue();
+    jest.spyOn(autoAcceptApi, 'offerViewed').mockResolvedValue();
+    listPending.mockResolvedValue({
+      requests: [makePendingRequest({ id: 7, offerSeconds: 12 })],
+    });
+    await renderHost('available');
+    await advance(11_900);
+    expect(declined).not.toHaveBeenCalled();
+    await advance(200);
+    expect(declined).toHaveBeenCalledWith(7);
+  });
+
+  it('R3: the clock pauses while accepting; a failed accept resumes it with the time left', async () => {
+    const declined = jest.spyOn(autoAcceptApi, 'offerDeclined').mockResolvedValue();
+    jest.spyOn(autoAcceptApi, 'offerViewed').mockResolvedValue();
+    let fail: (error: unknown) => void = () => undefined;
+    jest.spyOn(driverRequestsApi, 'accept').mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
+    const { screen } = await renderHost('available');
+    await advance(5_000);
+    fireEvent.press(screen.getByTestId('incoming-request-accept'));
+    await flush();
+    await advance(30_000);
+    expect(declined).not.toHaveBeenCalled();
+    await act(async () => {
+      fail(new ApiError({ kind: 'network', message: 'Network error' }));
+    });
+    await flush();
+    screen.getByTestId('incoming-request-card');
+    await advance(14_900);
+    expect(declined).not.toHaveBeenCalled();
+    await advance(200);
+    expect(declined).toHaveBeenCalledWith(7);
+  });
+
+  it('R5: a 409 "already accepted" swaps to "Another driver took this ride" (no toast) and leaves after 2 s', async () => {
+    jest.spyOn(autoAcceptApi, 'offerViewed').mockResolvedValue();
+    const error = jest.spyOn(toast, 'error');
+    jest.spyOn(driverRequestsApi, 'accept').mockRejectedValue(
+      new ApiError({
+        kind: 'conflict',
+        status: 409,
+        code: 'RIDE_ALREADY_ACCEPTED',
+        message: 'taken',
+      }),
+    );
+    listPending
+      .mockResolvedValueOnce({ requests: [makePendingRequest({ id: 7 })] })
+      .mockResolvedValue({ requests: [] });
+    const shown = jest.fn();
+    const { screen } = await renderHost('available', shown);
+    fireEvent.press(screen.getByTestId('incoming-request-accept'));
+    await flush();
+    screen.getByText('Another driver took this ride');
+    expect(screen.queryByTestId('incoming-request-accept')).toBeNull();
+    expect(error).not.toHaveBeenCalled();
+    await advance(2_000);
+    expect(screen.queryByText('Another driver took this ride')).toBeNull();
+    expect(shown).toHaveBeenLastCalledWith(false);
+  });
+
+  it('R1: Android back declines the request (offer-declined report) and stays on the tab', async () => {
+    const declined = jest.spyOn(autoAcceptApi, 'offerDeclined').mockResolvedValue();
+    jest.spyOn(autoAcceptApi, 'offerViewed').mockResolvedValue();
+    let onBack: (() => boolean | null | undefined) | undefined;
+    const remove = jest.fn();
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
+      onBack = handler;
+      return { remove };
+    });
+    const { store, screen } = await renderHost('available');
+    screen.getByTestId('incoming-request-card');
+    let handled: boolean | null | undefined;
+    act(() => {
+      handled = onBack?.();
+    });
+    expect(handled).toBe(true);
+    expect(declined).toHaveBeenCalledWith(7);
+    expect(store.getState().driverRequests.dismissedIds).toContain(7);
+    expect(mockNavigate).not.toHaveBeenCalled();
+    await flush();
+    expect(screen.queryByTestId('incoming-request-card')).toBeNull();
+    expect(remove).toHaveBeenCalled();
+  });
+
+  it('reports the offer on screen for the Drive map framing, and null for the taken state', async () => {
+    jest.spyOn(autoAcceptApi, 'offerViewed').mockResolvedValue();
+    jest
+      .spyOn(driverRequestsApi, 'accept')
+      .mockRejectedValue(new ApiError({ kind: 'conflict', status: 409, code: 'RIDE_ALREADY_ACCEPTED', message: 'taken' }));
+    listPending.mockResolvedValue({ requests: [makePendingRequest({ id: 7 }), makePendingRequest({ id: 9 })] });
+    const onShownOffer = jest.fn();
     const store = configureStore({ reducer: rootReducer });
     jest.spyOn(driverStatusApi, 'get').mockResolvedValue(statusInfo('available'));
     await store.dispatch(loadDriverStatus());
     const screen = render(
       <Provider store={store}>
-        <RideRequestHost bottomOffset={34} />
+        <RideRequestHost onShownOfferChange={onShownOffer} />
       </Provider>,
     );
     await flush();
-    const style = Object.assign({}, ...[screen.getByTestId('ride-request-host').props.style].flat());
-    // The home-indicator inset (tab bar hidden) + space[4] (16).
-    expect(style.bottom).toBe(34 + 16);
-  });
-});
-
-describe('RideRequestHost error before the first fix', () => {
-  const locationRequired = () =>
-    new ApiError({ kind: 'validation', status: 422, code: 'LOCATION_REQUIRED', message: 'Location required' });
-
-  it('waits for a second failure in a row when there is no fix yet', async () => {
-    jest.spyOn(locationTrackingService, 'getLastLocation').mockReturnValue(null);
-    listPending.mockRejectedValue(locationRequired());
-    const { screen } = await renderHost('available');
-    expect(listPending).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId('ride-requests-error')).toBeNull();
-
-    await advance(PENDING_POLL_INTERVAL_MS);
-    expect(listPending).toHaveBeenCalledTimes(2);
-    screen.getByTestId('ride-requests-error');
+    expect(onShownOffer).toHaveBeenLastCalledWith(7);
+    fireEvent.press(screen.getByTestId('incoming-request-accept'));
+    await flush();
+    // Ride 9 is next in the queue, but the taken state frames nothing.
+    screen.getByText('Another driver took this ride');
+    expect(onShownOffer).toHaveBeenLastCalledWith(null);
+    await advance(2_000);
+    expect(onShownOffer).toHaveBeenLastCalledWith(9);
   });
 
-  it('a good poll after the first failure shows the request and never the error', async () => {
-    jest.spyOn(locationTrackingService, 'getLastLocation').mockReturnValue(null);
-    listPending.mockRejectedValueOnce(locationRequired());
-    const { screen } = await renderHost('available');
-    expect(screen.queryByTestId('ride-requests-error')).toBeNull();
-
-    await advance(PENDING_POLL_INTERVAL_MS);
-    screen.getByTestId('incoming-request-card');
-  });
-
-  it('once there is a fix, the error shows at once', async () => {
-    listPending.mockRejectedValue(locationRequired());
-    const withFix = await renderHost('available');
-    withFix.screen.getByTestId('ride-requests-error');
+  it('reports the sheet height for the Drive map framing', async () => {
+    const onHeight = jest.fn();
+    const store = configureStore({ reducer: rootReducer });
+    jest.spyOn(driverStatusApi, 'get').mockResolvedValue(statusInfo('available'));
+    await store.dispatch(loadDriverStatus());
+    const screen = render(
+      <Provider store={store}>
+        <RideRequestHost onSheetHeightChange={onHeight} />
+      </Provider>,
+    );
+    await flush();
+    fireEvent(screen.getByTestId('ride-request-sheet'), 'layout', {
+      nativeEvent: { layout: { height: 518 } },
+    });
+    expect(onHeight).toHaveBeenCalledWith(518);
   });
 });
 
@@ -229,7 +343,7 @@ describe('useDriverLastLocation (through the host)', () => {
     const unsubscribe = jest.fn();
     let listener: ((fix: LocationFix) => void) | undefined;
     jest.spyOn(locationTrackingService, 'getLastLocation').mockReturnValue(null);
-    jest.spyOn(locationTrackingService, 'addLocationListener').mockImplementation((fn) => {
+    jest.spyOn(locationTrackingService, 'addLocationListener').mockImplementation(fn => {
       listener = fn;
       return unsubscribe;
     });
@@ -238,7 +352,10 @@ describe('useDriverLastLocation (through the host)', () => {
 
     act(() => listener?.({ ...FIX, latitude: 31.6 }));
     await advance(PENDING_POLL_INTERVAL_MS);
-    expect(listPending).toHaveBeenLastCalledWith({ latitude: 31.6, longitude: 74.3 });
+    expect(listPending).toHaveBeenLastCalledWith({
+      latitude: 31.6,
+      longitude: 74.3,
+    });
 
     screen.unmount();
     expect(unsubscribe).toHaveBeenCalled();

@@ -72,12 +72,32 @@ export interface PendingRideRequest {
   stops: PendingRideStop[];
   /** BE-88: a parcel delivery (what is carried only; never the receiver or the value). */
   parcel: ParcelRequestSummary | null;
+  /**
+   * BE-84 (UI-R11 R2 #4): what the driver keeps of this fare and the commission, as the server
+   * computed them (on the offer for an offer ride). Never computed on the device; null when not sent.
+   */
+  driverNet: number | null;
+  /** Percent, e.g. 12.5. */
+  commissionRate: number | null;
+  commissionAmount: number | null;
+  /** `passenger_count`; null when not sent. */
+  passengerCount: number | null;
+  /** The trip itself (pickup → drop-off), km and minutes; null when not sent. */
+  tripDistanceKm: number | null;
+  tripDurationMin: number | null;
+  /**
+   * UI-R11 R3 (BE-128): how long the driver has to decide, from the feed's `meta.offer_seconds`;
+   * null when the server does not send it (the device default, 20 s, applies).
+   */
+  offerSeconds: number | null;
 }
 
 /** One stop of a request, as the card lists it between the pickup and the drop-off. */
 export interface PendingRideStop {
   id: number | null;
   address: string;
+  /** UI-R11 R1: where the numbered stop pin goes; null when the stop has no coordinates. */
+  point: LatLng | null;
 }
 
 export interface PendingRidesPage {
@@ -122,12 +142,16 @@ export const toPendingRideStops = (raw: unknown): PendingRideStop[] => {
     .map((stop, index) => ({
       id: typeof stop.id === 'number' && Number.isInteger(stop.id) ? stop.id : null,
       address: toText(stop.address),
+      point: toLatLng(stop.latitude, stop.longitude),
       order: toNumber(stop.stop_order) ?? Number.MAX_SAFE_INTEGER,
       index,
     }))
-    .filter((stop): stop is { id: number | null; address: string; order: number; index: number } => stop.address !== null)
+    .filter(
+      (stop): stop is { id: number | null; address: string; point: LatLng | null; order: number; index: number } =>
+        stop.address !== null,
+    )
     .sort((a, b) => a.order - b.order || a.index - b.index)
-    .map(({ id, address }) => ({ id, address }));
+    .map(({ id, address, point }) => ({ id, address, point }));
 };
 
 /**
@@ -138,6 +162,7 @@ export const toPendingRideStops = (raw: unknown): PendingRideStop[] => {
 export const toPendingRideRequest = (
   raw: unknown,
   maxAgeMinutes: number | null,
+  offerSeconds: number | null = null,
 ): PendingRideRequest | null => {
   if (!isRecord(raw)) return null;
   const id = raw.id;
@@ -168,6 +193,13 @@ export const toPendingRideRequest = (
     serverFare: toNumber(raw.server_fare),
     stops: toPendingRideStops(raw.stops),
     parcel: toParcelRequestSummary(raw),
+    driverNet: toNumber(raw.driver_net),
+    commissionRate: toNumber(raw.commission_rate),
+    commissionAmount: toNumber(raw.commission_amount),
+    passengerCount: toNumber(raw.passenger_count),
+    tripDistanceKm: toNumber(raw.distance_km),
+    tripDurationMin: toNumber(raw.duration_minutes),
+    offerSeconds,
   };
 };
 
@@ -177,10 +209,13 @@ export const toPendingRidesPage = (body: unknown): PendingRidesPage => {
   const meta = isRecord(envelope.meta) ? envelope.meta : {};
   const maxAge = toNumber(meta.max_age_minutes);
   const maxAgeMinutes = maxAge !== null && maxAge > 0 ? maxAge : null;
+  // BE-128: the per-offer decision window in seconds (admin setting, 10–60).
+  const offer = toNumber(meta.offer_seconds);
+  const offerSeconds = offer !== null && offer > 0 ? offer : null;
   const data = Array.isArray(envelope.data) ? envelope.data : [];
   return {
     requests: data
-      .map((item) => toPendingRideRequest(item, maxAgeMinutes))
+      .map((item) => toPendingRideRequest(item, maxAgeMinutes, offerSeconds))
       .filter((item): item is PendingRideRequest => item !== null),
   };
 };

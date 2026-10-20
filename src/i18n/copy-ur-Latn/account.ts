@@ -488,12 +488,6 @@ export function registerAccountCopy(): void {
     waitingForApproval: 'Approval ka intezar',
     approved: 'Approved',
     pending: 'Pending',
-    todayTitle: 'Aaj',
-    statEarnings: 'Kamai',
-    statRides: 'Safar',
-    statOnline: 'Online waqt',
-    statAcceptance: 'Acceptance',
-    statRating: 'Ausat rating',
     statsUnavailable: 'Abhi aaj ke numbers load nahi ho sake.',
   });
 

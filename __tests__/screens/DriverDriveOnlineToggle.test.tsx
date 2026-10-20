@@ -67,8 +67,10 @@ describe('Drive tab online toggle', () => {
     await waitFor(() => expect(screen.getByText("You're online")).toBeTruthy());
     expect(JSON.parse(mock.history.put[0].data)).toEqual({ status: 'online' });
     expect(screen.getByText('Go offline')).toBeTruthy();
-    // Searching shimmer under the status row while online (§8.3).
-    expect(screen.getByTestId('drive-searching')).toBeTruthy();
+    // UI-R11 D2: online with no fix yet says so in the subtitle (no searching shimmer while a
+    // notice shows).
+    expect(screen.getByTestId('drive-hint').props.children).toBe('Finding your location…');
+    expect(screen.queryByTestId('drive-searching')).toBeNull();
   });
 
   it('shows "on a ride" and disables the toggle while on a ride', async () => {

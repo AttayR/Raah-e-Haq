@@ -72,7 +72,7 @@ const renderHost = async ({ autoAcceptOn = false } = {}) => {
   await store.dispatch(loadAutoAccept());
   const ui = () => (
     <Provider store={store}>
-      <RideRequestHost bottomOffset={49} />
+      <RideRequestHost />
     </Provider>
   );
   const screen = render(ui());
@@ -203,7 +203,7 @@ describe('Ride accepted for you', () => {
     screen.getByTestId('auto-accepted-card');
     await advance(AUTO_ACCEPTED_ADVANCE_MS * 3);
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('auto-accepted-auto-hint')).toBeNull();
+    expect(screen.queryByTestId('auto-accepted-go-countdown', { includeHiddenElements: true })).toBeNull();
     fireEvent.press(screen.getByTestId('auto-accepted-go'));
     expect(mockNavigate).toHaveBeenCalledWith('DriverRide');
   });
@@ -227,7 +227,7 @@ describe('Ride accepted for you', () => {
     await store.dispatch(loadAutoAccept());
     const screen = render(
       <Provider store={store}>
-        <RideRequestHost bottomOffset={49} />
+        <RideRequestHost />
       </Provider>,
     );
     await flush();

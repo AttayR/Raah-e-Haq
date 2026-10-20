@@ -18,7 +18,7 @@ import { toTransaction, toWallet } from '../../../src/features/wallet/api';
 import { transactionIcon } from '../../../src/features/wallet/format';
 import { passengerOwedBannerAmount, passengerOwedNote } from '../../../src/features/wallet/navigation';
 import { CommissionCard } from '../../../src/features/wallet/components/CommissionCard';
-import { IncomingRequestCard } from '../../../src/components/driver/IncomingRequestCard';
+import { RequestSheetContent } from '../../../src/components/driver/request/RequestSheetContent';
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
 import { makeRide, makeRideRequest } from '../../../test-utils/rideFixtures';
@@ -282,13 +282,7 @@ describe('wallet (BE-85 amount owed, new ledger types)', () => {
 describe('driver request feed (BE-83 offers)', () => {
   it('marks a passenger offer with the app fare to compare', () => {
     render(
-      <IncomingRequestCard
-        request={makePendingRequest({ estimatedFare: 170, isOffer: true, serverFare: 152 })}
-        accepting={false}
-        disabled={false}
-        onAccept={jest.fn()}
-        onReject={jest.fn()}
-      />,
+      <RequestSheetContent request={makePendingRequest({ estimatedFare: 170, isOffer: true, serverFare: 152 })} moreCount={0} compact={false} />,
     );
     screen.getByText('Passenger offer');
     screen.getByText('App fare Rs 152');
@@ -296,7 +290,7 @@ describe('driver request feed (BE-83 offers)', () => {
   });
 
   it('no offer badge for a normal request', () => {
-    render(<IncomingRequestCard request={makePendingRequest()} accepting={false} disabled={false} onAccept={jest.fn()} onReject={jest.fn()} />);
+    render(<RequestSheetContent request={makePendingRequest()} moreCount={0} compact={false} />);
     expect(screen.queryByTestId('incoming-request-offer')).toBeNull();
   });
 });

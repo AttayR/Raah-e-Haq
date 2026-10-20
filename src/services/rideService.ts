@@ -67,6 +67,14 @@ export interface RideUpdate {
   duration_min?: number;
 }
 
+/** BE-128 `eta` on RideResource. */
+export interface RideEta {
+  minutes: number;
+  distance_km: number;
+  target: 'pickup' | 'dropoff';
+  updated_at: string;
+}
+
 export interface RideResource {
   id: number;
   ride_id: string;
@@ -101,7 +109,14 @@ export interface RideResource {
   current_stop_index: number;
   active_stops_count: number;
   completed_stops_count: number;
+  /** Deprecated (BE-128): not an ETA; never shown. Use `eta`. */
   estimated_arrival?: string;
+  /**
+   * BE-128: the server's ETA for the ride's passenger and assigned driver while accepted /
+   * arrived (target pickup) or started (target drop-off); null otherwise or when the driver's
+   * location is stale; absent for anyone else.
+   */
+  eta?: RideEta | null;
   created_at: string;
   updated_at: string;
   /** BE-78: never a phone number (calls go through POST /rides/{id}/call). */

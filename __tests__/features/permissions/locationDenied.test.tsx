@@ -7,18 +7,16 @@ import React from 'react';
 import { NativeModules } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { DriveSheetBody, driveSheetSnaps, type DriveStatus } from '../../../src/components/driver/drive/DriveSheet';
+import { DriveSheetBody, drivePeekHeight, driveSheetSnaps, type DriveStatus } from '../../../src/components/driver/drive/DriveSheet';
 import { DRIVE_PEEK_HEIGHT } from '../../../src/screens/Driver/DriverDriveScreen';
-import type { DriverTodayStatsValues } from '../../../src/components/driver/home/DriverTodayStats';
 import { locationOsDenied, locationOsUndetermined } from '../../../src/features/permissions/locationStatus';
-
-const today: DriverTodayStatsValues = { earnings: null, trips: null, rating: null };
 
 const renderBody = async (
   status: DriveStatus,
   blocked: { onOpenSettings: () => void; onRetry: () => void } | null,
   hasRide = false,
   onLocationCardLayout?: (height: number) => void,
+  onPeekGroupHeight?: (height: number) => void,
 ) => {
   render(
     <ThemeProvider>
@@ -29,13 +27,11 @@ const renderBody = async (
         onToggle={jest.fn()}
         hasRide={hasRide}
         onResume={jest.fn()}
-        todayEarnings={null}
-        today={today}
-        statsError={null}
         isApproved
         vehicleType="car"
         locationBlocked={blocked}
         onLocationCardLayout={onLocationCardLayout}
+        onPeekGroupHeight={onPeekGroupHeight}
       />
     </ThemeProvider>,
   );
@@ -71,13 +67,20 @@ describe('Drive sheet height with the location card (T-580)', () => {
     expect(onLayout).toHaveBeenCalledWith(312);
   });
 
-  it('the peek grows by the card over the 56pt action (Open Settings + Try again visible), with full above it', () => {
-    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 312)).toEqual({ peekHeight: DRIVE_PEEK_HEIGHT - 56 + 312, snapPoints: ['peek', 'full'] });
+  it('the peek group holds the card, so the measured peek grows by it (Open Settings + Try again visible), with full above it', async () => {
+    const onGroup = jest.fn();
+    await renderBody('offline', { onOpenSettings: jest.fn(), onRetry: jest.fn() }, false, undefined, onGroup);
+    fireEvent(screen.getByTestId('drive-peek-group'), 'layout', { nativeEvent: { layout: { height: 12 + 56 + 12 + 312 } } });
+    expect(onGroup).toHaveBeenCalledWith(392);
+    const peek = drivePeekHeight(47, 392);
+    expect(peek).toBe(DRIVE_PEEK_HEIGHT - 56 + 312);
+    expect(driveSheetSnaps(peek, true)).toEqual({ peekHeight: peek, snapPoints: ['peek', 'full'] });
   });
 
-  it('without the card (or before it is measured): the normal 201 → half (T-587 auto-accept row)', () => {
-    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, null)).toEqual({ peekHeight: 201, snapPoints: ['peek', 'half'] });
-    expect(driveSheetSnaps(DRIVE_PEEK_HEIGHT, 0)).toEqual({ peekHeight: 201, snapPoints: ['peek', 'half'] });
+  it('without the card: the D1 peek 223 (24 + status block 47 + group 136 + 16) → half', () => {
+    expect(DRIVE_PEEK_HEIGHT).toBe(223);
+    expect(drivePeekHeight(47, 136)).toBe(223);
+    expect(driveSheetSnaps(223, false)).toEqual({ peekHeight: 223, snapPoints: ['peek', 'half'] });
   });
 });
 

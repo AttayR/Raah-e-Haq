@@ -1,9 +1,8 @@
 import { formatMoney } from '../../core/format/money';
-import type { DriverTodayStatsValues } from '../../components/driver/home/DriverTodayStats';
 import type { HomeStat } from '../passenger-home/types';
 import { STATS_COPY } from './copy';
 import { strings } from '../../i18n';
-import type { DriverStats, EarningsPeriod, PassengerStats } from './types';
+import type { EarningsPeriod, PassengerStats } from './types';
 
 /** Day and month names in the active language (T-575), read on every call. */
 const monthShort = (index: number): string | undefined => strings().format.monthsShort[index];
@@ -40,18 +39,6 @@ export const toPassengerHomeStats = (stats: PassengerStats | null): HomeStat[] =
     { label: STATS_COPY.distanceLabel, value: formatDistanceKm(stats.totalDistanceKm), icon: 'distance' },
     { label: STATS_COPY.spentLabel, value: formatMoney(stats.totalSpent, { currency: stats.currency }), icon: 'wallet' },
   ];
-};
-
-/** Driver Home "Today" values; `null` = still loading (a dash). Untracked figures are left out (tile hidden). */
-export const toDriverTodayValues = (stats: DriverStats | null): DriverTodayStatsValues => {
-  if (!stats) return { earnings: null, trips: null, rating: null };
-  return {
-    earnings: formatMoney(stats.earningsToday, { currency: stats.currency }),
-    trips: String(stats.tripsToday),
-    rating: formatRating(stats.rating),
-    ...(stats.onlineMinutesToday !== null ? { onlineTime: formatMinutes(stats.onlineMinutesToday) } : {}),
-    ...(stats.acceptanceRate !== null ? { acceptance: `${Math.round(stats.acceptanceRate)}%` } : {}),
-  };
 };
 
 /** `YYYY-MM-DD` as a calendar date (no timezone shift); null if malformed. */

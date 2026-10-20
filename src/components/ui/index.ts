@@ -12,6 +12,8 @@ export * from './Banner';
 export * from './BrandBar';
 export * from './BottomSheet';
 export * from './Button';
+export * from './CountdownRing';
+export * from './MetricStrip';
 export * from './Card';
 export * from './CarMarker';
 export * from './Chip';

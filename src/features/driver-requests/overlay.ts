@@ -8,3 +8,18 @@ import { createContext, useContext } from 'react';
 export const IncomingRequestShownContext = createContext(false);
 
 export const useIncomingRequestShown = (): boolean => useContext(IncomingRequestShownContext);
+
+/** UI-R11 R1: what the Drive map frames while a request sheet is up. */
+export type IncomingRequestFraming = {
+  /** The offer the host is showing (not the queue head, not the taken state); null otherwise. */
+  rideId: number | null;
+  /** The request sheet's height (0 while hidden), for the camera's bottom padding. */
+  sheetHeight: number;
+};
+
+const NO_FRAMING: IncomingRequestFraming = { rideId: null, sheetHeight: 0 };
+
+/** DriverBottomTabs owns it; RideRequestHost reports the shown offer and its sheet height. */
+export const IncomingRequestFramingContext = createContext<IncomingRequestFraming>(NO_FRAMING);
+
+export const useIncomingRequestFraming = (): IncomingRequestFraming => useContext(IncomingRequestFramingContext);

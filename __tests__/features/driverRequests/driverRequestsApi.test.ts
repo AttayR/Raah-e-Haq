@@ -33,7 +33,33 @@ describe('toPendingRideRequest', () => {
       serverFare: null,
       stops: [],
       parcel: null,
+      driverNet: null,
+      commissionRate: null,
+      commissionAmount: null,
+      passengerCount: null,
+      tripDistanceKm: null,
+      tripDurationMin: null,
+      offerSeconds: null,
     });
+  });
+
+  it('UI-R11: maps the BE-84 split, the trip size and passengers, and BE-128 meta.offer_seconds', () => {
+    const page = toPendingRidesPage({
+      success: true,
+      data: [pendingRide({ driver_net: '362.00', commission_rate: '20.00', commission_amount: 88, distance_km: '7.84', duration_minutes: 25, passenger_count: 2 })],
+      meta: { max_age_minutes: 10, offer_seconds: 30 },
+    });
+    expect(page.requests[0]).toMatchObject({
+      driverNet: 362,
+      commissionRate: 20,
+      commissionAmount: 88,
+      tripDistanceKm: 7.84,
+      tripDurationMin: 25,
+      passengerCount: 2,
+      offerSeconds: 30,
+    });
+    expect(toPendingRidesPage({ success: true, data: [pendingRide()], meta: { offer_seconds: 0 } }).requests[0].offerSeconds).toBeNull();
+    expect(toPendingRidesPage({ success: true, data: [pendingRide()] }).requests[0].offerSeconds).toBeNull();
   });
 
   it('T-552: lists the active stops in route order (QA 2026-10-16: the card showed none)', () => {
@@ -50,11 +76,12 @@ describe('toPendingRideRequest', () => {
       10,
     );
     expect(request?.stops).toEqual([
-      { id: 11, address: 'First Fake Stop' },
-      { id: 12, address: 'Second Fake Stop' },
+      // UI-R11 R1: with their coordinates, for the numbered stop pins.
+      { id: 11, address: 'First Fake Stop', point: { latitude: 31.49, longitude: 74.35 } },
+      { id: 12, address: 'Second Fake Stop', point: { latitude: 31.5, longitude: 74.35 } },
     ]);
     expect(toPendingRideStops(undefined)).toEqual([]);
-    expect(toPendingRideStops([{ address: 'No Id Stop' }])).toEqual([{ id: null, address: 'No Id Stop' }]);
+    expect(toPendingRideStops([{ address: 'No Id Stop' }])).toEqual([{ id: null, address: 'No Id Stop', point: null }]);
   });
 
   it('T-521 (BE-83): marks a passenger offer and keeps the app fare to compare', () => {

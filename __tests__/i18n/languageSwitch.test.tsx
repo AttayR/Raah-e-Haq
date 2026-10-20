@@ -30,7 +30,7 @@ describe('t() and strings() follow the active language', () => {
     setLocale('ur-Latn');
     expect(getLocale()).toBe('ur-Latn');
     expect(t('common.tryAgain')).toBe('Dobara koshish karein');
-    expect(t('drive.todayEarnings', { amount: 'Rs 1,250' })).toBe('Aaj · Rs 1,250');
+    expect(t('drive.todayEarnedA11y', { amount: 'Rs 1,250' })).toBe('Aaj Rs 1,250 kamaye');
   });
 
   it('falls back to English for a key Roman Urdu does not have', () => {

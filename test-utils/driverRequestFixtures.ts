@@ -46,5 +46,12 @@ export const makePendingRequest = (overrides: Partial<PendingRideRequest> = {}):
   serverFare: null,
   stops: [],
   parcel: null,
+  driverNet: null,
+  commissionRate: null,
+  commissionAmount: null,
+  passengerCount: null,
+  tripDistanceKm: null,
+  tripDurationMin: null,
+  offerSeconds: null,
   ...overrides,
 });

@@ -27,6 +27,7 @@ import { DriverRidePreview, TripAssignedPreview } from './sections/RideScreenPre
 import { ActivityHistoryPreview, ActivityRowsPreview } from './sections/ActivityPreviews';
 import { REGISTRATION_PREVIEWS } from './sections/RegistrationPreviews';
 import { AUTH_STATE_PREVIEWS } from './sections/AuthStatePreviews';
+import { REQUEST_SHEET_PREVIEWS } from './sections/RequestSheetPreviews';
 import {
   ChatThreadPreview,
   InboxMessagesPreview,
@@ -166,6 +167,8 @@ const SCREEN_PREVIEWS: Section[] = [
   ['screen-finding-driver-requeued', () => <FindingDriverPreview requeued />],
   ...REGISTRATION_PREVIEWS,
   ...AUTH_STATE_PREVIEWS,
+  // UI-R11: the incoming request sheet (driver-incoming-request R11).
+  ...REQUEST_SHEET_PREVIEWS,
 ];
 
 export const GALLERY_SECTION_KEYS = [...SECTIONS, ...SCREEN_PREVIEWS].map(([key]) => key);

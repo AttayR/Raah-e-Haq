@@ -9,11 +9,5 @@ export const DRIVER_HOME_COPY = localizedCopy({
   waitingForApproval: 'Waiting for approval',
   approved: 'Approved',
   pending: 'Pending',
-  todayTitle: 'Today',
-  statEarnings: 'Earned',
-  statRides: 'Trips',
-  statOnline: 'Online time',
-  statAcceptance: 'Acceptance',
-  statRating: 'Rating',
   statsUnavailable: "Couldn't load today's numbers right now.",
 } as const);

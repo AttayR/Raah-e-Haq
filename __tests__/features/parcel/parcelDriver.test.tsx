@@ -17,7 +17,7 @@ import { apiClient } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { toast } from '../../../src/core/toast';
 import { clearQueryCache } from '../../../src/core/api/queryCache';
-import { IncomingRequestCard } from '../../../src/components/driver/IncomingRequestCard';
+import { RequestSheetContent } from '../../../src/components/driver/request/RequestSheetContent';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
 import { toPendingRideRequest } from '../../../src/features/driver-requests/api';
 import { driverRideRefusalToast } from '../../../src/features/driver-ride/hooks';
@@ -142,8 +142,8 @@ describe('request card', () => {
     const raw = pendingRide({ vehicle_type: 'parcel', is_parcel: true, parcel: { status: 'requested', item_category: 'documents', item_category_label: 'Documents and papers', size_class: 'small', size_label: 'Small (fits in a bag)', max_weight_kg: 2 } });
     const request = toPendingRideRequest(raw, 10);
     expect(request?.parcel).toEqual({ categoryLabel: 'Documents and papers', sizeLabel: 'Small (fits in a bag)', maxWeightKg: 2 });
-    render(<IncomingRequestCard request={request ?? makePendingRequest()} accepting={false} disabled={false} onAccept={jest.fn()} onReject={jest.fn()} />);
-    expect(screen.getByText('New parcel request')).toBeTruthy();
+    render(<RequestSheetContent request={request ?? makePendingRequest()} moreCount={0} compact={false} />);
+    expect(screen.getByTestId('incoming-request-parcel-badge')).toBeTruthy();
     expect(screen.getByTestId('incoming-request-parcel-item').props.children).toBe('Documents and papers · Small (fits in a bag)');
     expect(screen.getByTestId('incoming-request-parcel-cash').props.children).toBe('Cash collected at the pickup');
     expect(screen.queryByText(/Sana/)).toBeNull();
@@ -151,7 +151,7 @@ describe('request card', () => {
   });
 
   it('a ride request has no parcel block', () => {
-    render(<IncomingRequestCard request={makePendingRequest()} accepting={false} disabled={false} onAccept={jest.fn()} onReject={jest.fn()} />);
+    render(<RequestSheetContent request={makePendingRequest()} moreCount={0} compact={false} />);
     expect(screen.queryByTestId('incoming-request-parcel')).toBeNull();
   });
 });

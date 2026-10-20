@@ -445,6 +445,49 @@ export const componentTokens = {
     scrimOpacity: 0.85,
     compactWindowHeight: 700,
   },
+  /**
+   * [UI-R11] Countdown ring (shared-trip-sheet TS9, TS12): 32 at the end of the Accept button, 12
+   * from its end edge, 3 pt strokes, the track at 32 % of the arc colour.
+   */
+  countdownRing: { size: 32, stroke: 3, trackOpacity: 0.32, endInset: space[3] },
+  /** [UI-R11] Metric strip (driver-incoming-request R2 #6): 56 min high, 24 high hairline separators. */
+  metricStrip: { minHeight: 56, separatorHeight: 24, cellPaddingVertical: space[2] },
+  /**
+   * [UI-R11] Incoming request sheet (driver-incoming-request R1–R5): capped at 70 % of the window,
+   * 20 top padding, compact layout under 700 pt (iPhone SE), the 64 taken/gone icon circle with a
+   * 32 glyph, and how long that state stays before the sheet leaves.
+   */
+  requestSheet: {
+    maxWindowRatio: 0.7,
+    topPadding: space[5],
+    compactWindowHeight: 700,
+    stateCircle: 64,
+    stateGlyph: 32,
+    goneDismissMs: 2000,
+    /** Between the share line and the offer's "App fare" caption. */
+    lineGap: 2,
+  },
+  /**
+   * [UI-R11] Drive sheet (driver-drive-home D1, D2): the 12 status dot with its 2 pt ring (16 outer)
+   * while online, the subtitle 2 under the status row, and the 1.0x first-frame peek estimate
+   * (24 handle + 47 status block + 12 + 56 auto-accept row + 12 + 56 action + 16 = 223) used
+   * until the sheet content is measured.
+   */
+  drive: {
+    statusDot: 12,
+    statusRing: 16,
+    subtitleGap: 2,
+    /** 1.0x status block: row 25 + 2 + subtitle 20 (measured at run time). */
+    headerEstimate: 47,
+    peekEstimate: 223,
+    /** Weak GPS notice: accuracy worse than this (m) for `weakGpsMs` (D2). */
+    weakGpsAccuracyM: 100,
+    weakGpsMs: 30_000,
+    /** "Can't reach Raah-e-Haq" after this many location uploads failed in a row (D2). */
+    uploadFailuresNotice: 3,
+    /** The request feed error shows after this many failed polls when there is no fix (R6). */
+    feedFailuresNotice: 2,
+  },
   /** UI-R8 denied state on the driver Drive sheet (shared-permissions): icon circle and glyph. */
   locationNeeded: { circle: 64, glyph: 32 },
   /**

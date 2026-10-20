@@ -7,7 +7,7 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import { riderRating } from '../../../src/features/driver-requests/rating';
 import { toPendingRideRequest } from '../../../src/features/driver-requests/api';
-import { IncomingRequestCard } from '../../../src/components/driver/IncomingRequestCard';
+import { RequestSheetContent } from '../../../src/components/driver/request/RequestSheetContent';
 import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
 import { pendingRide } from '../../../test-utils/driverRequestFixtures';
 import { makeRide } from '../../../test-utils/rideFixtures';
@@ -41,7 +41,7 @@ describe('driver request card (GET /rides/pending)', () => {
     const request = toPendingRideRequest(pendingRide({ passenger: { id: 3, name: 'Ayesha', rating } }), 10);
     expect(request?.passengerRating).toBeNull();
     const { queryByTestId, getByText, queryByText } = render(
-      <IncomingRequestCard request={request!} accepting={false} disabled={false} onAccept={noop} onReject={noop} />,
+      <RequestSheetContent request={request!} moreCount={0} compact={false} />,
     );
     expect(queryByTestId('incoming-request-rating')).toBeNull();
     getByText('New rider');

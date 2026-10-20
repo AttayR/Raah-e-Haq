@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppIsActive } from '../../hooks/useAppIsActive';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { rejectionMessage, type ThunkRejection } from '../../core/api/errors';
 import { toast } from '../../core/toast';
@@ -155,11 +155,28 @@ const ACCEPT_STATUS_RELOAD_CODES: ReadonlySet<string> = new Set([
   ACCEPT_RIDE_CODES.driverNotAvailable,
 ]);
 
+/**
+ * UI-R11 R5: accept refusals the request sheet says in place ("Another driver took this ride",
+ * "This ride is no longer available") instead of a toast.
+ */
+export type RequestGoneKind = 'taken' | 'gone';
+
+const GONE_CODES: Readonly<Record<string, RequestGoneKind>> = {
+  [ACCEPT_RIDE_CODES.alreadyAccepted]: 'taken',
+  [ACCEPT_RIDE_CODES.notAvailable]: 'gone',
+  [ACCEPT_RIDE_CODES.femaleDriverRequired]: 'gone',
+};
+
+export interface AcceptOptions {
+  /** Called (instead of the toast) when the ride was taken or is no longer available. */
+  onGone?: (kind: RequestGoneKind) => void;
+}
+
 export interface RideRequestActions {
   /** The ride id being accepted, or null. */
   acceptingId: number | null;
   /** Resolves with the accepted ride, or null when refused or skipped (double tap). */
-  accept: (rideId: number) => Promise<RideResource | null>;
+  accept: (rideId: number, options?: AcceptOptions) => Promise<RideResource | null>;
   /** Hides the request on this device (there is no reject endpoint). */
   reject: (rideId: number) => void;
 }
@@ -174,7 +191,7 @@ export const useRideRequestActions = (): RideRequestActions => {
   const acceptingId = useSelector(selectAcceptingRideId);
 
   const accept = useCallback(
-    async (rideId: number): Promise<RideResource | null> => {
+    async (rideId: number, options?: AcceptOptions): Promise<RideResource | null> => {
       const action = await dispatch(acceptRideRequest(rideId));
       if (acceptRideRequest.fulfilled.match(action)) {
         // T-574: a parcel is said as one, not as a ride.
@@ -186,7 +203,12 @@ export const useRideRequestActions = (): RideRequestActions => {
       if (action.meta.condition || isStaleSessionRejection(action.payload)) {
         return null;
       }
-      toast.error(acceptRefusalMessage(action.payload));
+      const gone = action.payload?.code ? GONE_CODES[action.payload.code] : undefined;
+      if (gone && options?.onGone) {
+        options.onGone(gone);
+      } else {
+        toast.error(acceptRefusalMessage(action.payload));
+      }
       if (action.payload?.code && ACCEPT_STATUS_RELOAD_CODES.has(action.payload.code)) {
         dispatch(loadDriverStatus());
       }
@@ -252,4 +274,60 @@ export const useRideRequestFeed = (
   }, [dispatch, location]);
 
   return { view, retry };
+};
+
+/** UI-R11: narrow, primitive reads of the feed, so an unchanged poll re-renders nobody. */
+const selectFeedLoadStatus = (state: SliceRoot) => state.driverRequests.loadStatus;
+const selectFeedErrorCode = (state: SliceRoot) => state.driverRequests.errorCode;
+const selectFeedHasRequest = (state: SliceRoot) => state.driverRequests.items.length > 0;
+
+/**
+ * How many polls in a row have failed (0 after a good one), counted when a poll finishes
+ * (`isFetching` goes back to false). It reads only `isFetching` and `loadStatus` from a store
+ * subscription and sets state only when the count changes, so a poll that changes nothing
+ * re-renders nothing (UI-R11 review: the Drive screen must not render every 5 s).
+ */
+export const useConsecutiveFeedFailures = (): number => {
+  const store = useStore<SliceRoot>();
+  const [failures, setFailures] = useState(0);
+  useEffect(() => {
+    let wasFetching = store.getState().driverRequests.isFetching;
+    let count = 0;
+    return store.subscribe(() => {
+      const { isFetching, loadStatus } = store.getState().driverRequests;
+      if (wasFetching && !isFetching) {
+        const next = loadStatus === 'failed' ? count + 1 : 0;
+        // Only a change is set: even an equal setState can run the component again.
+        if (next !== count) setFailures(next);
+        count = next;
+      }
+      wasFetching = isFetching;
+    });
+  }, [store]);
+  return failures;
+};
+
+/**
+ * UI-R11 (Drive D2, request R6): the feed error is the Drive sheet's subtitle notice, no longer
+ * a floating card. The first poll after going online can run before the tracker's first fix
+ * (422 LOCATION_REQUIRED): an error waits for a fix or a second failure in a row. `retry` polls
+ * once now; it is offered only when another poll could help (not for a status refusal). Reads
+ * `loadStatus`, `errorCode` and whether a request is listed as separate primitives.
+ */
+export const useRideRequestFeedNotice = (
+  location: LatLng | null,
+  failuresNeeded = 2,
+): { failed: boolean; canRetry: boolean; retry: () => void } => {
+  const dispatch = useDispatch<RequestsDispatch>();
+  const loadStatus = useSelector(selectFeedLoadStatus);
+  const errorCode = useSelector(selectFeedErrorCode);
+  const hasRequest = useSelector(selectFeedHasRequest);
+  const failures = useConsecutiveFeedFailures();
+  const error = !hasRequest && loadStatus === 'failed';
+  const failed = error && (location !== null || failures >= failuresNeeded);
+  const canRetry = failed && (!errorCode || !STATUS_RELOAD_CODES.has(errorCode));
+  const retry = useCallback(() => {
+    dispatch(fetchPendingRides(location));
+  }, [dispatch, location]);
+  return { failed, canRetry, retry };
 };

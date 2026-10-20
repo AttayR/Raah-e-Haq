@@ -83,6 +83,13 @@ export type PersonCardProps = {
   actions?: ReadonlyArray<PersonAction>;
   /** `card` (default) or `plain` inside a sheet that already is the card. */
   variant?: 'card' | 'plain';
+  /**
+   * [UI-R11] `compact`: Avatar 40 and the name in `title` (the rider row of the incoming request,
+   * driver-incoming-request R2 #8). Default `regular` (Avatar 56, name `h3`).
+   */
+  size?: 'regular' | 'compact';
+  /** [UI-R11] A `caption` after the rating on the same line (" · 3 passengers"). */
+  ratingSuffix?: string | null;
   testID?: string;
   nameTestID?: string;
   ratingTestID?: string;
@@ -109,6 +116,8 @@ export function PersonCard({
   plateHighlighted = false,
   actions = [],
   variant = 'card',
+  size = 'regular',
+  ratingSuffix,
   testID,
   nameTestID,
   ratingTestID,
@@ -120,12 +129,21 @@ export function PersonCard({
   const body = (
     <View style={styles.wrap}>
       <View style={styles.top}>
-        <Avatar name={name || fallbackName} uri={photoUri} size={56} />
+        <Avatar name={name || fallbackName} uri={photoUri} size={size === 'compact' ? 40 : 56} />
         <View style={styles.info}>
-          <AppText variant="h3" numberOfLines={1} testID={nameTestID}>
+          <AppText variant={size === 'compact' ? 'title' : 'h3'} numberOfLines={1} testID={nameTestID}>
             {name || fallbackName}
           </AppText>
-          <RatingDisplay rating={rating} newLabel={newRatingLabel} valueTestID={ratingTestID} />
+          {ratingSuffix ? (
+            <View style={styles.ratingRow}>
+              <RatingDisplay rating={rating} newLabel={newRatingLabel} valueTestID={ratingTestID} />
+              <AppText variant="caption" color="textSecondary" numberOfLines={1} style={styles.flexShrink}>
+                {` · ${ratingSuffix}`}
+              </AppText>
+            </View>
+          ) : (
+            <RatingDisplay rating={rating} newLabel={newRatingLabel} valueTestID={ratingTestID} />
+          )}
           {vehicleName ? (
             <AppText variant="caption" color="textSecondary" numberOfLines={1} testID={vehicleTestID}>
               {vehicleName}
@@ -188,6 +206,8 @@ const styles = StyleSheet.create({
   wrap: { gap: space[4] },
   top: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   info: { flex: 1, minWidth: 0, gap: 2 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center' },
+  flexShrink: { flexShrink: 1 },
   plate: {
     minHeight: p.plateHeight,
     paddingHorizontal: space[2],

@@ -146,3 +146,48 @@ export const useDriverDeviceLocation = (): LatLng | null => {
   }, [isActive]);
   return location;
 };
+
+/**
+ * UI-R11 (Drive D2): true once `threshold` location posts in a row have failed, false again after
+ * the next accepted post or a stop. Re-renders only when that boolean flips.
+ */
+export const useLocationUploadsFailing = (threshold: number): boolean => {
+  const [failing, setFailing] = useState(() => locationTrackingService.getPostFailures() >= threshold);
+  useEffect(() => {
+    setFailing(locationTrackingService.getPostFailures() >= threshold);
+    return locationTrackingService.addPostFailureListener((failures) => setFailing(failures >= threshold));
+  }, [threshold]);
+  return failing;
+};
+
+/**
+ * UI-R11 (Drive D2): true once every fix for `forMs` has been less accurate than `accuracyM`
+ * metres (a fix with no accuracy counts as good). Listens to the one watcher; re-renders only when
+ * the boolean flips; the timer and the listener are removed when `enabled` turns false or on
+ * unmount.
+ */
+export const useWeakGpsSignal = (enabled: boolean, accuracyM: number, forMs: number): boolean => {
+  const [weak, setWeak] = useState(false);
+  useEffect(() => {
+    setWeak(false);
+    if (!enabled) return undefined;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onFix = (fix: LocationFix | null) => {
+      const poor = fix !== null && fix.accuracy !== null && fix.accuracy > accuracyM;
+      if (!poor) {
+        if (timer !== null) clearTimeout(timer);
+        timer = null;
+        setWeak(false);
+      } else if (timer === null) {
+        timer = setTimeout(() => setWeak(true), forMs);
+      }
+    };
+    onFix(locationTrackingService.getLastLocation());
+    const unsubscribe = locationTrackingService.addLocationListener(onFix);
+    return () => {
+      unsubscribe();
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [accuracyM, enabled, forMs]);
+  return weak;
+};
