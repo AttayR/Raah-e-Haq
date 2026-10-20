@@ -200,3 +200,36 @@ Precondition: an accepted ride between the local passenger and the local driver 
    - For entry use the BE-61 local test code 246810 with a +92300999xxxx number; codes are never read from logs.
    - Verify succeeds.
 3. Backend check (BE-16): with `APP_ENV=production` in a feature test, the send-otp response has no `otp_code`.
+
+## Local test drivers and the driver bot (BE-117)
+
+LOCAL ONLY. Both commands refuse unless `APP_ENV=local`, the database host is this machine (127.0.0.1 / localhost / ::1) and the database name is in `DEV_TOOLS_DATABASES` (default `raahehaq_local`). They never run against production.
+
+### Create the test drivers
+
+```
+/opt/homebrew/opt/php@8.3/bin/php ~/My-Projects/Raah-e-Haq-backend/artisan dev:test-drivers --per-type=10 [--lat=31.5119 --lng=74.3473]
+```
+
+- Approved, online drivers in five groups spread 0.4–4 km around the centre (default Gulberg, Lahore): car (no AC), car_ac (AC approved), bike (opted in to parcels, so it serves Bike and Parcel), rickshaw, van. `--per-type` is 1–19.
+- Logins: email `test-driver-{group}-{NN}@raah-e-haq.test`, phone `+9230099903NN` (OTP test range; sign in with the local test OTP). NN per group: car 01–19, car_ac 20–38, bike 39–57, rickshaw 58–76, van 77–95.
+- Safe to re-run: missing drivers are created, the rest go back online at their spot; nothing is duplicated; a driver on an active ride is left alone. It also switches on the Car AC and Parcel rate-card tiers.
+
+### Run the driver bot
+
+```
+/opt/homebrew/opt/php@8.3/bin/php ~/My-Projects/Raah-e-Haq-backend/artisan dev:driver-bot --heartbeat [--accept-after=12 --drive=30 --start-after=10 --trip=45 --interval=3 --once]
+```
+
+Until Ctrl+C / SIGTERM (it finishes the current tick, then prints "driver bot stopped."):
+1. **Accept** — a request waiting `--accept-after` seconds goes to the nearest free test driver whose vehicle serves the tier, through the app's own accept path (the passenger gets the usual "driver assigned").
+2. **Drive** — smooth location steps to the pickup over `--drive` seconds, then arrived.
+3. **Start** — after `--start-after` seconds, with the ride PIN.
+4. **Complete** — drives to the dropoff over `--trip` seconds and completes; the server prices and settles in cash.
+
+- `--heartbeat` keeps idle test drivers pinging every 20 s so they stay on the passenger map.
+- It accepts ANY waiting request in the local DB after `--accept-after`; for manual driver tests (Bilal on the driver sim) stop it or raise `--accept-after`.
+- Women-only requests are never accepted. Parcels stop at "arrived" (pickup photo and receiver code are manual on a device).
+- It reads ride timestamps, so it can be stopped and restarted any time.
+
+Typical flow: `migrate:fresh --seed` → `dev:test-drivers` → `dev:driver-bot --heartbeat` in a terminal → in the Debug app (pointing at localhost) sign in as the QA passenger and book each tier.
