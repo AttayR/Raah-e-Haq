@@ -27,6 +27,7 @@
 - **Driver screen:** replaces the fixed dock (`maxHeight: '65%'`) with this sheet; DriverRide camera padding uses the live sheet height (as the dock height today).
 - **Passenger:** the trip states (`driver_en_route`, `driver_arrived`, `in_trip`, `completed`, `cancelled`) use this sheet; the booking states before it (`searching` and earlier) keep `BookingSheet` (UI-R10 shipped). The hand-over from finding driver is a content swap inside one sheet container (§TS7), never a remount with a blank frame.
 - **Footer (sticky, §5.14):** 16 top padding + action(s) + `max(insets.bottom + 8, 16)` (iPhone 17: 42; SE: 16). A hairline `border` above it only while content runs under it. A sheet with no footer ends with the last block → `max(insets.bottom + 8, 16)`.
+- **Peek and scroll (clarified 2026-10-20, UI-R13 design review):** every return to `peek` (handle tap, drag, state change) resets the inner scroll offset to 0, so the peek group always starts with the status header, progress and target row. At `peek` the footer hairline is off: details hidden below the peek group do not count as content running under the footer; it appears only at `expanded` while content scrolls under it (and on the receipt per its own scroll).
 
 ### TS1.1 Zones (top to bottom, gutter 16; x from the sheet start edge)
 

@@ -97,6 +97,7 @@ Copy keys (`ACTIVE_RIDE_COPY`): `driverEnRouteTitle` "Your driver is on the way"
 | `keepRide` | "Keep Ride" | "Keep ride" | "Ride rakhein" |
 | `cancelRide` | "Cancel ride" | unchanged | unchanged |
 
+- **Parcel rows (added 2026-10-20, UI-R12 design review r2):** the sender's cancel Dialog follows the same voice. Keys in `parcel.*` (en.ts): Dialog title (new key `cancelConfirmTitle`, the button label `cancelDelivery` stays "Cancel delivery") "Cancel delivery?" / "Delivery cancel karein?"; `cancelConfirmMessage` "Are you sure you want to cancel this delivery?" → on the way: "Your rider is already on the way." / "Aap ka rider raste mein hai." · arrived: new key `cancelConfirmMessageArrived` "Your rider is waiting at the pickup." / "Aap ka rider pickup par intezar kar raha hai."; `cancelKeep` "Keep delivery" unchanged. The server preview sentence is appended as for rides.
   The server preview sentence (BE-85: "Free to cancel until 6:05 PM." / "Cancelling now costs Rs 50…") is still appended after the question. Dialog action order per §5.15 (ghost "Keep ride" start, `destructive` "Cancel ride" end).
 - Outcome: shipped (cancelled panel → receipt state "Ride cancelled", PR section in `passenger-trip-complete.md`).
 
