@@ -13,7 +13,7 @@ import { useLogout } from '../../../hooks/useLogout';
 import { t } from '../../../i18n';
 import { useAppDispatch } from '../../../store';
 import { getUserProfile } from '../../../store/thunks/apiThunks';
-import { layout, space } from '../../../theme';
+import { componentTokens, layout, space } from '../../../theme';
 import { accountDeletionApi, DELETION_CODES } from '../api';
 import { formatDeletionDate, formatWait, keepTogether } from '../format';
 import { requestFailureOf, type Notice } from '../requestFailure';
@@ -154,22 +154,26 @@ export default function DeleteAccountVerifyScreen() {
             testID="delete-account-code"
           />
         </View>
-        <View style={styles.resend}>
+        <View style={styles.resend} testID="delete-account-resend-row">
           {left > 0 ? (
             <AppText variant="caption" color="textMuted" testID="delete-account-resend-wait">
               {t('accountDeletion.resendIn', { time: formatWait(left) })}
             </AppText>
           ) : (
-            <Button
-              label={t('accountDeletion.resend')}
-              variant="ghost"
-              size="sm"
-              fullWidth={false}
-              onPress={onResend}
-              loading={sending}
-              disabled={deleting}
-              testID="delete-account-resend"
-            />
+            // §D2.3: the visible label starts where the countdown caption did (the button's own
+            // inset is pulled back), so nothing jumps when the countdown ends.
+            <View style={styles.resendButton} testID="delete-account-resend-wrap">
+              <Button
+                label={t('accountDeletion.resend')}
+                variant="ghost"
+                size="sm"
+                fullWidth={false}
+                onPress={onResend}
+                loading={sending}
+                disabled={deleting}
+                testID="delete-account-resend"
+              />
+            </View>
           )}
         </View>
         {notice ? <Banner tone={notice.tone} text={notice.text} testID="delete-account-verify-notice" /> : null}
@@ -213,7 +217,8 @@ const styles = StyleSheet.create({
     paddingBottom: space[6],
   },
   otp: { marginTop: space[6] },
-  resend: { marginTop: space[4], alignItems: 'flex-start', minHeight: layout.touchTargetIOS },
+  resend: { marginTop: space[4], alignItems: 'flex-start', justifyContent: 'center', minHeight: layout.touchTargetIOS },
+  resendButton: { marginStart: -componentTokens.button.paddingHorizontal.sm },
   footer: {
     width: '100%',
     maxWidth: layout.contentMaxWidth,

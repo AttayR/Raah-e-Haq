@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import {
   AppText,
@@ -155,6 +155,24 @@ export function BalanceAcknowledge({
   );
 }
 
+/**
+ * Where the reason row should scroll so the chip at `x`..`x + width` shows whole with a gutter
+ * of room (a selected chip grows by its check glyph and may pass the screen edge), or null when
+ * it already does.
+ */
+export const chipRevealX = (
+  x: number,
+  width: number,
+  scrollX: number,
+  viewport: number,
+  content: number,
+): number | null => {
+  const max = Math.max(0, content - viewport);
+  if (x + width + layout.gutter > scrollX + viewport) return Math.min(max, x + width + layout.gutter - viewport);
+  if (x - layout.gutter < scrollX) return Math.max(0, x - layout.gutter);
+  return null;
+};
+
 /** §D1.7: optional single-select reason chips, horizontally scrolling; a second tap clears. */
 export function ReasonChips({
   options,
@@ -165,6 +183,20 @@ export function ReasonChips({
   selected: string | null;
   onSelect: (slug: string | null) => void;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollX = useRef(0);
+  const sizes = useRef({ viewport: 0, content: 0 });
+  // The chip just selected: scrolled into view once its new (wider) layout is known.
+  const reveal = useRef<string | null>(null);
+
+  const onChipLayout = useCallback((slug: string, e: LayoutChangeEvent) => {
+    if (reveal.current !== slug) return;
+    const { x, width } = e.nativeEvent.layout;
+    const target = chipRevealX(x, width, scrollX.current, sizes.current.viewport, Math.max(sizes.current.content, x + width + layout.gutter));
+    if (target !== null) scrollRef.current?.scrollTo({ x: target, animated: true });
+    reveal.current = null;
+  }, []);
+
   if (options.length === 0) return null;
   return (
     <View style={styles.section} testID="delete-account-reasons">
@@ -173,20 +205,36 @@ export function ReasonChips({
       </AppText>
       {/* Bleeds to the screen edges with a gutter inset (like TopicChips): chips slide under the edge, never cut at the gutter. */}
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.chipsBleed}
         contentContainerStyle={styles.chips}
+        scrollEventThrottle={16}
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          scrollX.current = e.nativeEvent.contentOffset.x;
+        }}
+        onLayout={(e: LayoutChangeEvent) => {
+          sizes.current.viewport = e.nativeEvent.layout.width;
+        }}
+        onContentSizeChange={(width: number) => {
+          sizes.current.content = width;
+        }}
         testID="delete-account-reasons-row"
       >
         {options.map((option) => (
-          <Chip
-            key={option.slug}
-            label={option.label}
-            selected={selected === option.slug}
-            onPress={() => onSelect(selected === option.slug ? null : option.slug)}
-            testID={`delete-account-reason-${option.slug}`}
-          />
+          <View key={option.slug} onLayout={(e) => onChipLayout(option.slug, e)} testID={`delete-account-reason-${option.slug}-wrap`}>
+            <Chip
+              label={option.label}
+              selected={selected === option.slug}
+              onPress={() => {
+                const next = selected === option.slug ? null : option.slug;
+                reveal.current = next;
+                onSelect(next);
+              }}
+              testID={`delete-account-reason-${option.slug}`}
+            />
+          </View>
         ))}
       </ScrollView>
     </View>

@@ -35,11 +35,12 @@ const d = componentTokens.dialog;
 const b = componentTokens.button;
 const BUTTON_GAP = space[2];
 /**
- * [UI-R18 review] Average advance of a `button` (16 pt, 600) glyph as a share of the font size,
- * on the wide side (capitals, Roman Urdu's long words), so the estimate errs towards stacking:
- * a label must never truncate ("Delete account" + "Cancel" rendered "Delete acc…").
+ * [UI-R18 review r2] Average advance of a `button` (16 pt, 600) glyph as a share of the font size
+ * (DESIGN_SYSTEM §5.15 "Fit estimate"): measured SF Pro averages 0.46–0.52 em for the app's
+ * en/ur-Latn dialog labels and 0.559 at most, so 0.56 never under-estimates a real label (a label
+ * must never truncate) without over-stacking short pairs.
  */
-const LABEL_CHAR_EM = 0.62;
+export const LABEL_CHAR_EM = 0.56;
 
 /**
  * Whether `label` fits on one line in a side-by-side column of a dialog `surfaceWidth` wide at

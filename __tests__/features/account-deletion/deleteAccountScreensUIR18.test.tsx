@@ -436,6 +436,36 @@ describe('Confirm it\'s you (§D2)', () => {
     expect(StyleSheet.flatten(row.props.contentContainerStyle)).toMatchObject({ paddingHorizontal: 16 });
   });
 
+  it('§D2.3: the Resend label starts where the countdown caption did (button inset pulled back, centred row)', async () => {
+    mockParams = { ...verifyParams, retryAfter: 0 };
+    await show(DeleteAccountVerifyScreen);
+    const wrap = screen.getByTestId('delete-account-resend-wrap');
+    expect(StyleSheet.flatten(wrap.props.style)).toMatchObject({ marginStart: -16 });
+    expect(StyleSheet.flatten(screen.getByTestId('delete-account-resend-row').props.style)).toMatchObject({
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+    });
+  });
+
+  it('a chip selected near the end scrolls fully into view', async () => {
+    mockParams = undefined;
+    mock.onGet('/account/deletion').reply(200, status());
+    await show(DeleteAccountScreen);
+    const row = screen.getByTestId('delete-account-reasons-row');
+    const scrollTo = jest.fn();
+    // The composite ScrollView the ref holds (first match by testID).
+    const composite = screen.UNSAFE_getAllByProps({ testID: 'delete-account-reasons-row' })[0];
+    Object.assign(composite.instance ?? {}, { scrollTo });
+    fireEvent(row, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 36 } } });
+    fireEvent(row, 'contentSizeChange', 640, 36);
+    fireEvent.press(screen.getByTestId('delete-account-reason-other'));
+    // The selected chip grows by its check glyph: its new layout passes the screen edge.
+    fireEvent(screen.getByTestId('delete-account-reason-other-wrap'), 'layout', {
+      nativeEvent: { layout: { x: 560, y: 0, width: 96, height: 36 } },
+    });
+    expect(scrollTo).toHaveBeenCalledWith({ x: 560 + 96 + 16 - 375, animated: true });
+  });
+
   it('Resend code: a new code restarts the countdown', async () => {
     mockParams = { ...verifyParams, retryAfter: 0 };
     mock.onPost('/account/deletion/code').replyOnce(200, { success: true, data: { expires_in: 300, retry_after: 60, phone_masked: 'x' } });

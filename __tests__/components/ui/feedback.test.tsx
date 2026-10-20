@@ -13,6 +13,7 @@ import {
   Banner,
   DialogHost,
   DialogSurface,
+  LABEL_CHAR_EM,
   labelFitsColumn,
   EmptyState,
   ErrorState,
@@ -305,7 +306,24 @@ describe('Dialog', () => {
     expect(labelFitsColumn('Cancel', 340, 1)).toBe(true);
     expect(labelFitsColumn('Sign out', 340, 1)).toBe(true);
     expect(labelFitsColumn('Delete account', 340, 1)).toBe(false);
+    // [UI-R18 review r2] 0.56 em: these pairs go side by side (iPhone 17 surface 340, SE 327).
+    expect(LABEL_CHAR_EM).toBe(0.56);
+    expect(labelFitsColumn('Cancel ride', 340, 1) && labelFitsColumn('Keep ride', 340, 1)).toBe(true);
+    expect(labelFitsColumn('Send alert', 327, 1) && labelFitsColumn('Cancel', 327, 1)).toBe(true);
+    expect(labelFitsColumn('Open settings', 327, 1)).toBe(false);
+    expect(labelFitsColumn('Keep editing', 327, 1)).toBe(false);
     expect(labelFitsColumn('Sign out', 280, 1.3)).toBe(false);
+  });
+
+  it('[UI-R18 review r2] "Cancel ride" / "Keep ride" sit side by side', async () => {
+    jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1);
+    const actions = [
+      { label: 'Cancel ride', onPress: noop, variant: 'destructive' as const },
+      { label: 'Keep ride', onPress: noop, variant: 'ghost' as const },
+    ];
+    await renderThemed(<DialogSurface title="Cancel ride?" actions={actions} testID="d5" />);
+    expect(flat(screen.getByTestId('d5-actions').props.style).flexDirection).toBe('row');
+    jest.restoreAllMocks();
   });
 
   it('[UI-R18 review] confirm({ layout: "stacked" }) reaches the host', async () => {

@@ -31,6 +31,7 @@ import {
   payNowTarget,
   reasonOptions,
 } from '../../../src/features/account-deletion/format';
+import { chipRevealX } from '../../../src/features/account-deletion/components/DeletionParts';
 import { requestFailureOf } from '../../../src/features/account-deletion/requestFailure';
 import { isDeletionScheduledRefusal, offerKeepAccount } from '../../../src/features/account-deletion/keepAccount';
 import { classifyRideRequestFailure } from '../../../src/features/ride-booking/rideRequestFailure';
@@ -139,6 +140,15 @@ describe('GET /account/deletion mapping and copy', () => {
     expect(payNowTarget(owed, true)).toEqual({ route: 'PayCommission', params: { owed: 300, currency: 'PKR' } });
     expect(payNowTarget(owed, false)).toEqual({ route: 'AddMoney', params: { amount: 300 } });
     expect(payNowTarget({ ...owed, payWith: ['topup'] }, true)).toEqual({ route: 'AddMoney', params: { amount: 300 } });
+  });
+});
+
+describe('reason chip reveal', () => {
+  it('scrolls a chip past the end (or start) into view with a gutter, clamped; null when visible', () => {
+    expect(chipRevealX(560, 96, 0, 375, 690)).toBe(297);
+    expect(chipRevealX(560, 96, 0, 375, 600)).toBe(225);
+    expect(chipRevealX(16, 80, 120, 375, 690)).toBe(0);
+    expect(chipRevealX(100, 80, 0, 375, 690)).toBeNull();
   });
 });
 
