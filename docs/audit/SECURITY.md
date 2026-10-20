@@ -614,3 +614,42 @@ These are rulings on proposals that are not built yet: `docs/design/screens/map-
 
 
 **BE-127 residuals (2026-10-20).** Zone centres are the rounded point plus a deterministic 200–400 m HMAC offset (driver, 0.01° cell; reused for zones within 0.5 km), and zones hide within a constant 1.4 km so the edge reveals only the centre (true point always ≥1.0 km inside). Accepted residuals: (1) an attacker who already knows one true point of a driver can derive the shared offset of that driver's other zones in the same cell/reuse chain (tighten later with a per-place salt); (2) a place gets a small number of offsets over its lifetime (typically ≤4, more in rare cell layouts) after 30-day resets or APP_KEY rotation — add an APP_KEY-rotation note to the owner runbook; (3) an empty APP_KEY makes nearby-drivers fail closed (500, no leak); (4) pre-BE-127 rows were true-centred for up to 30 days after deploy.
+
+## Diff review 2026-10-20: self-service account deletion (BE-129)
+
+### SEC-34 · medium · privacy: account deletion (BE-129, backend c10807f)
+**Verdict: PASS, with follow-ups.** The diff is 338d28a..c10807f on backend branch `be-129`. The full backend suite passes on sqlite: 2591 tests, including the 25 in `AccountDeletionTest`.
+
+**Checked and safe**
+- **OTP.** The code has its own purpose (`account_delete`), and the hash is bound to purpose and user. It has its own send pool (`delete-` cooldown, window, and a daily cap of 5), its own wrong-code counter shared by the app and the web page, and a TTL clamped to 60–600 s. It is single-use (`is_used`), and issuing a new code deletes the previous one. A login code is refused, and a code tried for an unknown number is checked against `user_id = 0`, so it always fails. Echoing the code happens only with APP_ENV=local and debug on.
+- **Web page `/account/delete`.**
+  - Enumeration: "send code" gives the same answer for every valid number. The lookup and the SMS run after the response, and the limits count the number whether or not an account exists.
+  - The web middleware applies CSRF to every POST, and GET has no side effects.
+  - The session id is regenerated after a correct code. The proof lasts 15 min (clamped to 5–60), is bound to the user id and the phone in the session, and is re-checked on every confirm or cancel.
+  - Every route has a per-IP throttle. Every response carries `Referrer-Policy: no-referrer`, and the page has a noindex meta tag. No personal data appears in a URL.
+- **Revocation.** `schedule()` deletes every Sanctum token and every `user_devices` row, and signs a driver out, inside the users row lock.
+- **423 guards.** Booking re-checks under the `RideBookingGuard::lockPassenger` row lock. Going online is refused in `DriverAvailability::set`. Every assignment path (driver accept, admin assign and update, admin create with a driver, auto-accept) goes through `RideAssignment` → `whileAvailable`, which refuses a scheduled account under the driver row lock.
+- **Locks.** The order is users → wallet, the same as WalletLedger, top-ups, settlements and `Wallet`. `precheck` runs before the code is used up, and `schedule` checks again under both locks.
+- **Anonymisation.** It clears every PII column on `users`, deletes files on the private and public disks after commit, removes documents, vehicle photos and papers, saved places, emergency contacts, devices, notifications, preferences, the live location, privacy zones and OTPs, revokes shares, and deletes chats the user sent unless the ride has a safety report. The ledger is kept and the wallet is blocked.
+- **Audit rows.** They hold ids, the channel, dates, the reason slug and the amount forfeited. The client IP and user agent are cleared by the existing BE-46 job.
+- **Migration.** It only adds things: two nullable columns, one index and a new table, with re-runnable guards. The `restrictOnDelete` foreign key is handled by the admin hard-delete (`LINKED_RECORDS`).
+- **Settings fallback.** It applies only when the admin value is empty, and it is URL-validated.
+
+**Follow-ups (none blocks this diff)**
+1. **Medium: parcel receiver PII is not scrubbed.** `anonymise()` (AccountDeletions.php:441) leaves `parcels.receiver_name`, `receiver_phone` (encrypted), `item_description` and `pickup_photo_path` on parcels the deleted user sent. Nothing else scrubs them either. Fix: null or blank these fields, and delete the pickup photo, for the user's finished parcel rides (keep them only where a safety incident exists).
+2. **Medium: the retention promise is not enforced.** The page and the API tell the user "we keep these for N years" (`retention_years`), but no job removes or further anonymises kept rides, tracking, tickets, ratings or safety records after N years. Fix: add a pruning job once the owner sets the legal figure (B-item), or reword the copy until then.
+3. **Medium: money during the cooling-off period.**
+   - Top-ups are not refused while a deletion is scheduled (`TopUps.php:133` checks only `wallet.status`). Credit added after the acknowledgement is forfeited without consent. Fix: return 423 `ACCOUNT_DELETION_SCHEDULED` on top-up creation.
+   - At `anonymise()`, either postpone while a `payment_intent` is pending or a payout settlement is pending, or cancel those first. Otherwise a payout can be approved after the bank details are nulled.
+4. **Low: admin ride creation is not guarded.** It does not refuse a passenger in the cooling-off period (`Admin/RideController.php:136`), and the open ride then postpones the anonymisation. Fix: the same 423 check under the passenger lock.
+5. **Low: session cleanup.** Use `session()->regenerate(true)` (web controller line 158). On `schedule()`, also delete the user's `sessions` rows. On `anonymise()`, also delete their `password_reset_tokens` (keyed by the real email). `device_sightings` stay linked to the user id: keeping them for fraud checks is accepted, but list them under "what we keep".
+6. **Low: the fallback URL can be http.** `ACCOUNT_DELETION_URL`, or `APP_URL` when that is empty, may be `http://` (SettingsController.php:129). Require https for `account_deletion_url` outside local.
+7. **Low or info:**
+   - Anyone can send up to 5 deletion SMS per day to any registered number. The per-IP throttle and the global SMS budget make this acceptable.
+   - An open ride that never closes postpones the anonymisation forever, with only a log line. Alert an admin after 7 days.
+   - Consider an `X-Robots-Tag: noindex` header in addition to the meta tag.
+
+**Rulings on the builder's out-of-scope notes**
+- *A pending payout settlement is not a blocker at request time.* **Accepted for the request.** It is not accepted for the anonymisation: see follow-up 3.
+- *Audit rows are pruned at 180 days.* **Accepted.** The rows hold no personal data beyond the IP and user agent, which BE-46 clears. `account_deletion_requests` keeps the lasting history without personal data.
+- *Free text inside kept records is kept.* **Accepted** for safety reports, support tickets, fare disputes and rating comments: these are evidence and dispute records, and the user is told they are kept. This holds only if they fall under the retention prune (follow-up 2). Structured third-party PII such as parcel receivers is **not** free text and must be scrubbed (follow-up 1).
