@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import SafeMapView from '../../../components/SafeMapView';
 import DualLocationPicker from '../../../components/passenger/DualLocationPicker';
 import { BottomSheet, MapControls, type SheetSnap } from '../../../components/ui';
-import { HomeSheetBody, type HomeHeaderKind } from '../../passenger-home/components/HomeSheet';
+import { HomeSheetBody } from '../../passenger-home/components/HomeSheet';
 import { HomeSheetTop } from '../../passenger-home/components/HomeSheetTop';
 import { useHomePeek } from '../../passenger-home/useHomePeek';
 import { greetingFor } from '../../passenger-home/greeting';
+import { headerKindFor, taglineSlot } from '../../passenger-home/layout';
 import { toHomeRecentRides } from '../../ride-history/recentRides';
 import { BookingSheet } from '../../ride-booking/components/BookingSheet';
 import { PlaceShortcutList } from '../../ride-booking/components/PlaceShortcuts';
@@ -22,13 +23,14 @@ import { t } from '../../../i18n';
  * Debug kit gallery (UI-R9 evidence): the passenger Home sheet and the place search full screen
  * over the styled map, built from the product components with API-shaped saved places and rides.
  * Shown with `-RHKitGallerySection screen-home` (and `-half`, `-empty`, `-loading`, `-error`,
- * UI-R20 `-ride-only` (parcel tier off) and `-live` (greeting + Return), `screen-search`), so
+ * UI-R20b `-parcel-off` (no service row), `-live` (greeting + Return), `-offline` (the offline
+ * line in the tagline slot), `screen-search`), so
  * small-device and dark-mode screenshots need no sign-in. Product screens never import this.
  */
 const noop = () => {};
 const MORNING = new Date(2026, 9, 19, 9, 0, 0);
 
-function HomeMap() {
+function GalleryMap() {
   const { theme } = useAppTheme();
   return <SafeMapView style={StyleSheet.absoluteFill} initialRegion={galleryRegion} customMapStyle={theme.mapStyle} />;
 }
@@ -39,16 +41,23 @@ type HomeState = 'loaded' | 'empty' | 'loading' | 'error';
 export function HomeSheetPreview({
   snap,
   state = 'loaded',
-  header = 'services',
+  variant = 'services',
 }: {
   snap: SheetSnap;
   state?: HomeState;
-  /** UI-R20 header (S1): service row (default), ride-only heading, or the live-ride greeting. */
-  header?: HomeHeaderKind;
+  /** UI-R20b (V10): parcel tier on (default), off, a live ride, or offline. */
+  variant?: 'services' | 'parcelOff' | 'live' | 'offline';
 }) {
   const { theme } = useAppTheme();
-  const live = header === 'greeting';
-  const { peek, halfMin, onHeaderHeight, onHeaderShown } = useHomePeek(header);
+  const live = variant === 'live';
+  const servicesVisible = variant !== 'parcelOff';
+  const slot = taglineSlot({ live, offline: variant === 'offline', compact: false });
+  const [servicesInPeek, setServicesInPeek] = useState(servicesVisible && !live);
+  const { peek, halfMin, onHeaderHeight, onGroupHeight, onRowHeight } = useHomePeek({
+    headerKind: headerKindFor(live, slot),
+    live,
+    servicesInPeek,
+  });
   const loaded = state === 'loaded';
   const places = loaded ? gallerySavedPlaces : [];
   const rides = loaded ? toHomeRecentRides(galleryRecentRides) : [];
@@ -56,7 +65,7 @@ export function HomeSheetPreview({
   const ridesState: HomeRidesState = state === 'loading' ? 'loading' : state === 'error' ? 'failed' : 'ready';
   return (
     <View style={[styles.fill, { backgroundColor: theme.colors.background }]} testID="gallery-screen-home">
-      <HomeMap />
+      <GalleryMap />
       <MapControls avatar={{ name: 'Ali Raza', onPress: noop, accessibilityLabel: 'Profile' }} onLocate={noop} />
       <BottomSheet
         peekHeight={peek}
@@ -65,18 +74,10 @@ export function HomeSheetPreview({
         initialSnap={snap}
         snapPoints={['peek', 'half', 'full']}
         header={
-          <HomeSheetTop
-            kind={header}
-            greeting={greetingFor(MORNING, 'Ali Raza')}
-            onRide={noop}
-            onParcel={noop}
-            onHeight={onHeaderHeight}
-            onShown={onHeaderShown}
-          />
+          <HomeSheetTop greeting={greetingFor(MORNING, 'Ali Raza')} slot={slot} live={live} onWhereTo={noop} onHeight={onHeaderHeight} />
         }
       >
         <HomeSheetBody
-          onWhereTo={noop}
           savedPlaces={places}
           savedPlacesLoading={state === 'loading'}
           savedPlacesLoaded={state !== 'loading'}
@@ -94,6 +95,12 @@ export function HomeSheetPreview({
           onSeeAllRides={noop}
           liveRide={live ? { status: t('kitGallery.homeLiveStatus') } : null}
           onReturnToRide={noop}
+          servicesVisible={servicesVisible}
+          onRide={noop}
+          onParcel={noop}
+          onServicesShown={setServicesInPeek}
+          onServiceRowHeight={onRowHeight}
+          onPeekGroupHeight={onGroupHeight}
         />
       </BottomSheet>
     </View>
@@ -104,7 +111,7 @@ export function PlaceSearchPreview() {
   const { theme } = useAppTheme();
   return (
     <View style={[styles.fill, { backgroundColor: theme.colors.background }]} testID="gallery-screen-search">
-      <HomeMap />
+      <GalleryMap />
       <BookingSheet>
         <DualLocationPicker
           pickup={{ latitude: 31.5104, longitude: 74.3442 }}

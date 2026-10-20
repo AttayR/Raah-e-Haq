@@ -50,4 +50,5 @@ export * from './VehicleMarker';
 export * from './Toast';
 export * from './TabBar';
 export * from './ride';
-export * from './ServiceTile';
+export * from './ServiceCard';
+export * from './LinearFade';

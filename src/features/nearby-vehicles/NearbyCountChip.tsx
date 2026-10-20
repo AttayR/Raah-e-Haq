@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useDerivedValue, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { FadeIn, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../../components/ui/AppText';
 import { useIsOffline } from '../../components/ui/Banner';
@@ -18,6 +18,13 @@ const controls = componentTokens.mapControls;
 /** The locate button's visual size (§4). */
 const LOCATE_VISUAL = componentTokens.iconButton.floatingVisual;
 const CHIP_BOTTOM_GAP = NEARBY_CHIP_BOTTOM_GAP;
+/**
+ * [UI-R20b] Bottom gap that keeps a chip of `height` vertically centred on the locate button
+ * (passenger-home V9): sheet gap 16 + (48 − height) / 2; 24 at the 32 min height, less when large
+ * text makes the chip taller.
+ */
+export const nearbyChipBottomGap = (height: number): number =>
+  controls.sheetGap + (LOCATE_VISUAL - Math.max(height, c.minHeight)) / 2;
 /** End room kept for the locate button and its gap (§4 max width). */
 const END_ROOM = LOCATE_VISUAL + controls.edge + c.gap * 1.5;
 /** §4: on SE-class widths at large text the "· N online" part drops first. */
@@ -78,10 +85,11 @@ export const NearbyCountChip: React.FC<NearbyCountChipProps> = ({ state, freshne
     lastCategory.current = category;
   }, [category]);
 
+  const gap = useSharedValue(CHIP_BOTTOM_GAP);
   const visible = useDerivedValue(() => withTiming(hidden ? 0 : 1, { duration: reduced ? 0 : motion.fast.duration }), [hidden, reduced]);
   const rideStyle = useAnimatedStyle(() => ({
     opacity: visible.value,
-    transform: [{ translateY: -(sheetHeight.value + CHIP_BOTTOM_GAP) }],
+    transform: [{ translateY: -(sheetHeight.value + gap.value) }],
   }));
 
   if (!content || offline) return null;
@@ -105,12 +113,24 @@ export const NearbyCountChip: React.FC<NearbyCountChipProps> = ({ state, freshne
       </AppText>
     </Animated.View>
   );
+  // [UI-R20b] One family with the locate button (passenger-home V9, map-vehicles §4): light
+  // `surface` + elevation 2, dark `surfaceRaised` + 1pt `border`, no shadow.
+  const dark = theme.mode === 'dark';
   const chipStyle = [
     styles.chip,
-    { maxWidth: width - controls.edge - END_ROOM, backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+    { maxWidth: width - controls.edge - END_ROOM },
+    dark
+      ? { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border, borderWidth: theme.borderWidth.thin }
+      : [{ backgroundColor: theme.colors.surface }, theme.elevation[2]],
   ];
   return (
-    <Animated.View style={[styles.anchor, rideStyle]} pointerEvents={hidden ? 'none' : 'box-none'}>
+    <Animated.View
+      style={[styles.anchor, rideStyle]}
+      pointerEvents={hidden ? 'none' : 'box-none'}
+      onLayout={e => {
+        gap.value = nearbyChipBottomGap(e.nativeEvent.layout.height);
+      }}
+    >
       {error && state.retry ? (
         <Pressable
           testID={testID}
@@ -140,7 +160,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: c.paddingHorizontal,
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: c.gap },
   dot: { width: c.dot, height: c.dot, borderRadius: radius.pill },

@@ -31,6 +31,19 @@ it('only a final status drops the stats', () => {
   expect(statsCached()).toBe(false);
 });
 
+it('UI-R17: an ended ride also drops the cached earnings periods; a cancel drops the strikes summary', () => {
+  const week = `${CACHE_NAMES.driverEarnings}|week`;
+  const strikes = `${CACHE_NAMES.driverStrikes}|`;
+  const cached = (key: string) => readCache(key, CACHE_TTL.driverEarnings) !== null;
+  writeCache(week, { trips: 1 });
+  writeCache(strikes, { active: 0 });
+  invalidateStatsForRide({ status: 'completed' });
+  expect(cached(week)).toBe(false);
+  expect(cached(strikes)).toBe(true);
+  invalidateStatsForRide({ status: 'cancelled' });
+  expect(cached(strikes)).toBe(false);
+});
+
 it('the passenger poll that sees the ride completed drops the stats', async () => {
   const store = makeStore();
   store.dispatch(createActiveRide.fulfilled(makeRide({ id: 21, status: 'started' }), 'req', makeRideRequest()));

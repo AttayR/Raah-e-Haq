@@ -28,7 +28,7 @@ import { dialog, dialogStore } from '../../../src/core/dialog';
 import { chargedCancelFeeOf, noShowAtOf, noShowFeeOf, useNoShowReady } from '../../../src/features/driver-ride/noShow';
 import { cancellationChargeText, driverSplitRows } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
-import { earningsRideText } from '../../../src/features/stats/format';
+import { tripRowText } from '../../../src/features/stats/tripItems';
 import { toDriverEarnings } from '../../../src/features/stats/api';
 import { resolveNotificationTarget } from '../../../src/features/notifications/routing';
 import { toAppNotification } from '../../../src/features/notifications/api';
@@ -457,7 +457,7 @@ describe('driver split (BE-84) and cancel fees on ride details', () => {
     expect(free && cancellationChargeText(free, 'passenger')).toBe('Cancelled rides are not charged.');
   });
 
-  it('the earnings row says the commission rate and amount, with the route as its title', () => {
+  it('the earnings row says the fare and commission, with the route as its title', () => {
     const data = toDriverEarnings(
       {
         period: 'day',
@@ -479,9 +479,11 @@ describe('driver split (BE-84) and cancel fees on ride details', () => {
       },
       'day',
     );
-    const text = earningsRideText(data.rides[0], (n) => formatMoney(n));
+    const text = tripRowText(data.rides[0], 'PKR', 300);
     expect(text.title).toBe('Gulberg → Liberty Market');
-    expect(text.subtitle).toContain('Fare Rs 300 · commission 20% = Rs 60');
+    // UI-R17 §3.3: the rate lives in the hero and the ride details, not on every row.
+    expect(text.split).toBe(`Fare ${formatMoney(300)} · Commission ${formatMoney(60)}`);
+    expect(text.net).toBe(formatMoney(240));
   });
 });
 

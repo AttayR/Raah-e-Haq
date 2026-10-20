@@ -24,12 +24,21 @@ export const CACHE_TTL = {
   /** UI-R9: the place search reuses Home's recent rides read this recently (no second GET). */
   recentRides: 60 * 1000,
   stats: 60 * 1000,
+  /** UI-R17 §3.6: a period's page 1 of GET /driver/earnings (Today / Week / Month flicks). */
+  driverEarnings: 60 * 1000,
+  /** UI-R17 §3.2: the strikes summary on the Earnings tab. */
+  driverStrikes: 60 * 1000,
+  /** UI-R17 Vehicle & documents: GET /profile/documents vehicles. */
+  profileVehicles: 60 * 1000,
   directions: 5 * 60 * 1000,
 } as const;
 
 /** Cache names shared by the hook that reads and the code that invalidates. */
 export const CACHE_NAMES = {
   stats: 'stats/me',
+  driverEarnings: 'driver/earnings',
+  driverStrikes: 'driver/strikes',
+  profileVehicles: 'profile/vehicles',
   savedPlaces: 'saved-places',
   recentRides: 'rides/recent',
 } as const;

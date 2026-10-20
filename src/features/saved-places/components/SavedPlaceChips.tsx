@@ -1,6 +1,7 @@
-import React, { memo } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import { Chip, Skeleton, SkeletonGroup } from '../../../components/ui';
+import React, { memo, useCallback, useState } from 'react';
+import { ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { useAppTheme } from '../../../app/providers/ThemeProvider';
+import { Chip, LinearFade, Skeleton, SkeletonGroup } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { componentTokens, layout, space } from '../../../theme';
 import type { RecentDestination } from '../../passenger-home/recentDestinations';
@@ -29,7 +30,7 @@ type Props = {
   onAdd: (label?: 'home') => void;
   /** "Saved places": the full list (edit, delete, set as pickup). */
   onOpenAll: () => void;
-  /** Chips placed before the saved places (e.g. "Turn on location", "Send a parcel"). */
+  /** Chips placed before the saved places (e.g. "Turn on location"). */
   leading?: React.ReactNode;
 };
 
@@ -56,78 +57,96 @@ const SKELETON_WIDTHS = [space[16] + space[2], space[16] + space[6], space[16]] 
  * sheet gutter so a cut chip reads as "more"), so the peek height never changes with the count.
  */
 function SavedPlaceChipsBase({ places, loading = false, loaded = true, onPlace, recents = [], onRecent, onAdd, onOpenAll, leading }: Props) {
+  const { theme } = useAppTheme();
   const hasHome = places.some(place => place.label === 'home');
+  // UI-R20b (V5): the trailing fade shows only while the chips are wider than the row.
+  const [rowWidth, setRowWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const onRowLayout = useCallback((e: LayoutChangeEvent) => setRowWidth(Math.round(e.nativeEvent.layout.width)), []);
+  const onContentSize = useCallback((width: number) => setContentWidth(Math.round(width)), []);
+  const overflowing = rowWidth > 0 && contentWidth > rowWidth;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      style={styles.bleed}
-      contentContainerStyle={styles.row}
-      accessibilityLabel={t('savedPlaces.chipsA11y')}
-      testID="home-saved-places-row"
-    >
-      {leading}
-      {loading ? (
-        <SkeletonGroup style={styles.skeletons} accessibilityLabel={t('home.shortcutsLoadingA11y')} testID="home-saved-places-loading">
-          {SKELETON_WIDTHS.map((width, index) => (
-            <Skeleton key={index} width={width} height={componentTokens.chip.height} shape="pill" />
-          ))}
-        </SkeletonGroup>
-      ) : (
-        placeChips(places).map(place => {
-          const title = savedPlaceTitle(place);
-          return (
-            <Chip
-              key={place.id}
-              icon={savedPlaceIcon(place.label)}
-              label={title}
-              onPress={() => onPlace(place)}
-              accessibilityLabel={`${title}, ${place.address}`}
-              testID={`home-saved-place-${place.id}`}
-            />
-          );
-        })
-      )}
-      {onRecent
-        ? recents.map((recent, index) => (
-            <Chip
-              key={recent.key}
-              icon="history"
-              label={recent.title}
-              onPress={() => onRecent(recent)}
-              accessibilityLabel={t('home.recentPlaceA11y', { address: recent.place.address ?? recent.title })}
-              testID={`home-recent-place-${index}`}
-            />
-          ))
-        : null}
-      {loading || !loaded ? null : hasHome ? (
+    <View style={styles.bleed} onLayout={onRowLayout}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.row}
+        onContentSizeChange={onContentSize}
+        accessibilityLabel={t('savedPlaces.chipsA11y')}
+        testID="home-saved-places-row"
+      >
+        {leading}
+        {loading ? (
+          <SkeletonGroup style={styles.skeletons} accessibilityLabel={t('home.shortcutsLoadingA11y')} testID="home-saved-places-loading">
+            {SKELETON_WIDTHS.map((width, index) => (
+              <Skeleton key={index} width={width} height={componentTokens.chip.height} shape="pill" />
+            ))}
+          </SkeletonGroup>
+        ) : (
+          placeChips(places).map(place => {
+            const title = savedPlaceTitle(place);
+            return (
+              <Chip
+                key={place.id}
+                variant="outline"
+                icon={savedPlaceIcon(place.label)}
+                label={title}
+                onPress={() => onPlace(place)}
+                accessibilityLabel={`${title}, ${place.address}`}
+                testID={`home-saved-place-${place.id}`}
+              />
+            );
+          })
+        )}
+        {onRecent
+          ? recents.map((recent, index) => (
+              <Chip
+                key={recent.key}
+                variant="outline"
+                icon="history"
+                style={styles.recent}
+                label={recent.title}
+                onPress={() => onRecent(recent)}
+                accessibilityLabel={t('home.recentPlaceA11y', { address: recent.place.address ?? recent.title })}
+                testID={`home-recent-place-${index}`}
+              />
+            ))
+          : null}
+        {loading || !loaded ? null : hasHome ? (
+          <Chip
+            variant="outline"
+            icon="add"
+            tone="primary"
+            label={t('savedPlaces.addShort')}
+            onPress={() => onAdd()}
+            accessibilityLabel={t('savedPlaces.addA11y')}
+            testID="home-saved-place-add"
+          />
+        ) : (
+          <Chip
+            variant="outline"
+            icon="homeAdd"
+            tone="primary"
+            label={t('savedPlaces.addHome')}
+            onPress={() => onAdd('home')}
+            accessibilityLabel={t('home.addHomeA11y')}
+            testID="home-saved-place-add"
+          />
+        )}
         <Chip
-          icon="add"
-          tone="primary"
-          label={t('savedPlaces.addShort')}
-          onPress={() => onAdd()}
-          accessibilityLabel={t('savedPlaces.addA11y')}
-          testID="home-saved-place-add"
+          variant="outline"
+          icon="bookmark"
+          label={t('home.savedPlaces')}
+          onPress={onOpenAll}
+          accessibilityLabel={t('home.savedPlacesA11y')}
+          testID="home-saved-places"
         />
-      ) : (
-        <Chip
-          icon="homeAdd"
-          tone="primary"
-          label={t('savedPlaces.addHome')}
-          onPress={() => onAdd('home')}
-          accessibilityLabel={t('home.addHomeA11y')}
-          testID="home-saved-place-add"
-        />
-      )}
-      <Chip
-        icon="bookmark"
-        label={t('home.savedPlaces')}
-        onPress={onOpenAll}
-        accessibilityLabel={t('home.savedPlacesA11y')}
-        testID="home-saved-places"
-      />
-    </ScrollView>
+      </ScrollView>
+      {overflowing ? (
+        <LinearFade color={theme.colors.surface} direction="toEnd" style={styles.fade} testID="home-saved-places-fade" />
+      ) : null}
+    </View>
   );
 }
 
@@ -136,6 +155,9 @@ export const SavedPlaceChips = memo(SavedPlaceChipsBase);
 
 const styles = StyleSheet.create({
   bleed: { marginHorizontal: -layout.gutter },
+  // UI-R20b (V5): exactly the content inset wide, so it never covers the last chip at the scroll end.
+  fade: { position: 'absolute', top: 0, bottom: 0, end: 0, width: componentTokens.home.chipFadeWidth },
+  recent: { maxWidth: componentTokens.home.recentChipMaxWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: layout.gutter },
   skeletons: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
 });

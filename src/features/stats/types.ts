@@ -96,6 +96,11 @@ export interface DriverEarnings {
   from: string | null;
   to: string | null;
   currency: string;
+  /**
+   * BE-125 (not shipped yet): the server's local date (`YYYY-MM-DD`) in `timezone`. Null until
+   * then: the app falls back to the device clock shifted by the UTC offset in `from`.
+   */
+  today: string | null;
   totals: EarningsTotals;
   series: EarningsDay[];
   rides: EarningsRide[];

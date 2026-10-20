@@ -11,9 +11,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { TabScrollToTop } from '../../src/hooks/TabScrollToTop';
 import { RideProgress } from '../../src/components/ui';
 import { setLocale, t } from '../../src/i18n';
-import { HOME_HEADER_ESTIMATE, homePeekHeight } from '../../src/features/passenger-home/components/HomeSheet';
-import { WHERE_TO_HEIGHT } from '../../src/features/passenger-home/components/WhereToBar';
-import { componentTokens, textStyles } from '../../src/theme';
+import { HOME_HEADER_ESTIMATE, HOME_PEEK_GROUP_ESTIMATE, homePeekHeight } from '../../src/features/passenger-home/layout';
+import { componentTokens, space, textStyles } from '../../src/theme';
 
 describe('TabScrollToTop', () => {
   const scrollToOffset = jest.fn();
@@ -91,14 +90,12 @@ describe('RideProgress labels', () => {
 });
 
 describe('Home peek with "Return to your ride"', () => {
-  it('grows by the live block minus "Where to?", so the chip row clears the tab bar', () => {
-    // UI-R20: the greeting header (22) shows only while a ride is live.
-    const headerHeight = HOME_HEADER_ESTIMATE.greeting;
-    const idle = homePeekHeight({ headerHeight, live: false });
-    expect(idle).toBe(170);
-    expect(homePeekHeight({ headerHeight, live: true })).toBe(
-      idle + componentTokens.button.height.lg + 8 + textStyles.bodySmall.lineHeight - WHERE_TO_HEIGHT,
+  it('the live block sits above the chips, so the chip row clears the tab bar (UI-R20b: 198)', () => {
+    // UI-R20b V1: live header = greeting (no tagline) + 12; group = Return + 8 + status + 12 + chips + 12.
+    expect(HOME_HEADER_ESTIMATE.live).toBe(textStyles.title.lineHeight + space[3]);
+    expect(HOME_PEEK_GROUP_ESTIMATE.live).toBe(
+      componentTokens.button.height.lg + space[2] + textStyles.bodySmall.lineHeight + space[3] + componentTokens.chip.height + space[3],
     );
-    expect(homePeekHeight({ headerHeight, live: true })).toBe(202);
+    expect(homePeekHeight({ headerHeight: HOME_HEADER_ESTIMATE.live, peekGroupHeight: HOME_PEEK_GROUP_ESTIMATE.live })).toBe(198);
   });
 });

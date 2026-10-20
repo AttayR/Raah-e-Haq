@@ -323,7 +323,7 @@ describe('DriverProfile (T-507)', () => {
 
   it('shows stats from GET /me/stats (rating "New", PKR), the vehicle and the licence; no demo values', async () => {
     jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([
-      { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved' },
+      { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved', rejectionReason: null, vehicleType: null, year: null, color: null },
     ]);
     jest.spyOn(statsApi, 'getMyStats').mockResolvedValue(
       toMyStats({ role: 'driver', currency: 'PKR', total_rides: 33, total_earnings: 15230, rating: null }),
@@ -333,7 +333,8 @@ describe('DriverProfile (T-507)', () => {
     expect(screen.getByTestId('driver-profile-rides')).toHaveTextContent(/33/);
     expect(screen.getByTestId('driver-profile-earnings')).toHaveTextContent(/Rs 15,230/);
     expect(screen.getByText('Mitsubishi Outlander')).toBeTruthy();
-    expect(screen.getByText('Plate Z-0001-19')).toBeTruthy();
+    // UI-R17: the plate as a chip, as sent.
+    expect(screen.getByText('Z-0001-19')).toBeTruthy();
     expect(screen.getByText('LHR-55821')).toBeTruthy();
     expect(screen.getByText('31 Mar 2028')).toBeTruthy();
     expect(screen.queryByText(/4\.9|156|\$|Toyota Corolla|DL-123456789/)).toBeNull();

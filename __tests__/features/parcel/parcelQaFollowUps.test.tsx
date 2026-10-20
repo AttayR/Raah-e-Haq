@@ -29,7 +29,8 @@ import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel'
 import { CancellationCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
 import { vehicleLabel } from '../../../src/features/ride-history/copy';
-import { HomeSheetTop } from '../../../src/features/passenger-home/components/HomeSheetTop';
+import { HomeSheetBody } from '../../../src/features/passenger-home/components/HomeSheet';
+import { homeBodyProps } from '../../../test-utils/homeFixtures';
 import { PersonCard, PLATE_MIN_FONT_SCALE } from '../../../src/components/ui/ride/PersonCard';
 import { useVehicleTypes } from '../../../src/features/ride-booking/hooks';
 import type { RideResource } from '../../../src/services/rideService';
@@ -244,9 +245,9 @@ describe('5. labels and the Home entry', () => {
     expect(vehicleLabel('car')).toBe('Car');
   });
 
-  it('"Send a parcel" is the Parcel tile in the sheet header (UI-R20), shown at peek with no expanding', () => {
+  it('"Send a parcel" is the Parcel service card at peek (UI-R20b), with no expanding', () => {
     const onParcel = jest.fn();
-    render(<HomeSheetTop kind="services" greeting="" onRide={jest.fn()} onParcel={onParcel} onHeight={jest.fn()} />);
+    render(<HomeSheetBody {...homeBodyProps({ servicesVisible: true, onParcel })} />);
     const row = screen.getByTestId('home-service-row');
     fireEvent.press(within(row).getByTestId('home-send-parcel'));
     expect(onParcel).toHaveBeenCalled();

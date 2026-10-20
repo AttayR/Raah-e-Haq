@@ -1,212 +1,83 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Animated, {
-  runOnJS,
-  useAnimatedReaction,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
-  type SharedValue,
-} from 'react-native-reanimated';
-import { AppText, Icon, ServiceTile } from '../../../components/ui';
-import { toEasing } from '../../../components/ui/easing';
-import { useReducedMotion } from '../../../hooks/useReducedMotion';
+import React, { memo, useCallback, useRef } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { AppText, Icon } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { componentTokens, layout, motion, space } from '../../../theme';
-import { HOME_HEADER_ESTIMATE, HomeSheetHeader, type HomeHeaderKind } from './HomeSheet';
+import { componentTokens, layout, space } from '../../../theme';
+import { headerKindFor, type HomeHeaderKind, type TaglineSlot } from '../layout';
+import { WhereToBar } from './WhereToBar';
 
-const fadeEasing = toEasing(motion.fast.easing);
-const resizeEasing = toEasing(motion.base.easing);
-
-/**
- * Service row (passenger-home § Services S2): Ride at the start (the active service, what "Where
- * to?" under it books), Parcel at the end. Two equal tiles, 12 apart, stretched to one height.
- */
-const HomeServiceRow = memo(function HomeServiceRow({ onRide, onParcel }: { onRide: () => void; onParcel: () => void }) {
-  return (
-    <View style={styles.row} testID="home-service-row">
-      <ServiceTile
-        icon="rides"
-        tone="primary"
-        active
-        title={t('home.serviceRideTitle')}
-        subtitle={t('home.serviceRideSub')}
-        accessibilityLabel={t('home.serviceRideA11y')}
-        accessibilityHint={t('home.serviceRideHint')}
-        onPress={onRide}
-        testID="home-service-ride"
-      />
-      <ServiceTile
-        icon="parcel"
-        tone="accent"
-        title={t('home.serviceParcelTitle')}
-        subtitle={t('home.serviceParcelSub')}
-        accessibilityLabel={t('home.serviceParcelA11y')}
-        accessibilityHint={t('home.serviceParcelHint')}
-        onPress={onParcel}
-        testID="home-send-parcel"
-      />
-    </View>
-  );
-});
-
-/** Parcel tier off (S1): one line that says plainly what Home books. One tile is not a choice. */
-function RideOnlyHeading() {
-  return (
-    <View
-      style={styles.heading}
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={t('home.rideOnlyHeading')}
-      testID="home-ride-only-heading"
-    >
-      <Icon name="rides" size={20} color="primaryText" />
-      <AppText variant="title" numberOfLines={1} style={styles.headingText}>
-        {t('home.rideOnlyHeading')}
-      </AppText>
-    </View>
-  );
-}
+type AnimatedStyle = StyleProp<ViewStyle>;
 
 type Props = {
-  /** Which header (S1): service row, ride-only heading, or the greeting while a ride is live. */
-  kind: HomeHeaderKind;
-  /** The greeting text; read only for `greeting`. */
+  /** "Good evening, Attay" (V3; the salutation alone without a name). */
   greeting: string;
-  /** Ride tile: the "Where to?" handler. */
-  onRide: () => void;
-  /** Parcel tile: Send a parcel. */
-  onParcel: () => void;
-  /** The shown header's natural height whenever it settles on a new one (drives the peek, S5). */
+  /** What shows under the greeting (V3): the tagline, the offline line, or nothing. */
+  slot: TaglineSlot;
+  /** A ride or parcel is in progress: greeting only; "Return" sits in the body instead of "Where to?". */
+  live: boolean;
+  onWhereTo: () => void;
+  /** The header's natural height whenever it changes by 1pt or more (drives the peek, V1). */
   onHeight: (height: number, kind: HomeHeaderKind) => void;
-  /**
-   * The header now shown (after the old one faded out). The peek follows the shown header, not
-   * `kind`, so it eases once, together with the header's own height.
-   */
-  onShown?: (kind: HomeHeaderKind) => void;
-  /** True while the sheet is dragged: a swap waits until the gesture ends (S6). */
-  hold?: SharedValue<boolean>;
+  /** Cold-open entrance (V7): the greeting block's and "Where to?"'s animated styles. */
+  greetingStyle?: AnimatedStyle;
+  whereToStyle?: AnimatedStyle;
 };
 
 /**
- * The Home sheet header (passenger-home § Services S1, S6). A change of `kind` (the parcel tier
- * switched, a ride started or ended) fades the old header out (`motion.fast`; it takes no taps
- * from the first frame), eases the header's height to the new one (`motion.base`, the sheet's
- * peek follows in step) and fades the new one in. Waits while the sheet is dragged; Reduce
- * Motion swaps at once. Memoised with boolean/string props: drags and map moves skip it.
+ * The pinned Home sheet header (UI-R20b, passenger-home V1, V3, V4): the time-of-day greeting in
+ * `title` (a header for screen readers), the tagline slot in `bodySmall` ("Fixed fares, within the
+ * city", or the offline line in `warning` with its glyph), then 12 and the "Where to?" hero and
+ * 12. While a ride is live it is the greeting and 12 only. Memoised on strings and booleans, so
+ * sheet drags, camera moves and nearby polls never re-render it.
  */
-function HomeSheetTopBase({ kind, greeting, onRide, onParcel, onHeight, onShown, hold }: Props) {
-  const reduce = useReducedMotion();
-  const [shown, setShown] = useState<HomeHeaderKind>(kind);
-  const [leaving, setLeaving] = useState(false);
-  const wanted = useRef(kind);
-  wanted.current = kind;
-  const shownRef = useRef(kind);
-  const pending = useRef(false);
-  const leavingRef = useRef(false);
-  const opacity = useSharedValue(1);
-  /** Header height; -1 until measured (it then takes its natural height). */
-  const height = useSharedValue(-1);
-  const heightTarget = useRef(-1);
-
-  const commit = useCallback(() => {
-    const next = wanted.current;
-    const resized = HOME_HEADER_ESTIMATE[next] !== HOME_HEADER_ESTIMATE[shownRef.current];
-    shownRef.current = next;
-    leavingRef.current = false;
-    setShown(next);
-    onShown?.(next);
-    setLeaving(false);
-    // The new header fades in once the height has eased to it.
-    const fadeIn = withTiming(1, { duration: motion.fast.duration, easing: fadeEasing });
-    opacity.value = reduce ? 1 : resized ? withDelay(motion.base.duration, fadeIn) : fadeIn;
-  }, [onShown, opacity, reduce]);
-
-  const swap = useCallback(() => {
-    pending.current = false;
-    if (reduce) {
-      commit();
-      return;
-    }
-    if (leavingRef.current) return;
-    leavingRef.current = true;
-    setLeaving(true);
-    opacity.value = withTiming(0, { duration: motion.fast.duration, easing: fadeEasing }, finished => {
-      if (finished) runOnJS(commit)();
-    });
-  }, [commit, opacity, reduce]);
-
-  useEffect(() => {
-    if (kind === shownRef.current && !leavingRef.current) return;
-    if (hold?.value) {
-      pending.current = true;
-      return;
-    }
-    swap();
-  }, [hold, kind, swap]);
-
-  const flushPending = useCallback(() => {
-    if (pending.current) swap();
-  }, [swap]);
-  useAnimatedReaction(
-    () => hold?.value ?? false,
-    (now, previous) => {
-      if (previous === true && !now) runOnJS(flushPending)();
-    },
-  );
-
+function HomeSheetTopBase({ greeting, slot, live, onWhereTo, onHeight, greetingStyle, whereToStyle }: Props) {
+  const kind = headerKindFor(live, slot);
+  const last = useRef<{ kind: HomeHeaderKind; height: number } | null>(null);
   const onLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      const next = e.nativeEvent.layout.height;
-      if (heightTarget.current >= 0 && Math.abs(heightTarget.current - next) < 1) return;
-      const first = heightTarget.current < 0;
-      heightTarget.current = next;
-      height.value = first || reduce ? next : withTiming(next, { duration: motion.base.duration, easing: resizeEasing });
-      onHeight(next, shownRef.current);
+      const height = e.nativeEvent.layout.height;
+      const prev = last.current;
+      if (prev && prev.kind === kind && Math.abs(prev.height - height) < 1) return;
+      last.current = { kind, height };
+      onHeight(height, kind);
     },
-    [height, onHeight, reduce],
+    [kind, onHeight],
   );
 
-  const outerStyle = useAnimatedStyle(() => (height.value < 0 ? {} : { height: height.value }));
-  const innerStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
   return (
-    <Animated.View style={[styles.clip, outerStyle]}>
-      <Animated.View
-        style={innerStyle}
-        onLayout={onLayout}
-        pointerEvents={leaving ? 'none' : 'auto'}
-        testID="home-sheet-top"
-      >
-        {shown === 'services' ? (
-          <HomeServiceRow onRide={onRide} onParcel={onParcel} />
-        ) : shown === 'rideOnly' ? (
-          <RideOnlyHeading />
-        ) : (
-          <HomeSheetHeader greeting={greeting} />
-        )}
+    <View style={styles.header} onLayout={onLayout} testID="home-sheet-top">
+      <Animated.View style={greetingStyle}>
+        <AppText variant="title" numberOfLines={1} accessibilityRole="header" testID="home-greeting">
+          {greeting}
+        </AppText>
+        {slot === 'tagline' ? (
+          <AppText variant="bodySmall" color="textSecondary" numberOfLines={1} testID="home-tagline">
+            {t('home.tagline')}
+          </AppText>
+        ) : slot === 'offline' ? (
+          <View style={styles.offline} accessible accessibilityLabel={t('home.offlineTagline')} testID="home-offline-tagline">
+            <Icon name="offline" size={componentTokens.home.taglineGlyph} color="warning" />
+            <AppText variant="bodySmall" color="warning" numberOfLines={1} style={styles.offlineText}>
+              {t('home.offlineTagline')}
+            </AppText>
+          </View>
+        ) : null}
       </Animated.View>
-    </Animated.View>
+      {live ? null : (
+        <Animated.View style={[styles.whereTo, whereToStyle]}>
+          <WhereToBar onPress={onWhereTo} />
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
 export const HomeSheetTop = memo(HomeSheetTopBase);
 
 const styles = StyleSheet.create({
-  clip: { overflow: 'hidden' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: componentTokens.serviceTile.rowGap,
-    paddingHorizontal: layout.gutter,
-  },
-  heading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    minHeight: HOME_HEADER_ESTIMATE.rideOnly,
-    paddingHorizontal: layout.gutter,
-  },
-  headingText: { flex: 1, minWidth: 0 },
+  header: { paddingHorizontal: layout.gutter, paddingBottom: space[3] },
+  whereTo: { marginTop: space[3] },
+  offline: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  offlineText: { flexShrink: 1 },
 });

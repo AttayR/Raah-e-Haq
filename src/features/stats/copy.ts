@@ -20,19 +20,6 @@ export const STATS_COPY = localizedCopy({
   periodDay: 'Today',
   periodWeek: 'This week',
   periodMonth: 'This month',
-  chartLabel: 'Earnings per day',
-  chartDay: (date: string, earnings: string, trips: number) =>
-    `${date}: ${earnings} · ${trips} ${trips === 1 ? 'trip' : 'trips'}`,
-  ridesTitle: 'Trips',
-  emptyTitle: {
-    day: 'No trips today',
-    week: 'No trips this week',
-    month: 'No trips this month',
-  },
-  emptyBody: 'Go online to start earning.',
   loadFailed: "Couldn't load earnings",
   retry: 'Try again',
-  rideFare: (fare: string, commission: string) => `Fare ${fare} · commission ${commission}`,
-  openRideHint: 'Opens the ride details',
-  tripFallback: 'Trip',
 } as const);

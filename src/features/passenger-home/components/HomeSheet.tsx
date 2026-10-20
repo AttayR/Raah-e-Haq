@@ -1,72 +1,17 @@
-import React, { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { memo, useCallback, useRef } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { type SharedValue } from 'react-native-reanimated';
 import { AppText, Banner, Button, Chip } from '../../../components/ui';
 import { SavedPlaceChips } from '../../saved-places/components/SavedPlaceChips';
 import type { SavedPlace } from '../../saved-places/types';
 import { t } from '../../../i18n';
-import { componentTokens, layout, space, textStyles } from '../../../theme';
+import { layout, space } from '../../../theme';
 import type { HomeRecentRide } from '../types';
 import type { RecentDestination } from '../recentDestinations';
 import { HomeRidesSection, type HomeRidesState } from './HomeRidesSection';
-import { WHERE_TO_HEIGHT, WhereToBar } from './WhereToBar';
-
-/**
- * §8.3 / passenger-home § Services S5: the body's part of the peek under the header: 12 + "Where
- * to?" 52 + 12 + chip row 32 + 16 = 124. The sheet sits above the tab bar, so the tab bar is not
- * part of it.
- */
-export const HOME_PEEK_BODY = space[3] + WHERE_TO_HEIGHT + space[3] + componentTokens.chip.height + space[4];
-
-/** The sheet header under the handle, by state (passenger-home § Services S1). */
-export type HomeHeaderKind = 'services' | 'rideOnly' | 'greeting';
-
-/**
- * Header heights at 1.0× text, used until the header has been measured (first frame): service
- * row 96, the ride-only heading and the greeting one `title` line (22).
- */
-export const HOME_HEADER_ESTIMATE: Record<HomeHeaderKind, number> = {
-  services: componentTokens.serviceTile.height,
-  rideOnly: textStyles.title.lineHeight,
-  greeting: textStyles.title.lineHeight,
-};
-
-/**
- * UI-R20 (S5): `half` is at least peek + 180, so the compact rides ErrorState (≤ 156 + 16) is
- * fully visible at `half` on iPhone SE with the service row (424 there; 437 on iPhone 17).
- */
-export const HOME_HALF_EXTRA = 180;
-
-/**
- * T-577: with a ride in progress "Return to your ride" (56) + 8 + its status line (20) take the
- * place of "Where to?" (52), so the peek grows by the difference and the chip row stays above
- * the tab bar instead of being cut off by it.
- */
-export const HOME_LIVE_PEEK_EXTRA =
-  componentTokens.button.height.lg + space[2] + textStyles.bodySmall.lineHeight - WHERE_TO_HEIGHT;
-
-/**
- * The Home sheet's peek (S5): handle area 24 + the measured header + the body's 124, taller while
- * "Return to your ride" shows. Service row 244 (250 at 1.3×), ride-only heading 170, live 202.
- */
-export const homePeekHeight = ({ headerHeight, live }: { headerHeight: number; live: boolean }): number =>
-  Math.round(componentTokens.sheet.contentTop + headerHeight + HOME_PEEK_BODY + (live ? HOME_LIVE_PEEK_EXTRA : 0));
-
-/** `half` floor for the Home sheet (S5): peek + 180 (the kit caps it at `full`). */
-export const homeHalfMinHeight = (peek: number): number => peek + HOME_HALF_EXTRA;
-
-/** Sheet header while a ride or parcel is in progress (S1): the time-of-day greeting in `title`. */
-export function HomeSheetHeader({ greeting }: { greeting: string }) {
-  return (
-    <View style={styles.header}>
-      <AppText variant="title" numberOfLines={1} accessibilityRole="header" testID="home-greeting">
-        {greeting}
-      </AppText>
-    </View>
-  );
-}
+import { HomeServiceRow } from './HomeServiceRow';
 
 type BodyProps = {
-  onWhereTo: () => void;
   /** GET /saved-places (T-516): one chip each; empty while loading or when there are none. */
   savedPlaces: ReadonlyArray<SavedPlace>;
   /** UI-R9: first read of the saved places with nothing cached: skeleton chips. */
@@ -100,20 +45,37 @@ type BodyProps = {
    */
   liveRide?: { status: string; parcel?: boolean } | null;
   onReturnToRide?: () => void;
+  /** UI-R20b (V6): the parcel tier is on (S7 value) and nothing is live: the service row shows. */
+  servicesVisible: boolean;
+  /** Ride card: the "Where to?" handler. Parcel card: Send a parcel. */
+  onRide: () => void;
+  onParcel: () => void;
+  /** The service row counts toward the peek (HomeServiceRow `onShown`). */
+  onServicesShown: (shown: boolean) => void;
+  /** The service row's natural height with its gap. */
+  onServiceRowHeight: (height: number) => void;
+  /** The peek group's height above the service row (chips, and "Return" while live), V1. */
+  onPeekGroupHeight: (height: number, kind: 'plain' | 'live') => void;
+  /** True while the sheet is dragged (the service row's swap waits). */
+  hold?: SharedValue<boolean>;
+  /** Cold-open entrance (V7). */
+  chipsStyle?: StyleProp<ViewStyle>;
+  rideStyle?: StyleProp<ViewStyle>;
+  parcelStyle?: StyleProp<ViewStyle>;
 };
 
 const noop = () => {};
 
 /**
- * Home sheet body (UI-R4 structure, UI-R9 content; passenger-home, DESIGN_SYSTEM §8.3): "Where
- * to?" (pushes Booking), the edge-to-edge shortcut chip row (place shortcuts only: "Turn on
- * location" first, T-580; saved places, T-516; recent destinations; "+ Add" / "Add home"; the full
- * list), then at `half`/`full` the location notice and recent rides with their loading and error
- * states. UI-R20: "Send a parcel" left the chip row; it is the Parcel service tile in the header
- * (HomeSheetTop). Memoised, so a sheet drag or a map camera move never re-renders it.
+ * Home sheet body (UI-R4 structure, UI-R9 content, UI-R20b order; passenger-home V1): the peek
+ * group first (the edge-to-edge outline chip row: "Turn on location" first, T-580; saved places,
+ * T-516; recent destinations; "+ Add" / "Add home"; the full list; and while a ride is live
+ * "Return to your ride" above it, T-577), then the Ride and Parcel service cards while the
+ * parcel tier is on, then at `half`/`full` the location notice and recent rides with their
+ * loading and error states. "Where to?" lives in the pinned header (HomeSheetTop). Memoised, so
+ * a sheet drag or a map camera move never re-renders it.
  */
 function HomeSheetBodyBase({
-  onWhereTo,
   savedPlaces,
   savedPlacesLoading = false,
   savedPlacesLoaded = true,
@@ -131,50 +93,84 @@ function HomeSheetBodyBase({
   onSeeAllRides,
   liveRide = null,
   onReturnToRide,
+  servicesVisible,
+  onRide,
+  onParcel,
+  onServicesShown,
+  onServiceRowHeight,
+  onPeekGroupHeight,
+  hold,
+  chipsStyle,
+  rideStyle,
+  parcelStyle,
 }: BodyProps) {
+  const live = liveRide !== null && onReturnToRide !== undefined;
+  const groupKind = live ? 'live' : 'plain';
+  const lastGroup = useRef<{ kind: 'plain' | 'live'; height: number } | null>(null);
+  const onGroupLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const height = e.nativeEvent.layout.height;
+      const prev = lastGroup.current;
+      if (prev && prev.kind === groupKind && Math.abs(prev.height - height) < 1) return;
+      lastGroup.current = { kind: groupKind, height };
+      onPeekGroupHeight(height, groupKind);
+    },
+    [groupKind, onPeekGroupHeight],
+  );
   return (
     <View style={styles.body}>
-      {liveRide && onReturnToRide ? (
-        <View style={styles.live} testID="home-live-ride">
-          <Button
-            label={liveRide.parcel ? t('parcel.homeReturn') : t('home.returnToRide')}
-            size="lg"
-            leadingIcon={liveRide.parcel ? 'parcel' : 'rides'}
-            onPress={onReturnToRide}
-            haptic="impactLight"
-            accessibilityHint={liveRide.status}
-            testID="home-return-to-ride"
+      <View onLayout={onGroupLayout} style={styles.group} testID="home-peek-group">
+        {liveRide && onReturnToRide ? (
+          <View style={styles.live} testID="home-live-ride">
+            <Button
+              label={liveRide.parcel ? t('parcel.homeReturn') : t('home.returnToRide')}
+              size="lg"
+              leadingIcon={liveRide.parcel ? 'parcel' : 'rides'}
+              onPress={onReturnToRide}
+              haptic="impactLight"
+              accessibilityHint={liveRide.status}
+              testID="home-return-to-ride"
+            />
+            <AppText variant="bodySmall" color="textSecondary" align="center" numberOfLines={1} testID="home-live-ride-status">
+              {liveRide.status}
+            </AppText>
+          </View>
+        ) : null}
+        <Animated.View style={chipsStyle}>
+          <SavedPlaceChips
+            places={savedPlaces}
+            loading={savedPlacesLoading && savedPlaces.length === 0}
+            loaded={savedPlacesLoaded}
+            onPlace={onSavedPlace}
+            recents={recents}
+            onRecent={onRecent}
+            onAdd={onAddPlace}
+            onOpenAll={onSavedPlaces}
+            leading={
+              locationOff ? (
+                <Chip
+                  variant="outline"
+                  icon="locationOff"
+                  iconColor="warning"
+                  label={t('home.turnOnLocation')}
+                  onPress={onEnableLocation}
+                  testID="home-location-chip"
+                />
+              ) : null
+            }
           />
-          <AppText variant="bodySmall" color="textSecondary" align="center" numberOfLines={1} testID="home-live-ride-status">
-            {liveRide.status}
-          </AppText>
-        </View>
-      ) : (
-        <WhereToBar onPress={onWhereTo} />
-      )}
-      <View style={styles.chips}>
-        <SavedPlaceChips
-          places={savedPlaces}
-          loading={savedPlacesLoading && savedPlaces.length === 0}
-          loaded={savedPlacesLoaded}
-          onPlace={onSavedPlace}
-          recents={recents}
-          onRecent={onRecent}
-          onAdd={onAddPlace}
-          onOpenAll={onSavedPlaces}
-          leading={
-            locationOff ? (
-              <Chip
-                icon="locationOff"
-                tone="primary"
-                label={t('home.turnOnLocation')}
-                onPress={onEnableLocation}
-                testID="home-location-chip"
-              />
-            ) : null
-          }
-        />
+        </Animated.View>
       </View>
+      <HomeServiceRow
+        visible={servicesVisible && !live}
+        onRide={onRide}
+        onParcel={onParcel}
+        onShown={onServicesShown}
+        onHeight={onServiceRowHeight}
+        hold={hold}
+        rideStyle={rideStyle}
+        parcelStyle={parcelStyle}
+      />
       <View style={styles.more}>
         {locationOff ? (
           <Banner
@@ -202,9 +198,10 @@ function HomeSheetBodyBase({
 export const HomeSheetBody = memo(HomeSheetBodyBase);
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: layout.gutter },
-  body: { paddingHorizontal: layout.gutter, paddingTop: space[3] },
-  chips: { marginTop: space[3] },
+  body: { paddingHorizontal: layout.gutter },
+  // Chips (32) + 12; while live, "Return" (56) + 8 + status (20) + 12 above them (V1).
+  group: { gap: space[3], paddingBottom: space[3] },
   live: { gap: space[2] },
-  more: { paddingTop: space[4], gap: space[4] },
+  // 16 under the chip row / cards to the first block at `half` (12 gap already above).
+  more: { paddingTop: space[1], gap: space[4] },
 });

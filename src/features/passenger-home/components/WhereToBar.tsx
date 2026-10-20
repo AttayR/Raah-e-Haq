@@ -1,38 +1,47 @@
 import React, { memo } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
 import { Icon } from '../../../components/ui/Icon';
-import { radius, space } from '../../../theme';
+import { usePressScale } from '../../../components/ui/usePressScale';
+import { componentTokens, radius } from '../../../theme';
 import { t } from '../../../i18n';
 
-/** §8.3 peek arithmetic: the field is 52. */
-export const WHERE_TO_HEIGHT = 52;
+const h = componentTokens.home;
 
 /**
- * The "Where to?" entry into booking (passenger-home block 3, §8.3; UI-R9): a 52-high field-like
- * button, full width, radius `md`, `surfaceAlt` fill (`surfaceAltPressed` while pressed) in both
- * modes, no shadow: it reads as the search field it opens, not as a floating card. Magnifier 24
- * `textSecondary` at 16, label in `title` 12 after it.
+ * The "Where to?" hero (UI-R20b, passenger-home V4): the first control in the sheet. A 56 min
+ * pill on `surfaceAlt` (pressed `surfaceAltPressed` + the 0.98 scale, §6.1), no shadow in either
+ * mode (nothing inside a sheet is elevated). A 32 navy search disc with the 20 `onPrimary` glyph
+ * 12 in from the start, then "Where to?" in `h3`. It books a ride: label "Where to? Book a ride
+ * within the city". Memoised: one stable handler.
  */
 function WhereToBarBase({ onPress }: { onPress: () => void }) {
   const { theme } = useAppTheme();
+  const { animatedStyle, onPressIn, onPressOut } = usePressScale();
   return (
-    <Pressable
-      testID="home-where-to"
-      accessibilityRole="button"
-      accessibilityLabel={t('home.whereToA11y')}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.bar,
-        { backgroundColor: pressed ? theme.colors.surfaceAltPressed : theme.colors.surfaceAlt },
-      ]}
-    >
-      <Icon name="search" size={24} color="textSecondary" />
-      <AppText variant="title" numberOfLines={1} style={styles.label}>
-        {t('home.whereTo')}
-      </AppText>
-    </Pressable>
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        testID="home-where-to"
+        accessibilityRole="button"
+        accessibilityLabel={t('home.whereToA11y')}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={({ pressed }) => [
+          styles.bar,
+          { backgroundColor: pressed ? theme.colors.surfaceAltPressed : theme.colors.surfaceAlt },
+        ]}
+      >
+        <View style={[styles.disc, { backgroundColor: theme.colors.primary }]} testID="home-where-to-disc">
+          <Icon name="search" size={h.whereToGlyph} color="onPrimary" />
+        </View>
+        <AppText variant="h3" numberOfLines={1} style={styles.label}>
+          {t('home.whereTo')}
+        </AppText>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -40,12 +49,19 @@ export const WhereToBar = memo(WhereToBarBase);
 
 const styles = StyleSheet.create({
   bar: {
-    minHeight: WHERE_TO_HEIGHT,
-    borderRadius: radius.md,
-    paddingHorizontal: space[4],
+    minHeight: h.whereToHeight,
+    borderRadius: radius.pill,
+    paddingHorizontal: h.whereToInset,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space[3],
+    gap: h.whereToInset,
+  },
+  disc: {
+    width: h.whereToDisc,
+    height: h.whereToDisc,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: { flex: 1 },
 });

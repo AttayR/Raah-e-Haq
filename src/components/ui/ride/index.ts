@@ -12,6 +12,8 @@ export * from './RatingStars';
 export * from './RideProgress';
 export * from './RouteLine';
 export * from './SearchingPulse';
+export * from './ServiceArt';
+export * from './serviceArtShapes';
 export * from './SlideToConfirm';
 export * from './useMarkerTracking';
 export * from './vehicleGlyphs';

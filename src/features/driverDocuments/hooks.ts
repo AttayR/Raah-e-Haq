@@ -45,6 +45,8 @@ export function useDriverDocuments(enabled = true) {
   const requestId = useRef(0);
   /** Set before the picker opens, so a second tap never opens another picker or upload. */
   const busy = useRef(false);
+  const documentsRef = useRef<DriverDocument[]>([]);
+  documentsRef.current = documents;
 
   useEffect(() => {
     mounted.current = true;
@@ -84,6 +86,34 @@ export function useDriverDocuments(enabled = true) {
       reload();
     }
   }, [enabled, reload]);
+
+  /**
+   * Pull to refresh (UI-R17): reads the list again over what is shown. A failure keeps the list
+   * (the caller says so in a toast) instead of replacing it with the error state. Resolves true on
+   * success. Ignored while an upload is in flight, so a stale list never overwrites the POST result.
+   */
+  const refresh = useCallback(async (): Promise<boolean> => {
+    if (busy.current) {
+      return true;
+    }
+    const id = ++requestId.current;
+    try {
+      const next = await driverDocumentsApi.list();
+      if (mounted.current && id === requestId.current) {
+        apply(next);
+        setError(null);
+        setLoading(false);
+      }
+      return true;
+    } catch (err) {
+      logApiFailure('useDriverDocuments#refresh failed', err);
+      if (mounted.current && id === requestId.current && documentsRef.current.length === 0) {
+        setError(DRIVER_DOCUMENTS_COPY.loadFailed);
+        setLoading(false);
+      }
+      return false;
+    }
+  }, [apply]);
 
   /** Sends one picked file; the list follows the response, a 409 NOT_REPLACEABLE reloads it. */
   const send = useCallback(
@@ -147,5 +177,5 @@ export function useDriverDocuments(enabled = true) {
     [send],
   );
 
-  return { documents, allRequiredApproved, loading, error, uploadingType, reload, upload };
+  return { documents, allRequiredApproved, loading, error, uploadingType, reload, refresh, upload };
 }

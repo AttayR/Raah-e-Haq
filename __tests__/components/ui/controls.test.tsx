@@ -168,7 +168,14 @@ describe('IconButton', () => {
       'dark',
     );
     const floating = screen.getByRole('button', { name: 'Locate' });
-    expect(flat(floating.props.style)).toMatchObject({ width: 48, backgroundColor: DarkTheme.colors.surface });
+    // UI-R20b (passenger-home V9): dark floating controls sit on `surfaceRaised` with a 1pt border, no shadow.
+    expect(flat(floating.props.style)).toMatchObject({
+      width: 48,
+      backgroundColor: DarkTheme.colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: DarkTheme.colors.border,
+    });
+    expect(flat(floating.props.style).elevation).toBeUndefined();
     expect(floating.props.hitSlop).toBe(0);
     const close = screen.getByRole('button', { name: 'Close' });
     expect(close.props.hitSlop).toBe(2);

@@ -99,6 +99,15 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   bgUnder('vehicleAcBadge', 'vehicleAcGlyph', 'nonText'),
   fgOn('vehicleAcGlyph', 'vehicleAcBadge', 'nonText'),
   fgOn('vehicleHalo', 'surface', 'decorative'),
+  // UI-R20b Home service-card art (passenger-home V2): the front face carries the 3:1 in both modes
+  // (3.02 / 4.72); the side face is 5.30 in light only, so it is listed as decorative.
+  fgOn('illoHub', 'vehicleTyre', 'decorative'),
+  fgOn('illoShadow', 'primarySoft', 'decorative'),
+  fgOn('illoBoxFront', 'accentSoft', 'nonText'),
+  fgOn('illoBoxTop', 'illoBoxFront', 'decorative'),
+  fgOn('illoBoxSide', 'accentSoft', 'decorative'),
+  fgOn('illoBoxTape', 'illoBoxFront', 'decorative'),
+  fgOn('illoMotion', 'accentSoft', 'decorative'),
   // UI-R17 Earnings hero (driver-earnings.md §1.1).
   bgUnder('heroFill', 'heroText', 'text'),
   fgOn('heroText', 'heroFill', 'text'),

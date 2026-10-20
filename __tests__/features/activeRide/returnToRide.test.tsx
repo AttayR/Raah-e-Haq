@@ -18,6 +18,7 @@ import { toRide } from '../../../src/features/ride-history/api';
 import type { Ride } from '../../../src/features/ride-history/types';
 import rideService from '../../../src/services/rideService';
 import { makeRide, makeRideRequest, makeStore, page, type TestStore } from '../../../test-utils/rideFixtures';
+import { homeBodyProps } from '../../../test-utils/homeFixtures';
 
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
@@ -53,22 +54,10 @@ const storeWithActiveRide = async (status: 'requested' | 'accepted' | 'ongoing',
 };
 
 describe('Home: Return to your ride', () => {
-  const body = (liveRide: { status: string } | null, onReturnToRide = jest.fn(), onWhereTo = jest.fn()) => (
+  // UI-R20b: "Where to?" moved to the pinned header (HomeSheetTop); the body carries "Return".
+  const body = (liveRide: { status: string } | null, onReturnToRide = jest.fn()) => (
     <ThemeProvider>
-      <HomeSheetBody
-        onWhereTo={onWhereTo}
-        savedPlaces={[]}
-        onSavedPlace={jest.fn()}
-        onAddPlace={jest.fn()}
-        onSavedPlaces={jest.fn()}
-        locationOff={false}
-        onEnableLocation={jest.fn()}
-        recentRides={[]}
-        onOpenRide={jest.fn()}
-        onSeeAllRides={jest.fn()}
-        liveRide={liveRide}
-        onReturnToRide={onReturnToRide}
-      />
+      <HomeSheetBody {...homeBodyProps({ liveRide, onReturnToRide })} />
     </ThemeProvider>
   );
 
@@ -88,11 +77,11 @@ describe('Home: Return to your ride', () => {
     expect(screen.getByTestId('home-live-ride-status')).toHaveTextContent('Your driver is on the way');
   });
 
-  it('no ride: "Where to?" as before', async () => {
+  it('no ride: no "Return" block (the header shows "Where to?")', async () => {
     render(body(null));
     await settle();
     expect(screen.queryByTestId('home-return-to-ride')).toBeNull();
-    expect(screen.getByText('Where to?')).toBeTruthy();
+    expect(screen.queryByTestId('home-live-ride')).toBeNull();
   });
 
   it('the status line follows the ride', () => {

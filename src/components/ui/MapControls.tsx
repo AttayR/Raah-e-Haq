@@ -98,8 +98,11 @@ export function MapControls({
             accessibilityLabel={avatar.accessibilityLabel}
             style={({ pressed }) => [
               styles.avatar,
-              { backgroundColor: theme.colors.surface },
-              theme.elevation[2],
+              // [UI-R20b] Same family as the floating IconButton: light `surface` + elevation 2,
+              // dark `surfaceRaised` + 1pt `border`, no shadow (passenger-home V9).
+              theme.mode === 'dark'
+                ? { backgroundColor: theme.colors.surfaceRaised, borderWidth: theme.borderWidth.thin, borderColor: theme.colors.border }
+                : [{ backgroundColor: theme.colors.surface }, theme.elevation[2]],
               pressed ? styles.pressed : null,
             ]}
             testID={`${testID}-avatar`}

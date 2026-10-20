@@ -104,6 +104,14 @@ const SPEC: Record<SemanticColorName, [string, string]> = {
   vehicleAcBadge: ['#FFFFFF', '#011C72'],
   vehicleAcGlyph: ['#011C72', '#FFFFFF'],
   vehicleHalo: ['#011C72', '#6A86DE'],
+  // [UI-R20b] Home service-card art (passenger-home V2).
+  illoHub: ['#C3CAD9', '#B7BFD0'],
+  illoShadow: ['#000000', '#000000'],
+  illoBoxFront: ['#F75606', '#F75606'],
+  illoBoxTop: ['#FF9B66', '#FF9B66'],
+  illoBoxSide: ['#B33D00', '#B33D00'],
+  illoBoxTape: ['#FFE2D1', '#FFE2D1'],
+  illoMotion: ['#6A86DE', '#6A86DE'],
   // UI-R17 driver-earnings.md §1.1.
   heroFill: ['#011C72', '#1C2850'],
   heroText: ['#FFFFFF', '#FFFFFF'],
@@ -337,9 +345,9 @@ describe('motion (§6)', () => {
 });
 
 describe('map styles (§9)', () => {
-  it('light and dark land colours', () => {
-    expect(mapStyles.light[0]).toEqual({ elementType: 'geometry', stylers: [{ color: '#F2F2F2' }] });
-    expect(mapStyles.dark[0]).toEqual({ elementType: 'geometry', stylers: [{ color: '#1D2230' }] });
+  it('light and dark land colours (UI-R20b brand-tinted, passenger-home V8)', () => {
+    expect(mapStyles.light[0]).toEqual({ elementType: 'geometry', stylers: [{ color: '#F3F5F9' }] });
+    expect(mapStyles.dark[0]).toEqual({ elementType: 'geometry', stylers: [{ color: '#1B2233' }] });
     expect(LightTheme.mapStyle).toBe(mapStyles.light);
     expect(DarkTheme.mapStyle).toBe(mapStyles.dark);
   });

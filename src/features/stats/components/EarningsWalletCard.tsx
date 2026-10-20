@@ -4,12 +4,13 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Button, Card, Icon, ListItem, Skeleton, type IconName } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { componentTokens, radius, space } from '../../../theme';
-import { useWallet } from '../../wallet/hooks';
+import type { RemoteData } from '../../../core/api/useRemoteData';
+import type { Wallet } from '../../wallet/types';
 import { owedCardState, type OwedCardState } from '../heroText';
 
 type Props = {
-  /** Reads GET /wallet while the Earnings tab is focused. */
-  visible: boolean;
+  /** GET /wallet, read by the screen while the Earnings tab is focused (pull to refresh asks again). */
+  wallet: Pick<RemoteData<Wallet>, 'data' | 'status' | 'reload'>;
   onOpenWallet: () => void;
   /** "Pay {amount}": Add money prefilled with what is owed (BE-74 top-up). */
   onPay: (amountOwed: number) => void;
@@ -23,13 +24,13 @@ const e = componentTokens.earnings;
  * and Wallet; on hold: the same without Pay; nothing owed or credit: one calm row to Wallet.
  * Loading is a skeleton and a failed read is a row that retries.
  */
-export function EarningsWalletCard({ visible, onOpenWallet, onPay }: Props) {
-  const { data, status, reload } = useWallet(visible);
+export function EarningsWalletCard({ wallet, onOpenWallet, onPay }: Props) {
+  const { data, status, reload } = wallet;
   const state = useMemo(() => owedCardState(data, status === 'failed'), [data, status]);
   return <OwedCard state={state} onOpenWallet={onOpenWallet} onPay={onPay} onRetry={reload} />;
 }
 
-type ViewProps = Omit<Props, 'visible'> & { state: OwedCardState; onRetry: () => void };
+type ViewProps = Omit<Props, 'wallet'> & { state: OwedCardState; onRetry: () => void };
 
 const OwedCard = React.memo(function OwedCard({ state, onOpenWallet, onPay, onRetry }: ViewProps) {
   switch (state.kind) {

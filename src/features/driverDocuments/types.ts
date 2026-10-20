@@ -30,6 +30,8 @@ export interface DriverDocument {
   /** Set only when `status` is `rejected`. */
   rejectionReason: string | null;
   canUpload: boolean;
+  /** When the item last changed (upload or review), as sent; null when absent. */
+  updatedAt: string | null;
 }
 
 export interface DriverDocumentsState {

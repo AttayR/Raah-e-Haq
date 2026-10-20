@@ -10,16 +10,15 @@ import { apiClient } from '../../../src/services/api';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { statsApi, toDriverEarnings, toMyStats } from '../../../src/features/stats/api';
 import {
-  earningsRideText,
   shortPlace,
-  barRatios,
-  chartLabel,
   formatMinutes,
   periodCaption,
   toDriverTodayValues,
   toPassengerHomeStats,
 } from '../../../src/features/stats/format';
 import type { DriverStats, PassengerStats } from '../../../src/features/stats/types';
+import { chartSlots } from '../../../src/features/stats/chartModel';
+import { tripRowText } from '../../../src/features/stats/tripItems';
 import { StatGrid } from '../../../src/features/passenger-home/components/StatGrid';
 import DriverEarningsScreen from '../../../src/features/stats/screens/DriverEarningsScreen';
 import { envelope, rawWallet } from '../../../test-utils/walletFixtures';
@@ -178,26 +177,29 @@ describe('GET /driver/earnings mapping and format', () => {
     expect(periodCaption('week', '2026-10-12T00:00:00+05:00', '2026-10-18T23:59:59+05:00')).toBe('12 Oct – 18 Oct');
     expect(periodCaption('day', '2026-10-12T00:00:00+05:00', null)).toBe('Mon, 12 Oct');
     expect(periodCaption('month', '2026-10-01T00:00:00+05:00', null)).toBe('October 2026');
-    expect(chartLabel('2026-10-12', 'week', 0)).toBe('Mon');
-    expect(chartLabel('2026-10-10', 'month', 9)).toBe('10');
-    expect(chartLabel('2026-10-11', 'month', 10)).toBe('');
-    expect(barRatios(toDriverEarnings(rawEarnings('week'), 'week').series)).toEqual([0, 1]);
+    const week = chartSlots(toDriverEarnings(rawEarnings('week'), 'week').series, 'week', null);
+    expect(week.map((slot) => [slot.label, slot.ratio])).toEqual([
+      ['Mon', 0],
+      ['Tue', 1],
+    ]);
+    const day = (date: string) => ({ date, trips: 0, grossFares: 0, earnings: 0 });
+    const month = chartSlots([day('2026-10-01'), day('2026-10-10'), day('2026-10-11')], 'month', null);
+    expect(month.map((slot) => slot.label)).toEqual(['1', '10', '']);
   });
 
-  it('T-514: a trip reads as its route (or its time), never as the raw ride code', () => {
+  it('T-514 / UI-R17 §3.3: a trip reads as its route (or its time), never as the raw ride code', () => {
     const [ride] = toDriverEarnings(rawEarnings('day'), 'day').rides;
-    const money = (n: number) => `Rs ${n}`;
-    const noRoute = earningsRideText(ride, money);
+    const noRoute = tripRowText(ride, 'PKR', 300);
     expect(noRoute.title).not.toContain('RH-TEST7');
-    expect(noRoute.title).toMatch(/·/); // "13 Oct · 10:00 AM"-style date and time
-    expect(noRoute.subtitle).toBe('3 km · Fare Rs 300 · commission Rs 60');
+    // No route: the time is the title and line 2 starts at the distance.
+    expect(noRoute).toMatchObject({ title: '10:00 AM', meta: '3 km', split: 'Fare Rs 300 · Commission Rs 60', net: 'Rs 240' });
 
-    const withRoute = earningsRideText(
+    const withRoute = tripRowText(
       { ...ride, pickupAddress: 'Liberty Market, Gulberg III, Lahore', dropoffAddress: 'Emporium Mall, Johar Town' },
-      money,
+      'PKR',
+      300,
     );
-    expect(withRoute.title).toBe('Liberty Market → Emporium Mall');
-    expect(withRoute.subtitle).toBe(`${noRoute.title} · 3 km · Fare Rs 300 · commission Rs 60`);
+    expect(withRoute).toMatchObject({ title: 'Liberty Market → Emporium Mall', meta: '10:00 AM · 3 km' });
     expect(shortPlace('  ')).toBeNull();
     expect(shortPlace(null)).toBeNull();
   });
@@ -237,11 +239,11 @@ describe('DriverEarningsScreen', () => {
     expect(screen.getByTestId('earnings-total').props.children).toBe('Rs 320');
     expect(screen.getByTestId('earnings-commission').props.children).toBe('\u2212 Rs 80');
     expect(screen.getByTestId('earnings-chart')).toBeTruthy();
-    // The busiest day is selected first.
-    expect(screen.getByTestId('earnings-chart-selected').props.children).toBe('Tue, 13 Oct: Rs 320 · 2 trips');
-    fireEvent.press(screen.getByTestId('earnings-bar-2026-10-12'));
-    expect(screen.getByTestId('earnings-chart-selected').props.children).toBe('Mon, 12 Oct: Rs 0 · 0 trips');
-    expect(screen.getByText('Rs 240')).toBeTruthy();
+    // The busiest day is selected first; the readout sits in the card header.
+    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Tue, 13 Oct: Rs 320, 2 trips');
+    fireEvent(screen.getByTestId('earnings-chart-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Mon, 12 Oct: Rs 0, No trips');
+    expect(screen.getByTestId('earnings-ride-7-net').props.children).toBe('Rs 240');
   });
 
   it('a ride row opens its RideDetails (T-501)', async () => {

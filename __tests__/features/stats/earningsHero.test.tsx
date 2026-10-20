@@ -12,6 +12,7 @@ import { apiClient } from '../../../src/services/api';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { EarningsHero } from '../../../src/features/stats/components/EarningsHero';
 import { EarningsWalletCard } from '../../../src/features/stats/components/EarningsWalletCard';
+import { useWallet } from '../../../src/features/wallet/hooks';
 import { heroContent, owedCardState } from '../../../src/features/stats/heroText';
 import { toDriverEarnings } from '../../../src/features/stats/api';
 import DriverEarningsScreen from '../../../src/features/stats/screens/DriverEarningsScreen';
@@ -166,11 +167,17 @@ describe('EarningsHero (§1.1)', () => {
   });
 });
 
+/** The screen reads GET /wallet (pull to refresh refreshes it too) and hands it to the card. */
+function WalletCardHost() {
+  const wallet = useWallet(true);
+  return <EarningsWalletCard wallet={wallet} onOpenWallet={() => mockNavigate('Wallet')} onPay={(amount) => mockNavigate('AddMoney', { amount })} />;
+}
+
 describe('amount owed card (§2)', () => {
   const card = () =>
     render(
       <ThemeProvider>
-        <EarningsWalletCard visible onOpenWallet={() => mockNavigate('Wallet')} onPay={(amount) => mockNavigate('AddMoney', { amount })} />
+        <WalletCardHost />
       </ThemeProvider>,
     );
   const providers = { top_up: { providers: [{ id: 'jazzcash', name: 'JazzCash', methods: ['mwallet'] }, { id: 'easypaisa', name: 'Easypaisa', methods: ['mwallet'] }], min_amount: 100, max_amount: 50000, daily_cap: 100000, daily_remaining: 100000, currency: 'PKR' } };

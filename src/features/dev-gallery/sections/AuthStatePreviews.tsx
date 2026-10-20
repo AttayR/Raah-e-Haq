@@ -56,11 +56,11 @@ function AccountStatusPreview({ user, statusUnverified = false }: { user: User; 
 
 /** Pending driver documents as GET /driver/documents returns them (fixture, no network). */
 const FIXTURE_DOCUMENTS: DriverDocument[] = [
-  { type: 'license', required: true, status: 'rejected', rejectionReason: 'Photo is blurry, please re-upload', canUpload: true },
-  { type: 'cnic_back', required: true, status: 'pending', rejectionReason: null, canUpload: false },
-  { type: 'vehicle_front', required: false, status: 'missing', rejectionReason: null, canUpload: true },
-  { type: 'profile', required: true, status: 'approved', rejectionReason: null, canUpload: false },
-  { type: 'cnic_front', required: true, status: 'approved', rejectionReason: null, canUpload: false },
+  { type: 'license', required: true, status: 'rejected', rejectionReason: 'Photo is blurry, please re-upload', canUpload: true, updatedAt: null },
+  { type: 'cnic_back', required: true, status: 'pending', rejectionReason: null, canUpload: false, updatedAt: null },
+  { type: 'vehicle_front', required: false, status: 'missing', rejectionReason: null, canUpload: true, updatedAt: null },
+  { type: 'profile', required: true, status: 'approved', rejectionReason: null, canUpload: false, updatedAt: null },
+  { type: 'cnic_front', required: true, status: 'approved', rejectionReason: null, canUpload: false, updatedAt: null },
 ];
 
 /** The real layout over fixture state: pending driver with documents loaded, or the support sheet up. */

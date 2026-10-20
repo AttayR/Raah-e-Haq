@@ -32,6 +32,7 @@ import { footerRowLabels, footerSlotWidth, labelFits } from '../../../src/featur
 import type { DriverParcelPanel } from '../../../src/features/parcel/useDriverParcel';
 import type { ParcelDraft } from '../../../src/features/parcel/types';
 import { envelope, makeRide, makeStore, type TestStore } from '../../../test-utils/rideFixtures';
+import { homeBodyProps } from '../../../test-utils/homeFixtures';
 
 jest.mock('../../../src/services/placesService', () => ({
   fetchAutocomplete: jest.fn(() => Promise.resolve([])),
@@ -310,20 +311,7 @@ describe('2. Home "Track your parcel"', () => {
 
   it('the live card says "Track your parcel" for a parcel and "Return to your ride" otherwise', () => {
     const body = (liveRide: { status: string; parcel?: boolean }) => (
-      <HomeSheetBody
-        onWhereTo={jest.fn()}
-        savedPlaces={[]}
-        onSavedPlace={jest.fn()}
-        onAddPlace={jest.fn()}
-        onSavedPlaces={jest.fn()}
-        locationOff={false}
-        onEnableLocation={jest.fn()}
-        recentRides={[]}
-        onOpenRide={jest.fn()}
-        onSeeAllRides={jest.fn()}
-        liveRide={liveRide}
-        onReturnToRide={jest.fn()}
-      />
+      <HomeSheetBody {...homeBodyProps({ liveRide, onReturnToRide: jest.fn() })} />
     );
     const { rerender } = render(body({ status: 'Rider at the pickup', parcel: true }));
     expect(screen.getByText('Track your parcel')).toBeTruthy();

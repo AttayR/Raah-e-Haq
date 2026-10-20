@@ -1,10 +1,11 @@
 import { apiService, unwrap } from '../../services/api';
-import { isRecord, readId, readText } from '../../core/api/read';
+import { isRecord, readId, readNumberOrNull, readText } from '../../core/api/read';
 import type { DriverVehicle, VehicleReviewStatus } from './types';
 
 /**
  * GET /profile/documents (BE-22/BE-42, owner only, `Cache-Control: private, no-store`):
- * `data.vehicles[]` carries `id, make, model, license_plate, verification_status`. The same
+ * `data.vehicles[]` carries `id, make, model, license_plate, verification_status, rejection_reason`
+ * (BE-126 adds `vehicle_type, year, color`). The same
  * body holds short-lived signed links to the identity documents; they are never read or kept
  * here (only the vehicle labels are mapped), so nothing sensitive outlives the request.
  */
@@ -23,6 +24,10 @@ const toVehicle = (raw: unknown): DriverVehicle | null => {
     model: text(raw.model),
     licensePlate: text(raw.license_plate),
     status: STATUSES.find((status) => status === raw.verification_status) ?? null,
+    rejectionReason: text(raw.rejection_reason) || null,
+    vehicleType: text(raw.vehicle_type) || null,
+    year: readNumberOrNull(raw.year),
+    color: text(raw.color) || null,
   };
 };
 

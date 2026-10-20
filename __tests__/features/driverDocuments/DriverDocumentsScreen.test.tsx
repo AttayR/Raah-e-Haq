@@ -77,7 +77,7 @@ describe('DriverDocumentsScreen', () => {
     });
 
     expect(await screen.findByTestId('driver-document-license')).toBeTruthy();
-    expect(screen.getByTestId('driver-documents-summary')).toHaveTextContent(DRIVER_DOCUMENTS_COPY.allApproved);
+    expect(screen.getByTestId('driver-documents-summary')).toHaveTextContent(new RegExp(DRIVER_DOCUMENTS_COPY.summaryApproved));
     expect(screen.queryByTestId('driver-document-license-upload')).toBeNull();
     expect(screen.queryByTestId('driver-document-profile-upload')).toBeNull();
 
@@ -134,7 +134,7 @@ describe('DriverDocumentsScreen', () => {
     renderScreen();
     expect(await screen.findByTestId('driver-documents-vehicle-4')).toBeTruthy();
     expect(screen.getByText('Mitsubishi Outlander')).toBeTruthy();
-    expect(screen.getByText('Plate Z-0001-19')).toBeTruthy();
+    expect(screen.getByTestId('driver-documents-vehicle-4-plate')).toHaveTextContent('Z-0001-19');
     expect(screen.getByTestId('driver-documents-vehicle-4')).toHaveTextContent(/Approved/);
     // The signed identity links in the same body are never shown.
     expect(screen.queryByText(/signed\.example/)).toBeNull();
@@ -148,6 +148,6 @@ describe('DriverDocumentsScreen', () => {
     renderScreen();
     fireEvent.press(await screen.findByTestId('driver-documents-vehicle-error'));
     expect(await screen.findByTestId('driver-documents-vehicle-empty')).toBeTruthy();
-    expect(screen.getByText('No vehicle on file yet')).toBeTruthy();
+    expect(screen.getByText('No vehicle on file')).toBeTruthy();
   });
 });

@@ -25,13 +25,17 @@ export interface DriverEarningsState extends RemoteData<DriverEarnings> {
   loadMore: () => void;
 }
 
+/** UI-R17 §3.6: each period's page 1 stays fresh for 60 s, so Today / Week / Month flicks never refetch. */
+const EARNINGS_CACHE = { name: CACHE_NAMES.driverEarnings, ttlMs: CACHE_TTL.driverEarnings } as const;
+
 /**
  * GET /driver/earnings for one period. Totals and the per-day series come with page 1; the
- * ride list pages on scroll. Switching the period loads it fresh and drops late responses.
+ * ride list pages on scroll. Switching the period shows a page 1 read in the last minute at once
+ * (no request), else loads it fresh and drops late responses. Pull to refresh always asks.
  */
 export const useDriverEarnings = (period: EarningsPeriod, enabled: boolean): DriverEarningsState => {
   const fetchFirst = useCallback(() => statsApi.getDriverEarnings(period, 1), [period]);
-  const remote = useRemoteData({ fetch: fetchFirst, key: period, fallbackError: STATS_COPY.loadFailed, enabled });
+  const remote = useRemoteData({ fetch: fetchFirst, key: period, fallbackError: STATS_COPY.loadFailed, enabled, cache: EARNINGS_CACHE });
   const [more, setMore] = useState<{ base: DriverEarnings | null; rides: EarningsRide[]; page: number; lastPage: number }>({
     base: null,
     rides: [],

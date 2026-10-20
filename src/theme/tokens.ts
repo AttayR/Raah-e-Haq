@@ -91,6 +91,18 @@ export type SemanticColors = {
   vehicleAcGlyph: string;
   /** Assigned vehicle halo fill and ring (opacity from component tokens). */
   vehicleHalo: string;
+  /**
+   * [UI-R20b] Home service-card illustrations (passenger-home V2): wheel hubs, the ground shadow
+   * (opacity from `componentTokens.serviceCard.shadowOpacity`), the parcel box faces and tape,
+   * and the speed lines. The car itself reuses the `vehicle*` tokens.
+   */
+  illoHub: string;
+  illoShadow: string;
+  illoBoxFront: string;
+  illoBoxTop: string;
+  illoBoxSide: string;
+  illoBoxTape: string;
+  illoMotion: string;
   /** [UI-R17] driver Earnings period hero (driver-earnings.md §1.1): fill, text, muted text, rules. */
   heroFill: string;
   /** The hero's big number and values: white in both modes (the brightest thing on screen). */
@@ -167,6 +179,13 @@ export const lightColors: SemanticColors = {
   vehicleAcBadge: extra.white,
   vehicleAcGlyph: navy[800],
   vehicleHalo: navy[800],
+  illoHub: neutral[300],
+  illoShadow: extra.black,
+  illoBoxFront: saffron[500],
+  illoBoxTop: saffron[300],
+  illoBoxSide: saffron[700],
+  illoBoxTape: saffron[100],
+  illoMotion: navy[400],
   heroFill: navy[800],
   heroText: extra.white,
   heroTextMuted: navy[200],
@@ -239,6 +258,13 @@ export const darkColors: SemanticColors = {
   vehicleAcBadge: navy[800],
   vehicleAcGlyph: extra.white,
   vehicleHalo: navy[400],
+  illoHub: dark[300],
+  illoShadow: extra.black,
+  illoBoxFront: saffron[500],
+  illoBoxTop: saffron[300],
+  illoBoxSide: saffron[700],
+  illoBoxTape: saffron[100],
+  illoMotion: navy[400],
   heroFill: extra.primarySoftDark,
   heroText: extra.white,
   heroTextMuted: navy[300],

@@ -23,7 +23,8 @@ import {
 import { cancellationText, RIDE_STATUS_LABEL, vehicleLabel } from '../../src/features/ride-history/copy';
 import { formatChatDayTime } from '../../src/features/chat/copy';
 import { formatDayLabel, formatTime as formatWalletTime } from '../../src/features/wallet/format';
-import { chartLabel, periodCaption } from '../../src/features/stats/format';
+import { periodCaption } from '../../src/features/stats/format';
+import { chartSlots } from '../../src/features/stats/chartModel';
 import { formatGender } from '../../src/components/passenger/settings/format';
 import { transactionTypeLabel, WALLET_COPY } from '../../src/features/wallet/copy';
 import { STATS_COPY } from '../../src/features/stats/copy';
@@ -118,7 +119,7 @@ describe('day words and month names', () => {
     expect(formatWalletTime(new Date(2026, 9, 12, 18, 5).toISOString())).toBe('6:05 PM');
     expect(periodCaption('day', '2026-10-18T00:00:00+05:00', null)).toBe('Itwar, 18 Oct');
     expect(periodCaption('month', '2026-10-01T00:00:00+05:00', null)).toBe('Aktoobar 2026');
-    expect(chartLabel('2026-10-12', 'week', 0)).toBe('Peer');
+    expect(chartSlots([{ date: '2026-10-12', trips: 0, grossFares: 0, earnings: 0 }], 'week', null)[0].label).toBe('Peer');
   });
 });
 
@@ -128,7 +129,7 @@ describe('QA 2026-10-19: lines that were still English read Roman Urdu', () => {
     'inbox.messages',
     'activity.summaryRides',
     'activity.summaryRating',
-    'earnings.strikesEntry',
+    'earnings.statementsTile',
     'walletTypes.ride_payment',
     'walletTypes.cancellation_fee',
     'statements.balanceTitle',

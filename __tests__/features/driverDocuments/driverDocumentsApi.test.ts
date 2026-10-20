@@ -37,9 +37,9 @@ describe('toDriverDocuments', () => {
     expect(state).toEqual({
       allRequiredApproved: false,
       documents: [
-        { type: 'profile', required: true, status: 'approved', rejectionReason: null, canUpload: false },
-        { type: 'cnic_front', required: true, status: 'rejected', rejectionReason: 'Blurry', canUpload: true },
-        { type: 'vehicle_left', required: false, status: 'missing', rejectionReason: null, canUpload: true },
+        { type: 'profile', required: true, status: 'approved', rejectionReason: null, canUpload: false, updatedAt: '2026-10-11T10:00:00Z' },
+        { type: 'cnic_front', required: true, status: 'rejected', rejectionReason: 'Blurry', canUpload: true, updatedAt: '2026-10-11T10:00:00Z' },
+        { type: 'vehicle_left', required: false, status: 'missing', rejectionReason: null, canUpload: true, updatedAt: '2026-10-11T10:00:00Z' },
       ],
     });
     expect(JSON.stringify(state)).not.toContain('signed.example.test');
@@ -51,7 +51,7 @@ describe('toDriverDocuments', () => {
       all_required_approved: true,
     });
     expect(state.documents).toEqual([
-      { type: 'license', required: true, status: 'pending', rejectionReason: null, canUpload: false },
+      { type: 'license', required: true, status: 'pending', rejectionReason: null, canUpload: false, updatedAt: '2026-10-11T10:00:00Z' },
     ]);
     expect(state.allRequiredApproved).toBe(true);
   });

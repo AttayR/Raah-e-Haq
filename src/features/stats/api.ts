@@ -26,6 +26,11 @@ const nonNegativeOrNull = (value: unknown): number | null => {
   const n = readNumberOrNull(value);
   return n !== null && n >= 0 ? n : null;
 };
+/** BE-125 `today`: a plain `YYYY-MM-DD`, else null (the app then derives it, earningsDates.ts). */
+const calendarDateOrNull = (value: unknown): string | null => {
+  const text = readText(value);
+  return text && /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+};
 /** A rating is only meaningful in 0–5; anything else reads as "not rated". */
 const rating = (value: unknown): number | null => {
   const n = readNumberOrNull(value);
@@ -132,6 +137,7 @@ export const toDriverEarnings = (raw: unknown, requested: EarningsPeriod, page =
     from: readText(data.from),
     to: readText(data.to),
     currency: currencyOf(data.currency),
+    today: calendarDateOrNull(data.today),
     totals: toTotals(data.totals),
     series: list(data.series, toDay),
     rides,

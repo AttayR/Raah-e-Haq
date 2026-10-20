@@ -39,8 +39,8 @@ describe('toDriverVehicles', () => {
       ],
     });
     expect(vehicles).toEqual([
-      { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved' },
-      { id: 5, make: null, model: null, licensePlate: null, status: null },
+      { id: 4, make: 'Mitsubishi', model: 'Outlander', licensePlate: 'Z-0001-19', status: 'approved', rejectionReason: null, vehicleType: null, year: null, color: null },
+      { id: 5, make: null, model: null, licensePlate: null, status: null, rejectionReason: null, vehicleType: null, year: null, color: null },
     ]);
     expect(JSON.stringify(vehicles)).not.toContain('signed.example');
     expect(toDriverVehicles(null)).toEqual([]);
@@ -50,18 +50,18 @@ describe('toDriverVehicles', () => {
   it('reads GET /profile/documents', async () => {
     mock.onGet('/profile/documents').reply(200, { success: true, data: { vehicles: [{ id: 1, make: 'Honda' }] } });
     await expect(driverProfileApi.getVehicles()).resolves.toEqual([
-      { id: 1, make: 'Honda', model: null, licensePlate: null, status: null },
+      { id: 1, make: 'Honda', model: null, licensePlate: null, status: null, rejectionReason: null, vehicleType: null, year: null, color: null },
     ]);
   });
 });
 
 describe('vehicle labels', () => {
   it('make + model, the plate, and the review badge', () => {
-    const vehicle = { id: 1, make: 'Toyota', model: 'Yaris', licensePlate: 'LEA-1234', status: 'pending' as const };
+    const vehicle = { id: 1, make: 'Toyota', model: 'Yaris', licensePlate: 'LEA-1234', status: 'pending' as const, rejectionReason: null, vehicleType: null, year: null, color: null };
     expect(vehicleTitle(vehicle)).toBe('Toyota Yaris');
     expect(vehiclePlate(vehicle)).toBe('Plate LEA-1234');
     expect(vehicleStatusBadge(vehicle)).toEqual({ label: 'In review', tone: 'warning' });
-    const bare = { id: 2, make: null, model: null, licensePlate: null, status: null };
+    const bare = { id: 2, make: null, model: null, licensePlate: null, status: null, rejectionReason: null, vehicleType: null, year: null, color: null };
     expect(vehicleTitle(bare)).toBe('Your vehicle');
     expect(vehiclePlate(bare)).toBe('No plate on file');
     expect(vehicleStatusBadge(bare)).toBeNull();

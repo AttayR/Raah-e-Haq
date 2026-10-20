@@ -62,14 +62,16 @@ afterEach(() => {
 });
 
 describe('map-first Home', () => {
-  it('opens at peek 170 with the ride-only heading and "Where to?"; snaps half → full and the map controls fade at full', async () => {
+  it('opens with the greeting, the tagline and "Where to?" (no service row while no parcel tier is known); snaps half → full and the map controls fade at full', async () => {
     mock.onGet('/rides').reply(200, page([]));
     await renderHome();
     // Safe-area mock: zero insets, so full = 874 − 0 − 8.
     await layoutSheet(874);
-    // UI-R20: no parcel tier known (the catalogue is not mocked here): the ride-only heading.
-    expect(screen.getByTestId('home-ride-only-heading')).toBeTruthy();
-    expect(screen.queryByTestId('home-greeting')).toBeNull();
+    // UI-R20b: no parcel tier known (the catalogue is not mocked here): no service row, and the
+    // ride-only heading is retired (the tagline says "within the city").
+    expect(screen.queryByTestId('home-service-row')).toBeNull();
+    expect(screen.getByTestId('home-greeting')).toBeTruthy();
+    expect(screen.getByTestId('home-tagline')).toHaveTextContent('Fixed fares, within the city');
     expect(screen.getByTestId('home-where-to')).toBeTruthy();
     expect(screen.getByTestId('home-controls').props.pointerEvents).toBe('box-none');
 

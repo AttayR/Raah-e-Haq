@@ -33,8 +33,8 @@ import {
   validateParcelDraft,
 } from '../../../src/features/parcel/rules';
 import { useSendParcel } from '../../../src/features/parcel/useSendParcel';
-import { HomeSheetBody, type HomeHeaderKind } from '../../../src/features/passenger-home/components/HomeSheet';
-import { HomeSheetTop } from '../../../src/features/passenger-home/components/HomeSheetTop';
+import { HomeSheetBody } from '../../../src/features/passenger-home/components/HomeSheet';
+import { homeBodyProps } from '../../../test-utils/homeFixtures';
 import type { ParcelDraft } from '../../../src/features/parcel/types';
 import type { RideResource } from '../../../src/services/rideService';
 import { envelope, makeRide, makeStore, type TestStore } from '../../../test-utils/rideFixtures';
@@ -194,34 +194,18 @@ describe('catalogue: the parcel tier is not a ride', () => {
     expect(toVehicleOptions(types, estimates).map((o) => o.id)).toEqual(['bike']);
   });
 
-  it('Home offers the Parcel tile only while the tier is on and not during a ride (UI-R20)', () => {
-    const base = {
-      onWhereTo: jest.fn(),
-      savedPlaces: [],
-      onSavedPlace: jest.fn(),
-      onAddPlace: jest.fn(),
-      onSavedPlaces: jest.fn(),
-      locationOff: false,
-      onEnableLocation: jest.fn(),
-      recentRides: [],
-      onOpenRide: jest.fn(),
-      onSeeAllRides: jest.fn(),
-    };
-    // The chip row no longer carries it.
-    const body = render(<HomeSheetBody {...base} />);
-    expect(screen.queryByTestId('home-send-parcel')).toBeNull();
-    body.unmount();
-
+  it('Home offers the Parcel card only while the tier is on and not during a ride (UI-R20b)', () => {
     const onParcel = jest.fn();
-    const top = (kind: HomeHeaderKind) => (
-      <HomeSheetTop kind={kind} greeting="Hello" onRide={jest.fn()} onParcel={onParcel} onHeight={jest.fn()} />
-    );
-    const { rerender } = render(top('rideOnly'));
+    // Tier off (or unknown): no service row, and the chip row never carries a parcel chip.
+    const view = render(<HomeSheetBody {...homeBodyProps({ onParcel })} />);
     expect(screen.queryByTestId('home-send-parcel')).toBeNull();
-    rerender(top('services'));
+    view.rerender(<HomeSheetBody {...homeBodyProps({ onParcel, servicesVisible: true })} />);
     fireEvent.press(screen.getByTestId('home-send-parcel'));
     expect(onParcel).toHaveBeenCalledTimes(1);
-    rerender(top('greeting'));
+    // A live ride hides it, whatever the tier says.
+    view.rerender(
+      <HomeSheetBody {...homeBodyProps({ onParcel, servicesVisible: true, liveRide: { status: 'On the way' }, onReturnToRide: jest.fn() })} />,
+    );
     expect(screen.queryByTestId('home-send-parcel')).toBeNull();
   });
 });

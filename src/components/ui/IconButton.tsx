@@ -36,8 +36,17 @@ export function IconButton({
   const { theme } = useAppTheme();
   const [pressed, setPressed] = useState(false);
   const diameter = size ?? (variant === 'floating' ? t.floatingVisual : t.visual);
+  // [UI-R20b] Floating map controls: `surface` + elevation 2 in light; `surfaceRaised` + a 1pt
+  // `border` and no shadow in dark (§3.5, passenger-home V9).
+  const darkFloating = variant === 'floating' && theme.mode === 'dark';
   const fill =
-    variant === 'floating' ? theme.colors.surface : variant === 'tonal' ? theme.colors.surfaceAlt : 'transparent';
+    variant === 'floating'
+      ? darkFloating
+        ? theme.colors.surfaceRaised
+        : theme.colors.surface
+      : variant === 'tonal'
+        ? theme.colors.surfaceAlt
+        : 'transparent';
   // Touch slop that brings a 40pt visual up to the 44pt target.
   const slop = Math.max(0, (t.target - diameter) / 2);
   return (
@@ -58,13 +67,11 @@ export function IconButton({
         {
           backgroundColor:
             pressed && !disabled
-              ? theme.colors[variant === 'tonal' ? 'surfaceAltPressed' : 'surfacePressed']
+              ? theme.colors[variant === 'tonal' || darkFloating ? 'surfaceAltPressed' : 'surfacePressed']
               : fill,
         },
-        variant === 'floating' ? theme.elevation[2] : null,
-        variant === 'floating' && theme.mode === 'dark'
-          ? { borderWidth: theme.borderWidth.thin, borderColor: theme.colors.border }
-          : null,
+        variant === 'floating' && !darkFloating ? theme.elevation[2] : null,
+        darkFloating ? { borderWidth: theme.borderWidth.thin, borderColor: theme.colors.border } : null,
         disabled && styles.disabled,
       ]}
     >

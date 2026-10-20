@@ -13,7 +13,7 @@ import { ReceiptCard } from '../../../src/features/ride-history/components/RideD
 import { toRide } from '../../../src/features/ride-history/api';
 import { toRideSummary } from '../../../src/features/driver-ride/steps';
 import { toDriverEarnings } from '../../../src/features/stats/api';
-import { earningsRideText } from '../../../src/features/stats/format';
+import { tripRowText } from '../../../src/features/stats/tripItems';
 import { makeRide } from '../../../test-utils/rideFixtures';
 
 const breakdown = { base: 150, distance: 120, time: 54, stops: 0, min_fare_adjustment: 0, total: 324 };
@@ -99,8 +99,7 @@ describe('locked receipt labels (T-557)', () => {
     expect(screen.queryByText(/quoted/)).toBeNull();
   });
 
-  it('driver Earnings row: a locked fare says so and shows the quoted km', () => {
-    const money = (n: number) => `Rs ${n}`;
+  it('UI-R17 §3.3: an Earnings row keeps the driven km and the plain "Fare · Commission" line (the locked-fare and quoted facts live on the ride details)', () => {
     const [locked, older, metered] = toDriverEarnings(
       {
         rides: [
@@ -111,8 +110,13 @@ describe('locked receipt labels (T-557)', () => {
       },
       'day',
     ).rides;
-    expect(earningsRideText(locked, money).subtitle).toBe('Quoted 5.2 km · Locked fare Rs 300 · commission Rs 60');
-    expect(earningsRideText(older, money).subtitle).toBe('3 km · Locked fare Rs 300 · commission 20% = Rs 60');
-    expect(earningsRideText(metered, money).subtitle).toBe('3 km · Fare Rs 300 · commission Rs 60');
+    const row = (ride: typeof locked) => tripRowText(ride, 'PKR', 300);
+    expect(row(locked)).toMatchObject({ title: 'Trip', meta: '0.4 km' });
+    expect(row(locked).split).toBe('Fare Rs 300 · Commission Rs 60');
+    expect(row(older)).toMatchObject({ meta: '3 km', split: 'Fare Rs 300 · Commission Rs 60' });
+    expect(row(metered)).toMatchObject({ meta: '3 km', split: 'Fare Rs 300 · Commission Rs 60' });
+    for (const ride of [locked, older, metered]) {
+      expect(JSON.stringify(row(ride))).not.toMatch(/Quoted|Locked/);
+    }
   });
 });

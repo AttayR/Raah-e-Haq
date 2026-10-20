@@ -41,6 +41,7 @@ const toDocument = (raw: RawRecord): DriverDocument | null => {
     status,
     rejectionReason: status === 'rejected' ? toReason(raw.rejection_reason) : null,
     canUpload: raw.can_upload === true,
+    updatedAt: typeof raw.updated_at === 'string' && raw.updated_at.trim() !== '' ? raw.updated_at : null,
   };
 };
 

@@ -163,11 +163,15 @@ export const componentTokens = {
   skeleton: {
     /** Text block height = line height − 6. */
     textInset: 6,
+    /** A section header (`overline`) placeholder. */
+    overline: { width: 60, height: 10 },
+    /** UI-R17 §3.5: an earnings trip row's text and amount lines. */
+    earningsRowLines: { title: 140, meta: 90, amount: 56 },
     /**
      * Placeholder heights that mirror real blocks at rest (1.0x font) so nothing jumps when data
      * arrives: wallet BalanceCard, EarningsHero, ride details cards, transaction detail card.
      */
-    heights: { walletHero: 152, earningsHero: 300, statementHero: 132, earningsOwed: 72, rideHistoryRow: 114, activitySummary: 54, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
+    heights: { walletHero: 152, earningsHero: 300, earningsChart: 237, earningsTile: 96, earningsRow: 80, documentsSummary: 72, documentsVehicleRow: 88, statementHero: 132, earningsOwed: 72, rideHistoryRow: 114, activitySummary: 54, rideSummary: 120, rideRoute: 136, rideReceipt: 168, detailCard: 168 },
   },
   /** UI-R5 ride components (§5.21–5.31, §6.5/§6.7, §12.5). */
   ride: {
@@ -292,6 +296,35 @@ export const componentTokens = {
     staleOpacity: 0.5,
     owedIcon: 24,
     owedIconCircle: 40,
+    /** UI-R17 round 2 §3.1 daily chart. */
+    chart: {
+      plotHeight: 120,
+      /** Bar width as a share of its slot, and its limits (week / month). */
+      barRatio: 0.6,
+      maxBar: { week: 24, month: 8 },
+      minBar: 3,
+      minBarHeight: 4,
+      barRadius: { week: 4, month: 2 },
+      slotGap: { week: space[1], month: 2 },
+      zeroDot: 4,
+      /** Month labels overflow their ~9pt slot on purpose. */
+      labelWidth: 28,
+      todayMarker: { width: 16, height: 2, gap: 2 },
+      labelMaxScale: 1.3,
+    },
+    /** §3.2 link tiles. */
+    tile: { minHeight: 96, iconTile: 36, glyph: 20, /** Icon kit sizes start at 16 (spec asks 14). */ statusIcon: 16, chevron: 16 },
+    /** §3.3 trip rows. */
+    row: { minHeight: 72, tile: 40, glyph: 24, trailingMinWidth: 72, dividerInset: 72 },
+    /** §3.5 paging footer. */
+    footerHeight: 56,
+  },
+  /** UI-R17 Vehicle & documents (driver-vehicle-documents.md §2). */
+  documents: {
+    summaryCircle: 40,
+    summaryGlyph: 24,
+    plateChipHeight: 24,
+    plateLetterSpacing: 0.5,
   },
   chat: {
     bubbleRadius: 18,
@@ -372,10 +405,46 @@ export const componentTokens = {
    */
   illustration: { textMaxWidth: 320, box: 160, disc: 128, glyph: 64, badge: 48, badgeGlyph: 28, badgeRing: 3, compactBox: 120, compactDisc: 96, compactGlyph: 48, compactBadge: 36, compactBadgeGlyph: 20, compactBadgeRing: 2 },
   /**
-   * UI-R20 service tile (passenger-home § Services S2): 44 icon disc (28 glyph), 12 from the outer
-   * edge to the content, 12 from the disc to the title, 12 between tiles in a row; 96 high at 1.0×.
+   * UI-R20b service card (passenger-home V2): 72 min high, the 104 × 56 art box 0 from the end and
+   * 2 from the bottom (drawing viewBox 88 × 48), the label 12 in from the top and the start, 12
+   * between the cards; on press the art nudges 3 toward the end. The art's ground shadow opacity
+   * per mode (the `illoShadow` colour is black).
    */
-  serviceTile: { disc: 44, padding: space[3], gap: space[3], rowGap: space[3], height: 96 },
+  serviceCard: {
+    minHeight: 72,
+    artWidth: 104,
+    artHeight: 56,
+    artBottom: 2,
+    rowGap: space[3],
+    labelInset: space[3],
+    pressNudge: 3,
+    viewBoxWidth: 88,
+    viewBoxHeight: 48,
+    shadowOpacity: { light: 0.1, dark: 0.3 },
+  },
+  /**
+   * UI-R20b passenger Home first view (passenger-home V1, V3–V9): the "Where to?" hero (56 pill,
+   * 32 navy search disc with a 20 glyph, 12 in), the chip row's 16 trailing fade and the 160 cap on
+   * a recent-destination chip, the user-location mark (40 halo, 20 ring, 14 dot), the status-bar
+   * scrim (insets.top + 24, `surface` 0.85 → 0), and the window height under which the tagline is
+   * hidden (iPhone SE).
+   */
+  home: {
+    whereToHeight: 56,
+    whereToDisc: 32,
+    whereToGlyph: 20,
+    whereToInset: space[3],
+    taglineGlyph: 16,
+    chipFadeWidth: space[4],
+    recentChipMaxWidth: 160,
+    userHalo: 40,
+    userRing: 20,
+    userDot: 14,
+    userHaloOpacity: { light: 0.16, dark: 0.2 },
+    scrimExtra: space[6],
+    scrimOpacity: 0.85,
+    compactWindowHeight: 700,
+  },
   /** UI-R8 denied state on the driver Drive sheet (shared-permissions): icon circle and glyph. */
   locationNeeded: { circle: 64, glyph: 32 },
   /**

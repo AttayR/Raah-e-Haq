@@ -47,6 +47,24 @@ export const springs = {
 /** Pattern-level values from §6 so components share one source. */
 export const motionPatterns = {
   pressScale: 0.98,
+  /**
+   * [UI-R20b] Passenger Home cold-open entrance (passenger-home V7), ms from Home's first layout:
+   * the sheet rises 40 → 0 on a clamped spring (≈ 300, no bounce); each block fades in and rises
+   * 8 → 0 in `motion.base` from its start; the map controls fade in `motion.fast` from 200. Ends
+   * at 470. Reduced motion: no movement, content at once, the map veil fades in 150.
+   */
+  homeEntrance: {
+    sheetFrom: 40,
+    sheetSpring: { damping: 28, stiffness: 260, mass: 1, overshootClamping: true } as SpringToken,
+    rise: 8,
+    greetingAt: 60,
+    whereToAt: 100,
+    chipsAt: 140,
+    rideAt: 180,
+    parcelAt: 220,
+    controlsAt: 200,
+    reducedVeilMs: 150,
+  },
   listAppear: { duration: 250, easing: standard, translateY: 8, staggerMs: 30, maxStaggered: 8 },
   searchingPulse: {
     duration: 2000,

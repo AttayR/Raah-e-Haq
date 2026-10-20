@@ -1,28 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import { Marker } from 'react-native-maps';
-import { useSharedValue } from 'react-native-reanimated';
+import { StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import Animated, { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootState } from '../../store';
-import SafeMapView, { type SafeMapViewRef } from '../../components/SafeMapView';
-import MapErrorBoundary from '../../components/MapErrorBoundary';
-import { AppText, BottomSheet, MapControls, Screen, type SheetSnap } from '../../components/ui';
+import type { SafeMapViewRef } from '../../components/SafeMapView';
+import { BottomSheet, LinearFade, MapControls, Screen, useIsOffline, type SheetSnap } from '../../components/ui';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useNativeLocation } from '../../hooks/useNativeLocation';
 import { useMapMounted } from '../../hooks/useMapMounted';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
-import { NearbyCountChip, NearbyVehicleMarkers, useNearbyFreshness } from '../../features/nearby-vehicles';
+import { NearbyCountChip, useNearbyFreshness } from '../../features/nearby-vehicles';
 import { usePassengerNotifications } from '../../hooks/usePassengerNotifications';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
-import { MAPS_CONFIG } from '../../config/mapsConfig';
 import { logger } from '../../core/logging/logger';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
-import { HomeSheetBody, type HomeHeaderKind } from '../../features/passenger-home/components/HomeSheet';
+import { HomeSheetBody } from '../../features/passenger-home/components/HomeSheet';
 import { HomeSheetTop } from '../../features/passenger-home/components/HomeSheetTop';
+import { HomeMap } from '../../features/passenger-home/components/HomeMap';
 import { useHomePeek } from '../../features/passenger-home/useHomePeek';
+import { useHomeEntrance } from '../../features/passenger-home/useHomeEntrance';
+import { useGreetingClock } from '../../features/passenger-home/useGreetingClock';
+import { headerKindFor, isCompactHeight, taglineSlot } from '../../features/passenger-home/layout';
 import { useOnePush } from '../../features/passenger-home/useOnePush';
 import { greetingFor } from '../../features/passenger-home/greeting';
 import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
@@ -41,14 +42,10 @@ import { useParcelAvailable } from '../../features/parcel/hooks';
 import { parcelLiveStatusText } from '../../features/parcel/live';
 import { useScreenToast } from '../../core/toast';
 import { t } from '../../i18n';
-import { radius, space } from '../../theme';
+import { componentTokens, space } from '../../theme';
 
-/** The greeting follows the clock (morning → afternoon → evening) while Home stays open. */
-const GREETING_REFRESH_MS = 60_000;
 /** Room kept above the sheet when the camera centres on the rider (§8.3: sheet height + 24). */
 const CAMERA_SHEET_GAP = space[6];
-/** The rider's position dot (16, `primary` with a `surface` ring). */
-const USER_DOT = space[4];
 /** T-535 (PERF-14): the Booking map replaces this one; only one Google Map lives at a time. */
 const MAP_ROUTES_ABOVE_HOME = ['Booking'] as const;
 
@@ -65,9 +62,11 @@ const MAP_ROUTES_ABOVE_HOME = ['Booking'] as const;
  * the booking map and only while Home is focused and the app is in the foreground (the hook
  * stops when backgrounded). T-586: react-native-svg vehicles on one shared ticker, and the
  * "N drivers online near you" chip bottom-start, on the locate button's baseline.
- * UI-R20 (passenger-home § Services): the sheet header is the Ride + Parcel service row while the
- * parcel tier is on, "Rides within the city" while it is off, the greeting only while a ride is
- * live; the peek follows the measured header (244 / 170 / 202) and `half` is at least peek + 180.
+ * UI-R20b (passenger-home § Services v2): the first view is greeting + tagline and the "Where
+ * to?" hero (the pinned header), then the outline chips and the illustrated Ride / Parcel cards
+ * (only while the parcel tier is on); peek = handle + measured header + measured peek group (274
+ * / 190, SE 254 / 170, live 198), `half` ≥ peek + 180. Brand-tinted map with a status-bar scrim,
+ * the blue user dot, and a cold-open entrance once per session (useHomeEntrance).
  */
 export default function PassengerHomeScreen() {
   const { theme } = useAppTheme();
@@ -83,7 +82,6 @@ export default function PassengerHomeScreen() {
     const parcelStatus = parcelLiveStatusText(inProgressRide);
     return parcelStatus ? { status: parcelStatus, parcel: true } : { status: liveRideStatusText(inProgressRide.status) };
   }, [inProgressRide]);
-  const [now, setNow] = useState(() => new Date());
   const live = liveRide !== null;
 
   // T-315: no lookups while another screen covers Home; failures show in the sheet, no alerts.
@@ -142,13 +140,21 @@ export default function PassengerHomeScreen() {
     if (savedStatus === 'failed' && savedData === null) reloadSaved();
   }, [reloadRides, reloadSaved, savedStatus, savedData]);
 
-  // BE-88: the Parcel tile only while the parcel tier is on (the cached vehicle catalogue says so;
+  // BE-88: the Parcel card only while the parcel tier is on (the cached vehicle catalogue says so;
   // T-561: re-read on focus once it is a few minutes old; UI-R20 S7: last known value at a cold start).
   const parcelAvailable = useParcelAvailable(isFocused);
-  // UI-R20 (S1): first match wins; a live ride or parcel always shows the greeting.
-  const headerKind: HomeHeaderKind = live ? 'greeting' : parcelAvailable ? 'services' : 'rideOnly';
-  // S5: peek = handle + the measured header + 124; half ≥ peek + 180.
-  const { peek: peekHeight, halfMin, onHeaderHeight, onHeaderShown } = useHomePeek(headerKind);
+  // UI-R20b (V3): greeting + tagline slot (offline line, hidden on a compact screen or while live).
+  const now = useGreetingClock(isFocused);
+  const offline = useIsOffline();
+  const { height: windowHeight } = useWindowDimensions();
+  const slot = taglineSlot({ live, offline, compact: isCompactHeight(windowHeight) });
+  // V6: the service row counts toward the peek from the moment it starts to show until it has faded out.
+  const [servicesInPeek, setServicesInPeek] = useState(parcelAvailable && !live);
+  const { peek: peekHeight, halfMin, onHeaderHeight, onGroupHeight, onRowHeight } = useHomePeek({
+    headerKind: headerKindFor(live, slot),
+    live,
+    servicesInPeek,
+  });
   const sheetDragging = useSharedValue(false);
 
   const {
@@ -156,14 +162,6 @@ export default function PassengerHomeScreen() {
     subscribeToPassengerNotifications,
     unsubscribeFromPassengerNotifications,
   } = usePassengerNotifications(user?.id?.toString());
-
-  // The greeting shows only while a ride is live (UI-R20 S1), so only then does its clock tick.
-  useEffect(() => {
-    if (!live) return undefined;
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), GREETING_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [live]);
 
   useEffect(() => {
     if (notificationsInitialized && user?.id) {
@@ -210,6 +208,11 @@ export default function PassengerHomeScreen() {
   }, [centre, currentLocation, mapReady]);
 
   const onMapReady = useCallback(() => setMapReady(true), []);
+  // V7: cold-open entrance, once per JS session.
+  const entrance = useHomeEntrance({ focused: isFocused, mapReady });
+  const controlsHidden = sheet.snap === 'full';
+  // V9: the scrim is static; its style changes only with the top inset.
+  const scrimStyle = useMemo(() => [styles.scrim, { height: insets.top + componentTokens.home.scrimExtra }], [insets.top]);
 
   const onLocate = useCallback(() => {
     if (!currentLocation) {
@@ -220,7 +223,7 @@ export default function PassengerHomeScreen() {
   }, [centre, currentLocation, enableLocation]);
 
   // Stable handlers, so the memoised sheet body skips the renders a map or sheet move causes.
-  // UI-R20 (S8): one push per tap for "Where to?", the Ride and Parcel tiles and "Return".
+  // UI-R20 (S8): one push per tap for "Where to?", the Ride and Parcel cards and "Return".
   const once = useOnePush(isFocused);
   const openBooking = useCallback(() => once(() => navigation.navigate('Booking')), [navigation, once]);
   const openSavedPlace = useCallback(
@@ -252,109 +255,105 @@ export default function PassengerHomeScreen() {
   return (
     <Screen edges={[]} testID="passenger-home">
       <View style={styles.fill} onLayout={(e: LayoutChangeEvent) => setMapHeight(e.nativeEvent.layout.height)}>
-        {mapMounted ? (
-          <MapErrorBoundary>
-            <SafeMapView
-              ref={mapRef}
-              style={styles.fill}
-              initialRegion={currentLocation ? regionInViewport(currentLocation, null) : MAPS_CONFIG.DEFAULT_REGION}
-              customMapStyle={theme.mapStyle}
-              onMapReady={onMapReady}
-              fallbackComponent={
-                <View style={styles.fill}>
-                  <AppText variant="body" color="textSecondary" align="center" style={styles.fallback}>
-                    {t('home.mapLoading')}
-                  </AppText>
-                </View>
-              }
-            >
-              {currentLocation ? (
-                <Marker coordinate={currentLocation} anchor={{ x: 0.5, y: 0.5 }} testID="home-user-marker">
-                  <View
-                    style={[
-                      styles.userDot,
-                      {
-                        backgroundColor: theme.colors.primary,
-                        borderColor: theme.colors.surface,
-                        borderWidth: theme.borderWidth.focus,
-                      },
-                      theme.elevation[1],
-                    ]}
-                  />
-                </Marker>
-              ) : null}
-              <NearbyVehicleMarkers drivers={nearbyDrivers.drivers} freshness={nearbyFreshness} />
-            </SafeMapView>
-          </MapErrorBoundary>
-        ) : (
-          <View testID="home-map-released" style={[styles.fill, { backgroundColor: theme.mapBackground }]} />
-        )}
+        <HomeMap
+          mapRef={mapRef}
+          mounted={mapMounted}
+          currentLocation={currentLocation}
+          onMapReady={onMapReady}
+          drivers={nearbyDrivers.drivers}
+          freshness={nearbyFreshness}
+          showVeil={entrance.entering}
+          veilStyle={entrance.veilStyle}
+        />
       </View>
+      {/* V9: keeps the clock and battery legible over map labels; hidden at `full`. */}
+      {controlsHidden ? null : (
+        <LinearFade
+          color={theme.colors.surface}
+          direction="down"
+          fromOpacity={componentTokens.home.scrimOpacity}
+          toOpacity={0}
+          style={scrimStyle}
+          testID="home-status-scrim"
+        />
+      )}
 
-      <MapControls
-        avatar={{
-          name: user?.name,
-          uri: user?.profile_image_url,
-          onPress: () => navigation.navigate('Profile'),
-          accessibilityLabel: t('home.openProfile'),
-        }}
-        onLocate={onLocate}
-        sheetHeight={sheetAnimatedHeight}
-        hidden={sheet.snap === 'full'}
-        testID="home-controls"
-      />
-      <NearbyCountChip state={nearbyDrivers} freshness={nearbyFreshness} sheetHeight={sheetAnimatedHeight} hidden={sheet.snap === 'full'} />
+      <Animated.View style={[StyleSheet.absoluteFill, entrance.controlsStyle]} pointerEvents="box-none">
+        <MapControls
+          avatar={{
+            name: user?.name,
+            uri: user?.profile_image_url,
+            onPress: () => navigation.navigate('Profile'),
+            accessibilityLabel: t('home.openProfile'),
+          }}
+          onLocate={onLocate}
+          sheetHeight={sheetAnimatedHeight}
+          hidden={controlsHidden}
+          testID="home-controls"
+        />
+        <NearbyCountChip state={nearbyDrivers} freshness={nearbyFreshness} sheetHeight={sheetAnimatedHeight} hidden={controlsHidden} />
+      </Animated.View>
 
-      <BottomSheet
-        peekHeight={peekHeight}
-        halfMinHeight={halfMin}
-        calmResize
-        dragging={sheetDragging}
-        active={isFocused}
-        snapPoints={['peek', 'half', 'full']}
-        animatedHeight={sheetAnimatedHeight}
-        onSnapChange={(snap, height) => setSheet({ snap, height })}
-        header={
-          <HomeSheetTop
-            kind={headerKind}
-            greeting={greetingFor(now, user?.name)}
+      <Animated.View style={[StyleSheet.absoluteFill, entrance.sheetStyle]} pointerEvents="box-none">
+        <BottomSheet
+          peekHeight={peekHeight}
+          halfMinHeight={halfMin}
+          calmResize
+          dragging={sheetDragging}
+          active={isFocused}
+          snapPoints={['peek', 'half', 'full']}
+          animatedHeight={sheetAnimatedHeight}
+          onSnapChange={(snap, height) => setSheet({ snap, height })}
+          header={
+            <HomeSheetTop
+              greeting={greetingFor(now, user?.name)}
+              slot={slot}
+              live={live}
+              onWhereTo={openBooking}
+              onHeight={onHeaderHeight}
+              greetingStyle={entrance.greetingStyle}
+              whereToStyle={entrance.whereToStyle}
+            />
+          }
+          accessibilityLabel={t('home.sheetA11y')}
+          testID="home-sheet"
+        >
+          <HomeSheetBody
+            savedPlaces={saved.places}
+            savedPlacesLoading={saved.status === 'loading'}
+            savedPlacesLoaded={saved.data !== null}
+            recents={recents}
+            onRecent={openRecent}
+            onSavedPlace={openSavedPlace}
+            onAddPlace={addPlace}
+            onSavedPlaces={openSavedPlaces}
+            locationOff={locationOff}
+            onEnableLocation={onEnableLocation}
+            recentRides={recentRides}
+            recentRidesState={ridesState}
+            onRetryRides={retryHome}
+            onOpenRide={openRide}
+            onSeeAllRides={openActivity}
+            liveRide={liveRide}
+            onReturnToRide={openBooking}
+            servicesVisible={parcelAvailable}
             onRide={openBooking}
             onParcel={sendParcel}
-            onHeight={onHeaderHeight}
-            onShown={onHeaderShown}
+            onServicesShown={setServicesInPeek}
+            onServiceRowHeight={onRowHeight}
+            onPeekGroupHeight={onGroupHeight}
             hold={sheetDragging}
+            chipsStyle={entrance.chipsStyle}
+            rideStyle={entrance.rideStyle}
+            parcelStyle={entrance.parcelStyle}
           />
-        }
-        accessibilityLabel={t('home.sheetA11y')}
-        testID="home-sheet"
-      >
-        <HomeSheetBody
-          onWhereTo={openBooking}
-          savedPlaces={saved.places}
-          savedPlacesLoading={saved.status === 'loading'}
-          savedPlacesLoaded={saved.data !== null}
-          recents={recents}
-          onRecent={openRecent}
-          onSavedPlace={openSavedPlace}
-          onAddPlace={addPlace}
-          onSavedPlaces={openSavedPlaces}
-          locationOff={locationOff}
-          onEnableLocation={onEnableLocation}
-          recentRides={recentRides}
-          recentRidesState={ridesState}
-          onRetryRides={retryHome}
-          onOpenRide={openRide}
-          onSeeAllRides={openActivity}
-          liveRide={liveRide}
-          onReturnToRide={openBooking}
-        />
-      </BottomSheet>
+        </BottomSheet>
+      </Animated.View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  fallback: { marginTop: space[12] },
-  userDot: { width: USER_DOT, height: USER_DOT, borderRadius: radius.pill },
+  scrim: { position: 'absolute', top: 0, start: 0, end: 0 },
 });

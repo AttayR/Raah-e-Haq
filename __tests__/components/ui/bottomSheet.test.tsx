@@ -2,11 +2,11 @@
  * UI-R3 BottomSheet: snap maths (SE cap, ordering, velocity projection, modal close), map and
  * modal modes, programmatic snaps, keyboard → full, a11y on the handle, light/dark.
  */
-import React, { createRef } from 'react';
+import React, { Profiler, createRef } from 'react';
 import { AccessibilityInfo, BackHandler, Keyboard, ScrollView, StyleSheet, Text, TextInput, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { DarkTheme, LightTheme } from '../../../src/theme';
+import { DarkTheme, LightTheme, layout as layoutTokens } from '../../../src/theme';
 import { BottomSheet, Button, type BottomSheetHandle } from '../../../src/components/ui';
 import { fullHeight, releaseTarget, resolveSnaps } from '../../../src/components/ui/sheetSnaps';
 
@@ -235,6 +235,48 @@ describe('BottomSheet (map mode)', () => {
     await layout(containerOf('sheet'), 874);
     expect(onSnapChange).toHaveBeenLastCalledWith('peek', 170);
     jest.restoreAllMocks();
+  });
+});
+
+describe('[UI-R20b] body height only where a snap depends on it', () => {
+  // Safe-area mock: zero bottom inset.
+  const footerBottom = Math.max(layoutTokens.bottomActionOffset, layoutTokens.bottomActionMinOffset);
+
+  it('a peek/full sheet without peekHeight sizes peek from the measured body (peek = content)', async () => {
+    const ref = createRef<BottomSheetHandle>();
+    const onSnapChange = jest.fn();
+    await renderThemed(
+      <BottomSheet ref={ref} snapPoints={['peek', 'full']} onSnapChange={onSnapChange} testID="sheet">
+        <Text>Body</Text>
+      </BottomSheet>,
+    );
+    await layout(containerOf('sheet'), 874);
+    await layout(screen.getByTestId('sheet-body'), 200);
+    act(() => ref.current?.snapTo('full'));
+    act(() => ref.current?.close());
+    expect(onSnapChange).toHaveBeenLastCalledWith('peek', 24 + 200 + footerBottom);
+    await layout(screen.getByTestId('sheet-body'), 300.4);
+    act(() => ref.current?.snapTo('full'));
+    act(() => ref.current?.close());
+    expect(onSnapChange).toHaveBeenLastCalledWith('peek', 24 + 300 + footerBottom);
+  });
+
+  it('a peek/half/full sheet with a numeric peek does not re-render when its body height changes', async () => {
+    const onRender = jest.fn();
+    await renderThemed(
+      <Profiler id="sheet" onRender={onRender}>
+        <BottomSheet peekHeight={274} snapPoints={['peek', 'half', 'full']} testID="sheet">
+          <Text>Body</Text>
+        </BottomSheet>
+      </Profiler>,
+    );
+    await layout(containerOf('sheet'), 874);
+    await layout(screen.getByTestId('sheet-body'), 400);
+    const commits = onRender.mock.calls.length;
+    // Home's service row easing 0 ↔ 84: the body re-lays out on every frame.
+    await layout(screen.getByTestId('sheet-body'), 420);
+    await layout(screen.getByTestId('sheet-body'), 484);
+    expect(onRender.mock.calls.length).toBe(commits);
   });
 });
 

@@ -404,7 +404,6 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   const bodyContentRef = useRef<View>(null);
   const visibleBody = useRef(0);
   const bodyHeightRef = useRef(0);
-  bodyHeightRef.current = bodyHeight;
   visibleBody.current =
     (resolved[resolved.length - 1]?.height ?? 0) - k.contentTop - headerHeight - (footer ? footerBlock : footerBottom) - keyboardHeight;
 
@@ -549,6 +548,17 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   const sheetHeight =
     resolved[resolved.length - 1]?.height ?? (containerHeight > 0 ? fullHeight({ containerHeight, topInset: insets.top }) : 0);
 
+  // [UI-R20b] Only a `content` snap (or `peek` without `peekHeight`, which falls back to content)
+  // depends on the body's height. Other sheets keep it in a ref
+  // (the focused-field scroll reads it), so a body that animates its height (Home's service row
+  // easing 0 ↔ 84) never re-renders the sheet on every frame. Whole points only.
+  const usesContentSnap = snaps.includes('content') || (peekHeight === undefined && snaps.includes('peek'));
+  const onBodyLayout = (e: LayoutChangeEvent) => {
+    const next = Math.round(e.nativeEvent.layout.height);
+    bodyHeightRef.current = next;
+    if (usesContentSnap) setBodyHeight(prev => (prev === next ? prev : next));
+  };
+
   const onContainerLayout = (e: LayoutChangeEvent) => setContainerHeight(Math.round(e.nativeEvent.layout.height));
 
   const expandCollapse = (direction: 'increment' | 'decrement') => {
@@ -608,7 +618,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       >
         <View
           ref={bodyContentRef}
-          onLayout={e => setBodyHeight(e.nativeEvent.layout.height)}
+          onLayout={onBodyLayout}
           testID={testID ? `${testID}-body` : undefined}
         >
           {contentKey !== undefined ? (

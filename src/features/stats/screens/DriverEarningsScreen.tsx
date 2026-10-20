@@ -1,34 +1,36 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useIsFocused, useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import {
   AppText,
-  Button,
-  EmptyState,
+  Banner,
   ErrorState,
   Header,
-  Icon,
+  OfflineBanner,
   Screen,
   ScrollHairline,
   SegmentedControl,
-  SkeletonList,
   useHeaderScroll,
+  useIsOffline,
 } from '../../../components/ui';
 import { perLocale, t } from '../../../i18n';
-import { formatMoney } from '../../../core/format/money';
-import { componentTokens, layout, space } from '../../../theme';
+import { layout, space } from '../../../theme';
 import { EarningsChart } from '../components/EarningsChart';
 import { EarningsHero } from '../components/EarningsHero';
 import { EarningsWalletCard } from '../components/EarningsWalletCard';
-import { EarningsLinksCard } from '../components/EarningsLinksCard';
+import { EarningsLinkTiles } from '../components/EarningsLinkTiles';
+import { EarningsEmpty, EarningsListFooter, EarningsSkeleton } from '../components/EarningsListParts';
+import { EarningsDayHeader, EarningsTripRow } from '../components/EarningsTripRow';
+import { StaleOpacityProvider, useStaleOpacity } from '../components/StaleFade';
 import { DRIVER_STATEMENTS_ROUTE, DRIVER_STRIKES_ROUTE } from '../../driver-statements/navigation';
 import { STATS_COPY } from '../copy';
-import { earningsRideText } from '../format';
-import { useDriverEarnings } from '../hooks';
+import { periodCaption } from '../format';
+import { useEarningsScreen } from '../useEarningsScreen';
+import type { TripListItem } from '../tripItems';
 import { RIDE_DETAILS_ROUTE } from '../../ride-history/navigation';
-import type { DriverEarnings, EarningsPeriod, EarningsRide } from '../types';
+import type { EarningsPeriod } from '../types';
 import { TabScrollToTop } from '../../../hooks/TabScrollToTop';
 import { ADD_MONEY_ROUTE, topUpParamsFor } from '../../wallet/navigation';
 
@@ -38,129 +40,104 @@ const PERIODS = perLocale(() => [
   { value: 'month', label: STATS_COPY.periodMonth },
 ] as const);
 
+const PERIOD_LABEL: Record<EarningsPeriod, () => string> = {
+  day: () => STATS_COPY.periodDay,
+  week: () => STATS_COPY.periodWeek,
+  month: () => STATS_COPY.periodMonth,
+};
+
+const keyOf = (item: TripListItem) => item.key;
+
 /**
- * Driver Earnings tab (T-507, BE-08; UI-R4 made it a tab root, DESIGN_SYSTEM §8.1; UI-R15b
- * layout, §5.2 revised UI-R15): `large` Header with the title in the bar, the Today / This week /
- * This month segments pinned under it with a hairline once the list scrolls. GET /driver/earnings
- * for the chosen period with the period total, trips, fares and commission, the
- * commission/settlements entry (GET /wallet -> Wallet screen), a per-day bar chart (week and month) and the period's completed rides, paged
- * on scroll; a ride opens RideDetails (T-501). Pull to refresh; loading, error and empty states.
+ * Driver Earnings tab (T-507, BE-08; UI-R4 tab root; UI-R15b layout; UI-R17, docs/design/screens/
+ * driver-earnings.md). Under the pinned Today / This week / This month segments, one list: the
+ * period hero, the amount owed (GET /wallet now), the daily chart (week and month), the Weekly
+ * statements and Strikes tiles, then the period's trips grouped by day, paged on scroll; a trip
+ * opens RideDetails (T-501). Pull to refresh reads the period, the wallet and the strikes again.
+ * Skeleton, error, empty and stale-period states; server data only.
  */
 export default function DriverEarningsScreen() {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const isFocused = useIsFocused();
+  const offline = useIsOffline();
   const [period, setPeriod] = useState<EarningsPeriod>('day');
-  const earnings = useDriverEarnings(period, isFocused);
-  const { status, error, refresh, reload } = earnings;
-  // UI-R17 §1.1: switching period keeps the last hero, dimmed, until the new one lands.
-  const lastData = useRef<DriverEarnings | null>(null);
-  if (earnings.data) lastData.current = earnings.data;
-  const stale = !earnings.data && status === 'loading' && lastData.current !== null;
-  const data = earnings.data ?? (stale ? lastData.current : null);
-  const rides = earnings.data ? earnings.rides : data?.rides ?? [];
+  const screen = useEarningsScreen(period, isFocused);
+  const { earnings, wallet, strikes, data, stale, items } = screen;
+  const staleOpacity = useStaleOpacity(stale);
   const { scrollY, onScroll } = useHeaderScroll();
   // T-577: re-tapping the selected tab scrolls this list to the top.
-  const listRef = useRef<FlatList<EarningsRide>>(null);
-  // A new period may remount the list at the top: the hairline follows it.
+  const listRef = useRef<FlatList<TripListItem>>(null);
+  // §3.6: a new period starts at the top (no animation), and the hairline follows.
   useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
     scrollY.value = 0;
   }, [period, scrollY]);
-  const title = t('earnings.title');
+  const tint = theme.mode === 'dark' ? theme.colors.primaryText : theme.colors.primary;
 
-  const [pulling, setPulling] = useState(false);
-  useEffect(() => {
-    if (pulling && status !== 'refreshing') setPulling(false);
-  }, [pulling, status]);
-  const onRefresh = useCallback(() => {
-    setPulling(true);
-    refresh();
-  }, [refresh]);
-
-  const renderItem = useCallback(
-    ({ item }: { item: EarningsRide }) => {
-      const money = (n: number) => formatMoney(n, { currency: data?.currency });
-      const text = earningsRideText(item, money);
-      return (
-        <Pressable
-          onPress={() => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId: item.id })}
-          accessibilityRole="button"
-          accessibilityLabel={`${text.title}, ${text.subtitle}, ${money(item.driverEarnings)}`}
-          accessibilityHint={STATS_COPY.openRideHint}
-          style={({ pressed }) => [styles.ride, pressed ? { backgroundColor: theme.colors.surfacePressed } : null]}
-          testID={`earnings-ride-${item.id}`}
-        >
-          <View style={styles.rideText}>
-            <AppText variant="bodyStrong" numberOfLines={1} testID={`earnings-ride-${item.id}-title`}>
-              {text.title}
-            </AppText>
-            <AppText variant="caption" color="textMuted" numberOfLines={2}>
-              {text.subtitle}
-            </AppText>
-          </View>
-          <AppText variant="numeric" style={styles.rideAmount}>
-            {money(item.driverEarnings)}
-          </AppText>
-          <Icon name="chevronEnd" size={20} color="textMuted" />
-        </Pressable>
-      );
-    },
-    [data?.currency, navigation, theme.colors.surfacePressed],
-  );
-
-  const separator = useCallback(
-    () => <View style={[styles.separator, { backgroundColor: theme.colors.border }]} />,
-    [theme.colors.border],
-  );
-
-  const periodControl = (
-    <SegmentedControl<EarningsPeriod>
-      options={PERIODS()}
-      value={period}
-      onChange={setPeriod}
-      accessibilityLabel={STATS_COPY.periodLabel}
-      testID="earnings-period"
-    />
-  );
-
-  // Title in the bar and the period segments pinned under it, in every state (no jump on load).
-  const header = (
-    <>
-      <Header variant="large" inlineTitle title={title} tone="background" testID="earnings" />
-      <View style={styles.controls}>{periodControl}</View>
-    </>
-  );
+  const openRide = useCallback((rideId: number) => navigation.navigate(RIDE_DETAILS_ROUTE, { rideId }), [navigation]);
   const openWallet = useCallback(() => navigation.navigate('Wallet'), [navigation]);
   const payOwed = useCallback(
     (amountOwed: number) => navigation.navigate(ADD_MONEY_ROUTE, topUpParamsFor(amountOwed)),
     [navigation],
   );
-  const walletCard = <EarningsWalletCard visible={isFocused} onOpenWallet={openWallet} onPay={payOwed} />;
+  const openStatements = useCallback(() => navigation.navigate(DRIVER_STATEMENTS_ROUTE), [navigation]);
+  const openStrikes = useCallback(() => navigation.navigate(DRIVER_STRIKES_ROUTE), [navigation]);
+  const goToDrive = useCallback(() => navigation.navigate('Drive'), [navigation]);
 
-  if (!data) {
+  const renderItem = useCallback(
+    ({ item }: { item: TripListItem }) =>
+      item.kind === 'day' ? (
+        <EarningsDayHeader label={item.label} totals={item.totals} a11y={item.a11y} first={item.first} date={item.date} />
+      ) : (
+        <EarningsTripRow ride={item.ride} text={item.text} first={item.first} last={item.last} onOpen={openRide} />
+      ),
+    [openRide],
+  );
+
+  // Title in the bar and the period segments pinned under it, in every state (no jump on load).
+  const header = (
+    <>
+      <Header variant="large" inlineTitle title={t('earnings.title')} tone="background" testID="earnings" />
+      <View style={styles.controls}>
+        <SegmentedControl<EarningsPeriod>
+          options={PERIODS()}
+          value={period}
+          onChange={setPeriod}
+          accessibilityLabel={STATS_COPY.periodLabel}
+          testID="earnings-period"
+        />
+      </View>
+    </>
+  );
+
+  const bannerKind = offline ? 'offline' : screen.periodFailed ? 'period' : screen.refreshFailed ? 'refresh' : null;
+  const { reload } = earnings;
+  const { onRefresh } = screen;
+  const banner = useMemo(() => {
+    if (bannerKind === 'offline') return <OfflineBanner />;
+    if (!bannerKind) return null;
+    // §3.4 / §3.6: a failed refresh keeps the last numbers; a failed switch keeps the old period dimmed.
+    const text = bannerKind === 'period' ? t('earnings.periodFailed', { period: PERIOD_LABEL[period]() }) : t('earnings.refreshFailed');
     return (
-      <Screen testID="earnings-screen">
-        {header}
-        {status === 'failed' ? (
-          <ErrorState
-            title={STATS_COPY.loadFailed}
-            body={error ?? undefined}
-            retryLabel={STATS_COPY.retry}
-            onRetry={reload}
-            testID="earnings-error"
-          />
-        ) : (
-          <SkeletonList heroHeight={componentTokens.skeleton.heights.earningsHero} rows={5} testID="earnings-loading" />
-        )}
-      </Screen>
+      <Banner
+        tone="warning"
+        text={text}
+        action={{ label: t('earnings.retry'), onPress: bannerKind === 'period' ? reload : onRefresh, testID: 'earnings-refresh-retry' }}
+        testID="earnings-refresh-error"
+      />
     );
-  }
+  }, [bannerKind, period, reload, onRefresh]);
+  const walletView = useMemo(
+    () => ({ data: wallet.data, status: wallet.status, reload: wallet.reload }),
+    [wallet.data, wallet.status, wallet.reload],
+  );
 
-  const listHeader = (
-    <View>
-      <View style={styles.headerBlock}>
-        {/* UI-R17 §1: the owed card 12 under the hero, always above the chart and links. */}
-        <View style={styles.top}>
+  // Memoised so a pull or a chart selection does not rebuild the hero, owed card and tiles.
+  const listHeader = useMemo(
+    () =>
+      data ? (
+        <View style={styles.headerBlock}>
           <EarningsHero
             totals={data.totals}
             currency={data.currency}
@@ -169,75 +146,94 @@ export default function DriverEarningsScreen() {
             to={data.to}
             stale={stale}
           />
-          {walletCard}
-        </View>
-        {error ? (
-          <AppText variant="bodySmall" color="danger" testID="earnings-refresh-error">
-            {error}
+          <EarningsWalletCard wallet={walletView} onOpenWallet={openWallet} onPay={payOwed} />
+          {banner ? <View style={styles.gap16}>{banner}</View> : null}
+          {data.period !== 'day' && data.series.length > 0 && data.totals.trips > 0 ? (
+            <View style={styles.gap16}>
+              <EarningsChart
+                series={data.series}
+                period={data.period}
+                currency={data.currency}
+                today={screen.today}
+                caption={periodCaption(data.period, data.from, data.to)}
+                stale={stale}
+              />
+            </View>
+          ) : null}
+          <View style={styles.gap16}>
+            <EarningsLinkTiles strikes={strikes.data} onOpenStatements={openStatements} onOpenStrikes={openStrikes} />
+          </View>
+          <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
+            {t('earnings.tripsHeader')}
           </AppText>
-        ) : null}
-        {data.period !== 'day' ? (
-          <EarningsChart series={data.series} period={data.period} currency={data.currency} />
-        ) : null}
-        <EarningsLinksCard
-          onOpenStatements={() => navigation.navigate(DRIVER_STATEMENTS_ROUTE)}
-          onOpenStrikes={() => navigation.navigate(DRIVER_STRIKES_ROUTE)}
-        />
-        <AppText variant="overline" color="textMuted" accessibilityRole="header" style={styles.sectionTitle}>
-          {STATS_COPY.ridesTitle}
-        </AppText>
-      </View>
-    </View>
+        </View>
+      ) : null,
+    [data, stale, walletView, openWallet, payOwed, banner, screen.today, strikes.data, openStatements, openStrikes],
   );
 
-  const renderFooter = () => {
-    if (earnings.loadingMore) {
-      return (
-        <View style={styles.footer}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      );
-    }
-    if (earnings.loadMoreError) {
-      return (
-        <View style={styles.footer}>
-          <AppText variant="bodySmall" color="textSecondary" align="center">
-            {earnings.loadMoreError}
-          </AppText>
-          <Button label={STATS_COPY.retry} variant="ghost" size="sm" fullWidth={false} onPress={earnings.loadMore} />
-        </View>
-      );
-    }
-    return null;
-  };
+  if (!data) {
+    return (
+      <Screen testID="earnings-screen">
+        {header}
+        {earnings.status === 'failed' ? (
+          <ErrorState
+            title={STATS_COPY.loadFailed}
+            body={earnings.error ?? undefined}
+            retryLabel={STATS_COPY.retry}
+            onRetry={earnings.reload}
+            testID="earnings-error"
+          />
+        ) : (
+          <EarningsSkeleton period={period} />
+        )}
+      </Screen>
+    );
+  }
 
   return (
     <Screen testID="earnings-screen">
       {header}
       <ScrollHairline scrollY={scrollY} testID="earnings-hairline" />
       <TabScrollToTop scrollRef={listRef} />
-      <Animated.FlatList
-        ref={listRef}
-        testID="earnings-rides"
-        style={styles.list}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        data={rides}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        ItemSeparatorComponent={separator}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={
-          <EmptyState icon="rides" title={STATS_COPY.emptyTitle[data.period]} body={STATS_COPY.emptyBody} testID="earnings-empty" />
-        }
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={[styles.content, rides.length === 0 && styles.contentEmpty]}
-        onEndReached={earnings.hasMore && !earnings.loadMoreError ? earnings.loadMore : undefined}
-        onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl refreshing={pulling} onRefresh={onRefresh} tintColor={theme.colors.primary} colors={[theme.colors.primary]} />
-        }
-      />
+      <StaleOpacityProvider value={staleOpacity} stale={stale}>
+        <Animated.FlatList
+          ref={listRef}
+          testID="earnings-rides"
+          style={styles.list}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          data={items}
+          keyExtractor={keyOf}
+          renderItem={renderItem}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={<EarningsEmpty period={data.period} mismatch={data.totals.trips > 0} onGoToDrive={goToDrive} />}
+          ListFooterComponent={
+            <EarningsListFooter
+              period={data.period}
+              loadingMore={earnings.loadingMore}
+              loadMoreError={earnings.loadMoreError}
+              ended={screen.ended}
+              onRetry={earnings.loadMore}
+            />
+          }
+          contentContainerStyle={styles.content}
+          onEndReached={!stale && earnings.hasMore && !earnings.loadMoreError ? earnings.loadMore : undefined}
+          onEndReachedThreshold={0.5}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
+          refreshControl={
+            <RefreshControl
+              refreshing={screen.pulling}
+              onRefresh={screen.onRefresh}
+              tintColor={tint}
+              colors={[tint]}
+              progressBackgroundColor={theme.colors.surface}
+            />
+          }
+        />
+      </StaleOpacityProvider>
     </Screen>
   );
 }
@@ -245,15 +241,10 @@ export default function DriverEarningsScreen() {
 const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', paddingBottom: space[8] },
-  contentEmpty: { flexGrow: 1 },
   // Pinned under the bar: 0 top / 12 bottom (§5.2 revised UI-R15).
   controls: { paddingHorizontal: layout.gutter, paddingBottom: space[3] },
-  headerBlock: { paddingHorizontal: layout.gutter, paddingBottom: space[2], gap: space[4] },
-  sectionTitle: { marginTop: space[2] },
-  top: { gap: space[3] },
-  ride: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 64 },
-  rideText: { flex: 1, minWidth: 0 },
-  rideAmount: { flexShrink: 0 },
-  separator: { height: StyleSheet.hairlineWidth, marginStart: space[4] },
-  footer: { paddingVertical: space[4], alignItems: 'center', gap: space[2] },
+  // §1: hero, 12, owed card; 16 between the later blocks; 24 above "Trips", 8 under it.
+  headerBlock: { paddingHorizontal: layout.gutter, paddingBottom: space[2], gap: space[3] },
+  gap16: { marginTop: space[1] },
+  sectionTitle: { marginTop: space[3] },
 });

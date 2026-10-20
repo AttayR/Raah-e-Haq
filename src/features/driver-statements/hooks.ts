@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { CACHE_NAMES, CACHE_TTL } from '../../core/api/queryCache';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { t } from '../../i18n';
 import { calendarDate, shiftDate, statementsApi } from './api';
@@ -68,3 +69,12 @@ export const nextIsCurrent = (shown: string, current: string): boolean => {
 /** GET /driver/strikes, read when the screen is focused. */
 export const useDriverStrikes = (enabled: boolean): RemoteData<DriverStrikes> =>
   useRemoteData({ fetch: statementsApi.getStrikes, fallbackError: t('strikes.loadFailed'), enabled });
+
+const STRIKES_SUMMARY_CACHE = { name: CACHE_NAMES.driverStrikes, ttlMs: CACHE_TTL.driverStrikes } as const;
+
+/**
+ * UI-R17 §3.2: the strikes summary on the Earnings tab, through the query cache (60 s): one
+ * request on first focus, none on period switches, a fresh one on pull to refresh. Never polled.
+ */
+export const useStrikesSummary = (enabled: boolean): RemoteData<DriverStrikes> =>
+  useRemoteData({ fetch: statementsApi.getStrikes, fallbackError: t('strikes.loadFailed'), enabled, cache: STRIKES_SUMMARY_CACHE });
