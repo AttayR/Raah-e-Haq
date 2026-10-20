@@ -551,7 +551,7 @@ These are rulings on proposals that are not built yet: `docs/design/screens/map-
 6. **Id rotation.** The public id changes at session start, on every coarse/hidden → fine transition, and at least hourly. Implementation: a per-driver visibility epoch is mixed into `publicId`. A marker can then not be linked across a stop, a zone or a new session.
 7. **Anti-following budget.**
    - Fine positions are served in at most **6 distinct 2 km cells per account per rolling hour**, using the `WomenMode::allowedCell` pattern (atomic, fails closed). Past the budget the answer is the coarse path (200, not 429), so the app keeps working.
-   - The `nearby-drivers` limit drops from 12/min to **6/min plus 180/hour** per user. The IP limit stays at 30/min. The app polls 4/min.
+   - The `nearby-drivers` limit drops from 12/min to **6/min plus 300/hour** per user (amended 2026-10-20 from 180/h: the app's 4/min poll is 240/h). The IP limit stays at 30/min. The app polls 4/min.
 8. **Counts (BE-116 a).** `by_tier` and `online_total` are computed from the **coarse** (grid, 120 s bucket) positions of all listed drivers, including zoned ones. A client-chosen centre with a 1 km minimum radius can then never home in on a hidden driver more finely than today's accepted 550 m cell. Counts never split by gender.
 9. **Uniform treatment.** No rule may depend on gender or on `WomenMode::driverEligible`. A feature test asserts byte-identical output for a female and a male driver with the same pings. `WomenMode::availabilityNear` stays on the coarse path.
 10. **No logs or caches** of fine public positions beyond the 15 s response cache. Fine responses are not stored per viewer.
