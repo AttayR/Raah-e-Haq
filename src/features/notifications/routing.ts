@@ -23,6 +23,10 @@ export type NotificationTarget =
   | { kind: 'earnings' }
   /** The wallet (category `wallet`: top-ups, settlements, adjustments; T-515/T-514). */
   | { kind: 'wallet' }
+  /** BE-130 `support`: an agent replied to this request (UI-R18 thread). */
+  | { kind: 'supportTicket'; ticketId: number }
+  /** A `support` notification without a request id: Help & support. */
+  | { kind: 'support' }
   /** Nothing more specific: the notifications list. */
   | { kind: 'inbox' };
 
@@ -36,16 +40,24 @@ export interface TargetSource {
   rideStatus?: string | null;
   /** BE-114 `reason: no_driver`: the request expired unanswered. */
   noDriver?: boolean;
+  /** BE-130 `support`: the request's id (`ticket_id`). */
+  ticketId?: number | null;
 }
+
+/** BE-130: an agent replied to a support request (`data.ticket_id`). */
+export const SUPPORT_TYPE = 'support';
 
 const ENDED_RIDE_TYPES = new Set(['ride_completed', 'ride_cancelled']);
 /** BE-74 top-up results; also routed by type in case a push arrives without its category. */
 const WALLET_TYPES = new Set(['topup_succeeded', 'topup_failed']);
 
 export const resolveNotificationTarget = (
-  { category, type, rideId, requeued = false, rideStatus = null, noDriver = false }: TargetSource,
+  { category, type, rideId, requeued = false, rideStatus = null, noDriver = false, ticketId = null }: TargetSource,
   role: NotificationRole,
 ): NotificationTarget => {
+  if (type === SUPPORT_TYPE) {
+    return ticketId ? { kind: 'supportTicket', ticketId } : { kind: 'support' };
+  }
   if ((category === 'chat' || type === 'chat_message') && rideId !== null) {
     return { kind: 'chat', rideId };
   }

@@ -18,6 +18,11 @@ export type PromoCardProps = {
   meta?: string;
   /** Extra content under the text (the invite code row). */
   children?: React.ReactNode;
+  /**
+   * UI-R18: `children` hold controls (the invite code's Copy button). The card is then not one
+   * accessibility element (that would hide them from VoiceOver); the text is its own group.
+   */
+  childrenInteractive?: boolean;
   /** Without it the card is not pressable. */
   onPress?: () => void;
   accessibilityLabel?: string;
@@ -37,6 +42,7 @@ export function PromoCard({
   description,
   meta,
   children,
+  childrenInteractive = false,
   onPress,
   accessibilityLabel,
   style,
@@ -44,34 +50,46 @@ export function PromoCard({
 }: PromoCardProps) {
   const { theme } = useAppTheme();
   const c = theme.colors;
+  const label = accessibilityLabel ?? [title, description].filter(Boolean).join('. ');
   const content = (
     <>
       <View style={[styles.disc, { backgroundColor: c.accent }]} testID={testID ? `${testID}-disc` : undefined}>
         <Icon name={kind === 'invite' ? 'gift' : 'promo'} size={b.promoGlyph} color="onAccent" />
       </View>
       <View style={styles.text}>
-        <AppText variant="title" numberOfLines={2}>
-          {title}
-        </AppText>
-        {description ? (
-          <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
-            {description}
+        <View
+          style={styles.words}
+          accessible={childrenInteractive}
+          accessibilityLabel={childrenInteractive ? label : undefined}
+          testID={testID ? `${testID}-text` : undefined}
+        >
+          <AppText variant="title" numberOfLines={2}>
+            {title}
           </AppText>
-        ) : null}
-        {meta ? (
-          <AppText variant="caption" color="textMuted" numberOfLines={1}>
-            {meta}
-          </AppText>
-        ) : null}
+          {description ? (
+            <AppText variant="bodySmall" color="textSecondary" numberOfLines={childrenInteractive ? 3 : 2}>
+              {description}
+            </AppText>
+          ) : null}
+          {meta ? (
+            <AppText variant="caption" color="textMuted" numberOfLines={1}>
+              {meta}
+            </AppText>
+          ) : null}
+        </View>
         {children}
       </View>
     </>
   );
-  const label = accessibilityLabel ?? [title, description].filter(Boolean).join('. ');
 
   if (!onPress) {
     return (
-      <View testID={testID} accessible accessibilityLabel={label} style={[styles.card, { backgroundColor: c.accentSoft }, style]}>
+      <View
+        testID={testID}
+        accessible={!childrenInteractive}
+        accessibilityLabel={childrenInteractive ? undefined : label}
+        style={[styles.card, { backgroundColor: c.accentSoft }, style]}
+      >
         {content}
       </View>
     );
@@ -106,4 +124,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { flex: 1, minWidth: 0, gap: space[1] },
+  words: { gap: space[1] },
 });

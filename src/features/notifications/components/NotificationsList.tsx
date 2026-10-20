@@ -75,7 +75,14 @@ export function NotificationsList({ role, list }: NotificationsListProps) {
     (item: AppNotification) => {
       if (item.readAt === null) markRead(item.id);
       const target = resolveNotificationTarget(
-        { category: item.category, type: item.type, rideId: item.data.rideId, requeued: item.data.requeued, noDriver: item.data.noDriver },
+        {
+          category: item.category,
+          type: item.type,
+          rideId: item.data.rideId,
+          requeued: item.data.requeued,
+          noDriver: item.data.noDriver,
+          ticketId: item.data.ticketId,
+        },
         role,
       );
       if (role !== 'passenger' || target.kind !== 'ride') {

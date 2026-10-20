@@ -11,7 +11,9 @@ export type AccountRoute =
   | 'ParcelOptIn'
   | 'RideHistory'
   | 'EmergencyContacts'
-  | 'NotificationPreferences';
+  | 'NotificationPreferences'
+  | 'Support'
+  | 'Invite';
 
 export interface AccountNavigator {
   navigate(name: AccountRoute): void;

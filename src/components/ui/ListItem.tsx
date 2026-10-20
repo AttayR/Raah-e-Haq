@@ -8,6 +8,8 @@ import { Icon, type IconName } from './Icon';
 
 export type ListItemProps = {
   title: string;
+  /** Title line cap (default 2); UI-R18 ticket subjects use 1 (tail ellipsis). */
+  titleNumberOfLines?: number;
   subtitle?: string;
   /** Subtitle line cap (default 2); 0 shows all of it (a bio or an address on Profile, T-545). */
   subtitleNumberOfLines?: number;
@@ -56,6 +58,7 @@ export type ListItemProps = {
  */
 export function ListItem({
   title,
+  titleNumberOfLines = 2,
   subtitle,
   subtitleNumberOfLines = 2,
   subtitleColor = 'textSecondary',
@@ -97,7 +100,7 @@ export function ListItem({
         <AppText
           variant={variant === 'content' ? 'title' : 'body'}
           color={destructive ? 'danger' : 'textPrimary'}
-          numberOfLines={2}
+          numberOfLines={titleNumberOfLines}
         >
           {title}
         </AppText>

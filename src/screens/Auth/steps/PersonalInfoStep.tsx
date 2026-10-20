@@ -5,6 +5,7 @@ import { REGISTRATION_FIELDS } from '../../../features/auth/copy/registrationFie
 import { formatCnicInput, formatIsoDateInput } from '../../../features/auth/registration/inputFormat';
 import type { RegistrationFormData } from '../../../features/auth/registration/registrationForm';
 import EmergencyContactFields, { fromPhoneField, toPhoneField } from './EmergencyContactFields';
+import InviteCodeField from './InviteCodeField';
 import PasswordStrength from './PasswordStrength';
 import { Anchored, ControlLabel, FieldError, FormGroup, stepStyles, useStepFields, type StepProps } from './stepParts';
 import { perLocale } from '../../../i18n';
@@ -22,7 +23,8 @@ const GENDER_OPTIONS = perLocale((): ReadonlyArray<{ value: Gender; label: strin
 /**
  * Registration page "About you" (UI-R7, both roles): name, email, mobile, password, CNIC, date of
  * birth (drivers 18+, BE-68), gender and address, then the emergency contact (required for
- * passengers). Every field is a kit TextField; the number pads get an iOS Done bar.
+ * passengers), then the optional invite code (UI-R18 §I4). Every field is a kit TextField; the
+ * number pads get an iOS Done bar.
  */
 export default function PersonalInfoStep(props: StepProps) {
   const { data } = props;
@@ -172,6 +174,7 @@ export default function PersonalInfoStep(props: StepProps) {
         </Anchored>
       </FormGroup>
       <EmergencyContactFields data={data} fields={f} />
+      <InviteCodeField value={data.inviteCode} onChange={(value) => f.set('inviteCode', value)} error={errors.inviteCode} />
     </View>
   );
 }

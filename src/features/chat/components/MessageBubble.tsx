@@ -21,6 +21,11 @@ type Props = {
   lastInRun?: boolean;
   /** Your message the other party has read (read receipts are cumulative, BE-13). */
   read?: boolean;
+  /**
+   * UI-R18 support thread: drawn above the first bubble of the other side's run (the
+   * "Raah-e-Haq support" badge and name). The ride chat passes nothing.
+   */
+  sender?: React.ReactNode;
 };
 
 const k = componentTokens.chat;
@@ -34,7 +39,7 @@ const k = componentTokens.chat;
  * and, when it can be resent, retries on tap. The body is plain text (BE-13), never markup. A
  * message with a BE-89 `safety_warning` gets a warning note under it (not a modal).
  */
-function MessageBubbleBase({ item, seen, onRetry, viewerId, firstInRun = true, lastInRun = true, read = false }: Props) {
+function MessageBubbleBase({ item, seen, onRetry, viewerId, firstInRun = true, lastInRun = true, read = false, sender }: Props) {
   const { theme } = useAppTheme();
   const c = theme.colors;
   const dark = theme.mode === 'dark';
@@ -87,6 +92,7 @@ function MessageBubbleBase({ item, seen, onRetry, viewerId, firstInRun = true, l
       style={[styles.row, mine ? styles.rowMine : styles.rowTheirs, firstInRun ? styles.runStart : null]}
       testID={`chat-bubble-${item.key}`}
     >
+      {sender && !mine && firstInRun ? sender : null}
       {retryable && item.kind === 'pending' ? (
         <Pressable
           onPress={() => onRetry(item.pending.clientId)}

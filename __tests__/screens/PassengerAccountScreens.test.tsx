@@ -132,9 +132,9 @@ describe('PassengerSettingsScreen', () => {
     // No invented stars, no image overlay, no "Danger Zone".
     expect(screen.queryByText(/danger zone/i)).toBeNull();
     expect(screen.UNSAFE_root.findAll((node) => node.props.source !== undefined && typeof node.type !== 'string')).toHaveLength(0);
-    // No dead rows: Help & support and Invite friends come back with T-619.
-    expect(screen.queryByText(/help/i)).toBeNull();
-    expect(screen.queryByText(/invite/i)).toBeNull();
+    // UI-R18 (T-619): Help & support and Invite friends open real screens.
+    expect(screen.getByText('Help & support')).toBeTruthy();
+    expect(screen.getByText('Invite friends')).toBeTruthy();
     // Active accounts show no status badge.
     expect(screen.queryByTestId('passenger-settings-profile-status')).toBeNull();
     expectOnlyThemeColors(theme);

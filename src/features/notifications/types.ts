@@ -25,6 +25,8 @@ export interface NotificationPayload {
   requeued: boolean;
   /** BE-114 `reason: no_driver`: the request ended because no driver accepted it in time. */
   noDriver?: boolean;
+  /** BE-130 `support`: the request an agent replied to (only on `support` rows). */
+  ticketId?: number;
 }
 
 export interface AppNotification {
@@ -78,6 +80,8 @@ export interface PushPayload {
   requeued: boolean;
   /** BE-114, `ride_cancelled` only: `reason` "no_driver" (no driver accepted the request in time). */
   noDriver?: boolean;
+  /** BE-130 `type: support`: the request an agent replied to. */
+  ticketId?: number;
 }
 
 export type DevicePlatform = 'ios' | 'android';

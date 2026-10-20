@@ -14,6 +14,7 @@ const STEP_FIELDS: ReadonlyArray<{ step: RegistrationStep; fields: readonly Form
     fields: [
       'fullName', 'email', 'phoneNumber', 'cnic', 'address', 'dateOfBirth', 'gender', 'password',
       'confirmPassword', 'emergencyContactNumber', 'emergencyContactName', 'emergencyRelationship',
+      'inviteCode',
     ],
   },
   {
@@ -47,6 +48,8 @@ const COMMON_FIELDS: Readonly<Record<string, FormField>> = {
   emergency_contact: 'emergencyContactNumber',
   emergency_contact_name: 'emergencyContactName',
   emergency_contact_relation: 'emergencyRelationship',
+  // UI-R18 §I4: the optional invite code at the end of the first page.
+  referral_code: 'inviteCode',
 };
 
 const PASSENGER_FIELDS: Readonly<Record<string, FormField>> = {
@@ -101,7 +104,7 @@ const baseKey = (field: string): string => field.split('.')[0];
 
 /**
  * Maps a 422 `errors` map (ApiError.fieldErrors) onto the registration form (T-202, AUTH-10).
- * Fields of the other role (or that no input shows, e.g. preferred_payment, referral_code)
+ * Fields of the other role (or that no input shows, e.g. preferred_payment)
  * become form-level messages instead of being dropped.
  */
 export function mapRegistrationServerErrors(

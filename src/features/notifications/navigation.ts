@@ -82,6 +82,11 @@ export const routeForTarget = (
     case 'rideRequests':
     case 'home':
       return tab(role, HOME_TAB[role]);
+    case 'supportTicket':
+      // UI-R18: registered in both role stacks; Back returns to where the user was.
+      return { screen: 'SupportTicket', params: { id: target.ticketId }, initial: false };
+    case 'support':
+      return { screen: 'Support', initial: false };
     case 'inbox':
     default:
       return tab(role, 'Inbox', { segment: 'notifications' });
@@ -114,6 +119,14 @@ export const focusedChildOf = (navigation: NotificationNavigation, parentName: s
     state = child;
   }
   return null;
+};
+
+/** UI-R18: the support request whose thread is the focused screen right now, or null. */
+export const focusedSupportTicketId = (navigation: NotificationNavigation): number | null => {
+  const route = focusedRouteOf(rootOf(navigation).getState() as AnyState | undefined);
+  if (!route || route.name !== 'SupportTicket') return null;
+  const id = (route.params as { id?: unknown } | undefined)?.id;
+  return typeof id === 'number' ? id : null;
 };
 
 /**

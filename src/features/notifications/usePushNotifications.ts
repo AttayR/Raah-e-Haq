@@ -14,7 +14,8 @@ import { toast } from '../../core/toast';
 import { logger } from '../../core/logging/logger';
 import { toPushPayload } from './api';
 import { NOTIFICATIONS_COPY } from './copy';
-import { focusedChatRideId, focusedChildOf, openNotificationTarget } from './navigation';
+import { focusedChatRideId, focusedChildOf, focusedSupportTicketId, openNotificationTarget } from './navigation';
+import { emitSupportReplyPush } from '../support/events';
 import { promptForPushWithPrimer, registerDeviceToken, setPushAskHandler, syncPushRegistration } from './push';
 import { resolveNotificationTarget, type NotificationRole } from './routing';
 import {
@@ -124,6 +125,14 @@ export const usePushNotifications = (role: NotificationRole): void => {
       if (target.kind === 'chat' && focusedChatRideId(navigationRef.current) === target.rideId) {
         markReadAndCount(payload.notificationId);
         return;
+      }
+      // UI-R18: a support reply re-reads its thread when open (it never polls); on screen, no banner.
+      if (target.kind === 'supportTicket') {
+        emitSupportReplyPush(target.ticketId);
+        if (focusedSupportTicketId(navigationRef.current) === target.ticketId) {
+          markReadAndCount(payload.notificationId);
+          return;
+        }
       }
       dispatch(fetchUnreadCount());
       // T-587: a ride assigned to the driver (auto-accept, or an admin): read the status now so

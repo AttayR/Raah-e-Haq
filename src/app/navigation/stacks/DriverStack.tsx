@@ -18,6 +18,7 @@ import type { ProfileEditRoutes } from '../../../features/profile-edit/navigatio
 import type { DriverStatementRoutes } from '../../../features/driver-statements/navigation';
 import type { VehicleAcRoutes } from '../../../features/ac/navigation';
 import type { ParcelDriverRoutes } from '../../../features/parcel/navigation';
+import { supportTicketScreenId, type SupportRoutes } from '../../../features/support/navigation';
 import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 export type DriverStackParamList = {
@@ -57,6 +58,13 @@ export type DriverStackParamList = {
   VehicleAc: VehicleAcRoutes['VehicleAc'];
   /** Account → Parcel deliveries (T-522, BE-88). */
   ParcelOptIn: ParcelDriverRoutes['ParcelOptIn'];
+  /** Account → Help & support, its requests, one request and a new one (UI-R18, BE-130). */
+  Support: SupportRoutes['Support'];
+  SupportRequests: SupportRoutes['SupportRequests'];
+  SupportTicket: SupportRoutes['SupportTicket'];
+  SupportNewRequest: SupportRoutes['SupportNewRequest'];
+  /** Account → Invite friends (UI-R18, BE-131). */
+  Invite: undefined;
 };
 
 /*
@@ -83,6 +91,12 @@ const loadWeeklyStatementScreen = () => require('../../../features/driver-statem
 const loadDriverStrikesScreen = () => require('../../../features/driver-statements/screens/DriverStrikesScreen').default;
 const loadVehicleAcScreen = () => require('../../../features/ac/screens/VehicleAcScreen').default;
 const loadParcelOptInScreen = () => require('../../../features/parcel/screens/ParcelOptInScreen').default;
+
+const loadSupportScreen = () => require('../../../features/support/screens/SupportScreen').default;
+const loadSupportRequestsScreen = () => require('../../../features/support/screens/SupportRequestsScreen').default;
+const loadSupportTicketScreen = () => require('../../../features/support/screens/SupportTicketScreen').default;
+const loadSupportNewRequestScreen = () => require('../../../features/support/screens/SupportNewRequestScreen').default;
+const loadInviteScreen = () => require('../../../features/invite/screens/InviteScreen').default;
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
@@ -131,6 +145,12 @@ const DriverStack = () => {
       <Stack.Screen name="DriverStrikes" getComponent={loadDriverStrikesScreen} />
       <Stack.Screen name="VehicleAc" getComponent={loadVehicleAcScreen} />
       <Stack.Screen name="ParcelOptIn" getComponent={loadParcelOptInScreen} />
+      <Stack.Screen name="Support" getComponent={loadSupportScreen} />
+      <Stack.Screen name="SupportRequests" getComponent={loadSupportRequestsScreen} />
+      {/* One screen per request: a push for another request opens its own thread. */}
+      <Stack.Screen name="SupportTicket" getComponent={loadSupportTicketScreen} getId={supportTicketScreenId} />
+      <Stack.Screen name="SupportNewRequest" getComponent={loadSupportNewRequestScreen} />
+      <Stack.Screen name="Invite" getComponent={loadInviteScreen} />
     </Stack.Navigator>
   );
 };

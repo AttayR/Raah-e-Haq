@@ -17,6 +17,7 @@ import { AccountChecks } from '../../profile-edit';
 import { peekMyStats } from '../../stats/hooks';
 import { SafetyGroup, YourAccountGroup } from '../components/AccountRoleRows';
 import { AppearanceRow, LanguageRow } from '../components/PreferenceRows';
+import { HelpGroup } from '../components/HelpGroup';
 import { versionLine } from '../rules';
 import type { AccountNavigator, AccountRole } from '../navigation';
 
@@ -27,8 +28,8 @@ import type { AccountNavigator, AccountRole } from '../navigation';
  * group order and names on both roles; only the rows of §4 differ. Everything renders from the
  * stored user: no request on focus, pull to refresh re-reads GET /auth/profile.
  *
- * UI-R18 adds the "Help" group (Help & support, Invite friends, Terms, Privacy) between
- * Preferences and Sign out; nothing is shown for it until those screens exist.
+ * UI-R18: the "Help" group (Help & support, Invite friends, and Terms / Privacy once GET
+ * /settings/public sends their links) sits between Preferences and Sign out.
  */
 export function AccountScreen({ role }: { role: AccountRole }) {
   const prefix = `${role}-settings`;
@@ -90,6 +91,8 @@ export function AccountScreen({ role }: { role: AccountRole }) {
           <AppearanceRow />
           <LanguageRow />
         </ListGroup>
+
+        <HelpGroup navigation={navigation} prefix={prefix} />
 
         <ListGroup>
           <ListItem

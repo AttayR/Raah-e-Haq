@@ -88,7 +88,7 @@ describe('mapRegistrationServerErrors', () => {
     const result = mapRegistrationServerErrors(
       {
         passenger_preferred_payment: ['The selected passenger preferred payment is invalid.'],
-        referral_code: ['The selected referral code is invalid.'],
+        promo_token: ['The selected promo token is invalid.'],
         vehicle_make: ['Required.'],
         license_type: ['Required.'],
       },
@@ -99,7 +99,7 @@ describe('mapRegistrationServerErrors', () => {
     expect(result.firstField).toBeNull();
     expect(result.formErrors).toEqual([
       'The selected passenger preferred payment is invalid.',
-      'The selected referral code is invalid.',
+      'The selected promo token is invalid.',
       'Required.',
     ]);
   });

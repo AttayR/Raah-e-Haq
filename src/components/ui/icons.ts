@@ -144,6 +144,8 @@ export const iconGlyphs = {
   pinCode: 'dialpad',
   lockClock: 'lock-clock',
   support: 'lifebuoy',
+  // UI-R18 Invite code row (Help topics reuse `smartphone` and `report`).
+  copy: 'content-copy',
   // Fare fairness (T-521).
   minus: 'minus',
   fareLock: 'lock-check-outline',

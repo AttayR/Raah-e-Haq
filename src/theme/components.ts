@@ -354,6 +354,29 @@ export const componentTokens = {
     sendIconSize: 20,
     closedIconSize: 20,
   },
+  /** UI-R18 Help & support (shared-support-invite §H). */
+  support: {
+    /** Leading topic / ticket / emergency tile (same as listItem.tile). */
+    tile: 40,
+    /** The brand badge beside a support reply. */
+    brandBadge: 32,
+    brandLogo: 20,
+    /** Unread support reply, before the status pill. */
+    unreadDot: 8,
+    /** "{n}/2000" under the description from this many characters (always shown there). */
+    subjectCounterFrom: 100,
+    /** Paged list footer spinner row. */
+    footerRow: 56,
+  },
+  /** UI-R18 Invite friends (shared-support-invite §I2). */
+  invite: {
+    codeRowHeight: 56,
+    codeLetterSpacing: 2,
+    /** The code stays on one line: it is read aloud. */
+    codeMaxFontScale: 1.2,
+    stepCircle: 32,
+    stepMinHeight: 56,
+  },
   /** T-520 safety: the SOS sheet's round badge and the passenger's PIN digit tiles. */
   safety: { sheetBadge: 56, sheetBadgeGlyph: 28, pinDigitWidth: 36, pinDigitHeight: 48 },
   /**

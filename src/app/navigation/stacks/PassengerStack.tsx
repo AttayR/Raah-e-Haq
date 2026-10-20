@@ -20,6 +20,7 @@ import type { SafetyRoutes } from '../../../features/safety/navigation';
 import type { ProfileEditRoutes } from '../../../features/profile-edit/navigation';
 import type { ParcelPassengerRoutes } from '../../../features/parcel/navigation';
 import type { RootStackParamList } from '../RootNavigation';
+import { supportTicketScreenId, type SupportRoutes } from '../../../features/support/navigation';
 import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 export type PassengerStackParamList = {
@@ -55,6 +56,13 @@ export type PassengerStackParamList = {
   EmergencyContactEditor: SafetyRoutes['EmergencyContactEditor'];
   /** Home → "Send a parcel" (T-522, BE-88). */
   SendParcel: ParcelPassengerRoutes['SendParcel'];
+  /** Account → Help & support, its requests, one request and a new one (UI-R18, BE-130). */
+  Support: SupportRoutes['Support'];
+  SupportRequests: SupportRoutes['SupportRequests'];
+  SupportTicket: SupportRoutes['SupportTicket'];
+  SupportNewRequest: SupportRoutes['SupportNewRequest'];
+  /** Account → Invite friends (UI-R18, BE-131). */
+  Invite: undefined;
 };
 
 /*
@@ -75,6 +83,12 @@ const loadSavedPlaceEditorScreen = () => require('../../../features/saved-places
 const loadEmergencyContactsScreen = () => require('../../../features/safety/screens/EmergencyContactsScreen').default;
 const loadEmergencyContactEditorScreen = () => require('../../../features/safety/screens/EmergencyContactEditorScreen').default;
 const loadSendParcelScreen = () => require('../../../features/parcel/screens/SendParcelScreen').default;
+
+const loadSupportScreen = () => require('../../../features/support/screens/SupportScreen').default;
+const loadSupportRequestsScreen = () => require('../../../features/support/screens/SupportRequestsScreen').default;
+const loadSupportTicketScreen = () => require('../../../features/support/screens/SupportTicketScreen').default;
+const loadSupportNewRequestScreen = () => require('../../../features/support/screens/SupportNewRequestScreen').default;
+const loadInviteScreen = () => require('../../../features/invite/screens/InviteScreen').default;
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 
@@ -123,6 +137,12 @@ const PassengerStack = ({ navigation }: Props) => {
       <Stack.Screen name="EmergencyContacts" getComponent={loadEmergencyContactsScreen} />
       <Stack.Screen name="EmergencyContactEditor" getComponent={loadEmergencyContactEditorScreen} />
       <Stack.Screen name="SendParcel" getComponent={loadSendParcelScreen} />
+      <Stack.Screen name="Support" getComponent={loadSupportScreen} />
+      <Stack.Screen name="SupportRequests" getComponent={loadSupportRequestsScreen} />
+      {/* One screen per request: a push for another request opens its own thread. */}
+      <Stack.Screen name="SupportTicket" getComponent={loadSupportTicketScreen} getId={supportTicketScreenId} />
+      <Stack.Screen name="SupportNewRequest" getComponent={loadSupportNewRequestScreen} />
+      <Stack.Screen name="Invite" getComponent={loadInviteScreen} />
     </Stack.Navigator>
   );
 };

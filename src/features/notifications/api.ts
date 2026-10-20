@@ -41,6 +41,12 @@ const toText = (value: unknown): string | null =>
 const toCount = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 
+/** BE-130: `{ ticketId }` for a support row or push that names its request, else nothing. */
+const ticketIdOf = (value: unknown): { ticketId?: number } => {
+  const id = toId(value);
+  return id === null ? {} : { ticketId: id };
+};
+
 /** Unknown or missing categories are `system` (the contract says so). */
 export const toCategory = (value: unknown): NotificationCategory =>
   NOTIFICATION_CATEGORIES.find((known) => known === value) ?? 'system';
@@ -58,6 +64,7 @@ const toPayload = (raw: unknown): NotificationPayload => {
     requeued: data.requeued === true || data.requeued === 'true' || data.requeued === 1,
     // BE-114: only said when it is so (older rows and other cancels carry no `reason`).
     ...(data.reason === 'no_driver' ? { noDriver: true } : {}),
+    ...ticketIdOf(data.ticket_id),
   };
 };
 
@@ -131,6 +138,7 @@ export const toPushPayload = (raw: unknown): PushPayload => {
     rideStatus: toText(data.ride_status),
     requeued: data.requeued === 'true',
     ...(data.reason === 'no_driver' ? { noDriver: true } : {}),
+    ...ticketIdOf(data.ticket_id),
   };
 };
 

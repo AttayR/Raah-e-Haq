@@ -74,6 +74,8 @@ export function buildRegistrationRequest(form: RegistrationFormData): RegisterWi
     emergency_contact: emergencyContact,
     date_of_birth: form.dateOfBirth.trim(),
     ...(form.gender ? { gender: form.gender } : {}),
+    // UI-R18 §I4: only when given (the server normalises it and refuses an unknown one).
+    ...(form.inviteCode.trim() ? { referral_code: form.inviteCode.trim().toUpperCase() } : {}),
   };
 
   if (form.role === 'passenger') {

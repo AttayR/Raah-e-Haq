@@ -243,6 +243,9 @@ jest.mock('react-native-haptic-feedback', () => {
   return {__esModule: true, default: {trigger}, trigger};
 });
 
+// Clipboard (UI-R18 Invite "Copy code"): the package's own mock.
+jest.mock('@react-native-clipboard/clipboard', () => require('@react-native-clipboard/clipboard/jest/clipboard-mock.js'));
+
 // Image picker
 jest.mock('react-native-image-picker', () => ({
   launchCamera: jest.fn(() => Promise.resolve({didCancel: true})),

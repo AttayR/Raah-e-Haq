@@ -31,6 +31,13 @@ export const CACHE_TTL = {
   /** UI-R17 Vehicle & documents: GET /profile/documents vehicles. */
   profileVehicles: 60 * 1000,
   directions: 5 * 60 * 1000,
+  /** UI-R18: GET /settings/public is read once per session (shared by Account and Help). */
+  publicSettings: 60 * 60 * 1000,
+  /** UI-R18 §Z: support topics change rarely. */
+  supportCategories: 24 * 60 * 60 * 1000,
+  /** UI-R18 §Z: the invite code never changes; the stats are read again after a minute. */
+  inviteCode: 24 * 60 * 60 * 1000,
+  inviteStats: 60 * 1000,
 } as const;
 
 /** Cache names shared by the hook that reads and the code that invalidates. */
@@ -41,6 +48,10 @@ export const CACHE_NAMES = {
   profileVehicles: 'profile/vehicles',
   savedPlaces: 'saved-places',
   recentRides: 'rides/recent',
+  publicSettings: 'settings/public',
+  supportCategories: 'support/categories',
+  inviteCode: 'referrals/code',
+  inviteStats: 'referrals/stats',
 } as const;
 
 /** Oldest entries go first beyond this many (directions are keyed by route). */

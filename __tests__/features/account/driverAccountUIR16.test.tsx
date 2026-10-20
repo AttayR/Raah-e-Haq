@@ -246,14 +246,15 @@ describe('Driver Account tab (UI-R16 shared AccountScreen)', () => {
     expect(screen.queryByText('Approved')).toBeNull();
     expect(screen.queryByTestId('driver-settings-profile-status')).toBeNull();
     expect(screen.getAllByRole('header').map((node) => node.props.children)).toEqual(
-      expect.arrayContaining(['Your account', 'Safety', 'Preferences']),
+      expect.arrayContaining(['Your account', 'Safety', 'Preferences', 'Help']),
     );
     expect(flat(screen.getByText('Sign out').props.style).color).toBe(theme.colors.danger);
     expect(screen.getByTestId('driver-settings-version')).toHaveTextContent(/^Raah-e-Haq 0\.0\.1/);
-    // Removed rows (A3, A6) and no Help row before UI-R18.
+    // Removed rows (A3, A6); UI-R18 adds the Help group (Help & support, Invite friends).
     expect(screen.queryByText('Edit profile')).toBeNull();
     expect(screen.queryByText('Phone notification settings')).toBeNull();
-    expect(screen.queryByText('Help & support')).toBeNull();
+    expect(screen.getByText('Help & support')).toBeTruthy();
+    expect(screen.getByText('Invite friends')).toBeTruthy();
   });
 
   it('UI-R15b: "Account" sits in the bar once', async () => {

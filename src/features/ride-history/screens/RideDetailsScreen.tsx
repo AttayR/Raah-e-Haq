@@ -9,6 +9,8 @@ import {
   EmptyState,
   ErrorState,
   Header,
+  ListGroup,
+  ListItem,
   Screen,
   Skeleton,
   SkeletonCard,
@@ -37,6 +39,9 @@ import { OverchargeReportSection } from '../../fare/components/OverchargeReport'
 import { AcReportSection } from '../../ac/components/AcReportSection';
 import { SafetyReportSection } from '../../women-mode/components/SafetyReportSection';
 import { ParcelReceiptCard } from '../../parcel/components/ParcelReceiptCard';
+import { tripPrefillOf, type SupportRoutes } from '../../support/navigation';
+
+type SupportNewRequestNavigator = { navigate(name: 'SupportNewRequest', params: SupportRoutes['SupportNewRequest']): void };
 import type { RideRatingState } from '../../rating/types';
 import { useRideDetail, useRideViewer } from '../hooks';
 import type { RideHistoryRoutes } from '../navigation';
@@ -50,7 +55,7 @@ import type { RideHistoryRoutes } from '../navigation';
  */
 export default function RideDetailsScreen() {
   const { theme } = useAppTheme();
-  const navigation = useNavigation<RideChatNavigator & { goBack(): void }>();
+  const navigation = useNavigation<RideChatNavigator & SupportNewRequestNavigator & { goBack(): void }>();
   const { params } = useRoute<RouteProp<RideHistoryRoutes, 'RideDetails'>>();
   const viewer = useRideViewer();
   const { data, status, error, reload, refresh, setData } = useRideDetail(params.rideId, params.ride ?? null);
@@ -207,6 +212,15 @@ export default function RideDetailsScreen() {
             // BE-87 / BE-105: a women's-safety report while the server allows it, then its status.
             <SafetyReportSection rideId={ride.id} state={ride.safetyReport ?? null} onReported={() => refresh()} testID="ride-details-safety-report" />
           ) : null}
+          {/* UI-R18: a support request about this ride (sent with its ride_id). */}
+          <ListGroup>
+            <ListItem
+              icon="support"
+              title={t('support.rideHelpRow')}
+              onPress={() => navigation.navigate('SupportNewRequest', { trip: tripPrefillOf(ride) })}
+              testID="ride-details-help"
+            />
+          </ListGroup>
         </View>
       </Animated.ScrollView>
     </Screen>

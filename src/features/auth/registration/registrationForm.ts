@@ -75,6 +75,8 @@ export interface RegistrationFormData {
   emergencyContactNumber: string;
   emergencyContactName: string;
   emergencyRelationship: string; // e.g. father, mother, spouse, friend
+  /** UI-R18 §I4: an optional invite code, sent as `referral_code` when filled in. */
+  inviteCode: string;
 
   // Vehicle Info (for drivers)
   vehicleType: string;
@@ -121,6 +123,7 @@ export const INITIAL_REGISTRATION_FORM: RegistrationFormData = {
   emergencyContactNumber: '',
   emergencyContactName: '',
   emergencyRelationship: '',
+  inviteCode: '',
   vehicleType: '',
   vehicleNumber: '',
   vehicleBrand: '',

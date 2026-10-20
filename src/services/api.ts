@@ -430,6 +430,8 @@ export interface RegisterRequest {
   emergency_contact_relation?: string;
   date_of_birth?: string; // YYYY-MM-DD
   gender?: 'male' | 'female' | 'other';
+  /** UI-R18 §I4 (BE-31): an invite code; left out when empty. */
+  referral_code?: string;
   license_number?: string;
   vehicle_type?: string;
   preferred_payment?: string;
@@ -640,6 +642,7 @@ class ApiService {
       formData.append('emergency_contact', userData.emergency_contact);
       if (userData.date_of_birth) formData.append('date_of_birth', userData.date_of_birth);
       if (userData.gender) formData.append('gender', userData.gender);
+      if (userData.referral_code) formData.append('referral_code', userData.referral_code);
       if (userData.license_number) formData.append('license_number', userData.license_number);
       if (userData.vehicle_type) formData.append('vehicle_type', userData.vehicle_type);
       if (userData.preferred_payment) formData.append('preferred_payment', userData.preferred_payment);
