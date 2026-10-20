@@ -60,6 +60,8 @@ describe('TripSheet details (TS1 Z6, review items 1 and 9)', () => {
 
   it('adds the 24 gap only when a slot draws something', () => {
     render(<TripSheet mode="receipt" stateKey="b" header={<Text>H</Text>} peek={<Text>P</Text>} persistent={null} />);
+    // UI-R12 r3: the gap also needs something above the details (a measured peek group).
+    act(() => fireEvent(screen.getByTestId('trip-sheet-peek'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 370, height: 90 } } }));
     const content = screen.getByTestId('trip-sheet-details-content');
     act(() => fireEvent(content, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 370, height: 0 } } }));
     expect(flat(screen.getByTestId('trip-sheet-details')).marginTop).toBeUndefined();

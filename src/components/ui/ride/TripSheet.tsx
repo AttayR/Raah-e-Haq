@@ -157,7 +157,9 @@ export const TripSheet = forwardRef<TripSheetHandle, TripSheetProps>(function Tr
     () => ({ opacity: detailsOpacity(height.value, peekValue.value, receipt) }),
     [receipt],
   );
-  // The 24 above the details only when a slot draws something (an empty one adds no gap).
+  // The 24 above the details only when a slot draws something (an empty one adds no gap) and
+  // something stands above them: under an empty peek group (a cancelled receipt without a fee,
+  // PR2 r3) the first block sits 16 under the header, from the header's own gap.
   const [detailsFilled, setDetailsFilled] = useState(false);
   const onDetailsLayout = useCallback((e: LayoutChangeEvent) => {
     const filled = e.nativeEvent.layout.height >= 1;
@@ -217,7 +219,7 @@ export const TripSheet = forwardRef<TripSheetHandle, TripSheetProps>(function Tr
         </View>
         {/* One View at a fixed position in both modes: `persistent` keeps its instance across them. */}
         <Animated.View
-          style={[detailsFilled ? styles.detailsGap : null, detailsFade]}
+          style={[detailsFilled && heights.peek > 0 ? styles.detailsGap : null, detailsFade]}
           accessibilityElementsHidden={detailsHidden}
           importantForAccessibility={detailsHidden ? 'no-hide-descendants' : 'auto'}
           testID={`${testID}-details`}

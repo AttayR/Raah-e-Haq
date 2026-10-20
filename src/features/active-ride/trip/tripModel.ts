@@ -170,7 +170,8 @@ export const passengerTripHeader = ({ stage, ride, parcel, offline, locationAge,
       etaMinutes = null;
       break;
     case 'cancelled':
-      title = ACTIVE_RIDE_COPY.cancelledTitle;
+      // UI-R12 r3: a parcel was a delivery, not a ride.
+      title = isParcelRide(ride) ? t('parcel.cancelledTitle') : ACTIVE_RIDE_COPY.cancelledTitle;
       subtitle = cancelledSubtitle(ride, parcel);
       etaMinutes = null;
       break;

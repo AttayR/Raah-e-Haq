@@ -1564,6 +1564,8 @@ export const en = {
     paymentCashDriver: 'Cash (collected at the pickup)',
     cancelDelivery: 'Cancel delivery',
     cancelledDone: 'Delivery cancelled.',
+    /** UI-R12 r3: the sender's cancelled receipt title. */
+    cancelledTitle: 'Delivery cancelled',
     // T-579: the sender's cancel question. UI-R12 r2 (PA4 parcel rows): the same voice as a ride.
     cancelConfirmTitle: 'Cancel delivery?',
     cancelConfirmMessage: 'Your rider is already on the way.',

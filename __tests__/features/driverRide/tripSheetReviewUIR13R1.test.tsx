@@ -23,10 +23,11 @@ import { componentTokens, layout as layoutTokens, textStyles, MAX_FONT_SIZE_MULT
 import activeRideReducer, { initialActiveRideState } from '../../../src/features/active-ride/slice';
 import { PassengerTripSheet } from '../../../src/features/active-ride/trip/PassengerTripSheet';
 import { advanceRideStage } from '../../../src/features/active-ride/stage';
+import { passengerTripHeader } from '../../../src/features/active-ride/trip/tripModel';
 import { cancelQuestion } from '../../../src/features/active-ride/cancel';
 import { DRIVER_RIDE_COPY } from '../../../src/features/driver-ride/copy';
 import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
-import { setLocale } from '../../../src/i18n';
+import { setLocale, t } from '../../../src/i18n';
 import '../../../src/i18n/copy-ur-Latn';
 import type { RideResource } from '../../../src/services/rideService';
 import { makeRide } from '../../../test-utils/rideFixtures';
@@ -262,5 +263,54 @@ describe('9. the sender\'s cancel dialog (PA4 parcel rows)', () => {
     setLocale('ur-Latn');
     expect(cancelQuestion(parcel('accepted')).options).toMatchObject({ title: 'Delivery cancel karein?', body: 'Aap ka rider raste mein hai.' });
     expect(cancelQuestion(parcel('arrived')).options.body).toBe('Aap ka rider pickup par intezar kar raha hai.');
+  });
+});
+
+describe('UI-R12 r3: cancelled receipt without a fee (PR2)', () => {
+  const sheet = (peekText: string | null) => (
+    <TripSheet
+      mode="receipt"
+      stateKey="cancelled"
+      header={<AppText>Ride cancelled</AppText>}
+      peek={peekText ? <AppText>{peekText}</AppText> : null}
+      persistent={<AppText>Report</AppText>}
+      testID="ts"
+    />
+  );
+  const gapOf = () => StyleSheet.flatten(screen.getByTestId('ts-details', { includeHiddenElements: true }).props.style).marginTop;
+
+  it('an empty peek group adds no 24 above the first block: it sits 16 under the header', () => {
+    render(sheet(null));
+    layoutOf(screen.getByTestId('ts-peek'), 0);
+    layoutOf(screen.getByTestId('ts-details-content', { includeHiddenElements: true }), 48);
+    expect(gapOf()).toBeUndefined();
+    // The 16 is the receipt header's own bottom gap (PR2).
+    const headerBlock = screen.getByTestId('ts-header').findAll((node) => StyleSheet.flatten(node.props.style)?.paddingBottom !== undefined)[0];
+    expect(StyleSheet.flatten(headerBlock.props.style).paddingBottom).toBe(componentTokens.tripSheet.zoneGap);
+  });
+
+  it('with a peek group (the fee card) the details keep their 24', () => {
+    render(sheet('Cancellation fee'));
+    layoutOf(screen.getByTestId('ts-peek'), 90);
+    layoutOf(screen.getByTestId('ts-details-content', { includeHiddenElements: true }), 48);
+    expect(gapOf()).toBe(componentTokens.tripSheet.detailsGap);
+  });
+});
+
+describe('UI-R12 r3 polish', () => {
+  const parcelCancelled = makeRide({ id: 51, status: 'cancelled', vehicle_type: 'parcel', is_parcel: true, cancellation_reason: 'passenger' });
+  const header = (ride: RideResource) => passengerTripHeader({ stage: 'cancelled', ride, parcel: null, offline: false, locationAge: null, now: 0 });
+
+  it('a cancelled parcel says "Delivery cancelled"; a ride keeps "Ride cancelled"', () => {
+    expect(header(parcelCancelled).title).toBe('Delivery cancelled');
+    expect(header(makeRide({ id: 52, status: 'cancelled' })).title).toBe('Ride cancelled');
+    setLocale('ur-Latn');
+    expect(header(parcelCancelled).title).toBe('Delivery cancel ho gayi');
+  });
+
+  it('the PIN field label has a Roman Urdu string', () => {
+    expect(t('safety.pinEntryLabel')).toBe('Ride PIN, 4 digits');
+    setLocale('ur-Latn');
+    expect(t('safety.pinEntryLabel')).toBe('Ride ka PIN, 4 digit');
   });
 });
