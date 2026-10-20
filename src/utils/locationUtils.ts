@@ -27,14 +27,3 @@ export const DEFAULT_LOCATIONS = {
 export const getDefaultLocation = () => {
   return DEFAULT_LOCATIONS.default;
 };
-
-// Mock location for testing
-export const mockLocation = {
-  latitude: 31.5204,
-  longitude: 74.3587,
-  accuracy: 10,
-  altitude: 0,
-  heading: 0,
-  speed: 0,
-  timestamp: Date.now(),
-};

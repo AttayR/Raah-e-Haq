@@ -12,7 +12,6 @@ import {
   DRIVER_LOCATION_WATCH_OPTIONS,
   type DriverLocationConfig,
 } from '../features/driver-location/config';
-import { DRIVER_LOCATION_COPY } from '../features/driver-location/copy';
 import { primeBeforeOsPrompt } from '../features/permissions/primer';
 import { locationOsUndetermined } from '../features/permissions/locationStatus';
 import {
@@ -47,32 +46,42 @@ export interface TrackingOptions {
 }
 
 /**
+ * The location access the driver has: `precise` (Android FINE, or iOS, whose "while using"
+ * prompt the library shows on the first watch), `approximate` (Android COARSE only) or `none`.
+ */
+export type DriverLocationAccess = 'precise' | 'approximate' | 'none';
+
+/** T-596: Android 12+ ignores a fine-only request; both are asked in one prompt. */
+const ANDROID_LOCATION_PERMISSIONS = [
+  PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+];
+
+/**
  * Foreground-only location permission (B-08: no background location). iOS asks "while using"
- * on the first watch (authorizationLevel whenInUse); Android asks for fine location here.
+ * on the first watch (authorizationLevel whenInUse); Android asks for fine and coarse together
+ * here (T-596), and only while neither is granted: a driver with approximate access is sent to
+ * Settings by the Drive screen ("Turn on precise location"), not prompted again on every watch.
  * The rationale page before the first OS prompt is the UI-R8 pre-prompt (features/permissions).
  */
-const requestForegroundPermission = async (): Promise<boolean> => {
+const requestForegroundPermission = async (): Promise<DriverLocationAccess> => {
   // UI-R8: the driver pre-prompt (no "Not now") before the OS asks the first time.
   await primeBeforeOsPrompt('locationDriver', locationOsUndetermined);
   if (Platform.OS !== 'android') {
-    return true;
+    return 'precise';
   }
   try {
     const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
     const coarse = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
-    if ((await PermissionsAndroid.check(fine)) || (await PermissionsAndroid.check(coarse))) {
-      return true;
-    }
-    const result = await PermissionsAndroid.request(fine, {
-      title: DRIVER_LOCATION_COPY.permissionTitle,
-      message: DRIVER_LOCATION_COPY.permissionMessage,
-      buttonPositive: DRIVER_LOCATION_COPY.permissionAllow,
-      buttonNegative: DRIVER_LOCATION_COPY.permissionDeny,
-    });
-    return result === PermissionsAndroid.RESULTS.GRANTED;
+    if (await PermissionsAndroid.check(fine)) return 'precise';
+    if (await PermissionsAndroid.check(coarse)) return 'approximate';
+    const results = await PermissionsAndroid.requestMultiple(ANDROID_LOCATION_PERMISSIONS);
+    if (results[fine] === PermissionsAndroid.RESULTS.GRANTED) return 'precise';
+    if (results[coarse] === PermissionsAndroid.RESULTS.GRANTED) return 'approximate';
+    return 'none';
   } catch (error) {
     logger.warn('Location permission check failed', { error });
-    return false;
+    return 'none';
   }
 };
 
@@ -150,12 +159,15 @@ class LocationTrackingService {
     const generation = ++this.generation;
 
     try {
-      const granted = await this.preparePermission();
+      const access = await this.preparePermission();
       if (generation !== this.generation) {
         return false;
       }
-      if (!granted) {
-        logger.warn('Driver location: permission not granted');
+      // T-596: dispatch needs the precise position, so approximate access does not track (the
+      // Drive screen shows "Turn on precise location" in place of the online control).
+      if (access !== 'precise') {
+        // An everyday state the Drive screen explains (no yellow Debug LogBox).
+        logger.debug('Driver location: precise permission not granted', { access });
         this.stopTracking();
         return false;
       }
@@ -221,8 +233,9 @@ class LocationTrackingService {
     let released = false;
     let counted = false;
     this.preparePermission()
-      .then((granted) => {
-        if (released || session !== this.session || !granted) return;
+      .then((access) => {
+        // T-596: an approximate position still places the driver on the offline map.
+        if (released || session !== this.session || access === 'none') return;
         counted = true;
         this.watchRefs += 1;
         this.syncWatch();
@@ -323,10 +336,15 @@ class LocationTrackingService {
     return rideService.getDriverLocation(driverId);
   }
 
-  /** Foreground-only configuration and permission, shared by every holder of the watcher. */
-  private async preparePermission(): Promise<boolean> {
+  /**
+   * Foreground-only configuration and permission, shared by every holder of the watcher.
+   * T-596: on Android the permission is asked only here, so the library must not ask again on
+   * the watch (it re-prompted a driver who chose approximate). iOS keeps the library's own
+   * "while using" prompt on the first watch.
+   */
+  private async preparePermission(): Promise<DriverLocationAccess> {
     Geolocation.setRNConfiguration({
-      skipPermissionRequests: false,
+      skipPermissionRequests: Platform.OS === 'android',
       authorizationLevel: 'whenInUse',
       enableBackgroundLocationUpdates: false,
     });

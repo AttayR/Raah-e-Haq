@@ -34,6 +34,7 @@ import { useMapMounted } from '../../hooks/useMapMounted';
 import { useDriverDevicePosition } from '../../features/driver-location/hooks';
 import { useLocationBlocked } from '../../features/permissions/useLocationBlocked';
 import { useDriverStatusToggle, useLoadDriverStatusOnMount } from '../../features/driver-status/hooks';
+import { useGoOfflineWhenLocationLost } from '../../features/driver-status/useGoOfflineWhenLocationLost';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
 import { isRestorableDriverRide } from '../../features/driver-ride/steps';
 import { useIncomingRequestFraming, useIncomingRequestShown } from '../../features/driver-requests/overlay';
@@ -184,18 +185,22 @@ export default function DriverDriveScreen() {
     if (open) Linking.openSettings();
   }, []);
 
-  // UI-R8: location refused → the sheet shows "Location needed to go online" instead of Go online.
+  // UI-R8: location refused → the sheet shows "Location needed to go online" instead of Go online;
+  // T-596: approximate only (Android) → "Turn on precise location".
   const locationAccess = useLocationBlocked(isFocused);
-  const { recheck: recheckLocation } = locationAccess;
+  const { recheck: recheckLocation, reason: locationBlockReason } = locationAccess;
+  // T-596: an online driver who lost precise location goes offline once, with a toast.
+  useGoOfflineWhenLocationLost(locationBlockReason);
   const locationBlocked = useMemo(
     () =>
-      locationAccess.blocked
+      locationBlockReason
         ? {
             onOpenSettings: () => Linking.openSettings(),
             onRetry: recheckLocation,
+            reason: locationBlockReason,
           }
         : null,
-    [locationAccess.blocked, recheckLocation],
+    [locationBlockReason, recheckLocation],
   );
 
   const onLocate = useCallback(() => {

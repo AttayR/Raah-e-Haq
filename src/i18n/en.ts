@@ -595,6 +595,9 @@ export const en = {
     continueHint: 'Your phone will ask for permission next',
     driverDeniedTitle: 'Location needed to go online',
     driverDeniedBody: 'Turn on location for Raah-e-Haq in Settings.',
+    driverApproximateTitle: 'Turn on precise location',
+    driverApproximateBody:
+      'Raah-e-Haq has only your approximate location. Turn on "Use precise location" for Raah-e-Haq in Settings to go online and get nearby ride requests.',
     openSettings: 'Open Settings',
     tryAgain: 'Try again',
   },
@@ -606,6 +609,8 @@ export const en = {
     onRide: "You're on a ride",
     checking: 'Checking your status…',
     offlineHint: 'Go online to start getting ride requests.',
+    offlinePreciseLost: "You're offline: ride requests need your precise location.",
+    offlineLocationLost: "You're offline: location is off for Raah-e-Haq.",
     onlineHint: 'Looking for ride requests near you.',
     onRideHint: 'Finish your ride to go offline.',
     goOnline: 'Go online',

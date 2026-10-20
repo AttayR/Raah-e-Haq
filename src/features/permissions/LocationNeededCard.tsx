@@ -5,28 +5,40 @@ import { AppText, Button, Card, Icon } from '../../components/ui';
 import { componentTokens, space } from '../../theme';
 import { t } from '../../i18n';
 
-type Props = { onOpenSettings: () => void; onRetry: () => void };
+type Props = {
+  onOpenSettings: () => void;
+  onRetry: () => void;
+  /** T-596: `approximate` asks for precise location (Android granted approximate only). */
+  reason?: 'denied' | 'approximate';
+};
 
 const k = componentTokens.locationNeeded;
 
+const COPY_KEYS = {
+  denied: { title: 'permissions.driverDeniedTitle', body: 'permissions.driverDeniedBody' },
+  approximate: { title: 'permissions.driverApproximateTitle', body: 'permissions.driverApproximateBody' },
+} as const;
+
 /**
- * Driver Drive tab, location refused (UI-R8, shared-permissions "Denied state"): replaces the
+ * Driver Drive tab, location refused (UI-R8, shared-permissions "Denied state"), or only
+ * approximate location granted (T-596, same layout, "Turn on precise location"): replaces the
  * online control. `warningSoft` circle with the location-off glyph, `h3` title, `bodySmall` body,
  * "Open Settings" (lg primary) and "Try again" (ghost, re-reads the permission).
  */
-export function LocationNeededCard({ onOpenSettings, onRetry }: Props) {
+export function LocationNeededCard({ onOpenSettings, onRetry, reason = 'denied' }: Props) {
   const { theme } = useAppTheme();
+  const copy = COPY_KEYS[reason];
   return (
-    <Card variant="outlined" testID="drive-location-needed">
+    <Card variant="outlined" testID={reason === 'approximate' ? 'drive-location-precise-needed' : 'drive-location-needed'}>
       <View style={styles.column}>
         <View style={[styles.circle, { backgroundColor: theme.colors.warningSoft }]}>
           <Icon name="locationOff" size={k.glyph} color="warning" />
         </View>
         <AppText variant="h3" align="center" accessibilityRole="header">
-          {t('permissions.driverDeniedTitle')}
+          {t(copy.title)}
         </AppText>
         <AppText variant="bodySmall" color="textSecondary" align="center">
-          {t('permissions.driverDeniedBody')}
+          {t(copy.body)}
         </AppText>
       </View>
       <View style={styles.actions}>

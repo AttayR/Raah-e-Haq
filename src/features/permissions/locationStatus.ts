@@ -71,3 +71,19 @@ export const locationOsDenied = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * T-596: Android grants approximate (coarse) location without precise (fine), which dispatch
+ * cannot use; the Drive screen asks the driver to turn on precise location. Always false on iOS
+ * (unchanged there) and when unknown. Read-only: it never asks the OS.
+ */
+export const locationOsApproximateOnly = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') return false;
+  try {
+    if (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION)) return false;
+    return await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION);
+  } catch (error) {
+    logUnknown(error);
+    return false;
+  }
+};

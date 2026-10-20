@@ -369,6 +369,9 @@ export const urLatn: TranslationTable = {
     continueHint: 'Is ke baad aap ka phone ijazat maangega',
     driverDeniedTitle: 'Online hone ke liye location zaroori hai',
     driverDeniedBody: 'Settings mein Raah-e-Haq ke liye location on karein.',
+    driverApproximateTitle: 'Durust (precise) location on karein',
+    driverApproximateBody:
+      'Raah-e-Haq ke paas sirf aap ki andazan location hai. Online hone aur qareeb ki ride requests paane ke liye Settings mein Raah-e-Haq ke liye "Use precise location" on karein.',
     openSettings: 'Settings kholein',
     tryAgain: 'Dobara koshish karein',
   },
@@ -379,6 +382,8 @@ export const urLatn: TranslationTable = {
     onRide: 'Aap ride par hain',
     checking: 'Aap ka status check ho raha hai…',
     offlineHint: 'Ride requests lene ke liye online ho jayein.',
+    offlinePreciseLost: 'Aap offline hain: ride requests ke liye durust (precise) location zaroori hai.',
+    offlineLocationLost: 'Aap offline hain: Raah-e-Haq ke liye location band hai.',
     onlineHint: 'Aap ke qareeb ride requests dhoond rahe hain.',
     onRideHint: 'Offline hone ke liye pehle ride mukammal karein.',
     goOnline: 'Online ho jayein',

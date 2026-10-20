@@ -31,9 +31,10 @@ type BodyProps = {
   onOpenRide?: (id: string) => void;
   /**
    * UI-R8: location access is refused. While offline (and no ride is open) the online control is
-   * replaced by the "Location needed to go online" card.
+   * replaced by the "Location needed to go online" card; T-596: by "Turn on precise location" when
+   * only approximate location is granted (`reason: 'approximate'`).
    */
-  locationBlocked?: { onOpenSettings: () => void; onRetry: () => void } | null;
+  locationBlocked?: { onOpenSettings: () => void; onRetry: () => void; reason?: 'denied' | 'approximate' } | null;
   /** T-580: the "Location needed" card's height. */
   onLocationCardLayout?: (height: number) => void;
   /** T-587: the auto-accept row (§7.1), between the status block and the online action. */
@@ -106,7 +107,11 @@ export function DriveSheetBody({
         <Animated.View style={actionStyle}>
           {locationBlocked && showsLocationCard(true, hasRide, status) ? (
             <View onLayout={e => onLocationCardLayout?.(e.nativeEvent.layout.height)} testID="drive-location-card-wrap">
-              <LocationNeededCard onOpenSettings={locationBlocked.onOpenSettings} onRetry={locationBlocked.onRetry} />
+              <LocationNeededCard
+                onOpenSettings={locationBlocked.onOpenSettings}
+                onRetry={locationBlocked.onRetry}
+                reason={locationBlocked.reason}
+              />
             </View>
           ) : hasRide ? (
             <Button
