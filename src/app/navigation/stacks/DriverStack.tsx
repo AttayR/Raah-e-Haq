@@ -19,6 +19,7 @@ import type { DriverStatementRoutes } from '../../../features/driver-statements/
 import type { VehicleAcRoutes } from '../../../features/ac/navigation';
 import type { ParcelDriverRoutes } from '../../../features/parcel/navigation';
 import { supportTicketScreenId, type SupportRoutes } from '../../../features/support/navigation';
+import type { AccountDeletionRoutes } from '../../../features/account-deletion/navigation';
 import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
 
 export type DriverStackParamList = {
@@ -65,6 +66,9 @@ export type DriverStackParamList = {
   SupportNewRequest: SupportRoutes['SupportNewRequest'];
   /** Account → Invite friends (UI-R18, BE-131). */
   Invite: undefined;
+  /** Profile → Delete account and its SMS-code step (UI-R18 §D, BE-129). */
+  DeleteAccount: AccountDeletionRoutes['DeleteAccount'];
+  DeleteAccountVerify: AccountDeletionRoutes['DeleteAccountVerify'];
 };
 
 /*
@@ -97,6 +101,9 @@ const loadSupportRequestsScreen = () => require('../../../features/support/scree
 const loadSupportTicketScreen = () => require('../../../features/support/screens/SupportTicketScreen').default;
 const loadSupportNewRequestScreen = () => require('../../../features/support/screens/SupportNewRequestScreen').default;
 const loadInviteScreen = () => require('../../../features/invite/screens/InviteScreen').default;
+const loadDeleteAccountScreen = () => require('../../../features/account-deletion/screens/DeleteAccountScreen').default;
+const loadDeleteAccountVerifyScreen = () =>
+  require('../../../features/account-deletion/screens/DeleteAccountVerifyScreen').default;
 
 const Stack = createNativeStackNavigator<DriverStackParamList>();
 
@@ -151,6 +158,8 @@ const DriverStack = () => {
       <Stack.Screen name="SupportTicket" getComponent={loadSupportTicketScreen} getId={supportTicketScreenId} />
       <Stack.Screen name="SupportNewRequest" getComponent={loadSupportNewRequestScreen} />
       <Stack.Screen name="Invite" getComponent={loadInviteScreen} />
+      <Stack.Screen name="DeleteAccount" getComponent={loadDeleteAccountScreen} />
+      <Stack.Screen name="DeleteAccountVerify" getComponent={loadDeleteAccountVerifyScreen} />
     </Stack.Navigator>
   );
 };

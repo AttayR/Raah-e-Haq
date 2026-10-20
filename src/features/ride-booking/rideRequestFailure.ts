@@ -9,6 +9,8 @@ export const PHONE_NOT_VERIFIED = 'PHONE_NOT_VERIFIED';
 export const PASSENGER_BALANCE_OWED = 'PASSENGER_BALANCE_OWED';
 /** BE-113: the passenger already has an open ride or parcel (409, `error.ride_id`). */
 export const RIDE_ALREADY_ACTIVE = 'RIDE_ALREADY_ACTIVE';
+/** BE-129: the passenger's account deletion is scheduled (423); "Keep my account" is offered. */
+export const ACCOUNT_DELETION_SCHEDULED = 'ACCOUNT_DELETION_SCHEDULED';
 
 /**
  * What the booking screen does with a refused POST /rides:
@@ -18,6 +20,8 @@ export const RIDE_ALREADY_ACTIVE = 'RIDE_ALREADY_ACTIVE';
  * - `balance_owed`: "You owe Rs X. Top up to book" with a top-up (BE-85);
  * - `offer_out_of_band`: the offer was outside the server's band (BE-83 422 `offered_fare`); the
  *   message is the server's and `band` (from `error.offer_band`, null if absent) resets the stepper;
+ * - `deletion_scheduled`: BE-129 423, the account is in its deletion cooling-off period; the
+ *   caller offers "Keep my account" (features/account-deletion offerKeepAccount);
  * - `already_active`: BE-113, the passenger already has an open booking (`rideId`, GET
  *   /rides/{id}); the app opens it instead of showing an error;
  * - `message`: show the server's text (for a 422 the first field message, e.g. "The selected
@@ -30,6 +34,7 @@ export type RideRequestFailure =
   | { kind: 'balance_owed'; message: string; amountOwed: number | null; limit: number | null }
   | { kind: 'offer_out_of_band'; message: string; band: OfferBand | null }
   | { kind: 'already_active'; message: string; rideId: number }
+  | { kind: 'deletion_scheduled' }
   | { kind: 'handled' }
   | { kind: 'message'; message: string; uncertain?: boolean };
 
@@ -60,6 +65,9 @@ export const classifyRideRequestFailure = (
       amountOwed: typeof owed === 'number' && owed > 0 ? owed : null,
       limit: typeof limit === 'number' ? limit : null,
     };
+  }
+  if (rejection.code === ACCOUNT_DELETION_SCHEDULED) {
+    return { kind: 'deletion_scheduled' };
   }
   if (rejection.status === 403 && rejection.code?.startsWith('ACCOUNT_')) {
     return { kind: 'handled' };

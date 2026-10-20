@@ -79,14 +79,15 @@ export default function InviteScreen() {
           <View style={styles.block}>
             <PromoCard
               kind="invite"
-              title={loading ? '' : card.title}
-              description={loading ? undefined : card.description}
+              title={card.title}
+              description={card.description}
+              loading={!shown}
               childrenInteractive
               testID="invite-card"
             >
-              {loading || !shown ? (
+              {!shown ? (
+                // 12 under the text lines, same as the code row it stands in for.
                 <SkeletonGroup testID="invite-loading">
-                  <Skeleton width="80%" textVariant="title" />
                   <Skeleton shape="block" height={componentTokens.invite.codeRowHeight} style={styles.codeSkeleton} />
                 </SkeletonGroup>
               ) : (
@@ -122,5 +123,5 @@ const styles = StyleSheet.create({
     gap: layout.sectionGap,
   },
   block: { gap: space[4] },
-  codeSkeleton: { borderRadius: radius.md, marginTop: space[2] },
+  codeSkeleton: { borderRadius: radius.md, marginTop: space[3] - space[1] },
 });

@@ -35,6 +35,12 @@ export const sharedTripRideIdOf = (state: unknown): number | null => {
 export interface LogoutOptions {
   /** Revoke every token of the user (POST /auth/logout-all) instead of only this device's. */
   allDevices?: boolean;
+  /**
+   * BE-129: the server already revoked every token and push device of the account (a 200 from
+   * POST /account/deletion). Nothing is sent: no /auth/logout, no device unregister, no trip-link
+   * revoke (each would answer 401). Only the local session and caches are cleared.
+   */
+  serverAlreadySignedOut?: boolean;
 }
 
 /** AsyncStorage key of the notification cache older builds kept per user. */
@@ -84,16 +90,20 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
   'session/logout',
   async (options, { dispatch, extra, getState }) => {
     const allDevices = !!options && options.allDevices === true;
+    const serverAlreadySignedOut = !!options && options.serverAlreadySignedOut === true;
     // Results of requests started before this point belong to the old session (T-103).
     bumpSessionEpoch();
     // This device's FCM token (T-502): sent with the revoke so the server stops pushing to it.
     const deviceToken = getRegisteredDeviceToken();
     const sharedRideId = sharedTripRideIdOf(getState());
     try {
-      if (sharedRideId !== null) {
+      if (sharedRideId !== null && !serverAlreadySignedOut) {
         await step('revoke live trip link', () => safetyApi.stopShare(sharedRideId, LOGOUT_REQUEST_TIMEOUT_MS));
       }
       await step('server revoke', async () => {
+        if (serverAlreadySignedOut) {
+          return;
+        }
         if (allDevices) {
           // logout-all also removes every device of the user (BE-11).
           await apiService.logoutAll({ timeout: LOGOUT_REQUEST_TIMEOUT_MS });

@@ -23,11 +23,6 @@ import type { AccountRole, ProfileNavigator } from '../navigation';
 
 type Props = {
   role: AccountRole;
-  /**
-   * UI-R18 hook-up: opens Delete account once BE-129 ships and the route exists. Not passed
-   * today, so the row is not drawn (shared-profile §P6).
-   */
-  onDeleteAccount?: () => void;
 };
 
 /**
@@ -38,7 +33,7 @@ type Props = {
  * the profile is re-read on focus (an admin's photo decision shows up), pull to refresh re-reads
  * the profile and the stats.
  */
-export function ProfileScreen({ role, onDeleteAccount }: Props) {
+export function ProfileScreen({ role }: Props) {
   const prefix = `${role}-profile`;
   const navigation = useNavigation<ProfileNavigator>();
   const dispatch = useAppDispatch();
@@ -74,6 +69,8 @@ export function ProfileScreen({ role, onDeleteAccount }: Props) {
   }, [dispatch, refreshStats]);
 
   const openEdit = useCallback(() => navigation.navigate('ProfileEdit'), [navigation]);
+  // UI-R18 §D (BE-129): Account → Profile → Delete account, both roles (store rule: 3 taps).
+  const openDeleteAccount = useCallback(() => navigation.navigate('DeleteAccount'), [navigation]);
   const bottom = { paddingBottom: Math.max(insets.bottom, space[4]) + space[6] };
 
   return (
@@ -109,7 +106,7 @@ export function ProfileScreen({ role, onDeleteAccount }: Props) {
             onPress={() => navigation.navigate('DriverDocuments')}
           />
         ) : null}
-        <AccountActions onDeleteAccount={onDeleteAccount} testID={`${prefix}-actions`} />
+        <AccountActions onDeleteAccount={openDeleteAccount} testID={`${prefix}-actions`} />
       </Animated.ScrollView>
     </Screen>
   );

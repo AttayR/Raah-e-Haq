@@ -20,6 +20,7 @@ import { unwrap, toApiError, toThunkRejection, ThunkRejection, ApiError } from '
 import {
   mergeServerUser,
   normalizeUser,
+  routesFromCache,
   routesHome,
   UNKNOWN_STATUS,
   withRefusedStatus,
@@ -635,8 +636,9 @@ export const initializeAuth = createAsyncThunk<
       const storedUser =
         (await apiService.getUserData()) ?? normalizeUser(getState().apiAuth.user) ?? null;
 
-      if (storedUser && routesHome(storedUser)) {
-        // The server confirmed this account active before; route now and check it after.
+      if (storedUser && routesFromCache(storedUser)) {
+        // The server confirmed this account active before; route now and check it after
+        // (AccountRestore first when its deletion is scheduled, BE-129).
         return { user: storedUser, revalidate: true };
       }
 

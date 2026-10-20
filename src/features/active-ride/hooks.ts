@@ -27,6 +27,7 @@ import { isRideInProgress } from './status';
 import { markerDriverLocation } from './arrivedMarker';
 import { ACTIVE_RIDE_COPY } from './copy';
 import { advanceRideStage, isDriverTrackable, type PassengerRideStageState } from './stage';
+import { offerKeepAccount } from '../account-deletion/keepAccount';
 
 /** How often the passenger's ride status is re-read while it is in progress. */
 export const ACTIVE_RIDE_POLL_MS = 10_000;
@@ -64,7 +65,7 @@ export class RideRequestRefused extends Error {
   readonly failure: RideRequestFailure;
 
   constructor(failure: RideRequestFailure) {
-    super(failure.kind === 'handled' ? 'Ride request refused' : failure.message);
+    super(failure.kind === 'handled' || failure.kind === 'deletion_scheduled' ? 'Ride request refused' : failure.message);
     this.name = 'RideRequestRefused';
     this.failure = failure;
   }
@@ -382,6 +383,9 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
         );
       } else if (failure.kind === 'balance_owed') {
         showBalanceOwed(failure, onBalanceOwedRef.current);
+      } else if (failure.kind === 'deletion_scheduled') {
+        // BE-129: booking is refused while the deletion is scheduled; offer to keep the account.
+        offerKeepAccount(dispatch, 'booking').catch(() => undefined);
       } else if (failure.kind === 'message' || failure.kind === 'offer_out_of_band') {
         showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, {
           label: ACTIVE_RIDE_COPY.dismiss,

@@ -15,3 +15,9 @@ export const resetApp = createAction('app/reset');
  * work from there.
  */
 export const accountStatusRefused = createAction<User>('app/accountStatusRefused');
+
+/**
+ * BE-129: POST /account/deletion/cancel succeeded ("Keep my account"): the signed-in user's
+ * `deletion_scheduled_for` is cleared, so AuthFlow leaves AccountRestore for the role's tabs.
+ */
+export const accountDeletionCancelled = createAction('app/accountDeletionCancelled');

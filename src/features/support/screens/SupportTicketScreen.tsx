@@ -141,6 +141,10 @@ export default function SupportTicketScreen() {
         <Banner
           tone="warning"
           text={t('support.replyRateLimited', { seconds: thread.waitSeconds })}
+          // Announced once: the label keeps the starting wait and the live region is on only for
+          // the first second, so TalkBack / VoiceOver do not re-read the ticking number.
+          accessibilityLabel={t('support.replyRateLimited', { seconds: thread.waitTotal ?? thread.waitSeconds })}
+          announce={thread.waitSeconds === thread.waitTotal}
           style={styles.banner}
           testID="support-ticket-wait"
         />
@@ -167,6 +171,7 @@ export default function SupportTicketScreen() {
             bottomInset={keyboardVisible ? 0 : insets.bottom}
             placeholder={t('support.replyPlaceholder')}
             maxLength={MESSAGE_MAX}
+            sendBlocked={thread.waitSeconds !== null}
           />
         </>
       )}

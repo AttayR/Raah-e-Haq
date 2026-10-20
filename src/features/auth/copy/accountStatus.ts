@@ -121,7 +121,6 @@ export const ACCOUNT_STATUS_COPY = localizedCopy({
   reasonFollowUp: 'Contact support if you have questions.',
   contactSupport: 'Contact support',
   supportSheetTitle: 'Contact support',
-  emailSupport: (email: string) => `Email ${email}`,
   emailSupportHint: 'Opens your email app',
   emailFailed: (email: string) => `Couldn't open your email app. Write to ${email}.`,
 } as const);

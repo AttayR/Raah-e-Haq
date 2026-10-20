@@ -3,14 +3,11 @@ import { ListGroup, ListItem } from '../../../components/ui';
 import { t } from '../../../i18n';
 
 /**
- * UI-R18 hook-up point (shared-profile §P6): Profile's last group, "Delete account" as a
- * destructive row (store rule: Account → Profile → Delete account in three taps). It renders
- * only when the caller passes `onDeleteAccount`, which UI-R18 does once BE-129 ships and the
- * `DeleteAccount` route exists. Until then nothing is drawn (no row that opens nothing).
- * "Change password" joins this group only when the app has that screen.
+ * Profile's last group (shared-profile §P6, UI-R18): "Delete account" as a destructive row
+ * (store rule: Account → Profile → Delete account in three taps), opening `DeleteAccount`
+ * (BE-129). "Change password" joins this group only when the app has that screen.
  */
-export function AccountActions({ onDeleteAccount, testID }: { onDeleteAccount?: () => void; testID: string }) {
-  if (!onDeleteAccount) return null;
+export function AccountActions({ onDeleteAccount, testID }: { onDeleteAccount: () => void; testID: string }) {
   return (
     <ListGroup testID={testID}>
       <ListItem

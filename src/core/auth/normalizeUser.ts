@@ -93,6 +93,8 @@ const NULLABLE_STRING_FIELDS = [
   'profile_image_url',
   'pending_profile_image_url',
   'profile_image_rejection_reason',
+  // BE-129: set during the account-deletion cooling-off period (AccountRestore before any tab).
+  'deletion_scheduled_for',
 ] as const;
 
 const PHOTO_REVIEWS: readonly ProfileImageReview[] = ['pending', 'approved', 'rejected'];
@@ -308,20 +310,25 @@ export function withRefusedStatus(user: User, error: RefusalLike | null | undefi
 }
 
 /** Where the signed-in state sends the user (AuthFlow). */
-export type AuthRoute = 'splash' | 'auth' | 'account-status' | 'driver' | 'passenger';
+export type AuthRoute = 'splash' | 'auth' | 'account-status' | 'account-restore' | 'driver' | 'passenger';
+
+/** BE-129: the account is in its deletion cooling-off period (a non-empty server date). */
+export const isDeletionScheduled = (user: Pick<User, 'deletion_scheduled_for'> | null | undefined): boolean =>
+  typeof user?.deletion_scheduled_for === 'string' && user.deletion_scheduled_for.trim() !== '';
 
 /**
  * Routing from the normalised fields only:
  * - not initialised yet: splash
  * - signed out (or no user): auth screens
  * - any status other than `active` (pending, inactive, suspended, rejected): account status
+ * - active driver / passenger whose deletion is scheduled (BE-129): AccountRestore, before any tab
  * - active driver / passenger: their home stack
  * - active but no role the app serves (admin, or none): account status, which can sign out
  */
 export function resolveAuthRoute(state: {
   isInitialized: boolean;
   isAuthenticated: boolean;
-  user: Pick<User, 'role' | 'status'> | null;
+  user: (Pick<User, 'role' | 'status'> & Partial<Pick<User, 'deletion_scheduled_for'>>) | null;
 }): AuthRoute {
   if (!state.isInitialized) {
     return 'splash';
@@ -331,6 +338,9 @@ export function resolveAuthRoute(state: {
   }
   if (state.user.status !== 'active') {
     return 'account-status';
+  }
+  if ((state.user.role === 'driver' || state.user.role === 'passenger') && isDeletionScheduled(state.user)) {
+    return 'account-restore';
   }
   if (state.user.role === 'driver') {
     return 'driver';
@@ -345,6 +355,15 @@ export function resolveAuthRoute(state: {
  * Whether a signed-in user goes to a home stack (active driver or passenger) rather than the
  * account-status screen. Screens use it to decide, e.g., whether "Login successful" is true.
  */
+/**
+ * Whether a cached user may be routed at once on cold start (no request first): a home stack,
+ * or AccountRestore for an active driver / passenger whose deletion is scheduled (BE-129).
+ */
+export const routesFromCache = (user: Pick<User, 'role' | 'status'> & Partial<Pick<User, 'deletion_scheduled_for'>>): boolean => {
+  const route = resolveAuthRoute({ isInitialized: true, isAuthenticated: true, user });
+  return route === 'driver' || route === 'passenger' || route === 'account-restore';
+};
+
 export const routesHome = (user: Pick<User, 'role' | 'status'>): boolean => {
   const route = resolveAuthRoute({ isInitialized: true, isAuthenticated: true, user });
   return route === 'driver' || route === 'passenger';

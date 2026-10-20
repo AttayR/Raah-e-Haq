@@ -1,8 +1,8 @@
 import React from 'react';
 import { I18nManager, StyleSheet, View } from 'react-native';
-import { AddressPair, AppText, Button, Card, Icon, RideStatusPill } from '../../../components/ui';
+import { AddressPair, AppText, Button, Card, Icon, RideStatusPill, Skeleton, SkeletonGroup } from '../../../components/ui';
 import { t } from '../../../i18n';
-import { layout, space } from '../../../theme';
+import { componentTokens, layout, space } from '../../../theme';
 import { formatDateTime, rideAmountText, rideTime } from '../../ride-history/format';
 import type { Ride, RideViewer } from '../../ride-history/types';
 import { tripPrefillOf, type SupportTripPrefill } from '../navigation';
@@ -63,6 +63,22 @@ export function HelpTripSection({ ride, viewer, onPress, onChooseAnother }: Prop
         />
       </View>
     </View>
+  );
+}
+
+/**
+ * While the last ride loads (UI-R18 review): the overline, the card and the "Choose another trip"
+ * line as skeletons, so the sections below do not jump down when the trip arrives.
+ */
+export function HelpTripPlaceholder() {
+  return (
+    <SkeletonGroup testID="support-trip-loading">
+      <Skeleton width="45%" textVariant="overline" style={styles.overline} />
+      <Skeleton shape="card" height={componentTokens.support.tripCardHeight} />
+      <View style={styles.another}>
+        <Skeleton width="40%" shape="pill" height={componentTokens.button.height.sm} />
+      </View>
+    </SkeletonGroup>
   );
 }
 

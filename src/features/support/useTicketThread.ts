@@ -15,8 +15,10 @@ export type TicketDetail = { kind: 'ticket'; ticket: SupportTicket } | { kind: '
 export interface TicketThread extends RemoteData<TicketDetail> {
   /** Replies on their way or refused (same shape as the ride chat's pending bubbles). */
   pending: PendingMessage[];
-  /** Seconds to wait after a 429 on reply; null otherwise. */
+  /** Seconds left to wait after a 429 on reply (counting down); null otherwise. */
   waitSeconds: number | null;
+  /** The wait it started from (stable while it counts down, for the screen-reader label). */
+  waitTotal: number | null;
   /** False when nothing was sent (empty text). */
   send: (text: string) => boolean;
   retry: (clientId: string) => void;
@@ -57,13 +59,14 @@ export function useTicketThread(id: number, enabled: boolean): TicketThread {
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
   const [waitSeconds, setWaitSeconds] = useState<number | null>(null);
-  const waitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [waitTotal, setWaitTotal] = useState<number | null>(null);
+  const waitTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const mounted = useRef(true);
 
   useEffect(
     () => () => {
       mounted.current = false;
-      if (waitTimer.current) clearTimeout(waitTimer.current);
+      if (waitTimer.current) clearInterval(waitTimer.current);
     },
     [],
   );
@@ -72,13 +75,24 @@ export function useTicketThread(id: number, enabled: boolean): TicketThread {
     if (ticketId === id) refresh();
   }), [id, refresh]);
 
+  // Counts down from retry_after once a second (the Banner shows it; Send is off until 0).
   const holdFor = useCallback((seconds: number) => {
-    setWaitSeconds(seconds);
-    if (waitTimer.current) clearTimeout(waitTimer.current);
-    waitTimer.current = setTimeout(() => {
+    let left = Math.max(1, Math.ceil(seconds));
+    setWaitSeconds(left);
+    setWaitTotal(left);
+    if (waitTimer.current) clearInterval(waitTimer.current);
+    waitTimer.current = setInterval(() => {
+      left -= 1;
+      if (!mounted.current) return;
+      if (left > 0) {
+        setWaitSeconds(left);
+        return;
+      }
+      if (waitTimer.current) clearInterval(waitTimer.current);
       waitTimer.current = null;
-      if (mounted.current) setWaitSeconds(null);
-    }, seconds * 1000);
+      setWaitSeconds(null);
+      setWaitTotal(null);
+    }, 1000);
   }, []);
 
   const patchTicket = useCallback(
@@ -142,5 +156,5 @@ export function useTicketThread(id: number, enabled: boolean): TicketThread {
     [deliver],
   );
 
-  return { ...remote, pending, waitSeconds, send, retry };
+  return { ...remote, pending, waitSeconds, waitTotal, send, retry };
 }

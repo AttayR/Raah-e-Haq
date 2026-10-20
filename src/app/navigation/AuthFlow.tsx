@@ -4,6 +4,7 @@ import { RootState } from '../../store';
 import AuthStack from './stacks/AuthStack';
 import RootNavigation from './RootNavigation';
 import AccountStatusScreen from '../../features/auth/screens/AccountStatusScreen';
+import AccountRestoreScreen from '../../features/account-deletion/screens/AccountRestoreScreen';
 import SplashScreen from '../../components/SplashScreen';
 import { resolveAuthRoute } from '../../core/auth/normalizeUser';
 import { logger } from '../../core/logging/logger';
@@ -30,6 +31,9 @@ export default function AuthFlow() {
       // Pending, inactive, suspended or rejected (BE-32), an unconfirmed status, or no role
       // this app serves: role- and status-specific copy, Check Status and Sign Out (T-106).
       return <AccountStatusScreen />;
+    case 'account-restore':
+      // BE-129: the account's deletion is scheduled; "Keep my account" or sign out, before any tab.
+      return <AccountRestoreScreen />;
     case 'driver':
     case 'passenger':
       return <RootNavigation />;

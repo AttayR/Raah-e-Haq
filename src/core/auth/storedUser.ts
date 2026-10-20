@@ -18,6 +18,9 @@ export const STORED_USER_FIELDS = [
   'roles',
   'status',
   'phone_verified_at',
+  // BE-129: a date, not personal data. Kept so a cold start goes straight to AccountRestore
+  // (never the tabs, even offline) while the account's deletion is scheduled.
+  'deletion_scheduled_for',
 ] as const;
 
 type StoredUserField = (typeof STORED_USER_FIELDS)[number];
@@ -28,7 +31,7 @@ type StoredUserField = (typeof STORED_USER_FIELDS)[number];
  * does not keep them.
  */
 export type StoredUser = Pick<User, 'id' | 'name' | 'role' | 'roles' | 'status'> &
-  Partial<Pick<User, 'phone_verified_at'>>;
+  Partial<Pick<User, 'phone_verified_at' | 'deletion_scheduled_for'>>;
 
 const ALLOWED = new Set<string>(STORED_USER_FIELDS);
 

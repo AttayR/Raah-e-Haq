@@ -10,7 +10,7 @@ import { useRecentRides, useRideViewer } from '../../ride-history/hooks';
 import { HelpContactGroup, HelpEmergencyGroup } from '../components/HelpContactGroups';
 import { HelpRequestsSection } from '../components/HelpRequestsSection';
 import { HelpTopicsGroup } from '../components/HelpTopicsGroup';
-import { HelpTripSection } from '../components/HelpTripSection';
+import { HelpTripPlaceholder, HelpTripSection } from '../components/HelpTripSection';
 import { useRecentTickets, useSupportCategories, useSupportContacts } from '../hooks';
 import type { SupportNavigator, SupportTripPrefill } from '../navigation';
 import type { SupportTicket } from '../types';
@@ -77,7 +77,11 @@ export default function SupportScreen() {
         }
         testID="support-scroll"
       >
-        {lastRide ? <HelpTripSection ride={lastRide} viewer={viewer} onPress={onTrip} onChooseAnother={onChooseAnother} /> : null}
+        {lastRide ? (
+          <HelpTripSection ride={lastRide} viewer={viewer} onPress={onTrip} onChooseAnother={onChooseAnother} />
+        ) : rides.status === 'loading' ? (
+          <HelpTripPlaceholder />
+        ) : null}
         <HelpTopicsGroup categories={categories.data} loading={categories.status === 'loading'} onPick={onTopic} />
         <HelpRequestsSection
           page={tickets.data}

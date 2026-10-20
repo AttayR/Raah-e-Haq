@@ -72,7 +72,7 @@ export const shortDate = (value: string | null, now: Date = new Date()): string 
 export const dateTime = (value: string | null): string =>
   [formatRelativeDate(value), formatTime(value)].filter(Boolean).join(' · ');
 
-/** The row's meta line: "#{number} · {last reply or created}". */
+/** The row's meta line: "{last reply or created} · #{number}" (date first: the number truncates). */
 export const ticketMeta = (ticket: SupportTicket, now: Date = new Date()): string =>
   t('support.ticketMeta', { number: ticket.ticketNumber, date: shortDate(ticket.lastReplyAt ?? ticket.createdAt, now) });
 

@@ -6,6 +6,7 @@ import { componentTokens, layout, radius, space } from '../../../theme';
 import { formatTime } from '../../../utils/format';
 import { NOTIFICATIONS_COPY } from '../copy';
 import { notificationTone } from '../format';
+import { SUPPORT_TYPE } from '../routing';
 import type { AppNotification } from '../types';
 
 /** Where the row sits in its day's card: the card's corners follow the first and last row. */
@@ -76,7 +77,7 @@ function NotificationRowBase({ item, onPress, onMarkRead, position = 'only' }: N
       ]}
     >
       <View style={[styles.tile, { backgroundColor: c[tone.tile] }]}>
-        <Icon name={tone.icon} size={k.tileIconSize} color={tone.glyph} />
+        <Icon name={item.type === SUPPORT_TYPE ? 'support' : tone.icon} size={k.tileIconSize} color={tone.glyph} />
       </View>
       <View style={styles.text}>
         <View style={styles.titleRow}>

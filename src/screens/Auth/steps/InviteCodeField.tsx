@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, View, type TextInput } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Button, TextField } from '../../../components/ui';
 import { useReducedMotion } from '../../../hooks/useReducedMotion';
@@ -29,11 +29,24 @@ export default function InviteCodeField({ value, onChange, error }: Props) {
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(value.length > 0 || !!error);
   const shown = open || !!error;
+  const inputRef = useRef<TextInput>(null);
+  // Set by the tap: focus once the revealed field is laid out, so the keyboard reveal scrolls it
+  // above the sticky footer (UI-R18 review). A field opened by a server error is not focused.
+  const focusOnLayout = useRef(false);
   return (
     <Anchored field="inviteCode">
       {shown ? (
-        <Animated.View entering={reduced ? undefined : reveal} testID="registration-invite">
+        <Animated.View
+          entering={reduced ? undefined : reveal}
+          onLayout={() => {
+            if (!focusOnLayout.current) return;
+            focusOnLayout.current = false;
+            inputRef.current?.focus();
+          }}
+          testID="registration-invite"
+        >
           <TextField
+            ref={inputRef}
             label={t('invite.signupLabel')}
             value={value}
             onChangeText={(text) => onChange(text.replace(/\s+/g, ''))}
@@ -52,7 +65,10 @@ export default function InviteCodeField({ value, onChange, error }: Props) {
             size="sm"
             fullWidth={false}
             leadingIcon="gift"
-            onPress={() => setOpen(true)}
+            onPress={() => {
+              focusOnLayout.current = true;
+              setOpen(true);
+            }}
             testID="registration-invite-toggle"
           />
         </View>

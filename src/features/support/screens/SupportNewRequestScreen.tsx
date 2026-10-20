@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useNavigation, usePreventRemove, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Banner, Button, Chip, FieldLabel, Header, KeyboardAwareScrollView, Screen, TextField } from '../../../components/ui';
+import { AppText, Banner, Button, FieldLabel, Header, KeyboardAwareScrollView, Screen, TextField } from '../../../components/ui';
 import { firstFieldMessages, toApiError } from '../../../core/api/errors';
 import { confirm } from '../../../core/dialog';
 import { haptics } from '../../../core/haptics';
@@ -12,7 +12,8 @@ import { t } from '../../../i18n';
 import { componentTokens, layout, space } from '../../../theme';
 import { DESCRIPTION_MIN, MESSAGE_MAX, SUBJECT_MAX, supportApi } from '../api';
 import { RequestTripCard } from '../components/RequestTripCard';
-import { retryMinutes, topicLabel } from '../format';
+import { TopicChips } from '../components/TopicChips';
+import { retryMinutes } from '../format';
 import { useSupportCategories } from '../hooks';
 import type { SupportNavigator, SupportRoutes } from '../navigation';
 
@@ -119,21 +120,14 @@ export default function SupportNewRequestScreen() {
         {topics.length > 0 ? (
           <View style={styles.field}>
             <FieldLabel required>{t('support.topicLabel')}</FieldLabel>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} testID="support-new-topics">
-              {topics.map((topic) => (
-                <Chip
-                  key={topic.slug}
-                  label={topicLabel(topic)}
-                  selected={category === topic.slug}
-                  accessibilityRole="radio"
-                  onPress={() => {
-                    setCategory(topic.slug);
-                    setErrors((e) => ({ ...e, category: undefined }));
-                  }}
-                  testID={`support-new-topic-${topic.slug}`}
-                />
-              ))}
-            </ScrollView>
+            <TopicChips
+              topics={topics}
+              selected={category}
+              onSelect={(slug) => {
+                setCategory(slug);
+                setErrors((e) => ({ ...e, category: undefined }));
+              }}
+            />
             {errors.category ? (
               <AppText variant="bodySmall" color="danger" accessibilityRole="alert">
                 {errors.category}
@@ -239,7 +233,6 @@ const styles = StyleSheet.create({
     gap: space[4],
   },
   field: { gap: space[2] },
-  chips: { gap: space[2] },
   counter: { alignSelf: 'flex-end', marginTop: space[1] },
   footer: {
     width: '100%',

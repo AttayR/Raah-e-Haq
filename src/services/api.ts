@@ -356,6 +356,11 @@ export interface User {
    * column nothing writes (BE-130 f); counts come from GET /me/stats.
    */
   rating?: number | null;
+  /**
+   * BE-129: the server's deletion date (ISO) while the account is in its cooling-off period, else
+   * null. Set in login / verify-otp and every profile read; AuthFlow shows AccountRestore first.
+   */
+  deletion_scheduled_for?: string | null;
 }
 
 export interface AuthResponse {

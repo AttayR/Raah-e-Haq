@@ -429,7 +429,6 @@ export function registerAuthCopy(): void {
     reasonFollowUp: 'Koi sawal ho to support se rabta karein.',
     contactSupport: 'Support se rabta karein',
     supportSheetTitle: 'Support se rabta karein',
-    emailSupport: (email: string) => `${email} par email karein`,
     emailSupportHint: 'Aap ki email app kholta hai',
     emailFailed: (email: string) => `Email app nahi khul saki. ${email} par likhein.`,
   });

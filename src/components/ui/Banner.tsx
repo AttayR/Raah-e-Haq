@@ -15,6 +15,16 @@ export type BannerProps = {
   icon?: IconName;
   title?: string;
   text: string;
+  /**
+   * UI-R18 review: what a screen reader reads instead of `text` (e.g. a countdown whose visible
+   * number ticks; the label stays put so it is not re-read every second).
+   */
+  accessibilityLabel?: string;
+  /**
+   * Warning / danger Banners are a polite live region; false turns that off (after the first
+   * announcement of a Banner whose text keeps changing).
+   */
+  announce?: boolean;
   /** Optional trailing text action ("Retry", "Update"). */
   action?: { label: string; onPress: () => void; testID?: string };
   /**
@@ -47,7 +57,18 @@ const defaultIcons: Record<BannerTone, IconName> = {
  * `bodySmall` text in the tone colour (≥4.5:1 on its soft fill in both modes, §1.5), an optional
  * `label` title and a trailing text action. Warning and danger banners are announced politely.
  */
-export function Banner({ tone = 'info', icon, title, text, action, actionPlacement = 'end', style, testID }: BannerProps) {
+export function Banner({
+  tone = 'info',
+  icon,
+  title,
+  text,
+  action,
+  actionPlacement = 'end',
+  accessibilityLabel,
+  announce = true,
+  style,
+  testID,
+}: BannerProps) {
   const { theme } = useAppTheme();
   const urgent = tone === 'warning' || tone === 'danger';
   const below = actionPlacement === 'below';
@@ -69,12 +90,18 @@ export function Banner({ tone = 'info', icon, title, text, action, actionPlaceme
   return (
     <View
       testID={testID}
-      accessibilityLiveRegion={urgent ? 'polite' : 'none'}
+      accessibilityLiveRegion={urgent && announce ? 'polite' : 'none'}
       style={[styles.banner, { backgroundColor: theme.colors[fills[tone]] }, style]}
     >
       <Icon name={icon ?? defaultIcons[tone]} size={20} color={tone} />
       <View style={styles.text}>
-        <View accessible accessibilityRole={urgent ? 'alert' : 'text'} style={styles.copy}>
+        <View
+          accessible
+          accessibilityRole={urgent ? 'alert' : 'text'}
+          accessibilityLabel={accessibilityLabel}
+          style={styles.copy}
+          testID={testID ? `${testID}-copy` : undefined}
+        >
           {title ? (
             <AppText variant="label" color={tone}>
               {title}

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, View } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useIsFocused, useNavigation, useRoute, type ParamListBase, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootState } from '../../../store';
@@ -9,6 +9,7 @@ import {
   Banner,
   Button,
   Chip,
+  EmptyState,
   ErrorState,
   Header,
   Screen,
@@ -36,6 +37,7 @@ import {
   type TopUpFormValues,
 } from '../topUpForm';
 import { useCreateTopUp } from '../topUpHooks';
+import { isDeletionScheduledRefusal, offerKeepAccount, type KeepAccountDispatch } from '../../account-deletion/keepAccount';
 import { isAllowedCheckoutUrl } from '../topUpLinks';
 import type { TopUpConfig, TopUpMethod, TopUpResult } from '../types';
 
@@ -72,6 +74,7 @@ export default function AddMoneyScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   const isFocused = useIsFocused();
   const isDriver = useSelector((state: RootState) => state.apiAuth.user?.role === 'driver');
+  const dispatch = useDispatch<KeepAccountDispatch>();
   const wallet = useWallet(isFocused);
   const config = wallet.data?.canTopUp ? wallet.data.topUp : null;
   const { create, submitting } = useCreateTopUp();
@@ -110,6 +113,23 @@ export default function AddMoneyScreen() {
   const header = (
     <Header title={t('topUp.title')} backLabel={WALLET_COPY.back} onBack={() => navigation.goBack()} tone="background" testID="add-money" />
   );
+
+  if (wallet.data && !wallet.data.canTopUp) {
+    // The server says no top-up for this wallet now (`can_top_up: false`, e.g. a scheduled
+    // deletion, BE-133): say so plainly instead of an error with a retry that cannot help.
+    return (
+      <Screen testID="add-money-screen">
+        {header}
+        <EmptyState
+          icon="wallet"
+          title={t('topUp.unavailableTitle')}
+          body={t('topUp.unavailableBody')}
+          action={{ label: WALLET_COPY.back, onPress: () => navigation.goBack() }}
+          testID="add-money-unavailable"
+        />
+      </Screen>
+    );
+  }
 
   if (!wallet.data || !config) {
     const failed = wallet.status === 'failed' || (wallet.data !== null && !config);
@@ -156,6 +176,13 @@ export default function AddMoneyScreen() {
   };
 
   const onError = (apiError: ApiError) => {
+    if (isDeletionScheduledRefusal(apiError)) {
+      // BE-133: no top-up while the account's deletion is scheduled; offer to keep the account.
+      offerKeepAccount(dispatch, 'topUp')
+        .then((kept) => (kept ? wallet.refresh() : undefined))
+        .catch(() => undefined);
+      return;
+    }
     triggerHaptic('notificationError');
     const fields = topUpFieldErrors(firstFieldMessages(apiError.fieldErrors));
     if (apiError.code && AMOUNT_CODES.has(apiError.code)) {

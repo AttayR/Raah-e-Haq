@@ -17,6 +17,8 @@ type Props = {
   disabled?: boolean;
   /** UI-R18: a support reply allows 2000 characters (BE-130 d); default the chat's 1000. */
   maxLength?: number;
+  /** UI-R18: typing stays possible but Send is off (a 429 wait); the draft is kept. */
+  sendBlocked?: boolean;
 };
 
 const k = componentTokens.chat;
@@ -34,7 +36,7 @@ export const SEND_SETTLE_MS = 100;
  * characters at most (BE-13); a "{n}/1000" counter shows above the field from 900. The host's
  * keyboard avoider keeps the bar above the keyboard.
  */
-export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder, disabled = false, maxLength = CHAT_BODY_MAX_LENGTH }) => {
+export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder, disabled = false, maxLength = CHAT_BODY_MAX_LENGTH, sendBlocked = false }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
   const [draft, setDraft] = useState('');
@@ -47,7 +49,7 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
   const lastChangeAt = useRef(0);
   const inputRef = useRef<TextInput>(null);
   const [pressed, setPressed] = useState(false);
-  const canSend = !disabled && draft.trim().length > 0;
+  const canSend = !disabled && !sendBlocked && draft.trim().length > 0;
   const lineHeight = theme.typography.body.lineHeight;
   // The counter shows for the last 10 % (900 of the chat's 1000).
   const counterFrom = Math.floor((maxLength * k.counterFrom) / CHAT_BODY_MAX_LENGTH);
@@ -60,7 +62,7 @@ export const ChatComposer: React.FC<Props> = ({ onSend, bottomInset, placeholder
 
   const send = () => {
     const text = latest.current;
-    if (disabled || text.trim().length === 0) return;
+    if (disabled || sendBlocked || text.trim().length === 0) return;
     if (onSend(text)) {
       latest.current = '';
       setDraft('');

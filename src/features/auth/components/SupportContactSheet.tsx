@@ -54,7 +54,8 @@ export function SupportContactSheet({ visible, onClose }: Props) {
         {supportEmail ? (
           <ListItem
             icon="email"
-            title={COPY.emailSupport(supportEmail)}
+            title={t('support.emailSupport')}
+            subtitle={supportEmail}
             onPress={email}
             accessibilityHint={COPY.emailSupportHint}
             testID="account-status-support-email"

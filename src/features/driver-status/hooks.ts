@@ -6,6 +6,7 @@ import { rejectionMessage } from '../../core/api/errors';
 import { toast } from '../../core/toast';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
 import { askForPushInContext } from '../notifications/push';
+import { isDeletionScheduledRefusal, offerKeepAccount } from '../account-deletion/keepAccount';
 import { DRIVER_STATUS_CODES } from './api';
 import { DRIVER_STATUS_COPY } from './copy';
 import {
@@ -90,6 +91,11 @@ export const useDriverStatusToggle = (): DriverStatusToggle => {
     }
     // Skipped by the in-flight guard (condition): nothing was sent, nothing to say.
     if (action.meta.condition || isStaleSessionRejection(action.payload)) {
+      return false;
+    }
+    if (goingOnline && isDeletionScheduledRefusal(action.payload)) {
+      // BE-129: 423 while the account's deletion is scheduled; offer to keep the account.
+      offerKeepAccount(dispatch, 'online').catch(() => undefined);
       return false;
     }
     toast.error(rejectionMessage(action.payload, DRIVER_STATUS_COPY.updateFailed));

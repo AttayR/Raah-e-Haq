@@ -1,9 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { componentTokens, radius, space } from '../../theme';
+import { componentTokens, radius, space, textStyles } from '../../theme';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
+import { Skeleton } from './Skeleton';
 
 const b = componentTokens.brand;
 
@@ -23,6 +24,12 @@ export type PromoCardProps = {
    * accessibility element (that would hide them from VoiceOver); the text is its own group.
    */
   childrenInteractive?: boolean;
+  /**
+   * UI-R18 review: the text is still loading. Two skeleton lines at the title and bodySmall line
+   * heights (80 % and 60 % wide, 4 apart) stand in for the title and description, so the card
+   * keeps its height when the text arrives. No empty text is drawn.
+   */
+  loading?: boolean;
   /** Without it the card is not pressable. */
   onPress?: () => void;
   accessibilityLabel?: string;
@@ -43,6 +50,7 @@ export function PromoCard({
   meta,
   children,
   childrenInteractive = false,
+  loading = false,
   onPress,
   accessibilityLabel,
   style,
@@ -57,26 +65,33 @@ export function PromoCard({
         <Icon name={kind === 'invite' ? 'gift' : 'promo'} size={b.promoGlyph} color="onAccent" />
       </View>
       <View style={styles.text}>
-        <View
-          style={styles.words}
-          accessible={childrenInteractive}
-          accessibilityLabel={childrenInteractive ? label : undefined}
-          testID={testID ? `${testID}-text` : undefined}
-        >
-          <AppText variant="title" numberOfLines={2}>
-            {title}
-          </AppText>
-          {description ? (
-            <AppText variant="bodySmall" color="textSecondary" numberOfLines={childrenInteractive ? 3 : 2}>
-              {description}
+        {loading ? (
+          <View style={styles.words} testID={testID ? `${testID}-loading` : undefined}>
+            <Skeleton width="80%" height={textStyles.title.lineHeight} />
+            <Skeleton width="60%" height={textStyles.bodySmall.lineHeight} />
+          </View>
+        ) : (
+          <View
+            style={styles.words}
+            accessible={childrenInteractive}
+            accessibilityLabel={childrenInteractive ? label : undefined}
+            testID={testID ? `${testID}-text` : undefined}
+          >
+            <AppText variant="title" numberOfLines={2}>
+              {title}
             </AppText>
-          ) : null}
-          {meta ? (
-            <AppText variant="caption" color="textMuted" numberOfLines={1}>
-              {meta}
-            </AppText>
-          ) : null}
-        </View>
+            {description ? (
+              <AppText variant="bodySmall" color="textSecondary" numberOfLines={childrenInteractive ? 3 : 2}>
+                {description}
+              </AppText>
+            ) : null}
+            {meta ? (
+              <AppText variant="caption" color="textMuted" numberOfLines={1}>
+                {meta}
+              </AppText>
+            ) : null}
+          </View>
+        )}
         {children}
       </View>
     </>

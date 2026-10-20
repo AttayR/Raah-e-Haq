@@ -272,26 +272,46 @@ describe('Ticket thread (§H5)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('SupportNewRequest');
   });
 
-  it('409 TICKET_CLOSED closes the thread; 429 shows how long to wait', async () => {
+  const sendText = async (text: string) => {
+    fireEvent.changeText(screen.getByTestId('chat-input'), text);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('chat-send'));
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    });
+    await flush();
+  };
+
+  it('429 shows a counting-down wait, keeps the draft typable and turns Send off until 0', async () => {
     mockParams = { id: 7 };
     mock.onGet('/support/tickets/7').reply(200, thread());
-    mock
-      .onPost('/support/tickets/7/reply')
-      .replyOnce(429, { success: false, code: 'rate_limited', message: 'Too many', retry_after: 20 })
-      .onPost('/support/tickets/7/reply')
-      .replyOnce(409, { success: false, error: { code: 'TICKET_CLOSED', message: 'closed' } });
+    mock.onPost('/support/tickets/7/reply').replyOnce(429, { success: false, code: 'rate_limited', message: 'Too many', retry_after: 2 });
     await renderWith(SupportTicketScreen);
-
-    const sendText = async (text: string) => {
-      fireEvent.changeText(screen.getByTestId('chat-input'), text);
-      await act(async () => {
-        fireEvent.press(screen.getByTestId('chat-send'));
-        await new Promise<void>((resolve) => setTimeout(resolve, 150));
-      });
-      await flush();
-    };
     await sendText('First');
-    expect(screen.getByTestId('support-ticket-wait')).toHaveTextContent(/You're replying quickly\. Try again in 20 s\./);
+    expect(screen.getByTestId('support-ticket-wait')).toHaveTextContent(/Please wait 2 seconds before you reply again\./);
+    const label = 'Please wait 2 seconds before you reply again.';
+    expect(screen.getByTestId('support-ticket-wait-copy').props.accessibilityLabel).toBe(label);
+    expect(screen.getByTestId('support-ticket-wait').props.accessibilityLiveRegion).toBe('polite');
+    fireEvent.changeText(screen.getByTestId('chat-input'), 'Draft');
+    expect(screen.getByTestId('chat-send').props.accessibilityState).toEqual({ disabled: true });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1050));
+    });
+    expect(screen.getByTestId('support-ticket-wait')).toHaveTextContent(/Please wait 1 seconds/);
+    // The visible number ticks; what a screen reader reads does not, and it is not re-announced.
+    expect(screen.getByTestId('support-ticket-wait-copy').props.accessibilityLabel).toBe(label);
+    expect(screen.getByTestId('support-ticket-wait').props.accessibilityLiveRegion).toBe('none');
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1050));
+    });
+    expect(screen.queryByTestId('support-ticket-wait')).toBeNull();
+    expect(screen.getByTestId('chat-send').props.accessibilityState).toEqual({ disabled: false });
+  });
+
+  it('409 TICKET_CLOSED closes the thread and drops the unsent bubble', async () => {
+    mockParams = { id: 7 };
+    mock.onGet('/support/tickets/7').reply(200, thread());
+    mock.onPost('/support/tickets/7/reply').replyOnce(409, { success: false, error: { code: 'TICKET_CLOSED', message: 'closed' } });
+    await renderWith(SupportTicketScreen);
     await sendText('Second');
     expect(screen.queryByTestId('chat-composer')).toBeNull();
     expect(within(screen.getByTestId('chat-closed-notice')).getByText(/This request is closed/)).toBeTruthy();

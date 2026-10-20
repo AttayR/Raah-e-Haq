@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { confirm, dialog } from '../core/dialog';
 import { t } from '../i18n';
-import { logout, type SessionThunkExtra } from '../store/thunks/sessionThunks';
+import { logout, type LogoutOptions, type SessionThunkExtra } from '../store/thunks/sessionThunks';
 
 // Typed locally (not useAppDispatch) so this hook does not import the store singleton.
 type LogoutDispatch = ThunkDispatch<unknown, SessionThunkExtra, UnknownAction>;
@@ -24,7 +24,7 @@ export const useLogout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const inFlight = useRef(false);
 
-  const performLogout = useCallback(async () => {
+  const performLogout = useCallback(async (options?: LogoutOptions) => {
     if (inFlight.current) {
       return;
     }
@@ -32,7 +32,7 @@ export const useLogout = () => {
     setIsLoggingOut(true);
     dialog.dismissAll();
     try {
-      await dispatch(logout());
+      await dispatch(logout(options));
     } finally {
       // The screen is usually unmounted by now (auth stack); the ref keeps a double tap out.
       inFlight.current = false;
@@ -56,5 +56,11 @@ export const useLogout = () => {
     }
   }, [performLogout]);
 
-  return { confirmLogout, isLoggingOut };
+  /**
+   * Signs out without asking. BE-129: after POST /account/deletion pass
+   * `{ serverAlreadySignedOut: true }` (the tokens are already revoked; /auth/logout is not called).
+   */
+  const signOut = useCallback((options?: LogoutOptions) => performLogout(options), [performLogout]);
+
+  return { confirmLogout, signOut, isLoggingOut };
 };

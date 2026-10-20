@@ -263,11 +263,12 @@ describe('PassengerProfile', () => {
     expect(screen.getByTestId('passenger-profile-email-state')).toHaveTextContent('Verified');
   });
 
-  it('UI-R16: Header "Edit" opens the form; no Delete account row until UI-R18', async () => {
+  it('UI-R16: Header "Edit" opens the form; UI-R18: the Delete account row opens DeleteAccount', async () => {
     await renderScreen(PassengerProfile, 'light');
     fireEvent.press(screen.getByTestId('passenger-profile-edit'));
     expect(mockNavigate).toHaveBeenLastCalledWith('ProfileEdit');
-    expect(screen.queryByText('Delete account')).toBeNull();
+    fireEvent.press(screen.getByTestId('passenger-profile-actions-delete'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('DeleteAccount');
   });
 
   it.each([

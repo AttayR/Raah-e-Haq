@@ -22,7 +22,7 @@ import {
   isStaleSessionRejection,
 } from '../thunks/apiThunks';
 import { logout } from '../thunks/sessionThunks';
-import { accountStatusRefused, resetApp } from '../actions';
+import { accountDeletionCancelled, accountStatusRefused, resetApp } from '../actions';
 import { rejectionMessage } from '../../core/api/errors';
 import { accountRefusalMessage } from '../../core/auth/accountRefusal';
 import { withRefusedStatus } from '../../core/auth/normalizeUser';
@@ -287,6 +287,12 @@ const authSlice = createSlice({
         }
         state.user = action.payload;
         state.statusUnverified = false;
+      })
+      // "Keep my account" (BE-129): the cooling-off period is over for this user.
+      .addCase(accountDeletionCancelled, (state) => {
+        if (state.isAuthenticated && state.user) {
+          state.user.deletion_scheduled_for = null;
+        }
       });
 
     // Background check of a session routed from the cache (T-531): only the user and

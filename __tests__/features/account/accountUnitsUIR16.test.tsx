@@ -85,11 +85,8 @@ describe('profile values', () => {
   });
 });
 
-describe('AccountActions (UI-R18 hook-up)', () => {
-  it('draws nothing without a handler; a destructive Delete account row with one', async () => {
-    await wrap(<AccountActions testID="actions" />);
-    expect(screen.queryByText('Delete account')).toBeNull();
-    screen.unmount();
+describe('AccountActions (UI-R18)', () => {
+  it('a destructive Delete account row that calls its handler', async () => {
     const onDelete = jest.fn();
     await wrap(<AccountActions testID="actions" onDeleteAccount={onDelete} />);
     expect(screen.getByText('Delete account').props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: LightTheme.colors.danger })]));

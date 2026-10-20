@@ -21,6 +21,6 @@ export interface AccountNavigator {
 
 /** Routes the shared Profile screen opens (both stacks register ProfileEdit and ChangePhone). */
 export interface ProfileNavigator {
-  navigate(name: 'ProfileEdit' | 'ChangePhone' | 'DriverDocuments'): void;
+  navigate(name: 'ProfileEdit' | 'ChangePhone' | 'DriverDocuments' | 'DeleteAccount'): void;
   goBack(): void;
 }

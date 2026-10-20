@@ -23,6 +23,7 @@ import { useFareOffer } from '../fare/hooks';
 import { isParcelType } from './api';
 import { EMPTY_PARCEL_DRAFT, buildParcelRideRequest, parcelFieldErrorsOf } from './rules';
 import type { ParcelDraft, ParcelField, ParcelFieldErrors, ParcelOptions } from './types';
+import { offerKeepAccount } from '../account-deletion/keepAccount';
 
 type Dispatch = ThunkDispatch<{ activeRide: ActiveRideState }, unknown, UnknownAction>;
 type LatLng = { latitude: number; longitude: number };
@@ -278,6 +279,8 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
         );
       } else if (failure.kind === 'balance_owed') {
         showBalanceOwed(failure, handlersRef.current.onBalanceOwed);
+      } else if (failure.kind === 'deletion_scheduled') {
+        offerKeepAccount(dispatch, 'booking').catch(() => undefined);
       } else if (failure.kind !== 'handled') {
         setFormError(failure.message);
       }

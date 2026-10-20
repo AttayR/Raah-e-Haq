@@ -367,6 +367,8 @@ export const componentTokens = {
     subjectCounterFrom: 100,
     /** Paged list footer spinner row. */
     footerRow: 56,
+    /** Help's last-trip card (§H1 measurements: 16 + 16 + 8 + 2 × 32 + 8 + 20 + 16). */
+    tripCardHeight: 148,
   },
   /** UI-R18 Invite friends (shared-support-invite §I2). */
   invite: {
@@ -377,6 +379,8 @@ export const componentTokens = {
     stepCircle: 32,
     stepMinHeight: 56,
   },
+  /** UI-R18 Delete account (shared-support-invite §D1): the 64 `dangerSoft` disc and its 32 glyph, list rows. */
+  accountDeletion: { disc: 64, discGlyph: 32, rowMinHeight: 44, rowGlyph: 20 } as const,
   /** T-520 safety: the SOS sheet's round badge and the passenger's PIN digit tiles. */
   safety: { sheetBadge: 56, sheetBadgeGlyph: 28, pinDigitWidth: 36, pinDigitHeight: 48 },
   /**

@@ -222,7 +222,7 @@ describe('Driver Profile (UI-R16 shared ProfileScreen)', () => {
     expect(screen.getByTestId('driver-profile-vehicle-row')).toHaveTextContent(/Vehicle & documents/);
   });
 
-  it('standard Header: back and the "Edit" text action; no Delete account row before UI-R18', async () => {
+  it('standard Header: back and the "Edit" text action; UI-R18: Delete account opens DeleteAccount', async () => {
     jest.spyOn(driverProfileApi, 'getVehicles').mockResolvedValue([]);
     await renderScreen(DriverProfile);
     expect(screen.getByText('Profile')).toBeTruthy();
@@ -230,7 +230,8 @@ describe('Driver Profile (UI-R16 shared ProfileScreen)', () => {
     expect(mockNavigate).toHaveBeenLastCalledWith('ProfileEdit');
     fireEvent.press(screen.getByTestId('driver-profile-header-back'));
     expect(mockGoBack).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Delete account')).toBeNull();
+    fireEvent.press(screen.getByTestId('driver-profile-actions-delete'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('DeleteAccount');
   });
 });
 

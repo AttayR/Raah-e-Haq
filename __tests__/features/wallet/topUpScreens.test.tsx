@@ -20,6 +20,7 @@ import TopUpCheckoutScreen from '../../../src/features/wallet/screens/TopUpCheck
 import TopUpStatusScreen from '../../../src/features/wallet/screens/TopUpStatusScreen';
 import TransactionDetailScreen from '../../../src/features/wallet/screens/TransactionDetailScreen';
 import { toTopUpResult } from '../../../src/features/wallet/api';
+import { dialog, dialogStore } from '../../../src/core/dialog';
 import { envelope, pageInfo, rawTopUp, rawTopUpConfig, rawTransaction, rawWallet } from '../../../test-utils/walletFixtures';
 
 const mockNavigate = jest.fn();
@@ -146,6 +147,39 @@ describe('AddMoneyScreen', () => {
       'TopUpStatus',
       expect.objectContaining({ id: TOP_UP_ID, providerName: 'Test gateway', result: expect.objectContaining({ topUp: expect.any(Object) }) }),
     );
+  });
+
+  it('[UI-R18] can_top_up false: says adding money is not available (no retry error)', async () => {
+    mock.onGet('/wallet').reply(200, envelope(rawWallet({ can_top_up: false })));
+    show(AddMoneyScreen);
+    expect(await screen.findByTestId('add-money-unavailable')).toHaveTextContent(/Adding money isn't available/);
+    expect(screen.queryByTestId('add-money-error')).toBeNull();
+    fireEvent.press(screen.getByText('Back'));
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('[UI-R18] 423 ACCOUNT_DELETION_SCHEDULED offers "Keep my account", which cancels the deletion', async () => {
+    mock.onGet('/wallet').reply(200, walletWithTopUp());
+    mock.onPost('/wallet/topups').reply(423, {
+      success: false,
+      message: 'Your account is set to be deleted. Keep your account to top up your wallet.',
+      error: { code: 'ACCOUNT_DELETION_SCHEDULED' },
+    });
+    mock.onPost('/account/deletion/cancel').reply(200, { success: true, data: { state: 'none', scheduled_for: null, cancelled: true } });
+    show(AddMoneyScreen);
+    fireEvent.changeText(await screen.findByTestId('add-money-amount-input'), '750');
+    fireEvent.press(screen.getByText('Card or checkout page'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('add-money-pay'));
+    });
+    await waitFor(() => expect(dialogStore.getCurrent()).not.toBeNull());
+    const question = dialogStore.getCurrent();
+    expect(question).toMatchObject({ title: 'Your account is set to be deleted', confirmLabel: 'Keep my account', cancelLabel: 'Not now' });
+    expect(question?.body).toBe('Keep your account to top up your wallet.');
+    await act(async () => {
+      if (question) dialog.answer(question.id, true);
+    });
+    await waitFor(() => expect(mock.history.post.some((r) => r.url === '/account/deletion/cancel')).toBe(true));
   });
 
   it('opens the hosted checkout for a card top-up', async () => {

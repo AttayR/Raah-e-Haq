@@ -23,6 +23,7 @@ import { DRIVER_DOCUMENTS_COPY } from '../../src/features/driverDocuments/copy';
 import { DRIVER_DOCUMENT_TYPES } from '../../src/features/driverDocuments/types';
 import AuthFlow from '../../src/app/navigation/AuthFlow';
 import { toast } from '../../src/core/toast';
+import { SUPPORT_EMAIL } from '../../src/config/support';
 import type { User } from '../../src/services/api';
 
 jest.mock('../../src/app/navigation/RootNavigation', () => {
@@ -403,7 +404,10 @@ describe('AccountStatusScreen UI-R8', () => {
     expect(screen.getByText("Your application wasn't approved")).toBeTruthy();
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     fireEvent.press(screen.getByTestId('account-status-contact-support'));
-    fireEvent.press(await screen.findByTestId('account-status-support-email'));
-    expect(open).toHaveBeenCalledWith('mailto:help@raahehaq.com');
+    const emailRow = await screen.findByTestId('account-status-support-email');
+    // UI-R18 review: the Help row anatomy, "Email support" with the address under it.
+    expect(emailRow).toHaveTextContent(new RegExp(`Email support.*${SUPPORT_EMAIL.replace(/\./g, '\\.')}`));
+    fireEvent.press(emailRow);
+    expect(open).toHaveBeenCalledWith(`mailto:${SUPPORT_EMAIL}`);
   });
 });
