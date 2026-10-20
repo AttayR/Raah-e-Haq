@@ -1145,3 +1145,19 @@ App follow-up: while searching, a poll or focus read returning `cancelled` + `no
 - Admin only: `POST /admin/rides` → 423 `ACCOUNT_DELETION_SCHEDULED` (field passenger_id) for a passenger in cooling-off.
 - Server only: a due deletion waits for an open ride, an open top-up, a pending settlement (payout or commission payment) and pending_balance; after 7 days past the date (ACCOUNT_DELETION_POSTPONED_ALERT_DAYS) admins get one security event `account_deletion_postponed`.
 - BE-135 (backend 4f9034a): a `TOPUP_PENDING` blocker (GET and the POST 409 `error`) can carry `retry_after_at` (ISO 8601) when a recent top-up failed or expired but the provider could still confirm it late (up to 24 h after creation, never after an amount mismatch); server copy "A recent wallet top-up could still be completed by the payment provider. Try again in N hours." Without `retry_after_at` it is the open-top-up case. Show both like ACTIVE_RIDE (no action). A provider success that arrives during the cooling-off period is never credited; admins see it under top-ups needs_review ("refund it through the provider").
+
+### Ride chat unread count (BE-136, backend a184115)
+
+- Every ride read for the ride's passenger or driver carries `chat: { unread_count }`: GET `/rides/{id}`, GET `/rides` (the active-ride poll) and ride action responses (arrived, start, complete, parcel steps).
+- It counts the other party's unread messages to the reader in the current thread; an earlier driver's messages after a requeue never count. Same number POST `/rides/{id}/messages/read` returns as `unread_count`.
+- 0 while the ride has no driver and once the chat expired (`read_only_until` passed). Admins and the driver request feed get no `chat` key.
+- Use it for the trip sheet Message badge instead of polling `/chats`.
+
+### Request reach marker ids "b2" (BE-119, SEC-32, backend 4583fdc)
+
+- GET `/rides/nearby-drivers` adds `meta.fine_epoch`: an opaque string when the answer has fine markers, else null.
+- While a ride is `requested`, its passenger's GET `/rides/{id}` carries `reach: { sent, viewing, sent_ids, viewing_ids, epoch }`. The ids are public marker `id`s from that passenger's own latest nearby answer (fine markers only) for drivers sent the request (`viewing_ids`: opened it). Drivers not drawn are counted, never listed. Apply ids only when `reach.epoch === meta.fine_epoch` of the drawn answer; ids are empty and `epoch` null without a fine nearby answer in the last 30 s.
+- Women mode (`female_driver_only`): `sent`/`viewing` null, ids empty, `epoch` null; show "Sending to drivers nearby…".
+- After allow-any-driver or a requeue only later offers count and are listed.
+- Change from BE-116: `viewing` counts every driver who opened the offer, including ones who then declined. A decline changes no count and no id; there is never a declined count or id.
+- GET `/rides/{id}/reach` stays `{sent, viewing}`; GET `/rides` has no reach. POST `/rides/{id}/offer-viewed` unchanged.

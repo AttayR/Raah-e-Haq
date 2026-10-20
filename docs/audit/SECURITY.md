@@ -577,6 +577,14 @@ These are rulings on proposals that are not built yet: `docs/design/screens/map-
    - It is idempotent (the first view wins) and throttled at 30/min.
 6. `ride_offers` (ride, driver, served_at, viewed_at, declined_at) is pruned after 30 days (SEC-24/25).
 
+**Amendment 2026-10-21 (BE-119 + BE-136 diff review, backend `a184115`, `4583fdc`): PASS.**
+- **`viewing` includes drivers who declined. Accepted.** A decline also stamps `viewed_at` if it was empty, and `declined_at` is never read for the passenger. So a decline never changes `sent`, `viewing` or the ids. A decline without a prior open looks the same as an open. Condition 4 holds more strictly than before (the old `viewing` dropped on a decline, which leaked the decline as a count change).
+- **Fine-marker cache. Accepted.** Key `ride-reach-fine-markers:{viewer}`, 30 s TTL (= `ID_CONTINUITY_SECONDS`). It holds only driver id => that viewer's own fine public id, plus a random epoch, with no positions. Each nearby answer replaces it, and an answer with no fine markers clears it. It fails closed (counts only). It is filled from exactly the drawn set (after the radius and tier filters, fine precision only), so a hidden, coarse, zoned or out-of-radius driver never gets an id.
+- **No identity leak and no cross-epoch linking.** The ids come from the existing per-viewer, per-session, salted HMAC (SEC-31 item 6). The ride poll only repeats ids from that viewer's latest answer and never mints or keeps older ones. `sent_ids` and `viewing_ids` are sorted by public id, so the order says nothing about internal ids. `meta.fine_epoch` and `reach.epoch` are random per answer.
+- Ids go only to `passenger_id === viewer`, only while `requested` (`RideReach::visible`), and only in `GET /rides/{id}`. Women mode gives no ids and null counts. After `allow_any_driver` or a requeue, `requested_at` is reset, so only later offers surface (`liveOffers`).
+- **BE-136 `chat.unread_count`.** The block appears only when `$isPassenger || $isDriver`. `unreadCountFor` returns 0 for non-participants, expired chats, rides with no driver, and messages from an earlier driver. `GET /rides` stays scoped to the caller and adds one correlated subquery (`withUnreadCount`), so there is no N+1. Admins get no block.
+- Suite: 2641 tests OK on sqlite in-memory.
+
 ### SEC-33 · high · abuse: driver auto-accept (BE-116 c)
 **Ruling: CONDITIONS (BE-120, must ship in the same release as BE-116 c).**
 
