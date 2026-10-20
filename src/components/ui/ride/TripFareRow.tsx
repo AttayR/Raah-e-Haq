@@ -34,7 +34,12 @@ export function TripFareRow({ amount, fixed, accessibilityLabel, testID = 'trip-
       <AppText variant="caption" color="textSecondary" numberOfLines={1} style={styles.cash} testID={`${testID}-unit`}>
         {t('ride.tripFareCash')}
       </AppText>
-      {fixed ? <FareTag kind="fixed" testID={`${testID}-tag`} /> : null}
+      {/* Centred in the 32 row (the tag itself is start-aligned for its other places). */}
+      {fixed ? (
+        <View style={styles.tag} testID={`${testID}-tag-slot`}>
+          <FareTag kind="fixed" testID={`${testID}-tag`} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -43,4 +48,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minHeight: k.fareRowMinHeight, gap: space[2] },
   // "cash" sits 4 after the amount (the row gap is 8), then the tag at the end.
   cash: { flex: 1, marginStart: -space[1] },
+  tag: { alignSelf: 'center', justifyContent: 'center' },
 });

@@ -362,3 +362,61 @@ describe('BottomSheet (modal mode)', () => {
     jest.restoreAllMocks();
   });
 });
+
+describe('[UI-R12] footer divider and focus reveal room', () => {
+  it('focusRevealExtra keeps the line under a focused field (its counter) above the footer', async () => {
+    const handlers: Record<string, (e: { endCoordinates: { height: number } }) => void> = {};
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: (e: { endCoordinates: { height: number } }) => void) => {
+      handlers[event] = handler;
+      return { remove: noop };
+    }) as unknown as typeof Keyboard.addListener);
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    await renderThemed(
+      <BottomSheet mode="modal" visible focusRevealExtra={20} header={<Text>Rate</Text>} footer={<Button label="Submit" onPress={noop} />} testID="m">
+        <Text>Stars and comment</Text>
+      </BottomSheet>,
+    );
+    await layout(containerOf('m'), 874);
+    await layout(screen.getByTestId('m-header'), 60);
+    await layout(screen.getByTestId('m-footer'), 132);
+    await layout(screen.getByTestId('m-body'), 500);
+    act(() => handlers.keyboardWillShow({ endCoordinates: { height: 336 } }));
+    const field = { measureLayout: (_: unknown, ok: (x: number, y: number, w: number, h: number) => void) => ok(0, 300, 358, 120) };
+    jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(field as unknown as ReturnType<typeof TextInput.State.currentlyFocusedInput>);
+    act(() => handlers.keyboardDidShow({ endCoordinates: { height: 336 } }));
+    // As the T-519 case (114) plus the 20 pt counter line.
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ y: 134 }));
+    jest.restoreAllMocks();
+  });
+
+  it('footerDivider draws a hairline above the footer only while content runs on under it', async () => {
+    await renderThemed(
+      <BottomSheet mode="modal" visible footerDivider footer={<Button label="Done" onPress={noop} />} testID="m">
+        <Text>Receipt</Text>
+      </BottomSheet>,
+    );
+    await layout(containerOf('m'), 874);
+    const scroll = screen.getByTestId('m-scroll');
+    act(() => {
+      fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 400 } } });
+      fireEvent(scroll, 'contentSizeChange', 390, 700);
+    });
+    expect(flat(screen.getByTestId('m-footer').props.style).borderTopWidth).toBeGreaterThan(0);
+    act(() => {
+      fireEvent.scroll(scroll, { nativeEvent: { contentOffset: { y: 300 }, layoutMeasurement: { height: 400 }, contentSize: { height: 700 } } });
+    });
+    expect(flat(screen.getByTestId('m-footer').props.style).borderTopWidth).toBeUndefined();
+  });
+
+  it('a sheet without footerDivider sends no scroll events to JS', async () => {
+    await renderThemed(
+      <BottomSheet mode="modal" visible footer={<Button label="Done" onPress={noop} />} testID="m">
+        <Text>Body</Text>
+      </BottomSheet>,
+    );
+    const scroll = screen.getByTestId('m-scroll');
+    expect(scroll.props.onScroll).toBeUndefined();
+    expect(scroll.props.onContentSizeChange).toBeUndefined();
+    expect(scroll.props.scrollEventThrottle).toBeUndefined();
+  });
+});

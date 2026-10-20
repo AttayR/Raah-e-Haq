@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, BottomSheet, Button, Card, Icon, TextField } from '../../../components/ui';
+import { AppText, BottomSheet, Button, Card, Icon, ListItem, TextField } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import { formatMoney } from '../../../utils/format';
@@ -125,6 +125,11 @@ type SectionProps = {
   /** T-574: a parcel ride, where the person who asked for more is the rider. */
   parcel?: boolean;
   testID?: string;
+  /**
+   * [UI-R12] How the report is offered: `button` (default, an outlined button) or `row` (the trip
+   * receipt, passenger-trip-complete PR2 row 6: a 56 ListItem with a 40 icon tile, §12.4).
+   */
+  entry?: 'button' | 'row';
 };
 
 /**
@@ -133,7 +138,7 @@ type SectionProps = {
  * After a report (or a refusal saying none can be made) the button goes at once, without waiting
  * for the ride to be read again; the server's state wins as soon as it stops offering the button.
  */
-export function OverchargeReportSection({ rideId, state, fare, onReported, parcel = false, testID = 'overcharge' }: SectionProps) {
+export function OverchargeReportSection({ rideId, state, fare, onReported, parcel = false, entry = 'button', testID = 'overcharge' }: SectionProps) {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState<{ rideId: number; state: OverchargeState } | null>(null);
   const action = useOverchargeReport(rideId, (result) => {
@@ -174,7 +179,14 @@ export function OverchargeReportSection({ rideId, state, fare, onReported, parce
               </View>
             </Card>
           ) : null}
-          {canReport ? (
+          {canReport && entry === 'row' ? (
+            <ListItem
+              title={parcel ? t('parcel.overchargeButton') : t('fare.reportButton')}
+              icon="report"
+              onPress={() => setOpen(true)}
+              testID={`${testID}-button`}
+            />
+          ) : canReport ? (
             <Button
               label={parcel ? t('parcel.overchargeButton') : t('fare.reportButton')}
               variant="outline"

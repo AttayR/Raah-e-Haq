@@ -10,6 +10,8 @@ import {
   TextInput,
   View,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -110,6 +112,16 @@ export type BottomSheetProps = React.PropsWithChildren<{
    * continues from where the old one stood. Read when the sheet first opens.
    */
   openFrom?: number;
+  /**
+   * [UI-R12] A 1 pt `border` hairline above the sticky footer while content runs on under it
+   * (scrolled short of the end), TS1 / §5.14. Default false.
+   */
+  footerDivider?: boolean;
+  /**
+   * [UI-R12] Extra room kept below a focused field when the keyboard reveal scrolls it into view
+   * (the field's helper or counter line under it, PR2 block 5). Default 0.
+   */
+  focusRevealExtra?: number;
   /** Read by screen readers on the handle. */
   accessibilityLabel?: string;
   testID?: string;
@@ -150,6 +162,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     handleTapToggles = false,
     draggable = true,
     openFrom,
+    footerDivider = false,
+    focusRevealExtra = 0,
     accessibilityLabel,
     testID,
     children,
@@ -422,6 +436,42 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // [T-519] Visible body height (between the header and the footer / keyboard) for the
   // focused-field scroll below; a ref so the keyboard listeners need not re-subscribe.
   const scrollRef = useRef<ScrollView>(null);
+  const revealExtraRef = useRef(focusRevealExtra);
+  revealExtraRef.current = focusRevealExtra;
+  // [UI-R12] Content runs on under the footer (not scrolled to its end): the footer's hairline.
+  // Only a change of the boolean re-renders.
+  const scrollMetrics = useRef({ offset: 0, viewport: 0, content: 0 });
+  const [moreBelow, setMoreBelow] = useState(false);
+  const updateMoreBelow = useCallback(() => {
+    if (!footerDivider) return;
+    const { offset, viewport, content } = scrollMetrics.current;
+    const next = viewport > 0 && content - (offset + viewport) > 1;
+    setMoreBelow(prev => (prev === next ? prev : next));
+  }, [footerDivider]);
+  const dividerScrollProps = useMemo(
+    () => ({
+      scrollEventThrottle: 16,
+      onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+        const last = scrollMetrics.current;
+        scrollMetrics.current = {
+          offset: contentOffset.y,
+          viewport: (layoutMeasurement as typeof layoutMeasurement | undefined)?.height ?? last.viewport,
+          content: (contentSize as typeof contentSize | undefined)?.height ?? last.content,
+        };
+        updateMoreBelow();
+      },
+      onLayout: (e: LayoutChangeEvent) => {
+        scrollMetrics.current.viewport = e.nativeEvent.layout.height;
+        updateMoreBelow();
+      },
+      onContentSizeChange: (_w: number, h: number) => {
+        scrollMetrics.current.content = h;
+        updateMoreBelow();
+      },
+    }),
+    [updateMoreBelow],
+  );
   const bodyContentRef = useRef<View>(null);
   const visibleBody = useRef(0);
   const bodyHeightRef = useRef(0);
@@ -439,7 +489,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       (_x, y, _width, height) => {
         if (y < 0 || y > bodyHeightRef.current) return; // Not a field of this sheet.
         const margin = space[2];
-        const target = Math.max(0, Math.min(y - margin, y + height + margin - visibleBody.current));
+        const below = margin + revealExtraRef.current;
+        const target = Math.max(0, Math.min(y - margin, y + height + below - visibleBody.current));
         scrollRef.current?.scrollTo({ y: target, animated: !reduce });
       },
       () => {},
@@ -663,6 +714,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={scrollable}
         contentContainerStyle={{ paddingBottom: (footer ? footerBlock : footerBottom) + keyboardHeight }}
+        // [UI-R12] Scroll events reach JS only for a sheet that draws the footer hairline.
+        {...(footerDivider ? dividerScrollProps : null)}
         testID={testID ? `${testID}-scroll` : undefined}
       >
         <View
@@ -691,6 +744,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
           bottom: keyboardHeight,
           backgroundColor: theme.colors.surface,
         },
+        footerDivider && moreBelow ? { borderTopWidth: theme.borderWidth.thin, borderTopColor: theme.colors.border } : null,
         footerStyle,
       ]}
       onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}

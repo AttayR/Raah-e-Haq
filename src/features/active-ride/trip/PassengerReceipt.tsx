@@ -145,7 +145,8 @@ function FareDetails({ view }: { view: PassengerTripView }) {
           quotedDistanceKm={readNumberOrNull(ride.quoted_distance_km)}
           quotedDurationMin={readNumberOrNull(ride.quoted_duration_minutes)}
           totalLabel={ACTIVE_RIDE_COPY.finalFareLabel}
-          footnote={view.parcel ? t('parcel.senderPaidAtPickup') : fare.paymentMethod ? ACTIVE_RIDE_COPY.paymentLabel(fare.paymentMethod) : null}
+          // The money card above already says how to pay: no repeated footnote here.
+          footnote={null}
         />
       ) : null}
     </View>
@@ -166,7 +167,7 @@ function RatingBlock({ view, receipt }: { view: PassengerTripView; receipt: Pass
           {view.parcel ? t('rating.titleParcel') : ACTIVE_RIDE_COPY.rateWith(name)}
         </AppText>
         <View style={styles.ratingForm}>
-          <RatingForm form={receipt.form} />
+          <RatingForm form={receipt.form} tagVariant="outline" />
         </View>
       </View>
     );

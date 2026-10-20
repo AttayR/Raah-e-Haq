@@ -146,7 +146,7 @@ export const urLatn: TranslationTable = {
     etaMore: '99+',
     etaAwayA11y: '{n} minute mein',
     etaAwayA11yOne: '1 minute mein',
-    tripFareCash: 'cash',
+    tripFareCash: 'naqad',
     stepRequested: 'Request hui',
     stepOnTheWay: 'Raaste mein',
     stepArrived: 'Aa gaya',

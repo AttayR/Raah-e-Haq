@@ -99,7 +99,8 @@ describe('trip sheet peek (TS1)', () => {
       <TripSheet stateKey="driver_en_route" header={<AppText>Header</AppText>} peek={<AppText>Peek</AppText>} details={<AppText>Details</AppText>} />,
     );
     expect(screen.getByTestId('trip-sheet-handle')).toBeTruthy();
-    expect(screen.getByTestId('trip-sheet-details')).toBeTruthy();
+    // At peek the details are hidden from screen readers (collapsed), so the query includes them.
+    expect(screen.getByTestId('trip-sheet-details', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByText('Peek')).toBeTruthy();
     rerender(
       <TripSheet mode="receipt" stateKey="completed" header={<AppText>Header</AppText>} peek={<AppText>Receipt</AppText>} footer={<AppText>Footer</AppText>} />,

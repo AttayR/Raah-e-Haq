@@ -91,6 +91,11 @@ export type PersonCardProps = {
   vehicleName?: string | null;
   /** Passenger side: the colour on its own line, so it is never cut (what the passenger looks for). */
   vehicleColor?: string | null;
+  /**
+   * [UI-R12] `joined`: one `caption` "{make} {model} · {colour}" wrapping to 2 lines (TS5, the
+   * trip sheets). `split` (default): make and model, then the colour on its own line.
+   */
+  vehicleLayout?: 'split' | 'joined';
   /** Passenger side: `vehicle.license_plate` in a 28pt pill. Hidden when null. */
   plate?: string | null;
   /** Driver arrived: a 2pt `primary` ring on the plate helps spot the car. */
@@ -134,6 +139,7 @@ export function PersonCard({
   newRatingLabel,
   vehicleName,
   vehicleColor,
+  vehicleLayout = 'split',
   plate,
   plateHighlighted = false,
   actions = [],
@@ -169,12 +175,18 @@ export function PersonCard({
           ) : (
             <RatingDisplay rating={rating} newLabel={newRatingLabel} valueTestID={ratingTestID} />
           )}
-          {vehicleName ? (
+          {vehicleLayout === 'joined' ? (
+            vehicleName || vehicleColor ? (
+              <AppText variant="caption" color="textSecondary" numberOfLines={2} testID={vehicleTestID}>
+                {[vehicleName, vehicleColor].filter(Boolean).join(' · ')}
+              </AppText>
+            ) : null
+          ) : vehicleName ? (
             <AppText variant="caption" color="textSecondary" numberOfLines={1} testID={vehicleTestID}>
               {vehicleName}
             </AppText>
           ) : null}
-          {vehicleColor ? (
+          {vehicleLayout === 'split' && vehicleColor ? (
             <AppText
               variant="caption"
               color="textSecondary"

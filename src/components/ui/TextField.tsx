@@ -32,6 +32,8 @@ export type TextFieldProps = Omit<
   /** Required field: a `danger` `*` after the label and "required" in the spoken name (T-564). */
   required?: boolean;
   helper?: string;
+  /** [UI-R12] `end` puts the helper at the end edge (a counter like "12/500"). Default `start`. */
+  helperAlign?: 'start' | 'end';
   /** Error message: 2pt `danger` border, the message under the field, read with the label. */
   error?: string | null;
   /**
@@ -74,6 +76,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     label,
     required = false,
     helper,
+    helperAlign = 'start',
     error,
     hideErrorText = false,
     variant = 'default',
@@ -237,7 +240,13 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           </AppText>
         </View>
       ) : helper ? (
-        <AppText variant="caption" color="textSecondary" style={styles.helperOnly}>
+        <AppText
+          variant="caption"
+          color="textSecondary"
+          align={helperAlign}
+          style={styles.helperOnly}
+          testID={testID ? `${testID}-helper` : undefined}
+        >
           {helper}
         </AppText>
       ) : null}

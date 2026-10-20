@@ -100,9 +100,8 @@ describe('ActiveRidePanel', () => {
     const { getByText, getByTestId, queryByTestId } = renderPanel(ride, stateOf(ride));
     expect(getByText(title)).toBeTruthy();
     expect(getByTestId('driver-assigned-card')).toBeTruthy();
-    // T-524: make + model and the colour on separate lines (no break inside "make model · colour").
-    expect(getByText('Honda City')).toBeTruthy();
-    expect(getByText('Grey')).toBeTruthy();
+    // UI-R12 TS5: one caption "{make} {model} · {colour}" (up to 2 lines) on the trip sheet.
+    expect(getByText('Honda City · Grey')).toBeTruthy();
     // UI-R5 PersonCard: the plate in its pill.
     expect(getByText('LEC-9')).toBeTruthy();
     expect(!!queryByTestId('active-ride-cancel')).toBe(cancellable);

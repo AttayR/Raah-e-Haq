@@ -81,6 +81,11 @@ type InputProps = {
   value: number;
   onChange: (value: number) => void;
   disabled?: boolean;
+  /**
+   * [UI-R12] Shown in the label slot while no star is chosen ("Tap a star to rate"), 8 under the
+   * stars like the star words that replace it (PR2 block 5). Default: an empty line.
+   */
+  emptyLabel?: string;
   testID?: string;
 };
 
@@ -89,7 +94,7 @@ type InputProps = {
  * label under the row ("Very bad" … "Excellent"); haptic `selection` per change. Screen readers
  * get one adjustable control (swipe up/down).
  */
-export function RatingInput({ value, onChange, disabled = false, testID }: InputProps) {
+export function RatingInput({ value, onChange, disabled = false, emptyLabel, testID }: InputProps) {
   const [width, setWidth] = useState(0);
   const select = useCallback(
     (next: number) => {
@@ -135,7 +140,7 @@ export function RatingInput({ value, onChange, disabled = false, testID }: Input
         ))}
       </View>
       <AppText variant="bodySmall" color="textSecondary" align="center" testID={testID ? `${testID}-label` : undefined}>
-        {label || ' '}
+        {label || emptyLabel || ' '}
       </AppText>
     </View>
   );

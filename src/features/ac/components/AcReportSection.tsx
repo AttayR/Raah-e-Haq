@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, BottomSheet, Button, Card, Icon, TextField } from '../../../components/ui';
+import { AppText, BottomSheet, Button, Card, Icon, ListItem, TextField } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { layout, space } from '../../../theme';
 import { AC_NOTE_MAX } from '../api';
@@ -81,6 +81,11 @@ type SectionProps = {
   /** Re-read the ride after a report (or a refusal saying none can be made). */
   onReported?: (result: AcReportResult | null) => void;
   testID?: string;
+  /**
+   * [UI-R12] How the report is offered: `button` (default, an outlined button) or `row` (the trip
+   * receipt, passenger-trip-complete PR2 row 6: a 56 ListItem with a 40 icon tile, §12.4).
+   */
+  entry?: 'button' | 'row';
 };
 
 /**
@@ -88,7 +93,7 @@ type SectionProps = {
  * report's status (under review with the AC part it refunds, refunded, or reviewed) after. The
  * button goes at once after a report; the server's state wins once it stops offering it.
  */
-export function AcReportSection({ rideId, state, onReported, testID = 'ac-report' }: SectionProps) {
+export function AcReportSection({ rideId, state, onReported, entry = 'button', testID = 'ac-report' }: SectionProps) {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState<{ rideId: number; state: AcReportState } | null>(null);
   const action = useAcReport(rideId, (result) => {
@@ -122,7 +127,9 @@ export function AcReportSection({ rideId, state, onReported, testID = 'ac-report
               </View>
             </Card>
           ) : null}
-          {canReport ? (
+          {canReport && entry === 'row' ? (
+            <ListItem title={t('ac.reportButton')} icon="ac" onPress={() => setOpen(true)} testID={`${testID}-button`} />
+          ) : canReport ? (
             <Button
               label={t('ac.reportButton')}
               variant="outline"

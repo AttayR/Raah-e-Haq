@@ -291,6 +291,28 @@ export const rideFollowEdgePadding = (viewport?: MapViewport | null): EdgePaddin
   return { ...pad, top, bottom };
 };
 
+/** UI-R12 PA5 / TS2.1: the pickup at about zoom 17 once the driver has arrived (phone width). */
+export const ARRIVED_REGION_DELTA = 0.004;
+/** TS2 camera padding: 16 under the top controls, 24 above the sheet. */
+export const ARRIVED_TOP_CLEARANCE = 16;
+export const ARRIVED_SHEET_CLEARANCE = 24;
+/** A sheet height change this large re-centres the arrived camera (TS2). */
+export const ARRIVED_REFIT_DELTA = 24;
+export const ARRIVED_ANIMATION_MS = 600;
+
+/**
+ * The region that centres the pickup at zoom ~17 in the map left between the top controls
+ * (`insets.top + 72`) and the sheet (`height + 24`), PA5.
+ */
+export const arrivedRegion = (pickup: LatLng, viewport?: MapViewport | null): Region =>
+  regionInViewport(
+    pickup,
+    viewport
+      ? { ...viewport, top: (viewport.top ?? 0) + ARRIVED_TOP_CLEARANCE, bottom: viewport.bottom + ARRIVED_SHEET_CLEARANCE }
+      : viewport,
+    ARRIVED_REGION_DELTA,
+  );
+
 export interface PassengerRideCamera {
   /**
    * True while the auto-fit owns the camera (driver on the way or on the trip, not paused by
@@ -364,11 +386,33 @@ export const usePassengerRideCamera = (
     refit: `${current}:${refit}`,
   });
 
+  // UI-R12 PA5: entering "driver arrived" (live, from on the way) animates once to the pickup at
+  // zoom 17 above the sheet; again only when the sheet height moves by 24 or more (its new peek
+  // lands after the state change), never on a location read. A pan holds it (T-549 rule).
+  const arrived = current === 'driver_arrived';
+  const pickLat = ride?.pickup_latitude;
+  const pickLng = ride?.pickup_longitude;
+  const sheetBottom = viewport?.bottom ?? 0;
+  const arrivedFitFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!arrived) {
+      arrivedFitFor.current = null;
+      return;
+    }
+    if (!mapReady || paused) return;
+    const pickup = coordinate(pickLat, pickLng);
+    if (!pickup) return;
+    if (arrivedFitFor.current !== null && Math.abs(sheetBottom - arrivedFitFor.current) < ARRIVED_REFIT_DELTA) return;
+    arrivedFitFor.current = sheetBottom;
+    mapRef.current?.animateToRegion(arrivedRegion(pickup, latestViewport.current), ARRIVED_ANIMATION_MS);
+  }, [arrived, mapReady, paused, pickLat, pickLng, sheetBottom, mapRef]);
+
   const following = useRef(false);
   following.current = followed && !paused;
   const isFollowing = useCallback(() => following.current, []);
   const holds = useRef(false);
-  holds.current = followed;
+  // Arrived owns the camera too (PA5): the passenger's own position must not recentre it.
+  holds.current = followed || arrived;
   const holdsCamera = useCallback(() => holds.current, []);
   const recentre = useCallback(() => {
     setPausedStage(null);

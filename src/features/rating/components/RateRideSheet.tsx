@@ -4,7 +4,7 @@ import { AppText, Avatar, BottomSheet, Button } from '../../../components/ui';
 import { toast } from '../../../core/toast';
 import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { t } from '../../../i18n';
-import { space } from '../../../theme';
+import { componentTokens, space, textStyles } from '../../../theme';
 import type { RaterRole, RideRatingState } from '../types';
 import { RatingForm, useRatingForm } from './RatingForm';
 
@@ -64,6 +64,8 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, par
       visible={visible}
       onClose={skip}
       accessibilityLabel={t('rating.sheetA11y')}
+      // The comment counter under the field stays above the footer when the keyboard is up.
+      focusRevealExtra={componentTokens.textField.helperGap + textStyles.caption.lineHeight}
       testID="rate-ride-sheet"
       header={
         keyboardUp ? (

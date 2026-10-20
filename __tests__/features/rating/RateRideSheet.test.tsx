@@ -248,8 +248,9 @@ describe('RateRideSheet', () => {
     jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(field as unknown as ReturnType<typeof TextInput.State.currentlyFocusedInput>);
     emit('keyboardDidShow', 336);
     // Sheet at full (866): visible body = 866 − 24 handle − 50 header − 132 footer − 336 keyboard
-    // = 324, so the box (y 260, 140 tall) ends 8 above the footer at y = 260 + 140 + 8 − 324.
-    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ y: 84 }));
+    // = 324, so the box (y 260, 140 tall) and its 20 pt counter line (UI-R12) end 8 above the
+    // footer at y = 260 + 140 + 20 + 8 − 324.
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ y: 104 }));
 
     emit('keyboardWillHide', 0);
     expect(screen.getByTestId('rate-ride-avatar')).toBeTruthy();

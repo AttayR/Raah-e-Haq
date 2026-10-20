@@ -504,6 +504,8 @@ export const componentTokens = {
     amountSkeletonWidth: 140,
     amountSkeletonHeight: 34,
     detailsRowHeight: 48,
+    /** TS1 Z6: the details fade in over the first 24 pt the sheet rises above peek. */
+    detailsRevealDistance: 24,
     chevron: 20,
   },
   /**

@@ -108,10 +108,13 @@ describe('the report sheets survive the trip → receipt swap (T-565)', () => {
     const springs = holdSprings();
     const view = render(<Host ride={acRide()} />);
     await act(async () => {});
-    fireEvent.press(screen.getByTestId('active-ride-ac-report-button'));
+    // The report row is in the details (screen-reader hidden until expanded).
+    fireEvent.press(screen.getByTestId('active-ride-ac-report-button', { includeHiddenElements: true }));
     await act(async () => {});
     springs.finish();
-    expect(screen.getByTestId('ac-report-sheet')).toBeTruthy();
+    // The report's Modal is mounted from inside the collapsed details (which screen readers skip;
+    // a native Modal is its own window on device), so this query includes hidden elements.
+    expect(screen.getByTestId('ac-report-sheet', { includeHiddenElements: true })).toBeTruthy();
 
     // The ride completes while the sheet is up: same instance (its open state is kept).
     view.rerender(<Host ride={acRide({ status: 'completed' })} />);

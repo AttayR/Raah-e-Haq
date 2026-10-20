@@ -89,17 +89,22 @@ const tagsTitle = (config: RatingConfig, stars: number): string => {
  * The rating form's body (kit RatingInput, tag Chips, comment TextField); the host draws the
  * person and the submit action (the sheet footer, or the trip receipt's footer).
  */
-export function RatingForm({ form, testID = 'rate-ride' }: { form: RatingFormState; testID?: string }) {
+export function RatingForm({
+  form,
+  tagVariant = 'filled',
+  testID = 'rate-ride',
+}: {
+  form: RatingFormState;
+  /** [UI-R12] The trip receipt's tags are `outline` chips (PR2 block 5). */
+  tagVariant?: 'filled' | 'outline';
+  testID?: string;
+}) {
   const { stars, setStars, selected, toggle, comment, setComment, config, status, reload, submitting, maxTags, maxComment, offered } = form;
   const atMax = selected.length >= maxTags;
   return (
     <View style={styles.body}>
-      <RatingInput value={stars} onChange={setStars} disabled={submitting} testID={`${testID}-stars`} />
-      {stars < 1 ? (
-        <AppText variant="bodySmall" color="textSecondary" align="center" testID={`${testID}-hint`}>
-          {t('rating.starsHint')}
-        </AppText>
-      ) : null}
+      {/* PR2: stars → 8 → "Tap a star to rate", then the chosen star's word in the same line. */}
+      <RatingInput value={stars} onChange={setStars} disabled={submitting} emptyLabel={t('rating.starsHint')} testID={`${testID}-stars`} />
 
       {stars >= 1 && config && offered.length > 0 ? (
         <View style={styles.section} testID={`${testID}-tags`}>
@@ -117,6 +122,7 @@ export function RatingForm({ form, testID = 'rate-ride' }: { form: RatingFormSta
                   key={tag.key}
                   label={tag.label}
                   selected={on}
+                  variant={tagVariant}
                   disabled={submitting || (!on && atMax)}
                   onPress={() => toggle(tag.key)}
                   testID={`${testID}-tag-${tag.key}`}
@@ -145,6 +151,7 @@ export function RatingForm({ form, testID = 'rate-ride' }: { form: RatingFormSta
           maxLength={maxComment}
           disabled={submitting}
           helper={t('rating.commentCount', { n: comment.length, max: maxComment })}
+          helperAlign="end"
           testID={`${testID}-comment`}
         />
       ) : null}

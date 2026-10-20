@@ -5,7 +5,10 @@
 import { act, renderHook } from '@testing-library/react-native';
 import type { LatLng } from 'react-native-maps';
 import {
+  ARRIVED_ANIMATION_MS,
+  ARRIVED_REGION_DELTA,
   TRIP_FOLLOW_INTERVAL_MS,
+  arrivedRegion,
   rideFollowCoordinates,
   usePassengerRideCamera,
   rideFollowEdgePadding,
@@ -131,11 +134,43 @@ describe('T-549: the ride camera on the trip', () => {
     expect(fit).toHaveBeenCalledTimes(2);
   });
 
-  it('no recentre button and no hold outside the followed stages', () => {
+  it('no recentre button outside the followed stages; arrived still holds the camera (UI-R12 PA5)', () => {
     const { result } = setup({ stage: 'driver_arrived', location: car(31.51, 74.34) });
     act(() => result.current.onRegionChangeComplete({} as never, { isGesture: true }));
     expect(result.current.paused).toBe(false);
-    expect(result.current.holdsCamera()).toBe(false);
+    expect(result.current.holdsCamera()).toBe(true);
+  });
+
+  it('UI-R12 PA5: the live switch to arrived animates once to the pickup at zoom 17 above the sheet', () => {
+    const animate = jest.fn();
+    const mapRef = { current: { fitToCoordinates: jest.fn(), animateToRegion: animate } };
+    type Q = { stage: PassengerRideStage; bottom: number };
+    const hook = renderHook(
+      ({ stage, bottom }: Q) => usePassengerRideCamera(mapRef, stage, car(31.53, 74.37), ride, null, { mapHeight: 874, top: 118, bottom }),
+      { initialProps: { stage: 'driver_en_route', bottom: 414 } as Q },
+    );
+    act(() => hook.result.current.onMapReady());
+    expect(animate).not.toHaveBeenCalled();
+
+    hook.rerender({ stage: 'driver_arrived', bottom: 414 });
+    expect(animate).toHaveBeenCalledTimes(1);
+    const [region, duration] = animate.mock.calls[0];
+    expect(duration).toBe(ARRIVED_ANIMATION_MS);
+    expect(region.longitudeDelta).toBe(ARRIVED_REGION_DELTA);
+    // Padding top insets.top + 72 (here 118 = insets + controls, + 16) and bottom sheet + 24.
+    expect(region).toEqual(arrivedRegion(PICKUP, { mapHeight: 874, top: 118, bottom: 414 }));
+    expect(region.latitude).toBeLessThan(PICKUP.latitude);
+
+    // The sheet settles at its arrived peek (+76): one refit; a small change does not refit.
+    hook.rerender({ stage: 'driver_arrived', bottom: 490 });
+    expect(animate).toHaveBeenCalledTimes(2);
+    hook.rerender({ stage: 'driver_arrived', bottom: 500 });
+    expect(animate).toHaveBeenCalledTimes(2);
+
+    // A pan holds it until the next stage.
+    act(() => hook.result.current.onRegionChangeComplete({} as never, { isGesture: true }));
+    hook.rerender({ stage: 'driver_arrived', bottom: 560 });
+    expect(animate).toHaveBeenCalledTimes(2);
   });
 });
 

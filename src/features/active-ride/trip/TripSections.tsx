@@ -102,6 +102,7 @@ export function PassengerTripPeek({ view, actions }: { view: PassengerTripView; 
           rating={driver.rating}
           vehicleName={driver.vehicleName}
           vehicleColor={driver.color}
+          vehicleLayout="joined"
           plate={driver.plate}
           plateHighlighted={stage === 'driver_arrived'}
           actions={actions}
@@ -200,13 +201,15 @@ export function PassengerTripDetails({ view, sharing, onStopSharing, shareBusy =
  * report sheet closes through `visible` instead of being unmounted by the trip → receipt swap.
  */
 export function PassengerTripExtras({ view }: { view: PassengerTripView }) {
-  const { ride, parcel, overcharge, acReport } = view;
+  const { ride, parcel, overcharge, acReport, stage } = view;
   if (!ride) return null;
+  // PR2 row 6: on the receipt the reports are 56 rows with an icon tile.
+  const entry = stage === 'completed' || stage === 'cancelled' ? 'row' : 'button';
   return (
     <React.Fragment key={ride.id}>
       {parcel ? <ParcelSenderSection parcel={parcel} rideId={ride.id} times={{ acceptedAt: ride.accepted_at, arrivedAt: ride.arrived_at }} /> : null}
-      <OverchargeReportSection rideId={ride.id} state={overcharge} parcel={isParcelRide(ride)} fare={view.fare} testID="active-ride-overcharge" />
-      <AcReportSection rideId={ride.id} state={acReport} testID="active-ride-ac-report" />
+      <OverchargeReportSection rideId={ride.id} state={overcharge} parcel={isParcelRide(ride)} fare={view.fare} entry={entry} testID="active-ride-overcharge" />
+      <AcReportSection rideId={ride.id} state={acReport} entry={entry} testID="active-ride-ac-report" />
     </React.Fragment>
   );
 }

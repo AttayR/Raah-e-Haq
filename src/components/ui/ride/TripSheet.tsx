@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import type { SharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { componentTokens, layout } from '../../../theme';
+import { componentTokens, layout, textStyles } from '../../../theme';
 import { BottomSheet, type BottomSheetHandle, type SheetSnap } from '../BottomSheet';
 
 const k = componentTokens.tripSheet;
@@ -32,6 +32,18 @@ export const tripPeekHeight = ({
   const bottom = Math.max(bottomInset + layout.bottomActionOffset, layout.bottomActionMinOffset);
   const footerBlock = footer > 0 ? sheet.footerTopPadding + footer + bottom : bottom;
   return Math.round(sheet.contentTop + header + peek + footerBlock);
+};
+
+/**
+ * TS1 Z6: how visible the details are with the sheet `height` tall: 0 at (or below) `peek`, 1 once
+ * it has risen 24 pt above it; always 1 on the receipt. A peek of 0 is not measured yet: hidden,
+ * so nothing flashes on the first open. Runs on the UI thread.
+ */
+export const detailsOpacity = (height: number, peek: number, receipt: boolean): number => {
+  'worklet';
+  if (receipt) return 1;
+  if (peek <= 0) return 0;
+  return Math.min(1, Math.max(0, (height - peek) / k.detailsRevealDistance));
 };
 
 export type TripSheetProps = {
@@ -110,6 +122,25 @@ export function TripSheet({
     ? undefined
     : tripPeekHeight({ header: heights.header, peek: heights.peek, footer: footer ? heights.footer : 0, bottomInset: insets.bottom }) ?? undefined;
 
+  // TS1 Z6: the details belong to `expanded`. At peek their top edge would show in the bottom
+  // block, so they fade in over the first 24 pt the sheet rises above peek (UI thread).
+  const localHeight = useSharedValue(0);
+  const height = animatedHeight ?? localHeight;
+  const peekValue = useSharedValue(peekHeight ?? 0);
+  useEffect(() => {
+    peekValue.value = peekHeight ?? 0;
+  }, [peekHeight, peekValue]);
+  const detailsFade = useAnimatedStyle(
+    () => ({ opacity: detailsOpacity(height.value, peekValue.value, receipt) }),
+    [receipt],
+  );
+  // The 24 above the details only when a slot draws something (an empty one adds no gap).
+  const [detailsFilled, setDetailsFilled] = useState(false);
+  const onDetailsLayout = useCallback((e: LayoutChangeEvent) => {
+    const filled = e.nativeEvent.layout.height >= 1;
+    setDetailsFilled((prev) => (prev === filled ? prev : filled));
+  }, []);
+
   // A new state opens at `peek` (TS1), also when the passenger had expanded the last one.
   const lastKey = useRef(stateKey);
   useEffect(() => {
@@ -118,13 +149,18 @@ export function TripSheet({
     if (!receipt) ref.current?.snapTo('peek');
   }, [stateKey, receipt]);
 
+  // While collapsed the details are invisible: screen readers skip them too (Cancel lives there).
+  const [expanded, setExpanded] = useState(false);
   const onSnapChange = useCallback(
-    (snap: SheetSnap, height: number) => {
-      onHeightChange?.(height);
-      onExpandedChange?.(!receipt && snap === 'content');
+    (snap: SheetSnap, settled: number) => {
+      onHeightChange?.(settled);
+      const next = !receipt && snap === 'content';
+      setExpanded(next);
+      onExpandedChange?.(next);
     },
     [onExpandedChange, onHeightChange, receipt],
   );
+  const detailsHidden = !receipt && !expanded;
 
   return (
     <BottomSheet
@@ -135,8 +171,11 @@ export function TripSheet({
       handleTapToggles={!receipt}
       draggable={!receipt}
       openFrom={openFrom}
-      animatedHeight={animatedHeight}
+      animatedHeight={height}
       onSnapChange={onSnapChange}
+      footerDivider
+      // PR2: the comment field's counter line stays above the footer when the keyboard is up.
+      focusRevealExtra={componentTokens.textField.helperGap + textStyles.caption.lineHeight}
       expandOnKeyboard
       active={active}
       accessibilityLabel={accessibilityLabel}
@@ -153,11 +192,18 @@ export function TripSheet({
           {peek}
         </View>
         {/* One View at a fixed position in both modes: `persistent` keeps its instance across them. */}
-        <View style={styles.details} testID={`${testID}-details`}>
-          {receipt ? null : details}
-          {persistent}
-          {receipt ? null : detailsEnd}
-        </View>
+        <Animated.View
+          style={[detailsFilled ? styles.detailsGap : null, detailsFade]}
+          accessibilityElementsHidden={detailsHidden}
+          importantForAccessibility={detailsHidden ? 'no-hide-descendants' : 'auto'}
+          testID={`${testID}-details`}
+        >
+          <View style={styles.details} onLayout={onDetailsLayout} testID={`${testID}-details-content`}>
+            {receipt ? null : details}
+            {persistent}
+            {receipt ? null : detailsEnd}
+          </View>
+        </Animated.View>
       </View>
     </BottomSheet>
   );
@@ -168,5 +214,6 @@ const styles = StyleSheet.create({
   // PR2: 16 between the receipt's header and its money card.
   receiptHeader: { paddingBottom: k.zoneGap },
   body: { paddingHorizontal: layout.gutter },
-  details: { marginTop: k.detailsGap, gap: k.zoneGap },
+  detailsGap: { marginTop: k.detailsGap },
+  details: { gap: k.zoneGap },
 });
