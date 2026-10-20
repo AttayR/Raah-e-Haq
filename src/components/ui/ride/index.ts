@@ -23,4 +23,5 @@ export * from './VehicleOptionCard';
 export * from './TripFareRow';
 export * from './TripSheet';
 export * from './TripStatusHeader';
+export * from './TripTargetRow';
 export * from './useCrossfade';

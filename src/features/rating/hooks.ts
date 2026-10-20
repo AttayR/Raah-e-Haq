@@ -6,9 +6,6 @@ import { ratingApi } from './api';
 import { classifyRateFailure } from './format';
 import type { RateRideBody, RatingConfig, RideRatingState } from './types';
 
-/** Rides whose rating prompt was skipped (or shown and closed) this session: never prompted again. */
-let dismissed: { epoch: number; ids: Set<number> } = { epoch: -1, ids: new Set() };
-
 /**
  * GET /rating-tags once per session (BE-07: "fetch once per session"). A failed load is not
  * cached, so the next sheet (or Retry) asks again. A new sign-in (session epoch) starts over.
@@ -29,7 +26,6 @@ export const loadRatingConfig = (): Promise<RatingConfig> => {
 /** Tests only. */
 export const resetRatingSessionState = (): void => {
   tagsCache = null;
-  dismissed = { epoch: -1, ids: new Set() };
 };
 
 export type RatingConfigStatus = 'loading' | 'ready' | 'failed';
@@ -60,42 +56,6 @@ export const useRatingConfig = (enabled = true): { config: RatingConfig | null; 
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
   return { config, status, reload };
-};
-
-const dismissedIds = (): Set<number> => {
-  const epoch = currentSessionEpoch();
-  if (dismissed.epoch !== epoch) dismissed = { epoch, ids: new Set() };
-  return dismissed.ids;
-};
-
-export const wasRatingPromptDismissed = (rideId: number): boolean => dismissedIds().has(rideId);
-
-export const dismissRatingPrompt = (rideId: number): void => {
-  dismissedIds().add(rideId);
-};
-
-export interface RatingPromptRide {
-  id: number;
-  status: string;
-  can_rate?: boolean;
-}
-
-/**
- * The after-ride prompt (T-505): open when the ride is `completed`, the server says `can_rate`,
- * the host is `active` (focused), and the prompt for this ride was not skipped this session.
- * `dismiss` remembers the ride, so a Skip (or closing the sheet) does not nag again.
- */
-export const useRatingPrompt = (ride: RatingPromptRide | null, active: boolean): { visible: boolean; dismiss: () => void } => {
-  const rideId = ride?.id ?? null;
-  const [, setVersion] = useState(0);
-  const eligible = !!ride && ride.status === 'completed' && ride.can_rate === true;
-  const visible = active && eligible && rideId !== null && !wasRatingPromptDismissed(rideId);
-  const dismiss = useCallback(() => {
-    if (rideId === null) return;
-    dismissRatingPrompt(rideId);
-    setVersion((v) => v + 1);
-  }, [rideId]);
-  return { visible, dismiss };
 };
 
 export interface RateRideOptions {

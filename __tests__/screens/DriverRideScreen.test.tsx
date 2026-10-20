@@ -8,6 +8,7 @@ import { Linking, Platform } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import * as Reanimated from 'react-native-reanimated';
 import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
+import { expandTripSheet } from '../../test-utils/tripSheet';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../src/services/api';
@@ -52,6 +53,10 @@ let mock: MockAdapter;
 /** The server's copy of the ride for GET /rides/41 (what the mount refresh reads). */
 let serverRide: RideResource;
 
+/** UI-R13: Start / Complete trip are SlideToConfirm; screen readers (and tests) use its activate action. */
+const slide = (element: ReturnType<typeof render>['root']) =>
+  fireEvent(element, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+
 const renderScreen = (ride: RideResource) => {
   serverRide = ride;
   mock.onGet('/rides/41').reply(() => [200, envelope(serverRide)]);
@@ -84,15 +89,15 @@ describe('DriverRideScreen', () => {
   it('walks pickup → arrived → start → stop → complete, posting no fare', async () => {
     const { store, screen } = renderScreen(makeRide({ status: 'accepted', passenger, stops: [stop({})] }));
     await settle(store);
-    expect(screen.getByTestId('driver-ride-title').props.children).toBe('Head to pickup');
+    expect(screen.getByTestId('driver-ride-title').props.children).toBe('Pick up Ayesha');
     expect(screen.getByTestId('driver-ride-passenger').props.children).toBe('Ayesha');
 
     mock.onPost('/rides/41/arrived').reply(200, envelope(makeRide({ status: 'arrived', passenger, stops: [stop({})] })));
     fireEvent.press(screen.getByTestId('driver-ride-arrived'));
-    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for the passenger'));
+    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for Ayesha'));
 
     mock.onPost('/rides/41/start').reply(200, envelope(makeRide({ status: 'started', passenger, stops: [stop({})] })));
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    slide(screen.getByTestId('driver-ride-start'));
     await waitFor(() => screen.getByTestId('driver-ride-complete-stop'));
     expect(screen.queryByTestId('driver-ride-cancel')).toBeNull();
 
@@ -113,7 +118,7 @@ describe('DriverRideScreen', () => {
         }),
       ),
     );
-    fireEvent.press(screen.getByTestId('driver-ride-complete'));
+    slide(screen.getByTestId('driver-ride-complete'));
     await waitFor(() => screen.getByTestId('driver-ride-summary'));
 
     expect(mock.history.put).toHaveLength(0);
@@ -129,6 +134,8 @@ describe('DriverRideScreen', () => {
     expect(screen.getByTestId('driver-ride-total').props.children).toBe('Rs 435');
     expect(screen.getByTestId('driver-ride-collect').props.children).toBe('Collect in cash');
     expect(screen.getByTestId('driver-ride-earnings').props.children).toBe('Rs 348');
+    // UI-R13 DC1 #5: the fare lines sit under "Fare details".
+    fireEvent.press(screen.getByTestId('driver-ride-fare-details'));
     screen.getByTestId('driver-ride-breakdown-stops');
     expect(screen.queryByTestId('driver-ride-breakdown-min')).toBeNull();
 
@@ -147,7 +154,7 @@ describe('DriverRideScreen', () => {
     });
     serverRide = makeRide({ status: 'cancelled' });
 
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    slide(screen.getByTestId('driver-ride-start'));
 
     await waitFor(() => screen.getByTestId('driver-ride-cancelled'));
   });
@@ -170,7 +177,7 @@ describe('DriverRideScreen', () => {
     // T-554: the banner says it; no toast on top of it.
     expect(errorSpy).not.toHaveBeenCalled();
 
-    expect(screen.getByTestId('driver-ride-title').props.children).toBe('Head to pickup');
+    expect(screen.getByTestId('driver-ride-title').props.children).toBe('Pick up Ayesha');
     expect(screen.getByTestId('driver-ride-arrived').props.accessibilityState).toMatchObject({ disabled: false });
     expect(selectDriverActiveRide(store.getState())?.status).toBe('accepted');
     // Nothing else was re-read or posted (no refetch loop, no status reload).
@@ -196,7 +203,7 @@ describe('DriverRideScreen', () => {
 
     mock.onPost('/rides/41/arrived').replyOnce(200, envelope(makeRide({ status: 'arrived', passenger })));
     fireEvent.press(screen.getByTestId('driver-ride-arrived'));
-    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for the passenger'));
+    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for Ayesha'));
     expect(screen.queryByTestId('driver-ride-arrival-refused')).toBeNull();
   });
 
@@ -213,7 +220,7 @@ describe('DriverRideScreen', () => {
     });
 
     fireEvent.press(screen.getByTestId('driver-ride-arrived'));
-    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for the passenger'));
+    await waitFor(() => expect(screen.getByTestId('driver-ride-title').props.children).toBe('Waiting for Ayesha'));
 
     expect(order).toEqual(['ping:20000', 'arrived']);
   });
@@ -223,6 +230,8 @@ describe('DriverRideScreen', () => {
     await settle(store);
     mock.onPost('/rides/41/cancel').reply(200, envelope(makeRide({ status: 'cancelled' })));
 
+    // TS8: Cancel is in the details; expand the sheet first, as the driver does.
+    expandTripSheet();
     fireEvent.press(screen.getByTestId('driver-ride-cancel'));
     const clock = settleCancelSheet();
     fireEvent.changeText(screen.getByTestId('cancel-reason-input'), 'no');
@@ -390,11 +399,12 @@ describe('DriverRideScreen', () => {
     }
   });
 
-  it('[T-519] Back from the summary is Done: the completed ride is cleared and the screen leaves', async () => {
+  it('[T-519, UI-R13 DC1] the receipt has no back; its footer is Done: the completed ride is cleared and the screen leaves', async () => {
     const { store, screen } = renderScreen(makeRide({ status: 'completed', passenger, can_rate: false }));
     await settle(store);
     screen.getByTestId('driver-ride-summary');
-    fireEvent.press(screen.getByTestId('driver-ride-back'));
+    expect(screen.queryByTestId('driver-ride-back')).toBeNull();
+    fireEvent.press(screen.getByTestId('driver-ride-done'));
     expect(selectDriverActiveRide(store.getState())).toBeNull();
     await waitFor(() => expect(mockGoBack).toHaveBeenCalled());
   });

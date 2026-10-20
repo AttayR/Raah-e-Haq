@@ -54,7 +54,8 @@ export type AddressPairProps = {
   testID?: string;
 };
 
-type Kind = 'pickup' | 'stop' | 'dropoff';
+export type AddressKind = 'pickup' | 'stop' | 'dropoff';
+type Kind = AddressKind;
 
 /** A vertical run of 2×2 dots (dash 2 / gap 3), sized to the space it is given. */
 function DottedSegment({ visible }: { visible: boolean }) {
@@ -70,7 +71,8 @@ function DottedSegment({ visible }: { visible: boolean }) {
   );
 }
 
-function RailGlyph({ kind }: { kind: Kind }) {
+/** The rail's glyph for one point (pickup circle, stop dot, drop-off square, M1); [UI-R13] also the trip target row's. */
+export function RailGlyph({ kind }: { kind: Kind }) {
   const { theme } = useAppTheme();
   const c = theme.colors;
   if (kind === 'pickup') return <View testID="address-rail-pickup" style={[styles.pickup, { backgroundColor: c.pickupPin }]} />;

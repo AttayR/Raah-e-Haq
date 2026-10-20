@@ -21,7 +21,7 @@ import { toParcelView } from '../../../src/features/parcel/api';
 import { parcelTimeline } from '../../../src/features/parcel/rules';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
-import { driverCancelledCopy } from '../../../src/components/driver/DriverRideCancelledCard';
+import { driverCancelledCopy } from '../../../src/features/driver-ride/trip/driverTripModel';
 import { setDriverActiveRide } from '../../../src/features/driver-ride/slice';
 import { useVehicleTypes } from '../../../src/features/ride-booking/hooks';
 import { MARKER_SETTLE_MS } from '../../../src/components/ui/ride/useMarkerTracking';
@@ -165,12 +165,12 @@ describe('1. the sender of a refused parcel', () => {
 
 describe('2. the driver after refusing a parcel', () => {
   it('copy: refused, cancelled parcel, and a normal ride', () => {
-    expect(driverCancelledCopy({ refusalReason: 'over_size' })).toEqual({
+    expect(driverCancelledCopy(null, { refusalReason: 'over_size' })).toEqual({
       title: 'Parcel refused',
       body: 'You refused this parcel at the pickup. The ride is cancelled with no strike, and you can take new requests.',
     });
-    expect(driverCancelledCopy({ refusalReason: null }).title).toBe('Parcel cancelled');
-    expect(driverCancelledCopy(null)).toEqual({ title: 'Ride cancelled', body: 'This ride is no longer assigned to you.' });
+    expect(driverCancelledCopy(null, { refusalReason: null }).title).toBe('Parcel cancelled');
+    expect(driverCancelledCopy(null, null)).toEqual({ title: 'Ride cancelled', body: 'This ride is no longer assigned to you.' });
   });
 
   it('refuse on the ride screen ends on "Parcel refused", without a console warning or error', async () => {

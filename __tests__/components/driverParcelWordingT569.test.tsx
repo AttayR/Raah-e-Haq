@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { DriverRidePanel } from '../../src/components/driver/DriverRidePanel';
+import { DriverTripSheet } from '../../src/features/driver-ride/trip/DriverTripSheet';
 import { CancelReasonSheet } from '../../src/components/driver/CancelReasonSheet';
 import { makeRide } from '../../test-utils/rideFixtures';
 import { settleCancelSheet } from '../../test-utils/cancelSheet';
@@ -14,7 +14,7 @@ const noop = () => undefined;
 
 const renderPanel = (vehicleType: string) =>
   render(
-    <DriverRidePanel
+    <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
       ride={makeRide({ id: 41, status: 'arrived', vehicle_type: vehicleType, passenger: undefined })}
       step="at_pickup"
       pendingAction={null}

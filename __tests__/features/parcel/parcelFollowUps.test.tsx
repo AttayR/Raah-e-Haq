@@ -15,6 +15,7 @@ import MockAdapter from 'axios-mock-adapter';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react-native';
+import { expandTripSheet } from '../../../test-utils/tripSheet';
 import { apiClient, type User } from '../../../src/services/api';
 import { clearQueryCache } from '../../../src/core/api/queryCache';
 import { rootReducer } from '../../../src/store/rootReducer';
@@ -27,7 +28,7 @@ import { parcelLiveStatusText } from '../../../src/features/parcel/live';
 import { buildParcelRideRequest } from '../../../src/features/parcel/rules';
 import { useSendParcel } from '../../../src/features/parcel/useSendParcel';
 import { HomeSheetBody } from '../../../src/features/passenger-home/components/HomeSheet';
-import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
+import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
 import { footerRowLabels, footerSlotWidth, labelFits } from '../../../src/features/driver-ride/footerLayout';
 import type { DriverParcelPanel } from '../../../src/features/parcel/useDriverParcel';
 import type { ParcelDraft } from '../../../src/features/parcel/types';
@@ -337,7 +338,7 @@ describe('3. the driver pickup footer on small phones', () => {
   const atPickup = (width: number, onNoShow?: () => void) => {
     mockWindow = { width, height: 640, scale: 2, fontScale: 1 };
     return render(
-      <DriverRidePanel
+      <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
         ride={makeRide({ id: 51, status: 'arrived', vehicle_type: 'parcel', is_parcel: true })}
         step="at_pickup"
         pendingAction={null}
@@ -357,41 +358,44 @@ describe('3. the driver pickup footer on small phones', () => {
   };
   const label = (testID: string) => screen.getByTestId(`${testID}-content`).findByType(ReactNative.Text).props.children;
 
-  it.each([
-    // T-578: a parcel is cancelled as a delivery; "Cancel delivery" takes its short form in the row.
-    [320, 'Refuse', 'Cancel'],
-    [375, 'Refuse', 'Cancel'],
-    [414, 'Refuse parcel', 'Cancel'],
-  ])('at %i pt: Pick up full width, Refuse and Cancel share one row (%s / %s)', (width, refuse, cancel) => {
+  it.each([320, 375, 414])('at %i pt: Pick up full width with Refuse above it; Cancel delivery is in the details, never the footer (UI-R13 TS8)', (width) => {
     atPickup(width);
-    const row = screen.getByTestId('driver-ride-footer-row');
-    expect(row.props.style).toEqual(expect.objectContaining({ flexDirection: 'row' }));
-    // Pick up stays outside the row (full width); Refuse and Cancel are inside it.
-    expect(within(row).queryByTestId('driver-parcel-pickup')).toBeNull();
-    expect(within(row).getByTestId('driver-parcel-refuse')).toBeTruthy();
-    expect(within(row).getByTestId('driver-ride-cancel')).toBeTruthy();
-    expect(screen.getByTestId('driver-parcel-pickup')).toBeTruthy();
-    expect(label('driver-parcel-refuse')).toBe(refuse);
-    expect(label('driver-ride-cancel')).toBe(cancel);
-    // The screen reader always hears the full label.
-    expect(screen.getByTestId('driver-parcel-refuse').props.accessibilityLabel).toBe('Refuse parcel');
+    const footer = screen.getByTestId('driver-ride-footer');
+    expect(screen.queryByTestId('driver-ride-footer-row')).toBeNull();
+    expect(within(footer).getByTestId('driver-parcel-pickup')).toBeTruthy();
+    expect(within(footer).getByTestId('driver-parcel-refuse')).toBeTruthy();
+    expect(within(footer).queryByTestId('driver-ride-cancel')).toBeNull();
+    expect(label('driver-parcel-refuse')).toBe('Refuse parcel');
+    // T-578: a parcel is cancelled as a delivery (in the details, TS8: expand first).
+    expandTripSheet();
     expect(screen.getByTestId('driver-ride-cancel').props.accessibilityLabel).toBe('Cancel delivery');
   });
 
-  it('after the wait, No-show replaces Cancel in the row', () => {
+  it.each([
+    [320, 'Refuse', 'No-show'],
+    [375, 'Refuse', 'No-show'],
+  ])('after the wait at %i pt, No-show replaces Cancel and shares one row with Refuse (%s / %s, T-559)', (width, refuse, noShow) => {
     const onNoShow = jest.fn();
-    atPickup(320, onNoShow);
+    atPickup(width, onNoShow);
+    // Expanded, so the absence of Cancel is real and not just the hidden details.
+    expandTripSheet();
     expect(screen.queryByTestId('driver-ride-cancel')).toBeNull();
-    expect(label('driver-ride-no-show')).toBe('No-show');
-    expect(screen.getByTestId('driver-ride-no-show').props.accessibilityLabel).toBe("Sender didn't come"); // T-569: a parcel ride waits for the sender
+    const row = screen.getByTestId('driver-ride-footer-row');
+    expect(row.props.style).toEqual(expect.objectContaining({ flexDirection: 'row' }));
+    expect(within(row).queryByTestId('driver-parcel-pickup')).toBeNull();
+    expect(label('driver-parcel-refuse')).toBe(refuse);
+    expect(label('driver-ride-no-show')).toBe(noShow);
+    // The screen reader always hears the full label; T-569: a parcel ride waits for the sender.
+    expect(screen.getByTestId('driver-parcel-refuse').props.accessibilityLabel).toBe('Refuse parcel');
+    expect(screen.getByTestId('driver-ride-no-show').props.accessibilityLabel).toBe("Sender didn't come");
     fireEvent.press(screen.getByTestId('driver-ride-no-show'));
     expect(onNoShow).toHaveBeenCalled();
   });
 
-  it('a plain ride at the pickup keeps Start trip and a full-width Cancel (no row)', () => {
+  it('a plain ride at the pickup keeps the slide and Cancel ride in the details (no row)', () => {
     mockWindow = { width: 320, height: 640, scale: 2, fontScale: 1 };
     render(
-      <DriverRidePanel
+      <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
         ride={makeRide({ id: 41, status: 'arrived' })}
         step="at_pickup"
         pendingAction={null}
@@ -407,7 +411,10 @@ describe('3. the driver pickup footer on small phones', () => {
       />,
     );
     expect(screen.queryByTestId('driver-ride-footer-row')).toBeNull();
-    expect(label('driver-ride-cancel')).toBe('Cancel ride');
+    expect(within(screen.getByTestId('driver-ride-footer')).getByTestId('driver-ride-start')).toBeTruthy();
+    expect(within(screen.getByTestId('driver-ride-footer')).queryByTestId('driver-ride-cancel')).toBeNull();
+    expandTripSheet();
+    expect(screen.getByTestId('driver-ride-cancel').props.accessibilityLabel).toBe('Cancel ride');
   });
 
   it('every row label fits its half at 320-414 pt, also with larger text', () => {

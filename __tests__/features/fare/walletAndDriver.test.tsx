@@ -8,6 +8,7 @@
 import React from 'react';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react-native';
+import { expandTripSheet } from '../../../test-utils/tripSheet';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiClient, type User } from '../../../src/services/api';
@@ -20,7 +21,7 @@ import { passengerOwedBannerAmount, passengerOwedNote } from '../../../src/featu
 import { CommissionCard } from '../../../src/features/wallet/components/CommissionCard';
 import { RequestSheetContent } from '../../../src/components/driver/request/RequestSheetContent';
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
-import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
+import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
 import { makeRide, makeRideRequest } from '../../../test-utils/rideFixtures';
 import { settleCancelSheet } from '../../../test-utils/cancelSheet';
 import { useActiveRideActions } from '../../../src/features/active-ride/hooks';
@@ -364,11 +365,14 @@ describe('driver cancel (BE-85 strikes and no-shows)', () => {
       onCompleteStop: jest.fn(),
       onCancel: jest.fn(),
     };
-    const { rerender } = render(<DriverRidePanel {...props} />);
+    const { rerender } = render(<DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined} {...props} />);
+    // UI-R13 TS8: Cancel is the last item of the details; expanded, it is reachable (and stays
+    // expanded across the rerender, so its absence below is real).
+    expandTripSheet();
     screen.getByTestId('driver-ride-cancel');
     expect(screen.queryByTestId('driver-ride-no-show')).toBeNull();
     const onNoShow = jest.fn();
-    rerender(<DriverRidePanel {...props} onNoShow={onNoShow} />);
+    rerender(<DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined} {...props} onNoShow={onNoShow} />);
     expect(screen.queryByTestId('driver-ride-cancel')).toBeNull();
     fireEvent.press(screen.getByTestId('driver-ride-no-show'));
     expect(onNoShow).toHaveBeenCalledTimes(1);

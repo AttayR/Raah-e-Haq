@@ -1,14 +1,13 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import SafeMapView from '../../../components/SafeMapView';
-import { DriverRidePanel } from '../../../components/driver/DriverRidePanel';
 import { RideMarker, RouteLine, VehicleMarker } from '../../../components/ui';
 import type { RideResource } from '../../../services/rideService';
 import ActiveRidePanel from '../../active-ride/components/ActiveRidePanel';
 import { advanceRideStage } from '../../active-ride/stage';
 import { BookingSheet } from '../../ride-booking/components/BookingSheet';
+import { DriverTripSheet } from '../../driver-ride/trip/DriverTripSheet';
 import { galleryAssignedCar, galleryRegion, galleryRoute } from '../fixtures/rideFixtures';
 
 /** The route sits in the top third, above the sheet (SafeMapView pins mapPadding to zero). */
@@ -85,36 +84,33 @@ export function TripAssignedPreview() {
   );
 }
 
-/** Driver: head to pickup (DriverRidePanel docked with its fixed footer). */
+/** Driver: head to pickup (UI-R13: the shared trip sheet with its one primary in the footer). */
 export function DriverRidePreview() {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
   return (
     <View style={[styles.fill, { backgroundColor: theme.colors.background }]} testID="gallery-screen-driver-ride">
       <RideMap />
-      <View style={styles.dock}>
-        <DriverRidePanel
-          ride={acceptedRide}
-          step="to_pickup"
-          pendingAction={null}
-          canCall
-          canNavigate
-          onCall={noop}
-          onMessage={noop}
-          onNavigate={noop}
-          onArrived={noop}
-          onStart={noop}
-          onComplete={noop}
-          onCompleteStop={noop}
-          onCancel={noop}
-          bottomInset={insets.bottom}
-        />
-      </View>
+      <DriverTripSheet
+        ride={acceptedRide}
+        step="to_pickup"
+        pendingAction={null}
+        canCall
+        onCall={noop}
+        onStart={noop}
+        canNavigate
+        onMessage={noop}
+        onNavigate={noop}
+        onArrived={noop}
+        onComplete={noop}
+        onCompleteStop={noop}
+        onCancel={noop}
+        onDone={noop}
+        onRatingChange={noop}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  dock: { position: 'absolute', start: 0, end: 0, bottom: 0, maxHeight: '65%' },
 });

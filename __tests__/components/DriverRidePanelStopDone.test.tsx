@@ -6,7 +6,8 @@
  */
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
-import { DriverRidePanel } from '../../src/components/driver/DriverRidePanel';
+import { expandTripSheet } from '../../test-utils/tripSheet';
+import { DriverTripSheet } from '../../src/features/driver-ride/trip/DriverTripSheet';
 import type { DriverRideAction } from '../../src/features/driver-ride/slice';
 import type { RideStopResource } from '../../src/services/rideService';
 import { makeRide } from '../../test-utils/rideFixtures';
@@ -29,7 +30,7 @@ const stop: RideStopResource = {
 
 const renderPanel = (pendingAction: DriverRideAction | null, onCompleteStop: (id: number) => void) =>
   render(
-    <DriverRidePanel
+    <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
       ride={makeRide({ id: 41, status: 'started', stops: [stop] })}
       step="on_trip"
       pendingAction={pendingAction}
@@ -74,9 +75,9 @@ const renderPickup = (
   pendingAction: DriverRideAction | null,
   handlers: { onCancel?: () => void; onNoShow?: () => void },
   step: 'to_pickup' | 'at_pickup',
-) =>
-  render(
-    <DriverRidePanel
+) => {
+  const view = render(
+    <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
       ride={makeRide({ id: 41, status: step === 'to_pickup' ? 'accepted' : 'arrived' })}
       step={step}
       pendingAction={pendingAction}
@@ -92,6 +93,10 @@ const renderPickup = (
       onNoShow={handlers.onNoShow}
     />,
   );
+  // TS8: Cancel is the last item of the details, reachable once the sheet is expanded.
+  expandTripSheet();
+  return view;
+};
 
 describe('DriverRidePanel Cancel / No-show during a background read (T-557)', () => {
   it.each(['refresh', 'restore'] as const)('Cancel opens the confirm sheet while a %s runs', (read) => {

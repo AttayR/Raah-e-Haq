@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -84,13 +84,16 @@ export type TripSheetProps = {
   testID?: string;
 };
 
+/** [UI-R13] Opens the details from a row in the peek group (the driver's target row, TS6.1). */
+export type TripSheetHandle = { expand: () => void };
+
 /**
  * The shared trip sheet (shared-trip-sheet TS1, kit, both roles): the kit BottomSheet in map
  * mode with a measured `peek` (handle + header + peek group + bottom block, re-applied only on a
  * ≥ 1 pt change) and `expanded` = the whole content. The details render only below the peek
  * group, so at `peek` they sit under the screen edge. Gutter 16 on every block.
  */
-export function TripSheet({
+export const TripSheet = forwardRef<TripSheetHandle, TripSheetProps>(function TripSheet({
   header,
   peek,
   details,
@@ -106,7 +109,7 @@ export function TripSheet({
   active = true,
   accessibilityLabel,
   testID = 'trip-sheet',
-}: TripSheetProps) {
+}, handle) {
   const insets = useSafeAreaInsets();
   const ref = useRef<BottomSheetHandle>(null);
   const [heights, setHeights] = useState({ header: 0, peek: 0, footer: 0 });
@@ -118,6 +121,7 @@ export function TripSheet({
     [],
   );
   const receipt = mode === 'receipt';
+  useImperativeHandle(handle, () => ({ expand: () => (receipt ? undefined : ref.current?.snapTo('content')) }), [receipt]);
   const peekHeight = receipt
     ? undefined
     : tripPeekHeight({ header: heights.header, peek: heights.peek, footer: footer ? heights.footer : 0, bottomInset: insets.bottom }) ?? undefined;
@@ -207,7 +211,7 @@ export function TripSheet({
       </View>
     </BottomSheet>
   );
-}
+});
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: layout.gutter, paddingBottom: k.headerGap },

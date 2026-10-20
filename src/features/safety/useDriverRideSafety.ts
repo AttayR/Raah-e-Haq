@@ -8,7 +8,7 @@ import { canCallOn } from './rules';
 import { usePinGate } from './usePinGate';
 
 export interface DriverRideSafety {
-  /** Spread on DriverRidePanel: masked Call and the PIN-aware Start trip. */
+  /** Spread on DriverTripSheet: masked Call and the PIN-aware Start trip. */
   panel: {
     canCall: boolean;
     calling: boolean;

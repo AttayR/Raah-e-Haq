@@ -24,8 +24,8 @@ import { ParcelDetailsSection } from '../../../src/features/parcel/components/Pa
 import { EMPTY_PARCEL_DRAFT } from '../../../src/features/parcel/rules';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
-import { DriverRideSummary } from '../../../src/components/driver/DriverRideSummary';
-import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
+import { DriverReceiptUnderTest } from '../../../test-utils/driverTripFixtures';
+import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
 import { CancellationCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
 import { vehicleLabel } from '../../../src/features/ride-history/copy';
@@ -143,9 +143,9 @@ describe('1. the fare is paid at the pickup', () => {
 
   it('the trip-complete card says paid at the pickup for a parcel, collect in cash otherwise', () => {
     const done: Partial<RideResource> = { status: 'completed', total_fare: 180, payment_method: 'cash' };
-    const { rerender } = render(<DriverRideSummary ride={makeRide({ ...done, vehicle_type: 'parcel', is_parcel: true })} onDone={jest.fn()} />);
+    const { rerender } = render(<DriverReceiptUnderTest ride={makeRide({ ...done, vehicle_type: 'parcel', is_parcel: true })} onDone={jest.fn()} />);
     expect(screen.getByTestId('driver-ride-collect').props.children).toBe('Paid in cash at the pickup');
-    rerender(<DriverRideSummary ride={makeRide(done)} onDone={jest.fn()} />);
+    rerender(<DriverReceiptUnderTest ride={makeRide(done)} onDone={jest.fn()} />);
     expect(screen.getByTestId('driver-ride-collect').props.children).toBe('Collect in cash');
   });
 
@@ -258,7 +258,7 @@ describe('5. labels and the Home entry', () => {
 describe("6. the driver's active ride", () => {
   const panel = (ride: RideResource) =>
     render(
-      <DriverRidePanel
+      <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
         ride={ride}
         step="on_trip"
         pendingAction={null}

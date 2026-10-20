@@ -5,7 +5,7 @@
 import React from 'react';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
-import { DriverRideSummary } from '../../../src/components/driver/DriverRideSummary';
+import { DriverReceiptUnderTest } from '../../../test-utils/driverTripFixtures';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage, type PassengerRideStageState } from '../../../src/features/active-ride/stage';
 import { leaveFinishedRide } from '../../../src/features/active-ride/done';
@@ -43,17 +43,17 @@ describe('driver: parcel wording (T-574)', () => {
   });
 
   it('the end card says the delivery is complete (or the parcel returned), a ride says "Trip complete"', () => {
-    const { rerender } = render(<DriverRideSummary ride={parcelRide({ status: 'completed' })} onDone={noop} />);
+    const { rerender } = render(<DriverReceiptUnderTest ride={parcelRide({ status: 'completed' })} onDone={noop} />);
     expect(screen.getByText('Delivery complete')).toBeTruthy();
     expect(screen.queryByText('Trip complete')).toBeNull();
     rerender(
-      <DriverRideSummary
+      <DriverReceiptUnderTest
         ride={parcelRide({ status: 'completed', parcel: { status: 'returned' } } as Partial<RideResource>)}
         onDone={noop}
       />,
     );
     expect(screen.getByText('Parcel returned')).toBeTruthy();
-    rerender(<DriverRideSummary ride={makeRide({ status: 'completed' })} onDone={noop} />);
+    rerender(<DriverReceiptUnderTest ride={makeRide({ status: 'completed' })} onDone={noop} />);
     expect(screen.getByText('Trip complete')).toBeTruthy();
   });
 });

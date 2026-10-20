@@ -237,9 +237,9 @@ describe('DriverRideScreen (T-413)', () => {
       (node) => node.props.customMapStyle !== undefined && typeof node.type !== 'string',
     )[0];
     expect(map.props.customMapStyle).toBe(theme.mapStyle);
-    expect(flat(screen.getByTestId('driver-ride-status-bar-scrim').props.style).backgroundColor).toBe(
-      theme.colors.surface,
-    );
+    // UI-R13 TS2: the kit StatusBarScrim (a static `surface` fade, hidden from screen readers).
+    const scrim = screen.getByTestId('driver-ride-status-bar-scrim', { includeHiddenElements: true });
+    expect(scrim.findAll((node) => node.props.stopColor !== undefined)[0].props.stopColor).toBe(theme.colors.surface);
     expect(flat(screen.getByTestId('driver-ride').props.style).backgroundColor).toBe(theme.colors.background);
   });
 });

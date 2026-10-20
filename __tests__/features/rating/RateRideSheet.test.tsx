@@ -15,7 +15,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../../src/services/api';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { RateRideSheet } from '../../../src/features/rating/components/RateRideSheet';
-import { DriverRideRatingPrompt } from '../../../src/features/rating/components/RideRatingPrompt';
+import { DriverReceiptUnderTest } from '../../../test-utils/driverTripFixtures';
 import { RideRatingSection } from '../../../src/features/rating/components/RideRatingSection';
 import { resetRatingSessionState } from '../../../src/features/rating/hooks';
 import activeRideReducer, { initialActiveRideState } from '../../../src/features/active-ride/slice';
@@ -293,29 +293,17 @@ const renderPrompt = async (store: ReturnType<typeof makeStore>, element: React.
   return view;
 };
 
-describe('after-ride prompt', () => {
-  // UI-R12: the passenger rates inline in the trip receipt (activeRide/tripSheetUIR12.test.tsx);
-  // this prompt sheet now opens only on the driver's ride screen.
-  it('driver: stays closed while inactive, without can_rate, or before completion', async () => {
-    const store = makeStore(completedRide());
-    const view = await renderPrompt(store, <DriverRideRatingPrompt active={false} />);
-    expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
+describe('after-ride rating (inline in the receipt)', () => {
+  // UI-R12 / UI-R13: both roles rate inline in the trip receipt (the prompt sheet over the summary
+  // is gone); the driver's footer flow is in driverRide/driverTripSheetUIR13.test.tsx.
+  it('driver: no form without can_rate or before completion; the rider by first name otherwise', async () => {
+    const view = await renderPrompt(makeStore(completedRide({ can_rate: false })), <DriverReceiptUnderTest ride={completedRide({ can_rate: false })} />);
+    expect(screen.queryByTestId('receipt-rating')).toBeNull();
     view.unmount();
-    await renderPrompt(makeStore(completedRide({ can_rate: false })), <DriverRideRatingPrompt active />);
-    expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
-    await renderPrompt(makeStore(completedRide({ status: 'started', can_rate: false })), <DriverRideRatingPrompt active />);
-    expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
-  });
-
-  it('driver: Skip closes it and the same ride does not prompt again this session', async () => {
-    const store = makeStore(completedRide());
-    const view = await renderPrompt(store, <DriverRideRatingPrompt active />);
-    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Sara');
-    await press('rate-ride-skip');
-    expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
-    view.unmount();
-    await renderPrompt(store, <DriverRideRatingPrompt active />);
-    expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
+    const ride = completedRide();
+    await renderPrompt(makeStore(ride), <DriverReceiptUnderTest ride={ride} />);
+    expect(screen.getByTestId('receipt-rating')).toBeTruthy();
+    expect(screen.getByText('How was your ride with Sara?')).toBeTruthy();
     expect(mock.history.post).toHaveLength(0);
   });
 });
@@ -401,9 +389,10 @@ describe('BE-107 parcel rides (T-569)', () => {
     expect(screen.getByText('Clean car')).toBeTruthy();
   });
 
-  it('the driver prompt on a parcel ride (vehicle_type parcel) uses the parcel tags', async () => {
+  it('the driver receipt on a parcel ride (vehicle_type parcel) uses the parcel tags', async () => {
     serveParcelTags();
-    await renderPrompt(makeStore(completedRide({ vehicle_type: 'parcel' })), <DriverRideRatingPrompt active />);
+    const ride = completedRide({ vehicle_type: 'parcel' });
+    await renderPrompt(makeStore(ride), <DriverReceiptUnderTest ride={ride} />);
     rate(5);
     expect(screen.getByText('Ready at pickup')).toBeTruthy();
     expect(screen.queryByText('Polite')).toBeNull();

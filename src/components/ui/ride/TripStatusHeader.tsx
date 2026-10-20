@@ -78,6 +78,9 @@ export type TripStatusHeaderProps = {
   badges?: React.ReactNode;
   /** The server ETA (BE-128 `eta.minutes`); null or absent hides the tile. */
   etaMinutes?: number | null;
+  /** [UI-R13] The title's and subtitle's testIDs (passenger defaults; the driver sheet's own). */
+  titleTestID?: string;
+  subtitleTestID?: string;
   testID?: string;
 };
 
@@ -93,6 +96,8 @@ export function TripStatusHeader({
   subtitleIcon,
   badges,
   etaMinutes,
+  titleTestID = 'active-ride-title',
+  subtitleTestID = 'active-ride-subtitle',
   testID = 'trip-status-header',
 }: TripStatusHeaderProps) {
   const titleFade = useChangeFade(title);
@@ -105,7 +110,7 @@ export function TripStatusHeader({
         <Animated.View style={titleFade}>
           {/* The live region is the title alone (Android; iOS announces stage changes itself), so
               ETA and subtitle ticks ("Arriving at …", "Location updated …") are never announced. */}
-          <AppText variant="h2" numberOfLines={2} accessibilityRole="header" accessibilityLiveRegion="polite" testID="active-ride-title">
+          <AppText variant="h2" numberOfLines={2} accessibilityRole="header" accessibilityLiveRegion="polite" testID={titleTestID}>
             {title}
           </AppText>
         </Animated.View>
@@ -121,7 +126,7 @@ export function TripStatusHeader({
                   numberOfLines={2}
                   style={styles.flex}
                   accessibilityLabel={eta ? `${eta}. ${subtitle}` : undefined}
-                  testID="active-ride-subtitle"
+                  testID={subtitleTestID}
                 >
                   {subtitle}
                 </AppText>

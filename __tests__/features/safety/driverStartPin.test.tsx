@@ -68,7 +68,8 @@ afterEach(() => {
 describe('driver start PIN', () => {
   it('opens the PIN entry and sends the 4 digits as a string; success starts the trip', async () => {
     const { store, screen } = await renderScreen(pinRide());
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     expect(startPosts()).toHaveLength(0);
     screen.getByTestId('pin-entry-sheet');
     expect(screen.getByTestId('pin-entry-input-input').props.keyboardType).toBe('number-pad');
@@ -88,7 +89,8 @@ describe('driver start PIN', () => {
 
   it('PIN_INVALID shows the attempts left and clears the boxes, without a generic toast', async () => {
     const { screen } = await renderScreen(pinRide());
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     mock.onPost('/rides/41/start').reply(422, {
       success: false,
       message: 'Wrong PIN',
@@ -104,7 +106,8 @@ describe('driver start PIN', () => {
   it('a wrong PIN keeps the keypad up: the field stays editable while checking and is refocused, cleared (T-539)', async () => {
     const focusSpy = jest.spyOn(TextInput.prototype, 'focus').mockImplementation(() => undefined);
     const { screen } = await renderScreen(pinRide());
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     let answer: (value: [number, unknown]) => void = () => undefined;
     mock.onPost('/rides/41/start').reply(
       () =>
@@ -139,7 +142,8 @@ describe('driver start PIN', () => {
     const focusSpy = jest.spyOn(TextInput.prototype, 'focus').mockImplementation(() => undefined);
     focusSpy.mockClear(); // the spy may carry calls from an earlier test
     const { screen } = await renderScreen(pinRide());
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     mock.onPost('/rides/41/start').reply(423, { success: false, error: { code: 'PIN_LOCKED', retry_after: 65 } }, { 'retry-after': '65' });
     enterPin(screen, '2222');
 
@@ -168,7 +172,8 @@ describe('driver start PIN', () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     openURL.mockClear();
     const { screen } = await renderScreen(pinRide());
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     mock.onPost('/rides/41/start').reply(423, { success: false, error: { code: 'PIN_BLOCKED', message: 'Blocked' } });
     serverRide = pinRide({ pin_blocked: true });
     enterPin(screen, '3333');
@@ -184,7 +189,8 @@ describe('driver start PIN', () => {
 
   it('after an admin clears the block, a refresh with pin_blocked false brings Start trip back', async () => {
     const { store, screen } = await renderScreen(pinRide());
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     mock.onPost('/rides/41/start').replyOnce(423, { success: false, error: { code: 'PIN_BLOCKED', message: 'Blocked' } });
     serverRide = pinRide({ pin_blocked: true });
     enterPin(screen, '3333');
@@ -200,7 +206,8 @@ describe('driver start PIN', () => {
     });
     await waitFor(() => screen.getByTestId('driver-ride-start'));
     expect(screen.queryByTestId('driver-ride-pin-blocked')).toBeNull();
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
     screen.getByTestId('pin-entry-input-input');
     expect(screen.queryByTestId('pin-entry-support')).toBeNull();
   });
@@ -215,7 +222,8 @@ describe('driver start PIN', () => {
   it('without pin_required, Start posts no body; a PIN_REQUIRED answer opens the entry', async () => {
     const { screen } = await renderScreen(pinRide({ pin_required: false }));
     mock.onPost('/rides/41/start').reply(422, { success: false, error: { code: 'PIN_REQUIRED', message: 'PIN needed' } });
-    fireEvent.press(screen.getByTestId('driver-ride-start'));
+    // UI-R13: Start trip is a SlideToConfirm; its activate action is the slide.
+    fireEvent(screen.getByTestId('driver-ride-start'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
 
     await waitFor(() => screen.getByTestId('pin-entry-sheet'));
     expect(startPosts()[0].data).toBeUndefined();

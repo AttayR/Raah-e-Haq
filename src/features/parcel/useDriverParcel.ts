@@ -44,7 +44,7 @@ export interface ParcelPanelAction {
   variant?: 'secondary' | 'destructiveSoft';
 }
 
-/** What DriverRidePanel shows for a parcel: its next step replaces Start trip / Complete trip. */
+/** What DriverTripSheet shows for a parcel: its next step replaces Start trip / Complete trip. */
 export interface DriverParcelPanel {
   parcel: ParcelView;
   fare: number | null;

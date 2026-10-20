@@ -20,7 +20,7 @@ import { ChatList } from '../../../src/features/chat/components/ChatList';
 import { SEND_SETTLE_MS } from '../../../src/features/chat/components/ChatComposer';
 import ActiveRidePanel from '../../../src/features/active-ride/components/ActiveRidePanel';
 import { advanceRideStage } from '../../../src/features/active-ride/stage';
-import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
+import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
 import type { RideResource } from '../../../src/services/rideService';
 import { makeRide } from '../../../test-utils/rideFixtures';
 import { message, mine, theirs, threadPage } from '../../../test-utils/chatFixtures';
@@ -493,7 +493,7 @@ describe('Message entry points', () => {
   it('driver panel: Message calls onMessage', () => {
     const onMessage = jest.fn();
     render(
-      <DriverRidePanel
+      <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
         ride={makeRide({ id: 7, status: 'accepted' })}
         step="to_pickup"
         pendingAction={null}

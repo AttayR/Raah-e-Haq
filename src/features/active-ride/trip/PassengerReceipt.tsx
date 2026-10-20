@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Avatar, Button, FareBreakdown, FareTag, Icon, Skeleton } from '../../../components/ui';
+import { AppText, Button, FareBreakdown, FareTag, Icon, Skeleton } from '../../../components/ui';
 import { componentTokens, radius, space } from '../../../theme';
 import { readNumberOrNull } from '../../../core/api/read';
 import { toast } from '../../../core/toast';
 import { t } from '../../../i18n';
 import { formatMoney } from '../../../utils/format';
 import { NOT_RATABLE, toRideRatingFields, toRideRatingState } from '../../rating/api';
-import { RatingForm, useRatingForm, type RatingFormState } from '../../rating/components/RatingForm';
+import { useRatingForm, type RatingFormState } from '../../rating/components/RatingForm';
+import { ReceiptRatingBlock } from '../../rating/components/ReceiptRating';
 import type { RideRatingFields, RideRatingState } from '../../rating/types';
 import { isParcelRide } from '../../parcel/api';
 import { ACTIVE_RIDE_COPY } from '../copy';
@@ -153,41 +154,22 @@ function FareDetails({ view }: { view: PassengerTripView }) {
   );
 }
 
-/** PR2 block 5 / 5': rate the driver inline, or the stars already given. */
+/** PR2 block 5 / 5': rate the driver inline, or the stars already given (shared ReceiptRating). */
 function RatingBlock({ view, receipt }: { view: PassengerTripView; receipt: PassengerReceiptState }) {
   const ride = view.ride;
   if (!ride || view.stage !== 'completed') return null;
-  if (receipt.form) {
-    const card = driverCardOf(ride);
-    const name = card.name ?? ACTIVE_RIDE_COPY.driverFallbackName;
-    return (
-      <View style={styles.rating} testID="receipt-rating">
-        <Avatar name={name} uri={card.photoUri} size={componentTokens.ride.person.avatar} />
-        <AppText variant="h3" align="center" numberOfLines={2} accessibilityRole="header">
-          {view.parcel ? t('rating.titleParcel') : ACTIVE_RIDE_COPY.rateWith(name)}
-        </AppText>
-        <View style={styles.ratingForm}>
-          <RatingForm form={receipt.form} tagVariant="outline" />
-        </View>
-      </View>
-    );
-  }
-  if (receipt.myStars !== null) {
-    const stars = receipt.myStars;
-    return (
-      <View style={styles.rated} accessible accessibilityLabel={t('rating.yourRatingA11y', { n: stars })} testID="receipt-rated">
-        <View style={styles.starsRow}>
-          {Array.from({ length: 5 }, (_, i) => (
-            <Icon key={i} name={i < stars ? 'star' : 'starOutline'} size={24} color={i < stars ? 'ratingStar' : 'borderStrong'} />
-          ))}
-        </View>
-        <AppText variant="bodySmall" color="textSecondary" align="center">
-          {ACTIVE_RIDE_COPY.youRated}
-        </AppText>
-      </View>
-    );
-  }
-  return null;
+  const card = driverCardOf(ride);
+  const name = card.name ?? ACTIVE_RIDE_COPY.driverFallbackName;
+  return (
+    <ReceiptRatingBlock
+      name={name}
+      photoUri={card.photoUri}
+      title={view.parcel ? t('rating.titleParcel') : ACTIVE_RIDE_COPY.rateWith(name)}
+      form={receipt.form}
+      myStars={receipt.myStars}
+      ratedLabel={ACTIVE_RIDE_COPY.youRated}
+    />
+  );
 }
 
 /** The receipt body (PR2): money card, Fare details, rating (the sheet's extras slot follows). */
@@ -230,8 +212,4 @@ const styles = StyleSheet.create({
   moneyText: { flex: 1, minWidth: 0, gap: k.titleGap },
   detailsRow: { flexDirection: 'row', alignItems: 'center', minHeight: k.detailsRowHeight, gap: space[2] },
   flipped: { transform: [{ rotate: '180deg' }] },
-  rating: { alignItems: 'center', gap: space[3] },
-  ratingForm: { alignSelf: 'stretch', marginTop: space[1] },
-  rated: { alignItems: 'center', gap: space[2] },
-  starsRow: { flexDirection: 'row', gap: space[1] },
 });

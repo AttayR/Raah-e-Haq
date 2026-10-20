@@ -8,7 +8,7 @@ import { render } from '@testing-library/react-native';
 import { riderRating } from '../../../src/features/driver-requests/rating';
 import { toPendingRideRequest } from '../../../src/features/driver-requests/api';
 import { RequestSheetContent } from '../../../src/components/driver/request/RequestSheetContent';
-import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
+import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
 import { pendingRide } from '../../../test-utils/driverRequestFixtures';
 import { makeRide } from '../../../test-utils/rideFixtures';
 import type { RideResource } from '../../../src/services/rideService';
@@ -52,7 +52,7 @@ describe('driver request card (GET /rides/pending)', () => {
 describe('driver ride panel', () => {
   const renderPanel = (passenger: RideResource['passenger']) =>
     render(
-      <DriverRidePanel
+      <DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined}
         ride={makeRide({ id: 41, status: 'accepted', passenger })}
         step="to_pickup"
         pendingAction={null}

@@ -41,6 +41,11 @@ export type MapControlsProps = {
    * same height as back, 16 from the end edge. The second persistent control (§9).
    */
   topEnd?: React.ReactNode;
+  /**
+   * [UI-R13] Diameter of back and locate: 48 (default) or the driving size 56
+   * (`touchTargetDriving`) on the driver's ride map (shared-trip-sheet TS2).
+   */
+  controlSize?: number;
   testID?: string;
 };
 
@@ -67,6 +72,7 @@ export function MapControls({
   hidden = false,
   locateHidden = false,
   topEnd,
+  controlSize,
   testID = 'map-controls',
 }: MapControlsProps) {
   const insets = useSafeAreaInsets();
@@ -91,6 +97,7 @@ export function MapControls({
           <IconButton
             icon={backIcon}
             variant="floating"
+            size={controlSize}
             onPress={onBack}
             accessibilityLabel={backLabel ?? (backIcon === 'close' ? t('common.close') : t('common.back'))}
             testID={backTestID ?? `${testID}-back`}
@@ -125,6 +132,7 @@ export function MapControls({
           <IconButton
             icon={locateIcon}
             variant="floating"
+            size={controlSize}
             onPress={onLocate}
             accessibilityLabel={locateLabel ?? t('kit.locateA11y')}
             testID={locateTestID ?? `${testID}-locate`}

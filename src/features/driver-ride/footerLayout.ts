@@ -1,4 +1,4 @@
-import { MAX_FONT_SIZE_MULTIPLIER, componentTokens, space, textStyles } from '../../theme';
+import { MAX_FONT_SIZE_MULTIPLIER, componentTokens, layout, space, textStyles } from '../../theme';
 
 /**
  * T-559: the driver ride footer on small phones. The primary step keeps the full width; when two
@@ -9,9 +9,9 @@ import { MAX_FONT_SIZE_MULTIPLIER, componentTokens, space, textStyles } from '..
  * always hears the full label.
  */
 
-/** The footer's side padding and the gap between buttons in a row (DriverRidePanel). */
-export const FOOTER_SIDE_PADDING = space[5];
-export const FOOTER_GAP = space[3];
+/** [UI-R13] The trip sheet footer's side padding (the gutter, 16) and the 8 between its actions. */
+export const FOOTER_SIDE_PADDING = layout.gutter;
+export const FOOTER_GAP = space[2];
 
 /**
  * A generous width per character of the `button` style (16pt semibold): wider than the average

@@ -13,12 +13,13 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Linking } from 'react-native';
 import { launchCamera } from 'react-native-image-picker';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
+import { expandTripSheet } from '../../../test-utils/tripSheet';
 import { apiClient } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { toast } from '../../../src/core/toast';
 import { clearQueryCache } from '../../../src/core/api/queryCache';
 import { RequestSheetContent } from '../../../src/components/driver/request/RequestSheetContent';
-import { DriverRidePanel } from '../../../src/components/driver/DriverRidePanel';
+import { DriverTripSheet } from '../../../src/features/driver-ride/trip/DriverTripSheet';
 import { toPendingRideRequest } from '../../../src/features/driver-requests/api';
 import { driverRideRefusalToast } from '../../../src/features/driver-ride/hooks';
 import { rideStep } from '../../../src/features/driver-ride/steps';
@@ -205,7 +206,8 @@ describe('the driver panel on a parcel', () => {
     const store = storeWith(parcelRide(driverParcel()));
     const { result } = hookFor(store);
     const ride = store.getState().driverRide.ride as RideResource;
-    render(<DriverRidePanel {...panelProps(ride)} parcel={result.current.panel} />);
+    render(<DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined} {...panelProps(ride)} parcel={result.current.panel} />);
+    expandTripSheet(); // the parcel block and the cash line are in the details
     expect(screen.getByTestId('driver-parcel-pickup')).toBeTruthy();
     expect(screen.getByTestId('driver-parcel-refuse')).toBeTruthy();
     expect(screen.queryByTestId('driver-ride-start')).toBeNull();
@@ -216,7 +218,8 @@ describe('the driver panel on a parcel', () => {
   it('with the parcel: Deliver and Return; coming back: Hand back; a blocked code leaves the return', () => {
     const withParcel = parcelRide(pickedUp(), { status: 'started' });
     const first = hookFor(storeWith(withParcel));
-    const { unmount } = render(<DriverRidePanel {...panelProps(withParcel)} parcel={first.result.current.panel} />);
+    const { unmount } = render(<DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined} {...panelProps(withParcel)} parcel={first.result.current.panel} />);
+    expandTripSheet(); // the parcel block and the cash line are in the details
     expect(screen.getByTestId('driver-parcel-deliver')).toBeTruthy();
     expect(screen.getByTestId('driver-parcel-return')).toBeTruthy();
     expect(screen.getByTestId('driver-parcel-call-receiver')).toBeTruthy();
@@ -226,14 +229,16 @@ describe('the driver panel on a parcel', () => {
 
     const returning = parcelRide(driverParcel({ status: 'returning' }), { status: 'started' });
     const second = hookFor(storeWith(returning));
-    const r2 = render(<DriverRidePanel {...panelProps(returning)} parcel={second.result.current.panel} />);
+    const r2 = render(<DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined} {...panelProps(returning)} parcel={second.result.current.panel} />);
+    expandTripSheet(); // the parcel block and the cash line are in the details
     expect(screen.getByTestId('driver-parcel-hand-back')).toBeTruthy();
     expect(screen.queryByTestId('driver-parcel-deliver')).toBeNull();
     r2.unmount();
 
     const blocked = parcelRide(pickedUp({ code: { ...pickedUp().code, blocked: true, can_resend: false } }), { status: 'started' });
     const third = hookFor(storeWith(blocked));
-    render(<DriverRidePanel {...panelProps(blocked)} parcel={third.result.current.panel} />);
+    render(<DriverTripSheet onDone={() => undefined} onRatingChange={() => undefined} {...panelProps(blocked)} parcel={third.result.current.panel} />);
+    expandTripSheet(); // the parcel block and the cash line are in the details
     expect(screen.getByTestId('driver-parcel-return')).toBeTruthy();
     expect(screen.queryByTestId('driver-parcel-deliver')).toBeNull();
     expect(screen.getByTestId('driver-parcel-code-blocked')).toBeTruthy();

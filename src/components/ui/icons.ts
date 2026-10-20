@@ -198,6 +198,8 @@ export const iconGlyphs = {
   sharing: 'share-variant',
   /** [UI-R12] Cancel ride in the trip details (TS8). */
   cancelCircle: 'close-circle-outline',
+  /** [UI-R13] The driver's "The rider cancelled" state (driver-to-pickup DP6). */
+  riderCancelled: 'account-cancel-outline',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

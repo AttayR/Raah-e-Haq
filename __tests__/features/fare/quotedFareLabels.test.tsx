@@ -6,9 +6,9 @@
  * completed before BE-103) keep "(quoted at booking)".
  */
 import React from 'react';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { DriverRideSummary } from '../../../src/components/driver/DriverRideSummary';
+import { DriverReceiptUnderTest } from '../../../test-utils/driverTripFixtures';
 import { ReceiptCard } from '../../../src/features/ride-history/components/RideDetailsSections';
 import { toRide } from '../../../src/features/ride-history/api';
 import { toRideSummary } from '../../../src/features/driver-ride/steps';
@@ -23,6 +23,9 @@ const renderThemed = async (node: React.ReactElement) => {
   // ThemeProvider holds its children until the stored appearance is read (T-601).
   await act(async () => {});
 };
+
+/** UI-R13 DC1 #5: the driver's fare lines sit under "Fare details", collapsed at first. */
+const openDriverFareDetails = () => fireEvent.press(screen.getByTestId('driver-ride-fare-details'));
 
 describe('BE-103 quoted fields are read nullable', () => {
   it('ride: the decimal string and minutes, null when absent', () => {
@@ -78,24 +81,27 @@ describe('locked receipt labels (T-557)', () => {
 
   it('driver trip complete: a locked fare labels its lines as the quote, with or without BE-103', async () => {
     await renderThemed(
-      <DriverRideSummary
+      <DriverReceiptUnderTest
         ride={makeRide({ status: 'completed', fare_breakdown: breakdown, fare_locked: true, quoted_distance_km: '5.24', quoted_duration_minutes: 18 })}
         onDone={() => undefined}
       />,
     );
+    openDriverFareDetails();
     expect(screen.getByText('Distance (quoted 5.2 km)')).toBeTruthy();
     expect(screen.getByText('Time (quoted 18 min)')).toBeTruthy();
     screen.unmount();
 
     await renderThemed(
-      <DriverRideSummary ride={makeRide({ status: 'completed', fare_breakdown: breakdown, fare_locked: true })} onDone={() => undefined} />,
+      <DriverReceiptUnderTest ride={makeRide({ status: 'completed', fare_breakdown: breakdown, fare_locked: true })} onDone={() => undefined} />,
     );
+    openDriverFareDetails();
     expect(screen.getByText('Distance (quoted at booking)')).toBeTruthy();
     expect(screen.getByText('Time (quoted at booking)')).toBeTruthy();
     screen.unmount();
 
     // A metered ride keeps the plain labels.
-    await renderThemed(<DriverRideSummary ride={makeRide({ status: 'completed', fare_breakdown: breakdown })} onDone={() => undefined} />);
+    await renderThemed(<DriverReceiptUnderTest ride={makeRide({ status: 'completed', fare_breakdown: breakdown })} onDone={() => undefined} />);
+    openDriverFareDetails();
     expect(screen.queryByText(/quoted/)).toBeNull();
   });
 
