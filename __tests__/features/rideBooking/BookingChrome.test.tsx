@@ -4,10 +4,10 @@
  * its height (T-314); nearby drivers are top-down vehicle markers (T-586).
  */
 import React from 'react';
-import { Keyboard, StyleSheet } from 'react-native';
+import { Keyboard, Platform, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderHook, within } from '@testing-library/react-native';
 import { DarkTheme, LightTheme, type AppTheme } from '../../../src/theme';
-import { MapTopControls } from '../../../src/features/ride-booking/components/MapTopControls';
+import { MAP_TOP_CONTROLS_HEIGHT, MapTopControls } from '../../../src/features/ride-booking/components/MapTopControls';
 import { useSharedValue } from 'react-native-reanimated';
 import { BookingSheet } from '../../../src/features/ride-booking/components/BookingSheet';
 import { NearbyVehicleMarkers } from '../../../src/features/nearby-vehicles';
@@ -27,8 +27,11 @@ jest.mock('../../../src/app/providers/ThemeProvider', () => ({
   useAppTheme: () => ({ theme: mockTheme, scheme: 'system', setScheme: jest.fn() }),
 }));
 // Notched phone: 47 pt top inset, 34 pt home indicator.
+let mockRootFrame = { x: 0, y: 0, width: 750, height: 1334 };
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
+  // The app's root view: the RN jest preset's 750 x 1334 window (T-592: on Android it shrinks with the keyboard).
+  useSafeAreaFrame: () => mockRootFrame,
 }));
 
 type Listener = (e: { endCoordinates: { height: number } }) => void;
@@ -149,6 +152,39 @@ describe.each([
     );
     // Test window is 750 x 1334 (RN jest preset): half = 667.
     expect(StyleSheet.flatten(getByTestId('booking-sheet').props.style).maxHeight).toBe(667);
+  });
+
+  it('T-592: the sheet never grows over the back / locate controls with the keyboard up, on either platform', () => {
+    // Room under the controls: root height − 47 top inset − controls − 16.
+    const room = (root: number) => root - 47 - MAP_TOP_CONTROLS_HEIGHT - 16;
+    const originalOS = Platform.OS;
+    try {
+      // iOS: the root keeps the whole window; the sheet is lifted by the keyboard instead.
+      const ios = render(
+        <BookingSheet maxHeightRatio={0.5}>
+          <AppText>content</AppText>
+        </BookingSheet>,
+      );
+      act(() => keyboardListeners.keyboardWillShow?.({ endCoordinates: { height: 291 } }));
+      expect(StyleSheet.flatten(ios.getByTestId('booking-sheet').props.style)).toMatchObject({ bottom: 291, maxHeight: room(1334) - 291 });
+      ios.unmount();
+
+      // Android: the root view ends at the keyboard's top (adjustResize, or MainActivity's IME
+      // padding on API 35+) while the window height stays 1334; the event reports 291 and the
+      // root loses 325 (with the navigation bar under the keyboard).
+      Object.defineProperty(Platform, 'OS', { configurable: true, get: () => 'android' });
+      const android = render(
+        <BookingSheet maxHeightRatio={0.5}>
+          <AppText>content</AppText>
+        </BookingSheet>,
+      );
+      mockRootFrame = { ...mockRootFrame, height: 1334 - 325 };
+      act(() => keyboardListeners.keyboardDidShow?.({ endCoordinates: { height: 291 } }));
+      expect(StyleSheet.flatten(android.getByTestId('booking-sheet').props.style)).toMatchObject({ bottom: 0, maxHeight: room(1009) });
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, get: () => originalOS });
+      mockRootFrame = { ...mockRootFrame, height: 1334 };
+    }
   });
 
   it('sheet: content scrolls below a fixed 24 pt handle band, with a hairline once scrolled (T-539)', () => {

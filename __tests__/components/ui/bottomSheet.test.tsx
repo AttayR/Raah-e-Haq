@@ -3,7 +3,7 @@
  * modal modes, programmatic snaps, keyboard → full, a11y on the handle, light/dark.
  */
 import React, { Profiler, createRef } from 'react';
-import { AccessibilityInfo, BackHandler, Keyboard, ScrollView, StyleSheet, Text, TextInput, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, BackHandler, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, useColorScheme, type StyleProp, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { DarkTheme, LightTheme, layout as layoutTokens } from '../../../src/theme';
@@ -338,6 +338,49 @@ describe('BottomSheet (modal mode)', () => {
     act(() => handlers.keyboardWillHide({ endCoordinates: { height: 0 } }));
     expect(onSnapChange).toHaveBeenLastCalledWith('content', 716);
     jest.restoreAllMocks();
+  });
+
+  it('[T-592] Android: a modal sheet rises by the part of its window under the keyboard, and not when the window shrank', async () => {
+    type Show = { endCoordinates: { height: number; screenY: number } };
+    const handlers: Record<string, (e: Show) => void> = {};
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: (e: Show) => void) => {
+      handlers[event] = handler;
+      return { remove: noop };
+    }) as unknown as typeof Keyboard.addListener);
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, get: () => 'android' });
+    try {
+      const onSnapChange = jest.fn();
+      await renderThemed(
+        <BottomSheet mode="modal" visible onSnapChange={onSnapChange} header={<Text>Rate</Text>} footer={<Button label="Submit" onPress={noop} />} testID="m">
+          <Text>Stars and comment</Text>
+        </BottomSheet>,
+      );
+      await layout(containerOf('m'), 874);
+      await layout(screen.getByTestId('m-header'), 60);
+      await layout(screen.getByTestId('m-footer'), 132);
+      await layout(screen.getByTestId('m-body'), 500);
+      expect(onSnapChange).toHaveBeenLastCalledWith('content', 716);
+
+      // Android 15+: the Modal's window keeps its full 874 while the keyboard's top is at 538, so
+      // 336 of it (the keyboard plus the navigation bar under it; the event reports 312) is
+      // covered: the footer rides on it and the sheet grows, as on iOS.
+      act(() => handlers.keyboardDidShow({ endCoordinates: { height: 312, screenY: 538 } }));
+      expect(flat(screen.getByTestId('m-footer').props.style).bottom).toBe(336);
+      expect(onSnapChange).toHaveBeenLastCalledWith('content', FULL);
+
+      // API ≤ 34: the window itself shrinks to the keyboard's top, so nothing is added twice.
+      await layout(containerOf('m'), 538);
+      expect(flat(screen.getByTestId('m-footer').props.style).bottom).toBe(0);
+
+      act(() => handlers.keyboardDidHide({ endCoordinates: { height: 0, screenY: 874 } }));
+      await layout(containerOf('m'), 874);
+      expect(flat(screen.getByTestId('m-footer').props.style).bottom).toBe(0);
+      expect(onSnapChange).toHaveBeenLastCalledWith('content', 716);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, get: () => originalOS });
+      jest.restoreAllMocks();
+    }
   });
 
   it('[T-519] ignores a focused field outside the sheet', async () => {

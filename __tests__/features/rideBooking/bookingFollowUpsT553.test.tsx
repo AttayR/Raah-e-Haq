@@ -31,8 +31,11 @@ const mockDetails = fetchPlaceDetails as jest.Mock;
 jest.mock('../../../src/app/providers/ThemeProvider', () => ({
   useAppTheme: () => ({ theme: jest.requireActual('../../../src/theme').LightTheme, scheme: 'system', setScheme: jest.fn() }),
 }));
+const mockRootFrame = { x: 0, y: 0, width: 750, height: 1334 };
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
+  // The app's root view: the RN jest preset's 750 x 1334 window (T-592: on Android it shrinks with the keyboard).
+  useSafeAreaFrame: () => mockRootFrame,
 }));
 
 type Listener = () => void;

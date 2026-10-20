@@ -33,6 +33,7 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { t } from '../../i18n';
 import { componentTokens, layout, motion, motionPatterns, reducedMotion, space, springs } from '../../theme';
 import { toEasing } from './easing';
+import { keyboardLift, modalKeyboardLift } from './keyboard';
 import { ModalRoot } from './ModalRoot';
 import { useModalTurn } from './modalQueue';
 import { fullHeight, openingTop, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
@@ -190,12 +191,19 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   const [headerHeight, setHeaderHeight] = useState(0);
   const [bodyHeight, setBodyHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboard, setKeyboard] = useState(NO_KEYBOARD);
+  // [T-592] How far the footer and the body's end rise above the keyboard. A map sheet lives in
+  // the activity window, which on Android already ends at the keyboard; a modal sheet's Modal is
+  // its own window, which on Android 15+ does not shrink, so its lift is measured (keyboard.ts).
+  const keyboardHeight = modal
+    ? modalKeyboardLift(Platform.OS, keyboard, containerHeight)
+    : keyboardLift(Platform.OS, keyboard.height);
 
   const footerBottom = Math.max(insets.bottom + layout.bottomActionOffset, layout.bottomActionMinOffset);
   const footerBlock = footer ? footerHeight : 0;
-  // [T-519] While the keyboard is up (iOS) it covers the bottom of the sheet, so a `content`
-  // sheet grows by its height (capped at `full`) instead of hiding its body under the keyboard.
+  // [T-519] While the keyboard is up (iOS; Android in a Modal, T-592) it covers the bottom of the
+  // sheet, so a `content` sheet grows by its height (capped at `full`) instead of hiding its body
+  // under the keyboard.
   const contentHeight = k.contentTop + headerHeight + bodyHeight + (footer ? footerBlock : footerBottom) + keyboardHeight;
 
   const computed = useMemo(
@@ -288,7 +296,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     // [T-571] The keyboard listeners go with the Modal: a keyboard that hides after that (the
     // focused field went away with the sheet) is never heard, and its stale height opened the
     // next presentation at full height with a blank half (QA 2026-10-18 bug 6).
-    setKeyboardHeight(0);
+    setKeyboard(NO_KEYBOARD);
     restoreSnap.current = null;
     onHiddenRef.current?.();
   }, []);
@@ -519,8 +527,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const show = Keyboard.addListener(showEvent, event => {
-      // Android resizes the window (adjustResize), so only iOS lifts the footer itself.
-      setKeyboardHeight(Platform.OS === 'ios' ? event.endCoordinates.height : 0);
+      // [T-592] Kept as reported; `keyboardHeight` above turns it into the lift this sheet needs.
+      setKeyboard({ height: event.endCoordinates.height, top: event.endCoordinates.screenY });
       if (closing.current) return;
       if (expandOnKeyboard && current !== 'full') {
         restoreSnap.current = current;
@@ -529,7 +537,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       }
     });
     const hide = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
+      setKeyboard(NO_KEYBOARD);
       if (closing.current) return;
       if (restoreSnap.current) {
         snapTo(restoreSnap.current);
@@ -823,6 +831,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     </Modal>
   );
 });
+
+const NO_KEYBOARD = { height: 0, top: 0 };
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },

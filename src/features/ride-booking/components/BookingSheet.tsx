@@ -9,10 +9,11 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { useKeyboardHeight } from '../../../hooks/useKeyboardHeight';
 import { KeyboardRevealProvider, type RevealScrollable } from '../../../components/ui/keyboardReveal';
+import { keyboardLift } from '../../../components/ui/keyboard';
 import { componentTokens, radius, space } from '../../../theme';
 import { MAP_TOP_CONTROLS_HEIGHT } from './MapTopControls';
 
@@ -53,14 +54,42 @@ type Props = {
 };
 
 /**
+ * T-592: the sheet's height cap. It stays below the map's top controls (back, locate), measured
+ * in the app's root view, whose height (`useSafeAreaFrame`) on Android already ends at the
+ * keyboard's top, while the window height (`useWindowDimensions`) never shrinks: using the window
+ * there let the sheet grow over the controls by the keyboard's height (Android smoke 2026-10-21).
+ * On iOS the root is the whole window and the sheet is lifted by `keyboardOffset` instead. The
+ * ratio cap applies only while the keyboard is down (typing needs the room).
+ */
+export const bookingSheetMaxHeight = ({
+  rootHeight,
+  windowHeight,
+  topInset,
+  keyboardHeight,
+  keyboardOffset,
+  maxHeightRatio,
+}: {
+  rootHeight: number;
+  windowHeight: number;
+  topInset: number;
+  keyboardHeight: number;
+  keyboardOffset: number;
+  maxHeightRatio?: number;
+}): number => {
+  const belowControls = rootHeight - topInset - MAP_TOP_CONTROLS_HEIGHT - space[4] - keyboardOffset;
+  const ratioCap = maxHeightRatio && keyboardHeight <= 0 ? windowHeight * maxHeightRatio : Infinity;
+  return Math.max(0, Math.min(belowControls, ratioCap));
+};
+
+/**
  * The booking map's bottom sheet (DESIGN_SYSTEM 5.14): `surface`, top radius 24, upward
  * shadow, bottom safe-area inset. It never grows under the map controls; longer content
  * scrolls inside, clipped 24 below the top (the kit sheet's content top) with a hairline once
- * scrolled, so nothing slides under the handle half cut (T-539). On iOS it rides above the
- * keyboard (Android resizes the window itself, `adjustResize`), so search suggestions stay
- * visible while typing. T-553: a focused search field and its suggestions are scrolled into the
- * visible part of the sheet (the kit keyboard reveal), e.g. the stop search at the end of the
- * vehicle step.
+ * scrolled, so nothing slides under the handle half cut (T-539). It rides above the keyboard
+ * (`keyboardLift`: iOS lifts it; on Android the window itself ends at the keyboard), so search
+ * suggestions stay visible while typing. T-553: a focused search field and its suggestions are
+ * scrolled into the visible part of the sheet (the kit keyboard reveal), e.g. the stop search at
+ * the end of the vehicle step.
  */
 export const BookingSheet: React.FC<Props> = ({
   children,
@@ -76,13 +105,18 @@ export const BookingSheet: React.FC<Props> = ({
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
+  const { height: rootHeight } = useSafeAreaFrame();
   const keyboardHeight = useKeyboardHeight();
-  const keyboardOffset = Platform.OS === 'ios' ? keyboardHeight : 0;
+  const keyboardOffset = keyboardLift(Platform.OS, keyboardHeight);
   const keyboardUp = keyboardHeight > 0;
-  const belowControls = windowHeight - insets.top - MAP_TOP_CONTROLS_HEIGHT - space[4] - keyboardOffset;
-  // The ratio cap applies only while the keyboard is down (typing needs the room).
-  const ratioCap = maxHeightRatio && !keyboardUp ? windowHeight * maxHeightRatio : Infinity;
-  const maxHeight = Math.max(0, Math.min(belowControls, ratioCap));
+  const maxHeight = bookingSheetMaxHeight({
+    rootHeight: rootHeight > 0 ? rootHeight : windowHeight,
+    windowHeight,
+    topInset: insets.top,
+    keyboardHeight,
+    keyboardOffset,
+    maxHeightRatio,
+  });
   const [scrolled, setScrolled] = useState(false);
   const [scrollLocked, setScrollLocked] = useState(false);
   const full = useRef<boolean | null>(null);

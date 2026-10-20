@@ -29,6 +29,8 @@ import {
   MapControls,
   Screen,
   keyboardAvoidingProps,
+  keyboardLift,
+  modalKeyboardLift,
   useHeaderScroll,
 } from '../../../src/components/ui';
 
@@ -52,6 +54,28 @@ describe('keyboardAvoidingProps', () => {
     expect(keyboardAvoidingProps('ios', 59)).toEqual({ behavior: 'padding', enabled: true, keyboardVerticalOffset: 59 });
     expect(keyboardAvoidingProps('ios', -3).keyboardVerticalOffset).toBe(0);
     expect(keyboardAvoidingProps('android', 24)).toEqual({ behavior: undefined, enabled: false, keyboardVerticalOffset: 0 });
+  });
+});
+
+describe('[T-592] keyboard lift', () => {
+  it('lifts by the keyboard on iOS; never in the Android activity window, which ends at the keyboard', () => {
+    expect(keyboardLift('ios', 291)).toBe(291);
+    expect(keyboardLift('ios', -1)).toBe(0);
+    expect(keyboardLift('android', 291)).toBe(0);
+  });
+
+  it('in a Modal on Android, lifts by the part of the window under the keyboard, and not when it shrank', () => {
+    // Android 15+: an edge-to-edge dialog keeps its 874 while the keyboard's top is at 538.
+    expect(modalKeyboardLift('android', { height: 312, top: 538 }, 874)).toBe(336);
+    // API ≤ 34: the dialog window shrinks to the keyboard's top (sub-point rounding is ignored).
+    expect(modalKeyboardLift('android', { height: 312, top: 538 }, 538)).toBe(0);
+    expect(modalKeyboardLift('android', { height: 312, top: 538 }, 538.4)).toBe(0);
+    // Not measured yet, or no keyboard.
+    expect(modalKeyboardLift('android', { height: 312, top: 538 }, 0)).toBe(0);
+    expect(modalKeyboardLift('android', { height: 0, top: 0 }, 874)).toBe(0);
+    // iOS: the keyboard's height, as before.
+    expect(modalKeyboardLift('ios', { height: 336, top: 538 }, 874)).toBe(336);
+    expect(modalKeyboardLift('ios', { height: 0, top: 874 }, 874)).toBe(0);
   });
 });
 
