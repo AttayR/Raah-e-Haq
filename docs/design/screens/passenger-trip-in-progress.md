@@ -30,3 +30,51 @@ No "Cancel ride" once the trip is ongoing (server forbids; BE-04).
 | Completed | Crossfade to passenger-trip-complete; haptic `notificationSuccess`. |
 | Offline | Offline banner; last state kept. |
 | App relaunch | Restored into this state (T-301). |
+
+---
+
+## UI-R12 (2026-10-20): on trip
+
+**Anatomy:** `shared-trip-sheet.md`. **Supersedes** the Layout above. **Keeps what ships:** the T-549 trip route (from the car through the stops still to visit, refetch rules), the T-517/T-586 vehicle motion on the route, live share, SOS, AC report ("AC not working?", BE-86), overcharge report (BE-106), parcel sender block (BE-88), no cancel once started (BE-04).
+
+**Before:** `docs/qa-reports/2026-10-11-regression/05-07-passenger-on-trip.png`, `docs/design/audit/2026-10-11-prod-audit/ref-passenger-on-trip.png`.
+
+### PT1. Peek group (iPhone 17)
+
+Z0 24 → Z1 header 56 → 12 → Z2 progress step 4, 4 → 16 → Z4 PersonCard 128 (same card, same actions as before the start, so nothing jumps) → 16 → Z5 fare row 32 → bottom 42. **Peek = 330** (38 %). Compact (SE): fare row to details → **256** (38 %).
+
+### PT2. Status header copy
+
+| Condition | Title | Subtitle | Tile |
+|---|---|---|---|
+| Next is the drop-off, ETA known | "Heading to {dropoff short}" / "{dropoff short} ki taraf" | "Arriving at {time}" / "{time} tak pohanch jayenge" (`time` = now + `eta.minutes`, device locale, recomputed on each ride read) | `eta.minutes` |
+| A stop is pending | "Heading to stop {n}" / "Stop {n} ki taraf" | "{stop short}" | ETA to the stop (`eta.target` `stop`) |
+| No ETA | as above | "{driver first name} · {plate}" | hidden |
+| Location stale > 60 s | as above | `textMuted` "Location updated {n} min ago" | hidden |
+| Offline | as above | `warning` offline line (PA2) | hidden |
+
+### PT3. Details (`expanded`)
+
+1. Fare row (compact only).
+2. **Route card** (Card `outlined`, `AddressPair` regular): pickup row text `textMuted` with label "Picked up" / "Pickup ho gaya"; each stop by `status`: completed → text `textMuted`, label "Stop {n} · done" / "Stop {n} · ho gaya"; the next → text `bodyStrong`, label "Next stop" / "Agla stop"; later → regular; drop-off (M1). Rail glyphs unchanged (one look everywhere, §5.23).
+3. Live share row (PA3 #3) while sharing.
+4. AC report section (shipped, AC rides) and overcharge report section (shipped, when the server offers it).
+5. No cancel.
+
+### PT4. Map
+
+TS2 chrome (back, Safety shield, recentre after a pan). TS2.1 on trip: vehicle 48 with halo, numbered stop pins still to visit, drop-off pin (M1), trip route from the car (T-549). Camera: fit vehicle + next target above the sheet; follow pauses on a pan.
+
+### PT5. States
+
+| State | Spec |
+|---|---|
+| Started (from arrived) | TS7 swap: title, tile and progress change; PIN card and waiting timer leave (fade 100); PersonCard stays put |
+| Stop reached | route card row updates (label crossfade 150); title/tile switch to the next target on the next read |
+| Completed | TS7 swap to the receipt (`passenger-trip-complete.md` UI-R12); haptic `notificationSuccess` |
+| App relaunch | restored into this state (T-301) |
+| 1.3× / Roman Urdu / Dark | as PA6 |
+
+### PT6. Accessibility and performance
+
+Announce "Trip started. Arriving at {time}." / "Trip shuru ho gayi. {time} tak pohanch jayenge." once; stop changes announce "Next stop {n}". Performance as PA8; the trip route follows T-549 limits.

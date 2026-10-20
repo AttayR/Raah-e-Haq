@@ -249,7 +249,7 @@ Extends `driver-drive-home.md` (peek, half). Fares stay server-fixed: "expected 
 
 ### 7.1 Auto-accept row (in the Drive sheet, offline and online)
 
-Placement: between the status row and the Go online / Go offline button: status row → 12 → **auto-accept row** → 12 → button. Peek = 24 + status row 25 + 12 + row 56 + 12 + button 56 + 16 = **201** (was 137); DESIGN_SYSTEM §8.3 updated accordingly. On iPhone SE the map keeps ≥ 45 % of the screen above the sheet.
+Placement: between the status row and the Go online / Go offline button: status row → 12 → **auto-accept row** → 12 → button. Peek = 24 + status row 25 + 12 + row 56 + 12 + button 56 + 16 = **201** (was 137); DESIGN_SYSTEM §8.3 updated accordingly. On iPhone SE the map keeps ≥ 45 % of the screen above the sheet. **[UI-R11, 2026-10-20]** The status row gains a subtitle line (+22): peek **223** (`driver-drive-home.md` § Drive v2 D1).
 
 Anatomy: container `surfaceAlt`, radius `md`, min height 56, padding 8 vertical / 16 horizontal (Switch slot absorbs the end padding per §5.9). Leading icon 24: off `flash-outline` `textSecondary`, on `flash` `primaryText`. 12 gap. Text column: title `body` weight 600 `textPrimary` "Auto-accept"; subtitle `caption` `textSecondary`, 1 line, ellipsis at the end (the tier list truncates first). Trailing kit `Switch` (64×44 slot).
 

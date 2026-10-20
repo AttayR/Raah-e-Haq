@@ -20,16 +20,17 @@ Conventions inside specs:
 | [passenger-destination-search](passenger-destination-search.md) | passenger | T-604 |
 | [passenger-vehicle-fare](passenger-vehicle-fare.md) | passenger | T-613 |
 | [passenger-finding-driver](passenger-finding-driver.md) | passenger | T-613 |
-| [passenger-driver-assigned](passenger-driver-assigned.md) | passenger | T-614 |
-| [passenger-trip-in-progress](passenger-trip-in-progress.md) | passenger | T-614 |
-| [passenger-trip-complete](passenger-trip-complete.md) | passenger | T-614 |
+| [shared-trip-sheet](shared-trip-sheet.md) | shared (trip sheet anatomy, both roles) | UI-R12, UI-R13 (TS9/TS2 also UI-R11) |
+| [passenger-driver-assigned](passenger-driver-assigned.md) | passenger | T-614 → UI-R12 |
+| [passenger-trip-in-progress](passenger-trip-in-progress.md) | passenger | T-614 → UI-R12 |
+| [passenger-trip-complete](passenger-trip-complete.md) | passenger | T-614 → UI-R12 |
 | [passenger-wallet](passenger-wallet.md) | passenger | T-617 |
 | [passenger-saved-places](passenger-saved-places.md) | passenger | T-618 |
-| [driver-drive-home](driver-drive-home.md) | driver | T-605 |
-| [driver-incoming-request](driver-incoming-request.md) | driver | T-605 |
-| [driver-to-pickup](driver-to-pickup.md) | driver | T-615 |
-| [driver-trip-in-progress](driver-trip-in-progress.md) | driver | T-615 |
-| [driver-trip-complete](driver-trip-complete.md) | driver | T-615 |
+| [driver-drive-home](driver-drive-home.md) | driver | T-605 → UI-R11 |
+| [driver-incoming-request](driver-incoming-request.md) | driver | T-605 → UI-R11 |
+| [driver-to-pickup](driver-to-pickup.md) | driver | T-615 → UI-R13 |
+| [driver-trip-in-progress](driver-trip-in-progress.md) | driver | T-615 → UI-R13 |
+| [driver-trip-complete](driver-trip-complete.md) | driver | T-615 → UI-R13 |
 | [driver-earnings](driver-earnings.md) | driver | T-616 |
 | [driver-vehicle-documents](driver-vehicle-documents.md) | driver | T-616 |
 | [shared-navigation-shell](shared-navigation-shell.md) | shared | T-610 |
