@@ -30,3 +30,6 @@ Everything below is built and tested in code against a local stand-in. Each item
 - Square crop for profile photos (needs a new native library) — yes or no.
 - Admin panel visual redesign — yes or no.
 - Keep Firebase Analytics — yes or no (B-20).
+- Account deletion (BE-129): confirm with legal how many years trips, payments, safety reports, support requests and ratings are kept (ACCOUNT_DELETION_RETENTION_YEARS, placeholder 5; users see it; the prune job BE-134 waits on it), how forfeited wallet credit is booked, and the kept-data list (vehicle and plate, device checks, chats on reported rides). Put https://raahehaq.com/account/delete in the Play Console "Data deletion" field once APP_URL is https.
+- Support email: set the real support address in the production app settings (`support_email`; the local seed uses support@raah-e-haq.com, the app's offline fallback is help@raahehaq.com).
+- Invite programme: set REFERRAL_SHARE_URL and the referrer/referee reward amounts.
