@@ -1,8 +1,7 @@
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import type { RideResource } from '../../services/rideService';
 import { toastOnScreen } from '../../core/toast';
-import { hideModal, showErrorModal } from '../../components/NotificationManager';
-import { confirm } from '../../core/dialog';
+import { alert, confirm } from '../../core/dialog';
 import { t } from '../../i18n';
 import { formatMoney } from '../../utils/format';
 import type { RideRequestFailure } from '../ride-booking/rideRequestFailure';
@@ -41,6 +40,32 @@ export interface ActiveRideActionsOptions {
   onBalanceOwed?: (amountOwed: number | null) => void;
 }
 
+/** The server's refusal message in a themed alert (UI-R19: was the legacy modal). */
+const showRequestFailed = (message: string): void => {
+  alert({ title: ACTIVE_RIDE_COPY.requestFailedTitle, body: message, confirmLabel: ACTIVE_RIDE_COPY.dismiss }).catch(() => undefined);
+};
+
+/**
+ * BE-37: POST /rides refused with PHONE_NOT_VERIFIED. With a verify route: "Verify phone" / "Not
+ * now" (the verify route runs on confirm); without one, the message with OK.
+ */
+export const showPhoneNotVerified = (message: string, onVerify: (() => void) | undefined): void => {
+  if (!onVerify) {
+    alert({ title: BOOKING_COPY.phoneNotVerifiedTitle, body: message, confirmLabel: ACTIVE_RIDE_COPY.dismiss }).catch(() => undefined);
+    return;
+  }
+  confirm({
+    title: BOOKING_COPY.phoneNotVerifiedTitle,
+    body: message,
+    confirmLabel: BOOKING_COPY.phoneNotVerifiedAction,
+    cancelLabel: BOOKING_COPY.notNow,
+  })
+    .then(verify => {
+      if (verify) onVerify();
+    })
+    .catch(() => undefined);
+};
+
 /**
  * "You owe Rs 200. Top up your wallet to book" (BE-85) with Top up / Not now. Without a top-up
  * route it is the server's message with OK.
@@ -50,7 +75,7 @@ export const showBalanceOwed = async (
   onTopUp: ((amountOwed: number | null) => void) | undefined,
 ): Promise<void> => {
   if (!onTopUp) {
-    showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal });
+    showRequestFailed(failure.message);
     return;
   }
   const topUp = await confirm({
@@ -83,7 +108,7 @@ export const openActiveBooking = async (dispatch: ActiveRideDispatch, rideId: nu
 
 /**
  * The feedback for a refused POST /rides (useActiveRideActions' requestRide): phone verification,
- * the balance owed, the keep-account offer, or the server's message in an error modal. Already
+ * the balance owed, the keep-account offer, or the server's message in an alert dialog. Already
  * handled refusals (`handled`, an opened `already_active`) show nothing here.
  */
 export const showRideRequestFailure = (
@@ -92,24 +117,13 @@ export const showRideRequestFailure = (
   options: ActiveRideActionsOptions,
 ): void => {
   if (failure.kind === 'phone_not_verified') {
-    const verify = options.onPhoneNotVerified;
-    showErrorModal(
-      BOOKING_COPY.phoneNotVerifiedTitle,
-      failure.message,
-      verify
-        ? { label: BOOKING_COPY.phoneNotVerifiedAction, onPress: () => { hideModal(); verify(); } }
-        : { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal },
-      verify ? { label: BOOKING_COPY.notNow, onPress: hideModal } : undefined,
-    );
+    showPhoneNotVerified(failure.message, options.onPhoneNotVerified);
   } else if (failure.kind === 'balance_owed') {
     showBalanceOwed(failure, options.onBalanceOwed);
   } else if (failure.kind === 'deletion_scheduled') {
     // BE-129: booking is refused while the deletion is scheduled; offer to keep the account.
     offerKeepAccount(dispatch, 'booking').catch(() => undefined);
   } else if (failure.kind === 'message' || failure.kind === 'offer_out_of_band') {
-    showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, {
-      label: ACTIVE_RIDE_COPY.dismiss,
-      onPress: hideModal,
-    });
+    showRequestFailed(failure.message);
   }
 };

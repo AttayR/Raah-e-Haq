@@ -2,26 +2,21 @@
  * T-565: follow-ups to the T-562 modal queue.
  * - A new confirm() during the dialog's iOS fade-out waits for `onDismiss` (no re-present while
  *   UIKit is still dismissing).
- * - NotificationManager keeps the last legacy modal rendered (hidden), so it holds its turn
- *   through the iOS dismiss like DialogHost; ModernModal's entrance runs on its turn.
  * - useDriverParcel hands the memoised closed sheets the same props when another sheet opens.
  * - Modal sheets that used to unmount with their section (rating, women mode, safety report) now
  *   close through `visible` and slide out.
  * - useVehicleTypes: a failed manual retry keeps what a concurrent quiet re-read loaded.
  */
 import React from 'react';
-import { Animated, Modal, Text, useColorScheme } from 'react-native';
+import { Modal, useColorScheme } from 'react-native';
 import * as Reanimated from 'react-native-reanimated';
 import MockAdapter from 'axios-mock-adapter';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { BottomSheet } from '../../../src/components/ui';
 import { DialogHost } from '../../../src/components/ui/Dialog';
 import { modalQueue } from '../../../src/components/ui/modalQueue';
-import ModernModal from '../../../src/components/ModernModal';
-import NotificationManager, { hideModal, showErrorModal } from '../../../src/components/NotificationManager';
 import { confirm, dialog } from '../../../src/core/dialog';
 import { toast } from '../../../src/core/toast';
 import { apiClient } from '../../../src/services/api';
@@ -61,12 +56,6 @@ const holdSprings = () => {
   };
 };
 
-const Blocker = ({ up }: { up: boolean }) => (
-  <BottomSheet mode="modal" visible={up} testID="blocker">
-    <Text>Blocker body</Text>
-  </BottomSheet>
-);
-
 const modals = () => screen.UNSAFE_getAllByType(Modal);
 
 let mock: MockAdapter;
@@ -79,7 +68,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => dialog.dismissAll());
-  act(() => hideModal());
   mock.restore();
   jest.useRealTimers();
   jest.restoreAllMocks();
@@ -113,58 +101,6 @@ describe('T-565 a confirm() during the dialog fade-out', () => {
     await act(async () => {});
     expect(modals().map((m) => m.props.visible)).toEqual([true]);
     expect(screen.getByText('End the trip?')).toBeTruthy();
-  });
-});
-
-describe('T-565 NotificationManager legacy modal', () => {
-  const Host = ({ sheetUp }: { sheetUp: boolean }) => (
-    <ThemeProvider>
-      <NotificationManager>
-        <Blocker up={sheetUp} />
-      </NotificationManager>
-    </ThemeProvider>
-  );
-
-  it('stays rendered (hidden) after hideModal and keeps its turn until iOS dismissed it', async () => {
-    const view = render(<Host sheetUp={false} />);
-    await act(async () => {});
-    act(() => showErrorModal('Could not book'));
-    await act(async () => {});
-    expect(screen.getByText('Could not book')).toBeTruthy();
-
-    act(() => hideModal());
-    view.rerender(<Host sheetUp />);
-    await act(async () => {});
-    // Before T-565 the ModernModal unmounted here and the sheet presented at once.
-    const hidden = modals().filter((m) => m.props.visible === false);
-    expect(hidden).toHaveLength(1);
-    expect(screen.queryByText('Blocker body')).toBeNull();
-
-    act(() => hidden[0].props.onDismiss());
-    await act(async () => {});
-    expect(screen.getByText('Blocker body')).toBeTruthy();
-  });
-
-  it('ModernModal starts its entrance when it gets its turn, not when it is asked for', async () => {
-    const springs = holdSprings();
-    const spring = jest.spyOn(Animated, 'spring');
-    const config = { visible: true, type: 'error' as const, title: 'Could not book' };
-    const Both = ({ sheetUp }: { sheetUp: boolean }) => (
-      <ThemeProvider>
-        <Blocker up={sheetUp} />
-        <ModernModal config={config} onClose={() => undefined} />
-      </ThemeProvider>
-    );
-    const view = render(<Both sheetUp />);
-    await act(async () => {});
-    expect(spring).not.toHaveBeenCalled();
-
-    view.rerender(<Both sheetUp={false} />);
-    await act(async () => {});
-    springs.finish();
-    await act(async () => {});
-    expect(screen.getByText('Could not book')).toBeTruthy();
-    expect(spring).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ toValue: 1 }));
   });
 });
 

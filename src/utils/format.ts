@@ -35,13 +35,19 @@ const currencyLabel = (currency?: string | null): string => {
 /** Typographic minus (U+2212) for debits; never a hyphen. */
 export const MINUS = '\u2212';
 
-/** Absolute amount as `Rs 1,250` / `Rs 412.50`, plus whether it rounds to non-zero. */
+/**
+ * [UI-R19] No-break space (U+00A0) between `Rs` and the number, so a wrapping line never leaves
+ * `Rs` at the end of one line and the amount on the next.
+ */
+export const NBSP = '\u00A0';
+
+/** Absolute amount as `Rs 1,250` / `Rs 412.50` (no-break space), plus whether it rounds to non-zero. */
 const unsignedMoney = (n: number, currency?: string | null): { text: string; nonZero: boolean } => {
   const cents = Math.round(Math.abs(n) * 100);
   const whole = Math.floor(cents / 100);
   const fraction = cents % 100;
   const body = groupThousands(String(whole)) + (fraction ? `.${String(fraction).padStart(2, '0')}` : '');
-  return { text: `${currencyLabel(currency)} ${body}`, nonZero: cents > 0 };
+  return { text: `${currencyLabel(currency)}${NBSP}${body}`, nonZero: cents > 0 };
 };
 
 /**

@@ -28,7 +28,7 @@ describe('RequestSheetContent', () => {
       estimatedDistanceKm: 2.36,
       estimatedPickupMin: 6,
     });
-    expect(getByTestId('incoming-request-fare').props.children).toBe('Rs 412.50');
+    expect(getByTestId('incoming-request-fare').props.children).toBe('Rs\u00A0412.50');
     getByText('Cash');
     expect(getByTestId('incoming-request-passenger').props.children).toBe('Ayesha');
     expect(getByTestId('incoming-request-rating').props.children).toBe('4.8');
@@ -43,15 +43,15 @@ describe('RequestSheetContent', () => {
   });
 
   it('R2 #4: "You keep" from the server split; no rate → net only; no driver_net → hidden', () => {
-    expect(shareLine({ driverNet: 362, commissionRate: 20 })).toBe('You keep Rs 362 · 20% commission');
-    expect(shareLine({ driverNet: 362, commissionRate: 12.5 })).toBe('You keep Rs 362 · 12.5% commission');
-    expect(shareLine({ driverNet: 362, commissionRate: null })).toBe('You keep Rs 362');
+    expect(shareLine({ driverNet: 362, commissionRate: 20 })).toBe('You keep Rs\u00A0362 · 20% commission');
+    expect(shareLine({ driverNet: 362, commissionRate: 12.5 })).toBe('You keep Rs\u00A0362 · 12.5% commission');
+    expect(shareLine({ driverNet: 362, commissionRate: null })).toBe('You keep Rs\u00A0362');
     expect(shareLine({ driverNet: null, commissionRate: 20 })).toBeNull();
     const { getByTestId, queryByTestId, rerender } = renderContent({
       driverNet: 362,
       commissionRate: 20,
     });
-    expect(getByTestId('incoming-request-share').props.children).toBe('You keep Rs 362 · 20% commission');
+    expect(getByTestId('incoming-request-share').props.children).toBe('You keep Rs\u00A0362 · 20% commission');
     rerender(<RequestSheetContent request={makePendingRequest()} moreCount={0} compact={false} />);
     expect(queryByTestId('incoming-request-share')).toBeNull();
   });
@@ -81,7 +81,7 @@ describe('RequestSheetContent', () => {
     );
     getByTestId('incoming-request-offer');
     getByText('Passenger offer');
-    expect(getByTestId('incoming-request-server-fare').props.children).toBe('App fare Rs 152');
+    expect(getByTestId('incoming-request-server-fare').props.children).toBe('App fare Rs\u00A0152');
     expect(getByTestId('incoming-request-more').props).toBeTruthy();
     getByText('+2 more');
   });
@@ -176,7 +176,7 @@ describe('RequestSheetContent', () => {
     expect(getByTestId('incoming-request-passenger').props.children).toBe('Ayesha');
     expect(getByTestId('incoming-request-pickup').props.numberOfLines).toBe(1);
     expect(getByTestId('incoming-request-share').props.children).toBe(
-      'You keep Rs 300 · 20% commission · App fare Rs 152',
+      'You keep Rs\u00A0300 · 20% commission · App fare Rs\u00A0152',
     );
   });
 });

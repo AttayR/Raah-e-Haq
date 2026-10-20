@@ -10,8 +10,8 @@ export const BOOKING_COPY = localizedCopy({
   vehicleTypesFailed: 'Could not load vehicle types.',
   estimateLoading: 'Calculating fare…',
   estimateFailed: 'Could not calculate the fare.',
-  // T-311: the booking price is the server's quote. T-521: the footnote is `fare.lockNote` (BE-82
-  // locks the fare when a driver accepts).
+  // T-311: the booking price is the server's quote (BE-82 locks the fare when a driver accepts;
+  // the FareTag is the lock note).
   estimatedTotal: 'Estimated total',
   /** UI-R10 (§12.5 [UI-R5]): the sticky footer names the action, the tier and the fare. */
   requestWithFare: (vehicle: string, fare: string) => `Request ${vehicle} · ${fare}`,

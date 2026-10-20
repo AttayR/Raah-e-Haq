@@ -55,29 +55,29 @@ class WebSocketService {
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        logger.debug(`🔌 Connected to ride updates for ride ${rideId}`);
+        logger.debug(`Connected to ride updates for ride ${rideId}`);
         this.reconnectAttempts.set(connectionId, 0);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          logger.debug(`📨 Received ride update:`, data);
+          logger.debug(`Received ride update:`, data);
           onEvent(data as RideUpdateEvent);
         } catch (error) {
-          logger.error('❌ Error parsing WebSocket message:', error);
+          logger.error('Error parsing WebSocket message:', error);
         }
       };
 
       ws.onclose = (event) => {
-        logger.debug(`🔌 WebSocket closed for ride ${rideId}:`, event.code, event.reason);
+        logger.debug(`WebSocket closed for ride ${rideId}:`, event.code, event.reason);
         this.handleReconnect(connectionId, () => 
           this.subscribeToRideUpdates(rideId, userType, onEvent)
         );
       };
 
       ws.onerror = (error) => {
-        logger.error(`❌ WebSocket error for ride ${rideId}:`, error);
+        logger.error(`WebSocket error for ride ${rideId}:`, error);
       };
 
       this.connections.set(connectionId, ws);
@@ -85,7 +85,7 @@ class WebSocketService {
       
       return connectionId;
     } catch (error) {
-      logger.error('❌ Failed to subscribe to ride updates:', error);
+      logger.error('Failed to subscribe to ride updates:', error);
       throw error;
     }
   }
@@ -108,29 +108,29 @@ class WebSocketService {
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        logger.debug(`🔌 Connected to driver requests for driver ${driverId}`);
+        logger.debug(`Connected to driver requests for driver ${driverId}`);
         this.reconnectAttempts.set(connectionId, 0);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          logger.debug(`📨 Received driver request:`, data);
+          logger.debug(`Received driver request:`, data);
           onEvent(data as DriverRequestEvent);
         } catch (error) {
-          logger.error('❌ Error parsing WebSocket message:', error);
+          logger.error('Error parsing WebSocket message:', error);
         }
       };
 
       ws.onclose = (event) => {
-        logger.debug(`🔌 WebSocket closed for driver ${driverId}:`, event.code, event.reason);
+        logger.debug(`WebSocket closed for driver ${driverId}:`, event.code, event.reason);
         this.handleReconnect(connectionId, () => 
           this.subscribeToDriverRequests(driverId, latitude, longitude, radius, onEvent)
         );
       };
 
       ws.onerror = (error) => {
-        logger.error(`❌ WebSocket error for driver ${driverId}:`, error);
+        logger.error(`WebSocket error for driver ${driverId}:`, error);
       };
 
       this.connections.set(connectionId, ws);
@@ -138,7 +138,7 @@ class WebSocketService {
       
       return connectionId;
     } catch (error) {
-      logger.error('❌ Failed to subscribe to driver requests:', error);
+      logger.error('Failed to subscribe to driver requests:', error);
       throw error;
     }
   }
@@ -157,29 +157,29 @@ class WebSocketService {
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        logger.debug(`🔌 Connected to notifications for user ${userId}`);
+        logger.debug(`Connected to notifications for user ${userId}`);
         this.reconnectAttempts.set(connectionId, 0);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          logger.debug(`📨 Received notification:`, data);
+          logger.debug(`Received notification:`, data);
           onEvent(data as NotificationEvent);
         } catch (error) {
-          logger.error('❌ Error parsing notification message:', error);
+          logger.error('Error parsing notification message:', error);
         }
       };
 
       ws.onclose = (event) => {
-        logger.debug(`🔌 WebSocket closed for notifications ${userId}:`, event.code, event.reason);
+        logger.debug(`WebSocket closed for notifications ${userId}:`, event.code, event.reason);
         this.handleReconnect(connectionId, () => 
           this.subscribeToNotifications(userId, onEvent)
         );
       };
 
       ws.onerror = (error) => {
-        logger.error(`❌ WebSocket error for notifications ${userId}:`, error);
+        logger.error(`WebSocket error for notifications ${userId}:`, error);
       };
 
       this.connections.set(connectionId, ws);
@@ -187,7 +187,7 @@ class WebSocketService {
       
       return connectionId;
     } catch (error) {
-      logger.error('❌ Failed to subscribe to notifications:', error);
+      logger.error('Failed to subscribe to notifications:', error);
       throw error;
     }
   }
@@ -200,7 +200,7 @@ class WebSocketService {
       this.connections.delete(connectionId);
       this.eventListeners.delete(connectionId);
       this.reconnectAttempts.delete(connectionId);
-      logger.debug(`🔌 Unsubscribed from ${connectionId}`);
+      logger.debug(`Unsubscribed from ${connectionId}`);
     }
   }
 
@@ -210,7 +210,7 @@ class WebSocketService {
       // Intentional close (logout): detach onclose so it does not schedule a reconnect.
       ws.onclose = null;
       ws.close();
-      logger.debug(`🔌 Closed connection ${connectionId}`);
+      logger.debug(`Closed connection ${connectionId}`);
     });
     this.connections.clear();
     this.eventListeners.clear();
@@ -223,18 +223,18 @@ class WebSocketService {
     
     if (attempts < this.maxReconnectAttempts) {
       const delay = this.reconnectDelay * Math.pow(2, attempts); // Exponential backoff
-      logger.debug(`🔄 Reconnecting ${connectionId} in ${delay}ms (attempt ${attempts + 1})`);
+      logger.debug(`Reconnecting ${connectionId} in ${delay}ms (attempt ${attempts + 1})`);
       
       setTimeout(async () => {
         try {
           await reconnectFn();
         } catch (error) {
-          logger.error(`❌ Reconnection failed for ${connectionId}:`, error);
+          logger.error(`Reconnection failed for ${connectionId}:`, error);
           this.reconnectAttempts.set(connectionId, attempts + 1);
         }
       }, delay);
     } else {
-      logger.error(`❌ Max reconnection attempts reached for ${connectionId}`);
+      logger.error(`Max reconnection attempts reached for ${connectionId}`);
     }
   }
 
@@ -260,7 +260,7 @@ class WebSocketService {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     } else {
-      logger.warn(`⚠️ WebSocket ${connectionId} is not open`);
+      logger.warn(`WebSocket ${connectionId} is not open`);
     }
   }
 

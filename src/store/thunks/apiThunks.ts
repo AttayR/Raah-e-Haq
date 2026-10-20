@@ -122,7 +122,7 @@ export const loginUser = createAsyncThunk<AuthSession, LoginRequest, ThunkConfig
   async (credentials, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
-      logger.debug('🔄 Redux Thunk - Starting user login...');
+      logger.debug('Redux Thunk - Starting user login...');
       const data = unwrap(await apiService.login(credentials));
       const user = requireUser(data.user);
 
@@ -130,7 +130,7 @@ export const loginUser = createAsyncThunk<AuthSession, LoginRequest, ThunkConfig
       if (!(await storeNewSession({ ...data, user }, startedIn))) {
         return rejectWithValue(staleSessionRejection());
       }
-      logger.debug('✅ Redux Thunk - Login successful');
+      logger.debug('Redux Thunk - Login successful');
 
       return { user };
     } catch (error) {
@@ -144,9 +144,9 @@ export const registerUser = createAsyncThunk<User, RegisterRequest, ThunkConfig>
   'auth/registerUser',
   async (userData, { rejectWithValue }) => {
     try {
-      logger.debug('🔄 Redux Thunk - Starting user registration...');
+      logger.debug('Redux Thunk - Starting user registration...');
       const data = unwrap(await apiService.register(userData));
-      logger.debug('✅ Redux Thunk - Registration successful');
+      logger.debug('Redux Thunk - Registration successful');
       return requireUser(data.user);
     } catch (error) {
       logApiFailure('registerUser failed', error);
@@ -248,10 +248,10 @@ export const sendOtp = createAsyncThunk<OtpSentInfo, string, ThunkConfig>(
   'auth/sendOtp',
   async (phone, { rejectWithValue }) => {
     try {
-      logger.debug('🔄 Redux Thunk - Starting OTP send process...');
+      logger.debug('Redux Thunk - Starting OTP send process...');
       const body = await apiService.sendOtp(phone);
       const data = unwrap(body);
-      logger.debug('✅ Redux Thunk - OTP sent; expires in', data.expires_in, 'seconds');
+      logger.debug('Redux Thunk - OTP sent; expires in', data.expires_in, 'seconds');
       // The local backend may echo otp_code (APP_ENV=local + debug). It is dropped here so
       // it never reaches Redux, redux-persist, the UI or the logs (AUTH-02, INF-05).
       // The message is kept: it is the same for every number and never claims a code was sent.
@@ -273,14 +273,14 @@ export const verifyOtp = createAsyncThunk<AuthSession, VerifyOtpRequest, ThunkCo
   async (otpData, { rejectWithValue }) => {
     const startedIn = currentSessionEpoch();
     try {
-      logger.debug('🔄 Redux Thunk - Starting OTP verification process...');
+      logger.debug('Redux Thunk - Starting OTP verification process...');
       const data = unwrap(await apiService.verifyOtp(otpData));
       const user = requireUser(data.user);
 
       if (!(await storeNewSession({ ...data, user }, startedIn))) {
         return rejectWithValue(staleSessionRejection());
       }
-      logger.debug('✅ Redux Thunk - OTP verification successful');
+      logger.debug('Redux Thunk - OTP verification successful');
 
       return { user };
     } catch (error) {

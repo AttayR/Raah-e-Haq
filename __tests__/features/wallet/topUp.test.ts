@@ -134,9 +134,9 @@ describe('validateTopUpForm', () => {
     const cfg = config({ daily_remaining: 1500 });
     expect(validateTopUpForm(values({ amount: '' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'Enter an amount.' } });
     expect(validateTopUpForm(values({ amount: '50.5' }), cfg)).toMatchObject({ ok: false, errors: { amount: expect.stringContaining('whole rupee') } });
-    expect(validateTopUpForm(values({ amount: '99' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'The minimum top-up is Rs 100.' } });
-    expect(validateTopUpForm(values({ amount: '30000' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'The most you can add at once is Rs 25,000.' } });
-    expect(validateTopUpForm(values({ amount: '2000' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'You can add up to Rs 1,500 more today.' } });
+    expect(validateTopUpForm(values({ amount: '99' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'The minimum top-up is Rs\u00A0100.' } });
+    expect(validateTopUpForm(values({ amount: '30000' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'The most you can add at once is Rs\u00A025,000.' } });
+    expect(validateTopUpForm(values({ amount: '2000' }), cfg)).toMatchObject({ ok: false, errors: { amount: 'You can add up to Rs\u00A01,500 more today.' } });
     expect(validateTopUpForm(values({ amount: '1500' }), cfg).ok).toBe(true);
   });
 

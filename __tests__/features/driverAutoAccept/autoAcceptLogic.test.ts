@@ -86,8 +86,8 @@ describe('steppers from the server limits', () => {
 describe('Drive row subtitle (§7.1)', () => {
   it('covers never set, off with settings, on online, on offline and a server refusal', () => {
     expect(autoAcceptSubtitle(settings(), false)).toBe('Accept matching rides for you');
-    expect(autoAcceptSubtitle(settings({ min_fare: 300, max_pickup_km: 1.5 }), true)).toBe('Off · Rs 300+ · 1.5 km');
-    expect(autoAcceptSubtitle(settings({ enabled: true, min_fare: 300 }), true)).toBe('Rs 300+ · up to 2.0 km · Car, Car AC');
+    expect(autoAcceptSubtitle(settings({ min_fare: 300, max_pickup_km: 1.5 }), true)).toBe('Off · Rs\u00A0300+ · 1.5 km');
+    expect(autoAcceptSubtitle(settings({ enabled: true, min_fare: 300 }), true)).toBe('Rs\u00A0300+ · up to 2.0 km · Car, Car AC');
     expect(autoAcceptSubtitle(settings({ enabled: true, min_fare: 300 }), false)).toBe('On · starts when you go online');
     expect(
       autoAcceptSubtitle(settings({ available: false, unavailable_code: 'X', unavailable_message: 'Server says no' }), true),

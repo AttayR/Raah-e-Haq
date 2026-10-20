@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: space[8] },
   body: { paddingHorizontal: space[4], gap: space[4], width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
   hero: { alignItems: 'center', gap: space[2], paddingVertical: space[4] },
-  heroIcon: { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  heroIcon: { width: componentTokens.wallet.detailIcon, height: componentTokens.wallet.detailIcon, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3] },
   rowLabel: { flexShrink: 0, maxWidth: '45%' },
   rowValue: { flex: 1, minWidth: 0 },

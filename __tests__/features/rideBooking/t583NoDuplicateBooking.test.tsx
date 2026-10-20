@@ -10,7 +10,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import rideService from '../../../src/services/rideService';
-import * as modals from '../../../src/components/NotificationManager';
+import { dialog, dialogStore } from '../../../src/core/dialog';
 import { toast, toastStore, useScreenToast } from '../../../src/core/toast';
 import { resetScreenToasts } from '../../../src/core/toast/screenToast';
 import { openActiveBooking, RideRequestRefused, useActiveRideActions } from '../../../src/features/active-ride/hooks';
@@ -35,14 +35,13 @@ const ALREADY_ACTIVE_409 = {
 };
 
 let mock: MockAdapter;
-let showError: jest.SpyInstance;
 
 beforeEach(() => {
   mock = new MockAdapter(apiClient);
-  showError = jest.spyOn(modals, 'showErrorModal').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
+  act(() => dialog.dismissAll());
   mock.restore();
   jest.restoreAllMocks();
   act(() => {
@@ -186,7 +185,7 @@ describe('POST /rides answers (BE-113)', () => {
     expect(refusal).toBeInstanceOf(RideRequestRefused);
     expect((refusal as RideRequestRefused).failure).toMatchObject({ kind: 'already_active', rideId: 202 });
     expect(store.getState().activeRide.ride?.id).toBe(202);
-    expect(showError).not.toHaveBeenCalled();
+    expect(dialogStore.getCurrent()).toBeNull();
     // T-585: the note waits for Booking to show the opened booking, then shows.
     expect(info).not.toHaveBeenCalled();
     expect(toastStore.getCurrent()).toBeNull();
@@ -210,7 +209,7 @@ describe('POST /rides answers (BE-113)', () => {
       await result.current.requestRide(makeRideRequest(), 'key-1').catch(() => undefined);
     });
     expect(store.getState().activeRide.ride).toBeNull();
-    expect(showError).toHaveBeenCalledWith('Ride Request Failed', ALREADY_ACTIVE_409.message, expect.anything());
+    expect(dialogStore.getCurrent()).toMatchObject({ kind: 'alert', title: 'Ride Request Failed', body: ALREADY_ACTIVE_409.message });
   });
 
   it('409 while another live ride is held: that ride stays, no "already have a booking" note', async () => {

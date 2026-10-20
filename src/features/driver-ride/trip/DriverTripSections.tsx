@@ -123,7 +123,7 @@ export function DriverTripPeek({ ride, step, compact, actions, onTargetPress }: 
       ) : null}
       <PersonCard
         variant="plain"
-        // T-414: an unrated rider (0.00 on the server) shows "New rider", not "★ 0.0".
+        // T-414: an unrated rider (0.00 on the server) shows "New rider", not "0.0 stars".
         name={riderNameOf(ride)}
         photoUri={ride.passenger?.profile_image_url ?? null}
         fallbackName={parcelRide ? COPY.senderFallback : COPY.passengerFallback}

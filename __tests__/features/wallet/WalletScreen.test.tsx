@@ -105,8 +105,8 @@ describe('WalletScreen (passenger)', () => {
     releaseWallet();
 
     await waitFor(() => expect(screen.getByTestId('wallet-balance')).toBeTruthy());
-    expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs 1,500');
-    expect(screen.getByTestId('wallet-balance-meta').props.children).toBe('Rs 15,230');
+    expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs\u00A01,500');
+    expect(screen.getByTestId('wallet-balance-meta').props.children).toBe('Rs\u00A015,230');
     expect(screen.getByText('Rides are paid in cash to the driver.')).toBeTruthy();
     // No fake funds or payment methods; can_top_up is false here, so no Add money either.
     expect(screen.queryByText(/Add Funds|Payment Methods|1200/)).toBeNull();
@@ -116,14 +116,14 @@ describe('WalletScreen (passenger)', () => {
 
     await waitFor(() => expect(screen.getByTestId('wallet-transaction-1')).toBeTruthy());
     const credit = screen.getByTestId('wallet-transaction-1-amount');
-    expect(credit.props.children).toBe('+Rs 500');
+    expect(credit.props.children).toBe('+Rs\u00A0500');
     expect(StyleSheet.flatten(credit.props.style).color).toBe(LightTheme.colors.success);
-    expect(screen.getByTestId('wallet-transaction-2-amount').props.children).toBe('Rs 300');
+    expect(screen.getByTestId('wallet-transaction-2-amount').props.children).toBe('Rs\u00A0300');
     // UI-R15: the app's own sentence-case label and the time only (no ride code in the row).
     expect(within(screen.getByTestId('wallet-transaction-2')).getByText('Ride payment')).toBeTruthy();
     expect(within(screen.getByTestId('wallet-transaction-2')).queryByText(/RH-TEST1/)).toBeNull();
     const reversed = screen.getByTestId('wallet-transaction-3-amount');
-    expect(reversed.props.children).toBe(`${MINUS}Rs 50`);
+    expect(reversed.props.children).toBe(`${MINUS}Rs\u00A050`);
     expect(StyleSheet.flatten(reversed.props.style).textDecorationLine).toBe('line-through');
 
     fireEvent.press(screen.getByTestId('wallet-transaction-1'));
@@ -136,7 +136,7 @@ describe('WalletScreen (passenger)', () => {
     renderWallet();
     await waitFor(() => expect(screen.getByTestId('wallet-transactions-empty')).toBeTruthy());
     expect(screen.getByText('No transactions yet')).toBeTruthy();
-    expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs 0');
+    expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs\u00A00');
   });
 
   it('shows an error with retry when the wallet cannot be loaded', async () => {
@@ -149,7 +149,7 @@ describe('WalletScreen (passenger)', () => {
 
     mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: 20 })));
     fireEvent.press(screen.getByTestId('wallet-error-retry'));
-    await waitFor(() => expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs 20'));
+    await waitFor(() => expect(screen.getByTestId('wallet-balance').props.children).toBe('Rs\u00A020'));
   });
 
   it('filters by direction and loads the next page on scroll', async () => {
@@ -185,8 +185,8 @@ describe('WalletScreen (driver)', () => {
     mock.onGet('/wallet/transactions').reply(200, envelope([rawTransaction()], pageInfo(1, 1, 1)));
     renderWallet('driver');
     await waitFor(() => expect(screen.getByTestId('wallet-commission-card')).toBeTruthy());
-    expect(screen.getByTestId('wallet-balance').props.children).toBe(`${MINUS}Rs 116`);
-    expect(screen.getByTestId('wallet-commission-owed').props.children).toBe('Rs 116');
+    expect(screen.getByTestId('wallet-balance').props.children).toBe(`${MINUS}Rs\u00A0116`);
+    expect(screen.getByTestId('wallet-commission-owed').props.children).toBe('Rs\u00A0116');
     fireEvent.press(screen.getByTestId('wallet-pay-commission'));
     expect(mockNavigate).toHaveBeenCalledWith('PayCommission', { owed: 116, currency: 'PKR' });
     fireEvent.press(screen.getByTestId('wallet-open-settlements'));

@@ -1,5 +1,5 @@
 /**
- * The one product-dialog API (DESIGN_SYSTEM §5.15, UI-R3). Replaces `Alert.alert` for product
+ * The one product-dialog API (DESIGN_SYSTEM §5.15, UI-R3). Replaces the native alert for product
  * confirmations so dialogs follow the theme (native Alert stays only for OS-level prompts).
  * A module-level queue rendered by `DialogHost` (mounted once by NotificationManager); callable
  * from screens (`useConfirm()`), hooks and thunks. One dialog is visible at a time.

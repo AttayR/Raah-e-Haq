@@ -4,7 +4,7 @@
  *   the queue, so other sheets opening and closing never re-render it.
  * - A drag or snapTo that lands on a snap during a close clears the `closing` guard (or finishes
  *   the close when the parent still wants the sheet closed); before, the sheet stayed up for good.
- * - The root Dialog, the legacy ModernModal and the driver cancel sheet (a kit sheet since T-573) take their turn too, and
+ * - The root Dialog and the driver cancel sheet (a kit sheet since T-573) take their turn too, and
  *   on iOS keep it until their dismiss animation has finished.
  */
 import React, { Profiler, createRef } from 'react';
@@ -16,7 +16,6 @@ import { BottomSheet, type BottomSheetHandle } from '../../../src/components/ui'
 import { Dialog, DialogHost } from '../../../src/components/ui/Dialog';
 import { MODAL_DISMISS_FALLBACK_MS, modalQueue, useModalTurn } from '../../../src/components/ui/modalQueue';
 import { CancelReasonSheet } from '../../../src/components/driver/CancelReasonSheet';
-import ModernModal from '../../../src/components/ModernModal';
 import { confirm, dialog } from '../../../src/core/dialog';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -269,24 +268,5 @@ describe('T-562 raw Modals take their turn', () => {
     springs.finish();
     await act(async () => {});
     expect(screen.getByTestId('cancel-reason-sheet')).toBeTruthy();
-  });
-
-  it('the legacy error modal waits for the sheet that is up', async () => {
-    const springs = holdSprings();
-    const config = { visible: true, type: 'error' as const, title: 'Could not book' };
-    const Both = ({ sheetUp }: { sheetUp: boolean }) => (
-      <ThemeProvider>
-        <Blocker up={sheetUp} />
-        <ModernModal config={config} onClose={noop} />
-      </ThemeProvider>
-    );
-    const view = render(<Both sheetUp />);
-    await act(async () => {});
-    expect(screen.queryByText('Could not book')).toBeNull();
-    view.rerender(<Both sheetUp={false} />);
-    await act(async () => {});
-    springs.finish();
-    await act(async () => {});
-    expect(screen.getByText('Could not book')).toBeTruthy();
   });
 });

@@ -195,7 +195,7 @@ describe('2. a refused parcel tells the sender why', () => {
 describe('3. the sender at the pickup', () => {
   it('is told to hand the parcel over and pay the locked fare', () => {
     showPanel(parcelRide(parcelBlock({ status: 'arrived' }), { status: 'arrived', accepted_fare: '180.00', total_fare: 170 }));
-    expect(screen.getByTestId('active-ride-subtitle').props.children).toBe('Hand the parcel to the rider and pay Rs 180 in cash.');
+    expect(screen.getByTestId('active-ride-subtitle').props.children).toBe('Hand the parcel to the rider and pay Rs\u00A0180 in cash.');
     expect(screen.queryByText(/^Meet your driver at/)).toBeNull();
   });
 

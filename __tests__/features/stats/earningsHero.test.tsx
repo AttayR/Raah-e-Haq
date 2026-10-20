@@ -83,11 +83,11 @@ afterEach(() => {
 describe('EarningsHero (§1.1)', () => {
   it('shows the big net, the three-row equation without a rate, and Trips + Distance only', async () => {
     render(hero(totals()));
-    expect((await screen.findByTestId('earnings-total')).props.children).toBe('Rs 1,048');
+    expect((await screen.findByTestId('earnings-total')).props.children).toBe('Rs\u00A01,048');
     expect(screen.getByTestId('earnings-period-caption').props.children).toBe('Mon, 19 Oct');
-    expect(screen.getByTestId('earnings-fares').props.children).toBe('Rs 1,310');
-    expect(screen.getByTestId('earnings-commission').props.children).toBe(`${MINUS} Rs 262`);
-    expect(screen.getByTestId('earnings-net').props.children).toBe('Rs 1,048');
+    expect(screen.getByTestId('earnings-fares').props.children).toBe('Rs\u00A01,310');
+    expect(screen.getByTestId('earnings-commission').props.children).toBe(`${MINUS} Rs\u00A0262`);
+    expect(screen.getByTestId('earnings-net').props.children).toBe('Rs\u00A01,048');
     // The headline says "You keep" once; the equation's total row is "Net".
     expect(screen.getAllByText('You keep')).toHaveLength(1);
     expect(screen.getByText('Net')).toBeTruthy();
@@ -107,8 +107,8 @@ describe('EarningsHero (§1.1)', () => {
   it('shows the rate, a booking-fee row and Online only when the server sends them (BE-123, BE-124)', async () => {
     render(hero(totals({ commissionRate: 12.5, commissionAmount: 162, bookingFees: 100, onlineMinutes: 125 }), 'week'));
     expect(await screen.findByText('Commission 12.5%')).toBeTruthy();
-    expect(screen.getByTestId('earnings-commission').props.children).toBe(`${MINUS} Rs 162`);
-    expect(screen.getByTestId('earnings-booking-fee').props.children).toBe(`${MINUS} Rs 100`);
+    expect(screen.getByTestId('earnings-commission').props.children).toBe(`${MINUS} Rs\u00A0162`);
+    expect(screen.getByTestId('earnings-booking-fee').props.children).toBe(`${MINUS} Rs\u00A0100`);
     expect(screen.getByTestId('earnings-online').props.children).toBe('2 h 05 min');
     expect(screen.getByTestId('earnings-period-caption').props.children).toBe('19 Oct – 25 Oct');
     expect(
@@ -118,7 +118,7 @@ describe('EarningsHero (§1.1)', () => {
 
   it('zero trips: Rs 0, a no-trips line instead of the equation, Trips 0 and 0 km', async () => {
     render(hero(totals({ trips: 0, grossFares: 0, commission: 0, earnings: 0, distanceKm: 0 }), 'month'));
-    expect((await screen.findByTestId('earnings-total')).props.children).toBe('Rs 0');
+    expect((await screen.findByTestId('earnings-total')).props.children).toBe('Rs\u00A00');
     expect(screen.getByText('No trips this month yet.')).toBeTruthy();
     expect(screen.queryByTestId('earnings-breakdown')).toBeNull();
     expect(screen.getByTestId('earnings-trips').props.children).toBe('0');
@@ -127,7 +127,7 @@ describe('EarningsHero (§1.1)', () => {
 
   it('negative net keeps its sign in the same colour (never clamped)', async () => {
     render(hero(totals({ trips: 1, grossFares: 0, commission: 40, earnings: -40 })));
-    expect((await screen.findByTestId('earnings-total')).props.children).toBe(`${MINUS}Rs 40`);
+    expect((await screen.findByTestId('earnings-total')).props.children).toBe(`${MINUS}Rs\u00A040`);
     const style = StyleSheet.flatten(screen.getByTestId('earnings-total').props.style);
     expect(style.color).toBe(lightColors.heroText);
   });
@@ -191,7 +191,7 @@ describe('amount owed card (§2)', () => {
   it('owed with top-up: amount, provider caption, Pay prefilled and Wallet', async () => {
     mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: -360, amount_owed: 360, commission_owed: 360, can_top_up: true, ...providers })));
     card();
-    expect((await screen.findByTestId('earnings-owed-amount')).props.children).toBe('Rs 360');
+    expect((await screen.findByTestId('earnings-owed-amount')).props.children).toBe('Rs\u00A0360');
     expect(screen.getByText('You owe Raah-e-Haq')).toBeTruthy();
     expect(screen.getByText('Commission from your cash trips. Pay with JazzCash or Easypaisa.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('earnings-owed-pay'));
@@ -219,7 +219,7 @@ describe('amount owed card (§2)', () => {
 
   it('on hold: owed layout without Pay', () => {
     const state = owedCardState(toWallet(rawWallet({ status: 'suspended', balance: -80, amount_owed: 80, can_top_up: true })), false);
-    expect(state).toEqual({ kind: 'onHold', amount: 'Rs 80', body: 'Your wallet is on hold. Contact support.' });
+    expect(state).toEqual({ kind: 'onHold', amount: 'Rs\u00A080', body: 'Your wallet is on hold. Contact support.' });
   });
 
   it('Roman Urdu owed copy', async () => {
@@ -247,13 +247,13 @@ describe('Earnings screen order and period switch', () => {
         <DriverEarningsScreen />
       </ThemeProvider>,
     );
-    expect((await screen.findByTestId('earnings-total')).props.children).toBe('Rs 320');
+    expect((await screen.findByTestId('earnings-total')).props.children).toBe('Rs\u00A0320');
     await screen.findByTestId('earnings-owed');
     fireEvent.press(screen.getByRole('radio', { name: 'Period, This week' }));
     // No skeleton flash: the old hero stays while the week loads.
     expect(screen.queryByTestId('earnings-loading', { includeHiddenElements: true })).toBeNull();
-    expect(screen.getByTestId('earnings-total').props.children).toBe('Rs 320');
+    expect(screen.getByTestId('earnings-total').props.children).toBe('Rs\u00A0320');
     replyWeek([200, envelope(rawEarnings('week', { trips: 5, gross_fares: 1000, commission: 200, earnings: 800 }))]);
-    await waitFor(() => expect(screen.getByTestId('earnings-total').props.children).toBe('Rs 800'));
+    await waitFor(() => expect(screen.getByTestId('earnings-total').props.children).toBe('Rs\u00A0800'));
   });
 });

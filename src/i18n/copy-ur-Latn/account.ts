@@ -116,7 +116,7 @@ export function registerAccountCopy(): void {
   registerCopyTranslation(SETTLEMENT_FORM_ERRORS, 'ur-Latn', {
     amountRequired: 'Jo raqam ada ki woh likhein.',
     amountInvalid: 'Raqam aise likhein jaise 500 ya 500.50.',
-    amountMin: 'Raqam kam az kam Rs 1 ho.',
+    amountMin: 'Raqam kam az kam Rs\u00A01 ho.',
     amountTooHigh: (owed: string) => `Aap ka baqaya ${owed} hai. Itni ya is se kam raqam likhein.`,
     amountMax: 'Raqam bohat zyada hai.',
     referenceRequired: 'Bank transfer ka reference likhein.',

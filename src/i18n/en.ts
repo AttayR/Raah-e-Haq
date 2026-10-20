@@ -1083,7 +1083,6 @@ export const en = {
     offerValueA11y: 'Your offer: {amount}',
     offerReset: 'Use recommended',
     offerOutOfBand: 'Your offer was outside the allowed range. It has been adjusted.',
-    lockNote: 'Your fare is locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.',
     // UI-R9b (UI-R10 polish): under the open breakdown; the FareTag above is the one lock note.
     lockTerms: 'Locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.',
     policyWait: '{free} min free waiting at the pickup, then {rate} a minute.',
@@ -1101,7 +1100,7 @@ export const en = {
     reportAmountPlaceholder: 'For example 400',
     reportAmountInvalid: 'Enter a whole amount in rupees, like 400.',
     reportNote: 'What happened? (optional)',
-    reportNotePlaceholder: 'For example: the driver asked for Rs 100 extra at the drop-off',
+    reportNotePlaceholder: 'For example: the driver asked for Rs\u00A0100 extra at the drop-off',
     reportSubmit: 'Send report',
     reportCancel: 'Not now',
     reportSent: 'Report sent. Pay only {amount}.',
@@ -1674,23 +1673,17 @@ export const en = {
   },
   /** Crash fallbacks of ErrorBoundary and MapErrorBoundary (T-575). */
   errorBoundary: {
-    alertTitle: 'App Error',
     generic: 'Something went wrong. Please try again.',
     appData: 'There was an issue with the app data. Please restart the app.',
     network: 'Network connection issue. Please check your internet connection.',
     auth: 'Authentication error. Please log in again.',
     location: 'Location service error. Please enable location permissions.',
-    ok: 'OK',
-    restart: 'Restart App',
     title: 'Oops! Something went wrong',
-    body: "We're sorry, but something unexpected happened. Please try again.",
-    retry: 'Try Again',
-    mapAlertTitle: 'Map Error',
+    retry: 'Try again',
     mapGeneric: 'There was an issue with the map. Please try again.',
     mapRestart: 'Map loading issue. Please restart the app.',
     mapService: 'Map service error. Please check your internet connection.',
     mapTitle: 'Map Error',
-    mapBody: 'There was an issue loading the map. Please try again.',
   },
   // T-586: the map count chip (map-vehicles.md §4) and the tier nouns it uses.
   nearbyMap: {

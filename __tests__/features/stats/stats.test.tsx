@@ -192,7 +192,7 @@ describe('GET /driver/earnings mapping and format', () => {
     const noRoute = tripRowText(ride, 'PKR', 300);
     expect(noRoute.title).not.toContain('RH-TEST7');
     // No route: the time is the title and line 2 starts at the distance.
-    expect(noRoute).toMatchObject({ title: '10:00 AM', meta: '3 km', split: 'Fare Rs 300 · Commission Rs 60', net: 'Rs 240' });
+    expect(noRoute).toMatchObject({ title: '10:00 AM', meta: '3 km', split: 'Fare Rs\u00A0300 · Commission Rs\u00A060', net: 'Rs\u00A0240' });
 
     const withRoute = tripRowText(
       { ...ride, pickupAddress: 'Liberty Market, Gulberg III, Lahore', dropoffAddress: 'Emporium Mall, Johar Town' },
@@ -230,20 +230,20 @@ describe('DriverEarningsScreen', () => {
     showEarnings();
     await waitFor(() => expect(screen.getByTestId('earnings-empty')).toBeTruthy());
     expect(screen.getByText('No trips today')).toBeTruthy();
-    expect(screen.getByTestId('earnings-total').props.children).toBe('Rs 0');
+    expect(screen.getByTestId('earnings-total').props.children).toBe('Rs\u00A00');
     // No chart for a single day.
     expect(screen.queryByTestId('earnings-chart')).toBeNull();
 
     fireEvent.press(screen.getByRole('radio', { name: 'Period, This week' }));
     await waitFor(() => expect(screen.getByTestId('earnings-ride-7')).toBeTruthy());
-    expect(screen.getByTestId('earnings-total').props.children).toBe('Rs 320');
-    expect(screen.getByTestId('earnings-commission').props.children).toBe('\u2212 Rs 80');
+    expect(screen.getByTestId('earnings-total').props.children).toBe('Rs\u00A0320');
+    expect(screen.getByTestId('earnings-commission').props.children).toBe('\u2212 Rs\u00A080');
     expect(screen.getByTestId('earnings-chart')).toBeTruthy();
     // The busiest day is selected first; the readout sits in the card header.
-    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Tue, 13 Oct: Rs 320, 2 trips');
+    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Tue, 13 Oct: Rs\u00A0320, 2 trips');
     fireEvent(screen.getByTestId('earnings-chart-plot'), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
-    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Mon, 12 Oct: Rs 0, No trips');
-    expect(screen.getByTestId('earnings-ride-7-net').props.children).toBe('Rs 240');
+    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Mon, 12 Oct: Rs\u00A00, No trips');
+    expect(screen.getByTestId('earnings-ride-7-net').props.children).toBe('Rs\u00A0240');
   });
 
   it('a ride row opens its RideDetails (T-501)', async () => {
@@ -259,7 +259,7 @@ describe('DriverEarningsScreen', () => {
     mock.onGet('/driver/earnings').reply(200, envelope(rawEarnings('day')));
     mock.onGet('/wallet').reply(200, envelope(rawWallet({ balance: -116, commission_owed: 116, amount_owed: 116 })));
     showEarnings();
-    await waitFor(() => expect(screen.getByTestId('earnings-owed-amount').props.children).toBe('Rs 116'));
+    await waitFor(() => expect(screen.getByTestId('earnings-owed-amount').props.children).toBe('Rs\u00A0116'));
     expect(screen.getAllByText('Earnings').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('earnings-back')).toBeNull();
     fireEvent.press(screen.getByTestId('earnings-owed-wallet'));

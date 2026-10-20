@@ -1,10 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PassengerStackParamList } from '../../../app/navigation/stacks/PassengerStack';
 import LocationSearch, { suggestionAddress } from '../../../components/passenger/LocationSearch';
-import { AppText, Banner, Button, Card, FieldLabel, Header, Icon, Screen, SegmentedControl, TextField } from '../../../components/ui';
+import { AppText, Banner, Button, Card, FieldLabel, Header, Icon, Screen, SegmentedControl, TextField, useStickyFooterBottom } from '../../../components/ui';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { firstFieldMessages, toApiError } from '../../../core/api/errors';
 import { toast } from '../../../core/toast';
@@ -56,7 +55,7 @@ export default function SavedPlaceEditorScreen() {
   const route = useRoute<RouteProp<PassengerStackParamList, 'SavedPlaceEditor'>>();
   const params: SavedPlaceEditorParams = route.params ?? {};
   const editing = params.place ?? null;
-  const insets = useSafeAreaInsets();
+  const footerBottom = useStickyFooterBottom();
   const { theme } = useAppTheme();
 
   const [location, setLocation] = useState<PickedLocation | null>(
@@ -214,7 +213,7 @@ export default function SavedPlaceEditorScreen() {
         style={[
           styles.footer,
           {
-            paddingBottom: Math.max(insets.bottom + layout.bottomActionOffset, layout.bottomActionMinOffset),
+            paddingBottom: footerBottom,
             borderTopColor: theme.colors.border,
             borderTopWidth: theme.borderWidth.hairline,
             backgroundColor: theme.colors.background,

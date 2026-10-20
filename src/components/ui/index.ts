@@ -45,6 +45,7 @@ export * from './SelectField';
 export * from './SelectionControl';
 export * from './Skeleton';
 export * from './StatusBarScrim';
+export * from './stickyFooter';
 export * from './StatTile';
 export * from './Switch';
 export * from './TextField';

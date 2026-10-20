@@ -234,7 +234,7 @@ describe('the form and the booking body', () => {
     );
     expect(errors.receiverName).toMatch(/letters only/);
     expect(errors.receiverPhone).toMatch(/Pakistani mobile/);
-    expect(errors.declaredValue).toBe('We carry parcels worth up to Rs 10,000.');
+    expect(errors.declaredValue).toBe('We carry parcels worth up to Rs\u00A010,000.');
     expect(errors.itemCategory).toBeDefined();
     expect(validateParcelDraft(filled, options)).toEqual({});
   });

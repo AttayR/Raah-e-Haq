@@ -131,7 +131,7 @@ export const SETTLEMENT_KIND_LABEL = localizedCopy({
 export const SETTLEMENT_FORM_ERRORS = localizedCopy({
   amountRequired: 'Enter the amount you paid.',
   amountInvalid: 'Enter an amount like 500 or 500.50.',
-  amountMin: 'The amount must be at least Rs 1.',
+  amountMin: 'The amount must be at least Rs\u00A01.',
   amountTooHigh: (owed: string) => `You owe ${owed}. Enter that amount or less.`,
   amountMax: 'The amount is too large.',
   referenceRequired: 'Enter the bank transfer reference.',

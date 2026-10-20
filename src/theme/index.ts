@@ -17,31 +17,12 @@ import {
   type StatusBarStyle,
 } from './tokens';
 import { textStyles } from './typography';
-import { saffron } from './palette';
 
 /**
- * Pre-T-601 colour names, kept so current screens compile and render as before. Each maps
- * onto a semantic token. New code must not use them; they are removed screen by screen in
- * T-602 onward.
+ * UI-R2 retired the legacy `accent` alias (`accent` is the spec saffron, §1.2, §1.4); UI-R19
+ * retired the pre-T-601 names (`text`, `mutedText`, `secondary`, `disabledFill`, `disabledText`).
  */
-export type LegacyColors = {
-  /** @deprecated use `textPrimary`. */
-  text: string;
-  /** @deprecated use `textSecondary`. */
-  mutedText: string;
-  /**
-   * @deprecated pre-T-601 "orange" secondary (pending status, BrandButton `secondary`).
-   * Saffron is not a button or status colour (§1.2); T-602 Button uses `primarySoft`.
-   */
-  secondary: string;
-  /** @deprecated disabled filled button fill; T-602 Button uses 0.4 opacity instead. */
-  disabledFill: string;
-  /** @deprecated disabled filled button label. */
-  disabledText: string;
-};
-
-/** UI-R2 retired the legacy `accent` alias: `accent` is the spec saffron (§1.2, §1.4). */
-export type ThemeColors = SemanticColors & LegacyColors;
+export type ThemeColors = SemanticColors;
 
 export type AppTheme = {
   mode: ColorMode;
@@ -64,19 +45,11 @@ export type AppTheme = {
   statusBarStyle: StatusBarStyle;
 };
 
-const legacyColors = (c: SemanticColors): LegacyColors => ({
-  text: c.textPrimary,
-  mutedText: c.textSecondary,
-  secondary: saffron[500],
-  disabledFill: c.surfaceAlt,
-  disabledText: c.textSecondary,
-});
-
 export const createTheme = (mode: ColorMode): AppTheme => {
   const semantic = semanticColors[mode];
   return {
     mode,
-    colors: { ...semantic, ...legacyColors(semantic) },
+    colors: semantic,
     typography: textStyles,
     space,
     layout,

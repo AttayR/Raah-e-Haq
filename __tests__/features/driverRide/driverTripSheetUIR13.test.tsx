@@ -97,13 +97,13 @@ describe('header model (DP2, DT2)', () => {
   it('to pickup: "Pick up {first name}", distance and cash fare, the server ETA', () => {
     expect(head('to_pickup', ride({ eta: eta('pickup') }))).toEqual({
       title: 'Pick up Ayesha',
-      subtitle: '2.4 km away · Rs 450 cash',
+      subtitle: '2.4 km away · Rs\u00A0450 cash',
       tone: 'textSecondary',
       icon: null,
       etaMinutes: 6,
     });
     // No ETA: no tile and no distance, never a guess.
-    expect(head('to_pickup', ride())).toMatchObject({ subtitle: 'Rs 450 cash', etaMinutes: null });
+    expect(head('to_pickup', ride())).toMatchObject({ subtitle: 'Rs\u00A0450 cash', etaMinutes: null });
     // An ETA for another target is not this one.
     expect(head('to_pickup', ride({ eta: eta('dropoff') })).etaMinutes).toBeNull();
     expect(head('to_pickup', ride({ passenger: undefined })).title).toBe('Head to pickup');
@@ -120,9 +120,9 @@ describe('header model (DP2, DT2)', () => {
 
   it('on trip: a stop next has no tile (BE-128 targets the drop-off); the drop-off has it', () => {
     const withStop = ride({ status: 'started', stops: [stop()], eta: eta('dropoff') });
-    expect(head('on_trip', withStop)).toMatchObject({ title: 'Head to stop 1', subtitle: 'Collect Rs 450 cash at the drop-off', etaMinutes: null });
+    expect(head('on_trip', withStop)).toMatchObject({ title: 'Head to stop 1', subtitle: 'Collect Rs\u00A0450 cash at the drop-off', etaMinutes: null });
     const toDropoff = ride({ status: 'started', stops: [stop({ status: 'completed' })], eta: eta('dropoff', 12, 5.1) });
-    expect(head('on_trip', toDropoff)).toMatchObject({ title: 'Drop off Ayesha', subtitle: '5.1 km to go · Collect Rs 450 cash', etaMinutes: 12 });
+    expect(head('on_trip', toDropoff)).toMatchObject({ title: 'Drop off Ayesha', subtitle: '5.1 km to go · Collect Rs\u00A0450 cash', etaMinutes: 12 });
   });
 
   it('offline replaces the subtitle in warning and hides the tile; weak GPS keeps the tile', () => {
@@ -138,7 +138,7 @@ describe('header model (DP2, DT2)', () => {
 
   it('Roman Urdu', () => {
     setLocale('ur-Latn');
-    expect(head('to_pickup', ride({ eta: eta('pickup') }))).toMatchObject({ title: 'Ayesha ko pick karein', subtitle: '2.4 km door · Rs 450 cash' });
+    expect(head('to_pickup', ride({ eta: eta('pickup') }))).toMatchObject({ title: 'Ayesha ko pick karein', subtitle: '2.4 km door · Rs\u00A0450 cash' });
     expect(head('at_pickup', ride({ status: 'arrived' })).title).toBe('Ayesha ka intezar');
   });
 });
@@ -160,12 +160,12 @@ describe('target, ETA, money (TS6.1, TS6.3)', () => {
   it('the money card shows only the fields the server sent (BE-84)', () => {
     const split = ride({ fare: 450, booking_fee: 20, commission_rate: 10, commission_amount: 43, driver_net: 387 } as Partial<RideResource>);
     expect(driverMoneyOf(split)?.rows.map((r) => [r.label, r.value])).toEqual([
-      ['Fare', 'Rs 450'],
+      ['Fare', 'Rs\u00A0450'],
       ['Booking fee (platform)', expect.stringContaining('20')],
       ['Commission (10%)', expect.stringContaining('43')],
-      ['You keep', 'Rs 387'],
+      ['You keep', 'Rs\u00A0387'],
     ]);
-    expect(driverMoneyOf(split)?.caption).toBe('Collect Rs 450 in cash at the drop-off.');
+    expect(driverMoneyOf(split)?.caption).toBe('Collect Rs\u00A0450 in cash at the drop-off.');
     // No split: the fare alone.
     expect(driverMoneyOf(ride())?.rows.map((r) => r.key)).toEqual(['fare']);
     expect(driverMoneyOf(ride({ accepted_fare: undefined, total_fare: undefined as unknown as number }))).toBeNull();
@@ -300,8 +300,8 @@ describe('receipt (DC1, DC3)', () => {
     const onDone = jest.fn();
     renderSheet({ ride: completed(), step: 'summary', onDone });
     await flush();
-    expect(screen.getByTestId('driver-ride-total').props.children).toBe('Rs 450');
-    expect(screen.getByTestId('driver-ride-earnings').props.children).toBe('Rs 405');
+    expect(screen.getByTestId('driver-ride-total').props.children).toBe('Rs\u00A0450');
+    expect(screen.getByTestId('driver-ride-earnings').props.children).toBe('Rs\u00A0405');
     expect(screen.getByText('after 10% commission')).toBeTruthy();
     expect(screen.queryByTestId('driver-ride-breakdown')).toBeNull();
     fireEvent.press(screen.getByTestId('driver-ride-fare-details'));
@@ -371,10 +371,10 @@ describe('receipt (DC1, DC3)', () => {
   });
 
   it('the completion announcement says what to collect and what the driver keeps', () => {
-    expect(driverTripAnnouncement('summary', completed())).toBe('Trip complete. Collect Rs 450 in cash. You keep Rs 405.');
+    expect(driverTripAnnouncement('summary', completed())).toBe('Trip complete. Collect Rs\u00A0450 in cash. You keep Rs\u00A0405.');
     // A parcel was paid at the pickup and a non-cash ride collects nothing: no "Collect" sentence.
-    expect(driverTripAnnouncement('summary', completed({ vehicle_type: 'parcel', is_parcel: true }))).toBe('Trip complete. You keep Rs 405.');
-    expect(driverTripAnnouncement('summary', completed({ payment_method: 'wallet' }))).toBe('Trip complete. You keep Rs 405.');
+    expect(driverTripAnnouncement('summary', completed({ vehicle_type: 'parcel', is_parcel: true }))).toBe('Trip complete. You keep Rs\u00A0405.');
+    expect(driverTripAnnouncement('summary', completed({ payment_method: 'wallet' }))).toBe('Trip complete. You keep Rs\u00A0405.');
     expect(driverTripAnnouncement('at_pickup', ride({ status: 'arrived' }))).toBe("You've arrived. Waiting for Ayesha.");
   });
 });

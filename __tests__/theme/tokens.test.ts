@@ -158,8 +158,6 @@ describe('semantic colours (§1.4)', () => {
         expect(theme.colors[key]).toBe(source[key]);
       }
       expect(theme.colors.accent).toBe('#F75606');
-      expect(theme.colors.text).toBe(source.textPrimary);
-      expect(theme.colors.mutedText).toBe(source.textSecondary);
     }
   });
 
@@ -250,7 +248,7 @@ describe('contrast (§1.5, WCAG 2.1 AA)', () => {
   it('former accent consumers (now primaryText) and the legacy disabled label meet AA', () => {
     for (const theme of [LightTheme, DarkTheme]) {
       expect(contrast(theme.colors.primaryText, theme.colors.surface)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(theme.colors.disabledText, theme.colors.disabledFill)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(theme.colors.textSecondary, theme.colors.surfaceAlt)).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

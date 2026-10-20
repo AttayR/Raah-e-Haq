@@ -162,7 +162,7 @@ describe('wallet (BE-85 amount owed, new ledger types)', () => {
     });
     expect(refused).not.toBeNull();
     const current = dialogStore.getCurrent();
-    expect(current).toMatchObject({ title: 'You owe Rs 200' });
+    expect(current).toMatchObject({ title: 'You owe Rs\u00A0200' });
     await act(async () => {
       if (current) dialog.answer(current.id, true);
     });
@@ -287,7 +287,7 @@ describe('driver request feed (BE-83 offers)', () => {
     );
     screen.getByText('Passenger offer');
     screen.getByText('App fare Rs 152');
-    expect(screen.getByTestId('incoming-request-fare').props.children).toBe('Rs 170');
+    expect(screen.getByTestId('incoming-request-fare').props.children).toBe('Rs\u00A0170');
   });
 
   it('no offer badge for a normal request', () => {
@@ -436,7 +436,7 @@ describe('driver split (BE-84) and cancel fees on ride details', () => {
     expect(ride && driverSplitRows(ride).map((r) => [r.label, r.value])).toEqual([
       ['Booking fee (platform)', formatMoney(-10)],
       ['Commission (12.5%)', formatMoney(-49)],
-      ['Your earnings', 'Rs 341'],
+      ['Your earnings', 'Rs\u00A0341'],
     ]);
   });
 
@@ -448,9 +448,9 @@ describe('driver split (BE-84) and cancel fees on ride details', () => {
   it('a cancel fee is said from each side; nothing charged reads as before', () => {
     const charged = toRide({ id: 14, status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' });
     const free = toRide({ id: 15, status: 'cancelled', cancellation_fee: null });
-    expect(charged && cancellationChargeText(charged, 'passenger')).toBe('A no-show fee of Rs 50 was charged to your wallet.');
+    expect(charged && cancellationChargeText(charged, 'passenger')).toBe('A no-show fee of Rs\u00A050 was charged to your wallet.');
     expect(charged && cancellationChargeText(charged, 'driver')).toBe(
-      'The passenger was charged Rs 50 for this cancellation. Your share shows in your wallet once it is credited.',
+      'The passenger was charged Rs\u00A050 for this cancellation. Your share shows in your wallet once it is credited.',
     );
     expect(free && cancellationChargeText(free, 'passenger')).toBe('Cancelled rides are not charged.');
   });

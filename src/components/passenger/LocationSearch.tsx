@@ -6,7 +6,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
 import { Icon, type IconName } from '../ui/Icon';
 import { useKeyboardReveal } from '../ui/keyboardReveal';
-import { MAX_FONT_SIZE_MULTIPLIER, radius, space, textStyles } from '../../theme';
+import { MAX_FONT_SIZE_MULTIPLIER, borderWidth, radius, space, textStyles } from '../../theme';
 import { LocationSuggestionRow, SuggestionTile, suggestionRowStyles, type MatchedRange } from './LocationSuggestionRow';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 
@@ -298,7 +298,8 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
         style={[
           styles.field,
           { backgroundColor: focused ? c.surface : c.surfaceAlt },
-          focused ? { borderColor: c.focusRing } : styles.fieldIdle,
+          // Idle: the border takes the fill colour, so the field keeps its size when focused.
+          { borderColor: focused ? c.focusRing : c.surfaceAlt },
         ]}
       >
         {glyph ? <Icon name={glyph} size={20} color={glyph === 'locate' ? 'primaryText' : 'textSecondary'} /> : null}
@@ -396,13 +397,12 @@ const styles = StyleSheet.create({
   field: {
     minHeight: 48,
     borderRadius: radius.md,
-    borderWidth: 2,
+    borderWidth: borderWidth.focus,
     paddingHorizontal: space[3],
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[2],
   },
-  fieldIdle: { borderColor: 'transparent' },
   input: { fontSize: textStyles.body.fontSize, fontWeight: textStyles.body.fontWeight, flex: 1, paddingVertical: space[2] },
   banner: {
     flexDirection: 'row',

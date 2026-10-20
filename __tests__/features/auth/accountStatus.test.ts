@@ -134,7 +134,7 @@ describe('theme tokens for outline / disabled controls (QA T-106 dark mode)', ()
     const { colors } = theme;
     expect(contrast(colors.primaryText, colors.surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(colors.primaryText, colors.background)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(colors.disabledText, colors.disabledFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.textSecondary, colors.surfaceAlt)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('dark mode outline controls use primaryText, not the primary fill', () => {

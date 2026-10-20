@@ -1,7 +1,8 @@
 /**
  * T-302 (PAX-23, BE-37): a refused POST /rides shows the server's own reason (for a 422 the
  * field message, not "Validation failed"), is logged as a warning (no red LogBox), and
- * PHONE_NOT_VERIFIED offers phone verification instead of a generic failure.
+ * PHONE_NOT_VERIFIED offers phone verification instead of a generic failure. UI-R19: the
+ * feedback is the themed Dialog (`alert` / `confirm`), no longer the legacy ModernModal.
  */
 import React from 'react';
 import { Provider } from 'react-redux';
@@ -9,20 +10,19 @@ import { act, renderHook } from '@testing-library/react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '../../../src/services/api';
 import { logger } from '../../../src/core/logging/logger';
-import * as modals from '../../../src/components/NotificationManager';
+import { dialog, dialogStore } from '../../../src/core/dialog';
 import { RideRequestRefused, useActiveRideActions } from '../../../src/features/active-ride/hooks';
 import { classifyRideRequestFailure } from '../../../src/features/ride-booking/rideRequestFailure';
 import { envelope, makeRide, makeRideRequest, makeStore } from '../../../test-utils/rideFixtures';
 
 let mock: MockAdapter;
-let showError: jest.SpyInstance;
 
 beforeEach(() => {
   mock = new MockAdapter(apiClient);
-  showError = jest.spyOn(modals, 'showErrorModal').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
+  act(() => dialog.dismissAll());
   mock.restore();
   jest.restoreAllMocks();
 });
@@ -72,11 +72,8 @@ describe('classifyRideRequestFailure', () => {
 });
 
 describe('useActiveRideActions.requestRide success (T-311)', () => {
-  it('opens no "Ride Requested" modal: the ride panel shows the searching stage', async () => {
+  it('opens no "Ride Requested" dialog: the ride panel shows the searching stage', async () => {
     mock.onPost('/rides').reply(201, envelope(makeRide({ id: 31 })));
-    const requestedModal = jest.spyOn(modals, 'showRideRequestedModal').mockImplementation(() => undefined);
-    const successModal = jest.spyOn(modals, 'showSuccessModal').mockImplementation(() => undefined);
-    const modal = jest.spyOn(modals, 'showModal').mockImplementation(() => undefined);
     const result = renderActions();
 
     let ride: unknown;
@@ -85,10 +82,7 @@ describe('useActiveRideActions.requestRide success (T-311)', () => {
     });
 
     expect(ride).toMatchObject({ id: 31 });
-    expect(requestedModal).not.toHaveBeenCalled();
-    expect(successModal).not.toHaveBeenCalled();
-    expect(modal).not.toHaveBeenCalled();
-    expect(showError).not.toHaveBeenCalled();
+    expect(dialogStore.getCurrent()).toBeNull();
   });
 });
 
@@ -106,7 +100,12 @@ describe('useActiveRideActions.requestRide refusals', () => {
     });
 
     expect(thrown).toBeInstanceOf(RideRequestRefused);
-    expect(showError).toHaveBeenCalledWith('Ride Request Failed', 'The selected vehicle type is invalid.', expect.anything());
+    expect(dialogStore.getCurrent()).toMatchObject({
+      kind: 'alert',
+      title: 'Ride Request Failed',
+      body: 'The selected vehicle type is invalid.',
+      confirmLabel: 'OK',
+    });
     expect(debug).toHaveBeenCalledWith('Failed to create ride', expect.objectContaining({ status: 422 }));
     expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
@@ -121,15 +120,47 @@ describe('useActiveRideActions.requestRide refusals', () => {
       await result.current.requestRide(makeRideRequest()).catch(() => undefined);
     });
 
-    expect(showError).toHaveBeenCalledTimes(1);
-    const [title, message, primary, secondary] = showError.mock.calls[0];
-    expect(title).toBe('Verify your phone number');
-    expect(message).toBe('Verify your phone number before requesting a ride.');
-    expect(primary.label).toBe('Verify number');
-    expect(secondary.label).toBe('Not now');
+    const shown = dialogStore.getCurrent();
+    expect(shown).toMatchObject({
+      kind: 'confirm',
+      title: 'Verify your phone number',
+      body: 'Verify your phone number before requesting a ride.',
+      confirmLabel: 'Verify number',
+      cancelLabel: 'Not now',
+    });
     expect(onPhoneNotVerified).not.toHaveBeenCalled();
-    act(() => primary.onPress());
+    await act(async () => dialog.answer(shown?.id ?? '', true));
     expect(onPhoneNotVerified).toHaveBeenCalledTimes(1);
+  });
+
+  it('PHONE_NOT_VERIFIED: "Not now" closes the question without verifying', async () => {
+    mock.onPost('/rides').reply(403, phone403);
+    const onPhoneNotVerified = jest.fn();
+    const result = renderActions(onPhoneNotVerified);
+
+    await act(async () => {
+      await result.current.requestRide(makeRideRequest()).catch(() => undefined);
+    });
+
+    await act(async () => dialog.answer(dialogStore.getCurrent()?.id ?? '', false));
+    expect(dialogStore.getCurrent()).toBeNull();
+    expect(onPhoneNotVerified).not.toHaveBeenCalled();
+  });
+
+  it('PHONE_NOT_VERIFIED without a verify route shows the message with OK', async () => {
+    mock.onPost('/rides').reply(403, phone403);
+    const result = renderActions();
+
+    await act(async () => {
+      await result.current.requestRide(makeRideRequest()).catch(() => undefined);
+    });
+
+    expect(dialogStore.getCurrent()).toMatchObject({
+      kind: 'alert',
+      title: 'Verify your phone number',
+      body: 'Verify your phone number before requesting a ride.',
+      confirmLabel: 'OK',
+    });
   });
 
   it('403 ACCOUNT_* shows no booking modal (the API client routes it to account status)', async () => {
@@ -145,6 +176,6 @@ describe('useActiveRideActions.requestRide refusals', () => {
       await result.current.requestRide(makeRideRequest()).catch(() => undefined);
     });
 
-    expect(showError).not.toHaveBeenCalled();
+    expect(dialogStore.getCurrent()).toBeNull();
   });
 });

@@ -162,7 +162,7 @@ describe('5. "You keep" on the receipt', () => {
     for (const key of ['paddingHorizontal', 'paddingStart', 'paddingEnd', 'paddingLeft', 'paddingRight', 'marginHorizontal'] as const) {
       expect(row[key]).toBe(details[key]);
     }
-    expect(screen.getByTestId('driver-ride-you-keep').props.accessibilityLabel).toBe('You keep, Rs 405, after 10% commission');
+    expect(screen.getByTestId('driver-ride-you-keep').props.accessibilityLabel).toBe('You keep, Rs\u00A0405, after 10% commission');
   });
 });
 

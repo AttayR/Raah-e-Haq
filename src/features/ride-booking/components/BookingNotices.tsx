@@ -7,7 +7,7 @@ import { Button } from '../../../components/ui/Button';
 import { Icon } from '../../../components/ui/Icon';
 import { IconButton } from '../../../components/ui/IconButton';
 import { Screen } from '../../../components/ui/Screen';
-import { radius, space } from '../../../theme';
+import { componentTokens, radius, space } from '../../../theme';
 import type { LocationErrorKind } from '../../../hooks/useNativeLocation';
 import { BOOKING_COPY } from '../copy';
 
@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, paddingVertical: space[3] },
   wait: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] },
   back: { position: 'absolute', top: space[2], start: space[4] },
-  iconCircle: { width: 96, height: 96, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  iconCircle: { width: componentTokens.emptyState.circle, height: componentTokens.emptyState.circle, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   mapPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

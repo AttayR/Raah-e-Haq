@@ -118,9 +118,9 @@ describe('locked receipt labels (T-557)', () => {
     ).rides;
     const row = (ride: typeof locked) => tripRowText(ride, 'PKR', 300);
     expect(row(locked)).toMatchObject({ title: 'Trip', meta: '0.4 km' });
-    expect(row(locked).split).toBe('Fare Rs 300 · Commission Rs 60');
-    expect(row(older)).toMatchObject({ meta: '3 km', split: 'Fare Rs 300 · Commission Rs 60' });
-    expect(row(metered)).toMatchObject({ meta: '3 km', split: 'Fare Rs 300 · Commission Rs 60' });
+    expect(row(locked).split).toBe('Fare Rs\u00A0300 · Commission Rs\u00A060');
+    expect(row(older)).toMatchObject({ meta: '3 km', split: 'Fare Rs\u00A0300 · Commission Rs\u00A060' });
+    expect(row(metered)).toMatchObject({ meta: '3 km', split: 'Fare Rs\u00A0300 · Commission Rs\u00A060' });
     for (const ride of [locked, older, metered]) {
       expect(JSON.stringify(row(ride))).not.toMatch(/Quoted|Locked/);
     }

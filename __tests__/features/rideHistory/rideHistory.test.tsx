@@ -170,17 +170,17 @@ describe('GET /rides mapping', () => {
 
 describe('ride format', () => {
   it('passenger sees the fare, driver the earnings, a cancelled ride "No charge"', () => {
-    expect(rideAmountText(ride(), 'passenger')).toBe('Rs 470');
-    expect(rideAmountText(ride(), 'driver')).toBe('Rs 376');
+    expect(rideAmountText(ride(), 'passenger')).toBe('Rs\u00A0470');
+    expect(rideAmountText(ride(), 'driver')).toBe('Rs\u00A0376');
     expect(rideAmountText(ride({ status: 'cancelled' }), 'passenger')).toBe('No charge');
   });
 
   it('[T-543] a cancelled ride the passenger was charged for shows the fee, not "No charge"', () => {
     const charged = ride({ status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' });
-    expect(rideAmountText(charged, 'passenger')).toBe('Rs 50 fee');
+    expect(rideAmountText(charged, 'passenger')).toBe('Rs\u00A050 fee');
     expect(rideAmountText(ride({ status: 'cancelled', cancellation_fee: 0 }), 'passenger')).toBe('No charge');
     // T-578: the driver sees the fee the passenger paid too (their share is credited separately).
-    expect(rideAmountText(charged, 'driver')).toBe('Rs 50 fee');
+    expect(rideAmountText(charged, 'driver')).toBe('Rs\u00A050 fee');
     expect(rideAmountText(ride({ status: 'cancelled', cancellation_fee: 0 }), 'driver')).toBe('No charge');
   });
 
@@ -328,7 +328,7 @@ describe('RideHistoryScreen', () => {
     expect(screen.queryByText('Johar Town')).toBeNull();
     expect(screen.getAllByText('Iqbal Town, Lahore')).toHaveLength(2);
     expect(screen.getAllByText('+2 stops')).toHaveLength(2);
-    expect(screen.getByTestId('ride-history-row-41-amount').props.children).toBe('Rs 470');
+    expect(screen.getByTestId('ride-history-row-41-amount').props.children).toBe('Rs\u00A0470');
     expect(screen.getByTestId('ride-history-row-42-amount').props.children).toBe('No charge');
     expect(screen.getByTestId('ride-history-end')).toBeTruthy();
 
@@ -354,7 +354,7 @@ describe('RideHistoryScreen', () => {
   it('a driver sees their earnings on each ride', async () => {
     mock.onGet('/rides').reply(200, envelope([rawRide()], pageInfo(1, 1, 1)));
     show(RideHistoryScreen, 'driver');
-    expect((await screen.findByTestId('ride-history-row-41-amount')).props.children).toBe('Rs 376');
+    expect((await screen.findByTestId('ride-history-row-41-amount')).props.children).toBe('Rs\u00A0376');
   });
 
   it('shows the error state with retry', async () => {
@@ -405,7 +405,7 @@ describe('RideDetailsScreen', () => {
       show(RideDetailsScreen);
       expect(await screen.findByTestId('ride-details-loading')).toBeTruthy();
       respond([200, envelope(rawRide())]);
-      expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs 470');
+      expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs\u00A0470');
       expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Bilal');
       expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Toyota Corolla');
       expect(screen.getByTestId('ride-details-person-subtitle-color').props.children).toBe('White');
@@ -433,7 +433,7 @@ describe('RideDetailsScreen', () => {
     // completed_at is days ago in real time, so the chat window is over.
     mock.onGet('/rides/41').reply(200, envelope(rawRide({ completed_at: '2026-01-01T09:26:00+05:00' })));
     show(RideDetailsScreen, 'driver');
-    expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs 376');
+    expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs\u00A0376');
     expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Ayesha');
     // UI-R5 PersonCard: the passenger shape has no vehicle line (the card title says "Your passenger").
     expect(screen.queryByTestId('ride-details-person-subtitle')).toBeNull();
@@ -573,7 +573,7 @@ describe('UI-R15 review fixes', () => {
     expect(message).toContain('Raah-e-Haq ride receipt');
     expect(message).toContain('From: Iqbal Town, Lahore');
     expect(message).toContain('To: Liberty Market, Lahore');
-    expect(message).toContain('Total: Rs 470');
+    expect(message).toContain('Total: Rs\u00A0470');
     expect(message).toContain('RH-TEST41');
     [DRIVER_PHONE, PASSENGER_PHONE, 'Bilal', 'Ayesha', 'LEA-1234'].forEach((secret) => {
       expect(message).not.toContain(secret);
@@ -609,7 +609,7 @@ describe('UI-R15 re-review fixes', () => {
     );
     show(RideHistoryScreen);
     const fee = await screen.findByTestId('ride-history-row-61-amount');
-    expect(fee.props.children).toBe('Rs 30 fee');
+    expect(fee.props.children).toBe('Rs\u00A030 fee');
     expect(StyleSheet.flatten(fee.props.style).color).toBe(LightTheme.colors.textPrimary);
     const free = screen.getByTestId('ride-history-row-62-amount');
     expect(free.props.children).toBe('No charge');
@@ -624,7 +624,7 @@ describe('UI-R15 re-review fixes', () => {
     );
     show(RideDetailsScreen);
     const amount = await screen.findByTestId('ride-details-amount');
-    expect(amount.props.children).toBe('Rs 30');
+    expect(amount.props.children).toBe('Rs\u00A030');
     expect(StyleSheet.flatten(amount.props.style).color).toBe(LightTheme.colors.textPrimary);
     expect(screen.getByTestId('ride-details-fee-label').props.children).toBe('Cancellation fee');
   });

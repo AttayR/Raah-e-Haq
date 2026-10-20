@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation, usePreventRemove, useRoute, type RouteProp } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Banner, Button, FieldLabel, Header, KeyboardAwareScrollView, Screen, TextField } from '../../../components/ui';
+import { AppText, Banner, Button, FieldLabel, Header, KeyboardAwareScrollView, Screen, TextField, useStickyFooterBottom } from '../../../components/ui';
 import { firstFieldMessages, toApiError } from '../../../core/api/errors';
 import { confirm } from '../../../core/dialog';
 import { haptics } from '../../../core/haptics';
@@ -42,7 +41,7 @@ export default function SupportNewRequestScreen() {
   const navigation = useNavigation<SupportNavigator>();
   const { params } = useRoute<RouteProp<SupportRoutes, 'SupportNewRequest'>>();
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
+  const footerBottom = useStickyFooterBottom();
   const categories = useSupportCategories();
 
   const [category, setCategory] = useState<string | null>(params?.category ?? null);
@@ -208,7 +207,7 @@ export default function SupportNewRequestScreen() {
         style={[
           styles.footer,
           {
-            paddingBottom: Math.max(insets.bottom + layout.bottomActionOffset, layout.bottomActionMinOffset),
+            paddingBottom: footerBottom,
             borderTopColor: theme.colors.border,
             borderTopWidth: theme.borderWidth.hairline,
             backgroundColor: theme.colors.background,

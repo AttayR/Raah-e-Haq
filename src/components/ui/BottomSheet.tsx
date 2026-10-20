@@ -36,6 +36,7 @@ import { toEasing } from './easing';
 import { keyboardLift, modalKeyboardLift } from './keyboard';
 import { ModalRoot } from './ModalRoot';
 import { useModalTurn } from './modalQueue';
+import { stickyFooterBottom } from './stickyFooter';
 import { fullHeight, openingTop, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
 
 export type { SheetSnap } from './sheetSnaps';
@@ -199,7 +200,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     ? modalKeyboardLift(Platform.OS, keyboard, containerHeight)
     : keyboardLift(Platform.OS, keyboard.height);
 
-  const footerBottom = Math.max(insets.bottom + layout.bottomActionOffset, layout.bottomActionMinOffset);
+  const footerBottom = stickyFooterBottom(insets.bottom, false);
   const footerBlock = footer ? footerHeight : 0;
   // [T-519] While the keyboard is up (iOS; Android in a Modal, T-592) it covers the bottom of the
   // sheet, so a `content` sheet grows by its height (capped at `full`) instead of hiding its body
@@ -773,7 +774,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       style={[
         styles.footer,
         {
-          paddingBottom: keyboardHeight > 0 ? space[2] : footerBottom,
+          // §5.14: 8 above the keyboard on both platforms (the home-indicator inset is covered).
+          paddingBottom: stickyFooterBottom(insets.bottom, keyboard.height > 0),
           bottom: keyboardHeight,
           backgroundColor: theme.colors.surface,
         },

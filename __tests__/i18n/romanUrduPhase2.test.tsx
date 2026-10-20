@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { Alert, Text } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { setLocale, t, type TranslationKey } from '../../src/i18n';
 import { resetLanguagePreferenceForTests } from '../../src/i18n/languagePreference';
 import '../../src/i18n/copy-ur-Latn';
@@ -189,9 +189,9 @@ describe('error boundaries', () => {
   }
 
   it.each([
-    ['ErrorBoundary', ErrorBoundary, 'Oho! Kuch ghalat ho gaya', 'App mein masla'],
-    ['MapErrorBoundary', MapErrorBoundary, 'Map mein masla', 'Map mein masla'],
-  ] as const)('%s shows its fallback and alert in Roman Urdu', (_name, Boundary, title, alertTitle) => {
+    ['ErrorBoundary', ErrorBoundary, 'Oho! Kuch ghalat ho gaya', 'Internet connection mein masla hai. Apna internet check karein.'],
+    ['MapErrorBoundary', MapErrorBoundary, 'Map mein masla', 'Map mein masla hai. Dobara koshish karein.'],
+  ] as const)('%s shows the kit ErrorState in Roman Urdu, with no native alert (UI-R19)', (_name, Boundary, title, body) => {
     setLocale('ur-Latn');
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const quiet = jest.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -202,9 +202,30 @@ describe('error boundaries', () => {
       </Boundary>,
     );
     expect(screen.getByText(title)).toBeTruthy();
+    expect(screen.getByText(body)).toBeTruthy();
     expect(screen.getByText('Dobara koshish karein')).toBeTruthy();
-    expect(alert.mock.calls[0][0]).toBe(alertTitle);
+    expect(alert).not.toHaveBeenCalled();
     alert.mockRestore();
+    quiet.mockRestore();
+  });
+
+  it('"Try again" re-mounts the children once they render again', () => {
+    setLocale('en');
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    let fail = true;
+    function Flaky(): React.ReactElement {
+      if (fail) throw new Error('Location off');
+      return <Text>map back</Text>;
+    }
+    render(
+      <MapErrorBoundary>
+        <Flaky />
+      </MapErrorBoundary>,
+    );
+    expect(screen.getByText('Location service error. Please enable location permissions.')).toBeTruthy();
+    fail = false;
+    fireEvent.press(screen.getByTestId('map-error-boundary-state-retry'));
+    expect(screen.getByText('map back')).toBeTruthy();
     quiet.mockRestore();
   });
 });

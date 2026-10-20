@@ -25,6 +25,12 @@ export type ButtonProps = {
   /** Full width by default (forms, sheets); `false` hugs the content. */
   fullWidth?: boolean;
   /**
+   * [UI-R19] A start-aligned, hugging ghost button whose label sits on the content edge (the 16
+   * gutter) instead of one padding further in: shifts the button back by its horizontal padding.
+   * The pressed fill still extends past the label, as in the platform text buttons.
+   */
+  flushStart?: boolean;
+  /**
    * Haptic fired on a successful press (§6.11). Opt-in: pass `impactLight` only on primary
    * commits (Request ride, Go online/offline, Accept, I've arrived, Send).
    */
@@ -78,6 +84,7 @@ export function Button({
   disabled = false,
   loading = false,
   fullWidth = true,
+  flushStart = false,
   haptic,
   countdown,
   accessibilityLabel,
@@ -137,6 +144,7 @@ export function Button({
         styles.base,
         { minHeight: dims.height, paddingHorizontal: dims.padding },
         fullWidth ? styles.full : styles.hug,
+        flushStart && !fullWidth ? { marginStart: -dims.padding } : null,
         { backgroundColor: fill },
         tone.border
           ? { borderWidth: theme.borderWidth.thin, borderColor: disabled ? theme.colors.border : theme.colors.borderStrong }

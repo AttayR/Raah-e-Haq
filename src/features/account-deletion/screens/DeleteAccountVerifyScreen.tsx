@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Banner, Button, Header, OtpInput, Screen } from '../../../components/ui';
+import { AppText, Banner, Button, Header, OtpInput, Screen, stickyFooterBottom } from '../../../components/ui';
 import { toApiError } from '../../../core/api/errors';
 import { confirm } from '../../../core/dialog';
 import { triggerHaptic } from '../../../core/haptics';
@@ -182,10 +182,8 @@ export default function DeleteAccountVerifyScreen() {
         style={[
           styles.footer,
           {
-            // Above the keyboard the home-indicator inset is covered: only the 16 minimum.
-            paddingBottom: keyboardUp
-              ? layout.bottomActionMinOffset
-              : Math.max(insets.bottom + layout.bottomActionOffset, layout.bottomActionMinOffset),
+            // Above the keyboard the home-indicator inset is covered: 8 (§5.14).
+            paddingBottom: stickyFooterBottom(insets.bottom, keyboardUp),
             borderTopColor: theme.colors.border,
             borderTopWidth: theme.borderWidth.hairline,
             backgroundColor: theme.colors.background,

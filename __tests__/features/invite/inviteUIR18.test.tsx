@@ -74,15 +74,15 @@ describe('Invite copy from programme (BE-131)', () => {
   it('uses the server amounts, the wallet note for ride credit, and 3 steps with the expiry', () => {
     const invite = toInviteCode(codeBody().data);
     expect(inviteCardText(invite.programme)).toEqual({
-      title: 'Get Rs 150 for each friend who rides',
-      description: 'Your friend gets Rs 100 off their first ride. Credit goes to your wallet.',
+      title: 'Get Rs\u00A0150 for each friend who rides',
+      description: 'Your friend gets Rs\u00A0100 off their first ride. Credit goes to your wallet.',
     });
     expect(inviteSteps(invite.programme)).toEqual({
-      steps: ['Share your code with a friend.', 'They sign up with your code.', 'After their first ride, you get Rs 150.'],
+      steps: ['Share your code with a friend.', 'They sign up with your code.', 'After their first ride, you get Rs\u00A0150.'],
       expires: 'Rewards expire after 30 days.',
     });
     const many = toInviteCode(codeBody({ programme: { ...programme, min_rides: 3 } }).data);
-    expect(inviteSteps(many.programme).steps[2]).toBe('After their first 3 rides, you get Rs 150.');
+    expect(inviteSteps(many.programme).steps[2]).toBe('After their first 3 rides, you get Rs\u00A0150.');
   });
 
   it('shows no amounts and two steps when the programme is off', () => {
@@ -133,7 +133,7 @@ describe('Invite screen (§I2)', () => {
     mock.onGet('/referrals/stats').reply(200, { success: true, data: { total_referrals: 2, completed_referrals: 1, total_rewards: 150 } });
     await renderInvite();
     expect(screen.getByTestId('invite-stat-joined').props.accessibilityLabel).toBe('Joined: 2');
-    expect(screen.getByTestId('invite-stat-earned').props.accessibilityLabel).toBe('Earned: Rs 150');
+    expect(screen.getByTestId('invite-stat-earned').props.accessibilityLabel).toBe('Earned: Rs\u00A0150');
   });
 
   it('shows an error with retry when the code cannot load, and no Share', async () => {

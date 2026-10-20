@@ -33,13 +33,13 @@ describe('validateSettlementForm', () => {
 
   it('refuses more than is owed', () => {
     const result = validateSettlementForm(values({ amount: '116.01' }), 116);
-    expect(result).toEqual({ ok: false, errors: { amount: 'You owe Rs 116. Enter that amount or less.' } });
+    expect(result).toEqual({ ok: false, errors: { amount: 'You owe Rs\u00A0116. Enter that amount or less.' } });
   });
 
   it('refuses zero, empty and malformed amounts', () => {
-    expect(validateSettlementForm(values({ amount: '0' }), 116)).toMatchObject({ ok: false, errors: { amount: 'The amount must be at least Rs 1.' } });
+    expect(validateSettlementForm(values({ amount: '0' }), 116)).toMatchObject({ ok: false, errors: { amount: 'The amount must be at least Rs\u00A01.' } });
     // The server minimum is 1 (POST /wallet/settlements amount: 1–500000).
-    expect(validateSettlementForm(values({ amount: '0.5' }), 116)).toMatchObject({ ok: false, errors: { amount: 'The amount must be at least Rs 1.' } });
+    expect(validateSettlementForm(values({ amount: '0.5' }), 116)).toMatchObject({ ok: false, errors: { amount: 'The amount must be at least Rs\u00A01.' } });
     expect(validateSettlementForm(values({ amount: '1' }), 116)).toMatchObject({ ok: true });
     expect(validateSettlementForm(values({ amount: '' }), 116)).toMatchObject({ ok: false, errors: { amount: 'Enter the amount you paid.' } });
     expect(validateSettlementForm(values({ amount: '12.345' }), 116)).toMatchObject({ ok: false, errors: { amount: expect.any(String) } });

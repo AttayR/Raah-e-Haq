@@ -112,8 +112,8 @@ describe('chart model (§3.1)', () => {
     expect(defaultSelection(chartSlots([day('2026-10-19', 100, 1), day('2026-10-20', 50, 1)], 'week', '2026-10-20'))).toBe(1);
     expect(defaultSelection(chartSlots([day('2026-10-19'), day('2026-10-20'), day('2026-10-21')], 'week', '2026-10-20'))).toBe(1);
     expect(clampSelectable(3, slots)).toBe(1);
-    expect(chartReadout(slots[1], 'PKR')).toMatchObject({ date: 'Today', amount: 'Rs 0', trips: 'No trips' });
-    expect(chartReadout(slots[0], 'PKR')).toMatchObject({ date: 'Mon, 19 Oct', amount: 'Rs 400', trips: '3 trips' });
+    expect(chartReadout(slots[1], 'PKR')).toMatchObject({ date: 'Today', amount: 'Rs\u00A00', trips: 'No trips' });
+    expect(chartReadout(slots[0], 'PKR')).toMatchObject({ date: 'Mon, 19 Oct', amount: 'Rs\u00A0400', trips: '3 trips' });
   });
 });
 
@@ -131,8 +131,8 @@ describe('trips list (§3.3)', () => {
     expect(items.map((i) => i.key)).toEqual(['day-2026-10-20', 'ride-1', 'day-2026-10-19', 'ride-2', 'ride-3', 'day-2026-10-16', 'ride-4']);
     const headers = items.filter((i) => i.kind === 'day');
     expect(headers.map((h) => (h.kind === 'day' ? [h.label, h.totals, h.first] : null))).toEqual([
-      ['Today', 'Rs 120 · 1 trip', true],
-      ['Yesterday', 'Rs 1,048 · 10 trips', false],
+      ['Today', 'Rs\u00A0120 · 1 trip', true],
+      ['Yesterday', 'Rs\u00A01,048 · 10 trips', false],
       // Not in `series`: no totals rather than a sum made in the app.
       ['Fri, 16 Oct', null, false],
     ]);
@@ -160,13 +160,13 @@ describe('trips list (§3.3)', () => {
     expect(text).toMatchObject({
       title: 'Gulberg → Liberty Market',
       meta: '9:07 PM · 1.1 km',
-      split: 'Fare Rs 150 · Commission Rs 30 · Fee Rs 10',
-      net: 'Rs 120',
+      split: 'Fare Rs\u00A0150 · Commission Rs\u00A030 · Fee Rs\u00A010',
+      net: 'Rs\u00A0120',
     });
     expect(JSON.stringify(text)).not.toMatch(/Quoted|Locked|Yesterday/);
-    expect(text.a11y).toBe('Gulberg → Liberty Market, 9:07 PM, fare Rs 150, commission Rs 30, you keep Rs 120');
+    expect(text.a11y).toBe('Gulberg → Liberty Market, 9:07 PM, fare Rs\u00A0150, commission Rs\u00A030, you keep Rs\u00A0120');
     // Older rides without the BE-84 amount use the stored platform commission.
-    expect(tripRowText(ride({ commissionAmount: null, platformCommission: 45 }), 'PKR', 300).split).toBe('Fare Rs 150 · Commission Rs 45');
+    expect(tripRowText(ride({ commissionAmount: null, platformCommission: 45 }), 'PKR', 300).split).toBe('Fare Rs\u00A0150 · Commission Rs\u00A045');
   });
 });
 
@@ -215,7 +215,7 @@ describe('EarningsChart (§3.1)', () => {
     fireEvent(plot(), 'responderMove', { nativeEvent: { locationX: 390 } });
     expect(screen.getByTestId('earnings-chart-date')).toHaveTextContent('Today');
     fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
-    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Today: Rs 0, No trips');
+    expect(screen.getByTestId('earnings-chart-selected').props.accessibilityLabel).toBe('Today: Rs\u00A00, No trips');
     fireEvent(plot(), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
     expect(screen.getByTestId('earnings-chart-date')).toHaveTextContent('Mon, 19 Oct');
   });

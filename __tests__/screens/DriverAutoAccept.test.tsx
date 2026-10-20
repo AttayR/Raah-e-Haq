@@ -80,10 +80,10 @@ describe('Drive auto-accept row', () => {
     expect(puts()).toHaveLength(0);
 
     screen.getByTestId('auto-accept-sheet');
-    expect(screen.getByTestId('auto-accept-min-fare-value').props.children).toBe('Rs 0');
+    expect(screen.getByTestId('auto-accept-min-fare-value').props.children).toBe('Rs\u00A00');
     expect(screen.getByTestId('auto-accept-min-fare-down').props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(screen.getByTestId('auto-accept-min-fare-up'));
-    expect(screen.getByTestId('auto-accept-min-fare-value').props.children).toBe('Rs 10');
+    expect(screen.getByTestId('auto-accept-min-fare-value').props.children).toBe('Rs\u00A010');
     expect(screen.getByTestId('auto-accept-pickup-value').props.children).toBe('2.0 km');
     screen.getByTestId('auto-accept-tier-car');
     screen.getByTestId('auto-accept-tier-car_ac');
@@ -109,7 +109,7 @@ describe('Drive auto-accept row', () => {
     mock.onPut('/driver/auto-accept').reply(...ok(autoAcceptData({ enabled: true, women_passengers_only: false, min_fare: 300 })));
     const { screen } = await renderDrive();
 
-    expect(subtitle(screen)).toBe('Off · Rs 300+ · 2.0 km');
+    expect(subtitle(screen)).toBe('Off · Rs\u00A0300+ · 2.0 km');
     fireEvent.press(screen.getByTestId('auto-accept-row'));
     fireEvent.press(screen.getByTestId('auto-accept-women-only-switch'));
     await act(async () => {
@@ -183,7 +183,7 @@ describe('Drive auto-accept row', () => {
     mock.onGet('/driver/auto-accept').reply(...ok(autoAcceptData({ enabled: true, min_fare: 250, max_pickup_km: 1.5 })));
     const { screen } = await renderDrive('available');
     await waitFor(() => screen.getByTestId('drive-auto-badge'));
-    expect(subtitle(screen)).toBe('Rs 250+ · up to 1.5 km · Car, Car AC');
+    expect(subtitle(screen)).toBe('Rs\u00A0250+ · up to 1.5 km · Car, Car AC');
     expect(screen.getByTestId('drive-hint').props.children).toBe('Matching rides are accepted for you.');
     expect(screen.getByTestId('drive-pickup-circle').props.radius).toBe(1500);
   });

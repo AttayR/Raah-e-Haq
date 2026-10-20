@@ -70,7 +70,7 @@ describe('PayCommissionScreen', () => {
     // UI-R3: the kit TextField puts the input at `${testID}-input`.
     const amount = await screen.findByTestId('pay-commission-amount-input');
     expect(amount.props.value).toBe('116');
-    expect(screen.getByTestId('pay-commission-owed').props.children).toBe('Rs 116');
+    expect(screen.getByTestId('pay-commission-owed').props.children).toBe('Rs\u00A0116');
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('pay-commission-submit'));
@@ -109,7 +109,7 @@ describe('PayCommissionScreen', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('pay-commission-submit'));
     });
-    expect(screen.getByTestId('pay-commission-amount-error').props.children).toBe('You owe Rs 116. Enter that amount or less.');
+    expect(screen.getByTestId('pay-commission-amount-error').props.children).toBe('You owe Rs\u00A0116. Enter that amount or less.');
     expect(screen.getByTestId('pay-commission-reference-error').props.children).toBe('Enter the bank transfer reference.');
     expect(mock.history.post).toHaveLength(0);
 
@@ -117,7 +117,7 @@ describe('PayCommissionScreen', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('pay-commission-submit'));
     });
-    expect(screen.getByTestId('pay-commission-amount-error').props.children).toBe('The amount must be at least Rs 1.');
+    expect(screen.getByTestId('pay-commission-amount-error').props.children).toBe('The amount must be at least Rs\u00A01.');
     expect(mock.history.post).toHaveLength(0);
   });
 
@@ -279,7 +279,7 @@ describe('TransactionDetailScreen', () => {
     mockParams = { id: 900, transaction: toTransaction(row) };
     mock.onGet('/wallet/transactions/900').reply(200, envelope({ ...row, reversed: true }));
     show(TransactionDetailScreen);
-    expect((await screen.findByTestId('transaction-amount')).props.children).toBe('Rs 240');
+    expect((await screen.findByTestId('transaction-amount')).props.children).toBe('Rs\u00A0240');
     expect(screen.getByTestId('transaction-gross')).toBeTruthy();
     expect(screen.getByText('Rs 300')).toBeTruthy();
     expect(screen.getByText('Rs 60')).toBeTruthy();
@@ -330,7 +330,7 @@ describe('TransactionDetailScreen', () => {
     mock.onGet('/wallet/transactions/1').reply(200, envelope(raw));
     show(TransactionDetailScreen);
     expect(await screen.findByText('Opening Balance')).toBeTruthy();
-    expect(screen.getByTestId('transaction-amount').props.children).toBe('+Rs 250');
+    expect(screen.getByTestId('transaction-amount').props.children).toBe('+Rs\u00A0250');
   });
 
   it('a ride entry links to its RideDetails (T-501)', async () => {

@@ -99,7 +99,7 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
     expect(dialogStore.getCurrent()).toMatchObject({
       id: asked.id,
       title: 'Cancel ride?',
-      body: 'Your driver is already on the way. Cancelling now costs Rs 50. It is charged to your wallet.',
+      body: 'Your driver is already on the way. Cancelling now costs Rs\u00A050. It is charged to your wallet.',
       confirmLabel: 'Cancel ride',
       cancelLabel: 'Keep ride',
     });
@@ -141,7 +141,7 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
 
     // The second question is about the taken ride, with its fee; nothing is cancelled yet.
     await waitFor(() => expect(dialogStore.getCurrent()?.title).toBe('Cancel ride?'));
-    expect(dialogStore.getCurrent()?.body).toContain('Cancelling now costs Rs 50');
+    expect(dialogStore.getCurrent()?.body).toContain('Cancelling now costs Rs\u00A050');
     expect(cancelRide).not.toHaveBeenCalled();
     await answer(true, pending);
     expect(cancelRide).toHaveBeenCalledWith(255);

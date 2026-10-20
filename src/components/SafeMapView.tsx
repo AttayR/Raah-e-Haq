@@ -1,18 +1,20 @@
 import React, { memo, useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import MapView, { EdgePadding, LatLng, MapViewProps, PROVIDER_GOOGLE } from 'react-native-maps';
-import { BrandColors } from '../theme/colors';
+import { View, StyleSheet, type NativeSyntheticEvent } from 'react-native';
+import MapView, { EdgePadding, LatLng, MapViewProps, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useAppTheme } from '../app/providers/ThemeProvider';
 import { logger } from '../core/logging/logger';
+import { t } from '../i18n';
+import { layout } from '../theme';
+import { AppText } from './ui/AppText';
 
 interface SafeMapViewProps extends MapViewProps {
   fallbackComponent?: React.ReactNode;
 }
 
 export interface SafeMapViewRef {
-  animateToRegion: (region: any, duration?: number) => void;
-  animateToCoordinate: (coordinate: any, duration?: number) => void;
-  fitToElements: (options?: { edgePadding?: any; animated?: boolean }) => void;
+  animateToRegion: (region: Region, duration?: number) => void;
+  animateToCoordinate: (coordinate: LatLng, duration?: number) => void;
+  fitToElements: (options?: { edgePadding?: EdgePadding; animated?: boolean }) => void;
   fitToSuppliedMarkers: (markers: string[], animated?: boolean) => void;
   fitToCoordinates: (coordinates: LatLng[], options?: { edgePadding?: EdgePadding; animated?: boolean }) => void;
 }
@@ -30,7 +32,7 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
 
     // Expose safe methods through ref
     useImperativeHandle(ref, () => ({
-      animateToRegion: (region: any, duration = 1000) => {
+      animateToRegion: (region: Region, duration = 1000) => {
         if (mapRef.current && isMapReady && isMounted) {
           try {
             mapRef.current.animateToRegion(region, duration);
@@ -39,10 +41,11 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
           }
         }
       },
-      animateToCoordinate: (coordinate: any, duration = 1000) => {
+      animateToCoordinate: (coordinate: LatLng, duration = 1000) => {
         if (mapRef.current && isMapReady && isMounted) {
           try {
-            mapRef.current.animateToCoordinate(coordinate, duration);
+            // react-native-maps 1.x has no animateToCoordinate; the camera centre does the same.
+            mapRef.current.animateCamera({ center: coordinate }, { duration });
           } catch (error) {
             logger.debug('SafeMapView: Error animating to coordinate:', error);
           }
@@ -51,12 +54,7 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       fitToElements: (options = { animated: true }) => {
         if (mapRef.current && isMapReady && isMounted) {
           try {
-            // fitToElements takes animated parameter and optional edgePadding
-            if (options.edgePadding) {
-              mapRef.current.fitToElements(options.animated, options.edgePadding);
-            } else {
-              mapRef.current.fitToElements(options.animated);
-            }
+            mapRef.current.fitToElements(options);
           } catch (error) {
             logger.debug('SafeMapView: Error fitting to elements:', error);
           }
@@ -65,7 +63,7 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       fitToSuppliedMarkers: (markers: string[], animated = true) => {
         if (mapRef.current && isMapReady && isMounted) {
           try {
-            mapRef.current.fitToSuppliedMarkers(markers, animated);
+            mapRef.current.fitToSuppliedMarkers(markers, { animated });
           } catch (error) {
             logger.debug('SafeMapView: Error fitting to markers:', error);
           }
@@ -116,7 +114,7 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       }
     };
 
-    const handleMapLoaded = () => {
+    const handleMapLoaded = (event: NativeSyntheticEvent<null>) => {
       if (isMounted && mapRef.current) {
         logger.debug('SafeMapView: Map loaded');
         setIsMapReady(true);
@@ -124,19 +122,13 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
         // Call original onMapLoaded if provided
         if (props.onMapLoaded) {
           try {
-            props.onMapLoaded();
+            props.onMapLoaded(event);
           } catch (error) {
             logger.debug('SafeMapView: Error in onMapLoaded callback:', error);
             setHasError(true);
           }
         }
       }
-    };
-
-    const handleError = (error: any) => {
-      logger.debug('SafeMapView: Map error:', error);
-      setHasError(true);
-      setIsMapReady(false);
     };
 
     // Show fallback only if there's an error
@@ -146,8 +138,10 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
       }
       
       return (
-        <View style={[props.style, styles.fallbackContainer]}>
-          <Text style={styles.fallbackText}>Map Error - Please restart the app</Text>
+        <View style={[props.style, styles.fallbackContainer, { backgroundColor: theme.colors.surfaceAlt }]}>
+          <AppText variant="body" color="textSecondary" align="center">
+            {t('errorBoundary.mapRestart')}
+          </AppText>
         </View>
       );
     }
@@ -164,12 +158,11 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
         style={[{ backgroundColor: theme.mapBackground }, props.style]}
         onMapReady={handleMapReady}
         onMapLoaded={handleMapLoaded}
-        onError={handleError}
         // Additional safety props to prevent crashes
         loadingEnabled={false}
         cacheEnabled={false}
         moveOnMarkerPress={false}
-        loadingIndicatorColor={BrandColors.primary}
+        loadingIndicatorColor={theme.colors.primary}
         loadingBackgroundColor={theme.mapBackground}
         // Critical props to prevent MapView crashes
         showsUserLocation={false}
@@ -179,7 +172,6 @@ const SafeMapViewBase = forwardRef<SafeMapViewRef, SafeMapViewProps>(
         showsBuildings={false}
         showsTraffic={false}
         showsIndoors={false}
-        showsPointsOfInterest={false}
         // Disable problematic features that can cause crashes
         pitchEnabled={false}
         rotateEnabled={false}
@@ -204,12 +196,7 @@ const styles = StyleSheet.create({
   fallbackContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
-  },
-  fallbackText: {
-    fontSize: 16,
-    color: BrandColors.primary,
-    fontWeight: '500',
+    padding: layout.gutter,
   },
 });
 

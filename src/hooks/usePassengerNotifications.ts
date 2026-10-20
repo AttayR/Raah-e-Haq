@@ -11,7 +11,7 @@ const noop = (): void => undefined;
  * redesign drops it (T-604). It only reads the notifications slice: it never fetches,
  * subscribes or clears anything, so mounting it more than once costs no requests (PAX-17,
  * QA T-104). The unread count is owned by useNotificationsSync (PassengerStack); a bell uses
- * `useUnreadNotificationCount` or `NotificationBell` from src/features/notifications.
+ * `useUnreadNotificationCount` from src/features/notifications (the tab bar Inbox badge).
  * The old no-op `send*Notification` functions are gone: the backend sends notifications.
  */
 export const usePassengerNotifications = (_passengerId?: string) => {

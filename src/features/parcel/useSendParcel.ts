@@ -2,19 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ScrollView, View } from 'react-native';
 import { useDispatch } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import { hideModal, showErrorModal } from '../../components/NotificationManager';
 import { REVEAL_DELAY_MS } from '../../components/ui/keyboardReveal';
 import { t } from '../../i18n';
 import { space } from '../../theme';
 import { reverseGeocode } from '../../services/placesService';
 import type { RideResource } from '../../services/rideService';
 import { createActiveRide, type ActiveRideState } from '../active-ride/slice';
-import { openActiveBooking, showBalanceOwed } from '../active-ride/rideRequestFeedback';
+import { openActiveBooking, showBalanceOwed, showPhoneNotVerified } from '../active-ride/rideRequestFeedback';
 import { ACTIVE_RIDE_COPY } from '../active-ride/copy';
 import { askForPushInContext } from '../notifications/push';
 import { displayAddress } from '../passenger-home/greeting';
 import { withAddresses, type BookingPlace } from '../ride-booking/buildRideRequest';
-import { BOOKING_COPY } from '../ride-booking/copy';
 import { useFareEstimates } from '../ride-booking/hooks';
 import type { FareEstimate } from '../ride-booking/api';
 import { classifyRideRequestFailure } from '../ride-booking/rideRequestFailure';
@@ -271,12 +269,7 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
         return;
       }
       if (failure.kind === 'phone_not_verified') {
-        showErrorModal(
-          BOOKING_COPY.phoneNotVerifiedTitle,
-          failure.message,
-          { label: BOOKING_COPY.phoneNotVerifiedAction, onPress: () => { hideModal(); handlersRef.current.onPhoneNotVerified(); } },
-          { label: BOOKING_COPY.notNow, onPress: hideModal },
-        );
+        showPhoneNotVerified(failure.message, () => handlersRef.current.onPhoneNotVerified());
       } else if (failure.kind === 'balance_owed') {
         showBalanceOwed(failure, handlersRef.current.onBalanceOwed);
       } else if (failure.kind === 'deletion_scheduled') {

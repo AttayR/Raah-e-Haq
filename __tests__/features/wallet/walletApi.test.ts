@@ -104,11 +104,11 @@ describe('row format', () => {
     const credit = toTransaction(rawTransaction({ direction: 'credit', type: 'referral_reward', amount: 500 }))!;
     const debit = toTransaction(rawTransaction())!;
     const none = toTransaction(rawTransaction({ direction: 'none', type: 'ride_payment', amount: 300 }))!;
-    expect(transactionAmountText(credit)).toBe('+Rs 500');
+    expect(transactionAmountText(credit)).toBe('+Rs\u00A0500');
     expect(transactionAmountColor(credit)).toBe('success');
-    expect(transactionAmountText(debit)).toBe(`${MINUS}Rs 58`);
+    expect(transactionAmountText(debit)).toBe(`${MINUS}Rs\u00A058`);
     expect(transactionAmountColor(debit)).toBe('textPrimary');
-    expect(transactionAmountText(none)).toBe('Rs 300');
+    expect(transactionAmountText(none)).toBe('Rs\u00A0300');
     expect(transactionAmountColor(none)).toBe('textPrimary');
     expect(transactionIcon(none)).toBe('rides');
     expect(transactionIcon({ type: 'unknown_thing', direction: 'credit' })).toBe('moneyIn');

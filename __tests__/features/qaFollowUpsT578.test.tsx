@@ -158,7 +158,7 @@ describe('2. the driver sees the no-show fee the passenger paid', () => {
   const noShow = toRide(makeRide({ id: 241, status: 'cancelled', cancellation_fee: '50.00', cancellation_charge_reason: 'no_show' })) as Ride;
 
   it('history row: "Rs 50 fee", not "No charge"', async () => {
-    expect(rideAmountText(noShow, 'driver')).toBe('Rs 50 fee');
+    expect(rideAmountText(noShow, 'driver')).toBe('Rs\u00A050 fee');
     render(
       <ThemeProvider>
         <RideHistoryRow ride={noShow} viewer="driver" onPress={jest.fn()} />
@@ -279,7 +279,7 @@ describe('4. parcel wording', () => {
     await act(async () => {
       await result.current.cancel('Sender is not at the pickup');
     });
-    expect(success).toHaveBeenCalledWith('Delivery cancelled.', 'Sender charged Rs 50. Your share comes to your wallet.', expect.anything());
+    expect(success).toHaveBeenCalledWith('Delivery cancelled.', 'Sender charged Rs\u00A050. Your share comes to your wallet.', expect.anything());
   });
 });
 

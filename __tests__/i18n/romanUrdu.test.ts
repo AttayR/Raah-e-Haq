@@ -17,7 +17,6 @@ import { ACTIVE_RIDE_COPY } from '../../src/features/active-ride/copy';
 import { DRIVER_REQUESTS_COPY } from '../../src/features/driver-requests/copy';
 import { DRIVER_RIDE_COPY } from '../../src/features/driver-ride/copy';
 import { DRIVER_STATUS_COPY } from '../../src/features/driver-status/copy';
-import { DRIVER_LOCATION_COPY } from '../../src/features/driver-location/copy';
 import {
   SETTLEMENT_FORM_ERRORS,
   SETTLEMENT_KIND_LABEL,
@@ -114,7 +113,6 @@ const COPY_OBJECTS: Record<string, object> = {
   DRIVER_REQUESTS_COPY,
   DRIVER_RIDE_COPY,
   DRIVER_STATUS_COPY,
-  DRIVER_LOCATION_COPY,
   WALLET_COPY,
   SETTLEMENT_STATUS_LABEL,
   SETTLEMENT_METHOD_LABEL,

@@ -64,6 +64,7 @@ export default function InviteCodeField({ value, onChange, error }: Props) {
             variant="ghost"
             size="sm"
             fullWidth={false}
+            flushStart
             leadingIcon="gift"
             onPress={() => {
               focusOnLayout.current = true;

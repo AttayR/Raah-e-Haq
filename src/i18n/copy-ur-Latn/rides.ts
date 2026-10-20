@@ -5,7 +5,6 @@ import { ACTIVE_RIDE_COPY } from '../../features/active-ride/copy';
 import { DRIVER_REQUESTS_COPY } from '../../features/driver-requests/copy';
 import { DRIVER_RIDE_COPY } from '../../features/driver-ride/copy';
 import { DRIVER_STATUS_COPY } from '../../features/driver-status/copy';
-import { DRIVER_LOCATION_COPY } from '../../features/driver-location/copy';
 
 /** Roman Urdu of the booking, live ride and driver request / ride copy (T-523). */
 export function registerRideCopy(): void {
@@ -346,13 +345,5 @@ export function registerRideCopy(): void {
     onRideToggleBlocked: 'Ride ke dauran aap offline nahi ho sakte.',
     loadFailed: 'Aap ka online status check nahi ho saka',
     updateFailed: 'Aap ka online status nahi badla. Dobara koshish karein.',
-  });
-
-  registerCopyTranslation(DRIVER_LOCATION_COPY, 'ur-Latn', {
-    permissionTitle: 'Location ki ijazat',
-    permissionMessage:
-      'App khuli hone par Raah-e-Haq aap ki location istemal karta hai taake sawariyan aap ko dekh sakein aur aap ko qareeb ki ride requests milein.',
-    permissionAllow: 'Ijazat dein',
-    permissionDeny: 'Abhi nahi',
   });
 }

@@ -12,41 +12,41 @@ import {
 
 describe('formatMoney', () => {
   it('prints Rs with a thousands separator and no decimals for whole amounts', () => {
-    expect(formatMoney(1200)).toBe('Rs 1,200');
-    expect(formatMoney(1250)).toBe('Rs 1,250');
-    expect(formatMoney(0)).toBe('Rs 0');
-    expect(formatMoney(150)).toBe('Rs 150');
-    expect(formatMoney(1234567)).toBe('Rs 1,234,567');
+    expect(formatMoney(1200)).toBe('Rs\u00A01,200');
+    expect(formatMoney(1250)).toBe('Rs\u00A01,250');
+    expect(formatMoney(0)).toBe('Rs\u00A00');
+    expect(formatMoney(150)).toBe('Rs\u00A0150');
+    expect(formatMoney(1234567)).toBe('Rs\u00A01,234,567');
   });
 
   it('shows two decimals only for a non-zero fraction', () => {
-    expect(formatMoney(412.5)).toBe('Rs 412.50');
-    expect(formatMoney(1250.05)).toBe('Rs 1,250.05');
-    expect(formatMoney(99.999)).toBe('Rs 100');
-    expect(formatMoney(10.001)).toBe('Rs 10');
+    expect(formatMoney(412.5)).toBe('Rs\u00A0412.50');
+    expect(formatMoney(1250.05)).toBe('Rs\u00A01,250.05');
+    expect(formatMoney(99.999)).toBe('Rs\u00A0100');
+    expect(formatMoney(10.001)).toBe('Rs\u00A010');
   });
 
   it('accepts numeric strings as the API sends them', () => {
-    expect(formatMoney('412.50')).toBe('Rs 412.50');
-    expect(formatMoney('1200')).toBe('Rs 1,200');
+    expect(formatMoney('412.50')).toBe('Rs\u00A0412.50');
+    expect(formatMoney('1200')).toBe('Rs\u00A01,200');
   });
 
   it('maps PKR (or no currency) to Rs and never prints PKR, $ or ₨', () => {
-    expect(formatMoney(1250, 'PKR')).toBe('Rs 1,250');
-    expect(formatMoney(1250, 'pkr')).toBe('Rs 1,250');
-    expect(formatMoney(1250, null)).toBe('Rs 1,250');
-    expect(formatMoney(1250, '₨')).toBe('Rs 1,250');
+    expect(formatMoney(1250, 'PKR')).toBe('Rs\u00A01,250');
+    expect(formatMoney(1250, 'pkr')).toBe('Rs\u00A01,250');
+    expect(formatMoney(1250, null)).toBe('Rs\u00A01,250');
+    expect(formatMoney(1250, '₨')).toBe('Rs\u00A01,250');
     expect(formatMoney(1250, 'PKR')).not.toMatch(/PKR|\$|₨/);
   });
 
   it('keeps another currency code from the API as sent', () => {
-    expect(formatMoney(20, 'usd')).toBe('USD 20');
+    expect(formatMoney(20, 'usd')).toBe('USD\u00A020');
   });
 
   it('signs negative amounts before the label', () => {
-    expect(formatMoney(-50)).toBe('\u2212Rs 50');
+    expect(formatMoney(-50)).toBe('\u2212Rs\u00A050');
     expect(MINUS).toBe('\u2212');
-    expect(formatMoney(-0.001)).toBe('Rs 0');
+    expect(formatMoney(-0.001)).toBe('Rs\u00A00');
   });
 
   it('returns empty for missing or invalid values so the caller shows its empty state', () => {
@@ -61,11 +61,11 @@ describe('formatMoney', () => {
 
 describe('formatSignedMoney', () => {
   it('signs credits with + and debits with U+2212, zero unsigned', () => {
-    expect(formatSignedMoney(500)).toBe('+Rs 500');
-    expect(formatSignedMoney(-50)).toBe('\u2212Rs 50');
-    expect(formatSignedMoney(0)).toBe('Rs 0');
-    expect(formatSignedMoney(-0.001)).toBe('Rs 0');
-    expect(formatSignedMoney('1250.5', 'PKR')).toBe('+Rs 1,250.50');
+    expect(formatSignedMoney(500)).toBe('+Rs\u00A0500');
+    expect(formatSignedMoney(-50)).toBe('\u2212Rs\u00A050');
+    expect(formatSignedMoney(0)).toBe('Rs\u00A00');
+    expect(formatSignedMoney(-0.001)).toBe('Rs\u00A00');
+    expect(formatSignedMoney('1250.5', 'PKR')).toBe('+Rs\u00A01,250.50');
     expect(formatSignedMoney(-1200)).not.toContain('-');
   });
 

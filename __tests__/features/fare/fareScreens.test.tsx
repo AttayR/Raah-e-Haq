@@ -62,7 +62,7 @@ describe('trip panel (passenger)', () => {
     expect(getByTestId('trip-fare-row-amount')).toHaveTextContent('Rs 152');
     getByText('Fixed fare');
     expect(getByTestId('trip-fare-row-tag')).toBeTruthy();
-    expect(getByTestId('trip-fare-row').props.accessibilityLabel).toBe('Your fare is locked at Rs 152. Pay only this amount.');
+    expect(getByTestId('trip-fare-row').props.accessibilityLabel).toBe('Your fare is locked at Rs\u00A0152. Pay only this amount.');
   });
 
   it('no fixed-fare tag while searching or for a ride accepted before the lock existed', () => {
@@ -104,7 +104,7 @@ describe('trip panel (passenger)', () => {
     const ride = makeRide({ status: 'cancelled', cancellation_reason: 'passenger', cancellation_fee: '50.00', cancellation_charge_reason: 'late_cancel' });
     const { getByTestId } = render(panel(ride));
     expect(getByTestId('active-ride-subtitle').props.children).toBe(
-      'You cancelled this ride. A cancellation fee of Rs 50 was charged to your wallet.',
+      'You cancelled this ride. A cancellation fee of Rs\u00A050 was charged to your wallet.',
     );
   });
 });
@@ -140,7 +140,7 @@ describe('"Driver asked for more?" (BE-82)', () => {
     });
 
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ asked_amount: 400, note: 'Asked for 400 at the drop-off' });
-    expect(toast.success).toHaveBeenCalledWith('Report sent. Pay only Rs 152.');
+    expect(toast.success).toHaveBeenCalledWith('Report sent. Pay only Rs\u00A0152.');
     expect(onReported).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(queryByTestId('overcharge-button')).toBeNull());
     expect(getByTestId('overcharge-status-text').props.children).toBe('Received. We are looking into it.');
@@ -216,7 +216,7 @@ describe('"Driver asked for more?" (BE-82)', () => {
         fare={152}
       />,
     );
-    expect(getByTestId('overcharge-status-text').props.children).toBe('Upheld. Rs 50 was refunded to your wallet.');
+    expect(getByTestId('overcharge-status-text').props.children).toBe('Upheld. Rs\u00A050 was refunded to your wallet.');
     expect(queryByTestId('overcharge-button')).toBeNull();
     rerender(<OverchargeReportSection rideId={41} state={null} fare={152} />);
     expect(queryByTestId('overcharge')).toBeNull();

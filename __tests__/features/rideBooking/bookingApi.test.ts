@@ -124,10 +124,10 @@ describe('vehicle options and fare breakdown', () => {
     const options = toVehicleOptions(types, estimates);
 
     expect(options.map((o) => [o.id, o.name, o.fare, o.unavailable])).toEqual([
-      ['car', 'Car', 'Rs 260', false],
-      ['bike', 'Bike', 'Rs 120', false],
+      ['car', 'Car', 'Rs\u00A0260', false],
+      ['bike', 'Bike', 'Rs\u00A0120', false],
       ['rickshaw', 'Rickshaw', null, true],
-      ['van', 'Van', 'Rs 410', false],
+      ['van', 'Van', 'Rs\u00A0410', false],
     ]);
     // UI-R5: no emoji artwork; the card picks an MDI glyph from the key.
     expect(JSON.stringify(options)).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
@@ -143,12 +143,12 @@ describe('vehicle options and fare breakdown', () => {
     const rows = fareBreakdownRows(quoteBreakdown(car), { distanceKm: estimates.distance_km, durationMin: estimates.duration_min });
 
     expect(rows.map(({ label, value }) => ({ label, value }))).toEqual([
-      { label: 'Base fare', value: 'Rs 50' },
-      { label: 'Distance · 6.4 km', value: 'Rs 182' },
-      { label: 'Time · 14 min', value: 'Rs 28' },
+      { label: 'Base fare', value: 'Rs\u00A050' },
+      { label: 'Distance · 6.4 km', value: 'Rs\u00A0182' },
+      { label: 'Time · 14 min', value: 'Rs\u00A028' },
     ]);
     expect(50 + 182 + 28).toBe(car.fare);
-    expect(formatFare(car.fare, car.currency)).toBe('Rs 260');
+    expect(formatFare(car.fare, car.currency)).toBe('Rs\u00A0260');
   });
 
   it('lists stops and a minimum-fare top-up only when the server charged them', () => {

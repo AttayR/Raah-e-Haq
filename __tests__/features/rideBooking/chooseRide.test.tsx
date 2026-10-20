@@ -298,12 +298,12 @@ describe('T-521: offer your fare, fuel notice and terms on the sheet', () => {
 
   it('starts at the server fare (no offered_fare), steps by the band step and stops at the edges', () => {
     const { getByTestId, getAllByText } = render(<WithOffer data={quoted()} />);
-    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 230');
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs\u00A0230');
     expect(getByTestId('offered-fare').props.children).toBe('none');
     getByTestId('offer-stepper-recommended');
 
     fireEvent.press(getByTestId('offer-stepper-up'));
-    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 240');
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs\u00A0240');
     expect(getByTestId('offered-fare').props.children).toBe('240');
     // The footer and the total follow the offer; the breakdown shows the difference.
     expect(getByTestId('fare-request')).toHaveTextContent('Request Car · Rs 240');
@@ -311,13 +311,13 @@ describe('T-521: offer your fare, fuel notice and terms on the sheet', () => {
     expect(getAllByText('+Rs 10').length).toBe(1);
 
     for (let i = 0; i < 10; i += 1) fireEvent.press(getByTestId('offer-stepper-up'));
-    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 270');
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs\u00A0270');
     expect(getByTestId('offer-stepper-up').props.accessibilityState).toMatchObject({ disabled: true });
 
     fireEvent.press(getByTestId('offer-stepper-reset'));
     expect(getByTestId('offered-fare').props.children).toBe('none');
     for (let i = 0; i < 10; i += 1) fireEvent.press(getByTestId('offer-stepper-down'));
-    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs 190');
+    expect(getByTestId('offer-stepper-value').props.children).toBe('Rs\u00A0190');
     expect(getByTestId('offer-stepper-down').props.accessibilityState).toMatchObject({ disabled: true });
   });
 

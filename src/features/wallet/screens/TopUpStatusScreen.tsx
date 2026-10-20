@@ -16,7 +16,7 @@ import { AppText, Button, Card, ErrorState, Header, Icon, Screen, SkeletonCard, 
 import { formatMoney } from '../../../core/format/money';
 import { triggerHaptic } from '../../../core/haptics';
 import { t } from '../../../i18n';
-import { layout, radius, space } from '../../../theme';
+import { componentTokens, layout, radius, space } from '../../../theme';
 import { ADD_MONEY_ROUTE, type WalletRoutes } from '../navigation';
 import { providerDisplayName, topUpStatusView } from '../topUpFormat';
 import { isTerminalTopUp, useAppActive, useTopUpStatus } from '../topUpHooks';
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: space[8] },
   body: { paddingHorizontal: space[4], gap: space[4], width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' },
   hero: { alignItems: 'center', gap: space[2], paddingVertical: space[6] },
-  heroIcon: { width: 72, height: 72, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: space[2] },
+  heroIcon: { width: componentTokens.wallet.statusIcon, height: componentTokens.wallet.statusIcon, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: space[2] },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3] },
   rowLabel: { flexShrink: 0, maxWidth: '45%' },
   rowValue: { flex: 1, minWidth: 0 },

@@ -128,9 +128,9 @@ describe('mappers', () => {
 
   it('report status texts: refunded, under review with the AC part, reviewed', () => {
     const base = { id: 1, refundAmount: 0, suggestedRefund: null, createdAt: null, resolvedAt: null };
-    expect(acReportStatusText({ ...base, status: 'upheld', refundAmount: 60 })).toBe('Rs 60 refunded to your wallet');
+    expect(acReportStatusText({ ...base, status: 'upheld', refundAmount: 60 })).toBe('Rs\u00A060 refunded to your wallet');
     expect(acReportStatusText({ ...base, status: 'open', suggestedRefund: 60 })).toBe(
-      'Under review. Up to Rs 60 comes back when it is upheld.',
+      'Under review. Up to Rs\u00A060 comes back when it is upheld.',
     );
     expect(acReportStatusText({ ...base, status: 'rejected' })).toBe('Reviewed. No refund this time.');
   });
@@ -186,7 +186,7 @@ describe('passenger: AC not working', () => {
     expect(toast.success).toHaveBeenCalledWith('Sorry about the AC. We refunded Rs 60 to your wallet.');
     expect(onReported).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByTestId('ac-report-button')).toBeNull());
-    expect(screen.getByTestId('ac-report-status-text').props.children).toBe('Rs 60 refunded to your wallet');
+    expect(screen.getByTestId('ac-report-status-text').props.children).toBe('Rs\u00A060 refunded to your wallet');
   });
 
   it('409 ALREADY_REPORTED: says so and the button goes', async () => {

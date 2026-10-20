@@ -132,7 +132,7 @@ describe('DriverDriveScreen (UI-R4)', () => {
     // UI-R11 D4: one Today card (no "Today · Rs" chip): earnings once, then the cells; untracked
     // online time / acceptance are hidden.
     expect(screen.queryByText('Today · Rs 1,250')).toBeNull();
-    expect(screen.getByTestId('drive-today-earnings').props.children).toBe('Rs 1,250');
+    expect(screen.getByTestId('drive-today-earnings').props.children).toBe('Rs\u00A01,250');
     expect(screen.getAllByText('Rs 1,250')).toHaveLength(1);
     expect(screen.getByText('2')).toBeTruthy();
     expect(screen.getByText('New')).toBeTruthy();

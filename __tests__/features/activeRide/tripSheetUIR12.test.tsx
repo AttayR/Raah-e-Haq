@@ -164,7 +164,7 @@ describe('trip model (PA2, PT2, PR2)', () => {
       'Your driver is here. Plate LEC-9.',
     );
     expect(tripAnnouncement('completed', passengerTripView('completed', driverRide({ status: 'completed', total_fare: 310, accepted_fare: null }), {}, false))).toBe(
-      "You've arrived. Pay Rs 310 in cash.",
+      "You've arrived. Pay Rs\u00A0310 in cash.",
     );
   });
 });

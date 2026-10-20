@@ -1,156 +1,59 @@
-import React, { Component, ReactNode } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Icon } from './ui/Icon';
-import { BrandColors } from '../theme/colors';
+import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { logger } from '../core/logging/logger';
 import { t } from '../i18n';
+import { BoundaryFallback } from './BoundaryFallback';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: any) => void;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
-  hasError: boolean;
   error: Error | null;
-  errorInfo: any;
 }
 
+/** The fallback's body for a map error. */
+export const mapErrorMessage = (error: Error): string => {
+  if (error.message.includes('NullPointerException') || error.message.includes('removeView')) return t('errorBoundary.mapRestart');
+  if (error.message.includes('MapView') || error.message.includes('Google Maps')) return t('errorBoundary.mapService');
+  if (error.message.includes('Location') || error.message.includes('permission')) return t('errorBoundary.location');
+  return t('errorBoundary.mapGeneric');
+};
+
+/**
+ * Catches a crash inside a map and shows the kit ErrorState with "Try again", which re-mounts
+ * the map (UI-R19: no longer a hand-styled card plus a native Alert on top of it).
+ */
 export class MapErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null,
-    };
-  }
+  state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
-    return {
-      hasError: true,
-      error,
-      errorInfo: null,
-    };
+    return { error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logger.error('MapErrorBoundary caught an error:', error, errorInfo);
-    
-    this.setState({
-      error,
-      errorInfo,
-    });
-
-    // Call the onError callback if provided
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo);
-    }
-
-    // Show user-friendly error message for map errors
-    this.showMapErrorAlert(error);
+    this.props.onError?.(error, errorInfo);
   }
-
-  showMapErrorAlert = (error: Error) => {
-    let errorMessage = t('errorBoundary.mapGeneric');
-    
-    // Provide more specific error messages based on error type
-    if (error.message.includes('NullPointerException') || error.message.includes('removeView')) {
-      errorMessage = t('errorBoundary.mapRestart');
-    } else if (error.message.includes('MapView') || error.message.includes('Google Maps')) {
-      errorMessage = t('errorBoundary.mapService');
-    } else if (error.message.includes('Location') || error.message.includes('permission')) {
-      errorMessage = t('errorBoundary.location');
-    }
-
-    Alert.alert(
-      t('errorBoundary.mapAlertTitle'),
-      errorMessage,
-      [
-        {
-          text: t('errorBoundary.ok'),
-          onPress: () => this.resetError(),
-        },
-        {
-          text: t('errorBoundary.restart'),
-          onPress: () => this.resetError(),
-        },
-      ],
-      { cancelable: false }
-    );
-  };
 
   resetError = () => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-    });
+    this.setState({ error: null });
   };
 
   render() {
-    if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
-      return (
-        <View style={styles.errorContainer}>
-          <View style={styles.errorContent}>
-            <Icon name="map" size={48} tint={BrandColors.primary} />
-            <Text style={styles.errorTitle}>{t('errorBoundary.mapTitle')}</Text>
-            <Text style={styles.errorMessage}>{t('errorBoundary.mapBody')}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={this.resetError}>
-              <Text style={styles.retryButtonText}>{t('errorBoundary.retry')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    }
-
-    return this.props.children;
+    const { error } = this.state;
+    if (!error) return this.props.children;
+    if (this.props.fallback) return this.props.fallback;
+    return (
+      <BoundaryFallback
+        title={t('errorBoundary.mapTitle')}
+        body={mapErrorMessage(error)}
+        onRetry={this.resetError}
+        testID="map-error-boundary"
+      />
+    );
   }
 }
-
-const styles = StyleSheet.create({
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    padding: 20,
-  },
-  errorContent: {
-    alignItems: 'center',
-    maxWidth: 300,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: BrandColors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
 
 export default MapErrorBoundary;

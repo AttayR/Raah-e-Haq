@@ -139,20 +139,20 @@ describe('fare readers', () => {
 describe('text', () => {
   it('terms only while fees are on', () => {
     expect(farePolicyLines(policy)).toEqual([
-      '3 min free waiting at the pickup, then Rs 3 a minute.',
-      'Free to cancel for 5 min after a driver accepts, then Rs 50.',
+      '3 min free waiting at the pickup, then Rs\u00A03 a minute.',
+      'Free to cancel for 5 min after a driver accepts, then Rs\u00A050.',
     ]);
     expect(farePolicyLines({ ...policy, feesEnabled: false })).toEqual([]);
     expect(farePolicyLines(null)).toEqual([]);
   });
 
   it('the cancel preview: costs now, free until a time, or free', () => {
-    expect(cancelPreviewText({ feeNow: 50, freeUntil: null, reason: 'late_cancel' })).toBe('Cancelling now costs Rs 50. It is charged to your wallet.');
+    expect(cancelPreviewText({ feeNow: 50, freeUntil: null, reason: 'late_cancel' })).toBe('Cancelling now costs Rs\u00A050. It is charged to your wallet.');
     expect(cancelPreviewText({ feeNow: 0, freeUntil: '2026-10-15T13:05:00+05:00', reason: null })).toMatch(/^Free to cancel until \d{1,2}:05 (AM|PM)\.$/);
     expect(cancelPreviewText({ feeNow: 0, freeUntil: null, reason: null })).toBe('Cancelling now is free.');
     expect(cancelPreviewText(null)).toBeNull();
     expect(cancelConfirmBody({ cancellation_preview: { fee_now: 50, free_until: null, reason: 'late_cancel' } })).toBe(
-      'Your driver is already on the way. Cancelling now costs Rs 50. It is charged to your wallet.',
+      'Your driver is already on the way. Cancelling now costs Rs\u00A050. It is charged to your wallet.',
     );
     expect(cancelConfirmBody(null)).toBe('Your driver is already on the way.');
   });
@@ -160,16 +160,16 @@ describe('text', () => {
   it('the waiting timer: free time left, then the rate', () => {
     expect(formatClock(125)).toBe('2:05');
     expect(waitingDetail(policy, 60)).toBe('Free waiting: 2:00 left');
-    expect(waitingDetail(policy, 200)).toBe('Waiting fee: Rs 3 a minute after 3 min (up to 15 min)');
+    expect(waitingDetail(policy, 200)).toBe('Waiting fee: Rs\u00A03 a minute after 3 min (up to 15 min)');
   });
 
   it('report status and the cancel-fee sentence', () => {
     const report = { id: 1, status: 'open' as const, askedAmount: null, fare: 152, refundAmount: 0, createdAt: null, resolvedAt: null };
     expect(reportStatusText(report)).toBe('Received. We are looking into it.');
-    expect(reportStatusText({ ...report, status: 'upheld', refundAmount: 50 })).toBe('Upheld. Rs 50 was refunded to your wallet.');
+    expect(reportStatusText({ ...report, status: 'upheld', refundAmount: 50 })).toBe('Upheld. Rs\u00A050 was refunded to your wallet.');
     expect(reportStatusText({ ...report, status: 'rejected' })).toBe('Reviewed. No action was taken.');
-    expect(cancellationFeeText(50, 'no_show')).toBe('A no-show fee of Rs 50 was charged to your wallet.');
-    expect(cancellationFeeText(50, 'late_cancel')).toBe('A cancellation fee of Rs 50 was charged to your wallet.');
+    expect(cancellationFeeText(50, 'no_show')).toBe('A no-show fee of Rs\u00A050 was charged to your wallet.');
+    expect(cancellationFeeText(50, 'late_cancel')).toBe('A cancellation fee of Rs\u00A050 was charged to your wallet.');
     expect(cancellationFeeText(0, null)).toBeNull();
   });
 });
@@ -238,7 +238,7 @@ describe('balance owed on book (BE-85)', () => {
     const onTopUp = jest.fn();
     const shown = showBalanceOwed({ message: 'You owe Rs 200. Top up to book.', amountOwed: 200 }, onTopUp);
     const current = dialogStore.getCurrent();
-    expect(current).toMatchObject({ title: 'You owe Rs 200', confirmLabel: 'Top up', cancelLabel: 'Not now' });
+    expect(current).toMatchObject({ title: 'You owe Rs\u00A0200', confirmLabel: 'Top up', cancelLabel: 'Not now' });
     if (current) dialog.answer(current.id, true);
     await shown;
     expect(onTopUp).toHaveBeenCalledTimes(1);

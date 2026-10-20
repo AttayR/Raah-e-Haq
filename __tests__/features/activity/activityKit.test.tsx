@@ -37,7 +37,7 @@ describe('toActivitySummary', () => {
       { key: 'rides', label: 'Rides', value: '12' },
       { key: 'rating', label: 'Rating', value: '4.9' },
       { key: 'distance', label: 'Distance', value: '84.3 km' },
-      { key: 'spent', label: 'Spent', value: 'Rs 5,600' },
+      { key: 'spent', label: 'Spent', value: 'Rs\u00A05,600' },
     ]);
   });
 

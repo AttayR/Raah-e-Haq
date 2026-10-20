@@ -58,6 +58,7 @@ export function HelpTripSection({ ride, viewer, onPress, onChooseAnother }: Prop
           variant="ghost"
           size="sm"
           fullWidth={false}
+          flushStart
           onPress={onChooseAnother}
           testID="support-trip-another"
         />

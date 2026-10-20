@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Icon } from '../../../components/ui';
-import { radius, space } from '../../../theme';
+import { componentTokens, radius, space } from '../../../theme';
 import { transactionTypeLabel, WALLET_COPY } from '../copy';
 import { formatTime, transactionAmountColor, transactionAmountText, transactionIcon } from '../format';
 import type { WalletTransaction } from '../types';
@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[3],
-    minHeight: 64,
+    minHeight: componentTokens.wallet.rowMinHeight,
     paddingHorizontal: space[4],
     paddingVertical: space[2],
   },
   icon: {
-    width: 40,
-    height: 40,
+    width: componentTokens.wallet.rowIcon,
+    height: componentTokens.wallet.rowIcon,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
