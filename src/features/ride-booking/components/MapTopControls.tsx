@@ -19,6 +19,13 @@ type Props = {
    * ride" (fits the ride again) instead of "show my location".
    */
   followRide?: { visible: boolean; onPress: () => void };
+  /**
+   * [UI-R12] The trip map (shared-trip-sheet TS2): recentre is transient (shown only after a pan,
+   * hidden at `expanded`), so the end-side control is hidden while this is true.
+   */
+  recentreHidden?: boolean;
+  /** [UI-R12] The top-end control: the Safety shield on the trip map. */
+  topEnd?: React.ReactNode;
 };
 
 /**
@@ -27,7 +34,7 @@ type Props = {
  * end-side control riding 16 above the sheet. No "start over" and no refresh: Back steps through
  * the booking and the data refreshes itself.
  */
-export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, sheetHeight, followRide }) => {
+export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, sheetHeight, followRide, recentreHidden = false, topEnd }) => {
   const follow = followRide?.visible === true;
   return (
     <MapControls
@@ -40,6 +47,8 @@ export const MapTopControls: React.FC<Props> = ({ onBack, onRecenter, sheetHeigh
       locateLabel={follow ? ACTIVE_RIDE_COPY.recentreA11y : BOOKING_COPY.recenterA11y}
       locateTestID={follow ? 'ride-recentre' : 'map-recenter'}
       sheetHeight={sheetHeight}
+      locateHidden={recentreHidden}
+      topEnd={topEnd}
     />
   );
 };

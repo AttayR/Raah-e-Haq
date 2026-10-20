@@ -33,7 +33,7 @@ import { componentTokens, layout, motion, motionPatterns, reducedMotion, space, 
 import { toEasing } from './easing';
 import { ModalRoot } from './ModalRoot';
 import { useModalTurn } from './modalQueue';
-import { fullHeight, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
+import { fullHeight, openingTop, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
 
 export type { SheetSnap } from './sheetSnaps';
 
@@ -94,6 +94,22 @@ export type BottomSheetProps = React.PropsWithChildren<{
    * sheet never eats Back or jumps to `full` for someone else's field. Default true.
    */
   active?: boolean;
+  /**
+   * [UI-R12] A tap on the handle toggles the lowest snap and the next one (shared-trip-sheet
+   * TS8, TS13): the way to Cancel in the trip details without dragging. Default false.
+   */
+  handleTapToggles?: boolean;
+  /**
+   * [UI-R12] False: no handle is drawn (the 24 top band stays as padding) and the sheet cannot be
+   * dragged (the trip receipt, passenger-trip-complete PR1). Default true.
+   */
+  draggable?: boolean;
+  /**
+   * [UI-R12] Opening height: the sheet rises from this height instead of from the bottom edge,
+   * so a sheet that takes over from another one (finding a driver → driver on the way, TS1/TS7)
+   * continues from where the old one stood. Read when the sheet first opens.
+   */
+  openFrom?: number;
   /** Read by screen readers on the handle. */
   accessibilityLabel?: string;
   testID?: string;
@@ -131,6 +147,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     contentKey,
     expandOnKeyboard = true,
     active = true,
+    handleTapToggles = false,
+    draggable = true,
+    openFrom,
     accessibilityLabel,
     testID,
     children,
@@ -355,6 +374,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // First placement once the container (and, for content snaps, the content) is measured, and
   // re-placement when the snap heights change (rotation, content swap on a `content` snap).
   const initialSnapRef = useRef(initialSnap);
+  const openFromRef = useRef(openFrom);
   useEffect(() => {
     if (!live || closing.current || containerHeight === 0 || resolved.length === 0) return;
     container.value = containerHeight;
@@ -362,8 +382,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     const wanted = currentRef.current ?? initialSnapRef.current ?? resolved[0].snap;
     const target = resolved.find(r => r.snap === wanted) ?? resolved[0];
     if (currentRef.current === null) {
-      // Opening: start below the screen, then rise with the spring.
-      top.value = containerHeight;
+      // Opening: start below the screen (or where the sheet it takes over from stood), then rise
+      // with the spring.
+      top.value = openingTop(containerHeight, openFromRef.current);
     } else if (calmRef.current && currentRef.current === target.snap) {
       // [UI-R20] Resized while up: a higher snap keeps its height (the next snap uses the new
       // heights); the lowest one eases to its new height without overshoot.
@@ -488,6 +509,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     const highest = resolved[resolved.length - 1];
     const lowest = resolved[0];
     return Gesture.Pan()
+      .enabled(draggable)
       .activeOffsetY([-6, 6])
       .onStart(() => {
         startTop.value = top.value;
@@ -518,7 +540,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         animateTo(target.height, event.velocityY);
         runOnJS(dragSettled)(target);
       });
-  }, [animateTo, beginClose, container, dismissible, dragSettled, dragging, finishClose, modal, resolved, startTop, top]);
+  }, [animateTo, beginClose, container, dismissible, dragSettled, draggable, dragging, finishClose, modal, resolved, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => {
     // [T-582] Read so a reveal re-writes the transform even when `top` did not change.
@@ -567,6 +589,27 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     if (next) snapTo(next.snap);
   };
 
+  // [UI-R12] A tap on the handle: lowest snap ↔ the next one up.
+  // Read through a ref: the tap gesture keeps one handler while the snaps and the position change.
+  const toggleSnap = useRef(() => {});
+  toggleSnap.current = () => {
+    if (resolved.length < 2) return;
+    const atLowest = current === null || current === resolved[0].snap;
+    snapTo(atLowest ? resolved[1].snap : resolved[0].snap);
+  };
+  const handleTap = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(handleTapToggles && draggable)
+        .withTestId(testID ? `${testID}-handle-tap` : 'sheet-handle-tap')
+        // A tap is rare and only snaps the sheet: handled on the JS thread.
+        .runOnJS(true)
+        .onEnd((_e, success) => {
+          if (success) toggleSnap.current();
+        }),
+    [draggable, handleTapToggles, testID],
+  );
+
   const swapIn = reduce
     ? FadeIn.duration(reducedMotion.listAppear.duration)
     : FadeIn.duration(motionPatterns.sheetContentSwap.duration)
@@ -588,18 +631,24 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     >
       <GestureDetector gesture={pan}>
         <View>
-          <View
-            style={styles.handleArea}
-            accessible
-            accessibilityRole="adjustable"
-            accessibilityLabel={accessibilityLabel ?? t('kit.sheetHandleA11y')}
-            accessibilityHint={t('kit.sheetHandleHint')}
-            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-            onAccessibilityAction={e => expandCollapse(e.nativeEvent.actionName === 'increment' ? 'increment' : 'decrement')}
-            testID={testID ? `${testID}-handle` : undefined}
-          >
-            <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
-          </View>
+          {draggable ? (
+            <GestureDetector gesture={handleTap}>
+              <View
+                style={styles.handleArea}
+                accessible
+                accessibilityRole="adjustable"
+                accessibilityLabel={accessibilityLabel ?? t('kit.sheetHandleA11y')}
+                accessibilityHint={t('kit.sheetHandleHint')}
+                accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+                onAccessibilityAction={e => expandCollapse(e.nativeEvent.actionName === 'increment' ? 'increment' : 'decrement')}
+                testID={testID ? `${testID}-handle` : undefined}
+              >
+                <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
+              </View>
+            </GestureDetector>
+          ) : (
+            <View style={styles.handleArea} testID={testID ? `${testID}-top` : undefined} />
+          )}
           {header ? (
             <View onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)} testID={testID ? `${testID}-header` : undefined}>
               {header}

@@ -152,9 +152,9 @@ describe('text', () => {
     expect(cancelPreviewText({ feeNow: 0, freeUntil: null, reason: null })).toBe('Cancelling now is free.');
     expect(cancelPreviewText(null)).toBeNull();
     expect(cancelConfirmBody({ cancellation_preview: { fee_now: 50, free_until: null, reason: 'late_cancel' } })).toBe(
-      'Are you sure you want to cancel this ride? Cancelling now costs Rs 50. It is charged to your wallet.',
+      'Your driver is already on the way. Cancelling now costs Rs 50. It is charged to your wallet.',
     );
-    expect(cancelConfirmBody(null)).toBe('Are you sure you want to cancel this ride?');
+    expect(cancelConfirmBody(null)).toBe('Your driver is already on the way.');
   });
 
   it('the waiting timer: free time left, then the rate', () => {

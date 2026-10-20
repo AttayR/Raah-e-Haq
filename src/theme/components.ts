@@ -258,7 +258,7 @@ export const componentTokens = {
     /** §5.26 fare breakdown rows. */
     fare: { rowMinHeight: 32 },
     /** §5.27/§5.28/§12.5 person card. */
-    person: { avatar: 56, plateHeight: 28, plateLetterSpacing: 0.5, actionHeight: 56, actionIcon: 24, actionGap: space[2] },
+    person: { avatar: 56, plateHeight: 28, plateLetterSpacing: 0.5, actionHeight: 56, actionIcon: 24, actionGap: space[2], glyph: 24, inlineAction: 48 },
     /** UI-R15 ride details: the non-interactive static map at the top of the receipt. */
     /** `edgeTop` keeps the pins below the top edge (and the city label Google draws there). */
     staticMap: { height: 180, minDelta: 0.01, padding: 2.2, edgeTop: space[8], edge: space[4] },
@@ -452,6 +452,37 @@ export const componentTokens = {
   countdownRing: { size: 32, stroke: 3, trackOpacity: 0.32, endInset: space[3] },
   /** [UI-R11] Metric strip (driver-incoming-request R2 #6): 56 min high, 24 high hairline separators. */
   metricStrip: { minHeight: 56, separatorHeight: 24, cellPaddingVertical: space[2] },
+  /**
+   * [UI-R12/R13] The shared trip sheet (shared-trip-sheet TS3, TS12): status header 56 min with the
+   * 56 ETA tile (radius md, 12 from the text), 16 between zones, details 24 below the peek group,
+   * the compact layout under 700 pt. ETA value: old out 100, new in 150 with a 4 pt rise; values
+   * above 99 read "99+". Fare row 32 min (TS6.2), the sharing dot 6 (TS5), the stale-location
+   * notice after 60 s, the receipt amount skeleton 140 × 34 (PR5).
+   */
+  tripSheet: {
+    headerMinHeight: 56,
+    /** Subtitle 2 below the title (TS3). */
+    titleGap: 2,
+    etaTile: 56,
+    etaTileRadius: radius.md,
+    headerGap: space[3],
+    zoneGap: space[4],
+    itemGap: space[3],
+    detailsGap: space[6],
+    targetRowLines: 2,
+    compactHeight: 700,
+    etaMax: 99,
+    etaOutMs: 100,
+    etaInMs: 150,
+    etaRise: 4,
+    fareRowMinHeight: 32,
+    sharingDot: 6,
+    staleLocationSeconds: 60,
+    amountSkeletonWidth: 140,
+    amountSkeletonHeight: 34,
+    detailsRowHeight: 48,
+    chevron: 20,
+  },
   /**
    * [UI-R11] Incoming request sheet (driver-incoming-request R1–R5): capped at 70 % of the window,
    * 20 top padding, compact layout under 700 pt (iPhone SE), the 64 taken/gone icon circle with a

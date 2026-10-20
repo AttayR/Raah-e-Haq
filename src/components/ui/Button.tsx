@@ -9,7 +9,7 @@ import { CountdownRing, type CountdownSpec } from './CountdownRing';
 import { Icon, type IconName } from './Icon';
 import { usePressScale } from './usePressScale';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'destructiveSoft';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'destructiveSoft' | 'destructiveGhost';
 export type ButtonSize = 'lg' | 'md' | 'sm';
 
 export type ButtonProps = {
@@ -48,6 +48,8 @@ const tones: Record<ButtonVariant, Tone> = {
   ghost: { fill: null, pressed: 'surfacePressed', text: 'primaryText', border: false },
   destructive: { fill: 'dangerFill', pressed: 'dangerPressed', text: 'onPrimary', border: false },
   destructiveSoft: { fill: 'dangerSoft', pressed: 'dangerSoftPressed', text: 'danger', border: false },
+  // [UI-R12] TS8: Cancel in the trip details, transparent with a `danger` label, `dangerSoft` when pressed.
+  destructiveGhost: { fill: null, pressed: 'dangerSoft', text: 'danger', border: false },
 };
 
 /** Height, padding, icon size and icon gap per size (§5.4); `lg` is the 56pt driving-screen action. */

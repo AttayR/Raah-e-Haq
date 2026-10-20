@@ -74,7 +74,7 @@ describe('Home: Return to your ride', () => {
     expect(screen.queryByText('Where to?')).toBeNull();
     fireEvent.press(screen.getByTestId('home-return-to-ride'));
     expect(onReturn).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('home-live-ride-status')).toHaveTextContent('Your driver is on the way');
+    expect(screen.getByTestId('home-live-ride-status')).toHaveTextContent('Driver is on the way');
   });
 
   it('no ride: no "Return" block (the header shows "Where to?")', async () => {
@@ -86,7 +86,7 @@ describe('Home: Return to your ride', () => {
 
   it('the status line follows the ride', () => {
     expect(liveRideStatusText('requested')).toBe('Finding you a driver…');
-    expect(liveRideStatusText('arrived')).toBe('Your driver has arrived');
+    expect(liveRideStatusText('arrived')).toBe('Your driver is here');
     expect(liveRideStatusText('ongoing')).toBe('Trip in progress');
   });
 });

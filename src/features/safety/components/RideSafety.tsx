@@ -1,10 +1,9 @@
 import React, { useCallback, useContext, useState } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { NavigationContext } from '@react-navigation/native';
-import { Button, IconButton } from '../../../components/ui';
+import { IconButton } from '../../../components/ui';
 import { haptics } from '../../../core/haptics';
 import { t } from '../../../i18n';
-import { space } from '../../../theme';
 import type { RideResource } from '../../../services/rideService';
 import { useLiveShare, useSos } from '../hooks';
 import { EMERGENCY_CONTACTS_ROUTE } from '../navigation';
@@ -36,11 +35,13 @@ type Props = {
 };
 
 /**
- * The passenger's safety row on the trip panel (T-520): "Safety" opens the SOS sheet and "Share
- * trip" shares the live trip link (BE-80), "Sharing live" once it is shared. Shown from the
- * driver's acceptance until 30 min after the ride ended; nothing before a driver is assigned.
+ * The passenger's Safety shield on the ride map (UI-R12, shared-trip-sheet TS2): a floating 48
+ * IconButton at the top end, `shield-alert-outline` in `danger`, opening the SOS sheet (calls 15 /
+ * 1122, alert my contacts, share the trip). Shown from the driver's acceptance until 30 min after
+ * the ride ended (T-520); nothing before a driver is assigned. It replaces the old SOS + Share
+ * button row under the PIN (Share is now the PersonCard's third action).
  */
-export function PassengerTripSafety({ ride, position }: Props) {
+export function PassengerSafetyShield({ ride, position, size }: Props & { size?: number }) {
   const [open, setOpen] = useState(false);
   const sos = useSos(ride.id);
   const shareable = canShareTrip(ride);
@@ -50,55 +51,23 @@ export function PassengerTripSafety({ ride, position }: Props) {
 
   const available = isSosAvailable(ride);
 
-  // [T-565] The SOS sheet stays mounted when the safety row goes (30 min after the ride): it
-  // closes through `visible` instead of unmounting a presented Modal.
+  // [T-565] The SOS sheet stays mounted when the shield goes (30 min after the ride): it closes
+  // through `visible` instead of unmounting a presented Modal.
   return (
     <>
       {available ? (
-        <View style={styles.column} testID="trip-safety">
-          <View style={styles.row}>
-            <View style={styles.cell}>
-              <Button
-                label={t('safety.sosButton')}
-                accessibilityLabel={t('safety.sosButtonA11y')}
-                variant="destructiveSoft"
-                leadingIcon="sos"
-                onPress={() => {
-                  haptics.impactLight();
-                  setOpen(true);
-                }}
-                testID="trip-safety-sos"
-              />
-            </View>
-            {shareable ? (
-              <View style={styles.cell}>
-                <Button
-                  label={share.link ? t('safety.sharing') : t('safety.shareTrip')}
-                  accessibilityLabel={
-                    share.link ? t('safety.sharing') : t('safety.shareTripA11y')
-                  }
-                  variant="secondary"
-                  leadingIcon="share"
-                  onPress={share.start}
-                  loading={share.busy}
-                  testID="trip-safety-share"
-                />
-              </View>
-            ) : null}
-          </View>
-          {shareable && share.link ? (
-            <Button
-              label={t('safety.stopSharing')}
-              accessibilityLabel={t('safety.stopSharingA11y')}
-              variant="ghost"
-              size="sm"
-              leadingIcon="shareOff"
-              onPress={share.stop}
-              disabled={share.busy}
-              testID="trip-safety-stop-sharing"
-            />
-          ) : null}
-        </View>
+        <IconButton
+          icon="sos"
+          variant="floating"
+          size={size}
+          iconColor="danger"
+          onPress={() => {
+            haptics.impactLight();
+            setOpen(true);
+          }}
+          accessibilityLabel={t('safety.sosButtonA11y')}
+          testID="trip-safety-sos"
+        />
       ) : null}
       <SosSheet
         visible={open && available}
@@ -161,8 +130,3 @@ export function DriverRideSafetyButton({
   );
 }
 
-const styles = StyleSheet.create({
-  column: { gap: space[1] },
-  row: { flexDirection: 'row', gap: space[2] },
-  cell: { flex: 1 },
-});

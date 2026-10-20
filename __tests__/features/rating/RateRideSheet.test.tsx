@@ -15,7 +15,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../../src/services/api';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { RateRideSheet } from '../../../src/features/rating/components/RateRideSheet';
-import { DriverRideRatingPrompt, PassengerRideRatingPrompt } from '../../../src/features/rating/components/RideRatingPrompt';
+import { DriverRideRatingPrompt } from '../../../src/features/rating/components/RideRatingPrompt';
 import { RideRatingSection } from '../../../src/features/rating/components/RideRatingSection';
 import { resetRatingSessionState } from '../../../src/features/rating/hooks';
 import activeRideReducer, { initialActiveRideState } from '../../../src/features/active-ride/slice';
@@ -293,27 +293,16 @@ const renderPrompt = async (store: ReturnType<typeof makeStore>, element: React.
 };
 
 describe('after-ride prompt', () => {
-  it('passenger: opens on a completed, ratable ride; a rating patches the ride and closes it', async () => {
-    mock.onPost('/rides/12/rate').reply(201, { success: true, data: { my_rating: RATED, can_rate: false } });
+  // UI-R12: the passenger rates inline in the trip receipt (activeRide/tripSheetUIR12.test.tsx);
+  // this prompt sheet now opens only on the driver's ride screen.
+  it('driver: stays closed while inactive, without can_rate, or before completion', async () => {
     const store = makeStore(completedRide());
-    await renderPrompt(store, <PassengerRideRatingPrompt active />);
-    // T-519: first name only, like the live ride card and ride details.
-    expect(screen.getByTestId('rate-ride-name').props.children).toBe('Bilal');
-    rate(5);
-    await press('rate-ride-submit');
-    expect(store.getState().activeRide.ride?.can_rate).toBe(false);
-    expect(store.getState().activeRide.ride?.my_rating).toMatchObject({ stars: 5, tags: ['clean_car'] });
-    expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
-  });
-
-  it('stays closed while inactive, without can_rate, or before completion', async () => {
-    const store = makeStore(completedRide());
-    const view = await renderPrompt(store, <PassengerRideRatingPrompt active={false} />);
+    const view = await renderPrompt(store, <DriverRideRatingPrompt active={false} />);
     expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
     view.unmount();
-    await renderPrompt(makeStore(completedRide({ can_rate: false })), <PassengerRideRatingPrompt active />);
+    await renderPrompt(makeStore(completedRide({ can_rate: false })), <DriverRideRatingPrompt active />);
     expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
-    await renderPrompt(makeStore(completedRide({ status: 'started', can_rate: false })), <PassengerRideRatingPrompt active />);
+    await renderPrompt(makeStore(completedRide({ status: 'started', can_rate: false })), <DriverRideRatingPrompt active />);
     expect(screen.queryByTestId('rate-ride-submit')).toBeNull();
   });
 

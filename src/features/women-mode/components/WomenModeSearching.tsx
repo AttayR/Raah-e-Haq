@@ -14,7 +14,8 @@ import {
 import type { WomenModeAction, WomenModeSummary } from '../types';
 
 type Props = {
-  rideId: number;
+  /** Null while no ride exists (nothing renders). */
+  rideId: number | null;
   /** Ride `women_mode` as the server sent it (raw); nothing renders without it. */
   raw: unknown;
   /**
@@ -109,7 +110,11 @@ function FallbackSheet({
  * released (a poll that left before the answer cannot bring the sheet back). An inline answer
  * that fails says why under the status line.
  */
-export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
+export function useWomenModeSearching({
+  rideId,
+  raw,
+  searching = true,
+}: Props) {
   const [answered, setAnswered] = useState<{
     rideId: number;
     raw: unknown;
@@ -154,7 +159,7 @@ export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
   const choose = async (action: WomenModeAction) => {
     const next = await choice.choose(action);
     // Refused (the hook shows why) or skipped (one answer at a time): the sheet stays.
-    if (!next) return;
+    if (!next || rideId === null) return;
     setAnswered({ rideId, raw, action, summary: next });
     if (action === 'keep_waiting')
       setSnoozedUntil(snoozeAfterKeepWaiting(next, Date.now()));
@@ -167,8 +172,25 @@ export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
   const noneNearbyNow = summary?.state === 'no_female_drivers_nearby';
   const [noneNearby, setNoneNearby] = useState(noneNearbyNow);
   if (showSheet && noneNearby !== noneNearbyNow) setNoneNearby(noneNearbyNow);
-  // [T-565] The sheet sits outside the status block and is always rendered, so it closes through
-  // `visible` when the ride is matched, released or no longer searching.
+  const snooze = () => setSnoozedUntil(Date.now() + DISMISS_SNOOZE_MS);
+  return {
+    searching,
+    summary,
+    released,
+    showSheet,
+    noneNearby,
+    choice,
+    choose,
+    snooze,
+  };
+}
+
+/** The state shared by the status block and the choice sheet (one per ride). */
+export type WomenModeSearchingState = ReturnType<typeof useWomenModeSearching>;
+
+/** "Looking for a female driver" with the inline "Allow any driver", while the ride searches. */
+export function WomenModeStatus({ state }: { state: WomenModeSearchingState }) {
+  const { searching, summary, released, showSheet, choice, choose } = state;
   return (
     <>
       {searching && summary && summary.state !== 'matched' ? (
@@ -213,16 +235,42 @@ export function WomenModeSearching({ rideId, raw, searching = true }: Props) {
           ) : null}
         </View>
       ) : null}
-      <FallbackSheet
-        visible={showSheet}
-        noneNearby={noneNearby}
-        pending={choice.pending}
-        error={choice.error}
-        onChoose={action => {
-          choose(action);
-        }}
-        onClose={() => setSnoozedUntil(Date.now() + DISMISS_SNOOZE_MS)}
-      />
+    </>
+  );
+}
+
+/**
+ * The "Keep waiting / Allow any driver" sheet. [T-565] UI-R12: the booking map mounts it once per
+ * ride at screen level (outside both the booking and the trip sheet), so an open sheet closes
+ * through `visible` when a driver takes the ride instead of being unmounted with its sheet.
+ */
+export function WomenModeChoiceSheet({
+  state,
+}: {
+  state: WomenModeSearchingState;
+}) {
+  const { showSheet, noneNearby, choice, choose, snooze } = state;
+  return (
+    <FallbackSheet
+      visible={showSheet}
+      noneNearby={noneNearby}
+      pending={choice.pending}
+      error={choice.error}
+      onChoose={action => {
+        choose(action);
+      }}
+      onClose={snooze}
+    />
+  );
+}
+
+/** The status block and its choice sheet together (one place, e.g. a single panel). */
+export function WomenModeSearching(props: Props) {
+  const state = useWomenModeSearching(props);
+  return (
+    <>
+      <WomenModeStatus state={state} />
+      <WomenModeChoiceSheet state={state} />
     </>
   );
 }

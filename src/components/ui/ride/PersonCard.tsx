@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { t } from '../../../i18n';
 import { componentTokens, radius, space } from '../../../theme';
@@ -8,6 +8,7 @@ import { Avatar } from '../Avatar';
 import { Badge } from '../Badge';
 import { Card } from '../Card';
 import { Icon, type IconName } from '../Icon';
+import { IconButton } from '../IconButton';
 import { RatingDisplay } from './RatingStars';
 
 const p = componentTokens.ride.person;
@@ -22,6 +23,10 @@ export type PersonAction = {
   accessibilityLabel?: string;
   accessibilityHint?: string;
   disabled?: boolean;
+  /** [UI-R12] Work in flight (creating a share link): a 20 spinner in place of the glyph, no taps. */
+  busy?: boolean;
+  /** [UI-R12] A 6 pt `success` dot on the glyph's top-end (Share while a live link exists, TS5). */
+  dot?: boolean;
   testID?: string;
 };
 
@@ -29,14 +34,15 @@ export type PersonAction = {
 function ActionButton({ action }: { action: PersonAction }) {
   const { theme } = useAppTheme();
   const c = theme.colors;
+  const inactive = !!action.disabled || !!action.busy;
   return (
     <Pressable
       onPress={action.onPress}
-      disabled={action.disabled}
+      disabled={inactive}
       accessibilityRole="button"
       accessibilityLabel={action.accessibilityLabel ?? action.label}
       accessibilityHint={action.accessibilityHint}
-      accessibilityState={{ disabled: !!action.disabled }}
+      accessibilityState={{ disabled: inactive, busy: !!action.busy }}
       android_ripple={{ color: c.surfaceAltPressed }}
       testID={action.testID}
       style={({ pressed }) => [
@@ -45,8 +51,18 @@ function ActionButton({ action }: { action: PersonAction }) {
         action.disabled ? styles.disabled : null,
       ]}
     >
-      <View>
-        <Icon name={action.icon} size={24} color="primaryText" />
+      <View style={styles.glyph}>
+        {action.busy ? (
+          <ActivityIndicator size="small" color={c.primaryText} testID={action.testID ? `${action.testID}-spinner` : undefined} />
+        ) : (
+          <Icon name={action.icon} size={24} color="primaryText" />
+        )}
+        {action.dot && !action.busy ? (
+          <View
+            style={[styles.dot, { backgroundColor: c.success, borderColor: c.surfaceAlt, borderWidth: theme.borderWidth.thin }]}
+            testID={action.testID ? `${action.testID}-dot` : undefined}
+          />
+        ) : null}
         {action.badgeCount ? (
           <View style={styles.badge}>
             <Badge variant="count" count={action.badgeCount} />
@@ -90,6 +106,12 @@ export type PersonCardProps = {
   size?: 'regular' | 'compact';
   /** [UI-R11] A `caption` after the rating on the same line (" · 3 passengers"). */
   ratingSuffix?: string | null;
+  /**
+   * [UI-R12/R13] `row` (default): the actions in a row of 56 cells under the identity row.
+   * `inline`: trailing tonal 48 IconButtons in the identity row (driver, compact height < 700,
+   * shared-trip-sheet TS5); no action row.
+   */
+  actionsLayout?: 'row' | 'inline';
   testID?: string;
   nameTestID?: string;
   ratingTestID?: string;
@@ -118,6 +140,7 @@ export function PersonCard({
   variant = 'card',
   size = 'regular',
   ratingSuffix,
+  actionsLayout = 'row',
   testID,
   nameTestID,
   ratingTestID,
@@ -126,6 +149,8 @@ export function PersonCard({
 }: PersonCardProps) {
   const { theme } = useAppTheme();
   const c = theme.colors;
+  const inline = actionsLayout === 'inline';
+  const shownActions = actions.slice(0, 3);
   const body = (
     <View style={styles.wrap}>
       <View style={styles.top}>
@@ -183,10 +208,24 @@ export function PersonCard({
             </AppText>
           </View>
         ) : null}
+        {inline
+          ? shownActions.map(action => (
+              <IconButton
+                key={action.key}
+                icon={action.icon}
+                variant="tonal"
+                size={p.inlineAction}
+                onPress={action.onPress}
+                disabled={!!action.disabled || !!action.busy}
+                accessibilityLabel={action.accessibilityLabel ?? action.label}
+                testID={action.testID}
+              />
+            ))
+          : null}
       </View>
-      {actions.length > 0 ? (
+      {!inline && shownActions.length > 0 ? (
         <View style={styles.actions}>
-          {actions.slice(0, 3).map(action => (
+          {shownActions.map(action => (
             <ActionButton key={action.key} action={action} />
           ))}
         </View>
@@ -230,5 +269,14 @@ const styles = StyleSheet.create({
     paddingVertical: space[1],
   },
   badge: { position: 'absolute', top: -space[1], end: -space[2] },
+  glyph: { minWidth: p.glyph, minHeight: p.glyph, alignItems: 'center', justifyContent: 'center' },
+  dot: {
+    position: 'absolute',
+    top: 0,
+    end: 0,
+    width: componentTokens.tripSheet.sharingDot,
+    height: componentTokens.tripSheet.sharingDot,
+    borderRadius: componentTokens.tripSheet.sharingDot,
+  },
   disabled: { opacity: componentTokens.state.disabledOpacity },
 });

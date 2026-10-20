@@ -24,7 +24,10 @@ export const cancelConfirmBody = (
     ? t('parcel.cancelConfirmMessage')
     : request
       ? ACTIVE_RIDE_COPY.cancelRequestMessage
-      : ACTIVE_RIDE_COPY.cancelConfirmMessage;
+      : ride?.status === 'arrived'
+        ? // UI-R12 PA4: the driver is already at the pickup.
+          ACTIVE_RIDE_COPY.cancelConfirmMessageArrived
+        : ACTIVE_RIDE_COPY.cancelConfirmMessage;
   return preview ? `${question} ${preview}` : question;
 };
 

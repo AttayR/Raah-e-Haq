@@ -57,17 +57,19 @@ const feesOn = {
 };
 
 describe('trip panel (passenger)', () => {
-  it('shows "Fare locked" once a driver accepted', () => {
+  it('shows the fare with the orange "Fixed fare" tag once a driver accepted (UI-R12 TS6.2)', () => {
     const { getByText, getByTestId } = render(panel(withDriver({ status: 'accepted', fare_locked: true, accepted_fare: '152.00' })));
-    getByText('Fare locked: Rs 152');
-    expect(getByTestId('fare-locked').props.accessibilityLabel).toBe('Your fare is locked at Rs 152. Pay only this amount.');
+    expect(getByTestId('trip-fare-row-amount')).toHaveTextContent('Rs 152');
+    getByText('Fixed fare');
+    expect(getByTestId('trip-fare-row-tag')).toBeTruthy();
+    expect(getByTestId('trip-fare-row').props.accessibilityLabel).toBe('Your fare is locked at Rs 152. Pay only this amount.');
   });
 
-  it('no lock badge while searching or for a ride accepted before the lock existed', () => {
+  it('no fixed-fare tag while searching or for a ride accepted before the lock existed', () => {
     const { queryByTestId, rerender } = render(panel(makeRide({ status: 'requested', fare_locked: false })));
-    expect(queryByTestId('fare-locked')).toBeNull();
+    expect(queryByTestId('trip-fare-row')).toBeNull();
     rerender(panel(withDriver({ status: 'accepted' })));
-    expect(queryByTestId('fare-locked')).toBeNull();
+    expect(queryByTestId('trip-fare-row-tag')).toBeNull();
   });
 
   it('ticks a waiting timer after a verified arrival while fees are on', () => {

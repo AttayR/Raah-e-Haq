@@ -1,6 +1,7 @@
 /**
- * T-520: the passenger trip safety row and SOS sheet, the live trip link, the masked call hook
- * and the PIN card.
+ * T-520: the passenger trip safety tools and SOS sheet, the live trip link, the masked call hook
+ * and the PIN card. UI-R12: SOS is the map's Safety shield; Share trip is the PersonCard's third
+ * action (useTripShare) with the "You're sharing this trip" dialog and the details' Stop row.
  * - SOS (BE-79): "Call 15" / "Call 1122" are plain tel: links that work with no network and when
  *   the alert fails; "Alert my emergency contacts" confirms first, POSTs /sos once with the
  *   position (a second tap re-opens messages, no second POST) and opens the SMS composer to the
@@ -18,7 +19,10 @@ import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../../src/services/api';
 import { rootReducer } from '../../../src/store/rootReducer';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
-import { PassengerTripSafety } from '../../../src/features/safety/components/RideSafety';
+import { PassengerSafetyShield } from '../../../src/features/safety/components/RideSafety';
+import { useTripShare } from '../../../src/features/active-ride/trip/useTripShare';
+import { Button, PersonCard } from '../../../src/components/ui';
+import type { RideResource } from '../../../src/services/rideService';
 import { RidePinCard } from '../../../src/features/safety/components/RidePinCard';
 import { useRideCall } from '../../../src/features/safety/hooks';
 import { safetyApi, toCallSession, toShareableUrl, toShareLink, toSosBody, toSosResult } from '../../../src/features/safety/api';
@@ -57,6 +61,18 @@ const sosBody = (contacts: unknown[] = [{ id: 1, name: 'Ayesha', phone: '+923001
 const ride = makeRide({ id: 41, status: 'started', driver_id: 3, driver: { id: 3, name: 'Bilal' } });
 const position = { latitude: 31.5, longitude: 74.3 };
 
+/** The trip sheet's share pieces: the PersonCard's Share cell, its dialog and the details' Stop row. */
+function ShareHarness({ ride: r }: { ride: RideResource }) {
+  const share = useTripShare(r);
+  return (
+    <>
+      <PersonCard name="Bilal" fallbackName="Your driver" actions={share.action ? [share.action] : []} variant="plain" />
+      {share.sharing ? <Button label="Stop" onPress={share.stop} testID="trip-safety-stop-sharing" /> : null}
+      {share.dialog}
+    </>
+  );
+}
+
 let mock: MockAdapter;
 let openURL: jest.SpyInstance;
 let shareSpy: jest.SpyInstance;
@@ -66,7 +82,8 @@ const renderSafety = async (r = ride, store = configureStore({ reducer: rootRedu
   const utils = render(
     <Provider store={store}>
       <ThemeProvider>
-        <PassengerTripSafety ride={r} position={position} />
+        <PassengerSafetyShield ride={r} position={position} />
+        <ShareHarness ride={r} />
       </ThemeProvider>
     </Provider>,
   );
@@ -216,16 +233,26 @@ describe('Share live trip', () => {
     mock.onDelete('/rides/41/share').reply(200, { success: true, data: { revoked: 1 } });
     const first = await renderSafety();
 
-    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    fireEvent.press(screen.getByTestId('trip-share-button'));
     await flush();
     expect(shareSpy).toHaveBeenCalledWith({ message: 'Follow my Raah-e-Haq trip live: https://raahehaq.com/t/tok' });
-    expect(screen.getByTestId('trip-safety-share')).toHaveTextContent(/Sharing live$/);
+    expect(screen.getByTestId('trip-share-button')).toHaveTextContent(/Sharing$/);
+    expect(screen.getByTestId('trip-share-button-dot')).toBeTruthy();
     expect(first.store.getState().activeRide.shareLink).toEqual({ rideId: 41, url: 'https://raahehaq.com/t/tok', expiresAt: 'x' });
 
-    // The link lives in the activeRide slice: a remounted panel still says "Sharing live".
+    // The link lives in the activeRide slice: a remounted panel still says "Sharing".
     first.unmount();
     await renderSafety(ride, first.store);
-    expect(screen.getByTestId('trip-safety-share')).toHaveTextContent(/Sharing live$/);
+    expect(screen.getByTestId('trip-share-button')).toHaveTextContent(/Sharing$/);
+
+    // Sharing → the dialog: "Share link again" opens the share sheet with the same link (no POST).
+    fireEvent.press(screen.getByTestId('trip-share-button'));
+    await flush();
+    expect(screen.getByText("You're sharing this trip")).toBeTruthy();
+    fireEvent.press(screen.getByTestId('trip-share-again'));
+    await flush();
+    expect(shareSpy).toHaveBeenCalledTimes(2);
+    expect(mock.history.post.filter((r) => r.url === '/rides/41/share')).toHaveLength(1);
 
     fireEvent.press(screen.getByTestId('trip-safety-stop-sharing'));
     await flush();
@@ -238,7 +265,7 @@ describe('Share live trip', () => {
   it('an ended ride says it can no longer be shared', async () => {
     mock.onPost('/rides/41/share').reply(409, { success: false, message: 'x', error: { code: 'RIDE_NOT_ACTIVE' } });
     await renderSafety();
-    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    fireEvent.press(screen.getByTestId('trip-share-button'));
     await flush();
     expect(toast.error).toHaveBeenCalledWith('This ride has ended, so it can no longer be shared.');
     expect(shareSpy).not.toHaveBeenCalled();
@@ -247,7 +274,7 @@ describe('Share live trip', () => {
   it('a local http link works in a Debug build (T-539): the share sheet opens', async () => {
     mock.onPost('/rides/41/share').reply(201, { success: true, data: { url: 'http://127.0.0.1:8000/t/tok', token: 'tok', expires_at: 'x' } });
     await renderSafety();
-    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    fireEvent.press(screen.getByTestId('trip-share-button'));
     await flush();
     expect(shareSpy).toHaveBeenCalledWith({ message: 'Follow my Raah-e-Haq trip live: http://127.0.0.1:8000/t/tok' });
     expect(toast.error).not.toHaveBeenCalled();
@@ -256,7 +283,7 @@ describe('Share live trip', () => {
   it('an unusable link says so (never a silent tap) and opens no share sheet (T-539)', async () => {
     mock.onPost('/rides/41/share').reply(201, { success: true, data: { url: 'http://example.com/t/tok', token: 'tok', expires_at: 'x' } });
     const { store } = await renderSafety();
-    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    fireEvent.press(screen.getByTestId('trip-share-button'));
     await flush();
     expect(toast.error).toHaveBeenCalledWith("Couldn't create a trip link. Please try again.");
     expect(shareSpy).not.toHaveBeenCalled();
@@ -267,7 +294,7 @@ describe('Share live trip', () => {
     mock.onPost('/rides/41/share').reply(201, { success: true, data: { url: 'https://raahehaq.com/t/tok', token: 'tok', expires_at: 'x' } });
     shareSpy.mockRejectedValueOnce(new Error('no activity'));
     await renderSafety();
-    fireEvent.press(screen.getByTestId('trip-safety-share'));
+    fireEvent.press(screen.getByTestId('trip-share-button'));
     await flush();
     expect(toast.error).toHaveBeenCalledWith("Couldn't open sharing on this phone. Please try again.");
   });
@@ -285,7 +312,7 @@ describe('Share live trip', () => {
   it('is not offered after the ride (SOS still is)', async () => {
     await renderSafety(makeRide({ id: 41, status: 'completed', driver_id: 3, completed_at: new Date().toISOString() }));
     screen.getByTestId('trip-safety-sos');
-    expect(screen.queryByTestId('trip-safety-share')).toBeNull();
+    expect(screen.queryByTestId('trip-share-button')).toBeNull();
   });
 });
 

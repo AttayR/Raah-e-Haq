@@ -36,6 +36,11 @@ export type MapControlsProps = {
   hidden?: boolean;
   /** Hides locate only. */
   locateHidden?: boolean;
+  /**
+   * [UI-R12] The top-end control (the ride maps' Safety shield, shared-trip-sheet TS2), at the
+   * same height as back, 16 from the end edge. The second persistent control (§9).
+   */
+  topEnd?: React.ReactNode;
   testID?: string;
 };
 
@@ -61,6 +66,7 @@ export function MapControls({
   sheetHeight,
   hidden = false,
   locateHidden = false,
+  topEnd,
   testID = 'map-controls',
 }: MapControlsProps) {
   const insets = useSafeAreaInsets();
@@ -111,6 +117,9 @@ export function MapControls({
           </Pressable>
         </View>
       ) : null}
+      {topEnd ? (
+        <View style={[styles.topEnd, { top: insets.top + componentTokens.header.overlayControlTopOffset }]}>{topEnd}</View>
+      ) : null}
       {onLocate && !locateHidden ? (
         <Animated.View style={[styles.locate, locateStyle]}>
           <IconButton
@@ -128,6 +137,7 @@ export function MapControls({
 
 const styles = StyleSheet.create({
   back: { position: 'absolute', start: c.edge },
+  topEnd: { position: 'absolute', end: c.edge },
   // [UI-R11 D5, passenger-home V9] A 48 floating circle (the IconButton family) with the kit's 40
   // avatar (photo or initials on `primarySoft`) centred in it, never a solid colour disc.
   avatar: {

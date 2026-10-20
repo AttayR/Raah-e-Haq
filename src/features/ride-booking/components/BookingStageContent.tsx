@@ -7,7 +7,6 @@ import { space } from '../../../theme';
 import ActiveRidePanel from '../../active-ride/components/ActiveRidePanel';
 import type { PassengerRideStageState } from '../../active-ride/stage';
 import type { FareOffer } from '../../fare/hooks';
-import { PassengerTripSafety } from '../../safety/components/RideSafety';
 import { FemaleDriverOption } from '../../women-mode/components/FemaleDriverOption';
 import type { useFareEstimates, useVehicleTypes } from '../hooks';
 import type { BookingFlow, BookingStage } from '../useBookingFlow';
@@ -37,10 +36,10 @@ type Props = {
   /** UI-R10: the booking just sent, for the finding-driver card while POST /rides runs. */
   draft: SearchDraft | null;
   onCancelRide: () => void;
+  /** BE-87 status block while searching (the screen owns its state and sheet). */
+  womenModeStatus?: React.ReactNode;
   ride: RideResource | null;
   rideStage: PassengerRideStageState | null;
-  onCall?: () => void;
-  calling: boolean;
   busy: boolean;
 };
 
@@ -63,10 +62,9 @@ export const BookingStageContent: React.FC<Props> = ({
   onEditTrip,
   draft,
   onCancelRide,
+  womenModeStatus,
   ride,
   rideStage,
-  onCall,
-  calling,
   busy,
 }) => {
   const { pickup, destination, stops, pickupField, destField, setMapPick, chooseOnMap } = flow;
@@ -188,9 +186,7 @@ export const BookingStageContent: React.FC<Props> = ({
           cancelInFooter
           inlineSearchingBar={false}
           onCancel={onCancelRide}
-          onCall={onCall}
-          calling={calling}
-          safety={ride ? <PassengerTripSafety ride={ride} position={currentLocation} /> : null}
+          womenModeStatus={womenModeStatus}
           busy={busy}
         />
       );

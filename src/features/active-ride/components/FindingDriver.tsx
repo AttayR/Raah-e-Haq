@@ -137,7 +137,9 @@ export const PassengerCancelButton: React.FC<{
   return (
     <Button
       label={isParcelRide(ride) ? t('parcel.cancelDelivery') : searching ? ACTIVE_RIDE_COPY.cancelRequest : ACTIVE_RIDE_COPY.cancelRide}
-      variant="destructiveSoft"
+      // UI-R12 TS8: a taken ride's Cancel is the last item of the trip details, never a filled slab.
+      variant={searching ? 'destructiveSoft' : 'destructiveGhost'}
+      leadingIcon={searching ? undefined : 'cancelCircle'}
       size={searching ? 'lg' : 'md'}
       onPress={onPress}
       disabled={disabled}

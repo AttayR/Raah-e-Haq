@@ -192,6 +192,10 @@ export const iconGlyphs = {
   gpsSearching: 'crosshairs',
   gpsWeak: 'crosshairs-question',
   rideTaken: 'car-clock',
+  /** [UI-R12] Share trip while a live link exists (TS5.1). */
+  sharing: 'share-variant',
+  /** [UI-R12] Cancel ride in the trip details (TS8). */
+  cancelCircle: 'close-circle-outline',
 } as const satisfies Record<string, MdiGlyph>;
 
 export type IconName = keyof typeof iconGlyphs;

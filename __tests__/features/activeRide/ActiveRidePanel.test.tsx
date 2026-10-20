@@ -86,9 +86,10 @@ describe('ActiveRidePanel', () => {
   });
 
   it.each([
-    ['accepted', 'Your driver is on the way', true],
-    ['arrived', 'Your driver has arrived', true],
-    ['started', 'Trip in progress', false],
+    // UI-R12 status sentences (PA2, PT2).
+    ['accepted', 'Driver is on the way', true],
+    ['arrived', 'Your driver is here', true],
+    ['started', 'Heading to Fake Dropoff Road', false],
   ] as const)('%s: title, the real driver card, cancel only before the trip', (status, title, cancellable) => {
     const ride = makeRide({
       status,
@@ -171,7 +172,7 @@ describe('ActiveRidePanel', () => {
     });
   });
 
-  it('completed: the server total and breakdown, cash, and Done', () => {
+  it('completed (UI-R12 receipt): the server total in the money card, Fare details expands the breakdown, Done', () => {
     const ride = makeRide({
       status: 'completed',
       total_fare: 310,
@@ -181,12 +182,15 @@ describe('ActiveRidePanel', () => {
       fare_breakdown: { base: 50, distance: 200, time: 40, stops: 20, min_fare_adjustment: 0, total: 310 },
     });
     const { getByText, getByTestId, queryByTestId, onDone } = renderPanel(ride, stateOf(ride));
-    expect(getByText('Ride completed')).toBeTruthy();
-    expect(getByText('Rs 310')).toBeTruthy();
+    expect(getByText("You've arrived")).toBeTruthy();
+    expect(getByTestId('receipt-amount')).toHaveTextContent('Rs 310');
+    expect(getByText('Pay your driver in cash')).toBeTruthy();
+    // PR2 block 4: the breakdown is collapsed until "Fare details" is tapped.
+    expect(queryByTestId('ride-fare-breakdown')).toBeNull();
+    fireEvent.press(getByTestId('receipt-fare-details'));
     expect(getByText('Distance · 8.4 km')).toBeTruthy();
     expect(getByText('Rs 200')).toBeTruthy();
     expect(getByText('Stops')).toBeTruthy();
-    expect(getByText('Pay your driver in cash')).toBeTruthy();
     // T-311: the summary is the final fare (the booking price was only an estimate).
     expect(getByText('Final fare')).toBeTruthy();
     expect(queryByTestId('active-ride-cancel')).toBeNull();

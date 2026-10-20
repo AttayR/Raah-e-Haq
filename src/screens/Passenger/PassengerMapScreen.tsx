@@ -20,9 +20,13 @@ import { bookingBackHandlers, leaveFinishedRide } from '../../features/active-ri
 import { useNoDriverRetry } from '../../features/active-ride/noDriver';
 import { topUpParamsFor } from '../../features/wallet/navigation';
 import { useFareOffer } from '../../features/fare/hooks';
-import { PassengerRideRatingPrompt } from '../../features/rating/components/RideRatingPrompt';
 import { usePassengerRideCamera, type MapViewport } from '../../features/active-ride/camera';
-import { useRideMapRoutes, useTripRoute } from '../../features/active-ride/tripRoute';
+import { useRideMapLayers } from '../../features/active-ride/useRideMapLayers';
+import { PassengerTripSheet } from '../../features/active-ride/trip/PassengerTripSheet';
+import { isTripStage } from '../../features/active-ride/trip/tripModel';
+import { isNoDriverCancel } from '../../features/active-ride/stage';
+import { PassengerSafetyShield } from '../../features/safety/components/RideSafety';
+import { WomenModeChoiceSheet, WomenModeStatus, useWomenModeSearching } from '../../features/women-mode/components/WomenModeSearching';
 import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
@@ -35,7 +39,7 @@ import { BookingStageContent } from '../../features/ride-booking/components/Book
 import { BookingErrorBanner, LocationOffBanner, LocationWaitState } from '../../features/ride-booking/components/BookingNotices';
 import { bookingInitialRegion } from '../../features/ride-booking/locationGate';
 import { useBookingLocationGate } from '../../features/ride-booking/useBookingLocationGate';
-import { bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
+import { applyBookingPrefill, bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
 import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
 import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
 import { useBookingNearby } from '../../features/ride-booking/useBookingNearby';
@@ -49,11 +53,8 @@ import { RouteSummaryPill } from '../../features/ride-booking/components/RouteSu
 import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
 import { useGuardedBookingActions } from '../../features/ride-booking/useBookingLeaveGuard';
 import { useScreenToast } from '../../core/toast';
-import { IndeterminateBar } from '../../components/ui';
+import { IndeterminateBar, StatusBarScrim } from '../../components/ui';
 import { useSharedValue } from 'react-native-reanimated';
-import { openRideChat } from '../../features/chat/navigation';
-import { useRideCall } from '../../features/safety/hooks';
-import { canCallOn } from '../../features/safety/rules';
 
 /** iPhone SE class height (667 pt): the capped sheets get a little more room (56 %, spec). */
 const SHORT_WINDOW_HEIGHT = 700;
@@ -127,31 +128,27 @@ const PassengerMapScreen = () => {
   const rideStage = usePassengerRideStage(currentRide);
   const rideSubmitting = useSelector(selectActiveRideSubmitting);
   const shownStage: BookingStage = rideShown ? 'requesting' : stage;
-
   const rideEnded = rideStage?.stage === 'completed' || rideStage?.stage === 'cancelled';
+  // UI-R12: from the accept on, the trip sheet (searching and "No driver found" keep the booking sheet).
+  const tripShown = rideShown && isTripStage(rideStage?.stage) && !isNoDriverCancel(currentRide);
+  const [tripExpanded, setTripExpanded] = useState(false);
   // Driver on the way (T-311/T-312): keep the driver and the pickup in view (T-549: on the trip the
   // car and the drop-off), until the passenger pans (T-549: the recentre button resumes it).
   // Ride cleared (T-313): recentre on the pickup, else the passenger, above the sheet (T-314).
   const rideCamera = usePassengerRideCamera(
     mapRef, rideStage?.stage, driverLocation, currentRide, pickup ?? currentLocation, viewport,
   );
-  // T-549: on the trip the drop-off and the route still ahead of the car, not the pickup; T-550:
-  // the stop pins are the ride's stops still to visit (also after a reopen; done ones go).
-  const inTrip = rideStage?.stage === 'in_trip';
-  const trip = useTripRoute(inTrip, currentRide, driverLocation);
-  // T-552: on the trip only the trip route (the booking route only after it failed).
-  const mapRoutes = useRideMapRoutes(inTrip, trip, routeCoordinates, driverLocation);
-  // T-520 (BE-78): a masked call (POST /rides/{id}/call), or the chat when calls are chat only.
-  const rideId = currentRide?.id ?? null;
-  const openChat = useCallback(() => {
-    if (rideId !== null) openRideChat(navigation, rideId);
-  }, [navigation, rideId]);
-  const rideCall = useRideCall(rideId, { onChatOnly: openChat });
+  // T-549/T-550/T-552 on the trip; UI-R12 TS2.1: the vehicle → pickup leg on the way, pins only at arrival.
+  const layers = useRideMapLayers({
+    stage: rideStage?.stage, ride: currentRide, driverLocation, pickup, stops, destination, bookingRoute: routeCoordinates,
+  });
   const compact = searchFocused;
   const choosing = !rideShown && shownStage === 'vehicle';
   const searching = shownStage === 'requesting' && (rideStage?.stage ?? 'searching') === 'searching';
   // Nearby drivers (BE-20) around the pickup, or the passenger, until a driver takes the ride; read
   // again at once when the ride ends (T-311). T-586: Choose ride and Finding show only the tier's.
+  // BE-87 / T-565: one women-mode state and choice sheet per ride, outside both sheets.
+  const womenMode = useWomenModeSearching({ rideId: currentRide?.id ?? null, raw: currentRide?.women_mode, searching });
   const nearby = useBookingNearby({
     center: pickup ?? currentLocation,
     focused: isFocused,
@@ -211,19 +208,7 @@ const PassengerMapScreen = () => {
     rideShown,
     pickup,
     destination,
-    apply: (next) => {
-      setMapPick(null);
-      setError(null);
-      if (next.pickup) {
-        setPickup(next.pickup);
-        setPickupQuery(next.pickupQuery);
-      }
-      if (next.destination) {
-        setDestination(next.destination);
-        setDestQuery(next.destQuery);
-      }
-      setStage(next.destination || destination ? 'home' : 'destination');
-    },
+    apply: (next) => applyBookingPrefill(flow, next, !!destination),
     route: (p, d) => {
       fetchRoute(p, d);
       setStage('vehicle');
@@ -323,11 +308,11 @@ const PassengerMapScreen = () => {
           onMapReady={onMapReady}
           onMapLoaded={onMapLoaded}
           onRegionChangeComplete={rideCamera.onRegionChangeComplete}
-          pickup={inTrip ? null : pickup}
-          stops={inTrip ? trip.stops : stops}
-          destination={trip.dropoff ?? destination}
-          route={mapRoutes.route}
-          driverRoute={mapRoutes.driverRoute}
+          pickup={layers.pickup}
+          stops={layers.stops}
+          destination={layers.destination}
+          route={layers.route}
+          driverRoute={layers.driverRoute}
           nearbyDrivers={nearby.drivers}
           nearbyTier={nearby.tier}
           nearbyFreshness={nearby.freshness}
@@ -338,15 +323,34 @@ const PassengerMapScreen = () => {
           searching={searching}
         />
 
+        {tripShown ? <StatusBarScrim testID="ride-status-scrim" /> : null}
         <MapTopControls
-          onBack={back.onScreen}
+          onBack={tripShown && rideEnded ? undefined : back.onScreen}
           onRecenter={centerOnUser}
           sheetHeight={sheetHeightValue}
           followRide={{ visible: rideCamera.paused, onPress: rideCamera.recentre }}
+          // TS2 / PR1: no back on the receipt (Done leaves); recentre only after a pan; the Safety shield top-end.
+          recentreHidden={tripShown && (!rideCamera.paused || tripExpanded)}
+          topEnd={tripShown && currentRide ? <PassengerSafetyShield ride={currentRide} position={currentLocation} /> : null}
         />
         {choosing && tripSummary && !compact ? <RouteSummaryPill summary={tripSummary} onPress={editTrip} /> : null}
         {nearby.chipShown ? <NearbyCountChip state={nearby.state} freshness={nearby.freshness} tier={nearby.tier} sheetHeight={sheetHeightValue} /> : null}
 
+        {tripShown && rideStage ? (
+          <PassengerTripSheet
+            stageState={rideStage}
+            ride={currentRide}
+            driverLocation={driverLocation}
+            onCancel={handleCancelRide}
+            onFinish={finishRide}
+            busy={request.sending || rideSubmitting}
+            animatedHeight={sheetHeightValue}
+            onHeightChange={setSheetHeightState}
+            onExpandedChange={setTripExpanded}
+            openFrom={sheetHeight}
+            active={isFocused}
+          />
+        ) : (
         <BookingSheet
           onHeightChange={setSheetHeight}
           maxHeightRatio={sheetRatio}
@@ -369,16 +373,14 @@ const PassengerMapScreen = () => {
             onEditTrip={editTrip}
             draft={draft}
             onCancelRide={handleCancelRide}
+            womenModeStatus={<WomenModeStatus state={womenMode} />}
             ride={currentRide}
             rideStage={rideStage}
-            onCall={canCallOn(currentRide) ? rideCall.call : undefined}
-            calling={rideCall.calling}
             busy={request.sending || rideSubmitting}
           />
         </BookingSheet>
-
-        {/* T-505: rate the driver over the trip summary once the ride completes. */}
-        <PassengerRideRatingPrompt active={isFocused} />
+        )}
+        <WomenModeChoiceSheet state={womenMode} />
       </View>
     </ErrorBoundary>
   );

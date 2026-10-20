@@ -19,3 +19,8 @@ export * from './useMarkerTracking';
 export * from './vehicleGlyphs';
 export * from './VehicleGlyph';
 export * from './VehicleOptionCard';
+// [UI-R12/R13] The shared trip sheet (shared-trip-sheet.md TS1–TS6).
+export * from './TripFareRow';
+export * from './TripSheet';
+export * from './TripStatusHeader';
+export * from './useCrossfade';

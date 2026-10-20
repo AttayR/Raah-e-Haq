@@ -8,7 +8,6 @@ import { NOT_RATABLE, toRideRatingFields } from '../api';
 import { useRatingPrompt } from '../hooks';
 import type { RaterRole, RideRatingFields, RideRatingState } from '../types';
 import { RateRideSheet } from './RateRideSheet';
-import { activeRideRatingChanged, selectActiveRide } from '../../active-ride/slice';
 import { driverRideRatingChanged, selectDriverActiveRide } from '../../driver-ride/slice';
 
 type Props = {
@@ -31,7 +30,8 @@ const ratedPerson = (ride: RideResource, role: RaterRole): { name: string | null
     : { name: firstNameOf(readText(ride.passenger?.name)), photoUri: readText(ride.passenger?.profile_image_url) };
 
 /**
- * The after-ride rating prompt (T-505) for the passenger map and the driver ride screen: opens the
+ * The after-ride rating prompt (T-505) for the driver ride screen (UI-R12: the passenger rates inline
+ * in the trip receipt, passenger-trip-complete PR7; UI-R13 moves the driver there too): opens the
  * rating sheet once the ride is `completed` and `can_rate`, over the trip summary. Skip (or any
  * close) is remembered for the session, so the same ride never asks again; a submitted or stale
  * rating patches the ride, which also closes the sheet (`can_rate` turns false).
@@ -71,17 +71,6 @@ export function RideRatingPrompt({ ride, role, active, onRatingChange }: Props) 
       onSkip={dismiss}
     />
   );
-}
-
-/** The passenger map's prompt: rates the driver of the active ride once it completes. */
-export function PassengerRideRatingPrompt({ active }: { active: boolean }) {
-  const dispatch = useDispatch();
-  const ride = useSelector(selectActiveRide);
-  const onRatingChange = useCallback(
-    (rideId: number, fields: RideRatingFields) => dispatch(activeRideRatingChanged({ rideId, ...fields })),
-    [dispatch],
-  );
-  return <RideRatingPrompt ride={ride} role="passenger" active={active} onRatingChange={onRatingChange} />;
 }
 
 /** The driver ride screen's prompt: rates the passenger after Complete trip (or a poll that saw it). */

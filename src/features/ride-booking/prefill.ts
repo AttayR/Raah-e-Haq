@@ -88,3 +88,32 @@ export function useBookingPrefill({ params, initial, rideShown, pickup, destinat
     routeRef.current(pickup, destination);
   }, [pickup, destination, rideShown]);
 }
+
+/** The booking flow's setters a prefill writes (T-516). */
+export type BookingPrefillTarget = {
+  setMapPick: (target: null) => void;
+  setError: (error: null) => void;
+  setPickup: (place: BookingPlace) => void;
+  setPickupQuery: (text: string) => void;
+  setDestination: (place: BookingPlace) => void;
+  setDestQuery: (text: string) => void;
+  setStage: (stage: 'home' | 'destination') => void;
+};
+
+/**
+ * New prefill params while the screen is open (T-516): replace the points they carry and go to
+ * the trip start (or the destination search when there is still no destination).
+ */
+export const applyBookingPrefill = (flow: BookingPrefillTarget, next: BookingPrefillState, hadDestination: boolean): void => {
+  flow.setMapPick(null);
+  flow.setError(null);
+  if (next.pickup) {
+    flow.setPickup(next.pickup);
+    flow.setPickupQuery(next.pickupQuery);
+  }
+  if (next.destination) {
+    flow.setDestination(next.destination);
+    flow.setDestQuery(next.destQuery);
+  }
+  flow.setStage(next.destination || hadDestination ? 'home' : 'destination');
+};

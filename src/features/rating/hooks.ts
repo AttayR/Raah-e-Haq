@@ -107,19 +107,21 @@ export interface RateRideOptions {
    * read failed too). The sheet closes without an error.
    */
   onStale: (state: RideRatingState | null) => void;
+  /** [UI-R12] Every other failed submit (the message is in `error`), e.g. for a toast. */
+  onFailed?: () => void;
 }
 
 /**
  * POST /rides/{id}/rate with a double-submit guard: a second submit while one is in flight is
  * ignored. Other failures stay in `error` (inline, the user can retry).
  */
-export const useRateRide = ({ rideId, onRated, onStale }: RateRideOptions) => {
+export const useRateRide = ({ rideId, onRated, onStale, onFailed }: RateRideOptions) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
   const mounted = useRef(true);
-  const callbacks = useRef({ onRated, onStale });
-  callbacks.current = { onRated, onStale };
+  const callbacks = useRef({ onRated, onStale, onFailed });
+  callbacks.current = { onRated, onStale, onFailed };
 
   useEffect(() => {
     mounted.current = true;
@@ -146,8 +148,9 @@ export const useRateRide = ({ rideId, onRated, onStale }: RateRideOptions) => {
             return null;
           });
           callbacks.current.onStale(state);
-        } else if (mounted.current) {
-          setError(failure.message);
+        } else {
+          if (mounted.current) setError(failure.message);
+          callbacks.current.onFailed?.();
         }
       } finally {
         inFlight.current = false;

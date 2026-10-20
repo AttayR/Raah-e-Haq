@@ -1,14 +1,12 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, Avatar, BottomSheet, Button, Chip, RatingInput, TextField } from '../../../components/ui';
+import { AppText, Avatar, BottomSheet, Button } from '../../../components/ui';
 import { toast } from '../../../core/toast';
 import { useKeyboardVisible } from '../../../hooks/useKeyboardVisible';
 import { t } from '../../../i18n';
 import { space } from '../../../theme';
-import { RATING_DEFAULTS, toRateBody } from '../api';
-import { keepAllowedTags, tagsForStars, toggleTag } from '../format';
-import { useRateRide, useRatingConfig } from '../hooks';
-import type { RaterRole, RatingConfig, RideRatingState } from '../types';
+import type { RaterRole, RideRatingState } from '../types';
+import { RatingForm, useRatingForm } from './RatingForm';
 
 export type RateRideSheetProps = {
   visible: boolean;
@@ -31,28 +29,10 @@ export type RateRideSheetProps = {
   onSkip: () => void;
 };
 
-const tagsTitle = (config: RatingConfig, stars: number): string => {
-  const good = stars >= config.positiveMinStars;
-  const bad = stars <= config.negativeMaxStars;
-  if (good && bad) return t('rating.tagsMixed');
-  return good ? t('rating.tagsGood') : t('rating.tagsBad');
-};
-
-/**
- * The after-ride rating sheet (T-505, BE-07), both roles, like Uber/Careem: the other person
- * (avatar + name), five stars (kit RatingInput), the tags for the chosen star band as chips (up
- * to `max_tags`, labels from GET /rating-tags), an optional comment, then Submit and Skip.
- * `stars` is sent as a JSON integer. A 409 / window-closed answer closes the sheet quietly
- * (the host re-reads the ride); other failures show inline above Submit, which retries.
- */
 export function RateRideSheet({ visible, rideId, role, personName, photoUri, parcel = false, onRated, onStale, onSkip }: RateRideSheetProps) {
-  const { config, status, reload } = useRatingConfig(visible);
   // [T-519] While the comment is being typed the header shrinks to the name, so the comment box
   // and Submit / Skip stay visible above the keyboard (the kit grows the sheet and scrolls to it).
   const keyboardUp = useKeyboardVisible();
-  const [stars, setStars] = useState(0);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [comment, setComment] = useState('');
   const handleRated = useCallback(
     (state: RideRatingState) => {
       toast.success(t('rating.thanks'));
@@ -60,11 +40,9 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, par
     },
     [onRated],
   );
-  const { submit, submitting, error } = useRateRide({ rideId, onRated: handleRated, onStale });
-
-  const offered = useMemo(() => tagsForStars(config, role, stars, parcel), [config, role, stars, parcel]);
-  const maxTags = config?.maxTags ?? RATING_DEFAULTS.maxTags;
-  const maxComment = config?.maxCommentLength ?? RATING_DEFAULTS.maxCommentLength;
+  // [UI-R12] One rating behaviour: the form is shared with the trip receipt (RatingForm).
+  const form = useRatingForm({ rideId, role, parcel, enabled: visible, onRated: handleRated, onStale });
+  const { stars, submitting, error } = form;
   const fallbackName = parcel
     ? role === 'passenger'
       ? t('rating.yourRider')
@@ -74,25 +52,11 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, par
       : t('rating.yourPassenger');
   const name = personName || fallbackName;
 
-  const onStars = useCallback(
-    (next: number) => {
-      setStars(next);
-      // Tags of a band the new star count no longer offers are dropped (the server refuses them).
-      setSelected((current) => keepAllowedTags(current, tagsForStars(config, role, next, parcel)));
-    },
-    [config, role, parcel],
-  );
-
-  const onSubmit = () => {
-    if (stars < 1 || submitting) return;
-    submit(toRateBody(stars, keepAllowedTags(selected, offered), comment));
-  };
+  const onSubmit = form.submit;
 
   const skip = () => {
     if (!submitting) onSkip();
   };
-
-  const atMax = selected.length >= maxTags;
 
   return (
     <BottomSheet
@@ -144,60 +108,7 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, par
       }
     >
       <View style={styles.body}>
-        <RatingInput value={stars} onChange={onStars} disabled={submitting} testID="rate-ride-stars" />
-        {stars < 1 ? (
-          <AppText variant="caption" color="textMuted" align="center">
-            {t('rating.starsHint')}
-          </AppText>
-        ) : null}
-
-        {stars >= 1 && config && offered.length > 0 ? (
-          <View style={styles.section} testID="rate-ride-tags">
-            <View style={styles.sectionTitle}>
-              <AppText variant="bodyStrong">{tagsTitle(config, stars)}</AppText>
-              <AppText variant="caption" color="textMuted">
-                {t('rating.tagsLimit', { n: maxTags })}
-              </AppText>
-            </View>
-            <View style={styles.chips}>
-              {offered.map((tag) => {
-                const on = selected.includes(tag.key);
-                return (
-                  <Chip
-                    key={tag.key}
-                    label={tag.label}
-                    selected={on}
-                    disabled={submitting || (!on && atMax)}
-                    onPress={() => setSelected((current) => toggleTag(current, tag.key, maxTags))}
-                    testID={`rate-ride-tag-${tag.key}`}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-        {stars >= 1 && status === 'failed' && !config ? (
-          <View style={styles.section} testID="rate-ride-tags-failed">
-            <AppText variant="bodySmall" color="textSecondary">
-              {t('rating.tagsLoadFailed')}
-            </AppText>
-            <Button label={t('rating.retry')} variant="outline" size="sm" fullWidth={false} onPress={reload} testID="rate-ride-tags-retry" />
-          </View>
-        ) : null}
-
-        {stars >= 1 ? (
-          <TextField
-            label={t('rating.commentLabel')}
-            placeholder={t('rating.commentPlaceholder')}
-            value={comment}
-            onChangeText={setComment}
-            multiline
-            maxLength={maxComment}
-            disabled={submitting}
-            helper={t('rating.commentCount', { n: comment.length, max: maxComment })}
-            testID="rate-ride-comment"
-          />
-        ) : null}
+        <RatingForm form={form} />
       </View>
     </BottomSheet>
   );
@@ -206,9 +117,6 @@ export function RateRideSheet({ visible, rideId, role, personName, photoUri, par
 const styles = StyleSheet.create({
   header: { alignItems: 'center', gap: space[1], paddingHorizontal: space[4], paddingBottom: space[3] },
   headerCompact: { paddingBottom: space[2] },
-  body: { paddingHorizontal: space[4], gap: space[4], paddingBottom: space[2] },
-  section: { gap: space[2] },
-  sectionTitle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space[2] },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  body: { paddingHorizontal: space[4], paddingBottom: space[2] },
   footer: { paddingHorizontal: space[4], gap: space[2] },
 });

@@ -196,13 +196,14 @@ describe('3. the sender at the pickup', () => {
   it('is told to hand the parcel over and pay the locked fare', () => {
     showPanel(parcelRide(parcelBlock({ status: 'arrived' }), { status: 'arrived', accepted_fare: '180.00', total_fare: 170 }));
     expect(screen.getByTestId('active-ride-subtitle').props.children).toBe('Hand the parcel to the rider and pay Rs 180 in cash.');
-    expect(screen.queryByText('Meet your driver at the pickup point')).toBeNull();
+    expect(screen.queryByText(/^Meet your driver at/)).toBeNull();
   });
 
   it('a plain ride keeps "Meet your driver"', () => {
     const ride = makeRide({ status: 'arrived' });
     showPanel(ride);
-    expect(screen.getByTestId('active-ride-subtitle').props.children).toBe('Meet your driver at the pickup point');
+    // UI-R12 PA2: the pickup's short name (first part of the address).
+    expect(screen.getByTestId('active-ride-subtitle').props.children).toBe('Meet your driver at Fake Pickup Street');
   });
 });
 

@@ -412,7 +412,13 @@ export const en = {
     rating4: 'Good',
     rating5: 'Excellent',
     // Progress and status (§5.24).
-    progressA11y: 'Ride progress: {step}, step {n} of 4',
+    progressA11y: 'Step {n} of 4: {step}',
+    // [UI-R12] Trip sheet ETA tile and status header (shared-trip-sheet TS3).
+    etaUnit: 'min',
+    etaMore: '99+',
+    etaAwayA11y: '{n} minutes away',
+    etaAwayA11yOne: '1 minute away',
+    tripFareCash: 'cash',
     stepRequested: 'Requested',
     stepOnTheWay: 'On the way',
     stepArrived: 'Arrived',

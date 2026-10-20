@@ -281,7 +281,7 @@ describe.each([
     render(<RideProgress step={2} testID="rp" />);
     expect(flat(screen.getByTestId('rp-segment-2').props.style)).toMatchObject({ backgroundColor: theme.colors.primary });
     expect(flat(screen.getByTestId('rp-segment-3').props.style)).toMatchObject({ backgroundColor: theme.colors.surfaceAlt });
-    expect(screen.getByLabelText('Ride progress: Arrived, step 3 of 4')).toBeTruthy();
+    expect(screen.getByLabelText('Step 3 of 4: Arrived')).toBeTruthy();
     expect(rideProgressStep('ongoing')).toBe(3);
     expect(rideProgressStep('started')).toBe(3);
     expect(rideProgressStep('completed')).toBeNull();

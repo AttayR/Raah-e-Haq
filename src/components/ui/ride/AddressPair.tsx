@@ -13,8 +13,15 @@ export type AddressStop = {
   key?: string | number;
   /** Caption instead of "Stop n" (e.g. "Next stop" on the driver's trip). */
   label?: string;
+  /**
+   * [UI-R12] PT3: `muted` (a stop already done: `textMuted`), `strong` (the next one: `bodyStrong`);
+   * regular otherwise.
+   */
+  tone?: AddressTone;
   testID?: string;
 };
+
+export type AddressTone = 'regular' | 'muted' | 'strong';
 
 export type AddressPairProps = {
   pickup: string;
@@ -38,6 +45,9 @@ export type AddressPairProps = {
   dividers?: boolean;
   /** Addresses are selectable (ride details, receipts). */
   selectable?: boolean;
+  /** [UI-R12] Caption instead of "Pickup" (the trip: "Picked up") and its tone. */
+  pickupLabel?: string;
+  pickupTone?: AddressTone;
   /** testIDs on the pickup and drop-off address text (screen tests read them). */
   pickupTestID?: string;
   dropoffTestID?: string;
@@ -93,22 +103,33 @@ export function AddressPair({
   stopNumberOfLines,
   dividers = false,
   selectable = false,
+  pickupLabel,
+  pickupTone = 'regular',
   pickupTestID,
   dropoffTestID,
   testID,
 }: AddressPairProps) {
   const { theme } = useAppTheme();
-  const rows: Array<{ kind: Kind; address: string; key: string; label: string; a11y: string; testID?: string }> = [
-    { kind: 'pickup', address: pickup, key: 'pickup', label: t('ride.pickup'), a11y: t('ride.pickupA11y', { address: pickup }), testID: pickupTestID },
+  const rows: Array<{ kind: Kind; address: string; key: string; label: string; a11y: string; tone: AddressTone; testID?: string }> = [
+    {
+      kind: 'pickup',
+      address: pickup,
+      key: 'pickup',
+      label: pickupLabel ?? t('ride.pickup'),
+      a11y: t('ride.pickupA11y', { address: pickup }),
+      tone: pickupTone,
+      testID: pickupTestID,
+    },
     ...stops.map((stop, i) => ({
       kind: 'stop' as const,
       address: stop.address,
       key: `stop-${stop.key ?? i}`,
       label: stop.label ?? t('ride.stop', { n: i + 1 }),
       a11y: t('ride.stopA11y', { n: i + 1, address: stop.address }),
+      tone: stop.tone ?? 'regular',
       testID: stop.testID,
     })),
-    { kind: 'dropoff', address: dropoff, key: 'dropoff', label: t('ride.dropoff'), a11y: t('ride.dropoffA11y', { address: dropoff }), testID: dropoffTestID },
+    { kind: 'dropoff', address: dropoff, key: 'dropoff', label: t('ride.dropoff'), a11y: t('ride.dropoffA11y', { address: dropoff }), tone: 'regular', testID: dropoffTestID },
   ];
   const linesOf = (n: number) => (n > 0 ? n : undefined);
   const lines = linesOf(numberOfLines);
@@ -141,7 +162,8 @@ export function AddressPair({
               </AppText>
             ) : null}
             <AppText
-              variant={size === 'lg' ? 'h3' : 'body'}
+              variant={size === 'lg' ? 'h3' : row.tone === 'strong' ? 'bodyStrong' : 'body'}
+              color={row.tone === 'muted' ? 'textMuted' : 'textPrimary'}
               numberOfLines={row.kind === 'stop' ? stopLines : lines}
               ellipsizeMode="tail"
               selectable={selectable}

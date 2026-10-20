@@ -1,7 +1,7 @@
 /**
  * T-589 (QA 2026-10-19, docs/qa-reports/2026-10-19-t584-t585-qa):
  * 1. the cancel question follows the ride: a driver who accepts while "Cancel request?" is open
- *    turns it into "Cancel Ride" with the taken ride's fee; a request confirmed as a request is
+ *    turns it into "Cancel ride?" with the taken ride's fee; a request confirmed as a request is
  *    read again first, and a driver who took it at that moment gets the ride's question before
  *    anything is cancelled;
  * 2. one ride-status reader: two enabled status polls never both read GET /rides/{id};
@@ -80,7 +80,7 @@ const answer = async (yes: boolean, pending?: Promise<void>) => {
 };
 
 describe('1. the cancel question follows the ride (finding 2)', () => {
-  it('a driver accepts while "Cancel request?" is open: the same dialog becomes "Cancel Ride" with the fee', async () => {
+  it('a driver accepts while "Cancel request?" is open: the same dialog becomes "Cancel ride?" with the fee', async () => {
     const cancelRide = jest.fn(() => Promise.resolve('cancelled' as const));
     const onRequestCancelled = jest.fn();
     const { result, rerender } = renderHook(
@@ -98,10 +98,10 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
     act(() => rerender({ ride: accepted() }));
     expect(dialogStore.getCurrent()).toMatchObject({
       id: asked.id,
-      title: 'Cancel Ride',
-      body: 'Are you sure you want to cancel this ride? Cancelling now costs Rs 50. It is charged to your wallet.',
+      title: 'Cancel ride?',
+      body: 'Your driver is already on the way. Cancelling now costs Rs 50. It is charged to your wallet.',
       confirmLabel: 'Cancel ride',
-      cancelLabel: 'Keep Ride',
+      cancelLabel: 'Keep ride',
     });
 
     await answer(true, pending);
@@ -110,7 +110,7 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
     expect(onRequestCancelled).not.toHaveBeenCalled();
   });
 
-  it('"Keep Ride" on the switched question cancels nothing', async () => {
+  it('"Keep ride" on the switched question cancels nothing', async () => {
     const cancelRide = jest.fn(() => Promise.resolve('cancelled' as const));
     const { result, rerender } = renderHook(
       ({ ride }: { ride: RideResource }) => usePassengerCancel(ride, cancelRide, jest.fn(), jest.fn()),
@@ -140,7 +140,7 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
     expect(reread).toHaveBeenCalledWith(255);
 
     // The second question is about the taken ride, with its fee; nothing is cancelled yet.
-    await waitFor(() => expect(dialogStore.getCurrent()?.title).toBe('Cancel Ride'));
+    await waitFor(() => expect(dialogStore.getCurrent()?.title).toBe('Cancel ride?'));
     expect(dialogStore.getCurrent()?.body).toContain('Cancelling now costs Rs 50');
     expect(cancelRide).not.toHaveBeenCalled();
     await answer(true, pending);
@@ -148,7 +148,7 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
     expect(onRequestCancelled).not.toHaveBeenCalled();
   });
 
-  it('taken at the tap, "Keep Ride" keeps it', async () => {
+  it('taken at the tap, "Keep ride" keeps it', async () => {
     const cancelRide = jest.fn(() => Promise.resolve('cancelled' as const));
     const reread = jest.fn(() => Promise.resolve<RideResource | null>(accepted()));
     const { result } = renderHook(() => usePassengerCancel(requested(), cancelRide, jest.fn(), jest.fn(), reread));
@@ -157,7 +157,7 @@ describe('1. the cancel question follows the ride (finding 2)', () => {
       pending = result.current();
     });
     await answer(true);
-    await waitFor(() => expect(dialogStore.getCurrent()?.title).toBe('Cancel Ride'));
+    await waitFor(() => expect(dialogStore.getCurrent()?.title).toBe('Cancel ride?'));
     await answer(false, pending);
     expect(cancelRide).not.toHaveBeenCalled();
   });

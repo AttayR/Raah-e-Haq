@@ -78,7 +78,8 @@ describe('2. parcel cancels are said as a delivery', () => {
     const acceptedState = advanceRideStage(null, accepted);
     if (!acceptedState) throw new Error('no stage');
     screen.rerender(<ActiveRidePanel stageState={acceptedState} ride={accepted} onCancel={jest.fn()} />);
-    expect(screen.getByTestId('active-ride-cancel')).toHaveTextContent('Cancel ride');
+    // UI-R12 TS8: a taken ride's Cancel is a ghost button with a leading close-circle glyph.
+    expect(screen.getByTestId('active-ride-cancel')).toHaveTextContent(/Cancel ride$/);
   });
 
   it('UI-R10: before a driver takes it, the cancel question is about the request', async () => {
@@ -105,7 +106,9 @@ describe('2. parcel cancels are said as a delivery', () => {
 
   it('the cancel question asks about the delivery, in Roman Urdu too', async () => {
     expect(cancelConfirmBody(parcelRequested)).toBe('Are you sure you want to cancel this delivery?');
-    expect(cancelConfirmBody(makeRide({ status: 'requested' }))).toBe('Are you sure you want to cancel this ride?');
+    expect(cancelConfirmBody(makeRide({ status: 'requested' }))).toBe('Your driver is already on the way.');
+    // UI-R12 PA4: at the pickup the driver is waiting.
+    expect(cancelConfirmBody(makeRide({ status: 'arrived' }))).toBe('Your driver is waiting for you.');
     setLocale('ur-Latn');
     const { result } = renderHook(() => usePassengerCancel(parcelRequested, jest.fn(), jest.fn()));
     let pending: Promise<void> | undefined;

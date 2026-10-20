@@ -98,3 +98,11 @@ export const releaseTarget = (
   });
   return best;
 };
+
+/**
+ * [UI-R12] Where an opening sheet starts (points from the container top): the bottom edge, or
+ * `openFrom` points up when it takes over from another sheet of that height (clamped to the
+ * container). It then springs to its snap from there.
+ */
+export const openingTop = (containerHeight: number, openFrom?: number | null): number =>
+  containerHeight - Math.max(0, Math.min(openFrom ?? 0, containerHeight));
