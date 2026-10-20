@@ -1,33 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
-import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import rideService, { type DriverLocation, type RideRequest, type RideResource } from '../../services/rideService';
 import { rejectionMessage } from '../../core/api/errors';
 import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
-import { toast, toastOnScreen } from '../../core/toast';
+import { toast } from '../../core/toast';
 import { askForPushInContext } from '../notifications/push';
-import { hideModal, showErrorModal } from '../../components/NotificationManager';
-import { confirm } from '../../core/dialog';
-import { t } from '../../i18n';
-import { formatMoney } from '../../utils/format';
 import { classifyRideRequestFailure, type RideRequestFailure } from '../ride-booking/rideRequestFailure';
-import { BOOKING_COPY } from '../ride-booking/copy';
-import {
-  cancelActiveRide,
-  createActiveRide,
-  openExistingActiveRide,
-  refreshActiveRide,
-  restoreActiveRide,
-  selectActiveRide,
-  type ActiveRideState,
-} from './slice';
+import { cancelActiveRide, createActiveRide, refreshActiveRide, restoreActiveRide, selectActiveRide } from './slice';
 import { isRideInProgress } from './status';
 import { markerDriverLocation } from './arrivedMarker';
 import { ACTIVE_RIDE_COPY } from './copy';
 import { advanceRideStage, isDriverTrackable, type PassengerRideStageState } from './stage';
-import { offerKeepAccount } from '../account-deletion/keepAccount';
+import {
+  openActiveBooking,
+  RideRequestRefused,
+  showRideRequestFailure,
+  type ActiveRideActionsOptions,
+  type ActiveRideDispatch,
+  type SliceRoot,
+} from './rideRequestFeedback';
+
+// The refused-request feedback moved to rideRequestFeedback.ts; these names stay importable here.
+export { openActiveBooking, RideRequestRefused, showBalanceOwed, type ActiveRideActionsOptions } from './rideRequestFeedback';
 
 /** How often the passenger's ride status is re-read while it is in progress. */
 export const ACTIVE_RIDE_POLL_MS = 10_000;
@@ -59,21 +55,6 @@ export const activeRidePollMs = (status: RideResource['status'] | undefined): nu
  * vehicle marker to drive to; never faster.
  */
 export const DRIVER_LOCATION_POLL_MS = 4_000;
-
-/** requestRide rejects with this: the feedback was already shown; `failure` says what it was. */
-export class RideRequestRefused extends Error {
-  readonly failure: RideRequestFailure;
-
-  constructor(failure: RideRequestFailure) {
-    super(failure.kind === 'handled' || failure.kind === 'deletion_scheduled' ? 'Ride request refused' : failure.message);
-    this.name = 'RideRequestRefused';
-    this.failure = failure;
-  }
-}
-
-// Typed locally (not useAppDispatch) so these hooks never import the store singleton.
-type SliceRoot = { activeRide: ActiveRideState };
-type ActiveRideDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
 
 /**
  * Polls GET /rides/{id} while the active ride is in progress, `enabled` (the screen is focused)
@@ -289,56 +270,6 @@ export const useRestoreActiveRide = (onRestored: (ride: RideResource) => void): 
   }, [dispatch]);
 };
 
-export interface ActiveRideActionsOptions {
-  /** BE-37: POST /rides refused with PHONE_NOT_VERIFIED; take the passenger to verify. */
-  onPhoneNotVerified?: () => void;
-  /**
-   * BE-85: POST /rides refused with PASSENGER_BALANCE_OWED; take the passenger to top up, with
-   * the amount owed (when the server sent it) to prefill Add money (T-543).
-   */
-  onBalanceOwed?: (amountOwed: number | null) => void;
-}
-
-/**
- * "You owe Rs 200. Top up your wallet to book" (BE-85) with Top up / Not now. Without a top-up
- * route it is the server's message with OK.
- */
-export const showBalanceOwed = async (
-  failure: { message: string; amountOwed: number | null },
-  onTopUp: ((amountOwed: number | null) => void) | undefined,
-): Promise<void> => {
-  if (!onTopUp) {
-    showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal });
-    return;
-  }
-  const topUp = await confirm({
-    title: failure.amountOwed !== null ? t('fare.owedTitle', { amount: formatMoney(failure.amountOwed) }) : failure.message,
-    body: t('fare.owedBody'),
-    confirmLabel: t('fare.owedTopUp'),
-    cancelLabel: t('fare.owedNotNow'),
-  });
-  if (topUp) onTopUp(failure.amountOwed);
-};
-
-/**
- * BE-113 (T-583): POST /rides answered 409 RIDE_ALREADY_ACTIVE. The open booking (`rideId`) is
- * read and becomes the active ride, with a short note (a toast on Booking) instead of an error.
- * Resolves with that ride, or null when it could not be read (or has ended meanwhile); the caller
- * then shows `failure.message`.
- */
-export const openActiveBooking = async (dispatch: ActiveRideDispatch, rideId: number): Promise<RideResource | null> => {
-  const action = await dispatch(openExistingActiveRide(rideId));
-  if (!openExistingActiveRide.fulfilled.match(action)) return null;
-  // T-585: shown by Booking once it has the opened booking on screen (useScreenToast), not in the
-  // commit that swaps the sheet or replaces the parcel form, where it was never seen.
-  toastOnScreen('booking', {
-    type: 'info',
-    title: ACTIVE_RIDE_COPY.alreadyActiveTitle,
-    message: ACTIVE_RIDE_COPY.alreadyActiveMessage,
-  });
-  return action.payload;
-};
-
 /**
  * Create and cancel for the booking screen: a loading toast while POST /rides runs, and an
  * error modal with the server's display-safe message (for a 422 the field message).
@@ -371,27 +302,10 @@ export const useActiveRideActions = (options: ActiveRideActionsOptions = {}) => 
       const opened = classified.kind === 'already_active' ? await openActiveBooking(dispatch, classified.rideId) : null;
       const failure: RideRequestFailure =
         classified.kind === 'already_active' && !opened ? { kind: 'message', message: classified.message } : classified;
-      if (failure.kind === 'phone_not_verified') {
-        const verify = onPhoneNotVerifiedRef.current;
-        showErrorModal(
-          BOOKING_COPY.phoneNotVerifiedTitle,
-          failure.message,
-          verify
-            ? { label: BOOKING_COPY.phoneNotVerifiedAction, onPress: () => { hideModal(); verify(); } }
-            : { label: ACTIVE_RIDE_COPY.dismiss, onPress: hideModal },
-          verify ? { label: BOOKING_COPY.notNow, onPress: hideModal } : undefined,
-        );
-      } else if (failure.kind === 'balance_owed') {
-        showBalanceOwed(failure, onBalanceOwedRef.current);
-      } else if (failure.kind === 'deletion_scheduled') {
-        // BE-129: booking is refused while the deletion is scheduled; offer to keep the account.
-        offerKeepAccount(dispatch, 'booking').catch(() => undefined);
-      } else if (failure.kind === 'message' || failure.kind === 'offer_out_of_band') {
-        showErrorModal(ACTIVE_RIDE_COPY.requestFailedTitle, failure.message, {
-          label: ACTIVE_RIDE_COPY.dismiss,
-          onPress: hideModal,
-        });
-      }
+      showRideRequestFailure(dispatch, failure, {
+        onPhoneNotVerified: onPhoneNotVerifiedRef.current,
+        onBalanceOwed: onBalanceOwedRef.current,
+      });
       throw new RideRequestRefused(failure);
     },
     [dispatch],

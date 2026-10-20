@@ -9,7 +9,7 @@ import { space } from '../../theme';
 import { reverseGeocode } from '../../services/placesService';
 import type { RideResource } from '../../services/rideService';
 import { createActiveRide, type ActiveRideState } from '../active-ride/slice';
-import { openActiveBooking, showBalanceOwed } from '../active-ride/hooks';
+import { openActiveBooking, showBalanceOwed } from '../active-ride/rideRequestFeedback';
 import { ACTIVE_RIDE_COPY } from '../active-ride/copy';
 import { askForPushInContext } from '../notifications/push';
 import { displayAddress } from '../passenger-home/greeting';

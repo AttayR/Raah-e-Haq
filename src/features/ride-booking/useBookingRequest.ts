@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { RideRequest } from '../../services/rideService';
 import { reverseGeocode } from '../../services/placesService';
-import { RideRequestRefused } from '../active-ride/hooks';
+import { RideRequestRefused } from '../active-ride/rideRequestFeedback';
 import type { FareOffer } from '../fare/hooks';
 import { buildRideRequest, withAddresses, type BookingPlace } from './buildRideRequest';
 import { useBookingAttemptKeys } from './idempotency';

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { NavigationContext } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Button, FareBreakdown, FareTag, Icon, Skeleton } from '../../../components/ui';
 import { componentTokens, radius, space } from '../../../theme';
@@ -12,6 +13,9 @@ import { useRatingForm, type RatingFormState } from '../../rating/components/Rat
 import { ReceiptRatingBlock } from '../../rating/components/ReceiptRating';
 import type { RideRatingFields, RideRatingState } from '../../rating/types';
 import { isParcelRide } from '../../parcel/api';
+import { toRide } from '../../ride-history/api';
+import { tripPrefillOf, type SupportRoutes } from '../../support/navigation';
+import type { RideResource } from '../../../services/rideService';
 import { ACTIVE_RIDE_COPY } from '../copy';
 import { driverCardOf, fareSummaryOf } from '../stage';
 import type { PassengerTripView } from './usePassengerTripView';
@@ -183,7 +187,38 @@ function RatingBlock({ view, receipt }: { view: PassengerTripView; receipt: Pass
   );
 }
 
-/** The receipt body (PR2): money card, Fare details, rating (the sheet's extras slot follows). */
+/** Anything that can open a new support request: a screen's `navigation` inside a role stack. */
+type SupportNewRequestNavigator = { navigate(name: 'SupportNewRequest', params: SupportRoutes['SupportNewRequest']): void };
+
+/**
+ * passenger-trip-complete §7 / shared-support-invite (routes): ghost `sm` "Get help with this
+ * ride" → SupportNewRequest with this ride as the trip, on a completed or cancelled receipt.
+ * Pushing the request keeps the booking screen (and any sheet it owns) mounted underneath (T-565).
+ * Hidden outside a navigator (the gallery) and for a ride without a usable id.
+ */
+export function ReceiptHelp({ ride }: { ride: RideResource | null }) {
+  const navigation: SupportNewRequestNavigator | undefined = useContext(NavigationContext);
+  const trip = useMemo(() => {
+    const parsed = ride ? toRide(ride) : null;
+    return parsed ? tripPrefillOf(parsed) : null;
+  }, [ride]);
+  if (!navigation || !trip) return null;
+  return (
+    <View style={styles.help}>
+      <Button
+        label={t('support.rideHelpRow')}
+        variant="ghost"
+        size="sm"
+        leadingIcon="support"
+        fullWidth={false}
+        onPress={() => navigation.navigate('SupportNewRequest', { trip })}
+        testID="receipt-help"
+      />
+    </View>
+  );
+}
+
+/** The receipt body (PR2): money card, Fare details, rating, help (the sheet's extras slot follows). */
 export function PassengerReceiptBody({ view, receipt }: { view: PassengerTripView; receipt: PassengerReceiptState }) {
   return (
     <View style={styles.body} testID={`active-ride-${view.stage}`}>
@@ -195,6 +230,7 @@ export function PassengerReceiptBody({ view, receipt }: { view: PassengerTripVie
         </View>
       ) : null}
       <RatingBlock view={view} receipt={receipt} />
+      <ReceiptHelp ride={view.ride} />
     </View>
   );
 }
@@ -226,4 +262,5 @@ const styles = StyleSheet.create({
   moneyText: { flex: 1, minWidth: 0, gap: k.titleGap },
   detailsRow: { flexDirection: 'row', alignItems: 'center', minHeight: k.detailsRowHeight, gap: space[2] },
   flipped: { transform: [{ rotate: '180deg' }] },
+  help: { alignItems: 'center' },
 });
