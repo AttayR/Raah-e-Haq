@@ -1135,3 +1135,12 @@ App follow-up: while searching, a poll or focus read returning `cancelled` + `no
 - `POST /account/deletion/cancel` → 200 `{state:"none", scheduled_for:null, cancelled: bool}` ("Welcome back. Your account is safe."); a no-op when nothing is scheduled.
 - After the period the server anonymises the account (it can't sign in again; the number can register anew). Trips, payments, safety reports, support requests and ratings stay, with the name shown as "Deleted user".
 - Public setting `account_deletion_url` = the web deletion page (`/account/delete`) unless an admin sets another URL. The app does not link it (in-app is the primary path).
+
+#### Follow-ups BE-132 / BE-133 (backend 61bd5c2, c26dc27)
+
+- `GET /account/deletion`: keep[] gains `device_checks` (en "Device checks we use to stop fraud", ur-Latn "Fraud rokne ke liye device checks"). Full keep list: trips, payments, safety_reports, support_requests, ratings, device_checks. blockers[] can hold `{code:"TOPUP_PENDING"}` while a wallet top-up may still be credited (open, up to its expiry + about 10 min), no amount; copy "A wallet top-up is still being processed. Try again in a few minutes."; show it like ACTIVE_RIDE (no action, refresh later). erase[] unchanged; anonymisation also removes the receiver name, number, item description and pickup photo of parcels the user sent (kept only where a safety report exists), web sessions and password reset links.
+- `POST /account/deletion` → 409 `TOPUP_PENDING` when a top-up is open (checked before the code is used).
+- `POST /wallet/topups` → 423 `ACCOUNT_DELETION_SCHEDULED` ("Your account is set to be deleted. Keep your account to top up your wallet.") during cooling-off, including an Idempotency-Key replay. `GET /wallet` `data.can_top_up` is false while scheduled.
+- `GET /settings/public`: `account_deletion_url` is null outside local/testing when not https; hide the web-deletion link when null.
+- Admin only: `POST /admin/rides` → 423 `ACCOUNT_DELETION_SCHEDULED` (field passenger_id) for a passenger in cooling-off.
+- Server only: a due deletion waits for an open ride, an open top-up, a pending settlement (payout or commission payment) and pending_balance; after 7 days past the date (ACCOUNT_DELETION_POSTPONED_ALERT_DAYS) admins get one security event `account_deletion_postponed`.
