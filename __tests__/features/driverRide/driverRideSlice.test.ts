@@ -195,7 +195,7 @@ describe('advanceDriverRide', () => {
     const second = await store.dispatch(advanceDriverRide({ rideId: 41, action: 'arrived' }));
     await first;
 
-    expect(second.meta.condition).toBe(true);
+    expect(advanceDriverRide.rejected.match(second) && second.meta.condition).toBe(true);
     expect(mock.history.post).toHaveLength(1);
   });
 
@@ -227,7 +227,7 @@ describe('advanceDriverRide', () => {
     );
     const store = storeWithRide(makeRide({ status: 'accepted' }));
     const pending = store.dispatch(advanceDriverRide({ rideId: 41, action: 'arrived' }));
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setImmediate(() => resolve()));
 
     bumpSessionEpoch();
     store.dispatch(resetApp());

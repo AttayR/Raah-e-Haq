@@ -4,6 +4,7 @@
  * vehicle id (economy/comfort/premium), so every non-bike booking got a 422.
  */
 import {
+  type BookingPlace,
   BUILD_ERRORS,
   buildRideRequest,
   coordinateLabel,
@@ -103,7 +104,7 @@ describe('withAddresses (map-tapped points)', () => {
     const unnamed = { latitude: 31.4, longitude: 74.2 };
     const reverse = jest.fn(async (lat: number) => (lat === 31.5 ? 'Mall Road, Lahore' : null));
 
-    const [a, b, c, d] = await withAddresses([pickup, tapped, unnamed, null], reverse);
+    const [a, b, c, d] = await withAddresses<BookingPlace>([pickup, tapped, unnamed, null], reverse);
 
     expect(a).toBe(pickup);
     expect(b).toEqual({ ...tapped, address: 'Mall Road, Lahore' });
@@ -114,7 +115,7 @@ describe('withAddresses (map-tapped points)', () => {
   });
 
   it('a geocoding failure still gives a real (coordinate) address', async () => {
-    const [p] = await withAddresses([{ latitude: 1, longitude: 2 }], async () => {
+    const [p] = await withAddresses<BookingPlace>([{ latitude: 1, longitude: 2 }], async () => {
       throw new Error('offline');
     });
     expect(p?.address).toBe('1.00000, 2.00000');

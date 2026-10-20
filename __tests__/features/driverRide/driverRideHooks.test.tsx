@@ -48,8 +48,8 @@ beforeEach(() => {
   getStatus = jest
     .spyOn(driverStatusApi, 'get')
     .mockResolvedValue({ status: 'available', activeRideId: null, changedAt: null });
-  jest.spyOn(toast, 'success').mockImplementation(() => undefined);
-  jest.spyOn(toast, 'error').mockImplementation(() => undefined);
+  jest.spyOn(toast, 'success').mockImplementation(() => 'toast-id');
+  jest.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
 });
 
 afterEach(() => {

@@ -32,9 +32,16 @@ export interface NotificationEvent extends WebSocketEvent {
   data: NotificationResource;
 }
 
+/** Any of the typed per-channel handlers the subscribe methods register. */
+type WebSocketListener =
+  | ((event: WebSocketEvent) => void)
+  | ((event: RideUpdateEvent) => void)
+  | ((event: DriverRequestEvent) => void)
+  | ((event: NotificationEvent) => void);
+
 class WebSocketService {
   private connections: Map<string, WebSocket> = new Map();
-  private eventListeners: Map<string, Set<(event: WebSocketEvent) => void>> = new Map();
+  private eventListeners: Map<string, Set<WebSocketListener>> = new Map();
   private reconnectAttempts: Map<string, number> = new Map();
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000; // 1 second
@@ -239,7 +246,7 @@ class WebSocketService {
   }
 
   // Add event listener
-  private addEventListener(connectionId: string, listener: (event: WebSocketEvent) => void): void {
+  private addEventListener(connectionId: string, listener: WebSocketListener): void {
     if (!this.eventListeners.has(connectionId)) {
       this.eventListeners.set(connectionId, new Set());
     }
@@ -247,7 +254,7 @@ class WebSocketService {
   }
 
   // Remove event listener
-  removeEventListener(connectionId: string, listener: (event: WebSocketEvent) => void): void {
+  removeEventListener(connectionId: string, listener: WebSocketListener): void {
     const listeners = this.eventListeners.get(connectionId);
     if (listeners) {
       listeners.delete(listener);
