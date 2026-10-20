@@ -48,6 +48,12 @@ type Props = {
  * the cards fade in and rise 8 → 0 (`motion.fast`). On → off: the cards fade out (no taps from the
  * first frame), then the height eases 84 → 0 and the peek shrinks. One animated height, no
  * LayoutAnimation. Waits while the sheet is dragged; Reduce Motion swaps at once. Memoised.
+ *
+ * Settled, the wrapper still declares a height: the row's measured natural height. Reanimated
+ * only sends the keys a style returns, so dropping `height` would leave the native view at the
+ * last frame it was sent; when frames drop (a busy JS/UI thread as a ride ends), that frame can be
+ * an early one and the cards stay clipped to a strip. Every swap bumps `generation`; a hide's
+ * fade or shrink that ends after a newer swap changes nothing on the JS side.
  */
 function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold, rideStyle, parcelStyle }: Props) {
   const reduce = useReducedMotion();
@@ -56,21 +62,33 @@ function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold
   const shownRef = useRef(visible);
   const pending = useRef(false);
   const natural = useRef(HOME_SERVICE_ROW_ESTIMATE);
-  /** -1 = natural height (no animation running or ever needed). */
+  /** -1 = settled at the natural height (no animation running). */
   const height = useSharedValue(visible ? -1 : 0);
+  /** The row's last measured natural height, -1 until measured (the wrapper then sizes itself). */
+  const naturalHeight = useSharedValue(-1);
+  const generation = useRef(0);
   const opacity = useSharedValue(visible ? 1 : 0);
   const rise = useSharedValue(0);
 
-  const finishHide = useCallback(() => {
+  const finishHide = useCallback((gen: number) => {
+    if (gen !== generation.current) return;
     setMounted(false);
     setLeaving(false);
   }, []);
+  const faded = useCallback(
+    (gen: number) => {
+      if (gen === generation.current) onShown(false);
+    },
+    [onShown],
+  );
 
   const apply = useCallback(
     (next: boolean) => {
       pending.current = false;
       if (shownRef.current === next) return;
       shownRef.current = next;
+      generation.current += 1;
+      const gen = generation.current;
       if (next) {
         setMounted(true);
         setLeaving(false);
@@ -94,20 +112,20 @@ function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold
         height.value = 0;
         opacity.value = 0;
         onShown(false);
-        finishHide();
+        finishHide(gen);
         return;
       }
       const fromHeight = natural.current;
       height.value = fromHeight;
       opacity.value = withTiming(0, { duration: motion.fast.duration, easing: fadeEasing }, done => {
         if (!done) return;
-        runOnJS(onShown)(false);
+        runOnJS(faded)(gen);
         height.value = withTiming(0, { duration: motion.base.duration, easing: resizeEasing }, shrunk => {
-          if (shrunk) runOnJS(finishHide)();
+          if (shrunk) runOnJS(finishHide)(gen);
         });
       });
     },
-    [finishHide, height, onShown, opacity, reduce, rise],
+    [faded, finishHide, height, onShown, opacity, reduce, rise],
   );
 
   useEffect(() => {
@@ -136,14 +154,18 @@ function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold
     (e: LayoutChangeEvent) => {
       const next = e.nativeEvent.layout.height;
       natural.current = next;
+      naturalHeight.value = next;
       if (reported.current !== null && Math.abs(reported.current - next) < 1) return;
       reported.current = next;
       onHeight(next);
     },
-    [onHeight],
+    [naturalHeight, onHeight],
   );
 
-  const outerStyle = useAnimatedStyle(() => (height.value < 0 ? {} : { height: height.value }));
+  const outerStyle = useAnimatedStyle(() => {
+    if (height.value >= 0) return { height: height.value };
+    return naturalHeight.value >= 0 ? { height: naturalHeight.value } : {};
+  });
   const innerStyle = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: rise.value }] }));
 
   if (!mounted) return null;
