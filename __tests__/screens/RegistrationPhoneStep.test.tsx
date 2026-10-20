@@ -284,6 +284,20 @@ describe('RegistrationPhoneStep', () => {
     dismiss.mockRestore();
   });
 
+  it('T-594: the keyboard Done/Enter verifies with all 6 digits, and does nothing with fewer', async () => {
+    mock.onPost('/auth/phone/verify').reply(422, { success: false, message: 'Wrong code.', code: 'invalid_code' });
+    await renderStep();
+    const field = () => screen.getByPlaceholderText('6-digit code');
+    const verifyCalls = () => mock.history.post.filter((request) => request.url === '/auth/phone/verify');
+    fireEvent.changeText(field(), '12345');
+    fireEvent(field(), 'submitEditing');
+    await act(async () => {});
+    expect(verifyCalls()).toHaveLength(0);
+    fireEvent.changeText(field(), '123456');
+    fireEvent(field(), 'submitEditing');
+    await waitFor(() => expect(verifyCalls()).toHaveLength(1));
+  });
+
   it('shows the wrong-number hint', async () => {
     await renderStep();
     expect(screen.getByText('Wrong number? Open the link we emailed you, sign in, then change it in Profile.')).toBeTruthy();

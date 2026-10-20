@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus, Platform, Linking, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { isAndroidEmulator, getDefaultLocation } from '../utils/locationUtils';
 import { logger } from '../core/logging/logger';
 import { primeBeforeOsPrompt } from '../features/permissions/primer';
 import { iosLocationOsStatus, locationOsUndetermined } from '../features/permissions/locationStatus';
@@ -82,6 +81,22 @@ const errorKindOf = (code: number): LocationErrorKind =>
 /** PERMISSION_DENIED (1) and TIMEOUT (3): situations the screens explain, logged at debug. */
 export const isExpectedPositionError = (code: number): boolean => code === 1 || code === 3;
 
+/**
+ * T-593: on Android the geolocation library asks the OS for permission itself on every lookup
+ * unless told not to. This hook asks only through the pre-prompt and PermissionsAndroid, so its
+ * Android lookups skip the library's own request (a lookup without access fails with code 1).
+ * Set before each lookup: the driver tracking service sets its own configuration for its watch.
+ */
+const noLibraryPromptOnAndroid = () => {
+  if (Platform.OS === 'android') Geolocation.setRNConfiguration({ skipPermissionRequests: true });
+};
+
+/** T-593: Android 12+ ignores a fine-only request; both are asked, either one is access. */
+const ANDROID_LOCATION_PERMISSIONS = [
+  PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+];
+
 export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = {}) => {
   const appInForeground = useAppInForeground();
   const enabled = active && appInForeground;
@@ -111,13 +126,7 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
   // Check location services status
   const checkLocationServices = useCallback((): Promise<boolean> => {
     return new Promise((resolve) => {
-      // For Android emulator, always return true
-      if (isAndroidEmulator()) {
-        logger.debug('Android emulator detected, skipping location services check');
-        resolve(true);
-        return;
-      }
-
+      noLibraryPromptOnAndroid();
       Geolocation.getCurrentPosition(
         () => resolve(true),
         (positionError) => {
@@ -141,16 +150,8 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
         );
 
         const isGranted = fineLocation || coarseLocation;
-        const isLocationEnabled = await checkLocationServices();
-
-        // For Android emulator, always return granted and enabled
-        if (isAndroidEmulator()) {
-          return {
-            isGranted: true,
-            canAskAgain: false,
-            isLocationEnabled: true,
-          };
-        }
+        // T-593: no lookup without access (it would be refused, or would ask the OS itself).
+        const isLocationEnabled = isGranted ? await checkLocationServices() : false;
 
         return {
           isGranted,
@@ -179,9 +180,7 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
   // Get current location; a failure is kept in `error` (no alert).
   const getCurrentLocation = useCallback((): Promise<Coordinates | null> => {
     return new Promise((resolve) => {
-      // For Android emulator, use a default location if real location fails
-      const isEmulator = Platform.OS === 'android' && __DEV__;
-
+      noLibraryPromptOnAndroid();
       Geolocation.getCurrentPosition(
         (position) => {
           const location = {
@@ -200,18 +199,6 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
           if (isExpectedPositionError(positionError.code)) logger.debug('Location error:', positionError);
           else logger.warn('Location error:', positionError);
 
-          // For Android emulator, use default location
-          if (isEmulator && positionError.code === 3) { // TIMEOUT
-            logger.debug('Using default location for Android emulator');
-            const defaultLocation = getDefaultLocation();
-            if (mounted.current) {
-              setCurrentLocation(defaultLocation);
-              setError(null);
-            }
-            resolve(defaultLocation);
-            return;
-          }
-
           if (mounted.current) setError(errorKindOf(positionError.code));
           resolve(null);
         },
@@ -229,20 +216,6 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
     setIsLoading(true);
 
     try {
-      // For Android emulator, skip permission request and use default location
-      if (isAndroidEmulator()) {
-        logger.debug('Android emulator detected, using default location');
-        const defaultLocation = getDefaultLocation();
-        setCurrentLocation(defaultLocation);
-        setError(null);
-        setPermissionStatus({
-          isGranted: true,
-          canAskAgain: false,
-          isLocationEnabled: true,
-        });
-        return true;
-      }
-
       if (Platform.OS === 'android') {
         // Check current status first
         const currentStatus = await checkPermissionStatus();
@@ -257,23 +230,16 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
           return (await getCurrentLocation()) !== null;
         }
 
-        // Request permission
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'RaaHeHaq needs access to your location to find nearby drivers and show your position.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'Allow',
-          }
-        );
+        // Request permission (the pre-prompt already explained why; T-593: fine and coarse).
+        const results = await PermissionsAndroid.requestMultiple(ANDROID_LOCATION_PERMISSIONS);
+        const answers = ANDROID_LOCATION_PERMISSIONS.map((permission) => results[permission]);
+        const granted = answers.includes(PermissionsAndroid.RESULTS.GRANTED);
 
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        if (!granted) {
           if (mounted.current) {
             setPermissionStatus({
               isGranted: false,
-              canAskAgain: granted !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
+              canAskAgain: !answers.every((answer) => answer === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN),
               isLocationEnabled: currentStatus.isLocationEnabled,
             });
             setError('denied');

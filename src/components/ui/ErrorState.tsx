@@ -106,7 +106,7 @@ function CompactErrorState({
       >
         <Icon name={kind === 'network' ? 'networkError' : 'warning'} size={k.compactGlyph} color="danger" />
       </View>
-      <AppText variant="title" align="center" numberOfLines={2}>
+      <AppText variant="title" align="center" numberOfLines={2} style={styles.compactTitle}>
         {title}
       </AppText>
       <View style={styles.compactAction}>
@@ -133,6 +133,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // T-594: the column's width, not the text's (a hugging centred heading clipped on Android).
+  compactTitle: { alignSelf: 'stretch' },
   // §5.4 ruling (UI-R8): a hugging button in a centred column centres itself.
   compactAction: { alignSelf: 'center' },
 });

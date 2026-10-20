@@ -69,6 +69,8 @@ export default function PhoneAuthScreen() {
   const sendBlocked = resendIn > 0 && (sendHold.global || toE164(digits) === sendHold.phone);
   // One send/verify at a time: a second tap lands before isLoading re-renders the button.
   const inFlight = useRef(false);
+  // Verify (the button, and T-594 the keyboard's Done/Enter) needs the whole, live code.
+  const canVerify = !isResending && !isExpired && !codeBurned && verificationCode.length === OTP_LENGTH;
 
   // The auth error is shared with Login: leaving this screen must not carry it over (T-107).
   useEffect(() => () => clearAuthError(), [clearAuthError]);
@@ -304,6 +306,9 @@ export default function PhoneAuthScreen() {
             resending={isResending}
             onResend={handleResendCode}
             onChangeNumber={handleBackToPhone}
+            onSubmit={() => {
+              if (canVerify) handleVerifyCode();
+            }}
             emailFallback={emailFallback}
           />
         ) : (
@@ -328,7 +333,7 @@ export default function PhoneAuthScreen() {
             size="lg"
             onPress={handleVerifyCode}
             loading={isLoading && !isResending}
-            disabled={isResending || isExpired || codeBurned || verificationCode.length !== OTP_LENGTH}
+            disabled={!canVerify}
             accessibilityLabel={isLoading && !isResending ? COPY.codeStep.verifying : undefined}
             haptic="impactLight"
             testID="phone-auth-verify"

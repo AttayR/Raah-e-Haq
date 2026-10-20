@@ -70,6 +70,8 @@ interface CodeStepProps {
   resending: boolean;
   onResend: () => void;
   onChangeNumber: () => void;
+  /** T-594: the keyboard's Done/Enter with the whole code verifies (as the Verify button does). */
+  onSubmit: () => void;
   emailFallback: React.ReactNode;
 }
 
@@ -91,6 +93,7 @@ export function PhoneCodeStep({
   resending,
   onResend,
   onChangeNumber,
+  onSubmit,
   emailFallback,
 }: CodeStepProps) {
   return (
@@ -112,6 +115,7 @@ export function PhoneCodeStep({
           onChangeText={onChange}
           keyboardType="number-pad"
           returnKeyType="done"
+          onSubmitEditing={onSubmit}
           textContentType="oneTimeCode"
           autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
           autoFocus

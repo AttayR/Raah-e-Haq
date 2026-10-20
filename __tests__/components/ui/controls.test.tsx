@@ -388,7 +388,12 @@ describe('Avatar fallbacks', () => {
       </ThemeProvider>,
     );
     await act(async () => {});
+    // T-594: the initials show while the photo loads (never a blank circle), then it covers them.
+    expect(screen.getByText('SM')).toBeTruthy();
+    expect(flat(screen.getByTestId('av').props.style).backgroundColor).toBe(LightTheme.colors.primarySoft);
+    fireEvent(screen.getByTestId('av-photo'), 'load');
     expect(screen.queryByText('SM')).toBeNull();
+    expect(flat(screen.getByTestId('av').props.style).backgroundColor).toBe(LightTheme.colors.surfaceAlt);
     fireEvent(screen.getByTestId('av-photo'), 'error');
     expect(screen.getByText('SM')).toBeTruthy();
     view.rerender(
@@ -398,6 +403,16 @@ describe('Avatar fallbacks', () => {
     );
     await act(async () => {});
     expect(screen.getByTestId('av-photo')).toBeTruthy();
+    expect(screen.getByText('SM')).toBeTruthy();
+    fireEvent(screen.getByTestId('av-photo'), 'load');
+    expect(screen.queryByText('SM')).toBeNull();
+    // T-594: a newer URL shows the initials straight away (not the old photo's loaded state).
+    view.rerender(
+      <ThemeProvider>
+        <Avatar name="Sana Malik" uri="https://example.test/c.png" testID="av" />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('SM')).toBeTruthy();
   });
 
   it.each([

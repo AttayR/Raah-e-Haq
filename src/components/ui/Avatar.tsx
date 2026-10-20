@@ -32,16 +32,22 @@ export const initialsOf = (name?: string | null): string => {
 
 /**
  * Avatar (DESIGN_SYSTEM §5.13): the photo, or initials on `primarySoft`; never an empty grey
- * circle. Decorative: the name next to it is what screen readers read.
+ * circle. Decorative: the name next to it is what screen readers read. T-594 (Android smoke
+ * issue 8): the initials show until the photo has loaded (a slow or unreachable photo left a
+ * blank circle on the first Home after sign-in), then the photo covers them.
  */
 export function Avatar({ name, uri, size = 40, online = false, testID }: AvatarProps) {
   const { theme } = useAppTheme();
   const [failed, setFailed] = useState(false);
+  // The URL whose photo has loaded: a new URL shows the initials until its own photo loads
+  // (compared in render, so there is no frame with the old state).
+  const [loadedUri, setLoadedUri] = useState<string | null>(null);
   // A new photo URL gets a fresh attempt; a URL that failed keeps the initials (UI-R2: no blobs).
   useEffect(() => setFailed(false), [uri]);
   const initials = initialsOf(name);
   const circle = { width: size, height: size, borderRadius: size / 2 };
   const showPhoto = !!uri && uri.trim().length > 0 && !failed;
+  const photoShown = showPhoto && loadedUri === uri;
   return (
     <View
       testID={testID}
@@ -49,24 +55,26 @@ export function Avatar({ name, uri, size = 40, online = false, testID }: AvatarP
       style={[
         styles.base,
         circle,
-        { backgroundColor: showPhoto ? theme.colors.surfaceAlt : theme.colors.primarySoft },
+        { backgroundColor: photoShown ? theme.colors.surfaceAlt : theme.colors.primarySoft },
         online ? { borderWidth: theme.borderWidth.focus, borderColor: theme.colors.success } : null,
       ]}
     >
-      {showPhoto ? (
-        <Image
-          source={{ uri: uri as string }}
-          style={[styles.photo, circle]}
-          onError={() => setFailed(true)}
-          testID={testID ? `${testID}-photo` : undefined}
-        />
-      ) : initials ? (
+      {photoShown ? null : initials ? (
         <AppText variant={size >= 96 ? 'h2' : size >= 56 ? 'title' : 'label'} color="onPrimarySoft" testID={testID ? `${testID}-initials` : undefined}>
           {initials}
         </AppText>
       ) : (
         <Icon name="account" size={glyphSize(size)} color="onPrimarySoft" />
       )}
+      {showPhoto ? (
+        <Image
+          source={{ uri: uri as string }}
+          style={[styles.photo, circle]}
+          onLoad={() => setLoadedUri(uri ?? null)}
+          onError={() => setFailed(true)}
+          testID={testID ? `${testID}-photo` : undefined}
+        />
+      ) : null}
     </View>
   );
 }

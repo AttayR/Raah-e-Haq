@@ -279,7 +279,8 @@ describe('useBookingFlow field text (T-534 review)', () => {
     act(() => {
       result.current.stepBack();
     });
-    expect(result.current.stage).toBe('pickup');
+    // T-594: Back from a search step is the Where to sheet, with the pick kept.
+    expect(result.current.stage).toBe('home');
     expect(result.current.pickupField.text).toBe('Gulberg III, Lahore');
   });
 
@@ -311,7 +312,11 @@ describe('useBookingFlow field text (T-534 review)', () => {
     act(() => {
       result.current.stepBack();
     });
-    expect(result.current.stage).toBe('destination');
+    // T-594: one press back to the Where to sheet ("Plan your trip"), both picks kept.
+    expect(result.current.stage).toBe('home');
+    expect(result.current.pickup).toMatchObject(GULBERG);
+    expect(result.current.destination).toMatchObject(DHA);
+    expect(result.current.destField.text).toBe('DHA Phase 5, Lahore');
     expect(d.clearRoute).toHaveBeenCalledTimes(1);
   });
 

@@ -91,6 +91,7 @@ describe('T-570: PhoneAuth code step', () => {
             resending={false}
             onResend={jest.fn()}
             onChangeNumber={jest.fn()}
+            onSubmit={jest.fn()}
             emailFallback={null}
             {...props}
           />

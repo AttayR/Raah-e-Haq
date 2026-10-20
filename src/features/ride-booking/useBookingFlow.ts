@@ -18,6 +18,18 @@ export type BookingStage = 'home' | 'pickup' | 'destination' | 'vehicle' | 'requ
 const STAGE_ORDER: BookingStage[] = ['home', 'pickup', 'destination', 'vehicle', 'requesting'];
 /** The route is drawn from the vehicle step on; an earlier step shows no route (T-551). */
 const ROUTE_FROM = STAGE_ORDER.indexOf('vehicle');
+/**
+ * T-594 (Android smoke issue 7): Back goes one sheet state back (DS §12.5): Choose a ride and the
+ * one-field searches return to the Where to sheet ("Plan your trip", both fields, picks kept) in
+ * one press, not through each search step (it took three presses).
+ */
+const PREVIOUS_STAGE: Record<BookingStage, BookingStage | null> = {
+  home: null,
+  pickup: 'home',
+  destination: 'home',
+  vehicle: 'home',
+  requesting: 'vehicle',
+};
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -180,10 +192,10 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     // UI-R10: while POST /rides is in flight (no ride shown yet) Back is held, never a step back to
     // "Choose a ride" under a request that is being created (a second tap could send it twice).
     if (stage === 'requesting' && !rideShown) return true;
-    const currentIndex = STAGE_ORDER.indexOf(stage);
-    if (currentIndex > 0 && !rideShown) {
-      if (currentIndex - 1 < ROUTE_FROM) clearRoute();
-      setStage(STAGE_ORDER[currentIndex - 1]);
+    const previous = PREVIOUS_STAGE[stage];
+    if (previous !== null && !rideShown) {
+      if (STAGE_ORDER.indexOf(previous) < ROUTE_FROM) clearRoute();
+      setStage(previous);
       setError(null);
       return true;
     }

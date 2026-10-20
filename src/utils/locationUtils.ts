@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 // Default locations for different cities
 export const DEFAULT_LOCATIONS = {
   lahore: {
@@ -24,12 +22,8 @@ export const DEFAULT_LOCATIONS = {
   }
 };
 
-// Check if running on Android emulator
-export const isAndroidEmulator = (): boolean => {
-  return Platform.OS === 'android' && __DEV__;
-};
-
-// Get default location for emulator
+// The service area's default point (map centre before a fix). T-593: never a stand-in for the
+// device's position; an emulator is given a position with `adb emu geo fix <lng> <lat>`.
 export const getDefaultLocation = () => {
   return DEFAULT_LOCATIONS.default;
 };

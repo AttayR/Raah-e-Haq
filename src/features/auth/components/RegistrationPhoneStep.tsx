@@ -130,6 +130,10 @@ export default function RegistrationPhoneStep({ pending, role, onGoToSignIn }: P
         onChangeText={step.setCode}
         keyboardType="number-pad"
         returnKeyType="done"
+        // T-594: Done/Enter with the whole code verifies, like the button below.
+        onSubmitEditing={() => {
+          if (step.canVerify && !step.verifying && step.code.length === OTP_LENGTH) step.verify();
+        }}
         textContentType="oneTimeCode"
         autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
         autoFocus

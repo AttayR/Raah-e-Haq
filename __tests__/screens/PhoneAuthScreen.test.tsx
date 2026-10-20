@@ -538,6 +538,26 @@ describe('PhoneAuthScreen (T-101)', () => {
       expect(isDisabled(verify())).toBe(false);
     });
 
+    it('T-594: the keyboard Done/Enter verifies with all 6 digits, and does nothing with fewer', async () => {
+      replyLocalSend();
+      mock.onPost('/auth/verify-otp').reply(401, { success: false, message: 'Invalid or expired OTP' });
+      await renderScreen();
+      await sendCode();
+      await waitFor(() => expect(screen.getByPlaceholderText('6-digit code')).toBeTruthy());
+      const field = () => screen.getByPlaceholderText('6-digit code');
+      const verifyCalls = () => mock.history.post.filter((request) => request.url === '/auth/verify-otp');
+
+      fireEvent.changeText(field(), '12345');
+      fireEvent(field(), 'submitEditing');
+      await act(async () => {});
+      expect(verifyCalls()).toHaveLength(0);
+
+      fireEvent.changeText(field(), '123456');
+      fireEvent(field(), 'submitEditing');
+      await waitFor(() => expect(verifyCalls()).toHaveLength(1));
+      expect(JSON.parse(verifyCalls()[0].data)).toMatchObject({ otp_code: '123456' });
+    });
+
     it('clears the old "Invalid or expired" error when the code expires', async () => {
       replyLocalSend();
       mock.onPost('/auth/verify-otp').reply(401, { success: false, message: 'Invalid or expired OTP' });

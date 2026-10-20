@@ -203,7 +203,8 @@ describe('Badge, Avatar, StatTile', () => {
     screen.unmount();
     // A photo that fails to load falls back to the initials, not an empty circle.
     await renderThemed(<Avatar name="Test Driver" uri="https://example.test/missing.png" size={56} testID="av" />);
-    expect(screen.queryByText('TD')).toBeNull();
+    // T-594: the initials show while the photo loads, never an empty circle.
+    expect(screen.getByText('TD')).toBeTruthy();
     await act(async () => {
       screen.getByTestId('av-photo').props.onError();
     });

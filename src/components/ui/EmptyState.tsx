@@ -135,7 +135,7 @@ function CompactEmptyState({ icon, title, body, action, style, testID }: Omit<Em
         <Icon name={icon} size={k.compactGlyph} color="primaryText" />
       </View>
       <View style={styles.compactText}>
-        <AppText variant="title" align="center" accessibilityRole="header">
+        <AppText variant="title" align="center" accessibilityRole="header" style={styles.compactTitle}>
           {title}
         </AppText>
         {body ? (
@@ -182,7 +182,10 @@ const styles = StyleSheet.create({
   column: { width: '100%', maxWidth: k.maxWidth, alignItems: 'center' },
   circle: { width: k.circle, height: k.circle, borderRadius: k.circle / 2, alignItems: 'center', justifyContent: 'center' },
   illustration: { width: k.illustration, height: k.illustration },
-  title: { marginTop: space[4] },
+  // T-594 (Android smoke issue 4): on Android/Fabric a centred heading that hugs its width in a
+  // centred column (semibold, negative letter spacing) is measured too narrow and its last word
+  // wraps out of sight ("No messages" read "No"). The title takes the column's width instead.
+  title: { marginTop: space[4], alignSelf: 'stretch' },
   body: { marginTop: space[2] },
   action: { marginTop: space[6] },
   compact: { alignItems: 'center', gap: space[3], paddingVertical: space[2] },
@@ -193,7 +196,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  compactText: { alignItems: 'center', gap: space[1], maxWidth: k.maxWidth },
+  compactText: { alignItems: 'center', gap: space[1], width: '100%', maxWidth: k.maxWidth },
+  compactTitle: { alignSelf: 'stretch' },
   // §5.4 ruling (UI-R8): a hugging button in a centred column centres itself.
   compactAction: { alignSelf: 'center' },
 });
