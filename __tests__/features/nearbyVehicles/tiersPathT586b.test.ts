@@ -27,7 +27,6 @@ const at = (north: number, east = 0) => ({
 
 const drv = (id: string, over: Partial<NearbyDriver> = {}): NearbyDriver => ({
   id,
-  rating: 0,
   vehicle_type: 'car',
   distance_km: 1,
   estimated_arrival_min: 3,
@@ -66,7 +65,7 @@ describe('tiers path glyphs (BE-116)', () => {
 });
 
 describe('separateClose (design review: a bike on top of a car)', () => {
-  const v = (id: string, north: number, east = 0): NearbyVehicleInput => ({ id, vehicleType: 'car', heading: null, ...at(north, east) });
+  const v = (id: string, north: number, east = 0): NearbyVehicleInput => ({ id, vehicleType: 'car', heading: null, precision: 'coarse', ...at(north, east) });
 
   it('pushes a close pair apart to the minimum, half each, along the line between them', () => {
     const [a, b] = separateClose([v('a', 0), v('b', 10)], 40);

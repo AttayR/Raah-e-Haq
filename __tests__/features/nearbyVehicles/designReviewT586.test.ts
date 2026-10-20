@@ -36,7 +36,6 @@ import { motionPatterns } from '../../../src/theme';
 
 const drv = (id: string, over: Partial<NearbyDriver> = {}): NearbyDriver => ({
   id,
-  rating: 0,
   vehicle_type: 'car',
   distance_km: 1,
   estimated_arrival_min: 3,
@@ -240,7 +239,7 @@ describe('2. AC and parcel without BE-116 tiers', () => {
 });
 
 describe('3. overlap spread is ~30 pt at the current zoom', () => {
-  const stacked = ['a', 'b', 'c'].map(id => ({ id, vehicleType: 'car', latitude: 31.52, longitude: 74.355, heading: null }));
+  const stacked = ['a', 'b', 'c'].map(id => ({ id, vehicleType: 'car', latitude: 31.52, longitude: 74.355, heading: null, precision: 'coarse' as const }));
 
   it('converts points to metres from the region', () => {
     expect(motionPatterns.nearbyMarker.overlapSpreadPt).toBe(30);

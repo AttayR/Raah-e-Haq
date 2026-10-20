@@ -354,13 +354,21 @@ export const NEARBY_MAX_RADIUS_KM = 10;
 export const NEARBY_DEFAULT_RADIUS_KM = 5;
 
 /**
+ * BE-118 (SEC-31): how a nearby marker's position was made. `fine`: the driver's position 45 s
+ * ago rounded to ~55 m (moving drivers only); `coarse`: the ~550 m grid, refreshed every 2 minutes.
+ */
+export type NearbyPrecision = 'fine' | 'coarse';
+
+/**
  * One entry of GET /rides/nearby-drivers (BE-20). No name, phone or user id: `id` is an opaque
- * string bound to the viewer (stable for about an hour; use it only as a list/marker key),
- * `rating` is in 0.5 steps, `location` is snapped to a ~550 m grid and refreshes every 2 minutes.
+ * string bound to the viewer, used only as a list/marker key. It changes at least hourly, at a
+ * new driver session and on every coarse/hidden → fine switch (BE-118): a new id is a new marker.
+ * BE-118 sends `rating` as 0 on every marker; the app does not read it (T-590).
  */
 export interface NearbyDriver {
   id: string;
-  rating: number;
+  /** BE-118: `coarse` when absent (older server) or unknown. */
+  precision?: NearbyPrecision;
   /** BE-58: null when the driver has no (known) vehicle type; never guessed as car. */
   vehicle_type: VehicleTypeKey | null;
   distance_km: number;
@@ -438,7 +446,7 @@ const normalizeNearbyDriver = (raw: unknown): NearbyDriver | null => {
   }
   return {
     id: item.id,
-    rating: toNumber(item.rating) ?? 0,
+    precision: item.precision === 'fine' ? 'fine' : 'coarse',
     vehicle_type: isVehicleTypeKey(item.vehicle_type) ? item.vehicle_type : null,
     distance_km: toNumber(item.distance_km) ?? 0,
     estimated_arrival_min: toNumber(item.estimated_arrival_min) ?? 0,
@@ -719,8 +727,9 @@ class RideService {
 
   /**
    * Available drivers near a point for the passenger map (GET /rides/nearby-drivers, BE-20).
-   * The radius is clamped to 1..10 km. Rate limited to 12 requests a minute per user: a 429
-   * rejects with ApiError kind 'rate_limited' and `retryAfter` (seconds).
+   * The radius is clamped to 1..10 km. Rate limited to 6 requests a minute and 300 an hour per
+   * user, 30 a minute per IP (BE-118, SEC-31): a 429 rejects with ApiError kind 'rate_limited'
+   * and `retryAfter` (seconds).
    */
   async getNearbyDrivers(query: NearbyDriversQuery, signal?: AbortSignal): Promise<NearbyDriver[]> {
     return (await this.getNearbyDriversResult(query, signal)).drivers;

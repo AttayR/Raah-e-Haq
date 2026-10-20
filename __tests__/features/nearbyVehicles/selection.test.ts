@@ -14,7 +14,6 @@ import { motionPatterns } from '../../../src/theme';
 
 const driver = (id: string, over: Partial<NearbyDriver> = {}): NearbyDriver => ({
   id,
-  rating: 0,
   vehicle_type: 'car',
   distance_km: 1,
   estimated_arrival_min: 3,
@@ -63,11 +62,11 @@ describe('marker cap and overlap (§2.1, §2.2)', () => {
 
   it('spreads vehicles on one grid point on a 40 m circle, ordered by id; single ones stay put', () => {
     const at = { latitude: 31.52, longitude: 74.355 };
-    const lone = { id: 'z', vehicleType: 'car', latitude: 31.6, longitude: 74.4, heading: null };
+    const lone = { id: 'z', vehicleType: 'car', latitude: 31.6, longitude: 74.4, heading: null, precision: 'coarse' as const };
     const spread = spreadOverlaps([
-      { id: 'b', vehicleType: 'car', ...at, heading: null },
-      { id: 'a', vehicleType: 'bike', ...at, heading: null },
-      { id: 'c', vehicleType: 'car', ...at, heading: null },
+      { id: 'b', vehicleType: 'car', ...at, heading: null, precision: 'coarse' as const },
+      { id: 'a', vehicleType: 'bike', ...at, heading: null, precision: 'coarse' as const },
+      { id: 'c', vehicleType: 'car', ...at, heading: null, precision: 'coarse' as const },
       lone,
     ]);
     expect(spread[3]).toBe(lone);
@@ -82,8 +81,8 @@ describe('marker cap and overlap (§2.1, §2.2)', () => {
 
   it('is a no-op for finer positions (no two on one point)', () => {
     const inputs = [
-      { id: 'a', vehicleType: 'car', latitude: 31.52, longitude: 74.355, heading: 10 },
-      { id: 'b', vehicleType: 'car', latitude: 31.5203, longitude: 74.355, heading: 10 },
+      { id: 'a', vehicleType: 'car', latitude: 31.52, longitude: 74.355, heading: 10, precision: 'fine' as const },
+      { id: 'b', vehicleType: 'car', latitude: 31.5203, longitude: 74.355, heading: 10, precision: 'fine' as const },
     ];
     expect(spreadOverlaps(inputs)).toEqual(inputs);
   });

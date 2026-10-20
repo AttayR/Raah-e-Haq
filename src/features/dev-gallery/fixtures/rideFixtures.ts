@@ -29,8 +29,8 @@ export const galleryRegion = { latitude: 31.4928, longitude: 74.3084, latitudeDe
 export const galleryAssignedCar = { coordinate: galleryRoute[2] };
 /** Gallery-only nearby vehicles (NearbyDriver shape, T-586): a car and an AC car. */
 export const galleryNearbyCars: NearbyDriver[] = [
-  { id: 'n1', rating: 0, vehicle_type: 'car', distance_km: 1, estimated_arrival_min: 3, location: { latitude: 31.5245, longitude: 74.3205 }, heading: 45 },
-  { id: 'n2', rating: 0, vehicle_type: 'car_ac', distance_km: 2, estimated_arrival_min: 5, location: { latitude: 31.4971, longitude: 74.3512 }, heading: 300 },
+  { id: 'n1', vehicle_type: 'car', distance_km: 1, estimated_arrival_min: 3, location: { latitude: 31.5245, longitude: 74.3205 }, heading: 45 },
+  { id: 'n2', vehicle_type: 'car_ac', distance_km: 2, estimated_arrival_min: 5, location: { latitude: 31.4971, longitude: 74.3512 }, heading: 300 },
 ];
 
 const rawRide = {

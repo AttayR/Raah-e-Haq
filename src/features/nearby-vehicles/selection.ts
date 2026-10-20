@@ -3,7 +3,7 @@
  * §2.2, §3, §4). Pure functions, unit tested in `__tests__/features/nearbyVehicles/selection.test.ts`.
  */
 import { motionPatterns } from '../../theme';
-import type { NearbyCounts, NearbyDriver, VehicleTypeKey } from '../../services/rideService';
+import type { NearbyCounts, NearbyDriver, NearbyPrecision, VehicleTypeKey } from '../../services/rideService';
 import { isVehicleTypeKey } from '../../services/rideService';
 
 const N = motionPatterns.nearbyMarker;
@@ -16,6 +16,8 @@ export interface NearbyVehicleInput {
   latitude: number;
   longitude: number;
   heading: number | null;
+  /** BE-118 (T-590): `fine` glides, `coarse` relocates with a crossfade. */
+  precision: NearbyPrecision;
 }
 
 /**
@@ -178,6 +180,7 @@ export const nearbyMarkerInputs = (
       latitude: d.location.latitude,
       longitude: d.location.longitude,
       heading: d.heading,
+      precision: d.precision ?? 'coarse',
     }));
   return separateClose(spreadOverlaps(nearest, spreadMeters), spreadMeters);
 };

@@ -16,7 +16,6 @@ import type { NearbyDriver } from '../../../src/services/rideService';
 
 const driver = (id: string, vehicle_type: NearbyDriver['vehicle_type'] = 'car'): NearbyDriver => ({
   id,
-  rating: 0,
   vehicle_type,
   distance_km: 1,
   estimated_arrival_min: 3,

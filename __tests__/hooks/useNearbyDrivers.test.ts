@@ -20,7 +20,6 @@ import {
 
 const driver: NearbyDriver = {
   id: 'a1b2c3d4e5f60718',
-  rating: 4.5,
   vehicle_type: 'car',
   distance_km: 1.2,
   estimated_arrival_min: 3,

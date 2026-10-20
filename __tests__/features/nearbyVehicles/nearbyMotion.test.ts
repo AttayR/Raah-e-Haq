@@ -23,11 +23,18 @@ const at = (north: number, east = 0) => ({
   latitude: ORIGIN.latitude + north / M_PER_DEG_LAT,
   longitude: ORIGIN.longitude + east / (M_PER_DEG_LAT * Math.cos((ORIGIN.latitude * Math.PI) / 180)),
 });
+/** A fine (BE-118) vehicle: glides. */
 const v = (id: string, north: number, east = 0, heading: number | null = null, vehicleType = 'car'): NearbyVehicleInput => ({
   id,
   vehicleType,
   heading,
+  precision: 'fine',
   ...at(north, east),
+});
+/** A coarse (550 m grid) vehicle: relocates with a crossfade. */
+const c = (id: string, north: number, east = 0, heading: number | null = null, vehicleType = 'car'): NearbyVehicleInput => ({
+  ...v(id, north, east, heading, vehicleType),
+  precision: 'coarse',
 });
 
 let layer: NearbyLayer;
@@ -122,10 +129,10 @@ describe('appear and leave (§2.5)', () => {
     expect(frame(2151, 'b')).toBeDefined();
   });
 
-  it('hourly id rotation: a new id of the same type within 100 m is the same marker (no blink)', () => {
-    update(0, [v('old', 0, 0, 90), v('bike', 300, 0, null, 'bike')]);
+  it('hourly id rotation: a new coarse id of the same type within 100 m is the same marker (no blink)', () => {
+    update(0, [c('old', 0, 0, 90), c('bike', 300, 0, null, 'bike')]);
     frames(400);
-    update(15000, [v('new', 60, 0, 90), v('bike2', 300, 0, null, 'car')]);
+    update(15000, [c('new', 60, 0, 90), c('bike2', 300, 0, null, 'car')]);
     const shown = frames(15000).frames;
     const same = shown.find(f => f.key === 'old');
     expect(same).toMatchObject({ opacity: 1, rotation: 90 });
@@ -264,5 +271,59 @@ describe('frame budget (§2.7)', () => {
     update(0, [v('a', 0, 0, 0), v('b', 900, 0, 45)]);
     expect(frames(100).animating).toBe(true);
     expect(frames(1000).animating).toBe(false);
+  });
+});
+
+describe('T-590: precision (BE-118, SEC-31)', () => {
+  it('a fine marker glides linearly over the update gap', () => {
+    update(0, [v('f', 0, 0, 90)]);
+    frames(400);
+    update(15000, [v('f', 0, 150, 90)]);
+    const mid = frame(22500, 'f')!;
+    expect(mid.opacity).toBe(1);
+    expect(distanceMeters(mid, at(0, 75))).toBeLessThan(2);
+    expect(distanceMeters(frame(30000, 'f')!, at(0, 150))).toBeLessThan(0.01);
+  });
+
+  it('a coarse marker relocates with the crossfade even when the move would be plausible', () => {
+    update(0, [c('k', 0, 0, 90)]);
+    frames(400);
+    update(15000, [c('k', 0, 150, 90)]);
+    // Fades out where it is (never slides between grid cells), then lands at the new point.
+    const out = frame(15075, 'k')!;
+    expect(out.opacity).toBeLessThan(1);
+    expect(distanceMeters(out, at(0))).toBeLessThan(0.01);
+    expect(distanceMeters(frame(15160, 'k')!, at(0, 150))).toBeLessThan(0.01);
+    expect(frame(15150 + 251, 'k')!.opacity).toBe(1);
+  });
+
+  it('a coarse → fine switch of the same id does not glide (crossfade)', () => {
+    update(0, [c('s', 0, 0, 90)]);
+    frames(400);
+    update(15000, [v('s', 0, 150, 90)]);
+    expect(distanceMeters(frame(15075, 's')!, at(0))).toBeLessThan(0.01);
+    expect(distanceMeters(frame(15160, 's')!, at(0, 150))).toBeLessThan(0.01);
+  });
+
+  it('a new fine id is a new marker: the old one fades out, the new one fades in (no bridging)', () => {
+    update(0, [v('f-old', 0, 0, 90)]);
+    frames(400);
+    update(15000, [v('f-new', 30, 0, 90)]);
+    const shown = frames(15000).frames;
+    expect(shown.find(f => f.key === 'f-new')!.opacity).toBe(0);
+    expect(shown.find(f => f.key === 'f-old')!.opacity).toBeGreaterThan(0);
+    expect(frame(15201, 'f-old')).toBeUndefined();
+    expect(frame(15300, 'f-new')!.opacity).toBe(1);
+  });
+
+  it('never pairs a coarse id with a fine id, either way, however close', () => {
+    update(0, [c('coarse-a', 0, 0, 90), v('fine-b', 1000, 0, 90)]);
+    frames(400);
+    update(15000, [v('fine-a', 10, 0, 90), c('coarse-b', 1010, 0, 90)]);
+    const shown = frames(15000).frames;
+    expect(shown.find(f => f.key === 'fine-a')!.opacity).toBe(0);
+    expect(shown.find(f => f.key === 'coarse-b')!.opacity).toBe(0);
+    expect(frame(15201, 'coarse-a')).toBeUndefined();
+    expect(frame(15201, 'fine-b')).toBeUndefined();
   });
 });

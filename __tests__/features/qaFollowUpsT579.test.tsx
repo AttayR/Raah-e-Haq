@@ -162,7 +162,7 @@ describe('3. nearby drivers line in the active language', () => {
   };
   it('loading, none, one and many in Roman Urdu', () => {
     setLocale('ur-Latn');
-    const driver = { id: 'a', rating: 4.5, vehicle_type: 'car' as const, distance_km: 1, estimated_arrival_min: 2, location: { latitude: 31.5, longitude: 74.3 }, heading: null };
+    const driver = { id: 'a', vehicle_type: 'car' as const, distance_km: 1, estimated_arrival_min: 2, location: { latitude: 31.5, longitude: 74.3 }, heading: null };
     const { rerender } = render(<Chip state={{ drivers: [], status: 'loading', error: null }} />);
     expect(screen.getByText('Qareeb drivers dhoond rahe hain…')).toBeTruthy();
     rerender(<Chip state={{ drivers: [], status: 'ready', error: null }} />);

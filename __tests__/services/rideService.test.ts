@@ -161,7 +161,7 @@ describe('rideService errors are ApiError', () => {
 describe('nearby drivers and driver location on the BE-20 contract (T-110)', () => {
   const nearby = {
     id: 'a1b2c3d4e5f60718',
-    rating: 4.5,
+    precision: 'coarse',
     vehicle_type: 'car',
     distance_km: 1.2,
     estimated_arrival_min: 3,
@@ -195,6 +195,30 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
 
     mock.onGet('/rides/nearby-drivers').replyOnce(200, envelope([nearby]));
     expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).counts).toBeNull();
+  });
+
+  it('T-590 (BE-118): reads precision (fine, else coarse), drops rating, keeps meta.counts over data.length', async () => {
+    const wire: Record<string, unknown> = { ...nearby };
+    delete wire.precision;
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, {
+      ...envelope([
+        { ...wire, id: 'f1', precision: 'fine', rating: 0 },
+        { ...wire, id: 'c1', precision: 'coarse', rating: 0 },
+        { ...wire, id: 'o1', rating: 0 },
+        { ...wire, id: 'u1', precision: 'exact', rating: 0 },
+      ]),
+      meta: { radius_km: 5, vehicle_type: null, counts: { by_tier: { car: 9 }, online_total: 11 } },
+    });
+    const { drivers, counts } = await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 });
+    expect(drivers.map(d => [d.id, d.precision])).toEqual([
+      ['f1', 'fine'],
+      ['c1', 'coarse'],
+      ['o1', 'coarse'],
+      ['u1', 'coarse'],
+    ]);
+    expect(drivers.every(d => !('rating' in d))).toBe(true);
+    // Zoned drivers are counted but not drawn: the counts are the server's, not the list length.
+    expect(counts).toEqual({ byTier: { car: 9 }, onlineTotal: 11 });
   });
 
   it('clamps the radius to 1..10 km and defaults to 5', async () => {

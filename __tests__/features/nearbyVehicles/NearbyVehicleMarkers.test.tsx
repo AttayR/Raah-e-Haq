@@ -18,7 +18,6 @@ jest.mock('../../../src/app/providers/ThemeProvider', () => ({
 
 const driver = (i: number, over: Partial<NearbyDriver> = {}): NearbyDriver => ({
   id: `d${i}`,
-  rating: 0,
   vehicle_type: i % 2 ? 'bike' : 'car',
   distance_km: i / 10,
   estimated_arrival_min: 3,

@@ -9,7 +9,7 @@ import { responseHasTiers, tierReadFor } from '../features/nearby-vehicles/selec
 /**
  * Polls GET /rides/nearby-drivers for the passenger map (BE-20).
  *
- * The server refreshes positions every 2 minutes and allows 12 requests a minute per user, so
+ * The server allows 6 requests a minute and 300 an hour per user (BE-118, SEC-31), so
  * requests are at least MIN_GAP_MS apart (also when the centre moves), the steady poll is
  * POLL_MS, and a 429 waits for its retry_after. Polling runs only while the app is in the
  * foreground (B-08). Timers and the in-flight request are cleared when disabled, backgrounded
@@ -20,8 +20,9 @@ import { responseHasTiers, tierReadFor } from '../features/nearby-vehicles/selec
  *
  * T-582 (QA 2026-10-19: "1 driver nearby" stayed after the driver went offline): the server
  * checks availability on every read, so a driver going offline drops out on the next one; 15 s
- * (was 30 s) clears the count within seconds while the map is open. Still 4 requests a minute at
- * most, under the 12 a minute the server allows and never closer than NEARBY_MIN_GAP_MS.
+ * (was 30 s) clears the count within seconds while the map is open. Still 4 requests a minute
+ * (240 an hour) at most, under the server's 6 a minute and 300 an hour, and never closer than
+ * NEARBY_MIN_GAP_MS. A fine (BE-118) id stays stable while the map polls at least every 30 s.
  *
  * T-586 (map-vehicles.md §2.4, §4): a failed poll keeps the last list on screen (the map dims
  * it after 2 failures or 30 s and drops it after 90 s, see useNearbyFreshness); `freshAt` and

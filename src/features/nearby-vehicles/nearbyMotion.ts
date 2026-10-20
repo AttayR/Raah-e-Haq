@@ -9,8 +9,14 @@
  * lands. A move under the jitter distance is ignored. An implausible move (over the teleport
  * distance, faster than the max speed, or after a long gap) relocates with a crossfade instead
  * of sliding across blocks. No extrapolation: a late update leaves the vehicle stopped at the
- * last point the server sent. Nothing here depends on how coarse positions are: with today's
- * 550 m / 120 s grid most moves relocate; finer positions slide with no code change.
+ * last point the server sent.
+ *
+ * T-590 (BE-118, SEC-31): the profile follows the marker's `precision`. A `fine` marker (delayed,
+ * ~55 m rounded) glides as above. A `coarse` marker (550 m / 120 s grid) always relocates with the
+ * crossfade: a slide between grid cells would draw a path the server never sent. A new id is a new
+ * marker (the old one fades out, the new one fades in): the server rotates fine ids so a marker
+ * cannot be linked across a stop, a privacy zone or a session, and the app must not bridge that.
+ * Only coarse ids of the same type within 100 m are paired across the hourly rotation (§2.5).
  */
 import { componentTokens, motionPatterns } from '../../theme';
 import {
@@ -22,6 +28,7 @@ import {
   type LatLng,
 } from '../../components/ui/ride/vehicleMotion';
 import type { NearbyVehicleInput } from './selection';
+import type { NearbyPrecision } from '../../services/rideService';
 
 const N = motionPatterns.nearbyMarker;
 const MAX_TICK_DT_MS = 4 * N.tickMs;
@@ -54,6 +61,7 @@ interface Track {
   key: string;
   id: string;
   vehicleType: string | null;
+  precision: NearbyPrecision;
   from: LatLng;
   to: LatLng;
   moveStart: number;
@@ -145,6 +153,7 @@ const createTrack = (layer: NearbyLayer, input: NearbyVehicleInput, now: number,
     key,
     id: input.id,
     vehicleType: input.vehicleType,
+    precision: input.precision,
     from: at,
     to: at,
     moveStart: now,
@@ -168,6 +177,9 @@ const updateTrack = (track: Track, input: NearbyVehicleInput, now: number, insta
   track.lastUpdateAt = now;
   track.id = input.id;
   track.vehicleType = input.vehicleType;
+  // Only a fine marker that was fine before glides (an id normally never changes precision).
+  const glides = input.precision === 'fine' && track.precision === 'fine';
+  track.precision = input.precision;
   if (track.leaving) {
     // Back in the list before it was gone: fade back in where it is.
     track.leaving = false;
@@ -189,11 +201,11 @@ const updateTrack = (track: Track, input: NearbyVehicleInput, now: number, insta
   track.lastTarget = target;
   const meters = distanceMeters(current, target);
   const duration = nearbyMoveDurationMs(gap);
-  const implausible = isImplausibleMove(meters, duration, gap);
-  // Heading: the server's; else the bearing of a real (plausible) move of ≥ 40 m, or of the first
+  const relocates = !glides || isImplausibleMove(meters, duration, gap);
+  // Heading: the server's; else the bearing of a glided (fine, plausible) move of ≥ 40 m, or of the first
   // move of a marker that never had one; else keep the last (§2.1, §2.3).
   const bearing =
-    meters >= N.headingMinMoveMeters && (!implausible || !track.oriented) ? bearingDegrees(current, target) : null;
+    meters >= N.headingMinMoveMeters && (!relocates || !track.oriented) ? bearingDegrees(current, target) : null;
   const rotation = heading ?? bearing;
   if (rotation !== null) track.oriented = true;
 
@@ -207,7 +219,7 @@ const updateTrack = (track: Track, input: NearbyVehicleInput, now: number, insta
     return;
   }
 
-  if (implausible) {
+  if (relocates) {
     // Fade out where it is drawn (150 ms), move while hidden, fade in (250 ms).
     const drawn = positionAt(track, now);
     if (!track.relocate) {
@@ -246,8 +258,9 @@ const leave = (track: Track, now: number, duration: number, instant: boolean) =>
 /**
  * Applies one successful nearby response (already filtered by tier, capped and spread). Known
  * ids move; vanished ids fade out (150 ms on a tier switch, else 200 ms); new ids fade and scale
- * in, staggered 20 ms (at most 8 staggered). §2.5 hourly id rotation: a new id of the same
- * `vehicle_type` within 100 m of a vanished one is the same marker (keeps its view and moves).
+ * in, staggered 20 ms (at most 8 staggered). §2.5 hourly id rotation: a new coarse id of the same
+ * `vehicle_type` within 100 m of a vanished coarse one is the same marker (keeps its view and
+ * moves); a fine id on either side is never paired (T-590, SEC-31).
  * `instant` (reduced motion): everything jumps.
  */
 export const applyNearbyUpdate = (
@@ -278,11 +291,13 @@ export const applyNearbyUpdate = (
     }
   }
 
-  // Hourly id rotation: pair new ids with vanished tracks of the same type, nearest first.
-  const vanished = [...layer.tracks.values()].filter(track => !seen.has(track) && !track.leaving);
+  // Hourly id rotation: pair new coarse ids with vanished coarse tracks of the same type, nearest
+  // first. Never a fine id (either side): its rotation must read as a new marker (SEC-31 item 6).
+  const vanished = [...layer.tracks.values()].filter(track => !seen.has(track) && !track.leaving && track.precision === 'coarse');
   if (!tierChanged && unmatched.length > 0 && vanished.length > 0) {
     const pairs: Array<{ input: NearbyVehicleInput; track: Track; meters: number }> = [];
     for (const input of unmatched) {
+      if (input.precision !== 'coarse') continue;
       for (const track of vanished) {
         if (track.vehicleType !== input.vehicleType) continue;
         const meters = distanceMeters(track.lastTarget, { latitude: input.latitude, longitude: input.longitude });

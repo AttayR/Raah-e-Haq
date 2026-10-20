@@ -55,7 +55,6 @@ const renderHome = async () => {
 
 const nearby = (id: string, heading: number | null, vehicle_type = 'car') => ({
   id,
-  rating: 4.5,
   vehicle_type,
   distance_km: 1.2,
   estimated_arrival_min: 3,
