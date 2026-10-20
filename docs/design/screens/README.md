@@ -25,7 +25,7 @@ Conventions inside specs:
 | [passenger-trip-in-progress](passenger-trip-in-progress.md) | passenger | T-614 → UI-R12 |
 | [passenger-trip-complete](passenger-trip-complete.md) | passenger | T-614 → UI-R12 |
 | [passenger-wallet](passenger-wallet.md) | passenger | T-617 |
-| [passenger-saved-places](passenger-saved-places.md) | passenger | T-618 |
+| [passenger-saved-places](passenger-saved-places.md) | passenger | T-618 → UI-R16 (rev 2026-10-20) |
 | [driver-drive-home](driver-drive-home.md) | driver | T-605 → UI-R11 |
 | [driver-incoming-request](driver-incoming-request.md) | driver | T-605 → UI-R11 |
 | [driver-to-pickup](driver-to-pickup.md) | driver | T-615 → UI-R13 |
@@ -39,6 +39,6 @@ Conventions inside specs:
 | [shared-chat-thread](shared-chat-thread.md) | shared | T-607 |
 | [shared-ride-history](shared-ride-history.md) | shared | T-617 |
 | [shared-ride-details](shared-ride-details.md) | shared | T-617 |
-| [shared-profile](shared-profile.md) | shared | T-618 |
-| [shared-settings](shared-settings.md) | shared | T-618 |
-| [shared-support-invite](shared-support-invite.md) | shared | T-619 |
+| [shared-profile](shared-profile.md) | shared (both roles, one screen) | T-618 → UI-R16 (rev 2026-10-20; §P6 Delete entry UI-R18) |
+| [shared-settings](shared-settings.md) | shared (Account tab, both roles) | T-618 → UI-R16 (rev 2026-10-20; Help group UI-R18) |
+| [shared-support-invite](shared-support-invite.md) | shared (Help & support, Invite, Delete account) | T-619 → UI-R18 (rev 2026-10-20; BE-129/130/131) |
