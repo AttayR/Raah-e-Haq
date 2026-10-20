@@ -63,6 +63,17 @@ export const usePassengerReceipt = (
   return { form: ratable ? form : null, canRate: ratable, myStars: state.myRating?.stars ?? null };
 };
 
+/** The money card is drawn: always on a completed ride; on a cancelled one only with a fee. */
+export const hasReceiptMoneyCard = (view: Pick<PassengerTripView, 'stage' | 'ride'>): boolean => {
+  if (view.stage !== 'cancelled') return true;
+  const fee = readNumberOrNull(view.ride?.cancellation_fee);
+  return fee !== null && fee > 0;
+};
+
+/** "Fare details" is drawn: a completed ride with the server's fare summary. */
+export const hasReceiptFareDetails = (view: Pick<PassengerTripView, 'stage' | 'ride'>): boolean =>
+  !!view.ride && view.stage === 'completed' && fareSummaryOf(view.ride) !== null;
+
 /** "Pay your driver in cash" + the final total, FareTag when fixed (PR2 block 3); skeleton while not final. */
 function MoneyCard({ view }: { view: PassengerTripView }) {
   const { theme } = useAppTheme();
@@ -176,10 +187,13 @@ function RatingBlock({ view, receipt }: { view: PassengerTripView; receipt: Pass
 export function PassengerReceiptBody({ view, receipt }: { view: PassengerTripView; receipt: PassengerReceiptState }) {
   return (
     <View style={styles.body} testID={`active-ride-${view.stage}`}>
-      <View style={styles.moneyGroup}>
-        <MoneyCard view={view} />
-        <FareDetails view={view} />
-      </View>
+      {/* [UI-R12 r2] An empty group would still take the body's 24 gap (a cancelled ride without a fee). */}
+      {hasReceiptMoneyCard(view) || hasReceiptFareDetails(view) ? (
+        <View style={styles.moneyGroup} testID="receipt-money-group">
+          <MoneyCard view={view} />
+          <FareDetails view={view} />
+        </View>
+      ) : null}
       <RatingBlock view={view} receipt={receipt} />
     </View>
   );

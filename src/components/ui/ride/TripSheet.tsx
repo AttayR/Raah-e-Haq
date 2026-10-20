@@ -21,17 +21,26 @@ export const tripPeekHeight = ({
   peek,
   footer,
   bottomInset,
+  footerBlock,
 }: {
   header: number;
   peek: number;
   /** Measured footer content (0 without a footer). */
   footer: number;
   bottomInset: number;
+  /**
+   * [UI-R13] The footer as the sheet laid it out (padding, content, bottom inset); preferred over
+   * the estimate from `footer` once measured, so the last peek block (the waiting timer) is never
+   * cut by the footer.
+   */
+  footerBlock?: number;
 }): number | null => {
   if (header <= 0 || peek <= 0) return null;
   const bottom = Math.max(bottomInset + layout.bottomActionOffset, layout.bottomActionMinOffset);
-  const footerBlock = footer > 0 ? sheet.footerTopPadding + footer + bottom : bottom;
-  return Math.round(sheet.contentTop + header + peek + footerBlock);
+  const estimate = footer > 0 ? sheet.footerTopPadding + footer + bottom : bottom;
+  const block = footer > 0 && footerBlock !== undefined && footerBlock > 0 ? footerBlock : estimate;
+  // Rounded up: a fraction of a point short is what clips the peek group's last line.
+  return Math.ceil(sheet.contentTop + header + peek + block);
 };
 
 /**
@@ -112,19 +121,29 @@ export const TripSheet = forwardRef<TripSheetHandle, TripSheetProps>(function Tr
 }, handle) {
   const insets = useSafeAreaInsets();
   const ref = useRef<BottomSheetHandle>(null);
-  const [heights, setHeights] = useState({ header: 0, peek: 0, footer: 0 });
+  const [heights, setHeights] = useState({ header: 0, peek: 0, footer: 0, footerBlock: 0 });
   const measure = useCallback(
     (key: 'header' | 'peek' | 'footer') => (e: LayoutChangeEvent) => {
-      const next = Math.round(e.nativeEvent.layout.height);
+      const next = Math.ceil(e.nativeEvent.layout.height);
       setHeights((prev) => (Math.abs(prev[key] - next) < 1 ? prev : { ...prev, [key]: next }));
     },
     [],
   );
+  const onFooterLayout = useCallback((height: number) => {
+    const next = Math.ceil(height);
+    setHeights((prev) => (Math.abs(prev.footerBlock - next) < 1 ? prev : { ...prev, footerBlock: next }));
+  }, []);
   const receipt = mode === 'receipt';
   useImperativeHandle(handle, () => ({ expand: () => (receipt ? undefined : ref.current?.snapTo('content')) }), [receipt]);
   const peekHeight = receipt
     ? undefined
-    : tripPeekHeight({ header: heights.header, peek: heights.peek, footer: footer ? heights.footer : 0, bottomInset: insets.bottom }) ?? undefined;
+    : tripPeekHeight({
+        header: heights.header,
+        peek: heights.peek,
+        footer: footer ? heights.footer : 0,
+        bottomInset: insets.bottom,
+        footerBlock: heights.footerBlock,
+      }) ?? undefined;
 
   // TS1 Z6: the details belong to `expanded`. At peek their top edge would show in the bottom
   // block, so they fade in over the first 24 pt the sheet rises above peek (UI thread).
@@ -178,6 +197,7 @@ export const TripSheet = forwardRef<TripSheetHandle, TripSheetProps>(function Tr
       animatedHeight={height}
       onSnapChange={onSnapChange}
       footerDivider
+      onFooterLayout={onFooterLayout}
       // PR2: the comment field's counter line stays above the footer when the keyboard is up.
       focusRevealExtra={componentTokens.textField.helperGap + textStyles.caption.lineHeight}
       expandOnKeyboard

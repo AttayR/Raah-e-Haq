@@ -396,16 +396,21 @@ describe('[UI-R12] footer divider and focus reveal room', () => {
       </BottomSheet>,
     );
     await layout(containerOf('m'), 874);
+    // [UI-R13] The overflow is measured against the body visible at the snap: full 866 − 24 handle
+    // area − 120 footer = 722 for a 1000 body (capped at full).
+    await layout(screen.getByTestId('m-footer'), 120);
+    await layout(screen.getByTestId('m-body'), 1000);
     const scroll = screen.getByTestId('m-scroll');
     act(() => {
-      fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 400 } } });
-      fireEvent(scroll, 'contentSizeChange', 390, 700);
+      fireEvent(scroll, 'contentSizeChange', 390, 1000);
     });
-    expect(flat(screen.getByTestId('m-footer').props.style).borderTopWidth).toBeGreaterThan(0);
-    act(() => {
-      fireEvent.scroll(scroll, { nativeEvent: { contentOffset: { y: 300 }, layoutMeasurement: { height: 400 }, contentSize: { height: 700 } } });
-    });
+    expect(screen.getByTestId('m-footer-divider')).toBeTruthy();
+    // An overlay: the footer itself keeps its layout (no border).
     expect(flat(screen.getByTestId('m-footer').props.style).borderTopWidth).toBeUndefined();
+    act(() => {
+      fireEvent.scroll(scroll, { nativeEvent: { contentOffset: { y: 300 }, layoutMeasurement: { height: 722 }, contentSize: { height: 1000 } } });
+    });
+    expect(screen.queryByTestId('m-footer-divider')).toBeNull();
   });
 
   it('a sheet without footerDivider sends no scroll events to JS', async () => {

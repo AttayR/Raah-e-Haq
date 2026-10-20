@@ -21,7 +21,7 @@ export const cancelConfirmBody = (
   const preview = cancelPreviewText(toCancellationPreview(ride?.cancellation_preview));
   // T-579: a parcel is asked about as a delivery; UI-R10: a ride no driver took yet as a request.
   const question = isParcelRide(ride)
-    ? t('parcel.cancelConfirmMessage')
+    ? parcelCancelMessage(ride?.status)
     : request
       ? ACTIVE_RIDE_COPY.cancelRequestMessage
       : ride?.status === 'arrived'
@@ -30,6 +30,14 @@ export const cancelConfirmBody = (
         : ACTIVE_RIDE_COPY.cancelConfirmMessage;
   return preview ? `${question} ${preview}` : question;
 };
+
+/** UI-R12 r2 (PA4 parcel rows): the rider waiting at the pickup, on the way, or none yet. */
+const parcelCancelMessage = (status: unknown): string =>
+  status === 'arrived'
+    ? t('parcel.cancelConfirmMessageArrived')
+    : status === 'accepted'
+      ? t('parcel.cancelConfirmMessage')
+      : t('parcel.cancelConfirmMessageRequest');
 
 /** UI-R10: still searching (being created, or `requested`): cancelling stops the search. */
 const isOpenRequest = (ride: RideResource | null): boolean => !ride || ride.status === 'requested';
@@ -41,7 +49,7 @@ export const cancelQuestion = (ride: RideResource | null): { options: ConfirmOpt
   return {
     request,
     options: {
-      title: parcel ? t('parcel.cancelDelivery') : request ? ACTIVE_RIDE_COPY.cancelRequestTitle : ACTIVE_RIDE_COPY.cancelConfirmTitle,
+      title: parcel ? t('parcel.cancelConfirmTitle') : request ? ACTIVE_RIDE_COPY.cancelRequestTitle : ACTIVE_RIDE_COPY.cancelConfirmTitle,
       body: cancelConfirmBody(ride, request),
       confirmLabel: parcel ? t('parcel.cancelDelivery') : request ? ACTIVE_RIDE_COPY.cancelRequest : ACTIVE_RIDE_COPY.cancelRide,
       cancelLabel: parcel ? t('parcel.cancelKeep') : request ? ACTIVE_RIDE_COPY.keepLooking : ACTIVE_RIDE_COPY.keepRide,

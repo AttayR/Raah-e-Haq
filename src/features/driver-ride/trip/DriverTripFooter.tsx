@@ -165,6 +165,7 @@ export function DriverTripFooter({ model, input }: { model: DriverFooterModel; i
       ) : null}
       {primary?.kind === 'slide' ? (
         <SlideToConfirm
+          key={primary.testID}
           label={primary.label}
           onConfirm={primary.onConfirm}
           loading={primary.loading}

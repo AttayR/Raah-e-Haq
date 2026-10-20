@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { t } from '../../../i18n';
 import { componentTokens, radius, space } from '../../../theme';
@@ -156,6 +156,7 @@ export function PersonCard({
   const { theme } = useAppTheme();
   const c = theme.colors;
   const inline = actionsLayout === 'inline';
+  const [plateWidth, setPlateWidth] = useState(0);
   const shownActions = actions.slice(0, 3);
   const body = (
     <View style={styles.wrap}>
@@ -201,18 +202,25 @@ export function PersonCard({
           <View
             accessible
             accessibilityLabel={t('ride.plateA11y', { plate })}
+            onLayout={(e: LayoutChangeEvent) => {
+              const next = Math.round(e.nativeEvent.layout.width);
+              setPlateWidth(prev => (prev === next ? prev : next));
+            }}
             style={[
               styles.plate,
               { backgroundColor: c.surfaceAlt },
               plateHighlighted ? { borderWidth: theme.borderWidth.focus, borderColor: c.primary } : null,
             ]}
           >
-            {/* T-561: a long plate shrinks to fit (never cut off: it is how the car is found). */}
+            {/* T-561: a long plate shrinks to fit (never cut off: it is how the car is found). [UI-R12 r2]
+                A plate that always fits (≤ 9 characters) never shrinks; a longer one is re-keyed on
+                the pill's measured width, so iOS sizes it again after a layout swap (it stuck at ~5 pt). */}
             <AppText
+              key={plateShrinks(plate) ? `${plate}:${plateWidth}` : plate}
               variant="numeric"
               numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={PLATE_MIN_FONT_SCALE}
+              adjustsFontSizeToFit={plateShrinks(plate)}
+              minimumFontScale={plateShrinks(plate) ? PLATE_MIN_FONT_SCALE : undefined}
               style={styles.plateText}
               testID={plateTestID}
             >
@@ -252,6 +260,12 @@ export function PersonCard({
 
 /** The smallest a long plate is drawn (of the numeric size) before it would be cut off. */
 export const PLATE_MIN_FONT_SCALE = 0.6;
+
+/** [UI-R12 r2] Plates up to this many characters always fit the pill at full size. */
+export const PLATE_FIT_CHARS = 9;
+
+/** Whether a plate may shrink to fit (only longer plates; a short one keeps its full size). */
+export const plateShrinks = (plate: string): boolean => plate.length > PLATE_FIT_CHARS;
 
 const styles = StyleSheet.create({
   wrap: { gap: space[4] },

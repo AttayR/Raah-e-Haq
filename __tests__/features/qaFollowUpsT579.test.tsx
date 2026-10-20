@@ -117,7 +117,8 @@ describe('2. parcel cancels are said as a delivery', () => {
     });
     await waitFor(() => expect(dialogStore.getCurrent()).not.toBeNull());
     expect(dialogStore.getCurrent()).toMatchObject({
-      title: 'Delivery cancel karein',
+      // UI-R12 r2 (PA4 parcel rows): the title is a question, the button stays the action.
+      title: 'Delivery cancel karein?',
       body: 'Kya aap waqai ye delivery cancel karna chahte hain?',
       confirmLabel: 'Delivery cancel karein',
       cancelLabel: 'Delivery rakhein',

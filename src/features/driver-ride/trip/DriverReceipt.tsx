@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { AppText, Badge, Button, Icon, ListItem, Skeleton } from '../../../components/ui';
+import { AppText, Badge, Button, Icon, Skeleton } from '../../../components/ui';
 import { componentTokens, radius, space } from '../../../theme';
 import { readText } from '../../../core/api/read';
 import { toast } from '../../../core/toast';
@@ -205,16 +205,25 @@ export function DriverReceiptBody({ ride, receipt }: { ride: RideResource; recei
       <View style={styles.moneyGroup}>
         <MoneyCard model={model} />
         {model.net !== null ? (
-          <ListItem
-            title={COPY.youKeep}
-            subtitle={model.rate !== null ? COPY.afterCommission(model.rate) : undefined}
-            trailing={
-              <AppText variant="numericL" testID="driver-ride-earnings">
-                {formatMoney(model.net)}
-              </AppText>
-            }
+          // DC1 #4: one start and end edge with Fare details below it (no row inset of its own).
+          <View
+            style={styles.youKeep}
+            accessible
+            accessibilityLabel={`${COPY.youKeep}, ${formatMoney(model.net)}${model.rate !== null ? `, ${COPY.afterCommission(model.rate)}` : ''}`}
             testID="driver-ride-you-keep"
-          />
+          >
+            <View style={styles.flex}>
+              <AppText variant="title">{COPY.youKeep}</AppText>
+              {model.rate !== null ? (
+                <AppText variant="caption" color="textSecondary">
+                  {COPY.afterCommission(model.rate)}
+                </AppText>
+              ) : null}
+            </View>
+            <AppText variant="numericL" testID="driver-ride-earnings">
+              {formatMoney(model.net)}
+            </AppText>
+          </View>
         ) : null}
         <FareDetails ride={ride} />
       </View>
@@ -275,6 +284,7 @@ const styles = StyleSheet.create({
   moneyGroup: { gap: space[2] },
   money: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], padding: space[4], borderRadius: radius.lg },
   moneyText: { flex: 1, minWidth: 0, gap: k.titleGap },
+  youKeep: { flexDirection: 'row', alignItems: 'center', minHeight: componentTokens.listItem.minHeight.one, gap: space[3] },
   detailsRow: { flexDirection: 'row', alignItems: 'center', minHeight: k.detailsRowHeight, gap: space[2] },
   flipped: { transform: [{ rotate: '180deg' }] },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: k.fareRowMinHeight, gap: space[3] },

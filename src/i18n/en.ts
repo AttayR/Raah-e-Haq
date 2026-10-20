@@ -1564,8 +1564,12 @@ export const en = {
     paymentCashDriver: 'Cash (collected at the pickup)',
     cancelDelivery: 'Cancel delivery',
     cancelledDone: 'Delivery cancelled.',
-    // T-579: the sender's cancel question.
-    cancelConfirmMessage: 'Are you sure you want to cancel this delivery?',
+    // T-579: the sender's cancel question. UI-R12 r2 (PA4 parcel rows): the same voice as a ride.
+    cancelConfirmTitle: 'Cancel delivery?',
+    cancelConfirmMessage: 'Your rider is already on the way.',
+    cancelConfirmMessageArrived: 'Your rider is waiting at the pickup.',
+    /** Before a rider took the delivery (no one is on the way yet). */
+    cancelConfirmMessageRequest: 'Are you sure you want to cancel this delivery?',
     item: 'Parcel',
     declaredValue: 'Declared value {amount}',
     receiver: 'Receiver',

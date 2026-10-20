@@ -118,6 +118,11 @@ export type BottomSheetProps = React.PropsWithChildren<{
    */
   footerDivider?: boolean;
   /**
+   * [UI-R13] The sticky footer's laid-out height (its top padding, content and bottom inset), so a
+   * host that sizes `peekHeight` itself (TripSheet) counts the footer exactly as drawn.
+   */
+  onFooterLayout?: (height: number) => void;
+  /**
    * [UI-R12] Extra room kept below a focused field when the keyboard reveal scrolls it into view
    * (the field's helper or counter line under it, PR2 block 5). Default 0.
    */
@@ -163,6 +168,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     draggable = true,
     openFrom,
     footerDivider = false,
+    onFooterLayout,
     focusRevealExtra = 0,
     accessibilityLabel,
     testID,
@@ -442,10 +448,15 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   // Only a change of the boolean re-renders.
   const scrollMetrics = useRef({ offset: 0, viewport: 0, content: 0 });
   const [moreBelow, setMoreBelow] = useState(false);
+  // [UI-R13] Only at the highest (scrollable) snap does content run on under the footer: at a lower
+  // snap the rest of the body sits below the screen edge, not behind the footer (TS1 "Peek and
+  // scroll"). The overflow is measured against the body area visible at that snap.
+  const atScrollableSnap = useRef(false);
   const updateMoreBelow = useCallback(() => {
     if (!footerDivider) return;
-    const { offset, viewport, content } = scrollMetrics.current;
-    const next = viewport > 0 && content - (offset + viewport) > 1;
+    const { offset, content } = scrollMetrics.current;
+    const viewport = visibleBody.current;
+    const next = atScrollableSnap.current && viewport > 0 && content - (offset + viewport) > 1;
     setMoreBelow(prev => (prev === next ? prev : next));
   }, [footerDivider]);
   const dividerScrollProps = useMemo(
@@ -614,6 +625,20 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   const highestSnap = resolved[resolved.length - 1]?.snap;
   const scrollable = current !== null && current === highestSnap;
+  atScrollableSnap.current = scrollable;
+  // The hairline follows the snap too (a settle at expanded with content under the footer).
+  useEffect(() => {
+    updateMoreBelow();
+  }, [scrollable, updateMoreBelow]);
+  // [UI-R13] Every return to the lowest snap (handle tap, drag, a new state) starts the body at its
+  // top again, so the peek group never keeps the scroll offset from the expanded sheet (TS1).
+  const lowestSnap = resolved[0]?.snap;
+  const multiSnap = resolved.length > 1;
+  useEffect(() => {
+    if (modal || !multiSnap || current === null || current !== lowestSnap) return;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    scrollMetrics.current.offset = 0;
+  }, [current, lowestSnap, modal, multiSnap]);
   // [T-560] Until a snap resolves, the (still off-screen) sheet takes the full height so its
   // header and body lay out at their natural size and can be measured. At height 0 they measured
   // 0, so a `content` sheet without body content (header + footer only) never resolved a snap
@@ -744,12 +769,22 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
           bottom: keyboardHeight,
           backgroundColor: theme.colors.surface,
         },
-        footerDivider && moreBelow ? { borderTopWidth: theme.borderWidth.thin, borderTopColor: theme.colors.border } : null,
         footerStyle,
       ]}
-      onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}
+      onLayout={e => {
+        setFooterHeight(e.nativeEvent.layout.height);
+        onFooterLayout?.(e.nativeEvent.layout.height);
+      }}
       testID={testID ? `${testID}-footer` : undefined}
     >
+      {/* [UI-R13] The hairline is an overlay, so showing it never changes the footer's height. */}
+      {footerDivider && moreBelow ? (
+        <View
+          pointerEvents="none"
+          style={[styles.footerDivider, { height: theme.borderWidth.thin, backgroundColor: theme.colors.border }]}
+          testID={testID ? `${testID}-footer-divider` : undefined}
+        />
+      ) : null}
       {footer}
     </Animated.View>
   ) : null;
@@ -807,6 +842,7 @@ const styles = StyleSheet.create({
   },
   handle: { width: k.handleWidth, height: k.handleHeight, borderRadius: k.handleHeight },
   body: { flex: 1 },
+  footerDivider: { position: 'absolute', top: 0, start: 0, end: 0 },
   footer: {
     position: 'absolute',
     start: 0,
