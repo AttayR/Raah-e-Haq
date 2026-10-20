@@ -1,7 +1,7 @@
 import type { BookingParams } from '../ride-booking/prefill';
 import type { TakenLabels } from './format';
 import { toBookingPlace } from './format';
-import type { SavedPlace, SavedPlaceLabel } from './types';
+import type { PickedLocation, SavedPlace, SavedPlaceLabel } from './types';
 
 /** `SavedPlaceEditor` params: an existing place to edit, or a new one (optionally a label). */
 export type SavedPlaceEditorParams = {
@@ -13,6 +13,11 @@ export type SavedPlaceEditorParams = {
   taken?: TakenLabels;
   /** Other places are at the server's cap: the form does not offer "Other". */
   otherFull?: boolean;
+  /**
+   * UI-R9b: start with this location (a recent destination's "Save as Home / Work / place");
+   * with `place` it replaces that place's location when saved. Nothing is written before Save.
+   */
+  location?: PickedLocation;
 };
 
 /** What the saved-places screens and the Home chips navigate with. */

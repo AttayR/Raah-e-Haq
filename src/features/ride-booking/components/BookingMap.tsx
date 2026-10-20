@@ -1,6 +1,6 @@
 import React, { useState, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { Details, LatLng, MapPressEvent, MapStyleElement, Region } from 'react-native-maps';
+import type { Details, LatLng, MapStyleElement, Region } from 'react-native-maps';
 import SafeMapView, { type SafeMapViewRef } from '../../../components/SafeMapView';
 import MapErrorBoundary from '../../../components/MapErrorBoundary';
 import { NearbyVehicleMarkers, type NearbyFreshness } from '../../nearby-vehicles';
@@ -21,10 +21,11 @@ type Props = {
   mapStyle?: MapStyleElement[];
   /** False until the map reports ready: "Loading map…" covers it meanwhile. */
   ready: boolean;
-  onPress: (e: MapPressEvent) => void;
   onMapReady: () => void;
   onMapLoaded: () => void;
   onRegionChangeComplete: (region: Region, details?: Details) => void;
+  /** UI-R9b: the map starts to move (the centre-pin picker lifts its pin). */
+  onRegionChangeStart?: () => void;
   pickup: LatLng | null;
   stops: LatLng[];
   destination: LatLng | null;
@@ -62,10 +63,10 @@ const BookingMapBase: React.FC<Props> = ({
   initialRegion,
   mapStyle,
   ready,
-  onPress,
   onMapReady,
   onMapLoaded,
   onRegionChangeComplete,
+  onRegionChangeStart,
   pickup,
   stops,
   destination,
@@ -93,8 +94,8 @@ const BookingMapBase: React.FC<Props> = ({
             style={styles.fill}
             initialRegion={region}
             customMapStyle={mapStyle}
-            onPress={onPress}
             onMapReady={onMapReady}
+            onRegionChangeStart={onRegionChangeStart}
             onRegionChangeComplete={spread.onRegionChangeComplete}
             onMapLoaded={onMapLoaded}
             fallbackComponent={loadingFallback()}

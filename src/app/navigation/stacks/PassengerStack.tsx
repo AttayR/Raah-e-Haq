@@ -1,9 +1,11 @@
 import React, { useCallback } from 'react';
 import {
   createNativeStackNavigator,
+  type NativeStackNavigationOptions,
   type NativeStackScreenProps,
 } from '@react-navigation/native-stack';
-import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { NavigatorScreenParams, RouteProp } from '@react-navigation/native';
+import { motion } from '../../../theme';
 import PassengerBottomTabs, { type PassengerTabParamList } from '../tabs/PassengerBottomTabs';
 import PassengerMapScreen from 'src/screens/Passenger/PassengerMapScreen';
 import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
@@ -99,6 +101,12 @@ const loadDeleteAccountVerifyScreen = () =>
 
 const Stack = createNativeStackNavigator<PassengerStackParamList>();
 
+/** Booking options: never frozen; the "Where to?" entry fades in for its shared-element move (UI-R9b). */
+export const bookingScreenOptions = ({ route }: { route: RouteProp<PassengerStackParamList, 'Booking'> }): NativeStackNavigationOptions =>
+  route.params?.entry === 'whereTo'
+    ? { freezeOnBlur: false, animation: 'fade', animationDuration: motion.base.duration }
+    : { freezeOnBlur: false };
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Passenger'>;
 
 /**
@@ -131,7 +139,8 @@ const PassengerStack = ({ navigation }: Props) => {
         native-stack does not freeze the screen directly below the focused one anyway; this keeps
         it so when another screen is pushed or those freeze rules change (see useMapMounted).
       */}
-      <Stack.Screen name="Booking" component={PassengerMapScreen} options={{ freezeOnBlur: false }} />
+      {/* UI-R9b: from "Where to?" Booking fades in (250 ms) while the bar moves to the planner. */}
+      <Stack.Screen name="Booking" component={PassengerMapScreen} options={bookingScreenOptions} />
       <Stack.Screen name="RideDetails" getComponent={loadRideDetailsScreen} getId={rideDetailsScreenId} />
       <Stack.Screen name="FavoriteLocations" getComponent={loadSavedPlacesScreen} />
       <Stack.Screen name="SavedPlaceEditor" getComponent={loadSavedPlaceEditorScreen} />

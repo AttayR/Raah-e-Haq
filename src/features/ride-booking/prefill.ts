@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { BookingPlace } from './buildRideRequest';
+import { takeBookingDraft, type BookingDraft } from './bookingDraftStore';
 
 /**
  * Route params of `Booking` (T-516): open the booking flow with a pickup and/or destination
@@ -8,6 +9,13 @@ import type { BookingPlace } from './buildRideRequest';
 export type BookingParams = {
   pickup?: BookingPlace;
   destination?: BookingPlace;
+  /**
+   * UI-R9b: opened from Home's "Where to?" (or the Ride card). Only this entry restores a trip
+   * left on Back within 10 minutes (the in-memory booking draft), and plays the bar's move to
+   * the top of the planner from `whereToTop` (its window y when tapped).
+   */
+  entry?: 'whereTo';
+  whereToTop?: number;
 };
 
 export type BookingPrefillStage = 'home' | 'destination' | 'vehicle';
@@ -20,6 +28,8 @@ export interface BookingPrefillState {
   stage: BookingPrefillStage;
   /** A destination was given: draw the route as soon as there is a pickup (maybe the GPS one). */
   routePending: boolean;
+  /** UI-R9b: stops of a restored draft (none for a prefill). */
+  stops: BookingPlace[];
 }
 
 const validPlace = (place: BookingPlace | undefined): place is BookingPlace =>
@@ -32,9 +42,10 @@ const validPlace = (place: BookingPlace | undefined): place is BookingPlace =>
  * - pickup only: the destination search;
  * - nothing (or unusable coordinates): the normal start.
  */
-export const bookingPrefillState = (params: BookingParams | undefined): BookingPrefillState => {
+export const bookingPrefillState = (params: BookingParams | undefined, draft: BookingDraft | null = null): BookingPrefillState => {
   const pickup = params?.pickup && validPlace(params.pickup) ? params.pickup : null;
   const destination = params?.destination && validPlace(params.destination) ? params.destination : null;
+  if (!pickup && !destination && draft) return draftPrefillState(draft);
   return {
     pickup,
     destination,
@@ -42,8 +53,32 @@ export const bookingPrefillState = (params: BookingParams | undefined): BookingP
     destQuery: destination?.address ?? '',
     stage: pickup && destination ? 'vehicle' : pickup ? 'destination' : 'home',
     routePending: !!destination,
+    stops: [],
   };
 };
+
+/**
+ * UI-R9b: a trip left on Back, restored by "Where to?": both ends → "Choose a ride" (the route,
+ * stops included, is drawn once the map has the points); otherwise the planner with what was
+ * chosen (a missing pickup is the passenger's position again).
+ */
+const draftPrefillState = (draft: BookingDraft): BookingPrefillState => {
+  const pickup = draft.pickup && validPlace(draft.pickup) ? draft.pickup : null;
+  const destination = draft.destination && validPlace(draft.destination) ? draft.destination : null;
+  return {
+    pickup,
+    destination,
+    pickupQuery: pickup ? draft.pickupQuery || (pickup.address ?? '') : '',
+    destQuery: destination ? draft.destQuery || (destination.address ?? '') : '',
+    stage: pickup && destination ? 'vehicle' : 'home',
+    routePending: !!destination,
+    stops: destination ? draft.stops.filter(validPlace) : [],
+  };
+};
+
+/** The state Booking opens with: its params, or (from "Where to?" only) the kept draft. */
+export const initialBookingState = (params: BookingParams | undefined): BookingPrefillState =>
+  bookingPrefillState(params, params?.entry === 'whereTo' ? takeBookingDraft() : null);
 
 type PrefillOptions = {
   params: BookingParams | undefined;

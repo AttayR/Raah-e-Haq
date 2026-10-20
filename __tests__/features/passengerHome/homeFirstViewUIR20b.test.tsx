@@ -184,7 +184,7 @@ describe('V1/V10: the first view on Home', () => {
     expect(screen.queryByTestId('home-ride-only-heading')).toBeNull();
     // Ride books like "Where to?"; Parcel opens the form.
     fireEvent.press(screen.getByTestId('home-service-ride'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('Booking');
+    expect(mockNavigate).toHaveBeenLastCalledWith('Booking', { entry: 'whereTo' });
   });
 
   it('peek 274 with the cards, half max(50 %, peek + 180)', async () => {
@@ -247,7 +247,7 @@ describe('V1/V10: the first view on Home', () => {
     expect(mockNavigate.mock.calls).toEqual([['SendParcel']]);
     act(() => jest.advanceTimersByTime(ONE_PUSH_MS));
     fireEvent.press(screen.getByTestId('home-where-to'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('Booking');
+    expect(mockNavigate).toHaveBeenLastCalledWith('Booking', { entry: 'whereTo' });
   });
 });
 
@@ -363,7 +363,7 @@ describe('V7: cold-open entrance', () => {
     expect(screen.getByTestId('home-map-veil', { includeHiddenElements: true }).props.pointerEvents).toBe('none');
     // Every control is pressable from frame 0.
     fireEvent.press(screen.getByTestId('home-where-to'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('Booking');
+    expect(mockNavigate).toHaveBeenLastCalledWith('Booking', { entry: 'whereTo' });
 
     view.unmount();
     delay.mockClear();

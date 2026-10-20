@@ -23,6 +23,8 @@ type Props = {
   /** UI-R9: where the passenger went lately (their finished rides); one chip each after the places. */
   recents?: ReadonlyArray<RecentDestination>;
   onRecent?: (recent: RecentDestination) => void;
+  /** UI-R9b: long press on a recent: Save as Home / Work / place, Remove from recents. */
+  onRecentLongPress?: (recent: RecentDestination) => void;
   /**
    * "+ Add": the add-place form. Without a saved Home it reads "Add home" and `onAdd('home')`
    * starts the form on that label (passenger-home "Empty (new account)").
@@ -56,7 +58,7 @@ const SKELETON_WIDTHS = [space[16] + space[2], space[16] + space[6], space[16]] 
  * is saved; only once the saved places loaded) and "Saved places". One line that scrolls sideways edge to edge (it bleeds past the
  * sheet gutter so a cut chip reads as "more"), so the peek height never changes with the count.
  */
-function SavedPlaceChipsBase({ places, loading = false, loaded = true, onPlace, recents = [], onRecent, onAdd, onOpenAll, leading }: Props) {
+function SavedPlaceChipsBase({ places, loading = false, loaded = true, onPlace, recents = [], onRecent, onRecentLongPress, onAdd, onOpenAll, leading }: Props) {
   const { theme } = useAppTheme();
   const hasHome = places.some(place => place.label === 'home');
   // UI-R20b (V5): the trailing fade shows only while the chips are wider than the row.
@@ -108,6 +110,8 @@ function SavedPlaceChipsBase({ places, loading = false, loaded = true, onPlace, 
                 style={styles.recent}
                 label={recent.title}
                 onPress={() => onRecent(recent)}
+                onLongPress={onRecentLongPress ? () => onRecentLongPress(recent) : undefined}
+                longPressLabel={onRecentLongPress ? t('home.recentMoreA11y') : undefined}
                 accessibilityLabel={t('home.recentPlaceA11y', { address: recent.place.address ?? recent.title })}
                 testID={`home-recent-place-${index}`}
               />

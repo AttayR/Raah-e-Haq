@@ -91,7 +91,8 @@ describe('map-first Home', () => {
     mock.onGet('/rides').reply(200, page([]));
     await renderHome();
     fireEvent.press(screen.getByTestId('home-where-to'));
-    expect(mockNavigate).toHaveBeenLastCalledWith('Booking');
+    // UI-R9b: the "Where to?" entry (draft restore + the bar's move to the planner).
+    expect(mockNavigate).toHaveBeenLastCalledWith('Booking', { entry: 'whereTo' });
     fireEvent.press(screen.getByTestId('home-saved-places'));
     expect(mockNavigate).toHaveBeenLastCalledWith('FavoriteLocations');
     fireEvent.press(screen.getByRole('button', { name: 'Open your profile' }));

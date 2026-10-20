@@ -14,7 +14,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import { clearActiveRide, selectActiveRide, selectActiveRideSubmitting } from '../../features/active-ride/slice';
 import { useActiveRideActions, useActiveRidePolling, usePassengerRideStage } from '../../features/active-ride/hooks';
-import { isRideInProgress } from '../../features/active-ride/status';
 import { usePassengerCancel } from '../../features/active-ride/cancel';
 import { bookingBackHandlers, leaveFinishedRide } from '../../features/active-ride/done';
 import { useNoDriverRetry } from '../../features/active-ride/noDriver';
@@ -27,7 +26,8 @@ import { isTripStage } from '../../features/active-ride/trip/tripModel';
 import { isNoDriverCancel } from '../../features/active-ride/stage';
 import { PassengerSafetyShield } from '../../features/safety/components/RideSafety';
 import { WomenModeChoiceSheet, WomenModeStatus, useWomenModeSearching } from '../../features/women-mode/components/WomenModeSearching';
-import { MapPickBanner } from '../../features/ride-booking/components/MapPick';
+import { BookingMapOverlays, useWhereToArrival } from '../../features/ride-booking/components/WhereToArrival';
+import { useBookingMapPick } from '../../features/ride-booking/useMapPicker';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PassengerStackParamList } from '../../app/navigation/stacks/PassengerStack';
 import { estimateFor, useFareEstimates, useVehicleTypes } from '../../features/ride-booking/hooks';
@@ -39,8 +39,8 @@ import { BookingStageContent } from '../../features/ride-booking/components/Book
 import { BookingErrorBanner, LocationOffBanner, LocationWaitState } from '../../features/ride-booking/components/BookingNotices';
 import { bookingInitialRegion } from '../../features/ride-booking/locationGate';
 import { useBookingLocationGate } from '../../features/ride-booking/useBookingLocationGate';
-import { applyBookingPrefill, bookingPrefillState, useBookingPrefill } from '../../features/ride-booking/prefill';
-import { useBookingFlow, type BookingStage } from '../../features/ride-booking/useBookingFlow';
+import { applyBookingPrefill, initialBookingState, useBookingPrefill } from '../../features/ride-booking/prefill';
+import { useBookingFlow, useRidePointsOnMap, type BookingStage } from '../../features/ride-booking/useBookingFlow';
 import { useBookingMapCamera } from '../../features/ride-booking/useBookingMapCamera';
 import { useBookingNearby } from '../../features/ride-booking/useBookingNearby';
 import { useCancelRequestsOnLeave } from '../../features/ride-booking/useCancelRequestsOnLeave';
@@ -50,7 +50,7 @@ import { useDefaultVehicle } from '../../features/ride-booking/vehicleSelection'
 import { toVehicleOptions } from '../../features/ride-booking/vehicleOptions';
 import { bookingFooter } from '../../features/ride-booking/components/BookingFooter';
 import { RouteSummaryPill } from '../../features/ride-booking/components/RouteSummaryPill';
-import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave } from '../../features/ride-booking/useBookingDraft';
+import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave, useKeepBookingDraft } from '../../features/ride-booking/useBookingDraft';
 import { useGuardedBookingActions } from '../../features/ride-booking/useBookingLeaveGuard';
 import { useScreenToast } from '../../core/toast';
 import { IndeterminateBar, StatusBarScrim } from '../../components/ui';
@@ -70,8 +70,9 @@ const isSearchStage = (stage: BookingStage): boolean => stage === 'home' || stag
 const PassengerMapScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<PassengerStackParamList>>();
   // T-516: a saved place can open booking with its pickup and/or destination already chosen.
+  // UI-R9b: "Where to?" restores a trip left on Back within 10 minutes (in-memory draft).
   const route = useRoute<RouteProp<PassengerStackParamList, 'Booking'>>();
-  const [prefill] = useState(() => bookingPrefillState(route.params));
+  const [prefill] = useState(() => initialBookingState(route.params));
   const mapRef = useRef<SafeMapViewRef | null>(null);
   const { handleError } = useErrorHandler();
   const { theme } = useAppTheme();
@@ -95,10 +96,13 @@ const PassengerMapScreen = () => {
   });
 
   const directions = useDirections();
-  const { routeCoordinates, fetchRoute } = directions;
+  const { routeCoordinates } = directions;
   const rideShown = !!currentRide;
   const flow = useBookingFlow({ prefill, currentLocation, rideShown, directions });
   const { pickup, stops, destination, mapPick, stage, error, setError, setStage, resetSelection } = flow;
+  // UI-R9b: the bar from Home lands on the planner's destination field (only on a fresh planner).
+  const arrival = useWhereToArrival(prefill.stage === 'home' && !prefill.destination ? route.params?.whereToTop ?? null : null);
+  const [initialRegion] = useState(() => bookingInitialRegion(currentLocation, currentRide, MAPS_CONFIG.DEFAULT_REGION));
 
   // While a search field is focused the sheet drops its extras so suggestions get the room; a
   // pick, Back (a new step) or the keyboard closing leaves that mode (T-553).
@@ -115,6 +119,8 @@ const PassengerMapScreen = () => {
     [sheetHeightValue],
   );
   const [mapHeight, setMapHeight] = useState(0);
+  // UI-R10 polish: the sheet at its cap under the map controls hides the locate control.
+  const [sheetFull, setSheetFull] = useState(false);
   const viewport: MapViewport | null =
     mapHeight > 0 ? { mapHeight, bottom: sheetHeight, top: insets.top + MAP_TOP_CONTROLS_HEIGHT } : null;
   const viewportRef = useRef(viewport);
@@ -158,15 +164,18 @@ const PassengerMapScreen = () => {
     searching,
     choosing,
     selectedTier: flow.selectedVehicle ?? null,
-    chipShown: !rideShown && !compact && !searching,
+    chipShown: !rideShown && !compact && !searching && !mapPick,
   });
+  // UI-R9b: the full-screen centre-pin picker (choose on map); the booking camera holds still under it.
+  const mapPickState = useBookingMapPick({ mapRef, flow, currentLocation, rideShown, initialRegion, rideCamera });
+  const picker = mapPickState.picker;
   const { isMapReady, onMapReady, onMapLoaded, centerOnUser } = useBookingMapCamera({
     mapRef,
     currentLocation,
     viewportRef,
     sheetHeight,
     routeCoordinates,
-    rideCameraHoldsMap: rideCamera.holdsCamera,
+    rideCameraHoldsMap: mapPickState.holdsMap,
     onRideCameraMapReady: rideCamera.onMapReady,
     requestLocationPermission,
     // T-553: a picked pickup is shown on the map while no route is drawn yet.
@@ -187,18 +196,8 @@ const PassengerMapScreen = () => {
   const vehicleOptions = useMemo(() => toVehicleOptions(vehicleTypes.data ?? [], estimates.data), [vehicleTypes.data, estimates.data]);
   useDefaultVehicle(vehicleOptions, flow.selectedVehicle, flow.setSelectedVehicle);
 
-  // A ride from Redux (booked here, or restored on launch) puts its own pickup and
-  // destination on the map, once per ride (not on every poll).
-  const shownRideIdRef = useRef<number | null>(null);
-  const { setPickup, setDestination, setPickupQuery, setDestQuery, setMapPick } = flow;
-  useEffect(() => {
-    if (!currentRide || !isRideInProgress(currentRide) || shownRideIdRef.current === currentRide.id) return;
-    shownRideIdRef.current = currentRide.id;
-    setPickup({ latitude: Number(currentRide.pickup_latitude), longitude: Number(currentRide.pickup_longitude) });
-    setDestination({ latitude: Number(currentRide.dropoff_latitude), longitude: Number(currentRide.dropoff_longitude) });
-    setPickupQuery(currentRide.pickup_address);
-    setDestQuery(currentRide.dropoff_address);
-  }, [currentRide, setPickup, setDestination, setPickupQuery, setDestQuery]);
+  // A ride from Redux puts its own pickup and destination on the map, once per ride.
+  const forgetShownRide = useRidePointsOnMap(currentRide, flow);
 
   // Saved-place prefill (T-516): new params while open replace the points they carry; the route
   // is drawn once a prefilled destination has a pickup (the GPS one when none was given).
@@ -210,7 +209,8 @@ const PassengerMapScreen = () => {
     destination,
     apply: (next) => applyBookingPrefill(flow, next, !!destination),
     route: (p, d) => {
-      fetchRoute(p, d);
+      // UI-R9b: a restored draft's stops are on its route too.
+      flow.routeVia(p, d);
       setStage('vehicle');
     },
   });
@@ -224,11 +224,11 @@ const PassengerMapScreen = () => {
 
   // The passenger has seen the outcome (completed / cancelled): start over, on Home (T-574/T-582).
   const finishRide = useCallback(() => {
-    shownRideIdRef.current = null;
+    forgetShownRide();
     dispatch(clearActiveRide());
     resetSelection();
     leaveFinishedRide(navigation);
-  }, [dispatch, resetSelection, navigation]);
+  }, [forgetShownRide, dispatch, resetSelection, navigation]);
   // BE-114 (T-583): "No driver found" → Try again books the same trip (a parcel restored without
   // its form data goes back to the parcel form).
   const noDriver = useNoDriverRetry(currentRide, requestRideService, () => {
@@ -254,7 +254,9 @@ const PassengerMapScreen = () => {
 
   // Back: one sheet state (§12.5), asks before dropping a trip, held while sending (UI-R10); see bookingBackHandlers.
   const leave = useCallback(() => navigation.goBack(), [navigation]);
-  const goBack = useDiscardOnLeave({ flow, rideShown, blocked: request.busy, onLeave: leave });
+  // UI-R9b: leaving with a planned trip keeps it for "Where to?" (10 min); "Discard" drops it.
+  const discardDraft = useKeepBookingDraft({ flow, rideShown });
+  const goBack = useDiscardOnLeave({ flow, rideShown, blocked: request.busy, onLeave: leave, onDiscard: discardDraft });
   const backState = { searching, findingWithRide: searching && rideShown, cancelled: rideCancelled, retrying: noDriver.retrying };
   const back = bookingBackHandlers(backState, { back: goBack, cancel: handleCancelRide, finish: finishRide });
   useBookingHardwareBack(isFocused, back.hardware);
@@ -301,13 +303,13 @@ const PassengerMapScreen = () => {
 
         <BookingMap
           mapRef={mapRef}
-          initialRegion={bookingInitialRegion(currentLocation, currentRide, MAPS_CONFIG.DEFAULT_REGION)}
+          initialRegion={initialRegion}
           mapStyle={theme.mapStyle}
           ready={isMapReady}
-          onPress={flow.onPressMap}
           onMapReady={onMapReady}
           onMapLoaded={onMapLoaded}
-          onRegionChangeComplete={rideCamera.onRegionChangeComplete}
+          onRegionChangeComplete={mapPickState.onRegionChangeComplete}
+          onRegionChangeStart={picker.onRegionChangeStart}
           pickup={layers.pickup}
           stops={layers.stops}
           destination={layers.destination}
@@ -327,14 +329,14 @@ const PassengerMapScreen = () => {
         {tripShown ? <StatusBarScrim testID="ride-status-scrim" /> : null}
         <MapTopControls
           onBack={tripShown && rideEnded ? undefined : back.onScreen}
-          onRecenter={centerOnUser}
+          onRecenter={mapPickState.locateWhilePicking ?? centerOnUser}
           sheetHeight={sheetHeightValue}
           followRide={{ visible: rideCamera.paused, onPress: rideCamera.recentre }}
           // TS2 / PR1: no back on the receipt (Done leaves); recentre only after a pan; the Safety shield top-end.
-          recentreHidden={tripShown && (!rideCamera.paused || tripExpanded)}
+          recentreHidden={tripShown ? !rideCamera.paused || tripExpanded : sheetFull && !mapPick}
           topEnd={tripShown && currentRide ? <PassengerSafetyShield ride={currentRide} position={currentLocation} /> : null}
         />
-        {choosing && tripSummary && !compact ? <RouteSummaryPill summary={tripSummary} onPress={editTrip} /> : null}
+        {choosing && tripSummary && !compact && !mapPick ? <RouteSummaryPill summary={tripSummary} onPress={editTrip} /> : null}
         {nearby.chipShown ? <NearbyCountChip state={nearby.state} freshness={nearby.freshness} tier={nearby.tier} sheetHeight={sheetHeightValue} /> : null}
 
         {tripShown && rideStage ? (
@@ -354,13 +356,14 @@ const PassengerMapScreen = () => {
         ) : (
         <BookingSheet
           onHeightChange={setSheetHeight}
+          onFullChange={setSheetFull}
+          hidden={picker.target !== null}
           maxHeightRatio={sheetRatio}
           footer={footer}
           topAccessory={searching ? <IndeterminateBar testID="active-ride-searching-bar" /> : null}
         >
           {error && <BookingErrorBanner message={error} onDismiss={() => setError(null)} />}
           {locationGate.refused && !rideShown && !compact && <LocationOffBanner onTurnOn={locationGate.askOrSettings} />}
-          {mapPick && !rideShown && <MapPickBanner target={mapPick} onCancel={() => setMapPick(null)} />}
           <BookingStageContent
             flow={flow}
             shownStage={shownStage}
@@ -378,9 +381,11 @@ const PassengerMapScreen = () => {
             ride={currentRide}
             rideStage={rideStage}
             busy={request.sending || rideSubmitting}
+            arrival={arrival}
           />
         </BookingSheet>
         )}
+        <BookingMapOverlays picker={picker} arrival={arrival} onPickerHeight={setSheetHeight} />
         <WomenModeChoiceSheet state={womenMode} />
       </View>
     </ErrorBoundary>

@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import LocationSearch, { suggestionAddress } from '../../../components/passenger/LocationSearch';
 import DualLocationPicker, { type PickerField, type ShortcutPlace } from '../../../components/passenger/DualLocationPicker';
 import type { RideResource } from '../../../services/rideService';
@@ -41,6 +41,8 @@ type Props = {
   ride: RideResource | null;
   rideStage: PassengerRideStageState | null;
   busy: boolean;
+  /** UI-R9b: where the "Where to?" move from Home lands (the planner's destination field). */
+  arrival?: { fieldRef: React.RefObject<View | null>; fieldStyle: StyleProp<ViewStyle> };
 };
 
 /**
@@ -66,8 +68,9 @@ export const BookingStageContent: React.FC<Props> = ({
   ride,
   rideStage,
   busy,
+  arrival,
 }) => {
-  const { pickup, destination, stops, pickupField, destField, setMapPick, chooseOnMap } = flow;
+  const { pickup, destination, stops, pickupField, destField, chooseOnMap } = flow;
   // UI-R9: stable handlers, so the memoised shortcut list re-renders only when its data changes.
   // A shortcut pick goes through the same handlers as a picked suggestion (route, next step).
   const { selectPickup, selectDestination } = flow;
@@ -81,7 +84,8 @@ export const BookingStageContent: React.FC<Props> = ({
     [],
   );
   const hasPickup = pickup !== null;
-  const onChooseOnMapChip = useCallback(() => setMapPick(hasPickup ? 'destination' : 'pickup'), [setMapPick, hasPickup]);
+  // UI-R9b: every way into the picker closes the keyboard first (flow.chooseOnMap).
+  const onChooseOnMapChip = useCallback(() => chooseOnMap(hasPickup ? 'destination' : 'pickup'), [chooseOnMap, hasPickup]);
 
   switch (shownStage) {
     case 'home':
@@ -107,6 +111,8 @@ export const BookingStageContent: React.FC<Props> = ({
             // UI-R9: saved and recent places for the field being filled.
             renderShortcuts={renderShortcuts}
             onShortcutPick={onShortcutPick}
+            destinationRef={arrival?.fieldRef}
+            destinationStyle={arrival?.fieldStyle}
           />
         </>
       );
@@ -123,7 +129,7 @@ export const BookingStageContent: React.FC<Props> = ({
             replaceOnType={locationFieldLabels()}
             onSelect={(s) => flow.selectPickup(s.coords, suggestionAddress(s), false)}
           />
-          {!compact && <ChooseOnMapButton onPress={() => setMapPick('pickup')} />}
+          {!compact && <ChooseOnMapButton onPress={() => chooseOnMap('pickup')} />}
         </View>
       );
     case 'destination':
@@ -139,7 +145,7 @@ export const BookingStageContent: React.FC<Props> = ({
             replaceOnType={locationFieldLabels()}
             onSelect={(s) => flow.selectDestination(s.coords, suggestionAddress(s), true)}
           />
-          {!compact && <ChooseOnMapButton onPress={() => setMapPick('destination')} />}
+          {!compact && <ChooseOnMapButton onPress={() => chooseOnMap('destination')} />}
         </View>
       );
     case 'vehicle':
@@ -170,7 +176,8 @@ export const BookingStageContent: React.FC<Props> = ({
                 stops={stops}
                 onAddStop={(c, address) => flow.updateStops([...stops, { ...c, address }].slice(0, MAX_STOPS))}
                 onRemoveStop={(index) => flow.updateStops(stops.filter((_, i) => i !== index))}
-                onAddStopOnMap={() => setMapPick('stop')}
+                onMoveStop={flow.moveStop}
+                onAddStopOnMap={() => chooseOnMap('stop')}
                 onFocusChange={onFocusChange}
               />
             ) : null

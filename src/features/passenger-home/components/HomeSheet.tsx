@@ -22,6 +22,8 @@ type BodyProps = {
   recents?: ReadonlyArray<RecentDestination>;
   /** A recent destination chip: Booking with it as the destination. */
   onRecent?: (recent: RecentDestination) => void;
+  /** UI-R9b: long press on a recent destination chip (its menu). */
+  onRecentLongPress?: (recent: RecentDestination) => void;
   /** A saved place chip: Booking with it as the destination. */
   onSavedPlace: (place: SavedPlace) => void;
   /** "+ Add" ("Add home" while no Home is saved: starts the form on that label). */
@@ -81,6 +83,7 @@ function HomeSheetBodyBase({
   savedPlacesLoaded = true,
   recents,
   onRecent,
+  onRecentLongPress,
   onSavedPlace,
   onAddPlace,
   onSavedPlaces,
@@ -144,6 +147,7 @@ function HomeSheetBodyBase({
             onPlace={onSavedPlace}
             recents={recents}
             onRecent={onRecent}
+            onRecentLongPress={onRecentLongPress}
             onAdd={onAddPlace}
             onOpenAll={onSavedPlaces}
             leading={

@@ -34,6 +34,8 @@ import { otherCount, takenLabels } from '../../features/saved-places/format';
 import { bookingParamsFor } from '../../features/saved-places/navigation';
 import type { SavedPlace } from '../../features/saved-places/types';
 import { HOME_RECENT_DESTINATIONS, recentDestinations, type RecentDestination } from '../../features/passenger-home/recentDestinations';
+import { useHiddenRecents } from '../../features/passenger-home/hiddenRecents';
+import { RecentPlaceMenu, useRecentPlaceMenu } from '../../features/passenger-home/components/RecentPlaceMenu';
 import type { HomeRidesState } from '../../features/passenger-home/components/HomeRidesSection';
 import { selectInProgressRide } from '../../features/active-ride/slice';
 import { useActiveRideStatusPolling } from '../../features/active-ride/hooks';
@@ -124,11 +126,14 @@ export default function PassengerHomeScreen() {
       }),
     [navigation, saved.places, saved.maxOther],
   );
-  // UI-R9: where the passenger went lately (their finished rides), after the saved places.
+  // UI-R9: where the passenger went lately (their finished rides), after the saved places;
+  // UI-R9b: minus the ones removed from recents (long press menu, this phone only).
+  const hiddenRecents = useHiddenRecents();
   const recents = useMemo(
-    () => recentDestinations(rideItems ?? [], saved.places, HOME_RECENT_DESTINATIONS),
-    [rideItems, saved.places],
+    () => recentDestinations(rideItems ?? [], saved.places, HOME_RECENT_DESTINATIONS, hiddenRecents),
+    [rideItems, saved.places, hiddenRecents],
   );
+  const recentMenu = useRecentPlaceMenu(navigation, saved.places, saved.maxOther);
   const ridesState: HomeRidesState =
     rideItems === null && recent.status === 'loading' ? 'loading' : rideItems === null && recent.status === 'failed' ? 'failed' : 'ready';
   const { reload: reloadRides } = recent;
@@ -226,6 +231,13 @@ export default function PassengerHomeScreen() {
   // UI-R20 (S8): one push per tap for "Where to?", the Ride and Parcel cards and "Return".
   const once = useOnePush(isFocused);
   const openBooking = useCallback(() => once(() => navigation.navigate('Booking')), [navigation, once]);
+  // UI-R9b: "Where to?" (and the Ride card) restore a trip left on Back within 10 min, and the bar
+  // moves to the top of the planner from where it was tapped.
+  const openWhereTo = useCallback(
+    (top?: number | null) =>
+      once(() => navigation.navigate('Booking', { entry: 'whereTo', ...(typeof top === 'number' ? { whereToTop: top } : null) })),
+    [navigation, once],
+  );
   const openSavedPlace = useCallback(
     (place: SavedPlace) => navigation.navigate('Booking', bookingParamsFor(place, 'destination')),
     [navigation],
@@ -309,7 +321,7 @@ export default function PassengerHomeScreen() {
               greeting={greetingFor(now, user?.name)}
               slot={slot}
               live={live}
-              onWhereTo={openBooking}
+              onWhereTo={openWhereTo}
               onHeight={onHeaderHeight}
               greetingStyle={entrance.greetingStyle}
               whereToStyle={entrance.whereToStyle}
@@ -324,6 +336,7 @@ export default function PassengerHomeScreen() {
             savedPlacesLoaded={saved.data !== null}
             recents={recents}
             onRecent={openRecent}
+            onRecentLongPress={recentMenu.open}
             onSavedPlace={openSavedPlace}
             onAddPlace={addPlace}
             onSavedPlaces={openSavedPlaces}
@@ -337,7 +350,7 @@ export default function PassengerHomeScreen() {
             liveRide={liveRide}
             onReturnToRide={openBooking}
             servicesVisible={parcelAvailable}
-            onRide={openBooking}
+            onRide={openWhereTo}
             onParcel={sendParcel}
             onServicesShown={setServicesInPeek}
             onServiceRowHeight={onRowHeight}
@@ -349,6 +362,7 @@ export default function PassengerHomeScreen() {
           />
         </BottomSheet>
       </Animated.View>
+      <RecentPlaceMenu recent={recentMenu.recent} otherFull={recentMenu.otherFull} onClose={recentMenu.onClose} />
     </Screen>
   );
 }

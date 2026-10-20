@@ -127,8 +127,10 @@ describe('SelectedFare: the fare inline, no fare step', () => {
     getByText('Distance · 5.0 km');
     getByText('Rs 150');
     getByText('Estimated total');
-    // T-521 (BE-82): the fare is locked when a driver accepts.
-    getByText('Your fare is locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.');
+    // T-521 (BE-82): the fare is locked when a driver accepts. UI-R9b (UI-R10 polish): the FareTag
+    // is the one "fixed fare" note; the footnote only adds when and the cash / extras terms.
+    getByText('Locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.');
+    expect(() => getByText(/Your fare is locked/)).toThrow();
     fireEvent.press(getByText('Hide fare details'));
     expect(queryByTestId('fare-breakdown')).toBeNull();
   });

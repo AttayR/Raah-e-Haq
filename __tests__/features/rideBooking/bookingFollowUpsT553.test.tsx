@@ -171,7 +171,7 @@ describe('T-553: search suggestions are kept above the keyboard (V-02)', () => {
 
 describe('T-553: picking a pickup on the two-field start', () => {
   const directions = () => ({ fetchRoute: jest.fn(), fetchRouteWithWaypoints: jest.fn(), clearRoute: jest.fn() });
-  const prefill = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home' as const, routePending: false };
+  const prefill = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home' as const, routePending: false, stops: [] };
   const GPS = { latitude: 31.5, longitude: 74.3 };
   const GULBERG = { latitude: 31.51, longitude: 74.35 };
   const DHA = { latitude: 31.47, longitude: 74.4 };

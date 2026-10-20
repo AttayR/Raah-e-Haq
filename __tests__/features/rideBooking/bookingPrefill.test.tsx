@@ -21,6 +21,7 @@ describe('bookingPrefillState', () => {
       destQuery: '',
       stage: 'home',
       routePending: false,
+      stops: [],
     });
   });
 

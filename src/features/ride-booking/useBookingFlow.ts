@@ -1,13 +1,14 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard } from 'react-native';
-import type { MapPressEvent } from 'react-native-maps';
 import { reverseGeocode } from '../../services/placesService';
 import { displayAddress } from '../passenger-home/greeting';
 import type { BookingPlace } from './buildRideRequest';
 import { MAX_STOPS } from './components/BookingStages';
 import { BOOKING_COPY } from './copy';
-import { mapTapTarget, type MapPickTarget } from './mapTap';
+import type { MapPickTarget } from './mapTap';
 import type { BookingPrefillState } from './prefill';
+import type { RideResource } from '../../services/rideService';
+import { isRideInProgress } from '../active-ride/status';
 
 /**
  * The booking steps; `requesting` is also the stage while a ride is shown. UI-R10: `vehicle` is
@@ -88,7 +89,7 @@ type Options = {
 export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions }: Options) => {
   const { fetchRoute, fetchRouteWithWaypoints, clearRoute } = directions;
   const [pickup, setPickup] = useState<BookingPlace | null>(prefill.pickup);
-  const [stops, setStops] = useState<BookingPlace[]>([]);
+  const [stops, setStops] = useState<BookingPlace[]>(prefill.stops);
   const [destination, setDestination] = useState<BookingPlace | null>(prefill.destination);
   // Map taps set a location only in this explicit mode (T-304, PAX-14).
   const [mapPick, setMapPick] = useState<MapPickTarget | null>(null);
@@ -118,25 +119,33 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     }
   }, [pickup, destination, pickupField.text, destField.text, fetchRoute, clearRoute, setPickupQuery, setDestQuery]);
 
-  // T-582 review: the latest tapped point per field; an answer for an older tap is dropped
+  // T-582 review: the latest placed point per field; an answer for an older one is dropped
   // (both the place and the field label), so a late first answer never names the second point.
   const latestTap = useRef<Record<'pickup' | 'destination', LatLng | null>>({ pickup: null, destination: null });
 
-  // PAX-14/PAX-24: only in the explicit choose-on-map mode, never on a marker press.
-  const onPressMap = useCallback((e: MapPressEvent) => {
-    const target = mapTapTarget({ mode: mapPick, action: e.nativeEvent.action, rideShown });
-    if (!target) return;
-    const point = { latitude: e.nativeEvent.coordinate.latitude, longitude: e.nativeEvent.coordinate.longitude };
+  /**
+   * UI-R9b: the centre-pin picker confirmed `at` for `target` (passenger-destination-search
+   * block 5). With the picker's address the field shows it at once; without one (still looking
+   * it up, or the lookup failed) the field says "Pinned on map" and the point is geocoded once.
+   * Then the route and the next step, as for a picked suggestion.
+   */
+  const placeOnMap = useCallback((target: MapPickTarget, at: LatLng, address: string | null) => {
+    if (rideShown) return;
+    const point: BookingPlace = address
+      ? { latitude: at.latitude, longitude: at.longitude, address }
+      : { latitude: at.latitude, longitude: at.longitude };
     setMapPick(null);
     if (target === 'pickup') {
       setPickup(point);
-      setPickupQuery(BOOKING_COPY.pinnedOnMap);
+      setPickupQuery(address ?? BOOKING_COPY.pinnedOnMap);
       latestTap.current.pickup = point;
-      resolvePinnedAddress(point, (address) => {
-        if (latestTap.current.pickup !== point) return;
-        setPickup((p) => (samePoint(p, point) ? { ...point, address } : p));
-        replacePickupLabel(BOOKING_COPY.pinnedOnMap, address);
-      });
+      if (!address) {
+        resolvePinnedAddress(point, (resolved) => {
+          if (latestTap.current.pickup !== point) return;
+          setPickup((p) => (samePoint(p, point) ? { ...point, address: resolved } : p));
+          replacePickupLabel(BOOKING_COPY.pinnedOnMap, resolved);
+        });
+      }
       if (destination) {
         fetchRouteWithWaypoints(point, stops, destination);
         setStage('vehicle');
@@ -146,13 +155,15 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
       }
     } else if (target === 'destination') {
       setDestination(point);
-      setDestQuery(BOOKING_COPY.pinnedOnMap);
+      setDestQuery(address ?? BOOKING_COPY.pinnedOnMap);
       latestTap.current.destination = point;
-      resolvePinnedAddress(point, (address) => {
-        if (latestTap.current.destination !== point) return;
-        setDestination((d) => (samePoint(d, point) ? { ...point, address } : d));
-        replaceDestLabel(BOOKING_COPY.pinnedOnMap, address);
-      });
+      if (!address) {
+        resolvePinnedAddress(point, (resolved) => {
+          if (latestTap.current.destination !== point) return;
+          setDestination((d) => (samePoint(d, point) ? { ...point, address: resolved } : d));
+          replaceDestLabel(BOOKING_COPY.pinnedOnMap, resolved);
+        });
+      }
       if (pickup) {
         fetchRouteWithWaypoints(pickup, stops, point);
         setStage('vehicle');
@@ -164,11 +175,13 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
       setStops(ns);
       fetchRouteWithWaypoints(pickup, ns, destination);
       // Each stop's answer names only that stop (matched by its own point object).
-      resolvePinnedAddress(point, (address) =>
-        setStops((list) => list.map((s) => (s === point ? { ...s, address } : s))),
-      );
+      if (!address) {
+        resolvePinnedAddress(point, (resolved) =>
+          setStops((list) => list.map((s) => (s === point ? { ...s, address: resolved } : s))),
+        );
+      }
     }
-  }, [mapPick, rideShown, pickup, stops, destination, fetchRouteWithWaypoints, clearRoute, setPickupQuery, setDestQuery, replacePickupLabel, replaceDestLabel]);
+  }, [rideShown, pickup, stops, destination, fetchRouteWithWaypoints, clearRoute, setPickupQuery, setDestQuery, replacePickupLabel, replaceDestLabel]);
 
   const resetSelection = useCallback(() => {
     setPickup(null);
@@ -192,6 +205,11 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     // UI-R10: while POST /rides is in flight (no ride shown yet) Back is held, never a step back to
     // "Choose a ride" under a request that is being created (a second tap could send it twice).
     if (stage === 'requesting' && !rideShown) return true;
+    // UI-R9b: Back (and Android back) closes the centre-pin picker first, back to the sheet.
+    if (mapPick && !rideShown) {
+      setMapPick(null);
+      return true;
+    }
     const previous = PREVIOUS_STAGE[stage];
     if (previous !== null && !rideShown) {
       if (STAGE_ORDER.indexOf(previous) < ROUTE_FROM) clearRoute();
@@ -200,7 +218,7 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
       return true;
     }
     return false;
-  }, [stage, rideShown, clearRoute]);
+  }, [stage, rideShown, mapPick, clearRoute]);
 
   /** The vehicle step's edit chips: back to that search, without the old route (T-551). */
   const editPoint = useCallback((target: 'pickup' | 'destination') => {
@@ -240,6 +258,15 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     setStops(ns);
     fetchRouteWithWaypoints(pickup, ns, destination);
   }, [pickup, destination, fetchRouteWithWaypoints]);
+
+  /** UI-R9b: a stop dragged from `from` to `to` (or moved by a screen reader action); one new route. */
+  const moveStop = useCallback((from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= stops.length || to >= stops.length) return;
+    const ns = [...stops];
+    const [moved] = ns.splice(from, 1);
+    ns.splice(to, 0, moved);
+    updateStops(ns);
+  }, [stops, updateStops]);
 
   /**
    * A pickup picked in the search. With `routeIfReady` (the two-field start) and a destination,
@@ -307,13 +334,15 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
     error,
     setError,
     swapPickupDrop,
-    onPressMap,
+    placeOnMap,
     resetSelection,
     stepBack,
     editPoint,
     pickupAtCurrentLocation,
     chooseOnMap,
     updateStops,
+    moveStop,
+    routeVia,
     selectPickup,
     selectDestination,
     pickCurrentLocation,
@@ -321,3 +350,26 @@ export const useBookingFlow = ({ prefill, currentLocation, rideShown, directions
 };
 
 export type BookingFlow = ReturnType<typeof useBookingFlow>;
+
+/**
+ * A ride from Redux (booked here, or restored on launch) puts its own pickup and destination on
+ * the map, once per ride (not on every poll). Returns `forget`, for a finished ride (T-574).
+ */
+export const useRidePointsOnMap = (
+  ride: RideResource | null,
+  flow: Pick<BookingFlow, 'setPickup' | 'setDestination' | 'setPickupQuery' | 'setDestQuery'>,
+): (() => void) => {
+  const shownRideId = useRef<number | null>(null);
+  const { setPickup, setDestination, setPickupQuery, setDestQuery } = flow;
+  useEffect(() => {
+    if (!ride || !isRideInProgress(ride) || shownRideId.current === ride.id) return;
+    shownRideId.current = ride.id;
+    setPickup({ latitude: Number(ride.pickup_latitude), longitude: Number(ride.pickup_longitude) });
+    setDestination({ latitude: Number(ride.dropoff_latitude), longitude: Number(ride.dropoff_longitude) });
+    setPickupQuery(ride.pickup_address);
+    setDestQuery(ride.dropoff_address);
+  }, [ride, setPickup, setDestination, setPickupQuery, setDestQuery]);
+  return useCallback(() => {
+    shownRideId.current = null;
+  }, []);
+};

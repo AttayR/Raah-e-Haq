@@ -27,6 +27,8 @@ export const SEARCH_RECENT_DESTINATIONS = 4;
 /** About 75 m: a recent this close to a saved place is that place, not a second shortcut. */
 const SAME_PLACE_DEGREES = 0.0007;
 
+const NONE_HIDDEN: ReadonlySet<string> = new Set();
+
 const normalise = (address: string): string => address.trim().replace(/\s+/g, ' ').toLowerCase();
 
 /** "Liberty Market, Gulberg III, Lahore" → title "Liberty Market", subtitle "Gulberg III, Lahore". */
@@ -42,12 +44,14 @@ const near = (a: { latitude: number; longitude: number }, lat: number, lng: numb
 
 /**
  * The drop-offs of completed rides, newest first, one per address, without the ones that are a
- * saved place already (same address or within ~75 m), capped at `max`.
+ * saved place already (same address or within ~75 m) or were removed from recents, capped at `max`.
  */
 export const recentDestinations = (
   rides: ReadonlyArray<Ride>,
   savedPlaces: ReadonlyArray<SavedPlace>,
   max: number,
+  /** UI-R9b: keys the passenger removed from recents on this phone. */
+  hidden: ReadonlySet<string> = NONE_HIDDEN,
 ): RecentDestination[] => {
   const seen = new Set(savedPlaces.map(place => normalise(place.address)));
   const out: RecentDestination[] = [];
@@ -57,7 +61,7 @@ export const recentDestinations = (
     const address = ride.dropoffAddress?.trim();
     if (ride.status !== 'completed' || !point || !address) continue;
     const key = normalise(address);
-    if (seen.has(key) || savedPlaces.some(place => near(point, place.lat, place.lng))) continue;
+    if (seen.has(key) || hidden.has(key) || savedPlaces.some(place => near(point, place.lat, place.lng))) continue;
     seen.add(key);
     out.push({
       key,

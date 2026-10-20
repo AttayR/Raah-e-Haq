@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, StyleSheet, View } from 'react-native';
+import { Keyboard, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
 import LocationSearch, { suggestionAddress, type LocationSearchHandle } from './LocationSearch';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../ui/AppText';
@@ -8,6 +9,7 @@ import { IconButton } from '../ui/IconButton';
 import type { IconName } from '../ui/Icon';
 import { componentTokens, radius, space } from '../../theme';
 import { BOOKING_COPY, isCurrentLocationLabel, locationFieldLabels } from '../../features/ride-booking/copy';
+import { useSwapCrossing } from './useSwapCrossing';
 
 type Coords = { latitude: number; longitude: number } | null;
 
@@ -43,6 +45,12 @@ type Props = {
   renderShortcuts?: (target: PickerField, onPick: (place: ShortcutPlace) => void) => React.ReactNode;
   /** A shortcut row was picked for `target` (after the field's session ended and it blurred). */
   onShortcutPick?: (target: PickerField, place: ShortcutPlace) => void;
+  /**
+   * UI-R9b: the "Where to?" move from Home lands on the destination field: its ref (measured in
+   * the window) and its style (hidden under the moving bar until it lands).
+   */
+  destinationRef?: React.RefObject<View | null>;
+  destinationStyle?: StyleProp<ViewStyle>;
 };
 
 export type PickerField = 'pickup' | 'destination';
@@ -73,6 +81,8 @@ const DualLocationPicker: React.FC<Props> = ({
   onChooseOnMapChip,
   renderShortcuts,
   onShortcutPick,
+  destinationRef,
+  destinationStyle,
 }) => {
   const { theme } = useAppTheme();
   const c = theme.colors;
@@ -118,6 +128,8 @@ const DualLocationPicker: React.FC<Props> = ({
       ? onUseCurrentLocation
       : undefined;
   const showShortcuts = !!renderShortcuts && !typed[target] && (focused !== null || !destination);
+  // UI-R9b: the two rows cross (250 ms) and the values swap in the middle.
+  const crossing = useSwapCrossing(onSwap);
   return (
     <View style={styles.container} testID="dual-location-picker">
       {!compact && (
@@ -125,7 +137,7 @@ const DualLocationPicker: React.FC<Props> = ({
           {BOOKING_COPY.planTitle}
         </AppText>
       )}
-      <View style={styles.row}>
+      <Animated.View style={[styles.row, crossing.pickupStyle]} onLayout={crossing.onPickupLayout}>
         <View style={[styles.pickupDot, { backgroundColor: c.pickupPin }]} />
         <View style={styles.field}>
           <LocationSearch
@@ -144,8 +156,8 @@ const DualLocationPicker: React.FC<Props> = ({
             onChangeQuery={(q) => markTyped('pickup', q)}
           />
         </View>
-      </View>
-      <View style={styles.row}>
+      </Animated.View>
+      <Animated.View style={[styles.row, crossing.destinationStyle]} onLayout={crossing.onDestinationLayout}>
         <View
           style={[
             styles.dropoffSquare,
@@ -153,7 +165,8 @@ const DualLocationPicker: React.FC<Props> = ({
           ]}
           testID="picker-rail-dropoff"
         />
-        <View style={styles.field}>
+        <Animated.View style={[styles.field, destinationStyle]}>
+          <View ref={destinationRef} collapsable={false}>
           <LocationSearch
             ref={(handle) => {
               fieldRefs.current.destination = handle;
@@ -171,8 +184,9 @@ const DualLocationPicker: React.FC<Props> = ({
             // scrolls fully out of view under the handle while typing (no sliver).
             revealTopMargin={DESTINATION_REVEAL_TOP}
           />
-        </View>
-      </View>
+          </View>
+        </Animated.View>
+      </Animated.View>
       {!typing && (offerCurrentLocation || onChooseOnMapChip || onSwap) ? (
         <View style={styles.actions}>
           {/* UI-R9 quick row: the chips wrap (Roman Urdu labels are long), swap stays at the end. */}
@@ -185,7 +199,7 @@ const DualLocationPicker: React.FC<Props> = ({
             ) : null}
           </View>
           {onSwap ? (
-            <IconButton icon="swap" variant="tonal" iconColor="primaryText" accessibilityLabel={BOOKING_COPY.swapA11y} onPress={onSwap} testID="swap-locations" />
+            <IconButton icon="swap" variant="tonal" iconColor="primaryText" accessibilityLabel={BOOKING_COPY.swapA11y} onPress={crossing.swap} testID="swap-locations" />
           ) : null}
         </View>
       ) : null}

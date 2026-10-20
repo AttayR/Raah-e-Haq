@@ -16,7 +16,8 @@ type Props = {
   slot: TaglineSlot;
   /** A ride or parcel is in progress: greeting only; "Return" sits in the body instead of "Where to?". */
   live: boolean;
-  onWhereTo: () => void;
+  /** UI-R9b: gets the bar's window y (the start of the move to the planner), null when unknown. */
+  onWhereTo: (top: number | null) => void;
   /** The header's natural height whenever it changes by 1pt or more (drives the peek, V1). */
   onHeight: (height: number, kind: HomeHeaderKind) => void;
   /** Cold-open entrance (V7): the greeting block's and "Where to?"'s animated styles. */

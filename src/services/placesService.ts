@@ -10,6 +10,8 @@ export type AutocompleteItem = {
   structured_formatting?: {
     main_text: string;
     secondary_text: string;
+    /** UI-R9b: the parts of `main_text` the typed text matched (drawn in 700). */
+    main_text_matched_substrings?: { offset: number; length: number }[];
   };
 };
 

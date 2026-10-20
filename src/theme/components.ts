@@ -177,6 +177,14 @@ export const componentTokens = {
   ride: {
     /** §5.21 map pins: 20 pickup circle / drop-off square with a 4pt ring, 22 numbered stop. */
     pin: { size: 20, ring: 4, dropoffRadius: 4, dropoffInner: 6, stopSize: 22, stopRing: 2, labelGap: space[1], labelMaxWidth: 200 },
+    /**
+     * [UI-R9b] §5.21 centre pin (choose on map, passenger-destination-search block 5): 32 tall, a
+     * 20 head with an 8 inner dot on a 3 stem; lifts 8 while the map moves (§6.6) and its contact
+     * shadow (12 × 4) shrinks to 0.8. The picker card's address skeleton is 70 % of its width.
+     */
+    centrePin: { height: 32, head: 20, innerDot: 8, stem: 3, lift: 8, shadowWidth: 12, shadowHeight: 4, shadowScale: 0.8, shadowOpacity: 0.24, addressSkeletonWidth: '70%' },
+    /** [UI-R9b] stop reorder: the drag handle's 44 target around a 24 glyph; the dragged row's lift. */
+    stopRow: { handleTarget: 44, dragScale: 1.02, dragOpacity: 0.96 },
     /** §5.21 route: 5pt line over a 7pt casing. */
     route: { width: 5, casingWidth: 7 },
     /** §5.21 car marker: 40 badge, 2pt ring; nearby (muted) drivers at 60%. */

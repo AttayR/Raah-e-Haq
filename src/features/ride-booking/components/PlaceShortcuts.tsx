@@ -10,6 +10,7 @@ import { useSavedPlaces } from '../../saved-places/hooks';
 import { savedPlaceIcon, savedPlaceTitle, toBookingPlace } from '../../saved-places/format';
 import type { SavedPlace } from '../../saved-places/types';
 import { recentDestinations, SEARCH_RECENT_DESTINATIONS, type RecentDestination } from '../../passenger-home/recentDestinations';
+import { useHiddenRecents } from '../../passenger-home/hiddenRecents';
 import type { BookingPlace } from '../buildRideRequest';
 
 /** A shortcut row picked: the point with its address (sent with the ride, T-302). */
@@ -115,9 +116,11 @@ function PlaceShortcutsBase({ onPick }: { onPick: PlaceShortcutPick }) {
   const saved = useSavedPlaces(true);
   const rides = useRecentRides(HOME_RECENT_RIDES + 1, true, { reuseCached: true });
   const rideItems = rides.data;
+  // UI-R9b: a recent removed on Home is not listed here either.
+  const hidden = useHiddenRecents();
   const recents = React.useMemo(
-    () => recentDestinations(rideItems ?? [], saved.places, SEARCH_RECENT_DESTINATIONS),
-    [rideItems, saved.places],
+    () => recentDestinations(rideItems ?? [], saved.places, SEARCH_RECENT_DESTINATIONS, hidden),
+    [rideItems, saved.places, hidden],
   );
   return (
     <PlaceShortcutList

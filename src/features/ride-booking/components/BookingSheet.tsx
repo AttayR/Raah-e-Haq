@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -15,6 +15,10 @@ import { useKeyboardHeight } from '../../../hooks/useKeyboardHeight';
 import { KeyboardRevealProvider, type RevealScrollable } from '../../../components/ui/keyboardReveal';
 import { componentTokens, radius, space } from '../../../theme';
 import { MAP_TOP_CONTROLS_HEIGHT } from './MapTopControls';
+
+/** UI-R9b: a drag inside the sheet (a stop being reordered) holds the sheet's scroll. */
+const SheetScrollLockContext = createContext<((locked: boolean) => void) | undefined>(undefined);
+export const useSheetScrollLock = (): ((locked: boolean) => void) | undefined => useContext(SheetScrollLockContext);
 
 type Props = {
   children: React.ReactNode;
@@ -38,6 +42,13 @@ type Props = {
   topAccessory?: React.ReactNode;
   /** Start scrolled to the end of the content (Debug gallery evidence only). */
   revealEnd?: boolean;
+  /**
+   * UI-R9b: the centre-pin picker covers the map: the sheet stays mounted (typed text, focus and
+   * scroll are kept) but is not drawn and reports no height meanwhile.
+   */
+  hidden?: boolean;
+  /** UI-R10 polish: the sheet reached its cap under the map controls (the locate control hides). */
+  onFullChange?: (full: boolean) => void;
   testID?: string;
 };
 
@@ -58,6 +69,8 @@ export const BookingSheet: React.FC<Props> = ({
   footer,
   topAccessory,
   revealEnd = false,
+  hidden = false,
+  onFullChange,
   testID = 'booking-sheet',
 }) => {
   const { theme } = useAppTheme();
@@ -71,6 +84,27 @@ export const BookingSheet: React.FC<Props> = ({
   const ratioCap = maxHeightRatio && !keyboardUp ? windowHeight * maxHeightRatio : Infinity;
   const maxHeight = Math.max(0, Math.min(belowControls, ratioCap));
   const [scrolled, setScrolled] = useState(false);
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const full = useRef<boolean | null>(null);
+  const lastHeight = useRef<number | null>(null);
+  const onLayout = (e: LayoutChangeEvent) => {
+    if (hidden) return;
+    const height = e.nativeEvent.layout.height;
+    lastHeight.current = height;
+    onHeightChange?.(height);
+    const isFull = maxHeight > 0 && height >= maxHeight - 1;
+    if (full.current !== isFull) {
+      full.current = isFull;
+      onFullChange?.(isFull);
+    }
+  };
+  // Shown again (the picker closed): the map controls ride on this sheet's height again at once,
+  // even when its layout did not change while it was hidden.
+  const onHeightRef = useRef(onHeightChange);
+  onHeightRef.current = onHeightChange;
+  useEffect(() => {
+    if (!hidden && lastHeight.current !== null) onHeightRef.current?.(lastHeight.current);
+  }, [hidden]);
   const scrollRef = useRef<ScrollView | null>(null);
   const getScroll = useCallback((): RevealScrollable | null => scrollRef.current, []);
   // UI-R10: the footer gets a top hairline while content runs on beneath it (not scrolled to the
@@ -108,9 +142,10 @@ export const BookingSheet: React.FC<Props> = ({
   return (
     <View
       testID={testID}
-      onLayout={(e: LayoutChangeEvent) => onHeightChange?.(e.nativeEvent.layout.height)}
+      onLayout={onLayout}
       style={[
         styles.sheet,
+        hidden ? styles.hidden : null,
         theme.elevation[3],
         {
           bottom: keyboardOffset,
@@ -141,6 +176,7 @@ export const BookingSheet: React.FC<Props> = ({
         onLayout={onScrollLayout}
         onContentSizeChange={onContentSizeChange}
         scrollEventThrottle={16}
+        scrollEnabled={!scrollLocked}
         testID={`${testID}-scroll`}
         bounces={false}
         keyboardShouldPersistTaps="handled"
@@ -151,7 +187,9 @@ export const BookingSheet: React.FC<Props> = ({
           { paddingBottom: (keyboardUp || footer ? 0 : insets.bottom) + space[4] },
         ]}
       >
-        <KeyboardRevealProvider getScroll={getScroll}>{children}</KeyboardRevealProvider>
+        <SheetScrollLockContext.Provider value={setScrollLocked}>
+          <KeyboardRevealProvider getScroll={getScroll}>{children}</KeyboardRevealProvider>
+        </SheetScrollLockContext.Provider>
       </ScrollView>
       {footer ? (
         <View
@@ -194,6 +232,7 @@ const styles = StyleSheet.create({
   handleArea: { height: componentTokens.sheet.contentTop, alignItems: 'center', paddingTop: componentTokens.sheet.handleTop },
   handle: { width: componentTokens.sheet.handleWidth, height: componentTokens.sheet.handleHeight, borderRadius: radius.pill },
   scroll: { flexGrow: 0 },
+  hidden: { display: 'none' },
   content: { paddingHorizontal: space[4], gap: space[3] },
   // §5.14: 16 above the footer action.
   footer: { paddingHorizontal: space[4], paddingTop: space[4] },

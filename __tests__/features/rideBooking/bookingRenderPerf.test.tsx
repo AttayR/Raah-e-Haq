@@ -187,7 +187,6 @@ describe('BookingMap renders (PERF-12, PERF-15)', () => {
       // A new object on every screen render, as the screen builds it: ignored after mount.
       initialRegion={{ latitude: 31.5, longitude: 74.3, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
       ready={ready}
-      onPress={noop}
       onMapReady={noop}
       onMapLoaded={noop}
       onRegionChangeComplete={noop}
@@ -245,8 +244,8 @@ describe('BookingMap renders (PERF-12, PERF-15)', () => {
       mapRef,
       initialRegion: region,
       ready: true,
-      onPress: noop,
       onMapReady: noop,
+      onRegionChangeStart: noop,
       onMapLoaded: noop,
       onRegionChangeComplete: noop,
       pickup: PICKUP,
@@ -259,13 +258,13 @@ describe('BookingMap renders (PERF-12, PERF-15)', () => {
     };
     expect(sameBookingMapProps(base, { ...base, initialRegion: { ...region } })).toBe(true);
     expect(sameBookingMapProps(base, { ...base, pickup: { ...PICKUP } })).toBe(false);
-    expect(sameBookingMapProps(base, { ...base, onPress: () => undefined })).toBe(false);
+    expect(sameBookingMapProps(base, { ...base, onRegionChangeStart: () => undefined })).toBe(false);
   });
 });
 
 describe('useBookingFlow field text (T-534 review)', () => {
   const directions = () => ({ fetchRoute: jest.fn(), fetchRouteWithWaypoints: jest.fn(), clearRoute: jest.fn() });
-  const prefill = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home' as const, routePending: false };
+  const prefill = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home' as const, routePending: false, stops: [] };
   const GPS = { latitude: 31.5, longitude: 74.3 };
   const GULBERG = { latitude: 31.51, longitude: 74.35 };
   const DHA = { latitude: 31.47, longitude: 74.4 };

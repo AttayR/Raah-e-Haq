@@ -4,6 +4,7 @@
  */
 export * from './AcBadge';
 export * from './AddressPair';
+export * from './CentrePin';
 export * from './FareBreakdown';
 export * from './MapPins';
 export * from './PersonCard';

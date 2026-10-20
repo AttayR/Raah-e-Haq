@@ -1,14 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Banner, Button, Icon, ListGroup, ListItem, OfflineBanner, useIsOffline } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { KeyboardRevealGroup } from '../../../components/ui/keyboardReveal';
-import StopsEditor from '../../../components/passenger/StopsEditor';
+import { StopRow, StopSearch } from '../../../components/passenger/StopsEditor';
 import { componentTokens, radius, space } from '../../../theme';
 import { BOOKING_COPY } from '../copy';
 import { ChooseOnMapButton } from './MapPick';
 import { SelectedFare, VehicleChoice, requestFareText } from './BookingChoices';
+import { useSheetScrollLock } from './BookingSheet';
 import type { BookingPlace } from '../buildRideRequest';
 import { estimateFor, type useFareEstimates, type useVehicleTypes } from '../hooks';
 import type { FareOffer } from '../../fare/hooks';
@@ -49,46 +50,81 @@ type StopsSectionProps = {
   stops: BookingPlace[];
   onAddStop: (c: Coords, address: string) => void;
   onRemoveStop: (index: number) => void;
+  /** UI-R9b: drag (or a screen reader action) moved a stop; absent: no reorder. */
+  onMoveStop?: (from: number, to: number) => void;
   onAddStopOnMap: () => void;
   onFocusChange?: (focused: boolean) => void;
 };
 
 /**
- * Stops as a sheet row (DESIGN_SYSTEM §9 v1.1, UI-R10): the stops on the trip with remove, then
- * "Add a stop" that opens the stop search and "Choose stop on map". T-556: while the stop search
- * is typed in, the sheet reveals this whole section, so the field and its suggestions stay in view.
+ * Stable keys for the stop rows (one per stop object), so a dragged row keeps its view and its
+ * animation as it lands. ListGroup keys its own wrappers by position; these keys are the rows'.
  */
-export const StopsSection: React.FC<StopsSectionProps> = ({ stops, onAddStop, onRemoveStop, onAddStopOnMap, onFocusChange }) => {
+const useStopKeys = () => {
+  const keys = useRef(new WeakMap<object, number>());
+  const next = useRef(0);
+  return (stop: object): number => {
+    let key = keys.current.get(stop);
+    if (key === undefined) {
+      next.current += 1;
+      key = next.current;
+      keys.current.set(stop, key);
+    }
+    return key;
+  };
+};
+
+/**
+ * Stops as a sheet row (DESIGN_SYSTEM §9 v1.1, UI-R10): the stops on the trip and "Add a stop" in
+ * one ListGroup (UI-R9b, UI-R10 polish), with remove and, from two stops, the drag handle that
+ * reorders them; "Add a stop" opens the stop search and "Choose stop on map". T-556: while the
+ * stop search is typed in, the sheet reveals this whole section, so the field and its
+ * suggestions stay in view. A drag holds the sheet's scroll.
+ */
+export const StopsSection: React.FC<StopsSectionProps> = ({ stops, onAddStop, onRemoveStop, onMoveStop, onAddStopOnMap, onFocusChange }) => {
   const [adding, setAdding] = useState(false);
+  const lockScroll = useSheetScrollLock();
+  const keyOf = useStopKeys();
   const canAdd = stops.length < MAX_STOPS;
   const searching = adding && canAdd;
+  const rows = stops.map((stop, index) => (
+    <StopRow
+      key={keyOf(stop)}
+      stop={stop}
+      index={index}
+      count={stops.length}
+      onRemove={onRemoveStop}
+      onMove={onMoveStop}
+      onDragChange={lockScroll}
+    />
+  ));
   return (
     <KeyboardRevealGroup style={styles.stops} testID="booking-stops-section">
-      {stops.length > 0 || searching ? (
-        <StopsEditor
-          stops={stops}
-          onAddStop={(c, address) => {
-            onAddStop(c, address);
-            setAdding(false);
-          }}
-          onRemoveStop={onRemoveStop}
-          maxStops={MAX_STOPS}
-          onFocusChange={onFocusChange}
-          searchVisible={searching}
-        />
+      {rows.length > 0 || (!searching && canAdd) ? (
+        <ListGroup inset="tile" testID="booking-stops-group">
+          {rows}
+          {!searching && canAdd ? (
+            <ListItem
+              icon="add"
+              title={BOOKING_COPY.addStop}
+              subtitle={BOOKING_COPY.addStopSubtitle(MAX_STOPS)}
+              onPress={() => setAdding(true)}
+              testID="add-stop-row"
+            />
+          ) : null}
+        </ListGroup>
       ) : null}
       {searching ? (
-        <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={onAddStopOnMap} />
-      ) : canAdd ? (
-        <ListGroup>
-          <ListItem
-            icon="add"
-            title={BOOKING_COPY.addStop}
-            subtitle={BOOKING_COPY.addStopSubtitle(MAX_STOPS)}
-            onPress={() => setAdding(true)}
-            testID="add-stop-row"
+        <>
+          <StopSearch
+            onAddStop={(c, address) => {
+              onAddStop(c, address);
+              setAdding(false);
+            }}
+            onFocusChange={onFocusChange}
           />
-        </ListGroup>
+          <ChooseOnMapButton testID="add-stop-on-map" label={BOOKING_COPY.addStopOnMap} onPress={onAddStopOnMap} />
+        </>
       ) : null}
     </KeyboardRevealGroup>
   );

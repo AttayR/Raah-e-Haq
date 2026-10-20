@@ -148,7 +148,7 @@ describe('Back on the booking map', () => {
 
   it('flow: Back while the request is being created stays on finding a driver', () => {
     const directions = { fetchRoute: jest.fn(), fetchRouteWithWaypoints: jest.fn(), clearRoute: jest.fn() };
-    const prefill = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home' as const, routePending: false };
+    const prefill = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home' as const, routePending: false, stops: [] };
     const { result } = renderHook(() => useBookingFlow({ prefill, currentLocation: null, rideShown: false, directions }));
     act(() => result.current.setStage('requesting'));
     let handled = false;

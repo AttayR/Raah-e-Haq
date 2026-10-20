@@ -20,7 +20,7 @@ import { HomeRidesSection } from '../../../src/features/passenger-home/component
 import { PlaceShortcutList } from '../../../src/features/ride-booking/components/PlaceShortcuts';
 import { ErrorState } from '../../../src/components/ui/ErrorState';
 import { Keyboard } from 'react-native';
-import { MapPickBanner, ChooseOnMapButton } from '../../../src/features/ride-booking/components/MapPick';
+import { ChooseOnMapButton } from '../../../src/features/ride-booking/components/MapPick';
 import DualLocationPicker from '../../../src/components/passenger/DualLocationPicker';
 import { BOOKING_COPY } from '../../../src/features/ride-booking/copy';
 import { makeRide, page } from '../../../test-utils/rideFixtures';
@@ -302,20 +302,11 @@ describe('place search shortcuts', () => {
     expect(onUse).toHaveBeenCalled();
   });
 
-  it('map pick: kit chip and info banner with Cancel', () => {
+  it('map pick: kit chip (UI-R9b: it opens the centre-pin picker, see mapPickerUIR9b)', () => {
     const onPress = jest.fn();
-    const onCancel = jest.fn();
-    withTheme(
-      <>
-        <ChooseOnMapButton onPress={onPress} />
-        <MapPickBanner target="destination" onCancel={onCancel} />
-      </>,
-    );
+    withTheme(<ChooseOnMapButton onPress={onPress} />);
     fireEvent.press(screen.getByTestId('choose-on-map'));
-    fireEvent.press(screen.getByTestId('map-pick-cancel'));
     expect(onPress).toHaveBeenCalled();
-    expect(onCancel).toHaveBeenCalled();
-    expect(screen.getByText('Tap the map to set your destination')).toBeTruthy();
   });
 });
 

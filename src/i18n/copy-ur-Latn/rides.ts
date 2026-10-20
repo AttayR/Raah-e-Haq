@@ -47,13 +47,16 @@ export function registerRideCopy(): void {
     searchFailed: 'Search abhi kaam nahi kar rahi.',
     addStopOnMap: 'Stop map par chunein',
     pinnedOnMap: 'Map par lagaya gaya',
-    mapPickHint: (target: 'pickup' | 'destination' | 'stop') =>
-      target === 'pickup'
-        ? 'Pickup lagane ke liye map par tap karein'
-        : target === 'destination'
-          ? 'Manzil lagane ke liye map par tap karein'
-          : 'Stop add karne ke liye map par tap karein',
-    mapPickCancel: 'Cancel',
+    mapPickLabel: (target: 'pickup' | 'destination' | 'stop') =>
+      target === 'pickup' ? 'Pickup' : target === 'destination' ? 'Drop-off' : 'Stop',
+    mapPickConfirm: (target: 'pickup' | 'destination' | 'stop') =>
+      target === 'pickup' ? 'Pickup pakka karein' : target === 'destination' ? 'Drop-off pakka karein' : 'Stop add karein',
+    mapPickFindingA11y: 'Pata dhoond rahe hain',
+    mapPickHint: 'Pin lagane ke liye map hilayein',
+    reorderStopA11y: (n: number) => `Stop ${n} ki jagah badlein`,
+    reorderStopHint: 'Daba kar rakhein aur khainch kar le jayein',
+    moveStopUp: 'Upar karein',
+    moveStopDown: 'Neeche karein',
     locationWaitTitle: 'Aap ki location dhoond rahe hain',
     locationWaitBody: 'Location ki ijazat dein taake driver aap ka pickup dhoond sakein.',
     locationOffTitle: 'Location band hai',

@@ -26,7 +26,7 @@ jest.mock('../../../src/app/providers/ThemeProvider', () => ({
 const directions = () => ({ fetchRoute: jest.fn(), fetchRouteWithWaypoints: jest.fn(), clearRoute: jest.fn() });
 const GPS = { latitude: 31.5, longitude: 74.3 };
 const DHA = { latitude: 31.47, longitude: 74.4, address: 'DHA Phase 5, Lahore' };
-const fresh: BookingPrefillState = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home', routePending: false };
+const fresh: BookingPrefillState = { pickup: null, destination: null, pickupQuery: '', destQuery: '', stage: 'home', routePending: false, stops: [] };
 
 describe('T-576: the planner opened from "Where to?" focuses the destination field', () => {
   it('the destination field of the two-field start is focused on mount; the pickup field is not', () => {

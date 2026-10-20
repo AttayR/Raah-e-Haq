@@ -68,6 +68,8 @@ export const iconGlyphs = {
   pinOutline: 'map-marker-outline',
   pinRadius: 'map-marker-radius-outline',
   swap: 'swap-vertical',
+  /** [UI-R9b] stop row drag handle (passenger-destination-search Interactions). */
+  drag: 'drag-vertical',
   // Money.
   cash: 'cash',
   promo: 'tag-outline',

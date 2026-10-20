@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type AccessibilityActionEvent, type StyleProp, type ViewStyle } from 'react-native';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { haptics } from '../../core/haptics';
 import { componentTokens, layout, radius, space } from '../../theme';
@@ -29,6 +29,12 @@ export type ChipProps = {
   /** [UI-R20b] Glyph colour when it differs from the label (e.g. a `warning` location glyph). */
   iconColor?: TextColor;
   onPress?: () => void;
+  /**
+   * [UI-R9b] A long press opens more options (a recent destination's menu). Screen readers get
+   * it as the `longpress` action named `longPressLabel` ("More options").
+   */
+  onLongPress?: () => void;
+  longPressLabel?: string;
   disabled?: boolean;
   accessibilityLabel?: string;
   /** `radio` inside a FilterChips group; `button` (default) otherwise. */
@@ -52,6 +58,8 @@ export const Chip: React.FC<ChipProps> = ({
   variant = 'filled',
   iconColor,
   onPress,
+  onLongPress,
+  longPressLabel,
   disabled = false,
   accessibilityLabel,
   accessibilityRole = 'button',
@@ -106,9 +114,16 @@ export const Chip: React.FC<ChipProps> = ({
     );
   }
 
+  const onAction = (e: AccessibilityActionEvent) => {
+    if (e.nativeEvent.actionName === 'longpress' && !disabled) onLongPress?.();
+  };
   return (
     <Pressable
       testID={testID}
+      onLongPress={onLongPress && !disabled ? onLongPress : undefined}
+      accessibilityActions={onLongPress ? [{ name: 'longpress', label: longPressLabel }] : undefined}
+      onAccessibilityAction={onLongPress ? onAction : undefined}
+      accessibilityHint={onLongPress ? longPressLabel : undefined}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={accessibilityRole === 'radio' ? { selected, checked: selected, disabled } : { selected, disabled }}

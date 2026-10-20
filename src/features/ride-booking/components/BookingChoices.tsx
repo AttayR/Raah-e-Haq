@@ -12,9 +12,9 @@ import {
 import type { FareEstimates } from '../api';
 import type { LoadStatus } from '../hooks';
 import { BOOKING_COPY } from '../copy';
-import { space } from '../../../theme';
-import { formatFare, quoteBreakdown, type VehicleOption } from '../vehicleOptions';
+import { componentTokens, space } from '../../../theme';
 import { t } from '../../../i18n';
+import { formatFare, quoteBreakdown, type VehicleOption } from '../vehicleOptions';
 import { FarePolicyNote } from '../../fare/components/FareBits';
 import { OfferStepper } from '../../fare/components/OfferStepper';
 import type { FareOffer } from '../../fare/hooks';
@@ -117,7 +117,8 @@ type SelectedFareProps = {
  * The selected tier's fare, inline under the list (UI-R10, §12.5): "Offer your fare" inside the
  * server's band (T-521, ±20%, the passenger may offer within it, no haggling), the FareTag (UI-R21),
  * and a "Fare details" toggle that expands the server breakdown (§5.26) and the waiting / cancel
- * terms in place. No separate fare step.
+ * terms in place. No separate fare step. UI-R10 polish: one fare-lock note (the FareTag); the open
+ * breakdown's footnote only adds when it locks and the cash and extras terms.
  */
 export const SelectedFare: React.FC<SelectedFareProps> = ({ quote, distanceKm, durationMin, offer, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -128,16 +129,19 @@ export const SelectedFare: React.FC<SelectedFareProps> = ({ quote, distanceKm, d
       {offered ? <OfferStepper offer={offered} /> : null}
       {/* UI-R21 §1.7 M4: replaces the lock caption; "Your offer" once the offer is off the quote. */}
       <FareTag kind={offered && offerDifference(offered.band, offered.value) !== 0 ? 'offer' : 'fixed'} testID="fare-lock-note" />
-      <Button
-        label={open ? BOOKING_COPY.hideFareDetails : BOOKING_COPY.fareDetails}
-        variant="ghost"
-        size="sm"
-        leadingIcon="info"
-        trailingIcon={open ? 'chevronUp' : 'chevronDown'}
-        fullWidth={false}
-        onPress={() => setOpen((v) => !v)}
-        testID="fare-details-toggle"
-      />
+      {/* UI-R10 polish (UI-R9b): the ghost's glyph sits on the 16 gutter, not 16 inside it. */}
+      <View style={styles.ghostAlign} testID="fare-details-toggle-wrap">
+        <Button
+          label={open ? BOOKING_COPY.hideFareDetails : BOOKING_COPY.fareDetails}
+          variant="ghost"
+          size="sm"
+          leadingIcon="info"
+          trailingIcon={open ? 'chevronUp' : 'chevronDown'}
+          fullWidth={false}
+          onPress={() => setOpen((v) => !v)}
+          testID="fare-details-toggle"
+        />
+      </View>
       {open ? (
         <View style={styles.details}>
           <FareBreakdown
@@ -147,7 +151,7 @@ export const SelectedFare: React.FC<SelectedFareProps> = ({ quote, distanceKm, d
             distanceKm={distanceKm}
             durationMin={durationMin}
             totalLabel={BOOKING_COPY.estimatedTotal}
-            footnote={t('fare.lockNote')}
+            footnote={t('fare.lockTerms')}
             testID="fare-breakdown"
           />
           <FarePolicyNote policy={quote.fare_policy} />
@@ -168,4 +172,5 @@ const styles = StyleSheet.create({
   list: { gap: space[2] },
   fare: { gap: space[2] },
   details: { gap: space[2] },
+  ghostAlign: { alignSelf: 'flex-start', marginStart: -componentTokens.button.paddingHorizontal.sm },
 });

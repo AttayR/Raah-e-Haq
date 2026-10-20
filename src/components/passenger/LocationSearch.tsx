@@ -7,9 +7,18 @@ import { AppText } from '../ui/AppText';
 import { Icon, type IconName } from '../ui/Icon';
 import { useKeyboardReveal } from '../ui/keyboardReveal';
 import { MAX_FONT_SIZE_MULTIPLIER, radius, space, textStyles } from '../../theme';
+import { LocationSuggestionRow, SuggestionTile, suggestionRowStyles, type MatchedRange } from './LocationSuggestionRow';
 import { BOOKING_COPY } from '../../features/ride-booking/copy';
 
-type Suggestion = { id: string; title: string; subtitle: string; icon: string; coords: { latitude: number; longitude: number } };
+type Suggestion = {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  coords: { latitude: number; longitude: number };
+  /** UI-R9b: the typed match inside `title`. */
+  matched?: MatchedRange[];
+};
 
 /** "Title, subtitle" of a picked suggestion: the address sent with the ride (T-302). */
 export const suggestionAddress = (s: Pick<Suggestion, 'title' | 'subtitle'>): string =>
@@ -88,8 +97,9 @@ export const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 
 /**
  * Address field with Google Places suggestions (passenger-destination-search.md): field 48
- * high on `surfaceAlt`, suggestion rows min 64 with a 40 circle icon, one-line title and
- * subtitle, plus "No places found" and "Search isn't working" states. It searches only for
+ * high on `surfaceAlt`, suggestion rows min 64 on the kit's 40 tile (UI-R9b: rounded square,
+ * divider at the text start), one-line title (the typed match in 700) and subtitle, plus "No
+ * places found" and "Search isn't working" states. It searches only for
  * text the passenger typed, never for a prefilled value ("Current location", a ride's
  * address).
  *
@@ -209,6 +219,7 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
           id: r.place_id,
           title: r.structured_formatting?.main_text || r.description,
           subtitle: r.structured_formatting?.secondary_text || r.description,
+          matched: r.structured_formatting?.main_text ? r.structured_formatting.main_text_matched_substrings : undefined,
           icon: 'place',
           coords: { latitude: 0, longitude: 0 },
         }));
@@ -332,10 +343,8 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
       ) : null}
 
       {showNoResults ? (
-        <View testID="location-search-empty" accessibilityLiveRegion="polite" style={styles.suggestionItem}>
-          <View style={[styles.suggestionIcon, { backgroundColor: c.surfaceAlt }]}>
-            <Icon name="mapSearch" size={20} color="textSecondary" />
-          </View>
+        <View testID="location-search-empty" accessibilityLiveRegion="polite" style={suggestionRowStyles.row}>
+          <SuggestionTile icon="mapSearch" />
           <View style={styles.suggestionText}>
             <AppText variant="title" numberOfLines={1}>
               {BOOKING_COPY.noPlacesTitle}
@@ -350,30 +359,17 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
       {remote.length > 0 ? (
         <View style={styles.suggestionList}>
           {remote.map((s, idx) => (
-            <Pressable
+            <LocationSuggestionRow
               key={s.id}
               testID={`location-suggestion-${idx}`}
-              accessibilityRole="button"
+              title={s.title}
+              subtitle={s.subtitle}
+              matched={s.matched}
+              selecting={selectingId === s.id}
+              divider={idx < remote.length - 1 || showMapRow}
               accessibilityLabel={suggestionAddress(s)}
-              style={({ pressed }) => [styles.suggestionItem, pressed ? { backgroundColor: c.surfacePressed } : null]}
               onPress={() => pick(s)}
-            >
-              <View style={[styles.suggestionIcon, { backgroundColor: c.surfaceAlt }]}>
-                <Icon name="pinOutline" size={20} color="textSecondary" />
-              </View>
-              <View style={styles.suggestionText}>
-                <AppText variant="title" numberOfLines={1}>
-                  {s.title}
-                </AppText>
-                <AppText variant="bodySmall" color="textSecondary" numberOfLines={1}>
-                  {s.subtitle}
-                </AppText>
-              </View>
-              {selectingId === s.id ? <ActivityIndicator size="small" color={c.primaryText} /> : null}
-              {idx < remote.length - 1 || showMapRow ? (
-                <View style={[styles.divider, { backgroundColor: c.border, height: theme.borderWidth.hairline }]} />
-              ) : null}
-            </Pressable>
+            />
           ))}
         </View>
       ) : null}
@@ -384,11 +380,9 @@ const LocationSearch = forwardRef<LocationSearchHandle, Props>(function Location
           accessibilityRole="button"
           accessibilityLabel={BOOKING_COPY.setLocationOnMap}
           onPress={onChooseOnMap}
-          style={({ pressed }) => [styles.suggestionItem, pressed ? { backgroundColor: c.surfacePressed } : null]}
+          style={({ pressed }) => [suggestionRowStyles.row, pressed ? { backgroundColor: c.surfacePressed } : null]}
         >
-          <View style={[styles.suggestionIcon, { backgroundColor: c.primarySoft }]}>
-            <Icon name="pinRadius" size={20} color="primaryText" />
-          </View>
+          <SuggestionTile icon="pinRadius" tone="primary" />
           <AppText variant="title" color="primaryText" numberOfLines={1} style={styles.flex}>
             {BOOKING_COPY.setLocationOnMap}
           </AppText>
@@ -420,16 +414,7 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
   suggestionList: { marginTop: space[1] },
-  suggestionItem: {
-    minHeight: 64,
-    paddingVertical: space[2],
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  suggestionIcon: { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   suggestionText: { flex: 1, minWidth: 0 },
-  divider: { position: 'absolute', bottom: 0, start: 52, end: 0 },
 });
 
 export default LocationSearch;

@@ -494,6 +494,13 @@ export const en = {
     // UI-R9: the sheet's shortcuts and recent rides states.
     recentPlaceA11y: 'Recent place, {address}',
     addHomeA11y: 'Add your home address',
+    // UI-R9b: long press on a recent destination chip (passenger-home Interactions).
+    recentMoreA11y: 'More options',
+    recentSaveHome: 'Save as Home',
+    recentSaveWork: 'Save as Work',
+    recentSavePlace: 'Save place',
+    recentRemove: 'Remove from recents',
+    recentRemoved: 'Removed from recents',
     shortcutsLoadingA11y: 'Loading your places',
     ridesLoadingA11y: 'Loading your recent rides',
     ridesFailedTitle: "Couldn't load your recent rides",
@@ -1072,6 +1079,8 @@ export const en = {
     offerReset: 'Use recommended',
     offerOutOfBand: 'Your offer was outside the allowed range. It has been adjusted.',
     lockNote: 'Your fare is locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.',
+    // UI-R9b (UI-R10 polish): under the open breakdown; the FareTag above is the one lock note.
+    lockTerms: 'Locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.',
     policyWait: '{free} min free waiting at the pickup, then {rate} a minute.',
     policyCancel: 'Free to cancel for {minutes} min after a driver accepts, then {fee}.',
     fareLocked: 'Fare locked: {amount}',

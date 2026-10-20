@@ -251,4 +251,36 @@ describe('Saved place form', () => {
     expect(screen.queryByRole('radio', { name: /Other/ })).toBeNull();
     expect(screen.getByRole('radio', { name: /Home/ })).toBeTruthy();
   });
+
+  it('UI-R9b: a recent\'s "Save as Home" starts with its location (no search); Save posts it', async () => {
+    mockParams = { label: 'home', location: { address: 'Emporium Mall, Johar Town, Lahore', lat: 31.46, lng: 74.26, placeId: null } };
+    let body: Record<string, unknown> = {};
+    mock.onPost('/saved-places').reply((config) => {
+      body = JSON.parse(config.data);
+      return [201, writeBody(placeBody({ label: 'home', name: null }))];
+    });
+    await renderEditor();
+    expect(screen.queryByTestId('mock-search-pick')).toBeNull();
+    expect(screen.getByTestId('saved-place-location')).toHaveTextContent(/Emporium Mall, Johar Town, Lahore/);
+    fireEvent.press(screen.getByTestId('saved-place-save'));
+    await flush();
+    expect(body).toEqual({ label: 'home', address: 'Emporium Mall, Johar Town, Lahore', lat: 31.46, lng: 74.26 });
+  });
+
+  it('UI-R9b: "Save as Home" with a Home saved edits it with the new location (PUT moves it)', async () => {
+    mockParams = {
+      place: { id: 7, label: 'home', name: null, address: 'House 1, DHA', lat: 31.4, lng: 74.4, placeId: 'ChIJold', sortOrder: 0, updatedAt: null },
+      location: { address: 'Emporium Mall, Johar Town, Lahore', lat: 31.46, lng: 74.26, placeId: null },
+    };
+    let body: Record<string, unknown> = {};
+    mock.onPut('/saved-places/7').reply((config) => {
+      body = JSON.parse(config.data);
+      return [200, writeBody(placeBody({ label: 'home', name: null }))];
+    });
+    await renderEditor();
+    expect(screen.getByTestId('saved-place-location')).toHaveTextContent(/Emporium Mall/);
+    fireEvent.press(screen.getByTestId('saved-place-save'));
+    await flush();
+    expect(body).toEqual({ label: 'home', name: null, address: 'Emporium Mall, Johar Town, Lahore', lat: 31.46, lng: 74.26 });
+  });
 });

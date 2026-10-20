@@ -53,9 +53,18 @@ export const BOOKING_COPY = localizedCopy({
   searchFailed: "Search isn't working right now.",
   addStopOnMap: 'Choose stop on map',
   pinnedOnMap: 'Pinned on map',
-  mapPickHint: (target: 'pickup' | 'destination' | 'stop') =>
-    target === 'pickup' ? 'Tap the map to set your pickup' : target === 'destination' ? 'Tap the map to set your destination' : 'Tap the map to add a stop',
-  mapPickCancel: 'Cancel',
+  // UI-R9b: the full-screen centre-pin picker (passenger-destination-search block 5).
+  mapPickLabel: (target: 'pickup' | 'destination' | 'stop') =>
+    target === 'pickup' ? 'Pickup' : target === 'destination' ? 'Drop-off' : 'Stop',
+  mapPickConfirm: (target: 'pickup' | 'destination' | 'stop') =>
+    target === 'pickup' ? 'Confirm pickup' : target === 'destination' ? 'Confirm drop-off' : 'Add stop',
+  mapPickFindingA11y: 'Finding the address',
+  mapPickHint: 'Move the map to place the pin',
+  // UI-R9b: stops reorder (passenger-destination-search Interactions).
+  reorderStopA11y: (n: number) => `Reorder stop ${n}`,
+  reorderStopHint: 'Long press and drag to move',
+  moveStopUp: 'Move up',
+  moveStopDown: 'Move down',
   // T-315: the booking map's inline "no location" state (no blocking alerts).
   locationWaitTitle: 'Finding your location',
   locationWaitBody: 'Allow location access so drivers can find your pickup.',

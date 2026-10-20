@@ -60,9 +60,10 @@ export default function SavedPlaceEditorScreen() {
   const { theme } = useAppTheme();
 
   const [location, setLocation] = useState<PickedLocation | null>(
-    editing ? { address: editing.address, lat: editing.lat, lng: editing.lng, placeId: editing.placeId } : null,
+    params.location ??
+      (editing ? { address: editing.address, lat: editing.lat, lng: editing.lng, placeId: editing.placeId } : null),
   );
-  const [searching, setSearching] = useState(!editing);
+  const [searching, setSearching] = useState(!editing && !params.location);
   const [query, setQuery] = useState('');
   const [label, setLabel] = useState<SavedPlaceLabel>(() => initialLabel(params));
   const [name, setName] = useState(editing?.name ?? '');

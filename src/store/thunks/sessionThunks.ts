@@ -17,6 +17,8 @@ import { safetyApi } from '../../features/safety/api';
 import { isRecord, readId } from '../../core/api/read';
 import { resetOtpSendHold } from '../../features/auth/otpSendHold';
 import { clearLastVehicle } from '../../features/ride-booking/vehicleSelection';
+import { clearBookingDraft } from '../../features/ride-booking/bookingDraftStore';
+import { clearHiddenRecents } from '../../features/passenger-home/hiddenRecents';
 
 /** Injected by the store (thunk extraArgument) so this file never imports the store itself. */
 export interface SessionThunkExtra {
@@ -134,9 +136,13 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
       await step('clear cached notifications', () => AsyncStorage.removeItem(LEGACY_NOTIFICATIONS_CACHE_KEY));
       // UI-R10: the last requested tier is this user's, not the next one's.
       await step('clear last vehicle', () => clearLastVehicle());
+      // UI-R9b: recents removed on this phone are this user's choice.
+      await step('clear hidden recents', () => clearHiddenRecents());
     } finally {
       // T-570: the phone-code send hold (in memory) belongs to this user's sign-in.
       resetOtpSendHold();
+      // UI-R9b: the in-memory booking draft (a trip left on Back) is this user's.
+      clearBookingDraft();
       dispatch(resetApp());
       await step('purge persisted state', () => extra.purgePersistedState());
     }
