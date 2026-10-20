@@ -29,7 +29,7 @@
 
 ## Rulings (UI-R14 design review, 2026-10-19)
 These supersede the layout above where they differ.
-- **Icon tile:** 40×40 rounded square (radius `md`), glyph 24 (`listItem.tileIconSize`), not a circle. Tones follow DS §12.4: ride `infoSoft`/`info`, chat `primarySoft`/`onPrimarySoft`, wallet/payment `successSoft`/`success`, promo `accentSoft`/`accentStrong` (**[UI-R21]** the accent pair now exists; a promo is not a warning), system `surfaceAlt`/`textSecondary`.
+- **Icon tile:** 40×40 rounded square (radius `md`), glyph 24 (`listItem.tileIconSize`), not a circle. Tones follow DS §12.4: ride `infoSoft`/`info`, chat `primarySoft`/`onPrimarySoft`, wallet/payment `successSoft`/`success`, promo `accentSoft`/`accentStrong` (**[UI-R21]** the accent pair now exists; a promo is not a warning), system `surfaceAlt`/`textSecondary`. **[UI-R18]** A notification with `type: support` (category `system`) keeps the system tone but uses the `support` glyph (lifebuoy, as on Account › Help & support) so a support reply is recognisable in the list; tap → `SupportTicket { id: data.ticket_id }` (shared-support-invite §H5).
 - **Row anatomy:** ListItem §5.8 measurements: padding 16, tile → **16** gap → text (text starts at x=72 inside the card), dividers inset 72.
 - **Title:** up to 2 lines (tail ellipsis), time `caption` on the first line's baseline at the end; body 2 lines.
 - **Filters:** `All | Unread` (both roles) until category filtering is wanted; the category chips above are deferred.
