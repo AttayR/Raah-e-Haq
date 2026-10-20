@@ -56,6 +56,7 @@
 | F | **Footer** | one `lg primary`: "Submit rating" / "Rating bhejein" once a star is chosen (loading while sending; stars locked); otherwise "Done" / "Theek hai" (= skip; the ride keeps `can_rate`, Activity shows "Rate ride"). After a successful submit: Toast "Thanks for your feedback" / "Aap ki rai ka shukriya", then Home | 16 + 56 + 42 | — |
 
 - **Gaps around the reports (clarified 2026-10-20, UI-R12 design review):** the gap before the first report is the gap after the block above it (24 after the rating block 5/5', or 24 after Fare details when there is no rating block); 16 between reports; no extra space when the server offers no report (the last block then meets the footer's own 16 top padding).
+- **Cancelled without a fee (clarified 2026-10-20, UI-R12 design review r3):** no money card and no Fare details, so the status header is the block above the first following block (report row, parcel status list or receiver card): **16** from the header to it, the header's own gap after. Empty slots add nothing: neither the body's 24 nor the details' 24 applies when the peek group above is empty. Measured on 6cfe5c3: ~44 (`docs/design/shots/ui-r13-r2/19-pax-cancelled-no-fee-light.png`).
 - **iPhone 17 height:** 24 + 50 + 16 + 90 + 8 + 48 + 24 + 185 + footer 114 = **559** (64 %). After the reveal the sheet grows to the cap and scrolls; the focused comment field rides above the keyboard (§5.6 reveal; footer 8 above the keyboard).
 - **SE:** ≈ 533 of 667 (80 %); within the 88 % cap; the map shows the route above.
 
