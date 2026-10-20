@@ -62,6 +62,8 @@ export interface NearbyDriversState {
   failures?: number;
   /** The `vehicle_type` the shown list was read for; null for an unfiltered read. */
   listTier?: VehicleTypeKey | null;
+  /** BE-119 `meta.fine_epoch` of the shown list (matches a requested ride's `reach.epoch`); null when none. */
+  fineEpoch?: string | null;
 }
 
 export interface UseNearbyDriversOptions {
@@ -90,7 +92,7 @@ type Center = { latitude: number; longitude: number } | null | undefined;
 // ~110 m: GPS jitter must not refetch. Public positions are snapped to ~550 m anyway.
 const roundCoord = (value: number) => Math.round(value * 1000) / 1000;
 
-const INITIAL: NearbyDriversState = { drivers: [], status: 'idle', error: null, counts: null, freshAt: null, failures: 0, listTier: null };
+const INITIAL: NearbyDriversState = { drivers: [], status: 'idle', error: null, counts: null, freshAt: null, failures: 0, listTier: null, fineEpoch: null };
 
 // Module-level so remounting the map (or a second instance) cannot skip the 10 s floor.
 let nextAllowedAt = 0;
@@ -101,7 +103,16 @@ let nextAllowedAt = 0;
  * an extra `vehicle_type` read on focus.
  */
 let serverSendsTiers: boolean | null = null;
-let lastRead: { lat: number; lng: number; radiusKm?: number; vehicleType?: VehicleTypeKey; drivers: NearbyDriver[]; counts: NearbyCounts | null; at: number } | null = null;
+let lastRead: {
+  lat: number;
+  lng: number;
+  radiusKm?: number;
+  vehicleType?: VehicleTypeKey;
+  drivers: NearbyDriver[];
+  counts: NearbyCounts | null;
+  fineEpoch: string | null;
+  at: number;
+} | null = null;
 
 export const __resetNearbyDriversThrottleForTests = () => {
   nextAllowedAt = 0;
@@ -113,7 +124,16 @@ const seedFor = (lat: number, lng: number, radiusKm: number | undefined, vehicle
   if (!lastRead || Date.now() - lastRead.at > NEARBY_POLL_MS) return null;
   if (lastRead.radiusKm !== radiusKm || lastRead.vehicleType !== vehicleType) return null;
   if (Math.abs(lastRead.lat - lat) > SEED_MAX_DEGREES || Math.abs(lastRead.lng - lng) > SEED_MAX_DEGREES) return null;
-  return { drivers: lastRead.drivers, status: 'ready', error: null, counts: lastRead.counts, freshAt: lastRead.at, failures: 0, listTier: vehicleType ?? null };
+  return {
+    drivers: lastRead.drivers,
+    status: 'ready',
+    error: null,
+    counts: lastRead.counts,
+    freshAt: lastRead.at,
+    failures: 0,
+    listTier: vehicleType ?? null,
+    fineEpoch: lastRead.fineEpoch,
+  };
 };
 
 const useAppIsActive = (): boolean => {
@@ -182,15 +202,15 @@ export const useNearbyDrivers = (center: Center, options: UseNearbyDriversOption
       controller = new AbortController();
       setState(prev => (prev.status === 'ready' ? prev : { ...prev, status: 'loading' }));
       try {
-        const { drivers, counts } = await rideService.getNearbyDriversResult(
+        const { drivers, counts, fineEpoch = null } = await rideService.getNearbyDriversResult(
           { latitude: lat, longitude: lng, radiusKm, vehicleType },
           controller.signal,
         );
         if (cancelled) return;
         const at = Date.now();
-        lastRead = { lat, lng, radiusKm, vehicleType, drivers, counts, at };
+        lastRead = { lat, lng, radiusKm, vehicleType, drivers, counts, fineEpoch, at };
         serverSendsTiers = responseHasTiers(drivers, counts);
-        setState({ drivers, status: 'ready', error: null, counts, freshAt: at, failures: 0, listTier: vehicleType ?? null });
+        setState({ drivers, status: 'ready', error: null, counts, freshAt: at, failures: 0, listTier: vehicleType ?? null, fineEpoch });
         schedule(NEARBY_POLL_MS);
       } catch (error) {
         if (cancelled) return;

@@ -7,6 +7,7 @@ import { NearbyVehicleMarkers, type NearbyFreshness } from '../../nearby-vehicle
 import { useOverlapSpread } from '../../nearby-vehicles/useOverlapSpread';
 import type { DriverLocation, NearbyDriver } from '../../../services/rideService';
 import { AssignedDriverMarker } from '../../active-ride/components/ActiveRidePanel';
+import type { ReachMarks } from '../../active-ride/reach';
 import type { PassengerRideStage } from '../../active-ride/stage';
 import { BookingMapLayers } from './BookingMapLayers';
 import { MapPlaceholder } from './BookingNotices';
@@ -37,6 +38,8 @@ type Props = {
   nearbyFreshness?: NearbyFreshness;
   /** The tier the nearby list was read for (an AC / parcel read on an older server). */
   nearbyListTier?: string | null;
+  /** BE-119 Phase 2: the drawn markers the searched request reached (epoch-checked), else null. */
+  nearbyReachMarks?: ReachMarks | null;
   driverLocation: DriverLocation | null;
   vehicleType?: string | null;
   stage?: PassengerRideStage | null;
@@ -72,6 +75,7 @@ const BookingMapBase: React.FC<Props> = ({
   nearbyTier = null,
   nearbyFreshness = 'fresh',
   nearbyListTier = null,
+  nearbyReachMarks = null,
   driverLocation,
   vehicleType,
   stage,
@@ -102,6 +106,7 @@ const BookingMapBase: React.FC<Props> = ({
               freshness={nearbyFreshness}
               listTier={nearbyListTier}
               spreadMeters={spread.spreadMeters}
+              reachMarks={nearbyReachMarks}
             />
             <AssignedDriverMarker location={driverLocation} vehicleType={vehicleType} stage={stage} route={driverRoute} />
           </SafeMapView>

@@ -27,10 +27,10 @@ describe('reach model', () => {
   it('reads counts, clamps viewing to sent, and keeps hidden (women mode) counts as null', () => {
     expect(reachOf(searchingRide())).toBeNull();
     expect(reachOf(searchingRide('x'))).toBeNull();
-    expect(reachOf(searchingRide({ sent: 6, viewing: 2 }))).toEqual({ sent: 6, viewing: 2 });
-    expect(reachOf(searchingRide({ sent: '3', viewing: 9 }))).toEqual({ sent: 3, viewing: 3 });
-    expect(reachOf(searchingRide({ sent: null, viewing: null }))).toEqual({ sent: null, viewing: null });
-    expect(reachOf(searchingRide({ sent: 4 }))).toEqual({ sent: 4, viewing: 0 });
+    expect(reachOf(searchingRide({ sent: 6, viewing: 2 }))).toMatchObject({ sent: 6, viewing: 2 });
+    expect(reachOf(searchingRide({ sent: '3', viewing: 9 }))).toMatchObject({ sent: 3, viewing: 3 });
+    expect(reachOf(searchingRide({ sent: null, viewing: null }))).toEqual({ sent: null, viewing: null, sentIds: [], viewingIds: [], epoch: null });
+    expect(reachOf(searchingRide({ sent: 4 }))).toMatchObject({ sent: 4, viewing: 0 });
   });
 
   it('English copy per state', () => {
@@ -38,8 +38,8 @@ describe('reach model', () => {
     expect(reachContent({ sent: 0, viewing: 0 }).label).toBe('Sending to drivers nearby…');
     expect(reachContent({ sent: 1, viewing: 0 }).label).toBe('Sent to 1 driver');
     expect(reachContent({ sent: 8, viewing: 0 }).label).toBe('Sent to 8 drivers');
-    expect(reachContent({ sent: 8, viewing: 1 }).label).toBe('Sent to 8 drivers · 1 viewing');
-    expect(reachContent({ sent: 8, viewing: 3 }).label).toBe('Sent to 8 drivers · 3 viewing');
+    expect(reachContent({ sent: 8, viewing: 1 }).label).toBe('Sent to 8 drivers · 1 saw it');
+    expect(reachContent({ sent: 8, viewing: 3 }).label).toBe('Sent to 8 drivers · 3 saw it');
   });
 
   it('Roman Urdu copy per state', () => {
@@ -47,8 +47,8 @@ describe('reach model', () => {
     expect(reachContent({ sent: 0, viewing: 0 }).label).toBe('Qareeb drivers ko bhej rahe hain…');
     expect(reachContent({ sent: 1, viewing: 0 }).label).toBe('1 driver ko bheji gayi');
     expect(reachContent({ sent: 8, viewing: 0 }).label).toBe('8 drivers ko bheji gayi');
-    expect(reachContent({ sent: 8, viewing: 1 }).label).toBe('8 drivers ko bheji gayi · 1 dekh raha hai');
-    expect(reachContent({ sent: 8, viewing: 3 }).label).toBe('8 drivers ko bheji gayi · 3 dekh rahe hain');
+    expect(reachContent({ sent: 8, viewing: 1 }).label).toBe('8 drivers ko bheji gayi · 1 ne dekh li');
+    expect(reachContent({ sent: 8, viewing: 3 }).label).toBe('8 drivers ko bheji gayi · 3 ne dekh li');
   });
 });
 
@@ -65,7 +65,7 @@ describe('RequestReachStrip', () => {
     expect(screen.queryByTestId('request-reach-dot')).toBeNull();
     const viewed = searchingRide({ sent: 7, viewing: 2 }, { id: ride.id });
     rerender(<ActiveRidePanel stageState={state} ride={viewed} onCancel={jest.fn()} />);
-    expect(screen.getByTestId('request-reach').props.accessibilityLabel).toBe('Sent to 7 drivers · 2 viewing');
+    expect(screen.getByTestId('request-reach').props.accessibilityLabel).toBe('Sent to 7 drivers · 2 saw it');
     expect(screen.getByTestId('request-reach-dot')).toBeTruthy();
     expect(screen.getByTestId('request-reach-viewing-n')).toHaveTextContent('2');
   });
@@ -75,10 +75,10 @@ describe('RequestReachStrip', () => {
     expect(screen.queryByTestId('request-reach')).toBeNull();
     const ride = searchingRide({ sent: 5, viewing: 1 });
     rerender(<RequestReachStrip ride={ride} searching />);
-    expect(screen.getByTestId('request-reach').props.accessibilityLabel).toBe('Sent to 5 drivers · 1 viewing');
+    expect(screen.getByTestId('request-reach').props.accessibilityLabel).toBe('Sent to 5 drivers · 1 saw it');
     // The next reply has no reach (a failed read keeps the ride; an older reply shape): silent, kept.
     rerender(<RequestReachStrip ride={{ ...ride, reach: undefined }} searching />);
-    expect(screen.getByTestId('request-reach').props.accessibilityLabel).toBe('Sent to 5 drivers · 1 viewing');
+    expect(screen.getByTestId('request-reach').props.accessibilityLabel).toBe('Sent to 5 drivers · 1 saw it');
     // Re-queued after a driver cancel (T-546): a new round, the server's new counts only.
     rerender(<RequestReachStrip ride={{ ...ride, reach: undefined, requeue_count: 1 }} searching />);
     expect(screen.queryByTestId('request-reach')).toBeNull();
@@ -103,6 +103,6 @@ describe('RequestReachStrip', () => {
     rerender(<RequestReachStrip ride={{ ...ride, reach: { sent: 6, viewing: 0 } }} searching />);
     rerender(<RequestReachStrip ride={{ ...ride, reach: { sent: 6, viewing: 1 } }} searching />);
     rerender(<RequestReachStrip ride={{ ...ride, reach: { sent: 6, viewing: 2 } }} searching />);
-    expect(announce.mock.calls.map(c => c[0])).toEqual(['Your request was sent to 4 drivers.', '1 driver is viewing it.']);
+    expect(announce.mock.calls.map(c => c[0])).toEqual(['Your request was sent to 4 drivers.', '1 driver saw it.']);
   });
 });

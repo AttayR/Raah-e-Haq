@@ -41,6 +41,8 @@ export type NearbyFreshness = 'fresh' | 'stale' | 'gone';
 export interface NearbyFrame {
   /** Stable render key (survives the hourly id rotation). */
   key: string;
+  /** The marker's current public id (BE-119 reach marks name it). */
+  id: string;
   vehicleType: string | null;
   latitude: number;
   longitude: number;
@@ -380,6 +382,7 @@ export const advanceNearbyLayer = (layer: NearbyLayer, t: number, instant: boole
     if (layer.freshness === 'gone' && layerOpacity <= 0) continue;
     frames.push({
       key: track.key,
+      id: track.id,
       vehicleType: track.vehicleType,
       latitude: at.latitude,
       longitude: at.longitude,
@@ -397,6 +400,7 @@ export const advanceNearbyLayer = (layer: NearbyLayer, t: number, instant: boole
  */
 export const frameChanged = (prev: NearbyFrame | undefined, next: NearbyFrame): boolean =>
   !prev ||
+  prev.id !== next.id ||
   prev.vehicleType !== next.vehicleType ||
   Math.abs(prev.opacity - next.opacity) >= 0.01 ||
   Math.abs(prev.scale - next.scale) >= 0.005 ||

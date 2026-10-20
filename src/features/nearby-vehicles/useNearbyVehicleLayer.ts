@@ -24,6 +24,7 @@ export interface NearbyVehicleLayerOptions {
 
 /** Keeps the previous frame object when nothing visible changed, so memoised markers skip. */
 const sameExact = (a: NearbyFrame, b: NearbyFrame): boolean =>
+  a.id === b.id &&
   a.vehicleType === b.vehicleType &&
   a.latitude === b.latitude &&
   a.longitude === b.longitude &&

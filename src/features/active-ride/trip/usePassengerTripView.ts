@@ -7,6 +7,7 @@ import type { DriverLocation, RideResource } from '../../../services/rideService
 import { t } from '../../../i18n';
 import { CHAT_COPY } from '../../chat/copy';
 import { openRideChat, type RideChatNavigator } from '../../chat/navigation';
+import { rideChatUnread, unreadBadgeCount, withUnreadA11y } from '../../chat/rideUnread';
 import { ridePinOf } from '../../safety/rules';
 import { toOverchargeState } from '../../fare/api';
 import { isAcRide, toAcReportState } from '../../ac/api';
@@ -113,7 +114,10 @@ type ActionOptions = {
   share?: PersonAction | null;
 };
 
-/** Call · Message · Share (TS5): a missing one leaves the others sharing the width. */
+/**
+ * Call · Message · Share (TS5): a missing one leaves the others sharing the width. The Message
+ * badge is the ride read's BE-136 `chat.unread_count` (no `/chats` poll, TS11); none without it.
+ */
 export const usePassengerTripActions = (view: PassengerTripView, { onCall, calling = false, share = null }: ActionOptions): PersonAction[] => {
   // Context, not useNavigation (which throws outside a navigator): no navigator, no Message.
   const navigation: RideChatNavigator | undefined = useContext(NavigationContext);
@@ -121,6 +125,7 @@ export const usePassengerTripActions = (view: PassengerTripView, { onCall, calli
   const rideId = ride?.id ?? null;
   const driverName = driver?.name ?? null;
   const hasDriver = driver !== null;
+  const unread = rideChatUnread(ride);
   return useMemo(() => {
     const actions: PersonAction[] = [];
     if (!hasDriver) return actions;
@@ -140,12 +145,13 @@ export const usePassengerTripActions = (view: PassengerTripView, { onCall, calli
         key: 'message',
         icon: 'chat',
         label: CHAT_COPY.message,
-        accessibilityLabel: CHAT_COPY.messageA11y(driverName ?? ACTIVE_RIDE_COPY.driverFallbackName),
+        accessibilityLabel: withUnreadA11y(CHAT_COPY.messageA11y(driverName ?? ACTIVE_RIDE_COPY.driverFallbackName), unread),
+        badgeCount: unreadBadgeCount(unread),
         onPress: () => openRideChat(navigation, rideId, driverName),
         testID: 'ride-chat-button',
       });
     }
     if (share) actions.push(share);
     return actions;
-  }, [calling, driverName, hasDriver, navigation, onCall, rideId, share]);
+  }, [calling, driverName, hasDriver, navigation, onCall, rideId, share, unread]);
 };

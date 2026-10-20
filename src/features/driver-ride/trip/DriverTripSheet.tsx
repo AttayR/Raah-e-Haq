@@ -7,6 +7,7 @@ import type { RideResource } from '../../../services/rideService';
 import { t } from '../../../i18n';
 import type { RideRatingFields } from '../../rating/types';
 import { isParcelRide } from '../../parcel/api';
+import { rideChatUnread, unreadBadgeCount, withUnreadA11y } from '../../chat/rideUnread';
 import type { DriverParcelPanel } from '../../parcel/useDriverParcel';
 import { DRIVER_RIDE_COPY as COPY } from '../copy';
 import type { DriverRideAction } from '../slice';
@@ -57,9 +58,13 @@ export type DriverTripSheetProps = {
   active?: boolean;
 };
 
-/** Call · Message · Navigate (TS5): a missing one leaves the others sharing the width. */
+/**
+ * Call · Message · Navigate (TS5): a missing one leaves the others sharing the width. The Message
+ * badge is the ride read's BE-136 `chat.unread_count` (no `/chats` poll, TS11); none without it.
+ */
 const useDriverActions = (p: DriverTripSheetProps, parcelRide: boolean): PersonAction[] => {
   const { canCall, calling = false, onCall, onMessage, canNavigate, onNavigate, step } = p;
+  const unread = rideChatUnread(p.ride);
   return useMemo(() => {
     const actions: PersonAction[] = [];
     if (canCall) {
@@ -75,14 +80,22 @@ const useDriverActions = (p: DriverTripSheetProps, parcelRide: boolean): PersonA
       });
     }
     if (onMessage) {
-      actions.push({ key: 'message', icon: 'chat', label: COPY.message, accessibilityLabel: parcelRide ? COPY.messageA11yParcel : COPY.messageA11y, onPress: onMessage, testID: 'driver-ride-message' });
+      actions.push({
+        key: 'message',
+        icon: 'chat',
+        label: COPY.message,
+        accessibilityLabel: withUnreadA11y(parcelRide ? COPY.messageA11yParcel : COPY.messageA11y, unread),
+        badgeCount: unreadBadgeCount(unread),
+        onPress: onMessage,
+        testID: 'driver-ride-message',
+      });
     }
     if (canNavigate) {
       const pickup = step === 'to_pickup' || step === 'at_pickup';
       actions.push({ key: 'navigate', icon: 'navigate', label: COPY.navigate, accessibilityLabel: pickup ? COPY.navigatePickupA11y : COPY.navigateA11y, onPress: onNavigate, testID: 'driver-ride-navigate' });
     }
     return actions;
-  }, [calling, canCall, canNavigate, onCall, onMessage, onNavigate, parcelRide, step]);
+  }, [calling, canCall, canNavigate, onCall, onMessage, onNavigate, parcelRide, step, unread]);
 };
 
 /**

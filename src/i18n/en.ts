@@ -1707,12 +1707,13 @@ export const en = {
     sending: 'Sending to drivers nearby…',
     sentOne: 'Sent to {n} driver',
     sent: 'Sent to {n} drivers',
-    viewingOne: '{n} viewing',
-    viewing: '{n} viewing',
+    // BE-119: `viewing` counts drivers who opened the offer, declines included (past tense).
+    viewingOne: '{n} saw it',
+    viewing: '{n} saw it',
     announceSentOne: 'Your request was sent to 1 driver.',
     announceSent: 'Your request was sent to {n} drivers.',
-    announceViewingOne: '1 driver is viewing it.',
-    announceViewing: '{n} drivers are viewing it.',
+    announceViewingOne: '1 driver saw it.',
+    announceViewing: '{n} drivers saw it.',
   },
   /** UI-R18 Help & support (shared-support-invite.md §H), both roles. */
   support: {

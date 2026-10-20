@@ -222,6 +222,12 @@ export interface RideResource {
    * reach (null counts in women mode). Read through features/active-ride/reach, never by hand.
    */
   reach?: unknown;
+  /**
+   * BE-136, the ride's passenger and assigned driver only: unread messages from the other party
+   * in the current chat thread (0 with no driver or after the chat expired). Absent for admins
+   * and in the driver request feed. Read through features/chat/rideUnread, never by hand.
+   */
+  chat?: RideChatWire | null;
   /** BE-105, passenger only: `{can_report, report}` (read through features/women-mode/api). */
   safety_report?: unknown;
   /** BE-88: a parcel delivery (vehicle_type parcel). */
@@ -243,6 +249,11 @@ export interface NoShowPreviewWire {
   capped?: boolean;
   verified?: boolean;
   cancel_at?: string | null;
+}
+
+/** RideResource.chat as the server sends it (BE-136). */
+export interface RideChatWire {
+  unread_count?: number | string | null;
 }
 
 /** RideResource.contact as the server sends it (BE-78). */
@@ -415,6 +426,12 @@ export interface NearbyCounts {
 export interface NearbyDriversResult {
   drivers: NearbyDriver[];
   counts: NearbyCounts | null;
+  /**
+   * BE-119 `meta.fine_epoch`: names the fine-path answer this list is. A requested ride's
+   * `reach.sent_ids` / `viewing_ids` refer to these markers only while `reach.epoch` equals it.
+   * Null when absent (older server) or when the answer has no fine markers.
+   */
+  fineEpoch?: string | null;
 }
 
 export interface NearbyDriversQuery {
@@ -504,7 +521,8 @@ const normalizeNearbyResult = (body: ApiResponse<unknown>): NearbyDriversResult 
     counts = counts ?? normalizeNearbyCounts(inner.counts);
   }
   const drivers = Array.isArray(list) ? list.map(normalizeNearbyDriver).filter((d): d is NearbyDriver => d !== null) : [];
-  return { drivers, counts };
+  const epoch = meta?.fine_epoch;
+  return { drivers, counts, fineEpoch: typeof epoch === 'string' && epoch !== '' ? epoch : null };
 };
 
 /** BE-76 heading as 0..360, or null (missing, not a number, negative). */

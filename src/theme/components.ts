@@ -206,6 +206,13 @@ export const componentTokens = {
       shadowInnerOpacity: { light: 0.16, dark: 0.4 },
       haloFillOpacity: { light: 0.14, dark: 0.2 },
       haloRingOpacity: { light: 0.32, dark: 0.45 },
+      /**
+       * [BE-119] Finding a driver, Phase 2 (passenger-finding-driver.md): fine vehicles the
+       * request was not sent to draw at 0.45; a viewing driver gets a 2 pt `success` ring, 32 pt.
+       */
+      reachUnsentOpacity: 0.45,
+      reachRingSize: 32,
+      reachRingWidth: 2,
       zIndex: { nearby: 0, assigned: 4 },
     },
     /** [T-586] map count chip (map-vehicles.md §4): 32 min pill, 8 dot, 16 spinner. */

@@ -65,7 +65,7 @@ function ActionButton({ action }: { action: PersonAction }) {
         ) : null}
         {action.badgeCount ? (
           <View style={styles.badge}>
-            <Badge variant="count" count={action.badgeCount} />
+            <Badge variant="count" count={action.badgeCount} testID={action.testID ? `${action.testID}-badge` : undefined} />
           </View>
         ) : null}
       </View>
@@ -229,18 +229,31 @@ export function PersonCard({
           </View>
         ) : null}
         {inline
-          ? shownActions.map(action => (
-              <IconButton
-                key={action.key}
-                icon={action.icon}
-                variant="tonal"
-                size={p.inlineAction}
-                onPress={action.onPress}
-                disabled={!!action.disabled || !!action.busy}
-                accessibilityLabel={action.accessibilityLabel ?? action.label}
-                testID={action.testID}
-              />
-            ))
+          ? shownActions.map(action => {
+              const button = (
+                <IconButton
+                  key={action.key}
+                  icon={action.icon}
+                  variant="tonal"
+                  size={p.inlineAction}
+                  onPress={action.onPress}
+                  disabled={!!action.disabled || !!action.busy}
+                  accessibilityLabel={action.accessibilityLabel ?? action.label}
+                  testID={action.testID}
+                />
+              );
+              // The unread count sits on the button's top-end, as on the row layout (the label says it).
+              return action.badgeCount ? (
+                <View key={action.key}>
+                  {button}
+                  <View style={styles.inlineBadge} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                    <Badge variant="count" count={action.badgeCount} testID={action.testID ? `${action.testID}-badge` : undefined} />
+                  </View>
+                </View>
+              ) : (
+                button
+              );
+            })
           : null}
       </View>
       {!inline && shownActions.length > 0 ? (
@@ -295,6 +308,7 @@ const styles = StyleSheet.create({
     paddingVertical: space[1],
   },
   badge: { position: 'absolute', top: -space[1], end: -space[2] },
+  inlineBadge: { position: 'absolute', top: -space[1], end: -space[1] },
   glyph: { minWidth: p.glyph, minHeight: p.glyph, alignItems: 'center', justifyContent: 'center' },
   dot: {
     position: 'absolute',

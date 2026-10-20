@@ -317,6 +317,7 @@ const PassengerMapScreen = () => {
           nearbyTier={nearby.tier}
           nearbyFreshness={nearby.freshness}
           nearbyListTier={nearby.state.listTier}
+          nearbyReachMarks={nearby.reachMarks}
           driverLocation={driverLocation}
           vehicleType={currentRide?.vehicle_type}
           stage={rideStage?.stage}

@@ -1,8 +1,10 @@
+import { useMemo, useRef } from 'react';
 import type { LatLng } from 'react-native-maps';
 import { useIsOffline } from '../../components/ui/Banner';
 import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import type { NearbyDriver, RideResource } from '../../services/rideService';
 import { useNearbyFreshness } from '../nearby-vehicles';
+import { reachMarksFor, useRequestReach, type ReachMarks } from '../active-ride/reach';
 
 type Options = {
   /** The pickup, else the passenger. */
@@ -27,6 +29,35 @@ type Options = {
 
 export type BookingNearby = ReturnType<typeof useBookingNearby>;
 
+const ID_SEP = '\n';
+const splitIds = (key: string): string[] => (key === '' ? [] : key.split(ID_SEP));
+
+/**
+ * BE-119 marks for the drawn nearby answer, as one object per change of the ids (not per poll),
+ * so the memoised map and markers skip polls that change nothing.
+ *
+ * The server names ids only when the passenger's nearby read was under 30 s before the ride read
+ * (the nearby poll runs every 15 s, so most ride reads carry them). A ride read without matching
+ * ids keeps the last matching set while the same nearby answer is drawn (no ring flicker between
+ * polls); a new nearby answer, women mode (null counts), a new search round or the end of the
+ * search drops it.
+ */
+const useReachMarks = (ride: RideResource | null, searching: boolean, fineEpoch: string | null | undefined): ReachMarks | null => {
+  const reach = useRequestReach(ride, searching);
+  const held = useRef<{ round: string; epoch: string; marks: ReachMarks } | null>(null);
+  const round = ride ? `${ride.id}:${ride.requeue_count ?? 0}` : '';
+  let marks = searching ? reachMarksFor(reach, fineEpoch) : null;
+  if (marks && fineEpoch) held.current = { round, epoch: fineEpoch, marks };
+  else if (!searching || !reach || reach.sent === null || !fineEpoch) held.current = null;
+  else if (held.current && held.current.round === round && held.current.epoch === fineEpoch) marks = held.current.marks;
+  const sentKey = marks ? [...marks.sent].sort().join(ID_SEP) : null;
+  const viewingKey = marks ? [...marks.viewing].sort().join(ID_SEP) : null;
+  return useMemo(
+    () => (sentKey === null || viewingKey === null ? null : { sent: new Set(splitIds(sentKey)), viewing: new Set(splitIds(viewingKey)) }),
+    [sentKey, viewingKey],
+  );
+};
+
 /**
  * Nearby vehicles on the booking map (T-586, split out of PassengerMapScreen in the design
  * review): the BE-20 read for the tier on screen, its freshness, what the map draws and whether
@@ -38,6 +69,9 @@ export type BookingNearby = ReturnType<typeof useBookingNearby>;
  *   tier's vehicles stay under the pickup pulse, at the nearby poll pace (no extra request); the
  *   chip is hidden (the reach strip carries the numbers).
  * - A driver on the way and later: no nearby vehicles (only the assigned one).
+ * - BE-119 (Phase 2): while searching, `reachMarks` names the drawn markers the request was sent
+ *   to and those viewing it, only when the ride's `reach.epoch` is the drawn answer's
+ *   `meta.fine_epoch`. Read from the ride and nearby polls already running (no request).
  */
 export const useBookingNearby = ({ center, focused, ride, requesting, rideEnded, searching, choosing, selectedTier, chipShown }: Options) => {
   const tier = choosing ? selectedTier : searching ? (ride?.vehicle_type ?? selectedTier) : null;
@@ -49,11 +83,14 @@ export const useBookingNearby = ({ center, focused, ride, requesting, rideEnded,
   const freshness = useNearbyFreshness(state);
   const offline = useIsOffline();
   const drivers: NearbyDriver[] | null = !ride || searching ? state.drivers : null;
+  // Phase 2 (passenger-finding-driver.md): only while searching, only on the answer the ids name.
+  const reachMarks = useReachMarks(ride, searching, state.fineEpoch);
   return {
     state,
     freshness,
     tier,
     drivers,
+    reachMarks,
     chipShown,
     // The chip renders nothing while idle or offline.
     chipVisible: chipShown && !offline && state.status !== 'idle',

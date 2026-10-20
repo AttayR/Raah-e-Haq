@@ -1,9 +1,14 @@
 /**
  * Request reach on Finding a driver (T-587, passenger-finding-driver.md § Request reach, BE-116):
  * `reach: {sent, viewing}` inside the passenger's own `GET /rides/{id}` while the ride is
- * `requested`, read on the existing ride poll (no request of its own). Counts only: no driver
- * identity. Women-mode requests carry null counts. Pure, unit tested in
+ * `requested`, read on the existing ride poll (no request of its own). No driver identity.
+ * Women-mode requests carry null counts. Pure, unit tested in
  * `__tests__/features/activeRide/requestReach.test.tsx`.
+ *
+ * BE-119 (SEC-32, Phase 2 map rings): `sent_ids` / `viewing_ids` are public marker ids of the
+ * passenger's own latest nearby answer (fine markers only), valid only for the answer whose
+ * `meta.fine_epoch` equals `reach.epoch` (`reachMarksFor`). Women mode: no ids, null epoch.
+ * There is never a declined count or id (`viewing` also counts drivers who opened and declined).
  */
 import { useRef } from 'react';
 import { isRecord, readNumberOrNull } from '../../core/api/read';
@@ -13,8 +18,17 @@ import type { RideResource } from '../../services/rideService';
 export interface RequestReach {
   /** Drivers the request was shown to; null when the server hides the counts (women mode). */
   sent: number | null;
-  /** Drivers looking at it now, never above `sent`; null with `sent`. */
+  /**
+   * Drivers who opened the offer (BE-119: declines included, so it never drops), never above
+   * `sent`; null with `sent`.
+   */
   viewing: number | null;
+  /** BE-119: fine nearby marker ids the request was sent to (empty in women mode or on an older server). */
+  sentIds: string[];
+  /** BE-119: fine nearby marker ids whose driver opened the offer (declined included). */
+  viewingIds: string[];
+  /** BE-119: the nearby answer (`meta.fine_epoch`) the ids belong to; null when none. */
+  epoch: string | null;
 }
 
 const count = (value: unknown): number | null => {
@@ -22,15 +36,46 @@ const count = (value: unknown): number | null => {
   return n !== null && n >= 0 ? Math.floor(n) : null;
 };
 
+const MAX_IDS = 50;
+
+const ids = (value: unknown): string[] =>
+  Array.isArray(value) ? [...new Set(value.filter((v): v is string => typeof v === 'string' && v !== ''))].slice(0, MAX_IDS) : [];
+
 /** The ride's `reach`, or null when it carries none (an older server, or not `requested`). */
 export const reachOf = (ride: RideResource | null | undefined): RequestReach | null => {
   const raw = ride?.reach;
   if (!isRecord(raw)) return null;
   const sent = count(raw.sent);
-  if (sent === null) return { sent: null, viewing: null };
+  // Women mode (null counts): no ids and no epoch, whatever else the body carries.
+  if (sent === null) return { sent: null, viewing: null, sentIds: [], viewingIds: [], epoch: null };
   const viewing = count(raw.viewing);
-  // A race may return more viewing than sent: never show it above `sent`.
-  return { sent, viewing: viewing === null ? 0 : Math.min(viewing, sent) };
+  const epoch = typeof raw.epoch === 'string' && raw.epoch !== '' ? raw.epoch : null;
+  return {
+    sent,
+    // A race may return more viewing than sent: never show it above `sent`.
+    viewing: viewing === null ? 0 : Math.min(viewing, sent),
+    sentIds: epoch ? ids(raw.sent_ids) : [],
+    viewingIds: epoch ? ids(raw.viewing_ids) : [],
+    epoch,
+  };
+};
+
+/** Which drawn nearby markers the request reached (BE-119), by public marker id. */
+export interface ReachMarks {
+  sent: ReadonlySet<string>;
+  viewing: ReadonlySet<string>;
+}
+
+/**
+ * The marks to draw on the nearby answer whose `meta.fine_epoch` is `fineEpoch`, or null (draw
+ * nothing): no reach, women mode, no ids, or the ids belong to another answer than the one drawn
+ * (a newer or older nearby read). Pure.
+ */
+export const reachMarksFor = (reach: RequestReach | null, fineEpoch: string | null | undefined): ReachMarks | null => {
+  if (!reach || reach.sent === null || !reach.epoch || !fineEpoch || reach.epoch !== fineEpoch) return null;
+  if (reach.sentIds.length === 0 && reach.viewingIds.length === 0) return null;
+  // A viewing driver was sent the request, even if a race left it out of `sent_ids`.
+  return { sent: new Set([...reach.sentIds, ...reach.viewingIds]), viewing: new Set(reach.viewingIds) };
 };
 
 /** A template split round its `{n}`, so the number can crossfade on its own. */
@@ -52,14 +97,14 @@ export interface ReachContent {
   /** "Sending to drivers nearby…" when nothing was sent yet (or the counts are hidden). */
   sending: string | null;
   sent: CountText | null;
-  /** Only while someone is viewing. */
+  /** Only once a driver opened the offer. */
   viewing: CountText | null;
   /** The visible text (the strip's accessibility label). */
   label: string;
 }
 
 /** What the strip says for `reach`, in the active language (read at render). */
-export const reachContent = (reach: RequestReach): ReachContent => {
+export const reachContent = (reach: Pick<RequestReach, 'sent' | 'viewing'>): ReachContent => {
   if (reach.sent === null || reach.sent === 0) {
     const sending = t('rideReach.sending');
     return { sending, sent: null, viewing: null, label: sending };

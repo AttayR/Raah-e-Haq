@@ -191,7 +191,7 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
 
     mock.onGet('/rides/nearby-drivers').replyOnce(200, envelope({ drivers: [nearby], counts: { online_total: 3 } }));
     const second = await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 });
-    expect(second).toEqual({ drivers: [nearby], counts: { byTier: {}, onlineTotal: 3 } });
+    expect(second).toEqual({ drivers: [nearby], counts: { byTier: {}, onlineTotal: 3 }, fineEpoch: null });
 
     mock.onGet('/rides/nearby-drivers').replyOnce(200, envelope([nearby]));
     expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).counts).toBeNull();
@@ -219,6 +219,17 @@ describe('nearby drivers and driver location on the BE-20 contract (T-110)', () 
     expect(drivers.every(d => !('rating' in d))).toBe(true);
     // Zoned drivers are counted but not drawn: the counts are the server's, not the list length.
     expect(counts).toEqual({ byTier: { car: 9 }, onlineTotal: 11 });
+  });
+
+  it('BE-119: reads meta.fine_epoch (a non-empty string), else null', async () => {
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, { ...envelope([nearby]), meta: { fine_epoch: 'ep-7' } });
+    expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).fineEpoch).toBe('ep-7');
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, { ...envelope([nearby]), meta: { fine_epoch: null } });
+    expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).fineEpoch).toBeNull();
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, { ...envelope([nearby]), meta: { fine_epoch: 42 } });
+    expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).fineEpoch).toBeNull();
+    mock.onGet('/rides/nearby-drivers').replyOnce(200, envelope([nearby]));
+    expect((await rideService.getNearbyDriversResult({ latitude: 31.5, longitude: 74.3 })).fineEpoch).toBeNull();
   });
 
   it('clamps the radius to 1..10 km and defaults to 5', async () => {

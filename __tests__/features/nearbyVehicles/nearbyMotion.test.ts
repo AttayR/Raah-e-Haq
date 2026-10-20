@@ -259,7 +259,7 @@ describe('reduced motion (§2.6)', () => {
 
 describe('frame budget (§2.7)', () => {
   it('a frame that moves < 0.5 m, turns < 1° and fades < 1 % is not a visible change', () => {
-    const base: NearbyFrame = { key: 'a', vehicleType: 'car', ...at(0), rotation: 10, opacity: 1, scale: 1 };
+    const base: NearbyFrame = { key: 'a', id: 'a', vehicleType: 'car', ...at(0), rotation: 10, opacity: 1, scale: 1 };
     expect(frameChanged(base, { ...base, ...at(0.3), rotation: 10.5, opacity: 0.995 })).toBe(false);
     expect(frameChanged(base, { ...base, ...at(0.6) })).toBe(true);
     expect(frameChanged(base, { ...base, rotation: 11.2 })).toBe(true);
