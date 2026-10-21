@@ -211,6 +211,7 @@ export function ReceiptHelp({ ride }: { ride: RideResource | null }) {
         size="sm"
         leadingIcon="support"
         fullWidth={false}
+        flushStart
         onPress={() => navigation.navigate('SupportNewRequest', { trip })}
         testID="receipt-help"
       />
@@ -262,5 +263,6 @@ const styles = StyleSheet.create({
   moneyText: { flex: 1, minWidth: 0, gap: k.titleGap },
   detailsRow: { flexDirection: 'row', alignItems: 'center', minHeight: k.detailsRowHeight, gap: space[2] },
   flipped: { transform: [{ rotate: '180deg' }] },
-  help: { alignItems: 'center' },
+  // UI-R19 review: the hugging ghost's glyph on the 16 gutter (flushStart), never centred.
+  help: { alignItems: 'flex-start' },
 });

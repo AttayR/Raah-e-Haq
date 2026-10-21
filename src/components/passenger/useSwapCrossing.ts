@@ -11,16 +11,23 @@ const HALF = { duration: motion.base.duration / 2, easing: motion.base.easing };
 /**
  * The pickup and destination rows' offset at crossing progress `p` (0 → 1): each row travels
  * toward the other one and fades out by the middle, where the values swap; the swapped texts then
- * arrive from the other row's place and fade in. `distance` is the gap between the rows' tops.
+ * arrive from the other row's place and fade in. `distance` is the gap between the rows' tops, so
+ * each text travels the whole way from its row to the other one over the 250 ms.
  */
 export const crossingOffset = (p: number, distance: number): number => {
   'worklet';
   return (p <= 0.5 ? p : 1 - p) * distance;
 };
 
+/**
+ * UI-R9b review (the rows barely seemed to travel): a row stays opaque for the first two thirds
+ * of its way to the middle, so the two rows are seen sliding over each other, and only fades in
+ * the last third, where the values swap (transparent at the middle itself).
+ */
+export const CROSSING_FADE_GAIN = 3;
 export const crossingOpacity = (p: number): number => {
   'worklet';
-  return Math.abs(1 - 2 * p);
+  return Math.min(1, Math.abs(1 - 2 * p) * CROSSING_FADE_GAIN);
 };
 
 type SwapCrossing = {

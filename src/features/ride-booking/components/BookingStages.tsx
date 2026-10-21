@@ -4,7 +4,7 @@ import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Banner, Button, Icon, ListGroup, ListItem, OfflineBanner, useIsOffline } from '../../../components/ui';
 import { t } from '../../../i18n';
 import { KeyboardRevealGroup } from '../../../components/ui/keyboardReveal';
-import { StopRow, StopSearch } from '../../../components/passenger/StopsEditor';
+import { StopRow, StopSearch, stopTextStart } from '../../../components/passenger/StopsEditor';
 import { componentTokens, radius, space } from '../../../theme';
 import { BOOKING_COPY } from '../copy';
 import { ChooseOnMapButton } from './MapPick';
@@ -96,12 +96,14 @@ export const StopsSection: React.FC<StopsSectionProps> = ({ stops, onAddStop, on
       onRemove={onRemoveStop}
       onMove={onMoveStop}
       onDragChange={lockScroll}
+      // UI-R9b review ruling: the divider under a stop row starts at its own text.
+      dividerInset={stopTextStart(!!onMoveStop && stops.length > 1)}
     />
   ));
   return (
     <KeyboardRevealGroup style={styles.stops} testID="booking-stops-section">
       {rows.length > 0 || (!searching && canAdd) ? (
-        <ListGroup inset="tile" testID="booking-stops-group">
+        <ListGroup testID="booking-stops-group">
           {rows}
           {!searching && canAdd ? (
             <ListItem

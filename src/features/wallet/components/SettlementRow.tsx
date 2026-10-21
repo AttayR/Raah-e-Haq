@@ -64,6 +64,8 @@ export function SettlementRow({ settlement, onCancel, cancelling = false }: Prop
           variant="ghost"
           size="sm"
           fullWidth={false}
+          // UI-R19 review: under the row's text, its label starts at the text start.
+          flushStart
           loading={cancelling}
           onPress={() => onCancel(settlement)}
           accessibilityLabel={`${WALLET_COPY.cancelRequest} ${formatMoney(settlement.amount, { currency: settlement.currency })}`}

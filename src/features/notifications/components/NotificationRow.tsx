@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View, type AccessibilityActionEvent } from 'reac
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Icon } from '../../../components/ui';
 import { componentTokens, layout, radius, space } from '../../../theme';
-import { formatTime } from '../../../utils/format';
+import { formatTime, keepMoneyTogether } from '../../../utils/format';
 import { NOTIFICATIONS_COPY } from '../copy';
 import { notificationTone } from '../format';
 import { SUPPORT_TYPE } from '../routing';
@@ -40,6 +40,9 @@ function NotificationRowBase({ item, onPress, onMarkRead, position = 'only' }: N
   const unread = item.readAt === null;
   const tone = notificationTone(item.category);
   const time = formatTime(item.createdAt);
+  // UI-R19 review: the server's "Rs 150" never wraps between "Rs" and the amount.
+  const title = keepMoneyTogether(item.title);
+  const body = item.body ? keepMoneyTogether(item.body) : '';
   const label = [unread ? NOTIFICATIONS_COPY.unreadA11y : null, item.title, item.body, time]
     .filter(Boolean)
     .join(', ');
@@ -82,7 +85,7 @@ function NotificationRowBase({ item, onPress, onMarkRead, position = 'only' }: N
       <View style={styles.text}>
         <View style={styles.titleRow}>
           <AppText variant={unread ? 'title' : 'body'} numberOfLines={2} style={styles.title}>
-            {item.title}
+            {title}
           </AppText>
           {time ? (
             <AppText variant="caption" color="textMuted" numberOfLines={1}>
@@ -90,9 +93,9 @@ function NotificationRowBase({ item, onPress, onMarkRead, position = 'only' }: N
             </AppText>
           ) : null}
         </View>
-        {item.body ? (
+        {body ? (
           <AppText variant="bodySmall" color="textSecondary" numberOfLines={2}>
-            {item.body}
+            {body}
           </AppText>
         ) : null}
       </View>

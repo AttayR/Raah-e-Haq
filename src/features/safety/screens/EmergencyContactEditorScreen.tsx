@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
-import { AppText, Button, ErrorState, Header, Screen, SkeletonList, TextField } from '../../../components/ui';
+import { useAppTheme } from '../../../app/providers/ThemeProvider';
+import { AppText, Button, ErrorState, Header, Screen, SkeletonList, TextField, useStickyFooterBottom } from '../../../components/ui';
 import { MAX_EMERGENCY_CONTACTS } from '../../../config/safety';
 import { toast } from '../../../core/toast';
 import { t, type TranslationKey } from '../../../i18n';
@@ -34,7 +35,8 @@ const fieldText = (error: ContactFieldError | null): string | null => (error ? t
  * route; the contact itself is read from GET /me/emergency-contacts (no PII in navigation
  * state). Both fields are checked here first; the server's 422 field errors (duplicate, own
  * number) show under the field, the cap (EMERGENCY_CONTACTS_LIMIT) as one line. Saving POSTs a
- * new contact or PUTs the edit.
+ * new contact or PUTs the edit. UI-R19 review: Form archetype, so "Save" sits in the sticky
+ * footer (hairline, `stickyFooterBottom`, above the keyboard), as on the Saved place editor.
  */
 export default function EmergencyContactEditorScreen() {
   const navigation = useNavigation<EmergencyContactsNavigator>();
@@ -86,6 +88,8 @@ function ContactForm({ editing, max, onSaved }: { editing: EmergencyContact | nu
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
+  const { theme } = useAppTheme();
+  const footerBottom = useStickyFooterBottom();
 
   const onSave = async () => {
     if (inFlight.current) return;
@@ -113,54 +117,70 @@ function ContactForm({ editing, max, onSaved }: { editing: EmergencyContact | nu
   };
 
   return (
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-      showsVerticalScrollIndicator={false}
-    >
-      <TextField
-        label={t('safety.contactName')}
-        placeholder={t('safety.contactNamePlaceholder')}
-        value={name}
-        onChangeText={text => {
-          setName(text);
-          setNameError(null);
-        }}
-        maxLength={CONTACT_NAME_MAX}
-        autoCapitalize="words"
-        autoComplete="name"
-        textContentType="name"
-        returnKeyType="next"
-        error={nameError}
-        testID="emergency-contact-name"
-      />
-      <TextField
-        variant="phone"
-        label={t('safety.contactPhone')}
-        helper={t('safety.contactPhoneHelper')}
-        value={digits}
-        onChangeText={text => {
-          setDigits(text);
-          setPhoneError(null);
-        }}
-        error={phoneError}
-        testID="emergency-contact-phone"
-      />
-      {formError ? (
-        <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID="emergency-contact-error">
-          {formError}
-        </AppText>
-      ) : null}
-      <Button
-        label={t('safety.contactSave')}
-        onPress={onSave}
-        loading={saving}
-        haptic="impactLight"
-        testID="emergency-contact-save"
-      />
-    </ScrollView>
+    <>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        showsVerticalScrollIndicator={false}
+      >
+        <TextField
+          label={t('safety.contactName')}
+          placeholder={t('safety.contactNamePlaceholder')}
+          value={name}
+          onChangeText={text => {
+            setName(text);
+            setNameError(null);
+          }}
+          maxLength={CONTACT_NAME_MAX}
+          autoCapitalize="words"
+          autoComplete="name"
+          textContentType="name"
+          returnKeyType="next"
+          error={nameError}
+          testID="emergency-contact-name"
+        />
+        <TextField
+          variant="phone"
+          label={t('safety.contactPhone')}
+          helper={t('safety.contactPhoneHelper')}
+          value={digits}
+          onChangeText={text => {
+            setDigits(text);
+            setPhoneError(null);
+          }}
+          error={phoneError}
+          testID="emergency-contact-phone"
+        />
+        {formError ? (
+          <AppText variant="bodySmall" color="danger" accessibilityRole="alert" testID="emergency-contact-error">
+            {formError}
+          </AppText>
+        ) : null}
+      </ScrollView>
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: footerBottom,
+            borderTopColor: theme.colors.border,
+            borderTopWidth: theme.borderWidth.hairline,
+            backgroundColor: theme.colors.background,
+          },
+        ]}
+        testID="emergency-contact-footer"
+      >
+        <Button
+          label={t('safety.contactSave')}
+          size="lg"
+          onPress={onSave}
+          loading={saving}
+          haptic="impactLight"
+          testID="emergency-contact-save"
+        />
+      </View>
+    </>
   );
 }
 
@@ -172,7 +192,14 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: layout.gutter,
     paddingTop: space[3],
-    paddingBottom: space[8],
+    paddingBottom: space[6],
     gap: space[5],
+  },
+  footer: {
+    width: '100%',
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal: layout.gutter,
+    paddingTop: space[2],
   },
 });

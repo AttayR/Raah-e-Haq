@@ -814,7 +814,7 @@ export const urLatn: TranslationTable = {
     offerValueA11y: 'Aap ki offer: {amount}',
     offerReset: 'Tajweez karda fare rakhein',
     offerOutOfBand: 'Aap ki offer ijazat wali had se bahar thi. Ise theek kar diya gaya hai.',
-    lockTerms: 'Driver ke accept karte hi lock. Driver ko cash dein; mazeed stops ya intezar se fare barh sakta hai.',
+    lockTerms: 'Driver ke accept karte hi fare fix ho jata hai. Driver ko cash dein. Mazeed stops ya intezar se fare barh sakta hai.',
     policyWait: 'Pickup par {free} min muft intezar, phir {rate} fi minute.',
     policyCancel: 'Driver ke accept karne ke {minutes} min tak cancel muft, phir {fee}.',
     fareLocked: 'Fare lock: {amount}',

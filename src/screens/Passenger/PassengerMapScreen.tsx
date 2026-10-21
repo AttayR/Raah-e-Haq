@@ -54,7 +54,7 @@ import { useBookingDraft, useBookingHardwareBack, useDiscardOnLeave, useKeepBook
 import { useGuardedBookingActions } from '../../features/ride-booking/useBookingLeaveGuard';
 import { useScreenToast } from '../../core/toast';
 import { IndeterminateBar, StatusBarScrim } from '../../components/ui';
-import { useSharedValue } from 'react-native-reanimated';
+import { useBookingSheetHeight } from '../../features/ride-booking/useBookingSheetHeight';
 
 /** iPhone SE class height (667 pt): the capped sheets get a little more room (56 %, spec). */
 const SHORT_WINDOW_HEIGHT = 700;
@@ -107,17 +107,8 @@ const PassengerMapScreen = () => {
   // While a search field is focused the sheet drops its extras so suggestions get the room; a
   // pick, Back (a new step) or the keyboard closing leaves that mode (T-553).
   const [searchFocused, setSearchFocused] = useSearchFocus(rideShown ? 'ride' : stage);
-  // T-314: what covers the map, so recentring and fitting keep points above the sheet.
-  const [sheetHeight, setSheetHeightState] = useState(0);
-  // The map's end-side control rides 16 above the sheet (kit MapControls, UI-R10).
-  const sheetHeightValue = useSharedValue(0);
-  const setSheetHeight = useCallback(
-    (h: number) => {
-      sheetHeightValue.value = h;
-      setSheetHeightState(h);
-    },
-    [sheetHeightValue],
-  );
+  // T-314 / UI-R10: the sheet's height (state and UI thread); its layout also drives the arrival.
+  const { sheetHeight, sheetHeightValue, setSheetHeight, setSheetHeightState, onBookingSheetHeight } = useBookingSheetHeight(arrival.onSheetLayout);
   const [mapHeight, setMapHeight] = useState(0);
   // UI-R10 polish: the sheet at its cap under the map controls hides the locate control.
   const [sheetFull, setSheetFull] = useState(false);
@@ -355,7 +346,7 @@ const PassengerMapScreen = () => {
           />
         ) : (
         <BookingSheet
-          onHeightChange={setSheetHeight}
+          onHeightChange={onBookingSheetHeight}
           onFullChange={setSheetFull}
           hidden={picker.target !== null}
           maxHeightRatio={sheetRatio}

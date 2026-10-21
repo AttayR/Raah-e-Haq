@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, Avatar, Badge, type AvatarSize } from '../../../components/ui';
 import { componentTokens, layout, radius, space, textStyles } from '../../../theme';
+import { keepMoneyTogether } from '../../../utils/format';
 import { CHAT_COPY, fallbackNameOf, formatChatListTime } from '../copy';
 import type { ChatSummary } from '../types';
 
@@ -20,11 +21,14 @@ const CURRENT_STATUSES = ['accepted', 'arrived', 'started', 'ongoing'];
 export const isCurrentChat = (chat: Pick<ChatSummary, 'rideStatus'>): boolean =>
   CURRENT_STATUSES.includes(chat.rideStatus);
 
-/** The one-line preview: "You: …" on your own last message; newlines folded so rows keep height. */
+/**
+ * The one-line preview: "You: …" on your own last message; newlines folded so rows keep height.
+ * UI-R19 review: "Rs 150" keeps its no-break space (joined after the fold, which would undo it).
+ */
 export const chatPreviewOf = (chat: ChatSummary): string => {
   const last = chat.lastMessage;
   if (!last) return CHAT_COPY.noMessagesYet;
-  const text = last.body.replace(/\s+/g, ' ').trim();
+  const text = keepMoneyTogether(last.body.replace(/\s+/g, ' ').trim());
   return last.isMine ? CHAT_COPY.youPrefix(text) : text;
 };
 

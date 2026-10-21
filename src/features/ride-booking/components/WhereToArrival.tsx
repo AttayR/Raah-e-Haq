@@ -9,10 +9,14 @@ import { WhereToFace, whereToBarStyles } from '../../passenger-home/components/W
 import type { MapPicker } from '../useMapPicker';
 import { MapPickOverlay } from './MapPick';
 
-/** The planner settles (keyboard up, sheet moved) within this long; the move starts then at the latest. */
-export const ARRIVAL_SETTLE_MS = 250;
-/** After the keyboard event, one more beat for the sheet's re-layout above it. */
-const AFTER_KEYBOARD_MS = 50;
+/**
+ * UI-R9b review: the destination field is focused on open, but the keyboard only comes up once
+ * the push has ended (~400 ms). The move waits for it this long; without a keyboard (a hardware
+ * keyboard) it starts then, over the sheet as it stands.
+ */
+export const ARRIVAL_SETTLE_MS = 600;
+/** After the keyboard event, the sheet's re-layout above it is awaited this long at most. */
+export const AFTER_KEYBOARD_MS = 120;
 /** A measure that never answers (a view gone meanwhile) shows the field after this long. */
 const MEASURE_TIMEOUT_MS = 150;
 
@@ -28,13 +32,21 @@ export type WhereToArrival = {
   layerRef: React.RefObject<View | null>;
   rect: { top: SharedValue<number>; left: SharedValue<number>; width: SharedValue<number>; height: SharedValue<number> };
   ghostOpacity: SharedValue<number>;
+  /**
+   * Call on every layout of the planner sheet. After the keyboard event the first one means the
+   * sheet has taken its keyboard height: the field is measured then, at its final place.
+   */
+  onSheetLayout: () => void;
 };
 
 /**
  * UI-R9b, passenger-home Interactions: "Where to?" has a shared-element feel. Booking (pushed with
  * a 250 ms fade) draws a copy of the Home bar where the bar was (`fromTop`, its window y) and moves
  * it, in `motion.base` on the UI thread, onto the planner's destination field once the planner has
- * settled (the keyboard is up, or 250 ms); the copy then fades out over the field, which appears.
+ * settled; the copy then fades out over the field, which appears. UI-R9b review: "settled" is the
+ * sheet's first layout after the keyboard event (it rises by the keyboard's height then), so the
+ * field is measured at its final place and the copy makes one 250 ms move, never a second one
+ * with the sheet (`ARRIVAL_SETTLE_MS` without a keyboard, `AFTER_KEYBOARD_MS` without a layout).
  * Without a start, with Reduce Motion, or when the field cannot be measured, nothing moves and
  * the field shows at once.
  */
@@ -113,6 +125,14 @@ export function useWhereToArrival(fromTop: number | null): WhereToArrival {
     });
   }, [finish, reveal, top, left, width, height, fieldOpacity, ghostOpacity]);
 
+  // Set by the keyboard event: the sheet's next layout starts the move.
+  const awaitingLayout = useRef(false);
+  const onSheetLayout = useCallback(() => {
+    if (!awaitingLayout.current) return;
+    awaitingLayout.current = false;
+    run();
+  }, [run]);
+
   useEffect(() => {
     if (fromTop === null || !active) return undefined;
     if (reduced) {
@@ -123,18 +143,20 @@ export function useWhereToArrival(fromTop: number | null): WhereToArrival {
     const event = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const sub = Keyboard.addListener(event, () => {
       if (timer) clearTimeout(timer);
+      awaitingLayout.current = true;
       timer = setTimeout(run, AFTER_KEYBOARD_MS);
     });
     return () => {
       if (timer) clearTimeout(timer);
       timer = null;
+      awaitingLayout.current = false;
       sub.remove();
     };
     // `run` starts the move once per open (`started`); later renders never restart it.
   }, [fromTop, active, reduced, run, reveal]);
 
   const fieldStyle = useAnimatedStyle(() => ({ opacity: fieldOpacity.value }));
-  return { active, fieldRef, fieldStyle, layerRef, rect: { top, left, width, height }, ghostOpacity };
+  return { active, fieldRef, fieldStyle, layerRef, rect: { top, left, width, height }, ghostOpacity, onSheetLayout };
 }
 
 /** The moving copy of the Home bar (decorative; the field it lands on is the control). */

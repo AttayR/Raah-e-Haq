@@ -1084,7 +1084,7 @@ export const en = {
     offerReset: 'Use recommended',
     offerOutOfBand: 'Your offer was outside the allowed range. It has been adjusted.',
     // UI-R9b (UI-R10 polish): under the open breakdown; the FareTag above is the one lock note.
-    lockTerms: 'Locked when a driver accepts. Pay cash to your driver; added stops or waiting can add to it.',
+    lockTerms: 'Your fare is fixed once a driver accepts. Pay your driver in cash. Extra stops or waiting time can raise it.',
     policyWait: '{free} min free waiting at the pickup, then {rate} a minute.',
     policyCancel: 'Free to cancel for {minutes} min after a driver accepts, then {fee}.',
     fareLocked: 'Fare locked: {amount}',

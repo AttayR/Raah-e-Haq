@@ -41,6 +41,16 @@ export const MINUS = '\u2212';
  */
 export const NBSP = '\u00A0';
 
+/** `Rs` (or `Rs.` / `PKR`) as a word, then ordinary spaces or tabs, then a digit. */
+const MONEY_GAP = /\b(Rs\.?|PKR)[ \t]+(?=\d)/g;
+
+/**
+ * [UI-R19 review] Text written by the server (notification titles and bodies, chat previews)
+ * spells money as "Rs 150" with an ordinary space, which can wrap as "Rs\u23CE150". This joins the
+ * label and the amount with the same no-break space `formatMoney` uses. Nothing else changes.
+ */
+export const keepMoneyTogether = (text: string): string => text.replace(MONEY_GAP, `$1${NBSP}`);
+
 /** Absolute amount as `Rs 1,250` / `Rs 412.50` (no-break space), plus whether it rounds to non-zero. */
 const unsignedMoney = (n: number, currency?: string | null): { text: string; nonZero: boolean } => {
   const cents = Math.round(Math.abs(n) * 100);

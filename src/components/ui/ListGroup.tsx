@@ -25,14 +25,24 @@ export type ListGroupProps = React.PropsWithChildren<{
  * Grouped list (DESIGN_SYSTEM §5.8): rows inside a Card with no padding, hairline dividers
  * inset to the text start, optional section header.
  */
-/** Where a row's text starts, read from its ListItem props; null for other row components. */
-function rowInset(row: React.ReactNode): Inset | null {
+/**
+ * A row component other than ListItem can say where its own text starts (UI-R9b review: the stop
+ * rows' text sits past their drag handle and pin glyph): the divider under it starts there.
+ */
+export type ListGroupRowProps = { dividerInset?: number };
+
+/** Where a row's text starts: its own `dividerInset`, else read from its ListItem props; null for other row components. */
+function rowInset(row: React.ReactNode): Inset | number | null {
+  if (React.isValidElement<ListGroupRowProps>(row) && typeof row.props.dividerInset === 'number') return row.props.dividerInset;
   if (!React.isValidElement<ListItemProps>(row) || row.type !== ListItem) return null;
   const { leading, icon, iconStyle } = row.props;
   if (leading) return 'tile';
   if (!icon) return 'none';
   return iconStyle === 'plain' ? 'icon' : 'tile';
 }
+
+const dividerStart = (inset: Inset | number): number =>
+  typeof inset === 'number' ? inset : componentTokens.listItem.dividerInset[inset];
 
 export function ListGroup({ title, inset, testID, children }: ListGroupProps) {
   const { theme } = useAppTheme();
@@ -51,10 +61,7 @@ export function ListGroup({ title, inset, testID, children }: ListGroupProps) {
               <View
                 testID={testID ? `${testID}-divider-${index}` : undefined}
                 style={[
-                  {
-                    marginStart:
-                      componentTokens.listItem.dividerInset[inset ?? rowInset(rows[index - 1]) ?? 'tile'],
-                  },
+                  { marginStart: dividerStart(inset ?? rowInset(rows[index - 1]) ?? 'tile') },
                   { backgroundColor: theme.colors.border, height: theme.borderWidth.hairline },
                 ]}
               />

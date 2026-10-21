@@ -6,6 +6,7 @@
  * 422 field errors and EMERGENCY_CONTACTS_LIMIT.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -137,6 +138,16 @@ describe('Emergency contacts list', () => {
 describe('Emergency contact form', () => {
   beforeEach(() => {
     mock.onGet('/me/emergency-contacts').reply(200, listBody([bilal]));
+  });
+
+  it('UI-R19 review: Save sits in the Form sticky footer (hairline), not inline after the fields', async () => {
+    await renderWith(<EmergencyContactEditorScreen />);
+    const footer = screen.getByTestId('emergency-contact-footer');
+    expect(footer).toContainElement(screen.getByTestId('emergency-contact-save'));
+    const style = StyleSheet.flatten(footer.props.style);
+    expect(style.borderTopWidth).toBeGreaterThan(0);
+    // Keyboard down: max(insets.bottom + 8, 16) (the test safe area has no inset).
+    expect(style.paddingBottom).toBe(16);
   });
 
   it('checks the name and the PK mobile before any request', async () => {

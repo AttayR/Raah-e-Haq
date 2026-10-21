@@ -38,6 +38,18 @@ describe('swap: the rows cross', () => {
     expect(crossingOpacity(1)).toBe(1);
   });
 
+  it('UI-R9b review: the rows stay opaque for two thirds of the way, so they are seen crossing', () => {
+    // Opaque while each row covers the first two thirds of its way to the middle (p up to 1/3).
+    expect(crossingOpacity(0.25)).toBe(1);
+    expect(crossingOpacity(0.75)).toBe(1);
+    expect(crossingOffset(0.25, 56)).toBe(14);
+    // Fading only in the last third; transparent at the middle where the values swap.
+    expect(crossingOpacity(0.4)).toBeCloseTo(0.6);
+    expect(crossingOpacity(0.45)).toBeCloseTo(0.3);
+    // Each text covers the whole distance: half on the way out, half on the way in.
+    expect(crossingOffset(0.5, 56) + crossingOffset(0.5, 56)).toBe(56);
+  });
+
   const picker = (onSwap: () => void) => (
     <DualLocationPicker
       pickup={{ latitude: 31.5, longitude: 74.3 }}

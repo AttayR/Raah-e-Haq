@@ -4,6 +4,7 @@
  * the trip; outside a navigator (the gallery) it is not drawn.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import MockAdapter from 'axios-mock-adapter';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
@@ -77,6 +78,8 @@ describe('receipt: Get help with this ride', () => {
     await flush();
     const help = screen.getByTestId('receipt-help');
     expect(help).toHaveTextContent(/Get help with this ride$/);
+    // UI-R19 review: the hugging ghost's glyph sits on the 16 gutter (pulled back by its sm padding).
+    expect(StyleSheet.flatten(help.props.style)).toMatchObject({ marginStart: -16, alignSelf: 'flex-start' });
     fireEvent.press(help);
     expect(navigate).toHaveBeenCalledWith('SupportNewRequest', {
       trip: {

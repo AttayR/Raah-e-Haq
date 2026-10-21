@@ -27,8 +27,18 @@ export const dropSlot = (index: number, offset: number, rowHeight: number, count
   return Math.min(count - 1, Math.max(0, index + Math.round(offset / rowHeight)));
 };
 
+/**
+ * UI-R9b review ruling: where a stop row's text starts in its ListGroup card (the divider under
+ * it starts there): the handle's 44 target 4 in, or the 8 inset without it, then the 22 stop
+ * glyph, each followed by the row's 8 gap. 86 with the handle (x 102 on the 16 gutter).
+ */
+export const stopTextStart = (reorderable: boolean): number =>
+  (reorderable ? space[1] + r.handleTarget : space[2]) + space[2] + componentTokens.ride.pin.stopSize + space[2];
+
 type RowProps = {
   stop: Coords;
+  /** The divider under this row in its ListGroup (`stopTextStart`); read by ListGroup. */
+  dividerInset?: number;
   index: number;
   count: number;
   onRemove: (index: number) => void;
