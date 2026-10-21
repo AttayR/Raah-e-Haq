@@ -34,3 +34,4 @@ Everything below is built and tested in code against a local stand-in. Each item
 - Support email: set the real support address in the production app settings (`support_email`; the local seed uses support@raah-e-haq.com, the app's offline fallback is help@raahehaq.com).
 - Invite programme: set REFERRAL_SHARE_URL and the referrer/referee reward amounts.
 - Realtime (BE-12, B-10): on the server run `php artisan reverb:start` and `php artisan queue:work` under supervisor, add the nginx `/app/` WebSocket proxy, and set real REVERB_APP_ID/KEY/SECRET (16+ chars) plus `BROADCAST_CONNECTION=reverb`; steps in the backend DEPLOYMENT.md "Realtime: Laravel Reverb". Until then the app polls (works, just slower). The app build needs `WS_URL=wss://raahehaq.com/ws` (or your proxy path) and `WS_APP_KEY` = REVERB_APP_KEY.
+- App `.env.production`: change `WS_URL` to `wss://raahehaq.com` (no `/ws` path; Reverb is served at `/app/<key>`) and set `WS_APP_KEY` when realtime goes live.
