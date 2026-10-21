@@ -106,3 +106,15 @@ export const releaseTarget = (
  */
 export const openingTop = (containerHeight: number, openFrom?: number | null): number =>
   containerHeight - Math.max(0, Math.min(openFrom ?? 0, containerHeight));
+
+/**
+ * [T-598] How far (points) the sticky footer sits below its pinned place: as far as the sheet's
+ * top is below its lowest snap, but only while the footer follows the sheet (opening from below,
+ * a drag, a close). When a placement grows the lowest snap (the trip receipt's stars add the tags
+ * and the comment), the sheet still starts at its old height for a frame: following then dropped
+ * "Cash collected" by the growth (~100-250 pt) for ~0.2 s, and a tap there fell on the sheet.
+ */
+export const footerDrop = (top: number, containerHeight: number, lowestHeight: number, follows: boolean): number => {
+  'worklet';
+  return follows ? Math.max(0, top - (containerHeight - lowestHeight)) : 0;
+};

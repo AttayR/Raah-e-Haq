@@ -37,7 +37,7 @@ import { keyboardLift, modalKeyboardLift } from './keyboard';
 import { ModalRoot } from './ModalRoot';
 import { useModalTurn } from './modalQueue';
 import { stickyFooterBottom } from './stickyFooter';
-import { fullHeight, openingTop, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
+import { footerDrop, fullHeight, openingTop, releaseTarget, resolveSnaps, sameSnaps, type ResolvedSnap, type SheetSnap } from './sheetSnaps';
 
 export type { SheetSnap } from './sheetSnaps';
 
@@ -227,6 +227,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   // Position: points from the container top to the sheet top. Off-screen until measured.
   const top = useSharedValue(100000);
+  // [T-598] 1 while the sticky footer rides with the sheet (opening from below, a drag, a close);
+  // 0 once a placement has landed, so a content snap that grows later (stars and tags on the
+  // trip receipt) rises under a footer that stays put instead of dropping it out of reach.
+  const footerFollows = useSharedValue(1);
   const container = useSharedValue(0);
   const [current, setCurrent] = useState<SheetSnap | null>(null);
   const [mounted, setMounted] = useState(modal ? visible : true);
@@ -258,6 +262,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       const target = (containerOnJS ?? container.value) - height;
       const finished = (ok?: boolean) => {
         'worklet';
+        // [T-598] Landed on a snap: the footer is pinned again. A close (height 0) keeps it with
+        // the sheet until the unmount, so it never flashes back at the bottom edge.
+        if (ok && height > 0) footerFollows.value = 0;
         if (ok && done) runOnJS(done)();
       };
       // [T-568] A close (height 0) ends when the sheet first reaches the bottom edge. The snap
@@ -268,7 +275,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         ? withTiming(target, { duration: reducedMotion.sheetSnap.duration, easing: swapEasing }, finished)
         : withSpring(target, { ...springs.sheet, velocity, overshootClamping: height <= 0 }, finished);
     },
-    [container, reduce, top],
+    [container, footerFollows, reduce, top],
   );
 
   const calmRef = useRef(calmResize);
@@ -310,10 +317,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
    * (the number pad lingered ~0.2 s after "Cancel" on the parcel code sheet).
    */
   const beginClose = useCallback(() => {
+    footerFollows.value = 1;
     closing.current = true;
     setClosingUI(true);
     Keyboard.dismiss();
-  }, []);
+  }, [footerFollows]);
   // [T-562] A drag or a snapTo that lands on a snap during a close cancels the close animation
   // (and with it the unmount). Clear `closing` then, or the sheet would stay up for good: every
   // later keyboard event, re-measure and `visible={false}` would be ignored. If the parent still
@@ -412,12 +420,15 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     const target = resolved.find(r => r.snap === wanted) ?? resolved[0];
     if (currentRef.current === null) {
       // Opening: start below the screen (or where the sheet it takes over from stood), then rise
-      // with the spring.
+      // with the spring; the footer comes up with it.
+      footerFollows.value = 1;
       top.value = openingTop(containerHeight, openFromRef.current);
     } else if (calmRef.current && currentRef.current === target.snap) {
       // [UI-R20] Resized while up: a higher snap keeps its height (the next snap uses the new
       // heights); the lowest one eases to its new height without overshoot.
       if (target.snap !== resolved[0].snap) return;
+      // [T-598] The footer stays pinned through the ease (it replaces any spring in flight).
+      footerFollows.value = 0;
       top.value = reduce
         ? containerHeight - target.height
         : withTiming(containerHeight - target.height, { duration: motion.base.duration, easing: swapEasing });
@@ -426,7 +437,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     }
     animateTo(target.height, 0, undefined, containerHeight);
     settle(target);
-  }, [animateTo, container, containerHeight, live, reduce, resolved, settle, top]);
+  }, [animateTo, container, containerHeight, footerFollows, live, reduce, resolved, settle, top]);
 
   // [T-582] Bumped when the host screen is shown again; the sheet's position style and the
   // published height read it, so both are written to their views once more.
@@ -584,6 +595,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       .activeOffsetY([-6, 6])
       .onStart(() => {
         startTop.value = top.value;
+        footerFollows.value = 1;
         if (dragging) dragging.value = true;
       })
       .onUpdate(event => {
@@ -611,7 +623,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         animateTo(target.height, event.velocityY);
         runOnJS(dragSettled)(target);
       });
-  }, [animateTo, beginClose, container, dismissible, dragSettled, draggable, dragging, finishClose, modal, resolved, startTop, top]);
+  }, [animateTo, beginClose, container, dismissible, dragSettled, draggable, dragging, finishClose, footerFollows, modal, resolved, startTop, top]);
 
   const sheetStyle = useAnimatedStyle(() => {
     // [T-582] Read so a reveal re-writes the transform even when `top` did not change.
@@ -624,13 +636,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       opacity: interpolate(container.value - top.value, [0, lowest], [0, 1], Extrapolation.CLAMP),
     };
   });
-  // The footer stays pinned to the container bottom; it only follows a modal sheet that is
-  // dragged below its lowest snap (closing).
-  const footerStyle = useAnimatedStyle(() => {
-    const lowest = resolved[0]?.height ?? 0;
-    const restTop = container.value - lowest;
-    return { transform: [{ translateY: Math.max(0, top.value - restTop) }] };
-  });
+  // The footer stays pinned to the container bottom; it only follows the sheet below its lowest
+  // snap while the sheet opens, is dragged or closes (T-598: not while a placement grows it).
+  const footerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: footerDrop(top.value, container.value, resolved[0]?.height ?? 0, footerFollows.value === 1) }],
+  }));
 
   const highestSnap = resolved[resolved.length - 1]?.snap;
   const scrollable = current !== null && current === highestSnap;
