@@ -1173,3 +1173,11 @@ App follow-up: while searching, a poll or focus read returning `cancelled` + `no
   - driver channel: `ride.requested {refetch:"rides.pending"}`; `ride.request_withdrawn {ride_id}`.
 - Rules: polling stays the fallback (never stop it); handlers idempotent; leave the ride channel when the ride ends or the user is no longer its party; leave the driver channel when offline; disconnect on logout and on any 401/403.
 - Legacy `POST /websocket/subscribe-*` return config-based `websocket_url` (null when not configured); not used by the app.
+
+### Booking cooldown, admin closure, notification money, web hardening (BE-142, SEC-39..41, backend 04702bb, 8915b68, 681765c)
+
+- **SEC-40** `POST /rides`: a passenger who cancelled 5 of their own requests that no driver ever took (accepted_at null, never requeued) within 30 minutes gets **429** `{success:false, message, code:"BOOKING_COOLDOWN", retry_after, error:{code, message, retry_after}}` + `Retry-After`. Config `RIDES_BOOKING_COOLDOWN_MAX_CANCELS` (5, 0 = off) / `RIDES_BOOKING_COOLDOWN_WINDOW_MINUTES` (30). Driver cancels, system expiries and accepted rides don't count; admin bookings are not limited. The app shows `message`, counts down `retry_after`, never retries automatically.
+- **BE-142** ride, parcel and wallet notification texts write amounts as `Rs` + U+00A0 + amount; other API messages keep a plain space.
+- **BE-142 (admin API, role:admin)** `POST /users/{id}/deletion {reason?}` → 200 `{data:{state:"scheduled", scheduled_for, channel:"admin"}}`; refusals 409 ACTIVE_RIDE / COMMISSION_OWED / TOPUP_PENDING / DELETION_ALREADY_SCHEDULED / BALANCE_POSITIVE, 422 CANNOT_CLOSE_OWN_ACCOUNT / CANNOT_CLOSE_ADMIN. The person gets an SMS (verified phone) and an email (if set) with the date and how to keep the account. `POST /users/{id}/deletion/cancel` → `{state:"none", scheduled_for:null, cancelled}`. Hard-delete refusals now say "Schedule deletion".
+- **SEC-39** web `GET /stats` and `GET /public/landing-stats` (not used by the app): approximate counts (rounded down), `approximate:true`, cached 5 min; throttled.
+- **SEC-41** web pages send X-Frame-Options DENY, CSP frame-ancestors 'none', nosniff, `Referrer-Policy: strict-origin-when-cross-origin` (signed email pages and /account/delete keep no-referrer), HSTS on https.

@@ -767,6 +767,7 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
 - Files: `storedFiles()` reads only this user's columns, their own vehicles and their own driver documents, inside the lock. `deleteFiles()` normalises each path (`..`, schemes and NUL are refused) and deletes only under the private and public prefixes, and only after commit. The test also checks that another user's file stays.
 - Suite on SQLite: 2706 tests OK.
 - Residual (low, no task): the hard delete still cascades a few rows that are not covered by the linked-records check: `risk_signals.user_id` (fraud evidence), `ride_offers` and the auto-accept rows of a driver with no assigned ride, `referrals`, `support_tickets`/`ticket_replies`, and `notifications.created_by`/`banners.created_by` when an admin account is deleted. Only an admin can trigger this. Fold `risk_signals` (and admin-authored rows) into `hasLinkedRecords` the next time this service is touched. Separately, if a future schema was imported with a non-`bigint unsigned` column, the no-FK branch would fail on `ADD CONSTRAINT`. That fails loudly and can be re-run, so it is acceptable.
+- **Residual resolved by BE-142 (backend `04702bb`, review 2026-10-21 PASS).** `hasLinkedRecords` now also covers `risk_signals` (user and reviewer), `ride_offers`, `ride_auto_assignments`, `referrals`, `support_tickets` (user and assignee), `ticket_replies`, notifications an admin wrote for someone else, and banners. Admins close such accounts with "Schedule deletion" (the BE-129 flow, `channel=admin`). See "BE-142 security review" below.
 
 ### SEC-37 · medium · RESOLVED (BE-140) · backend: legacy `POST /api/websocket/subscribe-driver` writes driver locations outside every location rule (bypasses the SEC-33 spoofing check)
 **Evidence**
@@ -838,16 +839,16 @@ Low (accepted or fold into the retry):
 - Routes: `route:list` shows only `admin/two-factor` (show, confirm) and `POST logout` as web `auth` routes without `admin.2fa`. That is intended. `dashboard`, `verify-email*`, `confirm-password`, `PUT password` and `email/verification-notification` now have `admin.idle` + `admin.2fa`.
 - Residual lows (no task): `failed()` audits the lock only when `attempts === max`, so a concurrent burst can jump past 5 without an `admin_2fa_locked` entry. The lock itself still holds. Two parallel enrolment confirms can each save recovery codes; the last set wins and the first set shown is invalid. Lockout DoS still needs the password (as above).
 
-### SEC-39 · low · backend: unthrottled public web endpoints
+### SEC-39 · low · RESOLVED (BE-142) · backend: unthrottled public web endpoints
 - `POST /contact` (`LandingController.php:22-58`) has no throttle and writes a log line per call. `GET /stats` (`:63-79`) has no throttle, runs two `COUNT` queries per call and discloses total user and driver counts. The API twins (`api/public/*`) are throttled.
 - **Fix:** `throttle:10,1` on `/contact` and `throttle:60,1` plus a 5-minute cache on `/stats`, or delete them if the landing page no longer uses them.
 
-### SEC-40 · low · backend: no per-passenger limit on booking and free cancelling
+### SEC-40 · low · RESOLVED (BE-142) · backend: no per-passenger limit on booking and free cancelling
 - `POST /api/rides` and `POST /api/rides/{ride}/cancel` carry only the general `throttle:120,1`. `RideBookingGuard` stops concurrent rides and duplicates, but not a book → cancel loop. Cancelling while `requested` is free.
 - Each booking fans out a `ride.requested` hint to up to 50 nearby drivers (`Realtime::requestRecipients`) and puts a phantom request on their feed and banner (T-708). The recipient query runs in the worker each time.
 - **Fix:** a per-passenger booking limiter (for example 6 per 10 min) and a cooldown after about 3 requested-state cancels in 15 min, with 429 `rate_limited` and `retry_after` in the BE-28 envelope. Add tests.
 
-### SEC-41 · low · backend: no security headers on the admin panel from the app itself
+### SEC-41 · low · RESOLVED (BE-142) · backend: no security headers on the admin panel from the app itself
 - Only `PublicTripHeaders` and `PrivateFileController` set `X-Frame-Options`/`nosniff`/CSP. The `DEPLOYMENT.md:745-746` nginx block adds `X-Frame-Options SAMEORIGIN` and `nosniff`, but no HSTS. Hostinger shared hosting (Apache, `public/.htaccess`) adds none, so `/admin` can be framed (clickjacking on wallet adjustments and driver approval).
 - **Fix:** a web-group middleware that sends `X-Frame-Options: DENY` (or CSP `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`, plus `Strict-Transport-Security` in production. Add a test.
 
@@ -861,12 +862,14 @@ Low (accepted or fold into the retry):
 - The hardening is good: no JS bridge (`onMessage`), incognito, no new windows, every non-https scheme blocked and nothing handed to the OS. But the in-app view has no address bar, so a tampered or misconfigured response could show a look-alike page that asks for a JazzCash/Easypaisa PIN.
 - **Fix:** accept a start URL only on the API origin (`/api/payments/checkout/…`) or on an allowlist of the gateway hosts (sandbox and production, from env). Show the current host in the header. Add a unit test.
 
-### SEC-44 · low · backend: admin web route writes any driver's position and status outside the location rules
+### SEC-44 · low · RESOLVED (BE-142) · backend: admin web route writes any driver's position and status outside the location rules
 - `routes/web.php:155` → `Admin/DriverTrackingController::updateLocation` (`:161-191`) calls `DriverLocation::updateLocation` for any `driver_id`, with any coordinates and `status` (`online|available|busy|offline`). There is no `AutoAccept::onPing`, no availability service (the users row and the online session are untouched) and no realtime hint. `:233` `trackRideLocation` does the same for `ride_tracking`.
 - Guarded by `auth` + `role:admin` + CSRF and validated. No admin view calls either route (`grep` in `resources/` finds nothing).
 - **Impact:** a compromised admin (see SEC-38, single factor) can plant a driver's position or mark them `available`, and that steers the nearest-driver and auto-accept selection without the jump check. It is not reachable by passengers or drivers.
 - **Fix:** delete both unused admin write routes, or route them through the same service as `tracking/update-location` (including `onPing`) and audit-log them. Add a test that they return 404, or that they are flagged.
 - Recorded during the BE-140 review. It is not a regression from that change.
+
+**Status (2026-10-21): SEC-39, SEC-40, SEC-41 and SEC-44 resolved by BE-142 (backend `04702bb`, `8915b68`).** See "BE-142 security review" at the end of this file.
 
 ### Pre-release checklist
 | Item | Result |
@@ -903,3 +906,37 @@ Verdict PASS. The uncommitted T-711 diff was reviewed at 99f42e4. `yarn verify` 
 | SEC-42 hidden recents / invite code | **Resolved.** Hidden recents are kept per user (`home_hidden_recents.<id>`), and nothing is stored while signed out. Logout removes every `home_hidden_recents*` key, including the old global one, and every `rh.invite.code.*` key (`sessionThunks.ts` steps). The in-memory invite caches are dropped by the session epoch (`queryCache.ts:169`). `__tests__/store/logout.test.ts` checks this. The addresses are still plain text while signed in, which the fix allows. |
 | SEC-43 checkout start URL | **Resolved.** `isAllowedCheckoutStartUrl` (`src/features/wallet/topUpLinks.ts`) is used in both `AddMoneyScreen` and `TopUpCheckoutScreen`. It accepts only two kinds of start URL. (1) `<API path>/payments/checkout/<id>` on the exact API scheme, host and port. The id is shape-checked, so no `/`, `.` or `%` can follow. (2) https with no explicit port on `payments.jazzcash.com.pk` or `easypay.easypaisa.com.pk`, which match `config/payments.php`. The sandbox hosts and local names are accepted only when `__DEV__`. Probed and refused: user-info (`a@b`, `a:443@b`, `\@`), trailing-dot hosts, suffix and sub-domain look-alikes, Cyrillic and punycode hosts, `%2e` and `..` paths, non-default ports, http, leading or embedded whitespace, and other schemes. The current host is shown under the title. The match fails closed if the backend `APP_URL` host ever differs from `API_URL` (for example `www.`): the flow then goes to the status screen. |
 | New, low (this diff) | `TopUpCheckoutScreen` `onNavigationStateChange` sets the host to `checkoutHostOf(state.url)`. A later navigation that `isAllowedCheckoutUrl` allows (any https) but `parseWebUrl` cannot parse (user-info, `_` in host, IPv6) sets the host to null, so the label disappears exactly on the spoof-shaped URL. Fix: refuse later navigations whose host can't be parsed, or keep showing the raw authority. Fold into the next wallet task. |
+
+## BE-142 security review (diff, 2026-10-21): SEC-36 residual, SEC-39, SEC-40, SEC-41 and SEC-44 resolved
+
+Verdict PASS. Reviewed backend `git diff 19a3a64..8915b68` (commits `04702bb`, `8915b68`, worktree `rh-backend-be-142`). Suite on sqlite `:memory:`: OK, 2795 tests, 43492 assertions.
+
+| Item | Status after BE-142 |
+|---|---|
+| SEC-36 residual | **Resolved.** See the SEC-36 status. The `Notification` clause is grouped correctly (`created_by = id AND (user_id IS NULL OR user_id != id)`). |
+| Admin closure (new) | **OK.** The web routes `admin/users/{user}/deletion` and `…/cancel` run under `web` (CSRF), `auth`, `role:admin`, `admin.idle` and `admin.2fa` (checked with `route:list`), and are throttled at 20/min. The forms have `@csrf` and a confirm step. The API twins are `role:admin`, but admin API tokens are refused since BE-141, so in practice they can't be reached. Both go through `AccountDeletions::schedule`/`cancel` under the users row lock. Every blocker except `PHONE_NOT_VERIFIED` still applies: an open ride, money owed, a live or late-creditable top-up, and an unacknowledged balance. The audit log is `high`, with `channel=admin` and `admin_id`. An admin can't close their own account (422, and the panel hides the form). |
+| Lock-out abuse | **Not a lock-out.** Scheduling revokes tokens, push devices and web sessions and takes a driver offline. Sign-in is not refused, though, and the person sees `deletion_scheduled_for` and can cancel (app, or `/account/delete` with an SMS code). Booking is 423 until they do. A rogue admin could only sign someone out repeatedly, which needs the admin password and TOTP, is throttled, and leaves one `high` audit entry each time. |
+| Ruling: the person may cancel an admin closure | **Accepted, and it is the right behaviour.** An admin closure is a deletion carried out for the person (for example a support request), so it has to stay reversible during cooling-off like the person's own request. It is **not** an enforcement tool. To remove someone for abuse or fraud, the admin sets `status` to suspended or banned. A cancel only clears the schedule and never changes `status`, and the API cancel is `active,pending` only, so a suspended account stays shut. Admin guidance (panel copy or the DEPLOYMENT/admin notes): "suspend first, then schedule, when the closure is for abuse". |
+| SEC-44 admin tracking writes | **Resolved.** `update-location` and `ride/{ride}/track` are gone (routes and methods). The remaining `driver-tracking/*` routes are GETs. The tracking page now polls the read-only `driver-location` route and checks the coordinates with `Number.isFinite`. |
+| SEC-39 public endpoints | **Resolved.** `/contact` 10/min and `/stats` 60/min (named limiters). `/stats` and `api/public/landing-stats` (60/min group) are cached for 5 min and rounded down by `CoarseCount` (under 100 shows 0, then steps of 100, then 1,000), with `approximate: true`. The average rating is rounded to 0.1. The keys didn't change. `/contact` logs no PII. |
+| SEC-40 book-then-cancel | **Resolved.** `cooldownRetryAfter` runs inside the booking transaction after `lockPassenger` (the users row lock), so parallel bookings are serialised. The one-active-ride guard already stops anyone stacking bookings, so a cancel must happen before each new booking and can't race past the count. What counts: `status = cancelled`, `cancelled_by = the passenger's id` (the passenger cancel in `RideLifecycle` writes the id; driver, admin and system cancels write another id or a string), `accepted_at IS NULL`, inside the window. Expiries don't count. The default is 5 in 30 min. The response is 429 `BOOKING_COOLDOWN` with `retry_after` and a `Retry-After` header. Admin bookings skip it. There is no other passenger booking path (`Ride::create` only in `Api/RidesController::store` and the admin panel). |
+| SEC-41 headers | **Resolved.** `SecurityHeaders` is prepended to the `web` group. The routing pipeline renders 419/429/403 inside the stack, so those responses carry the headers too (tested). The CSP is only `frame-ancestors 'none'`, so it doesn't restrict scripts or styles: the admin panel's inline scripts, CDN Leaflet and Tailwind, and the `/account/delete` page keep working. No view uses an iframe. A CSP or Referrer-Policy that a route already set (`PublicTripHeaders`, `PrivateFileController`, `NoReferrer`) is kept. HSTS is sent only when `isSecure()`, without `includeSubDomains` by default. The `/api` group is untouched. The nginx `X-Frame-Options` line was removed from DEPLOYMENT.md, so the header is not sent twice with conflicting values. |
+
+New lows (no task; fold into related work):
+1. **low · `AccountDeletions::scheduleByAdmin` (`app/Services/AccountDeletions.php:499`): an admin can schedule the deletion of another admin.** After the grace period the anonymisation can't be undone. Before that, any admin can cancel it, and admins could already change each other's status and roles, so this adds little new power. Fix: refuse when the target has the `admin` role (`CANNOT_CLOSE_ADMIN`). Admin accounts are managed by the owner.
+2. **low · admin closure with `acknowledge_balance`: the admin forfeits the person's positive balance for them** (top-up credit). It is audited (`balance_forfeited`) and a rogue admin could already adjust wallets, but the consent belongs to the person. Fix: on `channel=admin`, refuse while the balance is positive (refund or settle it first), or require a note.
+3. **low · no notice to the person when an admin schedules their deletion.** Push devices are deleted at that moment, so someone who doesn't open the app is anonymised without being told. Fix: send an SMS (or email) at schedule time with the date and how to cancel.
+4. **low · SEC-40 can misfire on requeued rides.** `RideLifecycle:434` resets `accepted_at` to null when a driver cancels and the ride goes back to the queue. If the passenger then cancels it, that counts as a "no driver accepted" cancel. Fix: also require `requeue_count = 0`. With 5 needed in 30 min, a real misfire is unlikely.
+5. **low · functional: `Referrer-Policy: same-origin` sends no Referer to cross-origin hosts.** Two consequences: OpenStreetMap tile requests on the admin `driver-tracking/map` page have no Referer, and the OSM tile policy can refuse them; and a referrer-restricted Google Maps key (the owner's B-02 restriction) would be refused if `driver-tracking/show` is ever given a real key (it is a `YOUR_API_KEY` placeholder today). `strict-origin-when-cross-origin` sends only the origin cross-origin and leaks no path. QA should open the admin map once.
+
+| Checklist (backend) | Result |
+|---|---|
+| 1 Config | OK. New `.env.example` keys have safe defaults. |
+| 2 AuthN | Unchanged. Admin routes keep `admin.2fa`. |
+| 3 AuthZ/IDOR | OK. `role:admin` on every new route, self-closure refused. Low 1. |
+| 4 Mass assignment | OK. `validate()` with `Rule::in(REASONS)`. |
+| 5 Injection | OK. Query builder only. |
+| 6 Uploads | n/a |
+| 7 Races | OK. Row locks for schedule, cancel and the booking cooldown. |
+| 8 WebSockets | n/a |
+| 9 Headers/CORS | SEC-41 resolved. Low 5 (functional). |
