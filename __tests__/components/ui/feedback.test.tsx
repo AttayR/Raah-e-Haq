@@ -24,7 +24,7 @@ import {
   ToastView,
 } from '../../../src/components/ui';
 import { alert, confirm, dialog } from '../../../src/core/dialog';
-import type { ToastConfig } from '../../../src/core/toast';
+import { toastClearance, type ToastConfig } from '../../../src/core/toast';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
@@ -205,6 +205,15 @@ describe('Toast (restyle)', () => {
       expect(contrastRatio(DarkTheme.colors.success, fill)).toBeGreaterThanOrEqual(AA_NON_TEXT);
     },
   );
+
+  it('[T-708] sits below a top overlay (the driver request banner) while one is up', async () => {
+    await renderThemed(<ToastView config={config()} onHide={noop} />);
+    const before = flat(screen.getByTestId('toast').props.style).top as number;
+    act(() => toastClearance.set(120));
+    expect(flat(screen.getByTestId('toast').props.style).top).toBe(before + 120);
+    act(() => toastClearance.set(0));
+    expect(flat(screen.getByTestId('toast').props.style).top).toBe(before);
+  });
 
   it('the action runs and the toast hides', async () => {
     jest.useFakeTimers();

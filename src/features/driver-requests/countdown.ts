@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { countdownRemainingMs, type CountdownSpec } from '../../components/ui/CountdownRing';
 import type { PendingRideRequest } from './api';
+import type { OfferSession } from './offerSession';
 
 /**
  * UI-R11 R3: how long the driver has to decide on one request when the feed sends no
@@ -33,11 +34,13 @@ export type OfferClock = CountdownSpec & { rideId: number };
  * the app in the foreground) for a new `request`, keeps running in the background (a return
  * shows the right remainder), and `paused` (an accept in flight) freezes it: the paused time is
  * added back when it resumes. Null while there is no request or it has not started.
+ * T-708: with a `session`, a request already shown elsewhere (the banner) keeps its first start.
  */
 export function useOfferClock(
   request: PendingRideRequest | null,
   ready: boolean,
   paused: boolean,
+  session: OfferSession | null = null,
 ): OfferClock | null {
   const [clock, setClock] = useState<Clock | null>(null);
   const id = request?.id ?? null;
@@ -48,9 +51,13 @@ export function useOfferClock(
       return;
     }
     if (ready) {
-      setClock(prev => (prev?.id === id ? prev : { id, startedAt: Date.now(), pausedAt: null }));
+      setClock(prev => {
+        if (prev?.id === id) return prev;
+        const now = Date.now();
+        return { id, startedAt: session ? session.clockStart(id, now) : now, pausedAt: null };
+      });
     }
-  }, [id, ready]);
+  }, [id, ready, session]);
 
   useEffect(() => {
     setClock(prev => {

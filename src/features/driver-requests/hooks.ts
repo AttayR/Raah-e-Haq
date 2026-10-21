@@ -51,7 +51,7 @@ const STATUS_RELOAD_CODES: ReadonlySet<string> = new Set([
 ]);
 
 export interface PendingRidePollingOptions {
-  /** The calling screen is focused (useIsFocused). */
+  /** The caller is on screen (useIsFocused; T-708: the driver stack, DriverRequestLayer). */
   isFocused: boolean;
   /** The device position, sent as the documented fallback; null while unknown. */
   location: LatLng | null;
@@ -59,14 +59,15 @@ export interface PendingRidePollingOptions {
 
 /**
  * Polls GET /rides/pending every 5 s while the driver is online, has no ride, the app is in
- * the foreground and the calling screen is focused. Anything else stops the timer and clears
+ * the foreground and the caller is focused. T-708: one caller only, DriverRequestLayer (the
+ * driver stack), so the feed runs on every driver tab and screen. Anything else stops the timer and clears
  * the list.
  *
  * - 429: the next poll waits `retry_after` seconds.
  * - 409 DRIVER_NOT_AVAILABLE / DRIVER_ON_RIDE: polling stops and the driver status is read
  *   again; the status change then re-arms (or keeps off) the poller.
- * - 409 NO_APPROVED_VEHICLE: polling stops (the card shows why) until the screen is focused
- *   again or the driver goes offline and online.
+ * - 409 NO_APPROVED_VEHICLE: polling stops (the card shows why) until the app returns to the
+ *   foreground or the driver goes offline and online.
  * - 422 LOCATION_REQUIRED and other failures: the message shows and polling continues.
  */
 export const usePendingRidePolling = ({ isFocused, location }: PendingRidePollingOptions): void => {

@@ -33,7 +33,7 @@ type Props = React.PropsWithChildren<{
 /**
  * The incoming request sheet (UI-R11, driver-incoming-request R1; DESIGN_SYSTEM §8.3 `request`
  * mode): the Drive sheet's surface in its request form, mounted by RideRequestHost above the
- * tabs (the single poller, T-408) while the Drive sheet steps aside. Full width at the bottom, no
+ * tabs (T-408) while the Drive sheet steps aside. Full width at the bottom, no
  * handle, not draggable, content height capped at 70 % of the window (the children give way:
  * the route scrolls), top radius `xl`, `surface`, elevation 3 (dark: 1 pt top `border`), and a
  * sticky footer `max(insets.bottom + 8, 16)` from the bottom. Rises on the sheet spring

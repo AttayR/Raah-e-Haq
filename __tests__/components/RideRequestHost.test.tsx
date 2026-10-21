@@ -1,6 +1,7 @@
 /**
- * T-408: ride requests arrive on every driver tab. The host is mounted once by DriverBottomTabs
- * (the single GET /rides/pending poller). UI-R4: a request reports itself through
+ * T-408: ride requests arrive on every driver tab. The host is mounted once by DriverBottomTabs;
+ * T-708: the feed is polled by DriverRequestLayer's DriverRequestFeedPoller (rendered next to the
+ * host here), and the host draws the request on the Drive tab only. UI-R4: a request reports itself through
  * `onRequestShownChange` (the tabs switch to Drive and hide the tab bar); loading and "no
  * requests" are left to the Drive sheet.
  */
@@ -12,6 +13,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { ApiError } from '../../src/core/api/errors';
 import { rootReducer } from '../../src/store/rootReducer';
 import { RideRequestHost } from '../../src/components/driver/RideRequestHost';
+import { DriverRequestFeedPoller } from '../../src/components/driver/DriverRequestLayer';
 import { driverRequestsApi } from '../../src/features/driver-requests/api';
 import { PENDING_POLL_INTERVAL_MS } from '../../src/features/driver-requests/hooks';
 import { REQUEST_DECISION_SECONDS } from '../../src/features/driver-requests/countdown';
@@ -71,6 +73,7 @@ const renderHost = async (status: DriverAvailability, onRequestShownChange?: (sh
   await store.dispatch(loadDriverStatus());
   const screen = render(
     <Provider store={store}>
+      <DriverRequestFeedPoller />
       <RideRequestHost onRequestShownChange={onRequestShownChange} />
     </Provider>,
   );
@@ -172,12 +175,31 @@ describe('RideRequestHost', () => {
     expect(shown).not.toHaveBeenCalledWith(true);
   });
 
-  it('does not poll while the tabs are covered by another driver screen', async () => {
+  it('draws nothing while the tabs are covered by another driver screen (the banner shows it, T-708)', async () => {
     mockIsFocused = false;
     const { screen } = await renderHost('available');
     await advance(PENDING_POLL_INTERVAL_MS * 2);
-    expect(listPending).not.toHaveBeenCalled();
     expect(screen.queryByTestId('ride-request-host')).toBeNull();
+  });
+
+  it('T-708: off the Drive tab it draws no sheet, never switches tabs, and does not run the clock', async () => {
+    const declined = jest.spyOn(autoAcceptApi, 'offerDeclined').mockResolvedValue();
+    const store = configureStore({ reducer: rootReducer });
+    jest.spyOn(driverStatusApi, 'get').mockResolvedValue(statusInfo('available'));
+    await store.dispatch(loadDriverStatus());
+    const shown = jest.fn();
+    const screen = render(
+      <Provider store={store}>
+        <DriverRequestFeedPoller />
+        <RideRequestHost onDriveTab={false} onRequestShownChange={shown} />
+      </Provider>,
+    );
+    await flush();
+    expect(store.getState().driverRequests.items.map(item => item.id)).toEqual([7]);
+    expect(screen.queryByTestId('ride-request-host')).toBeNull();
+    expect(shown).not.toHaveBeenCalledWith(true);
+    await advance(REQUEST_DECISION_SECONDS * 1000 + 1_000);
+    expect(declined).not.toHaveBeenCalled();
   });
 });
 
@@ -306,6 +328,7 @@ describe('RideRequestHost request sheet (UI-R11)', () => {
     await store.dispatch(loadDriverStatus());
     const screen = render(
       <Provider store={store}>
+        <DriverRequestFeedPoller />
         <RideRequestHost onShownOfferChange={onShownOffer} />
       </Provider>,
     );
@@ -327,6 +350,7 @@ describe('RideRequestHost request sheet (UI-R11)', () => {
     await store.dispatch(loadDriverStatus());
     const screen = render(
       <Provider store={store}>
+        <DriverRequestFeedPoller />
         <RideRequestHost onSheetHeightChange={onHeight} />
       </Provider>,
     );
@@ -338,19 +362,19 @@ describe('RideRequestHost request sheet (UI-R11)', () => {
   });
 });
 
-describe('useDriverLastLocation (through the host)', () => {
+describe('useDriverLastLocation (through the poller and the host)', () => {
   it('follows the tracker listener and removes it on unmount', async () => {
     const unsubscribe = jest.fn();
-    let listener: ((fix: LocationFix) => void) | undefined;
+    const listeners: ((fix: LocationFix) => void)[] = [];
     jest.spyOn(locationTrackingService, 'getLastLocation').mockReturnValue(null);
     jest.spyOn(locationTrackingService, 'addLocationListener').mockImplementation(fn => {
-      listener = fn;
+      listeners.push(fn);
       return unsubscribe;
     });
     const { screen } = await renderHost('available');
     expect(listPending).toHaveBeenLastCalledWith(null);
 
-    act(() => listener?.({ ...FIX, latitude: 31.6 }));
+    act(() => listeners.forEach(listener => listener({ ...FIX, latitude: 31.6 })));
     await advance(PENDING_POLL_INTERVAL_MS);
     expect(listPending).toHaveBeenLastCalledWith({
       latitude: 31.6,
@@ -358,6 +382,6 @@ describe('useDriverLastLocation (through the host)', () => {
     });
 
     screen.unmount();
-    expect(unsubscribe).toHaveBeenCalled();
+    expect(unsubscribe).toHaveBeenCalledTimes(listeners.length);
   });
 });

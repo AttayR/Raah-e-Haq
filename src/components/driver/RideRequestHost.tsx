@@ -8,12 +8,12 @@ import { haptics } from '../../core/haptics';
 import { useDriverLastLocation } from '../../features/driver-location/hooks';
 import { useAppIsActive } from '../../hooks/useAppIsActive';
 import {
-  usePendingRidePolling,
   useRideRequestActions,
   useRideRequestFeed,
   type RequestGoneKind,
 } from '../../features/driver-requests/hooks';
 import { useOfferClock, useOfferCountdown } from '../../features/driver-requests/countdown';
+import { useOfferSession } from '../../features/driver-requests/offerSession';
 import { DRIVER_REQUESTS_COPY as COPY } from '../../features/driver-requests/copy';
 import { selectDriverRequestsState, type DriverRequestsState } from '../../features/driver-requests/slice';
 import { selectDriverActiveRide } from '../../features/driver-ride/slice';
@@ -35,6 +35,12 @@ import { useLingering } from './request/useLingering';
 
 type Props = {
   /**
+   * T-708: the Drive tab is the open tab. An offer is drawn here only then; on another tab (or
+   * another driver screen) the in-app banner (DriverRequestLayer) shows it instead. Defaults to
+   * true (the host on its own).
+   */
+  onDriveTab?: boolean;
+  /**
    * Called with true while a request (or the taken state, or the auto-accept takeover) is on
    * screen and false once it is gone, so the tabs hide the tab bar and open the Drive map (§8.3).
    */
@@ -55,23 +61,28 @@ const selectQueuedBehind = (state: { driverRequests: DriverRequestsState }): num
   Math.max(0, selectDriverRequestsState(state).items.length - 1);
 
 /**
- * Incoming ride requests for every driver tab (T-408). Mounted once, by DriverBottomTabs, so
- * GET /rides/pending is polled (T-403) whenever the driver is online, has no ride, the app is in
- * the foreground and the tabs are on screen, whichever tab is open. UI-R11 (driver-incoming-
+ * Incoming ride requests on the Drive tab (T-408). Mounted once, by DriverBottomTabs. T-708:
+ * GET /rides/pending is polled by DriverRequestLayer (the driver stack, any tab or screen); this
+ * host draws the feed's head while the Drive tab is open, and the banner covers the rest. UI-R11 (driver-incoming-
  * request § Request sheet v2): the request is the Drive sheet in its `request` form (RequestSheet)
  * with Decline + Accept and the decision countdown (`meta.offer_seconds`, else 20 s; at 0 it is a
  * decline). A 409 taken / gone swaps the content for 2 s; accepting (T-404) opens DriverRide.
  * Feed loading, empty and error states are the Drive sheet's subtitle (no card here). Keeps the
  * offer-viewed (1 s on screen) and offer-declined reports and the auto-accept takeover (T-587).
  */
-export const RideRequestHost: React.FC<Props> = ({ onRequestShownChange, onSheetHeightChange, onShownOfferChange }) => {
+export const RideRequestHost: React.FC<Props> = ({
+  onDriveTab = true,
+  onRequestShownChange,
+  onSheetHeightChange,
+  onShownOfferChange,
+}) => {
   const navigation = useNavigation<NativeStackNavigationProp<DriverStackParamList>>();
   const { height: windowHeight } = useWindowDimensions();
   const compact = windowHeight < componentTokens.requestSheet.compactWindowHeight;
 
   const isFocused = useIsFocused();
   const location = useDriverLastLocation();
-  usePendingRidePolling({ isFocused, location });
+  const session = useOfferSession();
   const { view } = useRideRequestFeed(location);
   // A primitive: an unchanged poll does not re-render the sheet for the "+N more" badge.
   const moreCount = useSelector(selectQueuedBehind);
@@ -150,7 +161,7 @@ export const RideRequestHost: React.FC<Props> = ({ onRequestShownChange, onSheet
     [accept, navigation],
   );
 
-  const eligible = isFocused && isOnline && !isOnRide && !hasActiveRide;
+  const eligible = isFocused && onDriveTab && isOnline && !isOnRide && !hasActiveRide;
   const takeoverShown = isFocused && takeoverRide !== null;
   const offer = eligible && view.kind === 'request' ? view.request : null;
   const goneShown = isFocused && gone !== null && !takeoverShown;
@@ -170,14 +181,17 @@ export const RideRequestHost: React.FC<Props> = ({ onRequestShownChange, onSheet
     return () => clearTimeout(timer);
   }, [shownOfferId]);
 
-  // R4 / R8: haptic and the arrival announcement once per request.
+  // R4 / R8: haptic and the arrival announcement once per request (T-708: no second haptic when
+  // the banner already gave one).
   const arrivedId = offerShown && offer ? offer.id : null;
   const offerRef = useRef(offer);
   offerRef.current = offer;
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
   useEffect(() => {
     const arrived = offerRef.current;
     if (arrivedId === null || !arrived) return;
-    haptics.notificationWarning();
+    if (sessionRef.current?.claimAlert(arrivedId) ?? true) haptics.notificationWarning();
     const fare = arrived.estimatedFare !== null ? formatMoney(arrived.estimatedFare) : '';
     AccessibilityInfo.announceForAccessibility(
       arrived.estimatedPickupMin !== null
@@ -193,6 +207,7 @@ export const RideRequestHost: React.FC<Props> = ({ onRequestShownChange, onSheet
     offerShown ? offer : null,
     sheetUp && appActive,
     acceptingId !== null && acceptingId === offer?.id,
+    session,
   );
   const announce = useOfferCountdown(clock, handleReject);
   useEffect(() => {

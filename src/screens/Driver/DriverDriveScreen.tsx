@@ -82,7 +82,7 @@ const useMeasured = (estimate: number): [number, (next: number) => void] => {
  * (device offline, uploads failing, feed error + Retry, no fix, weak GPS). At `half`: the approval
  * warning, the Today card (GET /me/stats), the last trips (T-507) and the account card. Once per
  * session the map veil lifts and the sheet and its blocks rise in (D6). Incoming requests come
- * from RideRequestHost (the tabs' single poller): while one shows, this sheet and the map
+ * from RideRequestHost (fed by the driver stack's single poller, T-708): while one shows, this sheet and the map
  * controls step aside, the tab bar hides and the map frames the request's pins (R1).
  */
 export default function DriverDriveScreen() {

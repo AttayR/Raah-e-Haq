@@ -3,3 +3,4 @@ export type { ToastApi, ToastAction, ToastConfig, ToastOptions, ToastType } from
 export { useToast } from './useToast';
 export { toastOnScreen, useScreenToast, SCREEN_TOAST_FALLBACK_MS } from './screenToast';
 export type { ToastScreen } from './screenToast';
+export { toastClearance } from './clearance';

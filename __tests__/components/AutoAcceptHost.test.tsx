@@ -10,6 +10,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from '../../src/store/rootReducer';
 import { RideRequestHost } from '../../src/components/driver/RideRequestHost';
+import { DriverRequestFeedPoller } from '../../src/components/driver/DriverRequestLayer';
 import { AUTO_ACCEPTED_ADVANCE_MS } from '../../src/components/driver/AutoAcceptedCard';
 import { driverRequestsApi } from '../../src/features/driver-requests/api';
 import { PENDING_POLL_INTERVAL_MS } from '../../src/features/driver-requests/hooks';
@@ -72,6 +73,7 @@ const renderHost = async ({ autoAcceptOn = false } = {}) => {
   await store.dispatch(loadAutoAccept());
   const ui = () => (
     <Provider store={store}>
+      <DriverRequestFeedPoller />
       <RideRequestHost />
     </Provider>
   );
@@ -227,6 +229,7 @@ describe('Ride accepted for you', () => {
     await store.dispatch(loadAutoAccept());
     const screen = render(
       <Provider store={store}>
+        <DriverRequestFeedPoller />
         <RideRequestHost />
       </Provider>,
     );

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
-import { toast, toastStore, type ToastConfig, type ToastType } from '../../core/toast';
+import { toast, toastClearance, toastStore, type ToastConfig, type ToastType } from '../../core/toast';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { t } from '../../i18n';
 import { componentTokens, DarkTheme, layout, motionPatterns, radius, space } from '../../theme';
@@ -67,6 +67,8 @@ export function ToastView({ config, onHide, preview = false }: Props) {
   const opacity = useRef(new Animated.Value(preview ? 1 : 0)).current;
   const translateY = useRef(new Animated.Value(preview || reduce ? 0 : m.in.translateY)).current;
   const hiding = useRef(false);
+  // T-708: below a top overlay (the driver's request banner) while one is up.
+  const clearance = useSyncExternalStore(toastClearance.subscribe, toastClearance.get);
 
   const dark = theme.mode === 'dark';
   const fill = dark ? theme.colors.surfaceRaised : theme.colors.textPrimary;
@@ -131,7 +133,7 @@ export function ToastView({ config, onHide, preview = false }: Props) {
       {...(preview ? null : panResponder.panHandlers)}
       testID={preview ? `toast-preview-${type}` : 'toast'}
       style={[
-        preview ? styles.preview : [styles.container, { top: insets.top + space[2] + topOffset }],
+        preview ? styles.preview : [styles.container, { top: insets.top + space[2] + topOffset + clearance }],
         theme.elevation[4],
         {
           backgroundColor: fill,

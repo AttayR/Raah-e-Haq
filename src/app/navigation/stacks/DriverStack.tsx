@@ -21,6 +21,7 @@ import type { ParcelDriverRoutes } from '../../../features/parcel/navigation';
 import { supportTicketScreenId, type SupportRoutes } from '../../../features/support/navigation';
 import type { AccountDeletionRoutes } from '../../../features/account-deletion/navigation';
 import { keepScreenMounted, localeScreenLayout } from '../localeScreenLayout';
+import { driverRequestLayout } from '../../../components/driver/DriverRequestLayer';
 
 export type DriverStackParamList = {
   /** Drive · Earnings · Inbox · Account (UI-R4, DESIGN_SYSTEM §8.1). */
@@ -120,7 +121,12 @@ const DriverStack = () => {
 
   return (
     // T-535 (PERF-14): screens deeper in the stack stop rendering until they are shown again.
-    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }} screenLayout={localeScreenLayout}>
+    // T-708: the request feed and the in-app request banner cover every driver screen.
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, freezeOnBlur: true }}
+      screenLayout={localeScreenLayout}
+      layout={driverRequestLayout}
+    >
       <Stack.Screen name="DriverTabs" component={DriverBottomTabs} layout={keepScreenMounted} />
       <Stack.Screen name="Profile" getComponent={loadDriverProfile} />
       <Stack.Screen name="ProfileEdit" getComponent={loadProfileEditScreen} />

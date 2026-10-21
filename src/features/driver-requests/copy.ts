@@ -37,6 +37,9 @@ export const DRIVER_REQUESTS_COPY = localizedCopy({
   arrivalA11y: (fare: string, minutes: number) => `New ride request, ${fare}, pickup ${minutes} minutes away`,
   arrivalNoEtaA11y: (fare: string) => `New ride request, ${fare}`,
   sheetA11y: 'Ride request',
+  // T-708: the in-app banner on another tab or driver screen.
+  bannerTitle: 'New ride request',
+  bannerHint: 'Opens the request on the Drive map',
   accepted: 'Ride accepted. Head to the pickup.',
   acceptFailed: "Couldn't accept the ride. Try again.",
   // Pending feed refusals (BE-02).

@@ -207,6 +207,8 @@ export function registerRideCopy(): void {
     arrivalA11y: (fare: string, minutes: number) => `Nayi ride request, ${fare}, pickup ${minutes} minute door`,
     arrivalNoEtaA11y: (fare: string) => `Nayi ride request, ${fare}`,
     sheetA11y: 'Ride request',
+    bannerTitle: 'Nayi ride request',
+    bannerHint: 'Drive map par request kholta hai',
     accepted: 'Ride accept ho gayi. Pickup ki taraf chalein.',
     acceptFailed: 'Ride accept nahi ho saki. Dobara koshish karein.',
     locationRequired: 'Ride requests dekhne ke liye apni location share karein.',

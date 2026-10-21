@@ -28,8 +28,10 @@ type Props = NativeStackScreenProps<DriverStackParamList, 'DriverTabs'>;
 
 /**
  * The driver's four tabs with the shared tab bar (§5.3). RideRequestHost is mounted once here
- * (the single GET /rides/pending poller, T-408): a request switches to the Drive tab and hides
- * the tab bar so it sits on the Drive map (§8.3); declining or a timeout brings the bar back.
+ * (T-408): on the Drive tab a request hides the tab bar so it sits on the Drive map (§8.3);
+ * declining or a timeout brings the bar back. T-708: the feed is polled by the driver stack
+ * (DriverRequestLayer); on another tab the request is the in-app banner, and the tab stays open
+ * until the driver taps it. An auto-accepted ride (the takeover) still opens Drive by itself.
  */
 const DriverBottomTabs = ({ navigation }: Props) => {
   const inboxUnread = useUnreadNotificationCount();
@@ -82,6 +84,7 @@ const DriverBottomTabs = ({ navigation }: Props) => {
           </Tab.Navigator>
           {/* UI-R11: the request sheet sits on the bottom edge over the hidden tab bar. */}
           <RideRequestHost
+            onDriveTab={activeTab === 'Drive'}
             onRequestShownChange={onRequestShownChange}
             onSheetHeightChange={setRequestSheetHeight}
             onShownOfferChange={setShownOfferId}
