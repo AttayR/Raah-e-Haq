@@ -5,12 +5,10 @@ import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { logger } from '../../core/logging/logger';
 import { t } from '../../i18n';
 import { inviteApi, toInviteCode, type InviteCode, type InviteStats } from './api';
+import { inviteStorageKey } from './inviteStorage';
 
 const CODE_CACHE = { name: CACHE_NAMES.inviteCode, ttlMs: CACHE_TTL.inviteCode } as const;
 const STATS_CACHE = { name: CACHE_NAMES.inviteStats, ttlMs: CACHE_TTL.inviteStats } as const;
-
-/** Per account, so another account on the phone never sees this one's code. */
-export const inviteStorageKey = (userId: number): string => `rh.invite.code.${userId}`;
 
 const errorName = (error: unknown): string => (error instanceof Error ? error.name : 'unknown');
 

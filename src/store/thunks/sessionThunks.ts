@@ -19,6 +19,7 @@ import { resetOtpSendHold } from '../../features/auth/otpSendHold';
 import { clearLastVehicle } from '../../features/ride-booking/vehicleSelection';
 import { clearBookingDraft } from '../../features/ride-booking/bookingDraftStore';
 import { clearHiddenRecents } from '../../features/passenger-home/hiddenRecents';
+import { clearStoredInviteCodes } from '../../features/invite/inviteStorage';
 
 /** Injected by the store (thunk extraArgument) so this file never imports the store itself. */
 export interface SessionThunkExtra {
@@ -139,6 +140,8 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
       await step('clear last vehicle', () => clearLastVehicle());
       // UI-R9b: recents removed on this phone are this user's choice.
       await step('clear hidden recents', () => clearHiddenRecents());
+      // SEC-42: the stored invite code (per account) leaves the phone with the session.
+      await step('clear invite code', () => clearStoredInviteCodes());
     } finally {
       // T-570: the phone-code send hold (in memory) belongs to this user's sign-in.
       resetOtpSendHold();

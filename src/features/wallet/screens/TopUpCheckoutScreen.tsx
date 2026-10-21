@@ -11,10 +11,12 @@ import {
   type RouteProp,
 } from '@react-navigation/native';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
-import { ErrorState, Header, Screen } from '../../../components/ui';
+import { AppText, ErrorState, Header, Screen } from '../../../components/ui';
+import { env } from '../../../config/env';
 import { t } from '../../../i18n';
+import { space } from '../../../theme';
 import { TOP_UP_STATUS_ROUTE, type WalletRoutes } from '../navigation';
-import { isAllowedCheckoutUrl, isTopUpReturnUrl } from '../topUpLinks';
+import { checkoutHostOf, isAllowedCheckoutStartUrl, isAllowedCheckoutUrl, isTopUpReturnUrl } from '../topUpLinks';
 
 /**
  * Deliberately every origin. react-native-webview hands any URL that fails `originWhitelist` to
@@ -41,7 +43,9 @@ export const checkoutDecision = (
 
 /**
  * The gateway's hosted checkout (T-515, BE-74 `next_action.redirect`) in an in-app browser.
- * Only https pages load (and the local backend in Debug); every other scheme is blocked and
+ * It starts only on the API's signed checkout page or a gateway checkout host (SEC-43,
+ * isAllowedCheckoutStartUrl) and shows the current page's host under the title. After that only
+ * https pages load (and the local backend in Debug); every other scheme is blocked and
  * never handed to the OS. The server ends the flow by redirecting to
  * `raahehaq://wallet/topup?id=…`; that navigation is caught here and the status screen takes over, which reads the real
  * result from GET /wallet/topups/{id}. Closing the page (X or Android back) also goes to the
@@ -69,8 +73,11 @@ export default function TopUpCheckoutScreen() {
     );
   }, [navigation, result, providerName]);
 
-  // Defence in depth (AddMoney already checks): a page that is not allowed never loads.
-  const allowed = isAllowedCheckoutUrl(url);
+  // Defence in depth (AddMoney already checks): SEC-43, the page starts only on the API's own
+  // checkout page or a gateway checkout host; anything else never loads.
+  const allowed = isAllowedCheckoutStartUrl(url, { apiUrl: env.API_URL });
+  // SEC-43: the in-app view has no address bar, so the page's host is shown under the title.
+  const [host, setHost] = useState<string | null>(() => checkoutHostOf(url));
   useEffect(() => {
     if (!allowed) finish();
   }, [allowed, finish]);
@@ -99,7 +106,20 @@ export default function TopUpCheckoutScreen() {
   // Android may report the return link as a navigation without asking first.
   const onNavigationStateChange = useCallback(
     (state: WebViewNavigation) => {
-      if (checkoutDecision(state.url, returnUrl) === 'finish') finish();
+      const decision = checkoutDecision(state.url, returnUrl);
+      if (decision === 'finish') {
+        finish();
+      } else if (decision === 'load') {
+        const nextHost = checkoutHostOf(state.url);
+        if (nextHost === null) {
+          // SEC-43: a page whose host can't be shown (user info, "_" in the host, an odd
+          // authority) is not kept on screen without a host: stop it and go to the status screen.
+          webView.current?.stopLoading();
+          finish();
+        } else {
+          setHost(nextHost);
+        }
+      }
     },
     [finish, returnUrl],
   );
@@ -113,6 +133,18 @@ export default function TopUpCheckoutScreen() {
         tone="background"
         testID="top-up-checkout"
       />
+      {allowed && host ? (
+        <AppText
+          variant="caption"
+          color="textSecondary"
+          align="center"
+          numberOfLines={1}
+          style={styles.host}
+          testID="top-up-checkout-host"
+        >
+          {host}
+        </AppText>
+      ) : null}
       {failed ? (
         <ErrorState
           title={t('topUp.checkoutLoadFailed')}
@@ -160,6 +192,7 @@ export default function TopUpCheckoutScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  host: { paddingHorizontal: space[4], paddingBottom: space[2] },
   hidden: { display: 'none' },
   loading: {
     ...StyleSheet.absoluteFillObject,

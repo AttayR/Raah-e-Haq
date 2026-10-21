@@ -11,7 +11,14 @@ import { toTopUpResult, toTopUpBody, toWallet, toTransaction, walletApi } from '
 import { canTopUpToday, topUpPresets, validateTopUpForm, type TopUpFormValues } from '../../../src/features/wallet/topUpForm';
 import { isForegroundState, newIdempotencyKey, useCreateTopUp, useTopUpStatus } from '../../../src/features/wallet/topUpHooks';
 import { Linking } from 'react-native';
-import { isAllowedCheckoutUrl, isTopUpReturnUrl, topUpIdFromPath, topUpIdFromUrl } from '../../../src/features/wallet/topUpLinks';
+import {
+  checkoutHostOf,
+  isAllowedCheckoutStartUrl,
+  isAllowedCheckoutUrl,
+  isTopUpReturnUrl,
+  topUpIdFromPath,
+  topUpIdFromUrl,
+} from '../../../src/features/wallet/topUpLinks';
 import { transactionIcon } from '../../../src/features/wallet/format';
 import { providerDisplayName } from '../../../src/features/wallet/topUpFormat';
 import { createLinking, stateForPath, type AuthSnapshot } from '../../../src/app/navigation/linking';
@@ -372,6 +379,60 @@ describe('return link', () => {
     expect(isAllowedCheckoutUrl('http://localhost.evil.test/x', true)).toBe(false);
     expect(isAllowedCheckoutUrl('http://127.0.0.1:8000/x', false)).toBe(false);
     expect(isAllowedCheckoutUrl('https://', false)).toBe(false);
+  });
+
+  describe('SEC-43: the checkout start URL allowlist', () => {
+    const prod = { apiUrl: 'https://raahehaq.com/api', dev: false };
+    const local = { apiUrl: 'http://localhost:8000/api', dev: true };
+    const signed = `/api/payments/checkout/${TOP_UP_ID}?expires=1761040000&signature=abc123`;
+
+    it('accepts the API\'s own signed checkout page, on the API origin only', () => {
+      expect(isAllowedCheckoutStartUrl(`https://raahehaq.com${signed}`, prod)).toBe(true);
+      expect(isAllowedCheckoutStartUrl(`https://RaaheHaq.com:443${signed}`, prod)).toBe(true);
+      expect(isAllowedCheckoutStartUrl(`https://raahehaq.com.evil.test${signed}`, prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl(`https://raahehaq.com@evil.test${signed}`, prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl(`https://raahehaq.com:8443${signed}`, prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl(`http://raahehaq.com${signed}`, prod)).toBe(false);
+      // Another page of the API origin is not the checkout.
+      expect(isAllowedCheckoutStartUrl('https://raahehaq.com/api/wallet', prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl('https://raahehaq.com/payments/checkout/top_x', prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl(`https://raahehaq.com/api/payments/checkout/${TOP_UP_ID}/../../admin`, prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl('https://raahehaq.com/api/payments/checkout/', prod)).toBe(false);
+    });
+
+    it('accepts a gateway checkout host (production always, sandbox only in Debug); nothing else', () => {
+      expect(isAllowedCheckoutStartUrl('https://payments.jazzcash.com.pk/CustomerPortal/transactionmanagement/merchantform/', prod)).toBe(true);
+      expect(isAllowedCheckoutStartUrl('https://easypay.easypaisa.com.pk/easypay/Index.jsf', prod)).toBe(true);
+      expect(isAllowedCheckoutStartUrl('https://sandbox.jazzcash.com.pk/CustomerPortal/x', prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl('https://sandbox.jazzcash.com.pk/CustomerPortal/x', { ...prod, dev: true })).toBe(true);
+      expect(isAllowedCheckoutStartUrl('https://easypaystg.easypaisa.com.pk/easypay/Index.jsf', { ...prod, dev: true })).toBe(true);
+      expect(isAllowedCheckoutStartUrl('http://payments.jazzcash.com.pk/x', { ...prod, dev: true })).toBe(false);
+      expect(isAllowedCheckoutStartUrl('https://payments.jazzcash.com.pk.evil.test/x', prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl('https://jazzcash-payments.example.test/x', prod)).toBe(false);
+      expect(isAllowedCheckoutStartUrl('https://pay.example.test/c', { ...prod, dev: true })).toBe(false);
+    });
+
+    it('local Debug: the backend\'s checkout page over http, under any local name the emulator uses', () => {
+      expect(isAllowedCheckoutStartUrl(`http://localhost:8000${signed}`, local)).toBe(true);
+      expect(isAllowedCheckoutStartUrl(`http://127.0.0.1:8000${signed}`, local)).toBe(true);
+      expect(isAllowedCheckoutStartUrl(`http://10.0.2.2:8000${signed}`, local)).toBe(true);
+      expect(isAllowedCheckoutStartUrl(`http://localhost:8000${signed}`, { ...local, dev: false })).toBe(false);
+      expect(isAllowedCheckoutStartUrl(`http://evil.test:8000${signed}`, local)).toBe(false);
+      expect(isAllowedCheckoutStartUrl('http://localhost:8000/api/payments/fake/callback', local)).toBe(false);
+      // A local name is never trusted for a production API.
+      expect(isAllowedCheckoutStartUrl(`http://localhost:8000${signed}`, { ...prod, dev: true })).toBe(false);
+    });
+
+    it('never accepts a non-web scheme', () => {
+      ['tel:123', 'intent://pay#Intent;end', 'jazzcash://pay', 'raahehaq://wallet/topup?id=top_1', 'file:///etc/hosts'].forEach((url) =>
+        expect(isAllowedCheckoutStartUrl(url, local)).toBe(false),
+      );
+    });
+
+    it('names the host to show under the title', () => {
+      expect(checkoutHostOf(`https://RaaheHaq.com${signed}`)).toBe('raahehaq.com');
+      expect(checkoutHostOf('tel:123')).toBeNull();
+    });
   });
 
   it('never hands a non-web scheme from the checkout to the OS (the library whitelist path)', async () => {

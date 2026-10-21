@@ -191,7 +191,7 @@ describe('AddMoneyScreen', () => {
           method: 'card',
           status: 'created',
           mobile_number: null,
-          next_action: { type: 'redirect', url: 'http://localhost:8000/payments/checkout/top_1?signature=x', return_url: 'raahehaq://wallet/topup' },
+          next_action: { type: 'redirect', url: 'https://api.raah.test/api/payments/checkout/top_1?expires=1&signature=x', return_url: 'raahehaq://wallet/topup' },
         }),
       ),
     );
@@ -205,13 +205,13 @@ describe('AddMoneyScreen', () => {
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith(
         'TopUpCheckout',
-        expect.objectContaining({ url: 'http://localhost:8000/payments/checkout/top_1?signature=x', returnUrl: 'raahehaq://wallet/topup' }),
+        expect.objectContaining({ url: 'https://api.raah.test/api/payments/checkout/top_1?expires=1&signature=x', returnUrl: 'raahehaq://wallet/topup' }),
       ),
     );
     expect(JSON.parse(mock.history.post[0].data)).toEqual({ amount: 750, provider: 'fake', method: 'card' });
   });
 
-  it('refuses a checkout URL that is not https (or the Debug local backend) and goes to the status screen', async () => {
+  it('SEC-43: refuses a look-alike https start URL (not the API checkout page or a gateway host) and goes to the status screen', async () => {
     mock.onGet('/wallet').reply(200, walletWithTopUp());
     mock.onPost('/wallet/topups').reply(
       201,
@@ -220,7 +220,7 @@ describe('AddMoneyScreen', () => {
           method: 'card',
           status: 'created',
           mobile_number: null,
-          next_action: { type: 'redirect', url: 'http://pay.example.test/checkout', return_url: 'raahehaq://wallet/topup' },
+          next_action: { type: 'redirect', url: 'https://pay.example.test/checkout', return_url: 'raahehaq://wallet/topup' },
         }),
       ),
     );
@@ -309,14 +309,20 @@ describe('AddMoneyScreen', () => {
 
 describe('TopUpCheckoutScreen', () => {
   it('loads the checkout page and hands the return link to the status screen', async () => {
+    const start = `https://api.raah.test/api/payments/checkout/${TOP_UP_ID}?expires=1&signature=x`;
     const result = toTopUpResult(
-      rawTopUp({ method: 'card', status: 'created', next_action: { type: 'redirect', url: 'https://pay.example.test/c', return_url: 'raahehaq://wallet/topup' } }),
+      rawTopUp({ method: 'card', status: 'created', next_action: { type: 'redirect', url: start, return_url: 'raahehaq://wallet/topup' } }),
     );
-    mockParams = { result, url: 'https://pay.example.test/c', returnUrl: 'raahehaq://wallet/topup', providerName: 'Test gateway' };
+    mockParams = { result, url: start, returnUrl: 'raahehaq://wallet/topup', providerName: 'Test gateway' };
     show(TopUpCheckoutScreen);
     const webView = await screen.findByTestId('top-up-checkout-webview');
-    expect(webView.props.source).toEqual({ uri: 'https://pay.example.test/c' });
-    expect(webView.props.onShouldStartLoadWithRequest({ url: 'https://pay.example.test/pay' })).toBe(true);
+    expect(webView.props.source).toEqual({ uri: start });
+    // SEC-43: the page's host is shown (no address bar in the in-app view) and follows the page.
+    expect(screen.getByTestId('top-up-checkout-host')).toHaveTextContent('api.raah.test');
+    // Later pages (the gateway, 3-D Secure) may be any https.
+    expect(webView.props.onShouldStartLoadWithRequest({ url: 'https://sandbox.jazzcash.com.pk/CustomerPortal/x' })).toBe(true);
+    act(() => webView.props.onNavigationStateChange({ url: 'https://sandbox.jazzcash.com.pk/CustomerPortal/x' }));
+    expect(screen.getByTestId('top-up-checkout-host')).toHaveTextContent('sandbox.jazzcash.com.pk');
     expect(webView.props.onShouldStartLoadWithRequest({ url: 'intent://x#Intent;end' })).toBe(false);
     expect(mockDispatch).not.toHaveBeenCalled();
 
@@ -337,6 +343,31 @@ describe('TopUpCheckoutScreen (disallowed URL)', () => {
     await waitFor(() => expect(mockDispatch).toHaveBeenCalledTimes(1));
     expect(mockDispatch.mock.calls[0][0]).toMatchObject({ type: 'REPLACE', payload: { name: 'TopUpStatus' } });
     expect(screen.queryByTestId('top-up-checkout-webview')).toBeNull();
+  });
+
+  it('SEC-43: a later page whose host cannot be shown stops the checkout and goes to the status screen', async () => {
+    const start = `https://api.raah.test/api/payments/checkout/${TOP_UP_ID}?expires=1&signature=x`;
+    for (const next of ['https://user@pay.example.test/x', 'https://pay_example.test/x', 'https://pay.example.test:99999999/x']) {
+      mockDispatch.mockClear();
+      mockParams = { result: toTopUpResult(rawTopUp({ method: 'card', status: 'created' })), url: start, returnUrl: null };
+      show(TopUpCheckoutScreen);
+      const webView = await screen.findByTestId('top-up-checkout-webview');
+      expect(screen.getByTestId('top-up-checkout-host')).toHaveTextContent('api.raah.test');
+      act(() => webView.props.onNavigationStateChange({ url: next }));
+      expect(mockDispatch).toHaveBeenCalledTimes(1);
+      expect(mockDispatch.mock.calls[0][0]).toMatchObject({ type: 'REPLACE', payload: { name: 'TopUpStatus' } });
+      screen.unmount();
+    }
+  });
+
+  it('SEC-43: a look-alike https start page never loads', async () => {
+    const result = toTopUpResult(rawTopUp({ method: 'card', status: 'created' }));
+    mockParams = { result, url: 'https://jazzcash-pay.example.test/checkout', returnUrl: null };
+    show(TopUpCheckoutScreen);
+    await waitFor(() => expect(mockDispatch).toHaveBeenCalledTimes(1));
+    expect(mockDispatch.mock.calls[0][0]).toMatchObject({ type: 'REPLACE', payload: { name: 'TopUpStatus' } });
+    expect(screen.queryByTestId('top-up-checkout-webview')).toBeNull();
+    expect(screen.queryByTestId('top-up-checkout-host')).toBeNull();
   });
 });
 

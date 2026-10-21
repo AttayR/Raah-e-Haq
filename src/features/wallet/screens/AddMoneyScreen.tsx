@@ -38,7 +38,8 @@ import {
 } from '../topUpForm';
 import { useCreateTopUp } from '../topUpHooks';
 import { isDeletionScheduledRefusal, offerKeepAccount, type KeepAccountDispatch } from '../../account-deletion/keepAccount';
-import { isAllowedCheckoutUrl } from '../topUpLinks';
+import { env } from '../../../config/env';
+import { isAllowedCheckoutStartUrl } from '../topUpLinks';
 import type { TopUpConfig, TopUpMethod, TopUpResult } from '../types';
 
 /** Refusals that belong under the amount field (BE-74). */
@@ -161,9 +162,9 @@ export default function AddMoneyScreen() {
 
   const onResult = (result: TopUpResult) => {
     const providerName = provider?.name;
-    // Only an https checkout (or the local backend in Debug) opens; anything else goes to the
+    // SEC-43: only the API's own checkout page or a gateway host opens; anything else goes to the
     // status screen, which reads the result from the server.
-    if (result.nextAction.type === 'redirect' && isAllowedCheckoutUrl(result.nextAction.url)) {
+    if (result.nextAction.type === 'redirect' && isAllowedCheckoutStartUrl(result.nextAction.url, { apiUrl: env.API_URL })) {
       navigation.replace(TOP_UP_CHECKOUT_ROUTE, {
         result,
         url: result.nextAction.url,

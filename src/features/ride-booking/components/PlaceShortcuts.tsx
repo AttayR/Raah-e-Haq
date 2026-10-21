@@ -1,5 +1,7 @@
 import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../store';
 import { useAppTheme } from '../../../app/providers/ThemeProvider';
 import { AppText, ListItem, SkeletonGroup, SkeletonListItem } from '../../../components/ui';
 import { t } from '../../../i18n';
@@ -117,7 +119,8 @@ function PlaceShortcutsBase({ onPick }: { onPick: PlaceShortcutPick }) {
   const rides = useRecentRides(HOME_RECENT_RIDES + 1, true, { reuseCached: true });
   const rideItems = rides.data;
   // UI-R9b: a recent removed on Home is not listed here either.
-  const hidden = useHiddenRecents();
+  const userId = useSelector((state: RootState) => state.apiAuth.user?.id ?? null);
+  const hidden = useHiddenRecents(userId);
   const recents = React.useMemo(
     () => recentDestinations(rideItems ?? [], saved.places, SEARCH_RECENT_DESTINATIONS, hidden),
     [rideItems, saved.places, hidden],

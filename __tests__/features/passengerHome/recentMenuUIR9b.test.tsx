@@ -19,6 +19,7 @@ import {
   HIDDEN_RECENTS_KEY,
   __resetHiddenRecentsForTests,
   clearHiddenRecents,
+  hiddenRecentsKey,
   hideRecent,
   loadHiddenRecents,
   useHiddenRecents,
@@ -142,6 +143,7 @@ describe('the menu', () => {
   it('the hook: Save opens the form, Remove hides the recent with a toast and no request', async () => {
     const navigate = jest.fn();
     const success = jest.spyOn(toast, 'success');
+    await loadHiddenRecents(7);
     const { result } = renderHook(() => useRecentPlaceMenu({ navigate }, [], 10));
     act(() => result.current.open(recent));
     expect(result.current.recent).toBe(recent);
@@ -152,7 +154,9 @@ describe('the menu', () => {
     expect(success).toHaveBeenCalledWith('Removed from recents');
     expect(navigate).toHaveBeenCalledTimes(1);
     await flush();
-    expect(JSON.parse((await AsyncStorage.getItem(HIDDEN_RECENTS_KEY)) ?? '[]')).toEqual([recent.key]);
+    expect(JSON.parse((await AsyncStorage.getItem(hiddenRecentsKey(7))) ?? '[]')).toEqual([recent.key]);
+    // SEC-42: never under the old global key.
+    expect(await AsyncStorage.getItem(HIDDEN_RECENTS_KEY)).toBeNull();
     success.mockRestore();
   });
 });
@@ -170,19 +174,65 @@ describe('hidden recents', () => {
   });
 
   it('the hook follows changes; stored keys load at start; sign-out clears them', async () => {
-    await AsyncStorage.setItem(HIDDEN_RECENTS_KEY, JSON.stringify(['a, lahore']));
-    const { result } = renderHook(() => useHiddenRecents());
+    await AsyncStorage.setItem(hiddenRecentsKey(7), JSON.stringify(['a, lahore']));
+    const { result } = renderHook(() => useHiddenRecents(7));
     await act(async () => {
-      await loadHiddenRecents();
+      await loadHiddenRecents(7);
     });
     expect([...result.current]).toEqual(['a, lahore']);
     act(() => hideRecent('b, lahore'));
     expect([...result.current]).toEqual(['a, lahore', 'b, lahore']);
+    expect(JSON.parse((await AsyncStorage.getItem('home_hidden_recents.7')) ?? '[]')).toEqual(['a, lahore', 'b, lahore']);
     await act(async () => {
       await clearHiddenRecents();
     });
     expect(result.current.size).toBe(0);
-    expect(await AsyncStorage.getItem(HIDDEN_RECENTS_KEY)).toBeNull();
+    expect(await AsyncStorage.getItem(hiddenRecentsKey(7))).toBeNull();
+  });
+
+  it('SEC-42: the list is per user; another account on the phone never sees it, and nothing is stored signed out', async () => {
+    const { result, rerender } = renderHook(({ id }: { id: number | null }) => useHiddenRecents(id), {
+      initialProps: { id: 7 as number | null },
+    });
+    await act(async () => {
+      await loadHiddenRecents(7);
+    });
+    act(() => hideRecent('home of a friend, lahore'));
+    expect(result.current.has('home of a friend, lahore')).toBe(true);
+    // The old global key is not read at all.
+    await AsyncStorage.setItem(HIDDEN_RECENTS_KEY, JSON.stringify(['global, lahore']));
+
+    rerender({ id: 8 });
+    await act(async () => {
+      await loadHiddenRecents(8);
+    });
+    expect(result.current.size).toBe(0);
+    act(() => hideRecent('b, lahore'));
+    expect(JSON.parse((await AsyncStorage.getItem(hiddenRecentsKey(8))) ?? '[]')).toEqual(['b, lahore']);
+    expect(JSON.parse((await AsyncStorage.getItem(hiddenRecentsKey(7))) ?? '[]')).toEqual(['home of a friend, lahore']);
+
+    rerender({ id: null });
+    await act(async () => {
+      await loadHiddenRecents(null);
+    });
+    expect(result.current.size).toBe(0);
+  });
+
+  it('SEC-42: sign-out removes every stored list (any user, and the global key of older builds), nothing else', async () => {
+    await AsyncStorage.multiSet([
+      [hiddenRecentsKey(7), JSON.stringify(['a, lahore'])],
+      [hiddenRecentsKey(8), JSON.stringify(['b, lahore'])],
+      [HIDDEN_RECENTS_KEY, JSON.stringify(['c, lahore'])],
+      ['app_language', 'ur'],
+    ]);
+    await clearHiddenRecents();
+    const stored = await AsyncStorage.multiGet([hiddenRecentsKey(7), hiddenRecentsKey(8), HIDDEN_RECENTS_KEY, 'app_language']);
+    expect(stored).toEqual([
+      [hiddenRecentsKey(7), null],
+      [hiddenRecentsKey(8), null],
+      [HIDDEN_RECENTS_KEY, null],
+      ['app_language', 'ur'],
+    ]);
   });
 
   it('review: a first read answering after a sign-out cleared the keys never brings them back', async () => {
@@ -190,7 +240,7 @@ describe('hidden recents', () => {
     const getItem = jest
       .spyOn(AsyncStorage, 'getItem')
       .mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
-    const { result } = renderHook(() => useHiddenRecents());
+    const { result } = renderHook(() => useHiddenRecents(7));
     await act(async () => {
       await clearHiddenRecents();
     });

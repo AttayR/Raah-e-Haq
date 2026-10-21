@@ -128,7 +128,7 @@ export default function PassengerHomeScreen() {
   );
   // UI-R9: where the passenger went lately (their finished rides), after the saved places;
   // UI-R9b: minus the ones removed from recents (long press menu, this phone only).
-  const hiddenRecents = useHiddenRecents();
+  const hiddenRecents = useHiddenRecents(user?.id ?? null);
   const recents = useMemo(
     () => recentDestinations(rideItems ?? [], saved.places, HOME_RECENT_DESTINATIONS, hiddenRecents),
     [rideItems, saved.places, hiddenRecents],

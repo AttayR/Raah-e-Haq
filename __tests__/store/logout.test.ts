@@ -65,6 +65,10 @@ const signIn = async (store: ReturnType<typeof makeStore>['store']) => {
   await AsyncStorage.multiSet([
     ['@auth_session', JSON.stringify({ uid: 'firebase-uid' })],
     ['notifications', JSON.stringify([{ id: 1, title: 'Old user notification' }])],
+    // SEC-42: this user's hidden recents, the global list of older builds and the invite code.
+    ['home_hidden_recents.7', JSON.stringify(['emporium mall, johar town, lahore'])],
+    ['home_hidden_recents', JSON.stringify(['liberty market, lahore'])],
+    ['rh.invite.code.7', JSON.stringify({ referral_code: 'RAAH7', share_url: null })],
   ]);
   expect(store.getState()).not.toEqual(initialRoot());
 };
@@ -88,6 +92,9 @@ const expectFullySignedOut = async (
     'user_data',
     '@auth_session',
     'notifications',
+    'home_hidden_recents.7',
+    'home_hidden_recents',
+    'rh.invite.code.7',
   ]);
   stored.forEach(([, value]) => expect(value).toBeNull());
   expect(await authStorage.getToken()).toBeNull();
