@@ -16,6 +16,8 @@ import type { FareOffer } from '../../fare/hooks';
 import type { FareNotice } from '../../fare/types';
 import { FareNoticeBanner } from '../../fare/components/FareBits';
 import type { VehicleOption } from '../vehicleOptions';
+import { useBookingCooldownSeconds } from '../bookingCooldown';
+import { formatCountdown } from '../../safety/pin';
 
 type Coords = { latitude: number; longitude: number };
 
@@ -251,7 +253,8 @@ type FooterProps = {
 /**
  * The choose-ride sheet's one primary action, pinned in the footer (§12.2 map archetype):
  * "Request {tier} · {fare}" (§12.5 [UI-R5]) with the server's tier name and the offer (else the
- * quote). Disabled "Request" until the selected tier is priced. Haptic `impactLight` (§6.11).
+ * quote). Disabled "Request" until the selected tier is priced, and "Request again in m:ss" while
+ * a BOOKING_COOLDOWN runs. Haptic `impactLight` (§6.11).
  */
 export const ChooseRideFooter: React.FC<FooterProps> = ({
   options,
@@ -264,22 +267,26 @@ export const ChooseRideFooter: React.FC<FooterProps> = ({
   forceOffline = false,
 }) => {
   const offline = useIsOffline() || forceOffline;
+  // BOOKING_COOLDOWN: held with a countdown; this button is the only thing that re-renders each second.
+  const cooldown = useBookingCooldownSeconds();
   const option = useMemo(() => options.find((o) => o.id === selectedVehicle) ?? null, [options, selectedVehicle]);
   const quote = estimateFor(estimates.data, selectedVehicle);
   const fare = requestFareText(quote, offer);
   const ready = !!option && !!fare && !option.unavailable;
   const label = offline
     ? BOOKING_COPY.requestOffline
-    : ready && option && fare
-      ? BOOKING_COPY.requestWithFare(option.name, fare)
-      : BOOKING_COPY.requestIdle;
+    : cooldown > 0
+      ? BOOKING_COPY.requestCooldown(formatCountdown(cooldown))
+      : ready && option && fare
+        ? BOOKING_COPY.requestWithFare(option.name, fare)
+        : BOOKING_COPY.requestIdle;
   return (
     <Button
       label={label}
       size="lg"
       haptic="impactLight"
       onPress={onConfirm}
-      disabled={!ready || offline || disabled}
+      disabled={!ready || offline || disabled || cooldown > 0}
       loading={confirming}
       testID="fare-request"
     />

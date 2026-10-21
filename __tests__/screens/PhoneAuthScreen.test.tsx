@@ -12,6 +12,7 @@ import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import apiAuthReducer from '../../src/store/slices/apiAuthSlice';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
+import { authStorage } from '../../src/services/authStorage';
 import { activeOtpSendHold, resetOtpSendHold } from '../../src/features/auth/otpSendHold';
 import { ImageBackground, Keyboard, ScrollView } from 'react-native';
 
@@ -267,6 +268,30 @@ describe('PhoneAuthScreen (T-101)', () => {
       );
       // T-603: shown once — the toast only, no inline copy under the code field.
       expect(screen.queryByTestId('phone-auth-code-error')).toBeNull();
+    });
+
+    it('403 ADMIN_USE_PANEL (T-714): the admin copy as a toast; no session, no token stored', async () => {
+      const error = jest.spyOn(toast, 'error');
+      const save = jest.spyOn(authStorage, 'saveSession');
+      replyLocalSend();
+      mock.onPost('/auth/verify-otp').reply(403, {
+        success: false,
+        message: 'Server text for admins',
+        code: 'ADMIN_USE_PANEL',
+      });
+      const store = await renderScreen();
+      await sendCode();
+      await enterAndVerify();
+      await waitFor(() =>
+        expect(error).toHaveBeenCalledWith(
+          'This app is for passengers and drivers',
+          'Admins use the web dashboard. Sign in with a passenger or driver account.',
+          expect.objectContaining({ duration: expect.any(Number) }),
+        ),
+      );
+      expect(screen.queryByTestId('phone-auth-code-error')).toBeNull();
+      expect(store.getState().apiAuth.isAuthenticated).toBe(false);
+      expect(save).not.toHaveBeenCalled();
     });
   });
 

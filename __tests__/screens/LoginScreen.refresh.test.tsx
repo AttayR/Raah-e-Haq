@@ -16,6 +16,7 @@ import { ThemeProvider } from '../../src/app/providers/ThemeProvider';
 import apiAuthReducer from '../../src/store/slices/apiAuthSlice';
 import { apiClient } from '../../src/services/api';
 import { toast } from '../../src/core/toast';
+import { authStorage } from '../../src/services/authStorage';
 
 jest.mock('../../src/store', () => {
   const redux = jest.requireActual('react-redux');
@@ -158,6 +159,32 @@ describe('LoginScreen (UI-R6)', () => {
       ),
     );
     expect(screen.queryByTestId('login-password-error')).toBeNull();
+  });
+
+  it('403 ADMIN_USE_PANEL: the admin copy as a toast, not the server text; no token stored (T-714)', async () => {
+    const error = jest.spyOn(toast, 'error');
+    const save = jest.spyOn(authStorage, 'saveSession');
+    mockParams = { method: 'email' };
+    mock.onPost('/auth/login').reply(403, {
+      success: false,
+      message: 'Server text for admins',
+      code: 'ADMIN_USE_PANEL',
+    });
+    await renderLogin();
+    typeCredentials('admin@example.test', 'password1');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('login-submit'));
+    });
+    await waitFor(() =>
+      expect(error).toHaveBeenCalledWith(
+        'This app is for passengers and drivers',
+        'Admins use the web dashboard. Sign in with a passenger or driver account.',
+        expect.objectContaining({ duration: expect.any(Number) }),
+      ),
+    );
+    expect(error.mock.calls.some(([title]) => title === 'Server text for admins')).toBe(false);
+    expect(screen.queryByTestId('login-password-error')).toBeNull();
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('a double tap on Sign in sends one request (T-107)', async () => {

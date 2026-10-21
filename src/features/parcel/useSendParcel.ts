@@ -17,6 +17,7 @@ import { useFareEstimates } from '../ride-booking/hooks';
 import type { FareEstimate } from '../ride-booking/api';
 import { classifyRideRequestFailure } from '../ride-booking/rideRequestFailure';
 import { useBookingAttemptKeys } from '../ride-booking/idempotency';
+import { bookingCooldownSeconds, holdBookings } from '../ride-booking/bookingCooldown';
 import { useFareOffer } from '../fare/hooks';
 import { isParcelType } from './api';
 import { EMPTY_PARCEL_DRAFT, buildParcelRideRequest, parcelFieldErrorsOf } from './rules';
@@ -74,6 +75,8 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
   const [draft, setDraft] = useState<ParcelDraft>(EMPTY_PARCEL_DRAFT);
   const [errors, setErrors] = useState<ParcelFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  // BOOKING_COOLDOWN: the banner's message while the hold runs; cleared with the banner at 0.
+  const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // T-578: every refused submit scrolls to the topmost field still in error (also one that was
   // already red, e.g. the declaration checkbox off screen). A new object each time, so the same
@@ -114,6 +117,26 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
       })
       .catch(() => undefined);
   }, [pickupIsGps, lat, lng]);
+
+  // When the booking hold ends, its banner goes (unless another error replaced it meanwhile). One
+  // timeout to the end of the hold (re-armed if the hold was extended), cleared on unmount.
+  useEffect(() => {
+    if (cooldownMessage === null) return undefined;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = () => {
+      const left = bookingCooldownSeconds();
+      if (left > 0) {
+        timer = setTimeout(check, left * 1000);
+        return;
+      }
+      setFormError((e) => (e === cooldownMessage ? null : e));
+      setCooldownMessage(null);
+    };
+    check();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [cooldownMessage]);
 
   const anchor = useCallback<ParcelAnchor>((field) => {
     let ref = anchorRefs.current.get(field);
@@ -213,7 +236,8 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
   const keys = useBookingAttemptKeys();
 
   const submit = useCallback(async () => {
-    if (!options || inFlight.current) return;
+    // BOOKING_COOLDOWN: the button is disabled meanwhile; a press that still lands sends nothing.
+    if (!options || inFlight.current || bookingCooldownSeconds() > 0) return;
     // Taken before the geocode await, so a second tap meanwhile sends nothing (one POST).
     inFlight.current = true;
     setSubmitting(true);
@@ -274,6 +298,13 @@ export const useSendParcel = (options: ParcelOptions | null, currentLocation: La
         showBalanceOwed(failure, handlersRef.current.onBalanceOwed);
       } else if (failure.kind === 'deletion_scheduled') {
         offerKeepAccount(dispatch, 'booking').catch(() => undefined);
+      } else if (failure.kind === 'cooldown') {
+        // 429 BOOKING_COOLDOWN: the server's message in the form banner; Send is held, never retried.
+        holdBookings(failure.retryAfter);
+        if (mounted.current) {
+          setFormError(failure.message);
+          setCooldownMessage(failure.message);
+        }
       } else if (failure.kind !== 'handled') {
         setFormError(failure.message);
       }

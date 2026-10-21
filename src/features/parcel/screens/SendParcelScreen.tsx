@@ -18,6 +18,8 @@ import { ParcelDetailsSection } from '../components/ParcelDetailsSection';
 import { ParcelRouteSection } from '../components/ParcelRouteSection';
 import { useParcelOptions } from '../hooks';
 import { useSendParcel, type SendParcelForm } from '../useSendParcel';
+import { useBookingCooldownSeconds } from '../../ride-booking/bookingCooldown';
+import { formatCountdown } from '../../safety/pin';
 
 type Nav = NativeStackNavigationProp<PassengerStackParamList>;
 
@@ -47,6 +49,32 @@ function FareLine({ form }: { form: SendParcelForm }) {
         </AppText>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * "Send parcel". While a BOOKING_COOLDOWN (429) runs it is disabled as "Send again in m:ss"; only
+ * this button re-renders each second.
+ */
+function SendParcelButton({ form }: { form: SendParcelForm }) {
+  const cooldown = useBookingCooldownSeconds();
+  const label = form.submitting
+    ? t('parcel.booking')
+    : cooldown > 0
+      ? t('parcel.bookIn', { time: formatCountdown(cooldown) })
+      : t('parcel.book');
+  return (
+    <Button
+      label={label}
+      size="lg"
+      haptic="impactLight"
+      leadingIcon="parcel"
+      onPress={form.submit}
+      loading={form.submitting}
+      // Without both points the press shows what is missing; with them it needs the fare.
+      disabled={(form.estimates.status !== 'idle' && !form.quote) || cooldown > 0}
+      testID="send-parcel-submit"
+    />
   );
 }
 
@@ -141,17 +169,7 @@ export default function SendParcelScreen() {
         >
           {form.formError ? <Banner tone="danger" text={form.formError} testID="send-parcel-form-error" /> : null}
           <FareLine form={form} />
-          <Button
-            label={form.submitting ? t('parcel.booking') : t('parcel.book')}
-            size="lg"
-            haptic="impactLight"
-            leadingIcon="parcel"
-            onPress={form.submit}
-            loading={form.submitting}
-            // Without both points the press shows what is missing; with them it needs the fare.
-            disabled={form.estimates.status !== 'idle' && !form.quote}
-            testID="send-parcel-submit"
-          />
+          <SendParcelButton form={form} />
         </View>
       ) : null}
     </Screen>

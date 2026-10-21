@@ -8,6 +8,7 @@ import { useBookingAttemptKeys } from './idempotency';
 import { useConfirmRequest } from './useConfirmRequest';
 import type { BookingFlow } from './useBookingFlow';
 import { saveLastVehicle } from './vehicleSelection';
+import { bookingCooldownSeconds } from './bookingCooldown';
 
 type Options = {
   flow: Pick<BookingFlow, 'pickup' | 'destination' | 'stops' | 'selectedVehicle' | 'femaleDriverOnly' | 'setError' | 'setStage'>;
@@ -86,7 +87,8 @@ export const useBookingRequest = ({ flow, offer, requestRide }: Options) => {
   });
   const { confirm: confirmTap, confirming } = confirmRequest;
   const confirm = useCallback(() => {
-    if (!inFlight.current) confirmTap();
+    // BOOKING_COOLDOWN: the footer is disabled meanwhile; a tap that still lands sends nothing.
+    if (!inFlight.current && bookingCooldownSeconds() === 0) confirmTap();
   }, [confirmTap]);
 
   return { sending, confirming, busy: sending || confirming, confirm };

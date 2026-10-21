@@ -1193,6 +1193,7 @@ export const urLatn: TranslationTable = {
     fareNone: 'Is raaste par parcel delivery dastiyab nahi.',
     book: 'Parcel bhejein',
     booking: 'Bhej rahe hain…',
+    bookIn: '{time} mein dobara bhejein',
     fixFields: 'Nishan zada fields check karein.',
     statusRequested: 'Rider dhoond rahe hain',
     statusAccepted: 'Rider pickup ki taraf aa raha hai',

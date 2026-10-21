@@ -19,6 +19,7 @@ import { loginUser } from '../../src/store/thunks/apiThunks';
 import { createActiveRide, liveShareStarted } from '../../src/features/active-ride/slice';
 import type { User } from '../../src/services/api';
 import { activeOtpSendHold, rememberOtpSendHold } from '../../src/features/auth/otpSendHold';
+import { bookingCooldownSeconds, holdBookings } from '../../src/features/ride-booking/bookingCooldown';
 import { makeRide, makeRideRequest } from '../../test-utils/rideFixtures';
 
 const user: User = {
@@ -222,6 +223,18 @@ describe('logout thunk (T-102)', () => {
     await store.dispatch(logout());
 
     expect(activeOtpSendHold()).toBeNull();
+  });
+
+  it('[BOOKING_COOLDOWN] forgets the booking hold, even offline', async () => {
+    const { store } = makeStore();
+    await signIn(store);
+    holdBookings(300);
+    expect(bookingCooldownSeconds()).toBeGreaterThan(0);
+    mock.onPost('/auth/logout').networkError();
+
+    await store.dispatch(logout());
+
+    expect(bookingCooldownSeconds()).toBe(0);
   });
 
   it('still signs out locally when the token is already invalid (401)', async () => {

@@ -7,6 +7,7 @@ import { formatMoney } from '../../utils/format';
 import type { RideRequestFailure } from '../ride-booking/rideRequestFailure';
 import { BOOKING_COPY } from '../ride-booking/copy';
 import { offerKeepAccount } from '../account-deletion/keepAccount';
+import { holdBookings } from '../ride-booking/bookingCooldown';
 import { openExistingActiveRide, type ActiveRideState } from './slice';
 import { ACTIVE_RIDE_COPY } from './copy';
 
@@ -108,7 +109,8 @@ export const openActiveBooking = async (dispatch: ActiveRideDispatch, rideId: nu
 
 /**
  * The feedback for a refused POST /rides (useActiveRideActions' requestRide): phone verification,
- * the balance owed, the keep-account offer, or the server's message in an alert dialog. Already
+ * the balance owed, the keep-account offer, or the server's message in an alert dialog (a
+ * BOOKING_COOLDOWN also holds booking for its retry_after). Already
  * handled refusals (`handled`, an opened `already_active`) show nothing here.
  */
 export const showRideRequestFailure = (
@@ -123,6 +125,10 @@ export const showRideRequestFailure = (
   } else if (failure.kind === 'deletion_scheduled') {
     // BE-129: booking is refused while the deletion is scheduled; offer to keep the account.
     offerKeepAccount(dispatch, 'booking').catch(() => undefined);
+  } else if (failure.kind === 'cooldown') {
+    // 429 BOOKING_COOLDOWN: Request is held with a countdown (never retried); the server says why.
+    holdBookings(failure.retryAfter);
+    showRequestFailed(failure.message);
   } else if (failure.kind === 'message' || failure.kind === 'offer_out_of_band') {
     showRequestFailed(failure.message);
   }

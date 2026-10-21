@@ -11,6 +11,9 @@ import { radius, space } from '../../../theme';
 import { formatMoney } from '../../../utils/format';
 import { tierLabel } from '../../ride-history/copy';
 import { ACTIVE_RIDE_COPY } from '../copy';
+import { useBookingCooldownSeconds } from '../../ride-booking/bookingCooldown';
+import { BOOKING_COPY } from '../../ride-booking/copy';
+import { formatCountdown } from '../../safety/pin';
 
 /** After this long without a driver the subtitle says it is still looking (passenger-finding-driver.md). */
 export const FINDING_SLOW_AFTER_MS = 60_000;
@@ -178,12 +181,23 @@ export const NoDriverActions: React.FC<{ onRetry: () => void; onClose: () => voi
   onRetry,
   onClose,
   retrying = false,
-}) => (
-  <View style={styles.actions}>
-    <Button label={ACTIVE_RIDE_COPY.tryAgain} size="lg" onPress={onRetry} loading={retrying} testID="active-ride-try-again" />
-    <Button label={ACTIVE_RIDE_COPY.close} variant="ghost" onPress={onClose} disabled={retrying} testID="active-ride-close" />
-  </View>
-);
+}) => {
+  // BOOKING_COOLDOWN: Try again is a new POST /rides, so it is held like Request ("Request again in m:ss").
+  const cooldown = useBookingCooldownSeconds();
+  return (
+    <View style={styles.actions}>
+      <Button
+        label={cooldown > 0 ? BOOKING_COPY.requestCooldown(formatCountdown(cooldown)) : ACTIVE_RIDE_COPY.tryAgain}
+        size="lg"
+        onPress={onRetry}
+        loading={retrying}
+        disabled={cooldown > 0}
+        testID="active-ride-try-again"
+      />
+      <Button label={ACTIVE_RIDE_COPY.close} variant="ghost" onPress={onClose} disabled={retrying} testID="active-ride-close" />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   noDriver: { alignItems: 'center', gap: space[2], paddingTop: space[2] },

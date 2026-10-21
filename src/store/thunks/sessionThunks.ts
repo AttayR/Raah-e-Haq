@@ -18,6 +18,7 @@ import { isRecord, readId } from '../../core/api/read';
 import { resetOtpSendHold } from '../../features/auth/otpSendHold';
 import { clearLastVehicle } from '../../features/ride-booking/vehicleSelection';
 import { clearBookingDraft } from '../../features/ride-booking/bookingDraftStore';
+import { resetBookingCooldown } from '../../features/ride-booking/bookingCooldown';
 import { clearHiddenRecents } from '../../features/passenger-home/hiddenRecents';
 import { clearStoredInviteCodes } from '../../features/invite/inviteStorage';
 
@@ -147,6 +148,8 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
       resetOtpSendHold();
       // UI-R9b: the in-memory booking draft (a trip left on Back) is this user's.
       clearBookingDraft();
+      // BOOKING_COOLDOWN: the in-memory booking hold is this user's.
+      resetBookingCooldown();
       dispatch(resetApp());
       await step('purge persisted state', () => extra.purgePersistedState());
     }

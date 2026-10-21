@@ -11,6 +11,8 @@ export const PASSENGER_BALANCE_OWED = 'PASSENGER_BALANCE_OWED';
 export const RIDE_ALREADY_ACTIVE = 'RIDE_ALREADY_ACTIVE';
 /** BE-129: the passenger's account deletion is scheduled (423); "Keep my account" is offered. */
 export const ACCOUNT_DELETION_SCHEDULED = 'ACCOUNT_DELETION_SCHEDULED';
+/** 429 after 5 unaccepted requests cancelled within 30 minutes; `retry_after` seconds to wait. */
+export const BOOKING_COOLDOWN = 'BOOKING_COOLDOWN';
 
 /**
  * What the booking screen does with a refused POST /rides:
@@ -22,6 +24,9 @@ export const ACCOUNT_DELETION_SCHEDULED = 'ACCOUNT_DELETION_SCHEDULED';
  *   message is the server's and `band` (from `error.offer_band`, null if absent) resets the stepper;
  * - `deletion_scheduled`: BE-129 423, the account is in its deletion cooling-off period; the
  *   caller offers "Keep my account" (features/account-deletion offerKeepAccount);
+ * - `cooldown`: 429 BOOKING_COOLDOWN, the passenger cancelled too many unaccepted requests; the
+ *   server's message is shown and booking is held for `retryAfter` seconds (bookingCooldown),
+ *   never retried automatically;
  * - `already_active`: BE-113, the passenger already has an open booking (`rideId`, GET
  *   /rides/{id}); the app opens it instead of showing an error;
  * - `message`: show the server's text (for a 422 the first field message, e.g. "The selected
@@ -34,6 +39,7 @@ export type RideRequestFailure =
   | { kind: 'balance_owed'; message: string; amountOwed: number | null; limit: number | null }
   | { kind: 'offer_out_of_band'; message: string; band: OfferBand | null }
   | { kind: 'already_active'; message: string; rideId: number }
+  | { kind: 'cooldown'; message: string; retryAfter: number | null }
   | { kind: 'deletion_scheduled' }
   | { kind: 'handled' }
   | { kind: 'message'; message: string; uncertain?: boolean };
@@ -64,6 +70,15 @@ export const classifyRideRequestFailure = (
       message: rejectionMessage(rejection, fallback),
       amountOwed: typeof owed === 'number' && owed > 0 ? owed : null,
       limit: typeof limit === 'number' ? limit : null,
+    };
+  }
+  if (rejection.code === BOOKING_COOLDOWN) {
+    // Top-level retry_after or the Retry-After header (core/api/errors), else the nested one.
+    const wait = rejection.retryAfter ?? rejection.extra?.retry_after;
+    return {
+      kind: 'cooldown',
+      message: rejectionMessage(rejection, fallback),
+      retryAfter: typeof wait === 'number' && wait > 0 ? wait : null,
     };
   }
   if (rejection.code === ACCOUNT_DELETION_SCHEDULED) {

@@ -33,6 +33,7 @@ import {
   validateParcelDraft,
 } from '../../../src/features/parcel/rules';
 import { useSendParcel } from '../../../src/features/parcel/useSendParcel';
+import { bookingCooldownSeconds, resetBookingCooldown } from '../../../src/features/ride-booking/bookingCooldown';
 import { HomeSheetBody } from '../../../src/features/passenger-home/components/HomeSheet';
 import { homeBodyProps } from '../../../test-utils/homeFixtures';
 import type { ParcelDraft } from '../../../src/features/parcel/types';
@@ -350,6 +351,54 @@ describe('useSendParcel', () => {
     expect(result.current.draft.declarationAccepted).toBe(false);
     expect(h.onRulesChanged).toHaveBeenCalled();
     expect(h.onBooked).not.toHaveBeenCalled();
+  });
+
+  it('429 BOOKING_COOLDOWN: the server message in the form banner; Send is held, never retried', async () => {
+    mock.onPost('/rides/estimate').reply(200, envelope({ distance_km: 4, duration_min: 10, estimates: [] }));
+    const message = 'You cancelled several requests. You can book again in a few minutes.';
+    mock.onPost('/rides').reply(
+      429,
+      { success: false, message, code: 'BOOKING_COOLDOWN', retry_after: 120, error: { code: 'BOOKING_COOLDOWN', message, retry_after: 120 } },
+      { 'Retry-After': '120' },
+    );
+    const h = handlers();
+    const { result } = renderHook(() => useSendParcel(options, { latitude: 31.52, longitude: 74.35 }, h), { wrapper: withStore(makeStore()) });
+    try {
+      fillDraft(result);
+      await act(async () => {
+        await result.current.submit();
+      });
+      expect(result.current.formError).toBe(message);
+      expect(bookingCooldownSeconds()).toBeGreaterThan(115);
+      expect(bookingCooldownSeconds()).toBeLessThanOrEqual(120);
+      // A press that still lands while the hold runs sends nothing.
+      await act(async () => {
+        await result.current.submit();
+      });
+      expect(mock.history.post.filter((r) => r.url === '/rides')).toHaveLength(1);
+      expect(h.onBooked).not.toHaveBeenCalled();
+    } finally {
+      resetBookingCooldown();
+    }
+  });
+
+  it('BOOKING_COOLDOWN: the banner goes when the hold reaches 0', async () => {
+    mock.onPost('/rides/estimate').reply(200, envelope({ distance_km: 4, duration_min: 10, estimates: [] }));
+    const message = 'You cancelled several requests. You can book again in a few minutes.';
+    mock.onPost('/rides').reply(429, { success: false, message, code: 'BOOKING_COOLDOWN', retry_after: 2 }, { 'Retry-After': '2' });
+    const { result } = renderHook(() => useSendParcel(options, { latitude: 31.52, longitude: 74.35 }, handlers()), {
+      wrapper: withStore(makeStore()),
+    });
+    try {
+      fillDraft(result);
+      await act(async () => {
+        await result.current.submit();
+      });
+      expect(result.current.formError).toBe(message);
+      await waitFor(() => expect(result.current.formError).toBeNull(), { timeout: 4_000 });
+    } finally {
+      resetBookingCooldown();
+    }
   });
 });
 

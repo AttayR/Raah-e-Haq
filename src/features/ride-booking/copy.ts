@@ -19,6 +19,8 @@ export const BOOKING_COPY = localizedCopy({
   requestIdle: 'Request',
   /** UI-R10: the footer while NetInfo reports no connection. */
   requestOffline: "You're offline",
+  /** BOOKING_COOLDOWN (429): Request is held; `time` is m:ss from the server's retry_after. */
+  requestCooldown: (time: string) => `Request again in ${time}`,
   /** UI-R5 → UI-R10: one distance and duration format (`formatDistance` / `formatDuration`). */
   tripSummary: (km: number, min: number) => [formatDuration(min), formatDistance(km)].filter(Boolean).join(' · '),
   // UI-R10: the "Choose a ride" sheet (passenger-vehicle-fare.md).

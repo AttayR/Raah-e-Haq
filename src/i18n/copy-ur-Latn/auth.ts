@@ -426,6 +426,7 @@ export function registerAuthCopy(): void {
     approved: 'Aap approve ho gaye. Raah-e-Haq mein khush aamdeed!',
     checkFailed: 'Abhi check nahi ho saka. Dobara koshish karein.',
     reasonLabel: 'Wajah',
+    adminUsePanel: 'Admins web dashboard istemal karte hain. Passenger ya driver account se sign in karein.',
     reasonFollowUp: 'Koi sawal ho to support se rabta karein.',
     contactSupport: 'Support se rabta karein',
     supportSheetTitle: 'Support se rabta karein',

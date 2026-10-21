@@ -16,6 +16,7 @@ export function registerRideCopy(): void {
     requestWithFare: (vehicle: string, fare: string) => `${vehicle} mangwayein · ${fare}`,
     requestIdle: 'Request karein',
     requestOffline: 'Aap offline hain',
+    requestCooldown: (time: string) => `${time} mein dobara request karein`,
     tripSummary: (km: number, min: number) => [formatDuration(min), formatDistance(km)].filter(Boolean).join(' · '),
     chooseRideTitle: 'Sawari chunein',
     tripLine: (pickup: string, dropoff: string) => `${pickup} → ${dropoff}`,

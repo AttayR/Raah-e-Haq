@@ -1488,6 +1488,8 @@ export const en = {
     fareNone: 'Parcel delivery is not available on this route.',
     book: 'Send parcel',
     booking: 'Sending…',
+    /** BOOKING_COOLDOWN (429): Send parcel is held; `time` is m:ss from the server's retry_after. */
+    bookIn: 'Send again in {time}',
     fixFields: 'Please check the highlighted fields.',
     // Status (sender and driver).
     statusRequested: 'Finding a rider',

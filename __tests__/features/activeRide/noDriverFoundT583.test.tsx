@@ -16,6 +16,7 @@ import { NoDriverActions } from '../../../src/features/active-ride/components/Fi
 import { advanceRideStage, isNoDriverCancel } from '../../../src/features/active-ride/stage';
 import { useActiveRideActions } from '../../../src/features/active-ride/hooks';
 import { useNoDriverRetry } from '../../../src/features/active-ride/noDriver';
+import { holdBookings, resetBookingCooldown } from '../../../src/features/ride-booking/bookingCooldown';
 import { rebookRequestFor, rememberedBooking } from '../../../src/features/active-ride/lastBooking';
 import { createActiveRide, refreshActiveRide } from '../../../src/features/active-ride/slice';
 import { confirmPassengerLiveRide } from '../../../src/features/notifications/liveRideTarget';
@@ -92,6 +93,24 @@ describe('"No driver found" on the ride panel', () => {
     expect(screen.getByText('Try again')).toBeTruthy();
     expect(screen.getByText('Close')).toBeTruthy();
   });
+
+  it('BOOKING_COOLDOWN: Try again is disabled with the countdown and comes back at 0', () => {
+    jest.useFakeTimers();
+    try {
+      act(() => holdBookings(5));
+      render(<NoDriverActions onRetry={jest.fn()} onClose={jest.fn()} />);
+      expect(screen.getByTestId('active-ride-try-again')).toHaveTextContent('Request again in 0:05');
+      expect(screen.getByTestId('active-ride-try-again').props.accessibilityState).toMatchObject({ disabled: true });
+      act(() => {
+        jest.advanceTimersByTime(5_000);
+      });
+      expect(screen.getByTestId('active-ride-try-again')).toHaveTextContent('Try again');
+      expect(screen.getByTestId('active-ride-try-again').props.accessibilityState).toMatchObject({ disabled: false });
+    } finally {
+      resetBookingCooldown();
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('Try again books the same trip with a new key', () => {
@@ -131,6 +150,23 @@ describe('Try again books the same trip with a new key', () => {
     expect(second.headers?.['Idempotency-Key']).not.toBe('first-key-1');
     expect(store.getState().activeRide.ride?.id).toBe(42);
     expect(result.current.retrying).toBe(false);
+  });
+
+  it('BOOKING_COOLDOWN: a retry while the hold runs sends nothing', async () => {
+    const requestRide = jest.fn(() => Promise.resolve());
+    const onNothing = jest.fn();
+    holdBookings(60);
+    try {
+      const { result } = renderHook(() => useNoDriverRetry(noDriverRide({ id: 44 }), requestRide, onNothing));
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(requestRide).not.toHaveBeenCalled();
+      expect(onNothing).not.toHaveBeenCalled();
+      expect(result.current.retrying).toBe(false);
+    } finally {
+      resetBookingCooldown();
+    }
   });
 
   it('without a remembered body (a relaunch) a ride is rebuilt from itself; a parcel cannot be', () => {

@@ -13,7 +13,7 @@ import OtpService, { OTP_LENGTH, formatCountdown, sanitizeOtpInput } from '../..
 import { sendOtp, verifyOtp } from '../../store/thunks/apiThunks';
 import { logger } from '../../core/logging/logger';
 import { rejectionMessage } from '../../core/api/errors';
-import { accountRefusalParts, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
+import { accountRefusalParts, isAdminUsePanelRefusal, REFUSAL_TOAST_DURATION_MS } from '../../core/auth/accountRefusal';
 import { refusedAccountStatus, routesHome } from '../../core/auth/normalizeUser';
 import { classifyOtpRefusal, isGlobalOtpRefusal, type OtpRefusalLike } from '../../features/auth/otpRefusal';
 import { activeOtpSendHold, rememberOtpSendHold, resetOtpSendHold } from '../../features/auth/otpSendHold';
@@ -212,7 +212,8 @@ export default function PhoneAuthScreen() {
       const { message: refusalText, reason } = accountRefusalParts(rejection, COPY.fallbacks.invalidCode);
       // One message per failure (T-603): a 403 ACCOUNT_* is a toast with the rejection reason as
       // its second line (T-106), like Login; every other refusal shows under the code field.
-      if (rejection && refusedAccountStatus(rejection) !== null) {
+      // T-714: a 403 ADMIN_USE_PANEL is a toast too (the admin copy), not a code-field error.
+      if (rejection && (refusedAccountStatus(rejection) !== null || isAdminUsePanelRefusal(rejection))) {
         toast.error(refusalText, reason ?? undefined, reason ? { duration: REFUSAL_TOAST_DURATION_MS } : undefined);
       } else {
         setOtpError(reason ? `${refusalText}\n${reason}` : refusalText);

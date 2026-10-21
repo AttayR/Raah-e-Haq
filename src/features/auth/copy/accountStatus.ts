@@ -117,6 +117,8 @@ export const ACCOUNT_STATUS_COPY = localizedCopy({
   approved: "You're approved. Welcome to Raah-e-Haq!",
   checkFailed: "Couldn't check right now. Try again.",
   reasonLabel: 'Reason',
+  /** T-714: second line of the sign-in refusal for an admin account (403 ADMIN_USE_PANEL, BE-141). */
+  adminUsePanel: 'Admins use the web dashboard. Sign in with a passenger or driver account.',
   /** Rejected / suspended: the message when the server's reason is shown under it. */
   reasonFollowUp: 'Contact support if you have questions.',
   contactSupport: 'Contact support',
