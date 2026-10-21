@@ -18,7 +18,7 @@ import { formatDistance, formatDuration } from '../../../utils/format';
 import { space } from '../../../theme';
 import { cancellationText, paymentStatusLabel, RIDE_HISTORY_COPY as C, RIDE_STATUS_LABEL, vehicleLabel } from '../copy';
 import { formatMoney } from '../../../utils/format';
-import { formatDateTime, isChargedFee, otherParty, paymentMethodText, rideAmountText, rideTime, timelineSteps } from '../format';
+import { driverKeepOf, formatDateTime, isChargedFee, otherParty, paymentMethodText, rideTime, summaryAmountText, timelineSteps } from '../format';
 import type { Ride, RideViewer } from '../types';
 import { t } from '../../../i18n';
 import { isParcelRide } from '../../parcel/api';
@@ -68,7 +68,10 @@ function CardTitle({ children }: { children: string }) {
   );
 }
 
-/** Status, time, the amount (fare or earnings), cash, distance and duration. */
+/**
+ * Status, time, the amount, cash, distance and duration. T-707: a completed ride's amount is the
+ * cash the rider paid (it sits on the cash line); the driver also gets "You keep" with the net.
+ */
 export function SummaryCard({ ride, viewer }: SectionProps) {
   const metrics = [formatDistance(ride.distanceKm), ride.durationMinutes ? formatDuration(ride.durationMinutes) : '']
     .filter(Boolean)
@@ -76,6 +79,7 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
   const cancelled = ride.status === 'cancelled';
   const chargedFee = isChargedFee(ride);
   const vehicle = vehicleLabel(ride.vehicleType);
+  const keep = driverKeepOf(ride, viewer);
   return (
     <Card testID="ride-details-summary">
       <View style={styles.topRow}>
@@ -92,7 +96,7 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
         numberOfLines={cancelled && !chargedFee ? 2 : 1}
         testID="ride-details-amount"
       >
-        {chargedFee && ride.cancellationFee !== null ? formatMoney(ride.cancellationFee) : rideAmountText(ride, viewer)}
+        {chargedFee && ride.cancellationFee !== null ? formatMoney(ride.cancellationFee) : summaryAmountText(ride, viewer)}
       </AppText>
       {chargedFee ? (
         // UI-R15: a charged fee reads as money taken, labelled under the amount.
@@ -104,6 +108,21 @@ export function SummaryCard({ ride, viewer }: SectionProps) {
         <AppText variant="bodySmall" color="textSecondary">
           {[paymentMethodText(ride, viewer), paymentStatusLabel(ride.paymentStatus)].filter(Boolean).join(' · ')}
         </AppText>
+      ) : null}
+      {keep !== null ? (
+        <View
+          style={[styles.topRow, styles.metrics]}
+          accessible
+          accessibilityLabel={`${C.youKeep}, ${formatMoney(keep)}`}
+          testID="ride-details-you-keep"
+        >
+          <AppText variant="bodyStrong" style={styles.flex}>
+            {C.youKeep}
+          </AppText>
+          <AppText variant="numeric" testID="ride-details-you-keep-amount">
+            {formatMoney(keep)}
+          </AppText>
+        </View>
       ) : null}
       {vehicle || metrics ? (
         // UI-R15: the same vehicle glyph and label as the history row, then distance and time.

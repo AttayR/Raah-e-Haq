@@ -9,6 +9,7 @@ import {
   type DriverStatusTarget,
 } from './api';
 import { DRIVER_STATUS_COPY } from './copy';
+import { invalidateStatsForStatusChange } from '../stats/invalidate';
 
 /**
  * The signed-in driver's online/offline state (T-401, DRV-01/DRV-13): the one source of
@@ -72,7 +73,10 @@ export const setDriverStatus = createAsyncThunk<DriverStatusInfo, DriverStatusTa
     const startedIn = currentSessionEpoch();
     try {
       const info = await driverStatusApi.set(target);
-      return isStaleSession(startedIn) ? rejectWithValue(staleSessionRejection()) : info;
+      if (isStaleSession(startedIn)) return rejectWithValue(staleSessionRejection());
+      // T-600: the online time changed (a session opened or closed).
+      invalidateStatsForStatusChange();
+      return info;
     } catch (error) {
       return rejectWithValue(toThunkRejection(error, DRIVER_STATUS_COPY.updateFailed));
     }

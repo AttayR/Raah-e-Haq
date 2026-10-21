@@ -170,6 +170,7 @@ export function registerAccountCopy(): void {
     total: 'Kul',
     platformFee: 'Raah-e-Haq fee',
     youEarned: 'Aap ki kamai',
+    youKeep: 'Aap ko milenge',
     paymentMethod: 'Adaigi',
     paymentCash: { passenger: 'Cash (driver ko diya)', driver: 'Cash (aap ne liya)' },
     paymentStatus: 'Adaigi ki surat',

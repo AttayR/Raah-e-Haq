@@ -49,6 +49,8 @@ export const RIDE_HISTORY_COPY = localizedCopy({
   total: 'Total',
   platformFee: 'Raah-e-Haq fee',
   youEarned: 'Your earnings',
+  /** T-707: the driver's net under the cash collected in the ride details summary. */
+  youKeep: 'You keep',
   paymentMethod: 'Payment',
   paymentCash: { passenger: 'Cash (paid to driver)', driver: 'Cash (collected by you)' } as Record<RideViewer, string>,
   paymentStatus: 'Payment status',

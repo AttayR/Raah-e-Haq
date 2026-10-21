@@ -40,7 +40,7 @@ import { isRestorableDriverRide } from '../../features/driver-ride/steps';
 import { useIncomingRequestFraming, useIncomingRequestShown } from '../../features/driver-requests/overlay';
 import { useFramedRequest } from '../../components/driver/drive/useFramedRequest';
 import { regionInViewport, type MapViewport } from '../../features/active-ride/camera';
-import { useMyStats } from '../../features/stats/hooks';
+import { useMyStats, useReadAgainWhenOffline } from '../../features/stats/hooks';
 import { useRecentRides } from '../../features/ride-history/hooks';
 import { RIDE_DETAILS_ROUTE } from '../../features/ride-history/navigation';
 import { HOME_RECENT_RIDES, toHomeRecentRides } from '../../features/ride-history/recentRides';
@@ -121,6 +121,7 @@ export default function DriverDriveScreen() {
 
   const stats = useMyStats(isFocused, DRIVER_HOME_COPY.statsUnavailable);
   const driverStats = stats.data?.role === 'driver' ? stats.data : null;
+  useReadAgainWhenOffline(isOnline, isFocused, stats.refresh); // T-600: the Today card's online time
   // T-507: the last trips (GET /rides?per_page=3), the driver's earnings on each.
   const recent = useRecentRides(HOME_RECENT_RIDES, isFocused);
   const recentRides = useMemo(() => toHomeRecentRides(recent.data ?? [], 'driver'), [recent.data]);

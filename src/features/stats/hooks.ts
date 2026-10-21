@@ -17,6 +17,25 @@ export const useMyStats = (enabled: boolean, fallbackError: string = STATS_COPY.
   useRemoteData({ fetch: statsApi.getMyStats, fallbackError, enabled, cache: STATS_CACHE });
 
 /**
+ * T-600: the Drive screen's Today card read GET /me/stats only on focus, so a driver who stayed on
+ * Drive kept the online time of that read (54 min while the server and Earnings said 67). When
+ * the driver goes offline (`online` turns false) on a focused screen the stats are read again;
+ * a screen that is not focused reads on its next focus (the status change dropped the cache).
+ * No polling.
+ */
+export const useReadAgainWhenOffline = (online: boolean, focused: boolean, refresh: () => unknown): void => {
+  const wasOnline = useRef(online);
+  // Read through refs: only a change of `online` counts (a focus change alone is the read on focus).
+  const latest = useRef({ focused, refresh });
+  latest.current = { focused, refresh };
+  useEffect(() => {
+    const wentOffline = wasOnline.current && !online;
+    wasOnline.current = online;
+    if (wentOffline && latest.current.focused) latest.current.refresh();
+  }, [online]);
+};
+
+/**
  * The GET /me/stats read in the last minute, or null; never a request (UI-R16: the Account tab's
  * profile card takes its rating from here when Home, Drive or Profile already read it).
  */

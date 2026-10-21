@@ -11,6 +11,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { apiClient } from '../../src/services/api';
 import { rootReducer } from '../../src/store/rootReducer';
 import DriverDriveScreen from '../../src/screens/Driver/DriverDriveScreen';
+import { clearQueryCache } from '../../src/core/api/queryCache';
 
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -83,5 +84,29 @@ describe('Drive tab online toggle', () => {
 
     fireEvent.press(toggle);
     expect(mock.history.put).toHaveLength(0);
+  });
+
+  it('[T-600] going offline reads GET /me/stats again: the Today card shows the online time the server has now', async () => {
+    clearQueryCache();
+    const stats = (minutes: number) => ({
+      success: true,
+      data: { role: 'driver', currency: 'PKR', trips_today: 2, earnings_today: 300, online_minutes_today: minutes, rating: 4.8 },
+    });
+    // The server's online time moves on while the driver stays on Drive (fake local values).
+    const served = [54, 67];
+    mock.onGet('/me/stats').reply(() => [200, stats(served.shift() ?? 67)]);
+    mock.onGet('/driver/status').reply(200, statusBody('available'));
+    mock.onPut('/driver/status').reply(200, statusBody('offline'));
+    const { screen } = renderDrive();
+
+    await waitFor(() => expect(screen.getByTestId('driver-home-stat-online')).toHaveTextContent(/^54 min/));
+    expect(mock.history.get.filter(request => request.url === '/me/stats')).toHaveLength(1);
+
+    fireEvent.press(screen.getByTestId('drive-online-toggle'));
+
+    await waitFor(() => expect(screen.getByText("You're offline")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('driver-home-stat-online')).toHaveTextContent(/^1 h 07 min/));
+    // One read on focus and one after going offline: no polling.
+    expect(mock.history.get.filter(request => request.url === '/me/stats')).toHaveLength(2);
   });
 });

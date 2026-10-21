@@ -11,6 +11,7 @@ import { rootReducer } from '../../../src/store/rootReducer';
 import { resetApp } from '../../../src/store/actions';
 import { bumpSessionEpoch } from '../../../src/store/sessionEpoch';
 import { toDriverStatusInfo } from '../../../src/features/driver-status/api';
+import { CACHE_NAMES, readCache, writeCache } from '../../../src/core/api/queryCache';
 import {
   initialDriverStatusState,
   loadDriverStatus,
@@ -121,6 +122,23 @@ describe('driverStatus slice', () => {
     expect(store.getState().driverStatus.status).toBe('available');
     expect(selectDriverStatusBusy(store.getState())).toBe(false);
     expect(mock.history.put).toHaveLength(1);
+  });
+
+  it('[T-600] a status change drops the cached stats and earnings (the online time moved); a refusal keeps them', async () => {
+    const statsKey = `${CACHE_NAMES.stats}|`;
+    const dayKey = `${CACHE_NAMES.driverEarnings}|day`;
+    writeCache(statsKey, { role: 'driver', onlineMinutesToday: 54 });
+    writeCache(dayKey, { onlineMinutes: 54 });
+    mock.onPut('/driver/status').replyOnce(403, refusal('DRIVER_NOT_APPROVED', 'Not approved')).onPut('/driver/status').reply(200, statusBody('offline'));
+    const store = makeStore();
+
+    await store.dispatch(setDriverStatus('offline'));
+    expect(readCache(statsKey, 60_000)).not.toBeNull();
+
+    await store.dispatch(setDriverStatus('offline'));
+    expect(store.getState().driverStatus.status).toBe('offline');
+    expect(readCache(statsKey, 60_000)).toBeNull();
+    expect(readCache(dayKey, 60_000)).toBeNull();
   });
 
   it('keeps the confirmed status and the server message on a 403', async () => {

@@ -12,3 +12,13 @@ export const invalidateStatsForRide = (ride: { status: string }): void => {
   invalidateCache(CACHE_NAMES.driverEarnings);
   if (ride.status === 'cancelled') invalidateCache(CACHE_NAMES.driverStrikes);
 };
+
+/**
+ * T-600: going online or offline opens or closes an online session, so the cached GET /me/stats
+ * (Drive's Today card) and the earnings periods (their Online stat) are dropped; the next read
+ * asks the server.
+ */
+export const invalidateStatsForStatusChange = (): void => {
+  invalidateCache(CACHE_NAMES.stats);
+  invalidateCache(CACHE_NAMES.driverEarnings);
+};

@@ -59,6 +59,23 @@ export const rideAmountText = (ride: Ride, viewer: RideViewer): string => {
 };
 
 /**
+ * T-707: what the driver keeps of a completed ride (BE-84 `driver_net`, else the stored
+ * `driver_earnings`); null for the passenger, an unfinished ride or a ride without either.
+ */
+export const driverKeepOf = (ride: Pick<Ride, 'status' | 'split' | 'driverEarnings'>, viewer: RideViewer): number | null => {
+  if (viewer !== 'driver' || ride.status !== 'completed') return null;
+  return ride.split?.driverNet ?? ride.driverEarnings;
+};
+
+/**
+ * T-707: the ride details hero. It sits on the cash line, so a completed ride shows the cash the
+ * rider paid (the total) to both sides; the driver's net is a separate "You keep" line. Every
+ * other state reads as in the lists (`rideAmountText`).
+ */
+export const summaryAmountText = (ride: Ride, viewer: RideViewer): string =>
+  ride.status === 'completed' ? formatMoney(ride.totalFare) : rideAmountText(ride, viewer);
+
+/**
  * How the ride was paid: cash to the driver (collected by the driver); T-578: a parcel's fare is
  * paid in cash at the pickup.
  */

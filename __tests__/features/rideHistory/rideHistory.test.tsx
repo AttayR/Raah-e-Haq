@@ -406,6 +406,7 @@ describe('RideDetailsScreen', () => {
       expect(await screen.findByTestId('ride-details-loading')).toBeTruthy();
       respond([200, envelope(rawRide())]);
       expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs\u00A0470');
+      expect(screen.queryByTestId('ride-details-you-keep')).toBeNull();
       expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Bilal');
       expect(screen.getByTestId('ride-details-person-subtitle').props.children).toBe('Toyota Corolla');
       expect(screen.getByTestId('ride-details-person-subtitle-color').props.children).toBe('White');
@@ -433,7 +434,10 @@ describe('RideDetailsScreen', () => {
     // completed_at is days ago in real time, so the chat window is over.
     mock.onGet('/rides/41').reply(200, envelope(rawRide({ completed_at: '2026-01-01T09:26:00+05:00' })));
     show(RideDetailsScreen, 'driver');
-    expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs\u00A0376');
+    // T-707: the hero is the cash the rider paid (it sits on the cash line); the net is "You keep".
+    expect((await screen.findByTestId('ride-details-amount')).props.children).toBe('Rs\u00A0470');
+    expect(screen.getByTestId('ride-details-you-keep')).toHaveTextContent(/^You keep/);
+    expect(screen.getByTestId('ride-details-you-keep-amount').props.children).toBe('Rs\u00A0376');
     expect(screen.getByTestId('ride-details-person-name').props.children).toBe('Ayesha');
     // UI-R5 PersonCard: the passenger shape has no vehicle line (the card title says "Your passenger").
     expect(screen.queryByTestId('ride-details-person-subtitle')).toBeNull();

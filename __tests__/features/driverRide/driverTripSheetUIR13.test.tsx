@@ -329,6 +329,28 @@ describe('receipt (DC1, DC3)', () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
+  it('[T-598] stars, a tag, then "Cash collected" straight away: the first press posts once, with the tag', async () => {
+    mock.onGet('/rating-tags').reply(200, {
+      success: true,
+      data: { max_tags: 5, positive_min_stars: 4, negative_max_stars: 3, tags: { driver: { positive: [{ key: 'polite', label: 'Polite' }], negative: [] } } },
+    });
+    mock.onPost('/rides/41/rate').reply(201, { success: true, data: { my_rating: { stars: 5, tags: ['polite'], comment: null, created_at: '2026-10-20T10:30:00Z' }, can_rate: false } });
+    const onDone = jest.fn();
+    renderSheet({ ride: completed(), step: 'summary', onDone });
+    await flush();
+    pickStars(5);
+    fireEvent.press(screen.getByTestId('rate-ride-tag-polite'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('driver-ride-done'));
+      // A second press while the POST is in flight is not a second rating.
+      fireEvent.press(screen.getByTestId('driver-ride-done'));
+    });
+    await flush();
+    expect(mock.history.post).toHaveLength(1);
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ stars: 5, tags: ['polite'] });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
   it('a failed rating is a toast and is retried once from the footer, then the driver moves on', async () => {
     const errorSpy = jest.spyOn(toast, 'error').mockImplementation(() => '');
     mock.onPost('/rides/41/rate').reply(500, { message: 'boom' });
