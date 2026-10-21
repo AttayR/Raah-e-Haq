@@ -43,6 +43,9 @@ When both pickup and dropoff are set, the screen pushes passenger-vehicle-fare a
 - Swap animates the two rows crossing (250 ms) and swaps values. **[UI-R9 review: today an instant swap; animation in UI-R9b]**
 - Drag handle (left of a stop row, 24 `drag-vertical`) reorders stops. **[deferred to UI-R9b; stops move into the sheet in UI-R10]**
 - Back with values entered keeps them in the booking draft (Home → "Where to?" restores the draft for 10 min). **[deferred to UI-R9b]**
+  - **[UI-R9b review ruling, 2026-10-21]** The back chevron (and Android back) with a planned trip keeps the "Discard this trip?" dialog (passenger-vehicle-fare States): "Discard" clears the trip and no draft is kept; "Keep editing" stays. The iOS edge swipe-back, which cannot ask, keeps the draft (memory only, 10 min, this session). "Where to?" then restores it and lands on the step the trip had reached.
+- **[UI-R9b review ruling] Stop rows** (in the route ListGroup): drag handle 24 glyph in a 44 target, then the numbered pin glyph, then the text (x ≈ 102 on iPhone 17; accepted as built). Each divider starts at the text start of the row above it (stop rows: the stop text; the "Add a stop" row: its title at x 89).
+- **[UI-R9b review ruling] Result rows** (saved, recent, autocomplete) start under the fields (x 38, after the 5.23 rail), not at the 16 gutter. "Dividers inset 72" means "the divider starts at the row's text start": row start + 40 tile + 16 = x 94 here.
 - A saved or recent row tap fills the focused field (or the dropoff when none is focused) exactly like picking a suggestion; the route and the next step follow.
 
 ## Small device
