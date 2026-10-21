@@ -734,7 +734,7 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
 
 **New areas checked, no finding:** reach ids (BE-119) and `chat.unread_count` (BE-136) are unchanged since the SEC-32 amendment. The T-708 request banner shows only fare, net and distance, with no passenger data. T-593/T-596 changed no manifest permissions: FINE + COARSE + POST_NOTIFICATIONS only, no background location, iOS `UIBackgroundModes` = `remote-notification` only (B-08). Push-open targets are validated as positive integers. The account-deletion app flow never keeps or logs the code. AI fact packs (BE-92) use role labels, coarse areas and `PiiScrubber`. The fake payment gateway works only in local/testing (`FakeGateway::enabled`), and its callbacks are HMAC-checked. Secrets: no new tracked secrets in either repo. The env templates hold only empty or `CHANGE_ME` values. `.env` was never committed.
 
-### SEC-36 · high · backend: web `DELETE /profile` hard-deletes accounts, bypasses BE-129 and wipes safety evidence
+### SEC-36 · high · RESOLVED (BE-139) · backend: web `DELETE /profile` hard-deletes accounts, bypasses BE-129 and wipes safety evidence
 **Evidence**
 - `routes/web.php:202`: `DELETE /profile` → `ProfileController::destroy` (`app/Http/Controllers/ProfileController.php:138-165`). Its only middleware is `auth`. The form is `resources/views/profile/partials/delete-user-form.blade.php`. Any active passenger or driver can sign in on the web `/login` and reach it.
 - The handler checks the password and then calls the BE-70 `AccountDeletion::delete` (`app/Services/AccountDeletion.php:53-73`), which runs `$user->delete()`. The only thing that stops it is money history (`blocker`: transactions, settlements, a non-zero balance). The BE-129 path (`AccountDeletions`: OTP, cooling-off period, active-ride and commission blockers, anonymisation, file deletion) is never used.
@@ -760,7 +760,15 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
   - The admin delete of the same user returns 409.
   - Files are removed when a hard delete is allowed.
 
-### SEC-37 · medium · backend: legacy `POST /api/websocket/subscribe-driver` writes driver locations outside every location rule (bypasses the SEC-33 spoofing check)
+**Status (2026-10-21): resolved by BE-139 (backend `1844f20`), security diff review PASS.**
+- Web `DELETE /profile` (`ProfileController::destroy`): every non-admin gets a 302 to `/account/delete`, or a 403 `USE_ACCOUNT_DELETION_FLOW` for JSON. This happens before the password check, so the BE-53 limiter is not spent. The Blade form is removed and nothing references it any more.
+- `AccountDeletion::blocker` now also refuses `USER_HAS_LINKED_RECORDS` for any ride (passenger or driver), safety incident (reporter, passenger or driver), fare dispute or rating. It runs again under the users row lock. A RESTRICT violation maps to the same code. Both admin paths (`Api/UsersController::destroy`, `Admin/UserController::destroy`) go through it. No artisan command or seeder deletes users. The BE-129 `anonymise` path only updates the users row and never deletes it.
+- Migration `2026_10_21_100000_…`: sets `rides.passenger_id` and `safety_incidents.reporter_id` to RESTRICT. It finds the FK by column plus `foreign_table = users` (`Schema::getForeignKeys`, which gives a name on MySQL and none on SQLite) and skips the change when the rule is already set. With no FK, it adds one only if there are no orphan rows. Each Schema command is its own `ALTER`, so a run that fails halfway can be run again. It only changes the delete rule, so existing rows still validate on MySQL.
+- Files: `storedFiles()` reads only this user's columns, their own vehicles and their own driver documents, inside the lock. `deleteFiles()` normalises each path (`..`, schemes and NUL are refused) and deletes only under the private and public prefixes, and only after commit. The test also checks that another user's file stays.
+- Suite on SQLite: 2706 tests OK.
+- Residual (low, no task): the hard delete still cascades a few rows that are not covered by the linked-records check: `risk_signals.user_id` (fraud evidence), `ride_offers` and the auto-accept rows of a driver with no assigned ride, `referrals`, `support_tickets`/`ticket_replies`, and `notifications.created_by`/`banners.created_by` when an admin account is deleted. Only an admin can trigger this. Fold `risk_signals` (and admin-authored rows) into `hasLinkedRecords` the next time this service is touched. Separately, if a future schema was imported with a non-`bigint unsigned` column, the no-FK branch would fail on `ADD CONSTRAINT`. That fails loudly and can be re-run, so it is acceptable.
+
+### SEC-37 · medium · RESOLVED (BE-140) · backend: legacy `POST /api/websocket/subscribe-driver` writes driver locations outside every location rule (bypasses the SEC-33 spoofing check)
 **Evidence**
 - `app/Http/Controllers/Api/WebSocketController.php:73-139` stores a `DriverLocation` (`updateLocation`, `:110-122`), sends a session heartbeat and feeds privacy zones on every call.
 - Compared with `POST /tracking/update-location` (`DriverTrackingController.php:36-78`), this path:
@@ -777,6 +785,11 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
 - Remove the location write from `subscribe-driver` (return only the realtime config), or delete both legacy `websocket/subscribe-*` routes, now that `/settings/public` `meta.realtime` replaces them.
 - If a write must stay, it goes through the same validated service as `update-location`: rules, `role:driver`, the `driver-location` limiter and `AutoAccept::onPing`.
 - Update `DriverAvailabilityTest.php:447`. Add a test that a teleport through any location write is flagged.
+
+**Status (2026-10-21): resolved by BE-140 (backend `04a7ecf`), security diff review PASS.**
+- Both `websocket/subscribe-*` routes are deleted (404 in `RealtimeTest`). The stub `send*` helpers are deleted too, and one of them also wrote locations. `GET websocket/events` stays and is read-only.
+- Nothing calls the removed routes: no hits in the app `src/`, and no backend callers apart from the 404 tests. `AutoAcceptHardeningTest` now shows that the old teleport is refused.
+- Remaining `DriverLocation` writers: `Api/DriverTrackingController::updateLocation` (the ruled path); the status-only updates in `RideAssignment:287` and `RideLifecycle:796` (no coordinates); and the admin web `POST /admin/driver-tracking/update-location`. See SEC-44 for the admin route.
 
 ### SEC-38 · medium · backend: admin accounts have a single factor (web panel and admin API tokens)
 **Evidence**
@@ -818,6 +831,13 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
 - The hardening is good: no JS bridge (`onMessage`), incognito, no new windows, every non-https scheme blocked and nothing handed to the OS. But the in-app view has no address bar, so a tampered or misconfigured response could show a look-alike page that asks for a JazzCash/Easypaisa PIN.
 - **Fix:** accept a start URL only on the API origin (`/api/payments/checkout/…`) or on an allowlist of the gateway hosts (sandbox and production, from env). Show the current host in the header. Add a unit test.
 
+### SEC-44 · low · backend: admin web route writes any driver's position and status outside the location rules
+- `routes/web.php:155` → `Admin/DriverTrackingController::updateLocation` (`:161-191`) calls `DriverLocation::updateLocation` for any `driver_id`, with any coordinates and `status` (`online|available|busy|offline`). There is no `AutoAccept::onPing`, no availability service (the users row and the online session are untouched) and no realtime hint. `:233` `trackRideLocation` does the same for `ride_tracking`.
+- Guarded by `auth` + `role:admin` + CSRF and validated. No admin view calls either route (`grep` in `resources/` finds nothing).
+- **Impact:** a compromised admin (see SEC-38, single factor) can plant a driver's position or mark them `available`, and that steers the nearest-driver and auto-accept selection without the jump check. It is not reachable by passengers or drivers.
+- **Fix:** delete both unused admin write routes, or route them through the same service as `tracking/update-location` (including `onPing`) and audit-log them. Add a test that they return 404, or that they are flagged.
+- Recorded during the BE-140 review. It is not a regression from that change.
+
 ### Pre-release checklist
 | Item | Result |
 |---|---|
@@ -842,3 +862,14 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
 **Verdict: one release blocker in code, SEC-36 (high).** SEC-37, SEC-38 and SEC-11 (axios) should land before release as well. Owner items before launch: B-02, B-05/B-21, B-10, B-11, B-12, B-13, B-15, B-16, B-17, B-18, B-22, and the BE-134 legal figure.
 
 **Tasks:** BE-139 (SEC-36), BE-140 (SEC-37), BE-141 (SEC-38). SEC-11 stays with T-701; its axios upgrade should be done before release. Lows SEC-39..43 have no task yet (fold into related work).
+
+## T-711 security review (diff, 2026-10-21): SEC-11 partial, SEC-42 and SEC-43 resolved
+
+Verdict PASS. The uncommitted T-711 diff was reviewed at 99f42e4. `yarn verify` PASS (0/0/0, Jest 3918/3918).
+
+| Item | Status after T-711 |
+|---|---|
+| SEC-11 app dependencies | **Partly resolved (axios).** `axios` is pinned to exactly `1.20.0`. It pulls `follow-redirects` 1.16.1 and `form-data` 4.0.6. The `https-proxy-agent` dependency is Node-only: the `react-native` export maps to `dist/browser`. `yarn audit --groups dependencies` now reports 6 critical, 121 high, 51 moderate and 5 low, with no axios, follow-redirects or form-data advisory. **Still open (T-701):** the `firebase` JS SDK (via `@react-native-firebase/app`: `protobufjs`, `websocket-driver`, `@grpc/grpc-js`); build tooling (`minimatch`, `brace-expansion`, `js-yaml`, `nanoid`, `browserslist`, `ws` under `react-native`/CLI, `image-size`, `shell-quote`). Correction to the SEC-11 evidence: `@xmldom/xmldom` comes from `react-native-asset` → `plist` (build-time), not from `@react-native-firebase/auth`. That package stays on purpose, because `src/services/legacyFirebaseSignOut.ts` (from `AuthProvider`) signs out pre-T-107 sessions. Client compatibility: the interceptors, `onSessionAuthRefusal` (T-406), `isTokenTarget` (`getUri`), the 30 s and per-call timeouts and CancelToken are all unchanged APIs. For a React Native `FormData`, axios ≥1.17 now drops the explicit `multipart/form-data` header so the native layer sets the boundary. That is the correct behaviour, but it is a runtime change: an avatar, document or registration upload should be smoke-tested on a device. |
+| SEC-42 hidden recents / invite code | **Resolved.** Hidden recents are kept per user (`home_hidden_recents.<id>`), and nothing is stored while signed out. Logout removes every `home_hidden_recents*` key, including the old global one, and every `rh.invite.code.*` key (`sessionThunks.ts` steps). The in-memory invite caches are dropped by the session epoch (`queryCache.ts:169`). `__tests__/store/logout.test.ts` checks this. The addresses are still plain text while signed in, which the fix allows. |
+| SEC-43 checkout start URL | **Resolved.** `isAllowedCheckoutStartUrl` (`src/features/wallet/topUpLinks.ts`) is used in both `AddMoneyScreen` and `TopUpCheckoutScreen`. It accepts only two kinds of start URL. (1) `<API path>/payments/checkout/<id>` on the exact API scheme, host and port. The id is shape-checked, so no `/`, `.` or `%` can follow. (2) https with no explicit port on `payments.jazzcash.com.pk` or `easypay.easypaisa.com.pk`, which match `config/payments.php`. The sandbox hosts and local names are accepted only when `__DEV__`. Probed and refused: user-info (`a@b`, `a:443@b`, `\@`), trailing-dot hosts, suffix and sub-domain look-alikes, Cyrillic and punycode hosts, `%2e` and `..` paths, non-default ports, http, leading or embedded whitespace, and other schemes. The current host is shown under the title. The match fails closed if the backend `APP_URL` host ever differs from `API_URL` (for example `www.`): the flow then goes to the status screen. |
+| New, low (this diff) | `TopUpCheckoutScreen` `onNavigationStateChange` sets the host to `checkoutHostOf(state.url)`. A later navigation that `isAllowedCheckoutUrl` allows (any https) but `parseWebUrl` cannot parse (user-info, `_` in host, IPv6) sets the host to null, so the label disappears exactly on the spoof-shaped URL. Fix: refuse later navigations whose host can't be parsed, or keep showing the raw authority. Fold into the next wallet task. |
