@@ -1,0 +1,226 @@
+diff --git a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/fabric/MarkerManager.java b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/fabric/MarkerManager.java
+index 463c4ac..1f0111e 100644
+--- a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/fabric/MarkerManager.java
++++ b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/fabric/MarkerManager.java
+@@ -283,6 +283,11 @@ public class MarkerManager extends ViewGroupManager<MapMarker> implements RNMaps
+                     public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                         int newWidth = right - left;
+                         int newHeight = bottom - top;
++                        // A late layout (e.g. a Reanimated commit) can reach the view after
++                        // React took it out of its marker: there is no marker left to resize.
++                        if (!(v.getParent() instanceof MapMarker)) {
++                            return;
++                        }
+                         MapMarker marker = (MapMarker) v.getParent();
+                         marker.update(newWidth, newHeight);
+                     }
+diff --git a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapView.java b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapView.java
+index fa497a9..402c34d 100644
+--- a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapView.java
++++ b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapView.java
+@@ -90,7 +90,12 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+         GoogleMap.OnMarkerDragListener, OnMapReadyCallback, GoogleMap.OnPoiClickListener, GoogleMap.OnIndoorStateChangeListener, DefaultLifecycleObserver {
+     public GoogleMap map;
+     private Bundle savedMapState;
+-    private Map<Integer, MapFeature> savedFeatures = new HashMap<>();
++    // Ordered like the React children (Fabric and Paper insert and remove by child index).
++    private List<MapFeature> savedFeatures = new ArrayList<>();
++    // True from onDetachedFromWindow until the features are back on the map: React still adds
++    // and removes children meanwhile, and those changes must land in savedFeatures, or a child
++    // React removed while the screen was hidden comes back (stale route, default pin).
++    private boolean featuresDetached = false;
+     private boolean shouldRestorePadding = false;
+ 
+     private MarkerManager markerManager;
+@@ -140,7 +145,10 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+     private static final String[] PERMISSIONS = new String[]{
+             "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"};
+ 
+-    private final Map<Integer, MapFeature> features = new HashMap<>();
++    // A list, not a map keyed by index: an insert or a removal must shift the later children,
++    // or a feature inserted at an index in use overwrites (orphans) the one there, and a later
++    // removeViewAt finds the wrong child and leaves the old marker or polyline on the map.
++    private final List<MapFeature> features = new ArrayList<>();
+     private final Map<Marker, MapMarker> markerMap = new HashMap<>();
+     private final Map<Polyline, MapPolyline> polylineMap = new HashMap<>();
+     private final Map<Polygon, MapPolygon> polygonMap = new HashMap<>();
+@@ -325,9 +333,15 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+             prepareAttacherView();
+             getMapAsync((map)->{
+                 onMapReady(map);
+-                savedFeatures.forEach((index, feature) -> {
+-                    addFeature(feature, index);
+-                });
++                if (!featuresDetached || !isAttachedToWindow()) {
++                    return;
++                }
++                List<MapFeature> restore = savedFeatures;
++                savedFeatures = new ArrayList<>();
++                featuresDetached = false;
++                for (int i = 0; i < restore.size(); i++) {
++                    addFeature(restore.get(i), i);
++                }
+             });
+         }
+     }
+@@ -341,8 +355,14 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+         super.onSaveInstanceState(savedMapState);
+         super.onPause();
+         super.onStop();
+-        savedFeatures = new HashMap<>(features);
+-        savedFeatures.keySet().forEach(this::removeFeatureAt);
++        // When detached again before the last restore ran, savedFeatures already holds the children.
++        if (!featuresDetached) {
++            savedFeatures = new ArrayList<>(features);
++            for (int i = features.size() - 1; i >= 0; i--) {
++                removeFeatureAt(i);
++            }
++            featuresDetached = true;
++        }
+         shouldRestorePadding = true;
+         removeView(attacherGroup);
+         attacherGroup = null;
+@@ -374,7 +394,7 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+         LatLngBounds.Builder builder = new LatLngBounds.Builder();
+         boolean addedPosition = false;
+         LatLngBounds mapBounds = map.getProjection().getVisibleRegion().latLngBounds;
+-        for (MapFeature feature : features.values()) {
++        for (MapFeature feature : features) {
+             if (feature instanceof MapMarker) {
+                 Marker marker = (Marker) feature.getFeature();
+                 if (!onlyVisible ||
+@@ -751,7 +771,7 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+         // Detach lifecycle observer before destroying
+         detachLifecycleObserver();
+         savedMapState = null;
+-        savedFeatures = null;
++        savedFeatures = new ArrayList<>();
+ 
+         if (!paused) {
+             onPause();
+@@ -1124,12 +1144,17 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+     }
+ 
+     public void addFeature(View child, int index) {
++        if (featuresDetached && child instanceof MapFeature) {
++            // Off the window: kept in order and put on the map when it is attached again.
++            savedFeatures.add(Math.max(0, Math.min(index, savedFeatures.size())), (MapFeature) child);
++            return;
++        }
+         // Our desired API is to pass up annotations/overlays as children to the mapview component.
+         // This is where we intercept them and do the appropriate underlying mapview action.
+         if (child instanceof MapMarker) {
+             MapMarker annotation = (MapMarker) child;
+             annotation.addToMap(markerCollection);
+-            features.put(index, annotation);
++            features.add(clampFeatureIndex(index), annotation);
+ 
+             // Allow visibility event to be triggered later
+             int visibility = annotation.getVisibility();
+@@ -1159,47 +1184,47 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+         } else if (child instanceof MapPolyline) {
+             MapPolyline polylineView = (MapPolyline) child;
+             polylineView.addToMap(polylineCollection);
+-            features.put(index, polylineView);
++            features.add(clampFeatureIndex(index), polylineView);
+             Polyline polyline = (Polyline) polylineView.getFeature();
+             polylineMap.put(polyline, polylineView);
+         } else if (child instanceof MapGradientPolyline) {
+             MapGradientPolyline polylineView = (MapGradientPolyline) child;
+             polylineView.addToMap(map);
+-            features.put(index, polylineView);
++            features.add(clampFeatureIndex(index), polylineView);
+             TileOverlay tileOverlay = (TileOverlay) polylineView.getFeature();
+             gradientPolylineMap.put(tileOverlay, polylineView);
+         } else if (child instanceof MapPolygon) {
+             MapPolygon polygonView = (MapPolygon) child;
+             polygonView.addToMap(polygonCollection);
+-            features.put(index, polygonView);
++            features.add(clampFeatureIndex(index), polygonView);
+             Polygon polygon = (Polygon) polygonView.getFeature();
+             polygonMap.put(polygon, polygonView);
+         } else if (child instanceof MapCircle) {
+             MapCircle circleView = (MapCircle) child;
+             circleView.addToMap(circleCollection);
+-            features.put(index, circleView);
++            features.add(clampFeatureIndex(index), circleView);
+         } else if (child instanceof MapUrlTile) {
+             MapUrlTile urlTileView = (MapUrlTile) child;
+             urlTileView.addToMap(map);
+-            features.put(index, urlTileView);
++            features.add(clampFeatureIndex(index), urlTileView);
+         } else if (child instanceof MapWMSTile) {
+             MapWMSTile urlTileView = (MapWMSTile) child;
+             urlTileView.addToMap(map);
+-            features.put(index, urlTileView);
++            features.add(clampFeatureIndex(index), urlTileView);
+         } else if (child instanceof MapLocalTile) {
+             MapLocalTile localTileView = (MapLocalTile) child;
+             localTileView.addToMap(map);
+-            features.put(index, localTileView);
++            features.add(clampFeatureIndex(index), localTileView);
+         } else if (child instanceof MapOverlay) {
+             MapOverlay overlayView = (MapOverlay) child;
+             overlayView.addToMap(groundOverlayCollection);
+-            features.put(index, overlayView);
++            features.add(clampFeatureIndex(index), overlayView);
+             GroundOverlay overlay = (GroundOverlay) overlayView.getFeature();
+             overlayMap.put(overlay, overlayView);
+         } else if (child instanceof MapHeatmap) {
+             MapHeatmap heatmapView = (MapHeatmap) child;
+             heatmapView.addToMap(map);
+-            features.put(index, heatmapView);
++            features.add(clampFeatureIndex(index), heatmapView);
+             TileOverlay heatmap = (TileOverlay) heatmapView.getFeature();
+             heatmapMap.put(heatmap, heatmapView);
+         } else if (child instanceof ViewGroup) {
+@@ -1213,14 +1238,29 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+     }
+ 
+     public int getFeatureCount() {
+-        return features.size();
++        return featuresDetached ? savedFeatures.size() : features.size();
+     }
+ 
+     public View getFeatureAt(int index) {
+-        return features.get(index);
++        List<MapFeature> children = featuresDetached ? savedFeatures : features;
++        return index >= 0 && index < children.size() ? children.get(index) : null;
++    }
++
++    private int clampFeatureIndex(int index) {
++        return Math.max(0, Math.min(index, features.size()));
+     }
+ 
+     public void removeFeatureAt(int index) {
++        if (featuresDetached) {
++            // Already off the map (onDetachedFromWindow); it must not come back on attach.
++            if (index >= 0 && index < savedFeatures.size()) {
++                savedFeatures.remove(index);
++            }
++            return;
++        }
++        if (index < 0 || index >= features.size()) {
++            return;
++        }
+         MapFeature feature = features.remove(index);
+         if (feature instanceof MapMarker) {
+             markerMap.remove(feature.getFeature());
+@@ -1345,7 +1385,7 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+ 
+         boolean addedPosition = false;
+         if (!features.isEmpty()) {
+-            for (MapFeature feature : features.values()) {
++            for (MapFeature feature : features) {
+                 if (feature instanceof MapMarker) {
+                     Marker marker = (Marker) feature.getFeature();
+                     builder.include(marker.getPosition());
+@@ -1387,7 +1427,7 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
+ 
+         List<String> markerIDList = Arrays.asList(markerIDs);
+ 
+-        for (MapFeature feature : features.values()) {
++        for (MapFeature feature : features) {
+             if (feature instanceof MapMarker) {
+                 String identifier = ((MapMarker) feature).getIdentifier();
+                 Marker marker = (Marker) feature.getFeature();
