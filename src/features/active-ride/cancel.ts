@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { RideResource } from '../../services/rideService';
-import { confirm, openConfirm, type ConfirmHandle, type ConfirmOptions } from '../../core/dialog';
+import { openConfirm, type ConfirmHandle, type ConfirmOptions } from '../../core/dialog';
 import { toCancellationPreview } from '../fare/api';
 import { cancelPreviewText } from '../fare/format';
 import { t } from '../../i18n';
@@ -8,6 +8,7 @@ import { isParcelRide } from '../parcel/api';
 import { toast, toastOnScreen } from '../../core/toast';
 import { ACTIVE_RIDE_COPY } from './copy';
 import { isRideInProgress } from './status';
+import { canPassengerCancel, rideStageOf } from './stage';
 
 /**
  * The passenger's cancel question with the server's preview (BE-85 `cancellation_preview`):
@@ -58,6 +59,18 @@ export const cancelQuestion = (ride: RideResource | null): { options: ConfirmOpt
   };
 };
 
+/**
+ * T-709: the open cancel question no longer applies: the ride it asked about ended (completed,
+ * cancelled), started (no cancel once on the trip), is gone from the screen, or the screen now
+ * shows another ride (a "yes" must never cancel a ride it did not ask about). Before the ride
+ * exists (POST /rides in flight) the question stays.
+ */
+const cancelNoLongerOffered = (ride: RideResource | null, askedRideId: number | null): boolean => {
+  if (!ride) return askedRideId !== null;
+  if (askedRideId !== null && ride.id !== askedRideId) return true;
+  return !canPassengerCancel(rideStageOf(ride.status));
+};
+
 /** A driver took the searched ride: it is in progress and no longer `requested`. */
 const takenByDriver = (ride: RideResource | null): ride is RideResource =>
   !!ride && ride.status !== 'requested' && isRideInProgress(ride);
@@ -87,27 +100,44 @@ export const usePassengerCancel = (
 ): (() => Promise<void>) => {
   const rideRef = useRef(ride);
   rideRef.current = ride;
-  /** The open question, while it asks about a request. */
-  const openRequest = useRef<ConfirmHandle | null>(null);
+  /**
+   * The open cancel question: `request` while it still asks about a request (T-589 switches it
+   * once), `rideId` the ride it was asked about (null while the booking is being created).
+   */
+  const openQuestion = useRef<{ handle: ConfirmHandle; request: boolean; rideId: number | null } | null>(null);
 
-  // A poll saw the acceptance while the question was open: ask about the ride instead.
   useEffect(() => {
-    const open = openRequest.current;
-    if (!open || !takenByDriver(ride)) return;
-    openRequest.current = null;
-    open.update(cancelQuestion(ride).options);
+    const open = openQuestion.current;
+    if (!open) return;
+    // T-709: the ride left a cancellable state (e.g. completed while "Cancel ride?" was open):
+    // close the question; its "no" answer sends nothing.
+    if (cancelNoLongerOffered(ride, open.rideId)) {
+      openQuestion.current = null;
+      open.handle.close();
+      return;
+    }
+    if (ride && open.rideId === null) open.rideId = ride.id;
+    // A poll saw the acceptance while the question was open: ask about the ride instead.
+    if (!open.request || !takenByDriver(ride)) return;
+    open.request = false;
+    open.handle.update(cancelQuestion(ride).options);
   }, [ride]);
+
+  /** Asks `options` while tracking the question, so a ride that ends meanwhile closes it. */
+  const ask = useCallback(async (options: ConfirmOptions, request: boolean): Promise<boolean> => {
+    const handle = openConfirm(options);
+    const tracked = { handle, request, rideId: rideRef.current?.id ?? null };
+    openQuestion.current = tracked;
+    try {
+      return await handle.result;
+    } finally {
+      if (openQuestion.current === tracked) openQuestion.current = null;
+    }
+  }, []);
 
   return useCallback(async () => {
     const asked = cancelQuestion(rideRef.current);
-    const handle = openConfirm(asked.options);
-    if (asked.request) openRequest.current = handle;
-    let yes: boolean;
-    try {
-      yes = await handle.result;
-    } finally {
-      if (openRequest.current === handle) openRequest.current = null;
-    }
+    const yes = await ask(asked.options, asked.request);
     if (!yes) return;
     let current = rideRef.current;
     if (!current) {
@@ -126,7 +156,7 @@ export const usePassengerCancel = (
     }
     if (asRequest && takenByDriver(current)) {
       // Taken at the moment of the tap: the ride's question, with its fee, before cancelling.
-      if (!(await confirm(cancelQuestion(current).options))) return;
+      if (!(await ask(cancelQuestion(current).options, false))) return;
       asRequest = false;
     }
     // Still a request once confirmed: a driver who accepted while the dialog was open makes this a
@@ -144,5 +174,5 @@ export const usePassengerCancel = (
       // T-585: passenger-finding-driver.md "Cancel error": a toast, not a dialog; the ride stays.
       toast.error(ACTIVE_RIDE_COPY.cancelFailedToast);
     }
-  }, [cancelRide, onNoRide, onRequestCancelled, reread]);
+  }, [ask, cancelRide, onNoRide, onRequestCancelled, reread]);
 };

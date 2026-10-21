@@ -99,6 +99,11 @@ export interface ConfirmHandle {
   result: Promise<boolean>;
   /** Replaces the question's text and labels; a no-op once it was answered. */
   update: (options: ConfirmOptions) => void;
+  /**
+   * Closes the question as answered "no" (T-709), e.g. the ride it asks about ended meanwhile.
+   * It fades out with the text it showed, like any answer; a no-op once it was answered.
+   */
+  close: () => void;
 }
 
 /**
@@ -136,7 +141,8 @@ export const openConfirm = (options: ConfirmOptions): ConfirmHandle => {
     );
     emit();
   };
-  return { result, update };
+  const close = (): void => answer(id, false);
+  return { result, update, close };
 };
 
 /** A single-button notice; resolves when it is dismissed. */
