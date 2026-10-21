@@ -701,3 +701,144 @@ These are rulings on proposals that are not built yet: `docs/design/screens/map-
 3. **Low: connection limits and origins.** `max_connections` is unlimited (`REVERB_APP_MAX_CONNECTIONS` unset) and `REVERB_ALLOWED_ORIGINS=*` in `.env.production.example`. Origin checks protect only browsers, and private channels need a bearer token (not cookies), so cross-site WebSocket hijacking is not exploitable today. Fix: set a `max_connections` ceiling in DEPLOYMENT.md, add an nginx `limit_conn` per IP on `/app/`, and set the origin list to the admin domain if a browser client is ever added.
 4. **Low: coordinates at rest in the queue.** With `QUEUE_CONNECTION=database`, each `ride.driver_location` job, and any failed copy in `failed_jobs`, stores the driver's coordinates. A slow worker can also deliver a position after the ride has ended. Fix: give the broadcast `$tries = 1` and a short `retryUntil`/`deleteWhenMissingModels`-style expiry for location events, and schedule `queue:prune-failed --hours=24`. Optionally re-check the ride status in `broadcastWhen()`.
 5. **Low: placeholder credentials.** `.env.example` ships `REVERB_APP_SECRET=change-me-secret`. Fix: `Realtime::enabled()` (or the existing production config check) should refuse or warn when the key or secret is empty, `CHANGE_ME` or `change-me-*` outside local.
+
+## Pre-release audit 2026-10-21
+
+rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` at `3506707` (code as of `88aef14`). **Backend:** `fix/production-hardening` at `477df7d`. No request was sent to any server, and no local or production database was touched. Tools: `git ls-files`/`git grep`, `php artisan route:list --json` (offline), `composer audit --locked` (no advisories), `yarn audit --groups dependencies` (6 critical, 133 high, 72 moderate, 6 low), backend suite on in-memory sqlite (2694 tests OK, 42449 assertions), `yarn verify`.
+
+### Status of earlier findings
+
+| Finding | Status on 2026-10-21 |
+|---|---|
+| SEC-01 role checks | Holds. All 119 `admin/*` routes carry `role:admin`. Every non-admin `api/*` route is either public on purpose (auth, health, signed files, payment callbacks, public settings and banners) or behind `auth:sanctum` + `active`. Admin actions inside `SupportController` check `hasRole('admin')`. |
+| SEC-02, SEC-06 | Fixed in code. `config/app.php:45` forces debug off outside local/testing, and OTP echo needs `APP_ENV=local` plus debug (`OtpResponse::echoesCode`). The live server is still owner work (B-12, B-16). |
+| SEC-03, SEC-31, SEC-32, SEC-33 | Hold (BE-20, BE-118, BE-119, BE-120, BE-127). **But see SEC-37:** a legacy location-write path skips the SEC-33 spoofing check. |
+| SEC-04, SEC-30 | Hold. No `Log::` call takes request values. SMS logs mask the phone. Realtime failure logs (BE-138) carry the event class and reason only. |
+| SEC-05 uploads | Holds. Identity documents, vehicle papers and parcel photos go to the private `local` disk (`UserFiles::diskFor`, `ParcelDelivery::pickup`), with mime and size rules. Avatars are re-encoded (`ProfilePhoto`). Files are served only through `signed:relative` + `PrivateFileController`. |
+| SEC-07, SEC-08, SEC-13, SEC-26, SEC-27, SEC-28 | Hold (BE-25, BE-27, BE-28, BE-53, BE-54). Every current-password check, web `DELETE /profile` included, uses `ThrottledCurrentPassword`. |
+| SEC-09 wallet | Holds (BE-09 ledger: users → wallet lock order, amounts in minor units). |
+| SEC-10 composer | Fixed. `composer audit --locked`: no advisories. |
+| SEC-11 app dependencies | **Still open (medium), T-701.** `axios` is still 1.12.2 (high advisories, runtime). The `firebase` JS SDK (12.2.1) now comes in transitively through `@react-native-firebase/app` (critical `protobufjs` and `websocket-driver`, high `@grpc/grpc-js`; mostly not bundled on native). `@react-native-firebase/auth` is still installed (`@xmldom/xmldom` high), although T-107 removed the Firebase auth path. The rest is build-time tooling under `react-native`. Upgrade axios before release; it should not wait for the rest of T-701. |
+| SEC-12 Firebase rules | Owner, B-13, open. |
+| SEC-14, SEC-15 repo hygiene | **Still open (low).** `raah_e_haq_admin.sql`, `composer.phar`, `reh` and `test_ride_api.php` are still tracked, and `test_ride_api.php:14` still targets `https://raahehaq.com/api`. |
+| SEC-16 input bounds | **Still open (low), admin-only.** `per_page` is unbounded (`PaymentsController.php:18`, `SecurityController.php:16,26,35`, `AnalyticsController.php:22`). Banner `image_url`/`action_url` are `string` only (`SettingsController.php:49-50`). |
+| SEC-17 transport | **Still open (low).** `src/config/env.ts:55-59` accepts `http://`/`ws://` in release, and `Info.plist:44` keeps `NSAllowsLocalNetworking` for Release. The realtime client refuses non-wss in release (`resolveRealtimeConfig`), and OS cleartext blocks still apply. |
+| SEC-18 notification cache | Resolved. `notificationService` is gone, and logout removes the legacy key (`sessionThunks.ts:137`). |
+| SEC-19 socket URLs | Resolved (BE-12, T-406). The app connects only with `env.WS_URL` + `WS_APP_KEY`. The server's `meta.realtime` must match it, or the app stays on polling. |
+| SEC-20 logger | **Still open (low), T-606.** `logger.ts:21` still has no `Bearer …` string mask and no dob/gender/ip keys. `placesService.ts:139` logs the reverse-geocoded address at debug level (stripped in release). |
+| SEC-21, SEC-29 | Hold (T-104, T-114). |
+| SEC-22, SEC-23 | Accepted, unchanged. |
+| SEC-24, SEC-25 | Hold (BE-46). |
+| SEC-34 account deletion | Holds, except #2 (the retention prune, BE-134, blocked on the owner's legal figure). The BE-135 lows are folded in: `TopUps.php:339` never auto-credits a flagged intent, `$deleting` no longer depends on `$late` (`:354`), and the review label is worded. **But see SEC-36:** the old web delete still bypasses the whole flow. |
+| SEC-35 realtime | Follow-ups 1-5 resolved in `0a95617`/`384f16c`: `Realtime::passengerReachable` (active user with a live token), re-checked when the job runs, `tries=1`; `/broadcasting/auth` is POST-only with the `broadcast-auth` limiter; failed position jobs are pruned after 24 h; placeholder or short credentials turn realtime off outside local. App (T-406): auth goes through the shared axios client, so the token goes only to the API origin. A 401/403 drops channels, `reset` runs on logout, and nothing logs payloads. |
+
+**New areas checked, no finding:** reach ids (BE-119) and `chat.unread_count` (BE-136) are unchanged since the SEC-32 amendment. The T-708 request banner shows only fare, net and distance, with no passenger data. T-593/T-596 changed no manifest permissions: FINE + COARSE + POST_NOTIFICATIONS only, no background location, iOS `UIBackgroundModes` = `remote-notification` only (B-08). Push-open targets are validated as positive integers. The account-deletion app flow never keeps or logs the code. AI fact packs (BE-92) use role labels, coarse areas and `PiiScrubber`. The fake payment gateway works only in local/testing (`FakeGateway::enabled`), and its callbacks are HMAC-checked. Secrets: no new tracked secrets in either repo. The env templates hold only empty or `CHANGE_ME` values. `.env` was never committed.
+
+### SEC-36 · high · backend: web `DELETE /profile` hard-deletes accounts, bypasses BE-129 and wipes safety evidence
+**Evidence**
+- `routes/web.php:202`: `DELETE /profile` → `ProfileController::destroy` (`app/Http/Controllers/ProfileController.php:138-165`). Its only middleware is `auth`. The form is `resources/views/profile/partials/delete-user-form.blade.php`. Any active passenger or driver can sign in on the web `/login` and reach it.
+- The handler checks the password and then calls the BE-70 `AccountDeletion::delete` (`app/Services/AccountDeletion.php:53-73`), which runs `$user->delete()`. The only thing that stops it is money history (`blocker`: transactions, settlements, a non-zero balance). The BE-129 path (`AccountDeletions`: OTP, cooling-off period, active-ride and commission blockers, anonymisation, file deletion) is never used.
+- So any account with no completed ride (a passenger whose rides were all cancelled, or a new or pending driver) is deleted at once, and the foreign keys cascade:
+  - `rides.passenger_id` is `onDelete('cascade')` (`2025_09_17_115751_create_rides_table.php:17`), so every ride of that passenger is deleted, **an active or requested ride included**.
+  - Through `ride_id` cascades, the delete also removes `safety_incidents` (`2026_10_14_100100_…:19`, including reports the **driver** filed about this passenger), `fare_disputes`, `ride_messages` (both sides of the chat) and the other ride-scoped rows. `safety_incidents.reporter_id` also cascades (`:20`).
+- No user `deleting` hook removes files, so CNIC, licence and vehicle documents on the private disk, and the public avatar, are orphaned with no owner, no admin view and no prune.
+- The admin hard deletes (`Api/UsersController::destroy`, `Admin/UserController:318`) use the same service and cascade the same way.
+- `tests/Feature/ProfileTest.php:69-80` asserts that the hard delete works.
+
+**Impact**
+- A harasser who has not finished a ride (for example, books, abuses the driver and cancels) can erase the driver's safety report, the chat and the ride record from the web. That defeats the safety-first rule and the "kept for N years" promise of BE-129.
+- Deleting mid-ride removes the ride under the driver.
+- The identity documents of deleted drivers stay on disk forever, outside every retention and erase rule.
+
+**Required fix**
+- Web `DELETE /profile` for non-admins: remove the form and the route action, and send users to `/account/delete` (the BE-129 OTP flow, cooling-off and anonymise). Alternatively, call `AccountDeletions` precheck and schedule after a password and OTP check.
+- `AccountDeletion::delete` (admin hard delete) must also refuse with `LINKED_RECORDS` when the user has any ride (as passenger or driver), safety incident, fare dispute or rating. Admins anonymise through `AccountDeletions` instead.
+- Optionally, change `rides.passenger_id` and `safety_incidents.reporter_id` to `restrictOnDelete` as the database backstop.
+- When a hard delete is still allowed (an account with no records at all), delete the user's private and public files after commit (`UserFiles::deleteStored`).
+- Feature tests:
+  - The web delete of a passenger with a cancelled ride and a driver-filed safety incident leaves the ride and the incident in place, and schedules the deletion (or refuses).
+  - The admin delete of the same user returns 409.
+  - Files are removed when a hard delete is allowed.
+
+### SEC-37 · medium · backend: legacy `POST /api/websocket/subscribe-driver` writes driver locations outside every location rule (bypasses the SEC-33 spoofing check)
+**Evidence**
+- `app/Http/Controllers/Api/WebSocketController.php:73-139` stores a `DriverLocation` (`updateLocation`, `:110-122`), sends a session heartbeat and feeds privacy zones on every call.
+- Compared with `POST /tracking/update-location` (`DriverTrackingController.php:36-78`), this path:
+  - has no `role:driver` and no `throttle:driver-location` (route list: only `throttle:120,1` + `active`);
+  - has no validation of `address`, `speed`, `heading` or `accuracy` (`$request->address ?? null`, any length or type, stored as is);
+  - never calls `AutoAccept::onPing`, so no `is_mocked` flag and no jump detection;
+  - sends no realtime hint.
+- The jump detector compares each ping with the previous stored row (`AutoAccept.php:277`). A spoofer therefore "teleports" through `subscribe-driver` (no check), then sends normal `update-location` pings from the new spot. The jump is never seen, and the driver stays eligible to be the "nearest" for auto-accept (SEC-33 condition 2) and for the pickup-distance checks.
+- The app no longer calls this endpoint: T-406 removed `webSocketService` (`grep subscribe-driver src` finds nothing). `subscribe-ride` is likewise only a config echo now.
+
+**Impact:** the anti-spoofing control for auto-accept can be bypassed, which is the targeted-assignment risk in SEC-33. Unbounded strings also get into `driver_locations.address`.
+
+**Required fix**
+- Remove the location write from `subscribe-driver` (return only the realtime config), or delete both legacy `websocket/subscribe-*` routes, now that `/settings/public` `meta.realtime` replaces them.
+- If a write must stay, it goes through the same validated service as `update-location`: rules, `role:driver`, the `driver-location` limiter and `AutoAccept::onPing`.
+- Update `DriverAvailabilityTest.php:447`. Add a test that a teleport through any location write is flagged.
+
+### SEC-38 · medium · backend: admin accounts have a single factor (web panel and admin API tokens)
+**Evidence**
+- There is no 2FA/TOTP anywhere in the backend: no package and no columns (`grep -i 'two_factor|totp|fortify'` finds nothing).
+- An admin signs in on the web `/login` with email and password (`LoginRequest`, BE-53 limiter only). The session lifetime is 120 min (`config/session.php:35`).
+- `POST /api/auth/login` also issues an admin Sanctum token that is valid for 30 idle days (`SANCTUM_IDLE_EXPIRATION`) and has full `role:admin` API power: `payments/wallets/{wallet}/adjust`, transaction reversal, settlement approval, driver approval and gender verification, signed CNIC and licence URLs (`users/{user}/documents`), user export and notification broadcasts.
+- `DEPLOYMENT.md` documents no IP allowlist for `/admin` or the admin API.
+
+**Impact:** one phished or reused admin password, or one leaked admin token, gives control of money, driver approvals and every user's identity documents. That is the highest-value target in the platform.
+
+**Required fix**
+- TOTP 2FA, required for every `admin` role user on the web login: enrolment, recovery codes, and a `2fa` middleware on the `admin.*` group.
+- Refuse `POST /api/auth/login` tokens for admins (403 `ADMIN_USE_PANEL`), or issue them only after the second factor with a short absolute cap (for example 12 h).
+- Shorter idle lifetime for admin web sessions (for example 30 min).
+- Optional: an `ADMIN_ALLOWED_IPS` allowlist, documented in DEPLOYMENT.md.
+- Feature tests.
+- **Owner:** enrol each real admin after deploy.
+
+### SEC-39 · low · backend: unthrottled public web endpoints
+- `POST /contact` (`LandingController.php:22-58`) has no throttle and writes a log line per call. `GET /stats` (`:63-79`) has no throttle, runs two `COUNT` queries per call and discloses total user and driver counts. The API twins (`api/public/*`) are throttled.
+- **Fix:** `throttle:10,1` on `/contact` and `throttle:60,1` plus a 5-minute cache on `/stats`, or delete them if the landing page no longer uses them.
+
+### SEC-40 · low · backend: no per-passenger limit on booking and free cancelling
+- `POST /api/rides` and `POST /api/rides/{ride}/cancel` carry only the general `throttle:120,1`. `RideBookingGuard` stops concurrent rides and duplicates, but not a book → cancel loop. Cancelling while `requested` is free.
+- Each booking fans out a `ride.requested` hint to up to 50 nearby drivers (`Realtime::requestRecipients`) and puts a phantom request on their feed and banner (T-708). The recipient query runs in the worker each time.
+- **Fix:** a per-passenger booking limiter (for example 6 per 10 min) and a cooldown after about 3 requested-state cancels in 15 min, with 429 `rate_limited` and `retry_after` in the BE-28 envelope. Add tests.
+
+### SEC-41 · low · backend: no security headers on the admin panel from the app itself
+- Only `PublicTripHeaders` and `PrivateFileController` set `X-Frame-Options`/`nosniff`/CSP. The `DEPLOYMENT.md:745-746` nginx block adds `X-Frame-Options SAMEORIGIN` and `nosniff`, but no HSTS. Hostinger shared hosting (Apache, `public/.htaccess`) adds none, so `/admin` can be framed (clickjacking on wallet adjustments and driver approval).
+- **Fix:** a web-group middleware that sends `X-Frame-Options: DENY` (or CSP `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`, plus `Strict-Transport-Security` in production. Add a test.
+
+### SEC-42 · low · app storage: hidden recent destinations kept in plain text across logout
+- `src/features/passenger-home/hiddenRecents.ts:11,49` stores the normalised **address** of every destination the user hid (`recentDestinations.ts:11,32`) under one global key, `home_hidden_recents`. The key is not per user, and logout doesn't remove it: `authStorage.clear` removes only `LEGACY_KEYS` + `USER_KEY`. The invite-code cache (`features/invite/hooks.ts:37`, per user) is also left behind.
+- On a shared phone, the next account inherits the list, and the list survives in backups. These are places the user chose to hide, which may be sensitive.
+- **Fix:** clear both on logout (the logout wipe step), or store hidden recents as a hash of the key, per user. Add a unit test.
+
+### SEC-43 · low · app: the top-up checkout WebView accepts any https start URL
+- `TopUpCheckoutScreen.tsx:72,130-145` loads `params.url` (the server's `next_action.redirect`) when `isAllowedCheckoutUrl` holds, and that check is "any https" (`topUpLinks.ts:69-74`). Later navigations are also any https.
+- The hardening is good: no JS bridge (`onMessage`), incognito, no new windows, every non-https scheme blocked and nothing handed to the OS. But the in-app view has no address bar, so a tampered or misconfigured response could show a look-alike page that asks for a JazzCash/Easypaisa PIN.
+- **Fix:** accept a start URL only on the API origin (`/api/payments/checkout/…`) or on an allowlist of the gateway hosts (sandbox and production, from env). Show the current host in the header. Add a unit test.
+
+### Pre-release checklist
+| Item | Result |
+|---|---|
+| App 1 Secrets | OK. Only the public-by-design Firebase configs and the default `debug.keystore`. `.env.example` has empty values. Maps key history: B-02. |
+| App 2 Token storage | OK (Keychain, full logout). SEC-42 (low) |
+| App 3 Logging | OK in release (console stripped except `error`, through the strict redactor). SEC-20 (low) still open |
+| App 4 Transport | OK at OS level. SEC-17 (low) |
+| App 5 Auth flows | OK. OTP never kept or shown. 401 → logout. 403 `ACCOUNT_*` → status screen. Realtime auth through the shared client. |
+| App 6 Input/navigation | OK. Deep link `raahehaq://wallet/topup` reads only an id (shape-checked); push targets validated. SEC-43 (low) |
+| App 7 Permissions | OK. Foreground only (B-08). T-593/T-596 added no permissions. |
+| App 8 Dependencies | SEC-11 (medium) open: axios |
+| BE 1 Config | OK in code. Live: B-12, B-16. SEC-14/15 (low) |
+| BE 2 AuthN | OK for OTP, tokens and limiters. SEC-38 (medium): admin single factor |
+| BE 3 AuthZ/IDOR | OK. Every parameterised route checked (policies, `visibleTo`, `user_id` scoping, `role:*`). |
+| BE 4 Mass assignment | OK (the identity fields stay locked) |
+| BE 5 Injection | OK. Raw fragments are constants or bound. |
+| BE 6 Uploads | OK. SEC-36: files orphaned on a hard delete |
+| BE 7 Races | OK (assignment, ledger, deletion lock order) |
+| BE 8 WebSockets | OK (SEC-35 resolved). SEC-37: legacy subscribe endpoint |
+| BE 9 Headers/CORS | Framework CORS default, token auth. SEC-41 (low) |
+
+**Verdict: one release blocker in code, SEC-36 (high).** SEC-37, SEC-38 and SEC-11 (axios) should land before release as well. Owner items before launch: B-02, B-05/B-21, B-10, B-11, B-12, B-13, B-15, B-16, B-17, B-18, B-22, and the BE-134 legal figure.
+
+**Tasks:** BE-139 (SEC-36), BE-140 (SEC-37), BE-141 (SEC-38). SEC-11 stays with T-701; its axios upgrade should be done before release. Lows SEC-39..43 have no task yet (fold into related work).
