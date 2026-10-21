@@ -1161,3 +1161,15 @@ App follow-up: while searching, a poll or focus read returning `cancelled` + `no
 - After allow-any-driver or a requeue only later offers count and are listed.
 - Change from BE-116: `viewing` counts every driver who opened the offer, including ones who then declined. A decline changes no count and no id; there is never a declined count or id.
 - GET `/rides/{id}/reach` stays `{sent, viewing}`; GET `/rides` has no reach. POST `/rides/{id}/offer-viewed` unchanged.
+
+### Realtime with Laravel Reverb (BE-12, SEC-35, backend 58a6937 + 0a95617 + 384f16c)
+
+- Pusher protocol (`laravel-echo` + `pusher-js`, broadcaster "reverb"). Read GET `/settings/public` → `meta.realtime { enabled, protocol:"pusher", key, host, port, scheme, websocket_url, auth_endpoint }`; when `enabled` is false (server off, or credentials unset/placeholder) do not connect and keep polling. Accept server values only when they match `env.WS_URL` / `WS_APP_KEY`; wss only in release.
+- Channel auth: POST `<API origin>/broadcasting/auth` (no /api prefix), Bearer token; 401/403 JSON (403 also when realtime is off); 429 above 30/min per user (back off by Retry-After). GET is 405.
+- Channels (private only, client events off): `private-ride.{rideId}` (passenger + current driver), `private-user.{userId}` (self), `private-driver.{driverId}` (self, driver role).
+- Events are refetch hints (ids/statuses only; Echo listener names have a leading dot):
+  - ride channel: `ride.status {ride_id, status, previous_status, at}`, `ride.accepted {ride_id, status, at}` → refetch GET /rides/{id}.
+  - user channel: `ride.driver_location {ride_id, driver_id, latitude, longitude, heading, status, last_seen_at}` (passenger only, ≤1 per 3 s, dropped when older than 10 s or the passenger is unreachable); `chat.message {ride_id, message_id, sender_role, unread_count, created_at}` (no body); `chat.read {ride_id, up_to_id}`; `notification.created {id, category}`.
+  - driver channel: `ride.requested {refetch:"rides.pending"}`; `ride.request_withdrawn {ride_id}`.
+- Rules: polling stays the fallback (never stop it); handlers idempotent; leave the ride channel when the ride ends or the user is no longer its party; leave the driver channel when offline; disconnect on logout and on any 401/403.
+- Legacy `POST /websocket/subscribe-*` return config-based `websocket_url` (null when not configured); not used by the app.
