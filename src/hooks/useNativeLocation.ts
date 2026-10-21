@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus, Platform, Linking, PermissionsAndroid } from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
+import Geolocation, { type GeolocationError } from '@react-native-community/geolocation';
 import { logger } from '../core/logging/logger';
 import { primeBeforeOsPrompt } from '../features/permissions/primer';
 import { iosLocationOsStatus, locationOsUndetermined } from '../features/permissions/locationStatus';
+import { configureGeolocation, getPositionOnce, isDeviceLocationOff } from '../core/location/geolocation';
 
 export interface Coordinates {
   latitude: number;
@@ -74,9 +75,17 @@ const untilAppActive = (capMs: number, waits: Set<() => void>): Promise<void> =>
     waits.add(done);
   });
 
-/** Geolocation error codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT. */
-const errorKindOf = (code: number): LocationErrorKind =>
-  code === 1 ? 'denied' : code === 2 ? 'disabled' : 'unavailable';
+/**
+ * Geolocation error codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT.
+ * T-712: on Android a lookup only runs with access granted, so POSITION_UNAVAILABLE is no fix yet
+ * (a retry), unless the device's location itself is off; Settings could not help otherwise.
+ */
+const errorKindOf = (error: Pick<GeolocationError, 'code' | 'message'>): LocationErrorKind => {
+  if (error.code === 1) return 'denied';
+  if (error.code !== 2) return 'unavailable';
+  if (Platform.OS !== 'android') return 'disabled';
+  return isDeviceLocationOff(error) ? 'disabled' : 'unavailable';
+};
 
 /** PERMISSION_DENIED (1) and TIMEOUT (3): situations the screens explain, logged at debug. */
 export const isExpectedPositionError = (code: number): boolean => code === 1 || code === 3;
@@ -85,10 +94,11 @@ export const isExpectedPositionError = (code: number): boolean => code === 1 || 
  * T-593: on Android the geolocation library asks the OS for permission itself on every lookup
  * unless told not to. This hook asks only through the pre-prompt and PermissionsAndroid, so its
  * Android lookups skip the library's own request (a lookup without access fails with code 1).
- * Set before each lookup: the driver tracking service sets its own configuration for its watch.
+ * T-712: the app's one configuration (fused provider), applied once before the first lookup.
+ * iOS keeps the library's defaults here, as before.
  */
-const noLibraryPromptOnAndroid = () => {
-  if (Platform.OS === 'android') Geolocation.setRNConfiguration({ skipPermissionRequests: true });
+const configureOnAndroid = () => {
+  if (Platform.OS === 'android') configureGeolocation();
 };
 
 /** T-593: Android 12+ ignores a fine-only request; both are asked, either one is access. */
@@ -125,8 +135,10 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
 
   // Check location services status
   const checkLocationServices = useCallback((): Promise<boolean> => {
+    // T-712: no probe on Android. The fused lookup that follows tells a switched-off device
+    // (`disabled`) from no fix yet (`unavailable`), and a second GPS lookup costs time and battery.
+    if (Platform.OS === 'android') return Promise.resolve(true);
     return new Promise((resolve) => {
-      noLibraryPromptOnAndroid();
       Geolocation.getCurrentPosition(
         () => resolve(true),
         (positionError) => {
@@ -180,8 +192,8 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
   // Get current location; a failure is kept in `error` (no alert).
   const getCurrentLocation = useCallback((): Promise<Coordinates | null> => {
     return new Promise((resolve) => {
-      noLibraryPromptOnAndroid();
-      Geolocation.getCurrentPosition(
+      configureOnAndroid();
+      getPositionOnce(
         (position) => {
           const location = {
             latitude: position.coords.latitude,
@@ -196,14 +208,18 @@ export const useNativeLocation = ({ active = true }: UseNativeLocationOptions = 
         (positionError) => {
           // T-582: refused access and a timeout (iOS lets the lookup time out while its own
           // permission prompt is still up) are expected and shown in `error`; not warnings.
-          if (isExpectedPositionError(positionError.code)) logger.debug('Location error:', positionError);
+          // T-712: so is no fix yet on Android (code 2 read as 'unavailable', a retry).
+          const kind = errorKindOf(positionError);
+          if (isExpectedPositionError(positionError.code) || kind === 'unavailable') logger.debug('Location error:', positionError);
           else logger.warn('Location error:', positionError);
 
-          if (mounted.current) setError(errorKindOf(positionError.code));
+          if (mounted.current) setError(kind);
           resolve(null);
         },
         {
-          enableHighAccuracy: false,
+          // T-712: the fused provider's low-power mode never turns on GPS, so an approximate-only
+          // phone without network location would get nothing; Android still coarsens the fix.
+          enableHighAccuracy: Platform.OS === 'android',
           timeout: 10000,
           maximumAge: 60000,
         }

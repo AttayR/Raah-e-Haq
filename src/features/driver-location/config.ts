@@ -95,3 +95,19 @@ export const DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS = {
   fastestInterval: 15_000,
   maximumAge: 15_000,
 } as const;
+
+/**
+ * T-712: the same low-power watch on Android. The app reads through the fused provider there,
+ * where `enableHighAccuracy: false` is PRIORITY_BALANCED_POWER_ACCURACY (our patch; the stock
+ * library used LOW_POWER, which gave the offline driver no fix with Google Location Accuracy
+ * off). Balanced is not confirmed to get a fix without network location either (it rarely turns
+ * on GPS), so Android asks for high accuracy, but rarely: a fix at most every 30 s (15 s when
+ * another app already has one) and only after a 50 m move. See PERF-20 in docs/audit/PERFORMANCE.md.
+ */
+export const DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID = {
+  enableHighAccuracy: true,
+  distanceFilter: 50,
+  interval: 30_000,
+  fastestInterval: 15_000,
+  maximumAge: 30_000,
+} as const;

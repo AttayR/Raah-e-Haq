@@ -3,6 +3,7 @@
  * throttled POST /tracking/update-location, 409 DRIVER_OFFLINE / 429 handling and cleanup.
  */
 import Geolocation from '@react-native-community/geolocation';
+import { resetGeolocationConfigurationForTests } from '../../../src/core/location/geolocation';
 import { ApiError } from '../../../src/core/api/errors';
 import { driverLocationApi } from '../../../src/features/driver-location/api';
 import {
@@ -46,6 +47,7 @@ beforeEach(() => {
   geo.watchPosition.mockClear();
   geo.clearWatch.mockClear();
   geo.setRNConfiguration.mockClear();
+  resetGeolocationConfigurationForTests();
   post = jest.spyOn(driverLocationApi, 'post').mockResolvedValue(undefined);
 });
 

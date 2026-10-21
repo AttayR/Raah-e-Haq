@@ -3,10 +3,12 @@ import Geolocation, { type GeolocationError } from '@react-native-community/geol
 import rideService, { type DriverLocation } from './rideService';
 import { isApiError, type ApiErrorKind } from '../core/api/errors';
 import { logger } from '../core/logging/logger';
+import { configureGeolocation } from '../core/location/geolocation';
 import { DRIVER_LOCATION_CODES, driverLocationApi } from '../features/driver-location/api';
 import {
   DRIVER_LOCATION_CONFIG,
   DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
+  DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID,
   DRIVER_LOCATION_RIDE_CONFIG,
   DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
   DRIVER_LOCATION_WATCH_OPTIONS,
@@ -39,6 +41,10 @@ const WATCH_OPTIONS = {
   tracking: DRIVER_LOCATION_WATCH_OPTIONS,
   lowPower: DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
 } as const;
+
+/** T-712: Android's fused low-power mode never uses GPS, so it gets its own low-power options. */
+const watchOptionsFor = (mode: WatchMode) =>
+  mode === 'lowPower' && Platform.OS === 'android' ? DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID : WATCH_OPTIONS[mode];
 
 export interface TrackingOptions {
   /** Called after the server answered 409 DRIVER_OFFLINE (tracking has already stopped). */
@@ -340,14 +346,11 @@ class LocationTrackingService {
    * Foreground-only configuration and permission, shared by every holder of the watcher.
    * T-596: on Android the permission is asked only here, so the library must not ask again on
    * the watch (it re-prompted a driver who chose approximate). iOS keeps the library's own
-   * "while using" prompt on the first watch.
+   * "while using" prompt on the first watch. T-712: the app's one configuration (Android: the
+   * fused provider), applied once, before the first watch.
    */
   private async preparePermission(): Promise<DriverLocationAccess> {
-    Geolocation.setRNConfiguration({
-      skipPermissionRequests: Platform.OS === 'android',
-      authorizationLevel: 'whenInUse',
-      enableBackgroundLocationUpdates: false,
-    });
+    configureGeolocation();
     return requestForegroundPermission();
   }
 
@@ -389,10 +392,12 @@ class LocationTrackingService {
     const mode = this.wantedWatchMode();
     this.lastSignAt = Date.now();
     this.watchMode = mode;
+    // T-712: a no-op once applied; never changes the provider under a running watch.
+    configureGeolocation();
     this.watchId = Geolocation.watchPosition(
       (position) => this.handlePosition(watchGeneration, position),
       (error) => this.handleWatchError(watchGeneration, error),
-      WATCH_OPTIONS[mode],
+      watchOptionsFor(mode),
     );
   }
 

@@ -9,6 +9,7 @@ import React from 'react';
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import { act, render, renderHook, screen } from '@testing-library/react-native';
 import Geolocation from '@react-native-community/geolocation';
+import { resetGeolocationConfigurationForTests } from '../../../src/core/location/geolocation';
 import { ThemeProvider } from '../../../src/app/providers/ThemeProvider';
 import { DriveSheetBody } from '../../../src/components/driver/drive/DriveSheet';
 import { driverLocationApi } from '../../../src/features/driver-location/api';
@@ -48,6 +49,7 @@ beforeEach(() => {
   geo.watchPosition.mockImplementation(() => 1);
   geo.clearWatch.mockClear();
   geo.setRNConfiguration.mockClear();
+  resetGeolocationConfigurationForTests();
   jest.spyOn(driverLocationApi, 'post').mockResolvedValue(undefined);
 });
 

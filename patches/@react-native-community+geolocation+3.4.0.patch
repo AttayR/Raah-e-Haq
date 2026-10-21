@@ -1,3 +1,140 @@
+diff --git a/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java b/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java
+index 423f7a5..cfc78c1 100644
+--- a/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java
++++ b/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java
+@@ -47,7 +47,7 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+ 
+         if (currentActivity == null) {
+             mSingleLocationCallback = createSingleLocationCallback(success, error);
+-            checkLocationSettings(options, mSingleLocationCallback, error);
++            checkLocationSettings(options, mSingleLocationCallback, error, true);
+ 			return;
+         }
+ 
+@@ -58,7 +58,7 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+                             success.invoke(locationToMap(location));
+                         } else {
+                             mSingleLocationCallback = createSingleLocationCallback(success, error);
+-                            checkLocationSettings(options, mSingleLocationCallback, error);
++                            checkLocationSettings(options, mSingleLocationCallback, error, true);
+                         }
+                     });
+         } catch (SecurityException e) {
+@@ -68,6 +68,8 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+ 
+     @Override
+     public void startObserving(ReadableMap options) {
++        // Never two observers: a callback still registered would keep its own request running.
++        stopObserving();
+         mLocationCallback = new LocationCallback() {
+             @Override
+             public void onLocationResult(LocationResult locationResult) {
+@@ -88,7 +90,7 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+             }
+         };
+ 
+-        checkLocationSettings(options, mLocationCallback, null);
++        checkLocationSettings(options, mLocationCallback, null, false);
+     }
+ 
+     @Override
+@@ -97,13 +99,24 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+             return;
+         }
+         mFusedLocationClient.removeLocationUpdates(mLocationCallback);
++        // A settings check still in flight sees the callback is no longer current and does not
++        // register it (a quick stop then start left an orphan request and duplicate events).
++        mLocationCallback = null;
+     }
+ 
+-    private void checkLocationSettings(ReadableMap options, LocationCallback locationCallback, Callback error) {
++    private void checkLocationSettings(ReadableMap options, LocationCallback locationCallback, Callback error, boolean single) {
+         LocationOptions locationOptions = LocationOptions.fromReactMap(options);
+         LocationRequest.Builder requestBuilder = new LocationRequest.Builder(locationOptions.interval);
+-        requestBuilder.setPriority(locationOptions.highAccuracy ? Priority.PRIORITY_HIGH_ACCURACY : Priority.PRIORITY_LOW_POWER);
++        // Not high accuracy: balanced (Wi-Fi and cell), not low power, which may give no fix at all.
++        requestBuilder.setPriority(locationOptions.highAccuracy ? Priority.PRIORITY_HIGH_ACCURACY : Priority.PRIORITY_BALANCED_POWER_ACCURACY);
+         requestBuilder.setMaxUpdateAgeMillis((long) locationOptions.maximumAge);
++        if (single) {
++            // A single lookup ends natively too: one update, and no longer than its timeout.
++            requestBuilder.setMaxUpdates(1);
++            if (locationOptions.timeout > 0) {
++                requestBuilder.setDurationMillis(locationOptions.timeout);
++            }
++        }
+ 
+         if (locationOptions.fastestInterval >= 0) {
+             requestBuilder.setMinUpdateIntervalMillis(locationOptions.fastestInterval);
+@@ -118,8 +131,16 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+         settingsBuilder.addLocationRequest(locationRequest);
+         LocationSettingsRequest locationSettingsRequest = settingsBuilder.build();
+         mLocationServicesSettingsClient.checkLocationSettings(locationSettingsRequest)
+-                .addOnSuccessListener(locationSettingsResponse -> requestLocationUpdates(locationRequest, locationCallback))
++                .addOnSuccessListener(locationSettingsResponse -> {
++                    if (!single && locationCallback != mLocationCallback) {
++                        return;
++                    }
++                    requestLocationUpdates(locationRequest, locationCallback);
++                })
+                 .addOnFailureListener(err -> {
++                    if (!single && locationCallback != mLocationCallback) {
++                        return;
++                    }
+                     if(isAnyProviderAvailable()){
+                         requestLocationUpdates(locationRequest, locationCallback);
+                         return;
+@@ -162,19 +183,32 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+ 
+                 if (location == null) {
+                     callbackHolder.error(PositionError.buildError(PositionError.POSITION_UNAVAILABLE, "No location provided (FusedLocationProvider/lastLocation)."));
++                    mFusedLocationClient.removeLocationUpdates(this);
++                    if (mSingleLocationCallback == this) {
++                        mSingleLocationCallback = null;
++                    }
+                     return;
+                 }
+ 
+                 callbackHolder.success(location);
+ 
+-                mFusedLocationClient.removeLocationUpdates(mSingleLocationCallback);
+-                mSingleLocationCallback = null;
++                // Stop this lookup's own updates. A newer lookup replaces mSingleLocationCallback, so
++                // removing the field would leave this request (high accuracy) running for good.
++                mFusedLocationClient.removeLocationUpdates(this);
++                if (mSingleLocationCallback == this) {
++                    mSingleLocationCallback = null;
++                }
+             }
+ 
+             @Override
+             public void onLocationAvailability(@NonNull LocationAvailability locationAvailability) {
+                 if (!locationAvailability.isLocationAvailable()) {
+                     callbackHolder.error(PositionError.buildError(PositionError.POSITION_UNAVAILABLE, "Location not available (FusedLocationProvider/lastLocation)."));
++                    // The lookup has answered: end its updates too.
++                    mFusedLocationClient.removeLocationUpdates(this);
++                    if (mSingleLocationCallback == this) {
++                        mSingleLocationCallback = null;
++                    }
+                 }
+             }
+         };
+@@ -195,6 +229,8 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+             }
+             this.error.invoke(cause);
+             this.error = null;
++            // A native callback pair answers once: no success after an error.
++            this.success = null;
+         }
+ 
+         public void success(Location location) {
+@@ -204,6 +240,7 @@ public class PlayServicesLocationManager extends BaseLocationManager {
+             }
+             this.success.invoke(locationToMap(location));
+             this.success = null;
++            this.error = null;
+         }
+     }
+ }
 diff --git a/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm b/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm
 index 03df64d..b8088d4 100644
 --- a/node_modules/@react-native-community/geolocation/ios/RNCGeolocation.mm

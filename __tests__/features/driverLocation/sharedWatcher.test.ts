@@ -7,11 +7,13 @@
  * Covered here: the native patch is applied, one shared refcounted watcher owned by the
  * tracker, the self-heal restart of a silent watcher, and no posting of an old fix.
  */
+import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { driverLocationApi } from '../../../src/features/driver-location/api';
 import {
   DRIVER_LOCATION_CONFIG,
   DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS,
+  DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID,
   DRIVER_LOCATION_RIDE_WATCH_OPTIONS,
   DRIVER_LOCATION_WATCH_OPTIONS,
 } from '../../../src/features/driver-location/config';
@@ -255,6 +257,46 @@ describe('one shared watcher (T-410)', () => {
   });
 });
 
+describe('native fused provider patch (T-712)', () => {
+  const source = () =>
+    readFileSync(
+      'node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java',
+      'utf8',
+    );
+
+  it('stopObserving forgets its callback, and a late settings answer registers only the current one', () => {
+    const java = source();
+    expect(java).toMatch(/removeLocationUpdates\(mLocationCallback\);\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*mLocationCallback = null;/);
+    expect(java.match(/if \(!single && locationCallback != mLocationCallback\)/g)).toHaveLength(2);
+  });
+
+  it('a single lookup ends natively (one update, its timeout) and removes its own updates on every answer', () => {
+    const java = source();
+    expect(java).toContain('requestBuilder.setMaxUpdates(1);');
+    expect(java).toContain('requestBuilder.setDurationMillis(locationOptions.timeout);');
+    expect(java).not.toContain('removeLocationUpdates(mSingleLocationCallback)');
+    expect(java.match(/removeLocationUpdates\(this\);/g)).toHaveLength(3);
+  });
+
+  it('the patch touches only library sources (android/src, ios), never build output', () => {
+    const patch = readFileSync('patches/@react-native-community+geolocation+3.4.0.patch', 'utf8');
+    const header = /^diff --git a\/node_modules\/@react-native-community\/geolocation\/(\S+) /gm;
+    const files = Array.from(patch.matchAll(header), (m) => m[1]);
+    expect(files).toEqual([
+      'android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java',
+      'ios/RNCGeolocation.mm',
+    ]);
+    files.forEach((file) => expect(file).toMatch(/^(android\/src\/|ios\/)/));
+    expect(patch).not.toMatch(/GIT binary patch|Binary files/);
+  });
+
+  it('not high accuracy is balanced power, not low power', () => {
+    expect(source()).toContain(
+      'locationOptions.highAccuracy ? Priority.PRIORITY_HIGH_ACCURACY : Priority.PRIORITY_BALANCED_POWER_ACCURACY',
+    );
+  });
+});
+
 describe('watch accuracy by mode (T-537, PERF-20)', () => {
   const lastOptions = () => geo.watchPosition.mock.calls[geo.watchPosition.mock.calls.length - 1][2];
 
@@ -263,6 +305,64 @@ describe('watch accuracy by mode (T-537, PERF-20)', () => {
     await settle();
     expect(lastOptions()).toEqual(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS);
     expect(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS.enableHighAccuracy).toBe(false);
+  });
+
+  it('T-712: on Android (fused, whose low power never uses GPS) the offline watch is high accuracy, but sparse', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    jest.spyOn(PermissionsAndroid, 'check').mockResolvedValue(true);
+    const release = locationTrackingService.acquireLocationWatch();
+    // The Android permission step has more awaits (primer status, two checks).
+    for (let i = 0; i < 4; i += 1) await settle();
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID);
+    expect(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID).toEqual({
+      enableHighAccuracy: true,
+      distanceFilter: 50,
+      interval: 30_000,
+      fastestInterval: 15_000,
+      maximumAge: 30_000,
+    });
+
+    // Online tracking and rides keep their own options on Android too.
+    await locationTrackingService.startTracking();
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_WATCH_OPTIONS);
+    locationTrackingService.stopTracking();
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_LOW_POWER_WATCH_OPTIONS_ANDROID);
+    release();
+  });
+
+  it('T-712: a quick low-power -> tracking switch on Android clears each watch before the next; never two at once', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    jest.spyOn(PermissionsAndroid, 'check').mockResolvedValue(true);
+    const running = new Set<number>();
+    let most = 0;
+    geo.watchPosition.mockImplementation(() => {
+      const id = nextWatchId++;
+      running.add(id);
+      most = Math.max(most, running.size);
+      return id;
+    });
+    geo.clearWatch.mockImplementation((id: number) => {
+      running.delete(id);
+    });
+
+    const release = locationTrackingService.acquireLocationWatch();
+    // Going online right away, before the low-power watch had any fix.
+    const online = locationTrackingService.startTracking();
+    for (let i = 0; i < 4; i += 1) await settle();
+    expect(await online).toBe(true);
+    locationTrackingService.stopTracking();
+    expect(await locationTrackingService.startTracking()).toBe(true);
+
+    expect(most).toBe(1);
+    expect(running.size).toBe(1);
+    expect(lastOptions()).toEqual(DRIVER_LOCATION_WATCH_OPTIONS);
+    // Each watch started before the last one was cleared, with its own id.
+    const started = geo.watchPosition.mock.results.map((r) => r.value as number);
+    expect(geo.clearWatch.mock.calls.map(([id]) => id)).toEqual(started.slice(0, -1));
+
+    locationTrackingService.stopTracking();
+    release();
+    expect(running.size).toBe(0);
   });
 
   it('online tracking runs the high-accuracy watch; a ride its own; back to low power when tracking stops', async () => {

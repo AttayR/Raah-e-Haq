@@ -52,6 +52,14 @@ it.each([
   expect(request).not.toHaveBeenCalled();
 });
 
+it('T-712: no fix with access granted (canAskAgain false): the action looks again, not Settings', () => {
+  locationAs('unavailable', false);
+  const { result } = renderHook(() => useBookingLocationGate({ active: true, rideShown: false }));
+  result.current.askOrSettings();
+  expect(request).toHaveBeenCalled();
+  expect(openSettings).not.toHaveBeenCalled();
+});
+
 it('no fix (not refused): the full-screen wait with Try again; a ride wins over it', () => {
   locationAs('unavailable', false);
   const { result, rerender } = renderHook(

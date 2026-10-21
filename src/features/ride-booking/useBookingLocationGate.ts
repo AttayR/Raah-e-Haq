@@ -45,7 +45,9 @@ export const useBookingLocationGate = ({ active, rideShown }: { active: boolean;
       }
     : null;
   const askOrSettings = (): void => {
-    if (error === 'disabled' || !permissionStatus.canAskAgain) {
+    // T-712: only switched-off location or access refused for good needs Settings; with access
+    // granted (canAskAgain is false then) a lookup that found nothing simply looks again.
+    if (error === 'disabled' || (error === 'denied' && !permissionStatus.canAskAgain)) {
       openSettings();
     } else {
       requestLocationPermission();
