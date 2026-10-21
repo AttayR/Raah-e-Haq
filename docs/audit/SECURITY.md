@@ -808,6 +808,29 @@ rh-security, `audit all`, reading code only. **App:** `fix/phase-2-onboarding` a
 - Feature tests.
 - **Owner:** enrol each real admin after deploy.
 
+**Review of BE-141 (2026-10-21, backend commit 8df3b32 on 04a7ecf): FAIL, two fixes left.** The suite passes on sqlite (2733 tests).
+
+Checked and OK:
+- `app/Support/Totp.php` follows RFC 6238/4226: HMAC-SHA1, `pack('J')` counter, dynamic truncation, 6 digits, 30 s. It checks a ±1 step window with `hash_equals` and no early exit. Secrets are 160-bit.
+- Replay: a conditional update on `two_factor_last_used_step` (`AdminTwoFactor::acceptCode`) makes each code single use, even under concurrent posts.
+- Storage: the secret uses the `encrypted` cast. Recovery codes are sha256 hashes of 50-bit random codes. All four columns are `$hidden`. Nothing secret reaches logs or the audit log.
+- Recovery-code use is a transaction with `lockForUpdate`, so each code works once on MySQL.
+- Pending session: password step → logout → `regenerate()` → pending `{id, expires_at}` for 5 min. Success → login → `regenerate()` → `markPassed` clears pending. The status is re-checked after the code. Fixation and reuse are covered.
+- Remember-me: the admin path drops the recaller cookie, and `logout()` cycles `remember_token`. A recaller login from before BE-141 is signed out by `admin.2fa`. The admin idle timeout holds.
+- Coverage (`route:list`): every `admin/*` web route and `/profile*` have `admin.idle` + `admin.2fa`, except `admin/two-factor` show/confirm, which are the enrolment pages. Both middleware are ordered before `SubstituteBindings`.
+- API: login, verify-otp and verify-phone issue no admin token. `Sanctum::authenticateAccessTokensUsing` refuses any admin token and keeps `$isValid`. No `statefulApi`, so a web session cookie does not authenticate `/api`.
+- Non-admin flows: unchanged apart from the extra (pass-through) middleware on `/profile`.
+
+Required fixes (BE-141 retry):
+1. **medium: the wrong-code lock can be raced** (`TwoFactorChallengeController::store`). It checks `lockedFor()`, then verifies, then `failed()` → `RateLimiter::hit`. Database sessions don't block, so N parallel posts all pass the check before any hit lands. An attacker who holds the password then gets about 20 guesses per IP per minute (`throttle:20,1`) on every lock window, not 5 per 5 minutes. Fix: count the attempt before verifying (`RateLimiter::hit` first and refuse when the post-hit count is over the limit, or use an atomic `Cache::add`/`increment` counter), and clear it on success. Add a test that more than `max_attempts` wrong codes, even with the check skipped, can't succeed.
+2. **medium: APP_KEY rotation crashes admin sign-in and the documented reset.** Reading `two_factor_secret` decrypts it and throws `DecryptException` under a new key. That breaks `User::hasTwoFactorEnabled()` (password step, `admin.2fa`, challenge) and `AdminTwoFactorResetCommand` (line `two_factor_secret === null`). Every enrolled admin gets a 500, and the recovery command that DEPLOYMENT.md prescribes fails. Fix: decide presence on the raw attribute (`getAttributes()['two_factor_secret'] !== null`), and catch `DecryptException` in the command so the reset still nulls the columns. Document `APP_PREVIOUS_KEYS` in DEPLOYMENT.md as the way to rotate without a reset. Add a test that rotates the key, then resets.
+
+Low (accepted or fold into the retry):
+- An admin session that has not passed 2FA can still reach `PUT /password`, `confirm-password`, `dashboard` and `email/verification-notification` (auth only). All of these need the password already. Optionally add `admin.2fa` to them.
+- First enrolment is trust on first use: someone with only the password of a not-yet-enrolled admin can enrol their own app, and the unconfirmed secret is shown again on each visit. Mitigation: the owner enrols every real admin right after deploy (already in DEPLOYMENT.md).
+- Lockout DoS: someone who holds the password can keep an admin's challenge locked (recovery codes too) by sending 5 wrong codes every 5 minutes. A non-holder can't, because the pending state needs the right password. Each lock writes `admin_2fa_locked` (high). Treat that entry as a sign the password is compromised and rotate it.
+- The Sanctum hook loads `tokenable` roles on every API request (one extra query per request). This is a performance note, not a security one.
+
 ### SEC-39 · low · backend: unthrottled public web endpoints
 - `POST /contact` (`LandingController.php:22-58`) has no throttle and writes a log line per call. `GET /stats` (`:63-79`) has no throttle, runs two `COUNT` queries per call and discloses total user and driver counts. The API twins (`api/public/*`) are throttled.
 - **Fix:** `throttle:10,1` on `/contact` and `throttle:60,1` plus a 5-minute cache on `/stats`, or delete them if the landing page no longer uses them.
