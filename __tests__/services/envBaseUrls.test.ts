@@ -8,7 +8,8 @@ import MockAdapter from 'axios-mock-adapter';
 import { env } from '../../src/config/env';
 import { apiClient } from '../../src/services/api';
 import { notificationsApi } from '../../src/features/notifications/api';
-import webSocketService from '../../src/services/webSocketService';
+import { authorizeChannel } from '../../src/core/realtime';
+import { resolveRealtimeConfig } from '../../src/core/realtime/config';
 import locationTrackingService from '../../src/services/locationTrackingService';
 
 const fetchMock = globalThis.fetch as jest.Mock;
@@ -58,15 +59,19 @@ describe('backend URLs come from env', () => {
     expectAxiosCall('get', '/tracking/driver/7/latest');
   });
 
-  it('webSocketService subscribes through the axios client with the real token', async () => {
-    mock.onPost('/websocket/subscribe-ride').reply(200, {
-      success: true,
-      data: { ride_id: 5, user_type: 'passenger', websocket_url: 'wss://api.raah.test/ws/ride/5', channels: [] },
-    });
-    // The socket itself is refused by the Jest WebSocket guard; only the subscribe call matters here.
-    await webSocketService.subscribeToRideUpdates(5, 'passenger', jest.fn()).catch(() => undefined);
-    expectAxiosCall('post', '/websocket/subscribe-ride');
-    expect(JSON.parse(mock.history.post[0].data)).toEqual({ ride_id: 5, user_type: 'passenger' });
+  it('T-406: channel auth goes to <API origin>/broadcasting/auth through the axios client with the token', async () => {
+    const resolved = resolveRealtimeConfig(
+      { enabled: true, protocol: 'pusher', key: 'k', host: null, port: null, scheme: null, websocketUrl: null },
+      { API_URL: env.API_URL, WS_URL: env.WS_URL, WS_APP_KEY: 'k' },
+      { release: true },
+    );
+    if (!resolved.ok) throw new Error('expected a config');
+    expect(resolved.config.authEndpoint).toBe('https://api.raah.test/broadcasting/auth');
+    mock.onPost('https://api.raah.test/broadcasting/auth').reply(200, { auth: 'k:signature' });
+
+    await expect(authorizeChannel(resolved.config.authEndpoint, 'private-user.9', '1.2')).resolves.toEqual({ auth: 'k:signature' });
+    expect(mock.history.post[0].headers?.Authorization).toBe('Bearer test-token');
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ socket_id: '1.2', channel_name: 'private-user.9' });
   });
 
   it('sends the bearer token only to the API origin', async () => {
@@ -85,26 +90,6 @@ describe('backend URLs come from env', () => {
     expect(auth('https://evil.example.test/steal')).toBeUndefined();
     expect(auth('https://api.raah.test.evil.example/api/rides')).toBeUndefined();
     expect(auth('//evil.example.test/steal')).toBeUndefined();
-  });
-
-  it('webSocketService opens notification sockets on env.WS_URL', async () => {
-    const opened: string[] = [];
-    const RealGuard = globalThis.WebSocket;
-    class FakeWebSocket {
-      constructor(url: string) {
-        opened.push(url);
-      }
-      close = jest.fn();
-    }
-    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-
-    try {
-      await webSocketService.subscribeToNotifications(9, jest.fn());
-      expect(opened).toEqual(['wss://api.raah.test/ws/notifications/9']);
-      webSocketService.unsubscribe('notifications_9');
-    } finally {
-      globalThis.WebSocket = RealGuard;
-    }
   });
 
   it('the Jest WebSocket guard refuses real connections', () => {

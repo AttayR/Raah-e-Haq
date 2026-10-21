@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useConnectionRecovered } from './api/connectivity';
 import { ApiError, isApiError, type ThunkRejection } from './api/errors';
+import type { WakeSource } from './realtime/events';
 
 /**
- * The app's one poll engine (T-510, shared since T-536). There are no WebSockets yet
- * (BE-12/T-406), so screens poll while they are focused and the app is in the foreground; the
- * timer stops on disable (blur, background) and unmount. One request at a time: the next one is
+ * The app's one poll engine (T-510, shared since T-536). Realtime events (T-406) only wake it
+ * (`wake`); polling stays the fallback, so screens poll while they are focused and the app is
+ * in the foreground; the timer stops on disable (blur, background) and unmount. One request at a time: the next one is
  * scheduled only after the last one settled (a chain of timeouts, not an interval). A failure
  * backs off (a 429 waits at least its Retry-After) and the back-off survives a disable/enable.
  */
@@ -13,6 +14,11 @@ export const POLL_DEFAULT_INTERVAL_MS = 5000;
 export const POLL_MAX_DELAY_MS = 60000;
 /** `has_more` re-polls at once at most this many times in a row, then waits the interval. */
 export const POLL_MAX_BURST = 5;
+/**
+ * T-406: a realtime hint (`wake`) reads at once, but never sooner than this after the last read
+ * settled, so a burst of events is one read, not a storm.
+ */
+export const POLL_WAKE_MIN_GAP_MS = 1000;
 
 /** What a poll asks for next: wait the interval, poll again at once (`has_more`), or stop. */
 export type PollOutcome = 'continue' | 'again' | 'stop';
@@ -53,6 +59,13 @@ export interface PollingOptions {
    * poll at once instead of waiting one interval. A pending back-off still wins.
    */
   readAtOnceKey?: string | number;
+  /**
+   * T-406: realtime events that mean "the data changed": while enabled, each one reads now
+   * (after POLL_WAKE_MIN_GAP_MS since the last read; one read in flight gets one follow-up).
+   * A 429's back-off is kept. The interval keeps running as the fallback. Pass a stable value
+   * (useMemo), a new one re-subscribes.
+   */
+  wake?: WakeSource;
 }
 
 export const usePolling = ({
@@ -61,6 +74,7 @@ export const usePolling = ({
   run,
   lastFetchedAt,
   readAtOnceKey,
+  wake,
 }: PollingOptions): void => {
   const runRef = useRef(run);
   const intervalRef = useRef(intervalMs);
@@ -88,6 +102,8 @@ export const usePolling = ({
   const readAtOnceFor = useRef<string | number | null>(null);
   /** The pending back-off is a 429's (kept on reconnect), not a network failure's. */
   const rateLimited = useRef(false);
+  /** A wake arrived while a read was in flight: read again once it settled. */
+  const wakePending = useRef(false);
 
   const [engine] = useState(() => {
     const clear = () => {
@@ -137,6 +153,12 @@ export const usePolling = ({
           nextAllowedAt.current = now + intervalRef.current;
         }
       }
+      if (wakePending.current) {
+        wakePending.current = false;
+        if (!failed && !stopped.current) {
+          nextAllowedAt.current = Math.min(nextAllowedAt.current, now + POLL_WAKE_MIN_GAP_MS);
+        }
+      }
       // Still enabled (or enabled again while it ran): wait until the next allowed time.
       schedule();
     };
@@ -153,10 +175,29 @@ export const usePolling = ({
       nextAllowedAt.current = Date.now();
       schedule();
     };
-    return { schedule, clear, recover };
+    /** T-406: a realtime hint: read now (coalesced), unless off, stopped or held by a 429. */
+    const wakeNow = () => {
+      if (!enabledRef.current || stopped.current) return;
+      if (inFlight.current) {
+        wakePending.current = true;
+        return;
+      }
+      const now = Date.now();
+      if (rateLimited.current && backoffUntil.current > now) return;
+      const earliest = Math.max(now, lastSettledAt.current + POLL_WAKE_MIN_GAP_MS);
+      if (nextAllowedAt.current <= earliest && timer.current !== null) return;
+      // The socket proves the server answers: a network back-off no longer applies.
+      backoffUntil.current = 0;
+      delay.current = intervalRef.current;
+      nextAllowedAt.current = earliest;
+      schedule();
+    };
+    return { schedule, clear, recover, wakeNow };
   });
 
   useConnectionRecovered(engine.recover, enabled);
+
+  useEffect(() => (wake ? wake(engine.wakeNow) : undefined), [wake, engine]);
 
   useEffect(() => {
     enabledRef.current = enabled;

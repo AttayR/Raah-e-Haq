@@ -22,6 +22,8 @@ import {
 } from '../../../src/features/driver-requests/hooks';
 import { makePendingRequest } from '../../../test-utils/driverRequestFixtures';
 import { makeRide } from '../../../test-utils/rideFixtures';
+import { realtimeEvents } from '../../../src/core/realtime/events';
+import { POLL_WAKE_MIN_GAP_MS } from '../../../src/core/polling';
 
 const statusInfo = (status: DriverAvailability) => ({ status, activeRideId: null, changedAt: null });
 
@@ -86,6 +88,46 @@ const renderPoller = async (status: DriverAvailability, isFocused = true, laterS
   await flush();
   return { store, ...hook };
 };
+
+describe('usePendingRidePolling realtime hints (T-406)', () => {
+  it('ride.requested reads the feed now (coalesced, after the min gap); the 5 s poll continues', async () => {
+    const { unmount } = await renderPoller('available');
+    expect(listPending).toHaveBeenCalledTimes(1);
+
+    realtimeEvents.emit('ride.requested', { refetch: 'rides.pending' });
+    realtimeEvents.emit('ride.requested', { refetch: 'rides.pending' });
+    await advance(POLL_WAKE_MIN_GAP_MS);
+    expect(listPending).toHaveBeenCalledTimes(2);
+    await advance(PENDING_POLL_INTERVAL_MS);
+    expect(listPending).toHaveBeenCalledTimes(3);
+
+    unmount();
+    expect(realtimeEvents.listenerCount('ride.requested')).toBe(0);
+    realtimeEvents.emit('ride.requested', {});
+    await advance(PENDING_POLL_INTERVAL_MS);
+    expect(listPending).toHaveBeenCalledTimes(3);
+  });
+
+  it('ride.request_withdrawn drops that card at once', async () => {
+    const { result } = await renderPoller('available');
+    expect(result.current.view).toMatchObject({ kind: 'request', request: { id: 7 } });
+    await act(async () => {
+      realtimeEvents.emit('ride.request_withdrawn', { ride_id: 7 });
+    });
+    expect(result.current.view.kind).not.toBe('request');
+  });
+
+  it('ride.requested does not read while held by a 429', async () => {
+    listPending.mockReset();
+    listPending.mockRejectedValueOnce(new ApiError({ kind: 'rate_limited', status: 429, message: 'slow', retryAfter: 30 }));
+    listPending.mockResolvedValue({ requests: [] });
+    await renderPoller('available');
+    expect(listPending).toHaveBeenCalledTimes(1);
+    realtimeEvents.emit('ride.requested', {});
+    await advance(POLL_WAKE_MIN_GAP_MS * 5);
+    expect(listPending).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('usePendingRidePolling', () => {
   it('polls at once and every 5 s while online, with the location fallback', async () => {

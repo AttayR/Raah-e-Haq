@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
@@ -10,6 +10,7 @@ import { formatDistance, formatMoney } from '../../utils/format';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
 import { layout, space } from '../../theme/spacing';
 import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
+import { RIDE_EVENTS, wakeOn } from '../../core/realtime/events';
 import { loadDriverStatus, selectDriverStatusState, type DriverStatusState } from '../driver-status/slice';
 import { DRIVER_RIDE_CODES, type DriverRideTransition } from './api';
 import { DRIVER_RIDE_COPY } from './copy';
@@ -340,9 +341,13 @@ export const useDriverRideStatusPolling = (enabled: boolean): void => {
     throw payload ? pollFailureOf(payload) : new Error(DRIVER_RIDE_COPY.refreshFailed);
   }, [dispatch, rideId]);
 
+  // T-406: `ride.status` on private-ride.{id} (e.g. the passenger cancelled) reads the ride now.
+  const wake = useMemo(() => (rideId === null ? undefined : wakeOn(RIDE_EVENTS, rideId)), [rideId]);
+
   usePolling({
     enabled: enabled && rideId !== null && active,
     intervalMs: DRIVER_RIDE_POLL_INTERVAL_MS,
     run,
+    wake,
   });
 };

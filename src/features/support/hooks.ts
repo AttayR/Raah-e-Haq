@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { SUPPORT_EMAIL } from '../../config/support';
 import { CACHE_NAMES, CACHE_TTL } from '../../core/api/queryCache';
+import { invalidatePublicSettings } from '../../core/api/publicSettings';
 import { usePagedList, type PagedList } from '../../core/api/usePagedList';
 import { useRemoteData, type RemoteData } from '../../core/api/useRemoteData';
 import { t } from '../../i18n';
@@ -40,7 +41,13 @@ export function useSupportContacts(enabled = true): SupportContactsState {
     enabled,
     cache: PUBLIC_SETTINGS_CACHE,
   });
-  return { contacts: remote.data ?? OFFLINE_CONTACTS, loaded: remote.data !== null, refresh: remote.refresh };
+  const { refresh: remoteRefresh } = remote;
+  // Pull to refresh asks the server again (the shared body is otherwise read once a session).
+  const refresh = useCallback(() => {
+    invalidatePublicSettings();
+    return remoteRefresh();
+  }, [remoteRefresh]);
+  return { contacts: remote.data ?? OFFLINE_CONTACTS, loaded: remote.data !== null, refresh };
 }
 
 /** GET /support/categories (already filtered for the caller's role), cached for a day. */

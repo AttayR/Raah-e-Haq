@@ -1,6 +1,6 @@
 import { createAsyncThunk, type ThunkAction, type UnknownAction } from '@reduxjs/toolkit';
 import { apiService, cancelAllRequests } from '../../services/api';
-import webSocketService from '../../services/webSocketService';
+import { realtime } from '../../core/realtime';
 import locationTrackingService from '../../services/locationTrackingService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { notificationsApi } from '../../features/notifications/api';
@@ -125,7 +125,8 @@ export const logout = createAsyncThunk<void, LogoutOptions | void, { extra: Sess
           throw error;
         }
       });
-      await step('close sockets', () => webSocketService.closeAll());
+      // T-406: the realtime connection, its channels and any reconnect timer go now.
+      await step('close sockets', () => realtime.reset());
       // Stop and forget the last position and listeners, so user A's location is never
       // posted under user B (T-104).
       await step('reset location tracking', () => locationTrackingService.reset());
@@ -223,7 +224,7 @@ export const accountRefused =
  */
 export const stopLiveServices = (caller: string): void => {
   try {
-    webSocketService.closeAll();
+    realtime.reset();
     // reset, not stop: the last position and listeners are dropped right away.
     locationTrackingService.reset();
   } catch (error) {

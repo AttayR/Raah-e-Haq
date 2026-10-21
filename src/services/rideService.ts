@@ -557,26 +557,12 @@ export interface NotificationResource {
   updated_at: string;
 }
 
-export interface WebSocketSubscription {
-  ride_id: number;
-  user_type: 'passenger' | 'driver';
-  websocket_url: string;
-  channels: string[];
-}
-
-export interface DriverRequestSubscription {
-  driver_id: number;
-  websocket_url: string;
-  channels: string[];
-}
-
 const emptyPage = (): PaginatedRides => ({ data: [], current_page: 1, last_page: 1, per_page: 0, total: 0 });
 
 class RideService {
   private baseUrl = '/rides';
   private trackingUrl = '/tracking';
   private notificationsUrl = '/notifications';
-  private websocketUrl = '/websocket';
 
   // Create a new ride request with stops support
   /**
@@ -978,53 +964,6 @@ class RideService {
       return unwrap(await apiService.get<{ unread_count: number }>(`${this.notificationsUrl}/unread-count`)).unread_count;
     } catch (error) {
       logApiFailure('RideService#getUnreadCount failed', error);
-      throw error;
-    }
-  }
-
-  // ==================== WEBSOCKET METHODS ====================
-
-  // Subscribe to ride updates (returns the socket URL to connect to)
-  async subscribeToRideUpdates(rideId: number, userType: 'passenger' | 'driver'): Promise<WebSocketSubscription> {
-    try {
-      logger.debug('Subscribing to ride updates:', { rideId, userType });
-      return unwrap(
-        await apiService.post<WebSocketSubscription>(`${this.websocketUrl}/subscribe-ride`, {
-          ride_id: rideId,
-          user_type: userType
-        }),
-      );
-    } catch (error) {
-      logger.error('Failed to subscribe to ride updates:', error);
-      throw error;
-    }
-  }
-
-  // Subscribe to driver requests (returns the socket URL to connect to)
-  async subscribeToDriverRequests(driverId: number, latitude: number, longitude: number, radius: number = 10): Promise<DriverRequestSubscription> {
-    try {
-      logger.debug('Subscribing to driver requests:', { driverId, radius });
-      return unwrap(
-        await apiService.post<DriverRequestSubscription>(`${this.websocketUrl}/subscribe-driver`, {
-          driver_id: driverId,
-          latitude,
-          longitude,
-          radius
-        }),
-      );
-    } catch (error) {
-      logger.error('Failed to subscribe to driver requests:', error);
-      throw error;
-    }
-  }
-
-  // Get WebSocket events documentation
-  async getWebSocketEvents(): Promise<unknown> {
-    try {
-      logger.debug('Getting WebSocket events documentation');
-      return unwrap(await apiService.get<unknown>(`${this.websocketUrl}/events`));
-    } catch (error) {
-      logger.error('Failed to get WebSocket events:', error);
       throw error;
     }
   }

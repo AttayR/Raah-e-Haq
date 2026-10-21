@@ -212,6 +212,46 @@ const reportAccountRefused = (error: ApiError, config?: InternalAxiosRequestConf
   }
 };
 
+/**
+ * SEC-35 / T-406: told when the current session's token was refused: a 401 on any route, a
+ * 403 ACCOUNT_* (blocked or pending account), or a 401/403 from /broadcasting/auth. The realtime
+ * manager drops its connection and subscriptions on it, since a channel's authorization is only
+ * checked when subscribing. A business 403 (e.g. CONTACT_CLOSED, not a ride's party) is not
+ * one: it would only cost reconnects and the server's 30 channel auths a minute.
+ */
+type SessionAuthRefusalListener = (status: 401 | 403) => void;
+const sessionAuthRefusalListeners = new Set<SessionAuthRefusalListener>();
+
+export const onSessionAuthRefusal = (listener: SessionAuthRefusalListener): (() => void) => {
+  sessionAuthRefusalListeners.add(listener);
+  return () => {
+    sessionAuthRefusalListeners.delete(listener);
+  };
+};
+
+const BROADCAST_AUTH_PATH = /\/broadcasting\/auth\/?$/;
+
+const isSessionAuthRefusal = (error: ApiError, config?: InternalAxiosRequestConfig): boolean => {
+  if (error.status === 401) return true;
+  if (error.status !== 403) return false;
+  const path = (config?.url ?? '').split(/[?#]/)[0];
+  return isAccountRefusal(error) || BROADCAST_AUTH_PATH.test(path);
+};
+
+const reportSessionAuthRefusal = (error: ApiError, config?: InternalAxiosRequestConfig): void => {
+  const epoch = config?.authSessionEpoch;
+  const status = error.status;
+  if ((status !== 401 && status !== 403) || epoch === undefined || isStaleSession(epoch)) return;
+  if (!isSessionAuthRefusal(error, config)) return;
+  [...sessionAuthRefusalListeners].forEach((listener) => {
+    try {
+      listener(status);
+    } catch (listenerError) {
+      logger.warn('Auth refusal listener failed', { name: listenerError instanceof Error ? listenerError.name : typeof listenerError });
+    }
+  });
+};
+
 // Request interceptor: adds the bearer token (from the in-memory copy of the Keychain entry)
 // only to requests whose resolved URL is on our API origin (isTokenTarget, SEC-21).
 apiClient.interceptors.request.use(
@@ -265,6 +305,9 @@ apiClient.interceptors.response.use(
     const apiError = toApiError(error);
     // T-540: "the server answers again" clears stale network errors on screen.
     connectivity.reportFailure(apiError.kind);
+    if (axios.isAxiosError(error)) {
+      reportSessionAuthRefusal(apiError, error.config);
+    }
     if (apiError.status === 401 && axios.isAxiosError(error)) {
       reportUnauthorized(error.config);
     }

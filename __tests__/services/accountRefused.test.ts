@@ -20,7 +20,7 @@ import { bootstrapAuth } from '../../src/store/thunks/apiThunks';
 import { bumpSessionEpoch } from '../../src/store/sessionEpoch';
 import { resolveAuthRoute } from '../../src/core/auth/normalizeUser';
 import locationTrackingService from '../../src/services/locationTrackingService';
-import webSocketService from '../../src/services/webSocketService';
+import { realtime } from '../../src/core/realtime';
 import type { User } from '../../src/services/api';
 
 const user: User = {
@@ -82,7 +82,7 @@ afterEach(() => {
 describe('403 ACCOUNT_* on any route (T-106)', () => {
   it('a suspended account on a ride route routes to account status and keeps the session', async () => {
     const store = await signedIn();
-    const closeAll = jest.spyOn(webSocketService, 'closeAll');
+    const closeAll = jest.spyOn(realtime, 'reset');
     const resetTracking = jest.spyOn(locationTrackingService, 'reset');
     mock.onGet('/rides/available').reply(403, {
       success: false,

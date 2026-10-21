@@ -17,6 +17,8 @@ import { perLocale, t } from '../../i18n';
 import { ACCEPT_RIDE_CODES, PENDING_RIDES_CODES, type LatLng, type PendingRideRequest } from './api';
 import { DRIVER_REQUESTS_COPY } from './copy';
 import { isParcelRide } from '../parcel/api';
+import { readRideId, realtimeEvents } from '../../core/realtime/events';
+import { POLL_WAKE_MIN_GAP_MS } from '../../core/polling';
 import {
   acceptRideRequest,
   clearPendingRequests,
@@ -91,8 +93,20 @@ export const usePendingRidePolling = ({ isFocused, location }: PendingRidePollin
     }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight = false;
+    let wakePending = false;
+    let lastSettledAt = 0;
+    /** A 429 holds polls (and wakes) back until then. */
+    let heldUntil = 0;
+    /** Set when a refusal ended polling: a realtime hint does not restart it. */
+    let stopped = false;
 
     function schedule(delayMs: number): void {
+      if (timer !== null) clearTimeout(timer);
+      if (wakePending && Date.now() >= heldUntil) {
+        wakePending = false;
+        delayMs = Math.min(delayMs, POLL_WAKE_MIN_GAP_MS);
+      }
       timer = setTimeout(() => {
         timer = null;
         poll();
@@ -100,8 +114,11 @@ export const usePendingRidePolling = ({ isFocused, location }: PendingRidePollin
     }
 
     async function poll(): Promise<void> {
+      inFlight = true;
       dispatch(pruneExpiredRequests(Date.now()));
       const action = await dispatch(fetchPendingRides(locationRef.current));
+      inFlight = false;
+      lastSettledAt = Date.now();
       if (cancelled) {
         return;
       }
@@ -109,23 +126,44 @@ export const usePendingRidePolling = ({ isFocused, location }: PendingRidePollin
         const payload = action.payload;
         if (payload?.kind === 'rate_limited') {
           const backoff = payload.retryAfter ? payload.retryAfter * 1000 : DEFAULT_RATE_LIMIT_BACKOFF_MS;
+          heldUntil = Date.now() + Math.max(PENDING_POLL_INTERVAL_MS, backoff);
           schedule(Math.max(PENDING_POLL_INTERVAL_MS, backoff));
           return;
         }
         if (payload?.code && STATUS_RELOAD_CODES.has(payload.code)) {
+          stopped = true;
           dispatch(loadDriverStatus());
           return;
         }
         if (payload?.code === PENDING_RIDES_CODES.noApprovedVehicle) {
+          stopped = true;
           return;
         }
       }
       schedule(PENDING_POLL_INTERVAL_MS);
     }
 
+    // T-406: `ride.requested` on private-driver.{me} reads the feed now (coalesced: one read in
+    // flight gets one follow-up, never sooner than POLL_WAKE_MIN_GAP_MS after the last one);
+    // `ride.request_withdrawn` drops that card at once. The 5 s poll stays the fallback.
+    const offRequested = realtimeEvents.on('ride.requested', () => {
+      if (cancelled || stopped || Date.now() < heldUntil) return;
+      if (inFlight) {
+        wakePending = true;
+        return;
+      }
+      schedule(Math.max(0, lastSettledAt + POLL_WAKE_MIN_GAP_MS - Date.now()));
+    });
+    const offWithdrawn = realtimeEvents.on('ride.request_withdrawn', (payload) => {
+      const rideId = readRideId(payload);
+      if (!cancelled && rideId !== null) dispatch(dismissRideRequest(rideId));
+    });
+
     poll();
     return () => {
       cancelled = true;
+      offRequested();
+      offWithdrawn();
       if (timer !== null) {
         clearTimeout(timer);
       }

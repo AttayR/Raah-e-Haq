@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
 import { apiClient } from '../../src/services/api';
 import { authStorage } from '../../src/services/authStorage';
-import webSocketService from '../../src/services/webSocketService';
+import { realtime } from '../../src/core/realtime';
 import locationTrackingService from '../../src/services/locationTrackingService';
 import { fetchUnreadCount } from '../../src/features/notifications/slice';
 import { getRegisteredDeviceToken, registerDeviceToken, resetPushDevice } from '../../src/features/notifications/push';
@@ -114,7 +114,7 @@ describe('logout thunk (T-102)', () => {
     const { store, extra } = makeStore();
     await signIn(store);
     mock.onPost('/auth/logout').reply(200, { success: true, message: 'Logged out' });
-    const closeAll = jest.spyOn(webSocketService, 'closeAll');
+    const closeAll = jest.spyOn(realtime, 'reset');
     const stopTracking = jest.spyOn(locationTrackingService, 'stopTracking');
 
     const result = await store.dispatch(logout());
@@ -123,7 +123,9 @@ describe('logout thunk (T-102)', () => {
     expect(mock.history.post).toHaveLength(1);
     expect(mock.history.post[0].url).toBe('/auth/logout');
     expect(mock.history.post[0].headers?.Authorization).toBe(`Bearer ${TOKEN}`);
-    expect(closeAll).toHaveBeenCalledTimes(1);
+    // T-406: once by the epoch bump and once by the explicit 'close sockets' step.
+    expect(closeAll).toHaveBeenCalledTimes(2);
+    expect(realtime.debugState()).toEqual({ channels: [], attached: [], reconnectPending: false, attempts: 0, refused: [] });
     expect(stopTracking).toHaveBeenCalledTimes(1);
     await expectFullySignedOut(store, extra);
   });
@@ -230,7 +232,7 @@ describe('logout thunk (T-102)', () => {
     const { store, extra } = makeStore();
     await signIn(store);
     mock.onPost('/auth/logout').reply(200, { success: true });
-    jest.spyOn(webSocketService, 'closeAll').mockImplementation(() => {
+    jest.spyOn(realtime, 'reset').mockImplementation(() => {
       throw new Error('socket already gone');
     });
 

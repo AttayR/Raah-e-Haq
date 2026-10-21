@@ -1,4 +1,5 @@
 import { apiService, unwrap } from '../../services/api';
+import { readPublicSettings } from '../../core/api/publicSettings';
 import { isRecord, readId, readNumber, readText } from '../../core/api/read';
 import type {
   NewTicketInput,
@@ -168,6 +169,7 @@ export const supportApi = {
   },
 
   async publicSettings(): Promise<SupportContacts> {
-    return toSupportContacts(unwrap(await apiService.get<unknown>('/settings/public')));
+    // T-406: the session's one read, shared with the realtime settings (meta.realtime).
+    return toSupportContacts(unwrap(await readPublicSettings()));
   },
 };

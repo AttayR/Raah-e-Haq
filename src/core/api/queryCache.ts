@@ -49,6 +49,8 @@ export const CACHE_NAMES = {
   savedPlaces: 'saved-places',
   recentRides: 'rides/recent',
   publicSettings: 'settings/public',
+  /** T-406: the raw GET /settings/public body (support rows + meta.realtime), see publicSettings.ts. */
+  publicSettingsBody: 'public-settings/body',
   supportCategories: 'support/categories',
   inviteCode: 'referrals/code',
   inviteStats: 'referrals/stats',

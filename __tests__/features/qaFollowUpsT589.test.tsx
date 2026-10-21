@@ -34,7 +34,7 @@ import { ARRIVED_SETTLE_MS, assignedMarkerIntervalMs } from '../../src/features/
 import { createActiveRide, refreshActiveRide } from '../../src/features/active-ride/slice';
 import { driverLocationApi } from '../../src/features/driver-location/api';
 import locationTrackingService from '../../src/services/locationTrackingService';
-import webSocketService from '../../src/services/webSocketService';
+import { realtime } from '../../src/core/realtime';
 import { rootReducer } from '../../src/store/rootReducer';
 import { logout, type SessionThunkExtra } from '../../src/store/thunks/sessionThunks';
 import type { RideResource } from '../../src/services/rideService';
@@ -376,7 +376,7 @@ describe('4. expected situations log at debug (no yellow LogBox)', () => {
     await store.dispatch(logout());
     expect(warn).not.toHaveBeenCalled();
 
-    jest.spyOn(webSocketService, 'closeAll').mockImplementation(() => {
+    jest.spyOn(realtime, 'reset').mockImplementation(() => {
       throw new TypeError('socket already gone');
     });
     await store.dispatch(logout());

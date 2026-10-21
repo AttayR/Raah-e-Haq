@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { isApiError } from '../../core/api/errors';
 import { errorToastMessage } from '../../core/toast/toast';
 import { CHAT_BODY_MAX_LENGTH, CHAT_CODES, chatApi } from './api';
 import { createClientId } from './clientId';
 import { CHAT_COPY } from './copy';
 import { usePolling, type PollOutcome } from './polling';
+import { wakeOn } from '../../core/realtime/events';
 import {
   chatThreadReducer,
   initialThreadState,
@@ -129,7 +130,9 @@ export const useChatThread = (rideId: number, visible: boolean): ChatThread => {
   // Only an open chat gets new messages: once sending closed (can_send false, or a refused
   // send: 403 CONTACT_CLOSED / the old 409 chat_closed) the poll stops.
   const pollEnabled = visible && state.status === 'ready' && state.meta !== null && state.meta.canSend;
-  usePolling({ enabled: pollEnabled, run: poll, lastFetchedAt });
+  // T-406: `chat.message` / `chat.read` of this ride read after_id now (also brings "Seen").
+  const wake = useMemo(() => wakeOn(['chat.message', 'chat.read'], rideId), [rideId]);
+  usePolling({ enabled: pollEnabled, run: poll, lastFetchedAt, wake });
 
   const loadOlder = useCallback(() => {
     const current = stateRef.current;
@@ -229,6 +232,9 @@ export interface ChatList {
   refresh: () => void;
 }
 
+/** T-406: any new message re-reads the list (last message, unread count). */
+const CHAT_LIST_WAKE = wakeOn(['chat.message']);
+
 /** T-581: while Messages is on screen the list is re-read this often (a ride ending moves its row). */
 export const CHAT_LIST_POLL_INTERVAL_MS = 15000;
 
@@ -302,7 +308,13 @@ export const useChatList = (visible: boolean): ChatList => {
     }
     return 'continue';
   }, []);
-  usePolling({ enabled: visible && status === 'ready', intervalMs: CHAT_LIST_POLL_INTERVAL_MS, run: poll, lastFetchedAt });
+  usePolling({
+    enabled: visible && status === 'ready',
+    intervalMs: CHAT_LIST_POLL_INTERVAL_MS,
+    run: poll,
+    lastFetchedAt,
+    wake: CHAT_LIST_WAKE,
+  });
 
   return { chats, status, errorMessage, refreshing, refresh };
 };

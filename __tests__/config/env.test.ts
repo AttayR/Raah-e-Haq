@@ -8,13 +8,13 @@ const valid = {
 
 describe('readEnv', () => {
   it('returns typed values from the config source', () => {
-    expect(readEnv(valid)).toEqual(valid);
+    expect(readEnv(valid)).toEqual({ ...valid, WS_APP_KEY: '' });
   });
 
   it('trims whitespace and trailing slashes from URLs', () => {
     expect(
       readEnv({ API_URL: ' https://api.raah.test/api/ ', WS_URL: 'wss://api.raah.test/ws//', MAPS_KEY: ' k ' }),
-    ).toEqual({ API_URL: 'https://api.raah.test/api', WS_URL: 'wss://api.raah.test/ws', MAPS_KEY: 'k' });
+    ).toEqual({ API_URL: 'https://api.raah.test/api', WS_URL: 'wss://api.raah.test/ws', WS_APP_KEY: '', MAPS_KEY: 'k' });
   });
 
   it('throws one clear error naming every missing key', () => {
@@ -34,6 +34,11 @@ describe('readEnv', () => {
     );
   });
 
+  it('T-406: reads the optional Reverb app key, trimmed, and rejects a malformed one', () => {
+    expect(readEnv({ ...valid, WS_APP_KEY: ' raah-local ' }).WS_APP_KEY).toBe('raah-local');
+    expect(() => readEnv({ ...valid, WS_APP_KEY: 'a b/c' })).toThrow(/WS_APP_KEY may only/);
+  });
+
   it('rejects URLs with the wrong scheme', () => {
     expect(() => readEnv({ ...valid, API_URL: 'localhost:8000/api' })).toThrow(/API_URL must start/);
     expect(() => readEnv({ ...valid, WS_URL: 'http://localhost:8080' })).toThrow(/WS_URL must start/);
@@ -45,6 +50,7 @@ describe('env', () => {
     expect(env).toEqual({
       API_URL: 'https://api.raah.test/api',
       WS_URL: 'wss://api.raah.test/ws',
+      WS_APP_KEY: '',
       MAPS_KEY: 'test-maps-key',
     });
   });

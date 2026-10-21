@@ -9,6 +9,7 @@ import { useDriverLocationTracking } from '../../../features/driver-location/hoo
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
 import { useNotificationsSync } from '../../../features/notifications/hooks';
+import { useRealtimeSession } from '../../../features/realtime/useRealtimeSession';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
 import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import type { DriverWalletRoutes } from '../../../features/wallet/navigation';
@@ -117,6 +118,8 @@ const DriverStack = () => {
   useDriverLocationTracking();
   // The one unread-count owner and FCM (device registration, foreground toast, tap routing) (T-502).
   useNotificationsSync();
+  // T-406: realtime hints (user, driver and ride channels) that wake the polls.
+  useRealtimeSession('driver');
   usePushNotifications('driver');
 
   return (

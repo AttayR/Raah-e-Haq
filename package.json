@@ -27,6 +27,8 @@
     "@react-navigation/native-stack": "^7.3.25",
     "@reduxjs/toolkit": "^2.8.2",
     "axios": "^1.12.2",
+    "laravel-echo": "2.5.0",
+    "pusher-js": "8.6.0",
     "react": "19.1.0",
     "react-native": "0.80.1",
     "react-native-config": "^1.7.2",
@@ -49,6 +51,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-class-static-block": "7.28.3",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "^19.0.0",

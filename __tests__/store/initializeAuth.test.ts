@@ -20,7 +20,7 @@ import {
   revalidateSession,
 } from '../../src/store/thunks/apiThunks';
 import type { User } from '../../src/services/api';
-import webSocketService from '../../src/services/webSocketService';
+import { realtime } from '../../src/core/realtime';
 import locationTrackingService from '../../src/services/locationTrackingService';
 import { resolveAuthRoute } from '../../src/core/auth/normalizeUser';
 
@@ -354,7 +354,7 @@ describe('fast cold start (T-531, PERF-01)', () => {
     await storeSession();
     mock.onGet('/auth/profile').reply(200, { success: true, data: { user: { ...serverUser, status: 'suspended' } } });
     const store = makeStore();
-    const closeAll = jest.spyOn(webSocketService, 'closeAll');
+    const closeAll = jest.spyOn(realtime, 'reset');
     const reset = jest.spyOn(locationTrackingService, 'reset');
 
     await store.dispatch(bootstrapAuth());
@@ -372,7 +372,7 @@ describe('fast cold start (T-531, PERF-01)', () => {
     await storeSession();
     mock.onGet('/auth/profile').reply(200, { success: true, data: { user: serverUser } });
     const store = makeStore();
-    const closeAll = jest.spyOn(webSocketService, 'closeAll');
+    const closeAll = jest.spyOn(realtime, 'reset');
     const reset = jest.spyOn(locationTrackingService, 'reset');
 
     await store.dispatch(bootstrapAuth());

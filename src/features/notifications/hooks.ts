@@ -5,6 +5,7 @@ import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { toApiError } from '../../core/api/errors';
 import { toast } from '../../core/toast';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
+import { realtimeEvents } from '../../core/realtime/events';
 import { notificationsApi } from './api';
 import { NOTIFICATIONS_COPY } from './copy';
 import { getPushPermission, syncPushRegistration, type PushPermission } from './push';
@@ -13,6 +14,7 @@ import {
   fetchUnreadCount,
   markAllNotificationsRead,
   markNotificationRead,
+  notificationsStale,
   selectHasMoreNotifications,
   selectNotificationsState,
   selectUnreadNotificationCount,
@@ -35,6 +37,9 @@ type NotificationsDispatch = ThunkDispatch<SliceRoot, unknown, UnknownAction>;
  * after a push (QA T-104: one owner instead of three mounts each fetching).
  */
 export const UNREAD_POLL_MS = 60_000;
+
+/** T-406: `notification.created` events within this window share one unread-count read. */
+export const NOTIFICATION_EVENT_COALESCE_MS = 2_000;
 
 /** The unread count for a tab badge or a bell. Reads the store only; never fetches. */
 export const useUnreadNotificationCount = (): number => useSelector(selectUnreadNotificationCount);
@@ -66,9 +71,35 @@ export const useNotificationsSync = (): void => {
       if (next === 'active') start();
       else if (next === 'background') stop();
     });
+    // T-406: `notification.created` (private-user.{me}): the list goes stale and the badge is
+    // read again; a burst of events is one read (leading + one trailing within the window).
+    let eventTimer: ReturnType<typeof setTimeout> | null = null;
+    let eventPending = false;
+    const readAfterEvent = () => {
+      dispatch(notificationsStale());
+      if (eventTimer) {
+        eventPending = true;
+        return;
+      }
+      dispatch(fetchUnreadCount());
+      const settle = () => {
+        if (!eventPending) {
+          eventTimer = null;
+          return;
+        }
+        eventPending = false;
+        dispatch(fetchUnreadCount());
+        eventTimer = setTimeout(settle, NOTIFICATION_EVENT_COALESCE_MS);
+      };
+      eventTimer = setTimeout(settle, NOTIFICATION_EVENT_COALESCE_MS);
+    };
+    const offEvent = realtimeEvents.on('notification.created', readAfterEvent);
     return () => {
       stop();
       subscription.remove();
+      offEvent();
+      if (eventTimer) clearTimeout(eventTimer);
+      eventTimer = null;
     };
   }, [dispatch]);
 };

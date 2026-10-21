@@ -11,8 +11,17 @@ import packageJson from '../../package.json';
 export interface Env {
   /** REST API base URL, without a trailing slash, e.g. https://raahehaq.com/api */
   API_URL: string;
-  /** WebSocket base URL, without a trailing slash, e.g. wss://raahehaq.com/ws */
+  /**
+   * Realtime (Laravel Reverb, T-406) origin without a trailing slash: scheme (ws/wss), host and
+   * port, no path (pusher-js adds /app/{key}), e.g. wss://raahehaq.com or, local Debug,
+   * ws://127.0.0.1:8080.
+   */
   WS_URL: string;
+  /**
+   * The Reverb app key (public, not a secret). Empty: realtime stays off and the app polls.
+   * Optional so an env file without it still builds.
+   */
+  WS_APP_KEY: string;
   /** Google Maps / Places / Directions key */
   MAPS_KEY: string;
 }
@@ -50,7 +59,12 @@ export function readEnv(source: EnvSource | null | undefined): Env {
     throw new Error('[env] WS_URL must start with ws:// or wss://');
   }
 
-  return {API_URL: apiUrl, WS_URL: wsUrl, MAPS_KEY: value('MAPS_KEY')};
+  const wsAppKey = (raw.WS_APP_KEY ?? '').trim();
+  if (wsAppKey !== '' && !/^[A-Za-z0-9_-]{1,128}$/.test(wsAppKey)) {
+    throw new Error('[env] WS_APP_KEY may only contain letters, digits, "-" and "_"');
+  }
+
+  return {API_URL: apiUrl, WS_URL: wsUrl, WS_APP_KEY: wsAppKey, MAPS_KEY: value('MAPS_KEY')};
 }
 
 export const env: Env = readEnv(Config);

@@ -4,6 +4,8 @@ import rideService, { type DriverLocation, type RideRequest, type RideResource }
 import { rejectionMessage } from '../../core/api/errors';
 import { useAppIsActive } from '../../hooks/useAppIsActive';
 import { pollFailureOf, usePolling, type PollOutcome } from '../../core/polling';
+import { readDriverLocationEvent, realtimeEvents, RIDE_EVENTS, wakeOn } from '../../core/realtime/events';
+import { realtime } from '../../core/realtime';
 import { isStaleSessionRejection } from '../../store/thunks/apiThunks';
 import { toast } from '../../core/toast';
 import { askForPushInContext } from '../notifications/push';
@@ -136,12 +138,36 @@ const useStatusPoll = (enabled: boolean, appActive: boolean): void => {
     throw payload ? pollFailureOf(payload) : new Error('Failed to refresh ride');
   }, [dispatch, rideId]);
 
+  // T-406: `ride.status` / `ride.accepted` on private-ride.{id} read the ride now.
+  const wake = useMemo(() => (rideId === undefined ? undefined : wakeOn(RIDE_EVENTS, rideId)), [rideId]);
+
   usePolling({
     enabled: enabled && reader && appActive && rideId !== undefined && inProgress,
     intervalMs: pollMs,
     run: pollStatus,
     readAtOnceKey: rideId,
+    wake,
   });
+};
+
+/**
+ * T-406: the position to show: `next` unless it is older than `previous` (a late poll answer
+ * after a newer socket event), and `previous` itself when nothing changed, so an equal update
+ * re-renders nobody. `null` (no position) always wins.
+ */
+export const newerDriverLocation = (previous: DriverLocation | null, next: DriverLocation | null): DriverLocation | null => {
+  if (next === null || previous === null) return next;
+  if (Date.parse(next.last_seen_at) < Date.parse(previous.last_seen_at)) return previous;
+  if (
+    previous.latitude === next.latitude &&
+    previous.longitude === next.longitude &&
+    (previous.heading ?? null) === (next.heading ?? null) &&
+    previous.last_seen_at === next.last_seen_at &&
+    previous.status === next.status
+  ) {
+    return previous;
+  }
+  return next;
 };
 
 /**
@@ -173,16 +199,21 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
     };
   }, []);
 
+  /** T-406: when the last `ride.driver_location` event arrived (0: none yet). */
+  const lastPushedAt = useRef(0);
+
   const readDriverLocation = useCallback((forRideId: number) => {
     const current = rideRef.current;
     if (!current || current.id !== forRideId || !isDriverTrackable(current) || locationInFlight.current) return;
+    // The socket is delivering positions: the poll is only the fallback, so skip this tick.
+    if (realtime.isConnected() && Date.now() - lastPushedAt.current < DRIVER_LOCATION_POLL_MS * 2) return;
     locationInFlight.current = true;
     rideService
       .getDriverLocationForRide(current)
       .then((result) => {
         const still = rideRef.current;
         if (mounted.current && still?.id === forRideId && isDriverTrackable(still)) {
-          setDriverLocation(result.available ? result.location : null);
+          setDriverLocation((previous) => newerDriverLocation(previous, result.available ? result.location : null));
         }
       })
       .catch(() => {
@@ -205,6 +236,21 @@ export const useActiveRidePolling = (enabled: boolean): { driverLocation: Driver
     const timer = setInterval(() => readDriverLocation(rideId), DRIVER_LOCATION_POLL_MS);
     return () => clearInterval(timer);
   }, [enabled, appActive, trackable, rideId, readDriverLocation]);
+
+  // T-406: `ride.driver_location` (private-user.{me}, at most every 3 s) moves the marker
+  // through the same state as the poll, so it takes the same animation path. Out-of-order or
+  // repeated events are dropped by last_seen_at.
+  useEffect(() => {
+    if (!trackable || rideId === undefined) return undefined;
+    return realtimeEvents.on('ride.driver_location', (payload) => {
+      const event = readDriverLocationEvent(payload);
+      const current = rideRef.current;
+      if (!event || !mounted.current || !current || event.ride_id !== rideId || current.id !== rideId) return;
+      if (!isDriverTrackable(current)) return;
+      lastPushedAt.current = Date.now();
+      setDriverLocation((previous) => newerDriverLocation(previous, event.location));
+    });
+  }, [trackable, rideId]);
 
   // T-589: arrived with no position read yet: read it now, so the car can be put on the pickup
   // without waiting for the next tick.

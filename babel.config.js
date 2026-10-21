@@ -21,6 +21,10 @@ module.exports = api => {
     ],
   ];
 
+  // T-406: laravel-echo's ESM build (the one Metro resolves) uses a class `static {}` block,
+  // which the React Native preset does not parse.
+  plugins.push('@babel/plugin-transform-class-static-block');
+
   if (isProduction) {
     plugins.push(['transform-remove-console', {exclude: ['error']}]);
   }

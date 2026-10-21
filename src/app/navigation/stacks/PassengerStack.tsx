@@ -12,6 +12,7 @@ import { useRestoreActiveRide } from '../../../features/active-ride/hooks';
 import ChatThreadScreen from '../../../features/chat/screens/ChatThreadScreen';
 import { rideChatScreenId, type RideChatParams } from '../../../features/chat/navigation';
 import { useNotificationsSync } from '../../../features/notifications/hooks';
+import { useRealtimeSession } from '../../../features/realtime/useRealtimeSession';
 import { usePushNotifications } from '../../../features/notifications/usePushNotifications';
 import { topUpStatusScreenId } from '../../../features/wallet/navigation';
 import type { WalletRoutes } from '../../../features/wallet/navigation';
@@ -123,6 +124,8 @@ const PassengerStack = ({ navigation }: Props) => {
   useRestoreActiveRide(openActiveRide);
   // The one unread-count owner and FCM (device registration, foreground toast, tap routing) (T-502).
   useNotificationsSync();
+  // T-406: realtime hints (user, driver and ride channels) that wake the polls.
+  useRealtimeSession('passenger');
   usePushNotifications('passenger');
 
   return (
