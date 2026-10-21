@@ -54,6 +54,13 @@ type Props = {
  * last frame it was sent; when frames drop (a busy JS/UI thread as a ride ends), that frame can be
  * an early one and the cards stay clipped to a strip. Every swap bumps `generation`; a hide's
  * fade or shrink that ends after a newer swap changes nothing on the JS side.
+ *
+ * The cards sit absolutely positioned inside the clip, so the clip's animated height never lays
+ * them out. In flow, Yoga squeezed the row to the clip's current height while it shrank (the row
+ * measured 12, its bottom padding, with the cards at 0); that reading became the "natural" height,
+ * the next show grew to 12 and settled there, and the measured row could never grow back inside a
+ * 12pt clip (the Ride/Parcel row stuck clipped after every ride, until a relaunch). Before the
+ * first measurement the clip uses the 1.0× estimate, since an absolute child does not size it.
  */
 function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold, rideStyle, parcelStyle }: Props) {
   const reduce = useReducedMotion();
@@ -64,7 +71,7 @@ function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold
   const natural = useRef(HOME_SERVICE_ROW_ESTIMATE);
   /** -1 = settled at the natural height (no animation running). */
   const height = useSharedValue(visible ? -1 : 0);
-  /** The row's last measured natural height, -1 until measured (the wrapper then sizes itself). */
+  /** The row's last measured natural height, -1 until measured (the wrapper then uses the estimate). */
   const naturalHeight = useSharedValue(-1);
   const generation = useRef(0);
   const opacity = useSharedValue(visible ? 1 : 0);
@@ -164,14 +171,14 @@ function HomeServiceRowBase({ visible, onRide, onParcel, onShown, onHeight, hold
 
   const outerStyle = useAnimatedStyle(() => {
     if (height.value >= 0) return { height: height.value };
-    return naturalHeight.value >= 0 ? { height: naturalHeight.value } : {};
+    return { height: naturalHeight.value >= 0 ? naturalHeight.value : HOME_SERVICE_ROW_ESTIMATE };
   });
   const innerStyle = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: rise.value }] }));
 
   if (!mounted) return null;
   return (
     <Animated.View style={[styles.clip, outerStyle]} testID="home-service-row-wrap">
-      <Animated.View style={innerStyle} pointerEvents={leaving ? 'none' : 'auto'} testID="home-service-row-inner">
+      <Animated.View style={[styles.content, innerStyle]} pointerEvents={leaving ? 'none' : 'auto'} testID="home-service-row-inner">
         <View style={styles.row} onLayout={onLayout} testID="home-service-row">
           <Animated.View style={[styles.slot, rideStyle]}>
             <ServiceCard
@@ -203,6 +210,8 @@ export const HomeServiceRow = memo(HomeServiceRowBase);
 
 const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
+  // Out of flow: laid out at its own height whatever the clip's height is (see above).
+  content: { position: 'absolute', top: 0, start: 0, end: 0 },
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',
